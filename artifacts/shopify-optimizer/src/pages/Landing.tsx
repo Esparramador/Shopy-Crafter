@@ -130,6 +130,15 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
+  // Hash-based navigation (e.g. /#fp-pricing loads section 4)
+  useEffect(() => {
+    if (!content) return;
+    const hash = window.location.hash;
+    if (!hash) return;
+    const idx = FP_SECTIONS.findIndex(s => `#${s.id}` === hash);
+    if (idx >= 0) setTimeout(() => goToSection(idx), 350);
+  }, [content, goToSection]);
+
   // Lock body scroll ONLY on desktop — mobile uses native scroll
   useEffect(() => {
     const isMobile = () => window.innerWidth <= 768;
