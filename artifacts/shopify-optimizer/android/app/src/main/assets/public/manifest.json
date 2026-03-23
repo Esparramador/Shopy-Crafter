@@ -1,0 +1,22 @@
+{
+  "name": "ShopifyAI Pro",
+  "short_name": "ShopifyAI",
+  "description": "Gestión inteligente de tiendas Shopify con IA",
+  "start_url": "/admin/intelligence",
+  "display": "standalone",
+  "background_color": "#080810",
+  "theme_color": "#c8a84b",
+  "orientation": "portrait",
+  "lang": "es",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    { "name": "Revenue Intelligence", "url": "/admin/intelligence", "description": "Ver análisis de revenue" },
+    { "name": "Inventario", "url": "/admin/inventory", "description": "Gestionar inventario" }
+  ]
+}

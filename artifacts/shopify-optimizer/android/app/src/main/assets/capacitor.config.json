@@ -1,0 +1,23 @@
+{
+	"appId": "es.shopybrain.app",
+	"appName": "ShopyBrain",
+	"webDir": "dist/public",
+	"server": {
+		"url": "https://shopybrain.replit.app",
+		"cleartext": false,
+		"androidScheme": "https"
+	},
+	"android": {
+		"allowMixedContent": false,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": false
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"backgroundColor": "#080810",
+			"androidSplashResourceName": "splash",
+			"showSpinner": false
+		}
+	}
+}
