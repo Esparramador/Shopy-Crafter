@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable, bulkJobsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeJsonWithBrain } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -159,7 +159,7 @@ Devuelve JSON con:
   "metaDescription": "140-155 chars con keyword, precio, beneficio, CTA"
 }`;
 
-        const result = await askClaudeJson<{ metaTitle: string; metaDescription: string }>(projectId, prompt, SEO_SYSTEM);
+        const result = await askClaudeJsonWithBrain<{ metaTitle: string; metaDescription: string }>(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined);
 
         await db.insert(seoDataTable).values({
           projectId,
@@ -377,7 +377,7 @@ Devuelve JSON con:
   "blogPostIdea": "idea de post de blog que rankea y linkea al producto"
 }`;
 
-  const result = await askClaudeJson(projectId, prompt, SEO_SYSTEM);
+  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined);
   res.json(result);
 });
 
@@ -397,7 +397,7 @@ Devuelve JSON con:
   "productPosts": [1 post por producto principal, mismo formato]
 }`;
 
-  const result = await askClaudeJson(projectId, prompt, SEO_SYSTEM, 6000);
+  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined, 6000);
   res.json(result);
 });
 
@@ -421,7 +421,7 @@ El artículo debe tener:
 
 Devuelve JSON con: title, metaTitle (60 chars), metaDescription (155 chars), bodyHtml (HTML completo), wordCount (number), readyForShopify (true).`;
 
-  const result = await askClaudeJson(projectId, prompt, SEO_SYSTEM, 8000);
+  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", undefined, 8000);
   res.json(result);
 });
 

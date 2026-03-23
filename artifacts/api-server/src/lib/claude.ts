@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
-import { projectsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable } from "@workspace/db";
+import { eq, desc, and, gte } from "drizzle-orm";
 
 let defaultClient: Anthropic | null = null;
 
@@ -78,4 +78,100 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
   const content = response.content[0];
   if (content.type !== "text") throw new Error("Unexpected non-text response");
   return content.text;
+}
+
+/**
+ * Builds a ShopyBrain context block to inject into Claude system prompts.
+ * Queries the OmniCore memory engine for relevant accumulated knowledge.
+ */
+export async function buildShopyBrainContext(
+  niche?: string,
+  useCase?: "redesign" | "seo" | "pricing" | "images" | "general"
+): Promise<string> {
+  try {
+    const minConfidence = 0.6;
+
+    const memoriesQuery = db
+      .select({
+        memoryType: omnicoreMemoriesTable.memoryType,
+        nicheContext: omnicoreMemoriesTable.nicheContext,
+        content: omnicoreMemoriesTable.content,
+        confidence: omnicoreMemoriesTable.confidenceScore,
+      })
+      .from(omnicoreMemoriesTable)
+      .where(gte(omnicoreMemoriesTable.confidenceScore, String(minConfidence)))
+      .orderBy(desc(omnicoreMemoriesTable.confidenceScore))
+      .limit(12);
+
+    const promptsQuery = db
+      .select({
+        useCase: omnicorePromptLibraryTable.useCase,
+        promptTemplate: omnicorePromptLibraryTable.promptTemplate,
+        performanceScore: omnicorePromptLibraryTable.performanceScore,
+      })
+      .from(omnicorePromptLibraryTable)
+      .orderBy(desc(omnicorePromptLibraryTable.performanceScore))
+      .limit(5);
+
+    const [memories, prompts] = await Promise.all([memoriesQuery, promptsQuery]);
+
+    if (memories.length === 0 && prompts.length === 0) return "";
+
+    const lines: string[] = ["", "--- OMNICORE BRAIN CONTEXT (accumulated agency knowledge) ---"];
+
+    if (niche) lines.push(`Active niche: ${niche}`);
+    if (useCase) lines.push(`Task context: ${useCase}`);
+
+    const nicheMemories = niche
+      ? memories.filter(m => m.nicheContext && m.nicheContext.toLowerCase().includes(niche.toLowerCase()))
+      : [];
+    const generalMemories = memories.filter(m => !nicheMemories.includes(m));
+
+    if (nicheMemories.length > 0) {
+      lines.push(`\nNiche-specific knowledge (${niche}):`);
+      for (const m of nicheMemories.slice(0, 6)) {
+        lines.push(`  [${m.memoryType}] ${m.content} (confidence: ${m.confidence})`);
+      }
+    }
+
+    if (generalMemories.length > 0) {
+      lines.push("\nGeneral agency knowledge:");
+      for (const m of generalMemories.slice(0, 6)) {
+        const nicheTag = m.nicheContext ? ` [${m.nicheContext}]` : "";
+        lines.push(`  [${m.memoryType}${nicheTag}] ${m.content}`);
+      }
+    }
+
+    const useCasePrompts = useCase
+      ? prompts.filter(p => p.useCase === useCase || p.useCase === "general")
+      : prompts;
+
+    if (useCasePrompts.length > 0) {
+      lines.push("\nProven prompt patterns:");
+      for (const p of useCasePrompts.slice(0, 3)) {
+        lines.push(`  [${p.useCase}] ${p.promptTemplate.slice(0, 200)}...`);
+      }
+    }
+
+    lines.push("--- END OMNICORE CONTEXT ---");
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * askClaudeJson enhanced with ShopyBrain context injection.
+ */
+export async function askClaudeJsonWithBrain<T>(
+  projectId: number,
+  prompt: string,
+  systemPrompt: string,
+  useCase: "redesign" | "seo" | "pricing" | "images" | "general",
+  niche?: string,
+  maxTokens = 4096
+): Promise<T> {
+  const brainContext = await buildShopyBrainContext(niche, useCase);
+  const enrichedSystem = brainContext ? systemPrompt + brainContext : systemPrompt;
+  return askClaudeJson<T>(projectId, prompt, enrichedSystem, maxTokens);
 }

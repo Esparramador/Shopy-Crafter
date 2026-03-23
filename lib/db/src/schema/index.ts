@@ -14,3 +14,4 @@ export * from "./inventory";
 export * from "./onboarding";
 export * from "./competitors";
 export * from "./billing";
+export * from "./shopybrain";

@@ -17,6 +17,11 @@ import Competitors from "@/pages/admin/Competitors";
 import Billing from "@/pages/admin/Billing";
 import Forecast from "@/pages/admin/Forecast";
 import SystemHealth from "@/pages/admin/SystemHealth";
+import ShopyBrain from "@/pages/admin/ShopyBrain";
+import ShopyBrainMemories from "@/pages/admin/ShopyBrainMemories";
+import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
+import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
+import MyPricing from "@/pages/admin/MyPricing";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
 import ImagesPage from "@/pages/projects/Images";
@@ -208,6 +213,41 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><SystemHealth /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/shopybrain/memories">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ShopyBrainMemories /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/shopybrain/insights">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ShopyBrainInsights /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/shopybrain/study">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ShopyBrainStudy /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/shopybrain">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ShopyBrain /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/my-pricing">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><MyPricing /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

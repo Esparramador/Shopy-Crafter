@@ -1,0 +1,71 @@
+IMPORTANT BUSINESS MODEL CHANGE:
+Remove ALL SaaS subscription logic from the app.
+This is NOT a subscription SaaS product.
+
+WHAT TO REMOVE:
+- All Stripe/LemonSqueezy integration code
+- /billing/checkout endpoint
+- /billing/webhook endpoint  
+- /billing/portal endpoint
+- /admin/billing page
+- subscriptions table (or keep empty for future)
+- Trial expiry logic
+- Plan limits enforcement (stores, images)
+- Upgrade modals
+- "Actualizar plan" buttons
+
+WHAT TO KEEP:
+- Everything else works the same
+- No artificial limits on stores or images
+- No paywalls on features
+- Admin has full access to everything always
+
+REPLACE BILLING WITH:
+A simple /admin/clients page that shows:
+- List of clients with their service level
+  (Basic maintenance | Active management | Premium)
+- Monthly service start date
+- Notes field (free text about the engagement)
+- Status: active | paused | completed
+- Link to their Shopify store
+- Monthly revenue from this client
+
+This is just a CRM tracker, not a billing system.
+The actual billing happens externally via Shopify
+subscriptions that the admin manages separately.
+
+CLIENT SERVICE TRACKER DATABASE:
+ALTER TABLE projects ADD COLUMN service_level 
+  TEXT DEFAULT 'none'; 
+  -- none | maintenance | active | premium
+
+ALTER TABLE projects ADD COLUMN service_start_date TEXT;
+ALTER TABLE projects ADD COLUMN service_monthly_value REAL DEFAULT 0;
+ALTER TABLE projects ADD COLUMN service_notes TEXT;
+ALTER TABLE projects ADD COLUMN client_contact_name TEXT;
+ALTER TABLE projects ADD COLUMN client_contact_email TEXT;
+ALTER TABLE projects ADD COLUMN client_contact_phone TEXT;
+ALTER TABLE projects ADD COLUMN contract_start TEXT;
+ALTER TABLE projects ADD COLUMN contract_notes TEXT;
+
+SIMPLE REVENUE TRACKER /admin/revenue:
+Shows your agency revenue overview:
+
+METRICS:
+- Total MRR (sum of all active service_monthly_value)
+- Total clients active
+- Average revenue per client
+- Clients by service level breakdown
+- Month-over-month growth (manual entry)
+
+CLIENT LIST TABLE:
+| Client | Store | Service | €/mes | Desde | Estado |
+Each row editable inline.
+No payment processing — just tracking.
+
+INVOICE GENERATOR (keep this — very useful):
+Claude generates professional invoice PDF
+for each client per month.
+Admin downloads and sends manually
+or via email.
+No automatic charging — manual professional invoicing.

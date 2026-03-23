@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, cogsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeJsonWithBrain } from "../lib/claude";
 
 const router = Router();
 
@@ -137,12 +137,12 @@ Basándote en tu conocimiento del mercado actual en España/LATAM para este tipo
 
 Devuelve JSON con: budgetMin, budgetMax, midMin, midMax, premiumMin, premiumMax, medianPrice, positioningRecommendation, competitorData (array con url, price, brand).`;
 
-  const result = await askClaudeJson<{
+  const result = await askClaudeJsonWithBrain<{
     budgetMin: number; budgetMax: number; midMin: number; midMax: number;
     premiumMin: number; premiumMax: number; medianPrice: number;
     positioningRecommendation: string;
     competitorData: Array<{ url: string; price: number | null; brand: string | null }>;
-  }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM);
+  }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", project?.storeNiche ?? undefined);
 
   await db.update(cogsTable)
     .set({ lastCompetitorAnalysis: result as Record<string, unknown> })
@@ -189,13 +189,13 @@ Calcula:
 
 Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null).`;
 
-  const result = await askClaudeJson<{
+  const result = await askClaudeJsonWithBrain<{
     optimalPrice: number; psychologicalPrice: number; compareAtPrice: number;
     recommendedStrategy: string;
     marginWaterfall: { revenue: number; platformFees: number; cogs: number; packaging: number; shipping: number; returns: number; marketing: number; overhead: number; netMargin: number; netMarginPct: number };
     reasoning: string; marginWarnings: string[]; bundleSuggestions: string[];
     monthlyRevenueProjection: number | null;
-  }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM);
+  }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", project.storeNiche ?? undefined);
 
   if (cogs) {
     await db.update(cogsTable)

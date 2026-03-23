@@ -18,6 +18,14 @@ const MODULE_NAV = [
   { id: "seo",         label: "SEO Engine",   icon: "🔍" },
 ];
 
+const SHOPYBRAIN_NAV = [
+  { label: "Shopy Brain", icon: "🧠", href: "/admin/shopybrain" },
+  { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
+  { label: "Knowledge Domains", icon: "⚡", href: "/admin/shopybrain/insights" },
+  { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
+  { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
+];
+
 const ADMIN_NAV = [
   { label: "Gestión Clientes", icon: "👥", href: "/admin/clients" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
@@ -27,7 +35,7 @@ const ADMIN_NAV = [
   { label: "Billing & Planes", icon: "💳", href: "/admin/billing" },
   { label: "Logros", icon: "🏆", href: "/admin/achievements" },
   { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
-  { label: "Editor Landing", icon: "⚡", href: "/admin/cms" },
+  { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
 ];
 
@@ -110,6 +118,25 @@ export function AppLayout({ children }: AppLayoutProps) {
               Nueva tienda
             </div>
           </Link>
+        </div>
+
+        {/* Shopy Brain nav */}
+        <div className="sidebar-nav">
+          <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
+            🧠 Shopy Brain
+          </span>
+          {SHOPYBRAIN_NAV.map(item => (
+            <Link key={item.href} href={item.href}>
+              <div
+                className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
+                role="button"
+                aria-current={location === item.href ? "page" : undefined}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+              </div>
+            </Link>
+          ))}
         </div>
 
         {/* Admin nav */}

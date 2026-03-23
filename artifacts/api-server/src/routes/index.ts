@@ -20,6 +20,8 @@ import competitorsRouter from "./competitors.js";
 import billingRouter from "./billing.js";
 import voiceRouter from "./voice.js";
 import pushRouter from "./push.js";
+import shopybrainRouter from "./shopybrain.js";
+import agencyRouter from "./agency.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -51,5 +53,7 @@ router.use(competitorsRouter);
 router.use(billingRouter);
 router.use(voiceRouter);
 router.use(pushRouter);
+router.use(shopybrainRouter);
+router.use(agencyRouter);
 
 export default router;

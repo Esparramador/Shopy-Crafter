@@ -1,0 +1,225 @@
+import { Router } from "express";
+import { randomBytes } from "crypto";
+import { db, agencyCostStructureTable, serviceCatalogTable, pricingDecisionsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "../lib/auth.js";
+import Anthropic from "@anthropic-ai/sdk";
+
+const router = Router();
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const DEFAULT_SERVICES = [
+  { serviceName: "Setup Starter", serviceType: "setup", costTimeHours: 1.5, costPlatform: 1.5, priceCurrent: 297, priceMin: 197, priceMax: 497, marketAvgPrice: 350, ourPositioning: "mid" },
+  { serviceName: "Setup Agency Pro", serviceType: "setup", costTimeHours: 2.5, costPlatform: 4.5, priceCurrent: 597, priceMin: 397, priceMax: 897, marketAvgPrice: 650, ourPositioning: "premium" },
+  { serviceName: "Setup Enterprise", serviceType: "setup", costTimeHours: 5, costPlatform: 12, priceCurrent: 1497, priceMin: 997, priceMax: 2497, marketAvgPrice: 1800, ourPositioning: "premium" },
+  { serviceName: "Retainer Starter", serviceType: "retainer", costTimeHours: 2, costPlatform: 3, priceCurrent: 49, priceMin: 39, priceMax: 79, marketAvgPrice: 59, ourPositioning: "mid" },
+  { serviceName: "Retainer Agency Pro", serviceType: "retainer", costTimeHours: 4, costPlatform: 8, priceCurrent: 149, priceMin: 99, priceMax: 249, marketAvgPrice: 179, ourPositioning: "premium" },
+  { serviceName: "Retainer Enterprise", serviceType: "retainer", costTimeHours: 8, costPlatform: 20, priceCurrent: 399, priceMin: 299, priceMax: 599, marketAvgPrice: 450, ourPositioning: "premium" },
+  { serviceName: "Auditoría One-Shot", serviceType: "extra", costTimeHours: 2, costPlatform: 2, priceCurrent: 197, priceMin: 147, priceMax: 297, marketAvgPrice: 220, ourPositioning: "premium" },
+  { serviceName: "Boost Único", serviceType: "extra", costTimeHours: 1, costPlatform: 3.5, priceCurrent: 297, priceMin: 197, priceMax: 447, marketAvgPrice: 320, ourPositioning: "premium" },
+  { serviceName: "Pack Imágenes IA", serviceType: "extra", costTimeHours: 0.5, costPlatform: 12, priceCurrent: 97, priceMin: 67, priceMax: 147, marketAvgPrice: 110, ourPositioning: "mid" },
+  { serviceName: "Consultoría /hora", serviceType: "consultation", costTimeHours: 1, costPlatform: 0.5, priceCurrent: 150, priceMin: 100, priceMax: 250, marketAvgPrice: 160, ourPositioning: "premium" },
+  { serviceName: "Reporte PDF Premium", serviceType: "extra", costTimeHours: 0.5, costPlatform: 0.5, priceCurrent: 97, priceMin: 67, priceMax: 147, marketAvgPrice: 100, ourPositioning: "premium" },
+];
+
+async function ensureDefaultServices() {
+  const existing = await db.select().from(serviceCatalogTable);
+  if (existing.length === 0) {
+    for (const svc of DEFAULT_SERVICES) {
+      const totalCost = (svc.costTimeHours * 80) * 0.3 + svc.costPlatform;
+      await db.insert(serviceCatalogTable).values({
+        id: randomBytes(12).toString("hex"),
+        ...svc,
+        totalCost,
+        costTools: 0,
+      });
+    }
+  }
+}
+
+async function ensureDefaultCostStructure() {
+  const existing = await db.select().from(agencyCostStructureTable);
+  if (!existing.length) {
+    await db.insert(agencyCostStructureTable).values({
+      id: randomBytes(12).toString("hex"),
+    });
+  }
+}
+
+router.get("/agency/cost-structure", requireAdmin, async (req, res): Promise<void> => {
+  await ensureDefaultCostStructure();
+  const [costs] = await db.select().from(agencyCostStructureTable);
+  res.json(costs);
+});
+
+router.put("/agency/cost-structure", requireAdmin, async (req, res): Promise<void> => {
+  await ensureDefaultCostStructure();
+  const [existing] = await db.select().from(agencyCostStructureTable);
+  const body = { ...req.body, updatedAt: new Date() };
+  delete body.id;
+  await db.update(agencyCostStructureTable).set(body).where(eq(agencyCostStructureTable.id, existing.id));
+  const [updated] = await db.select().from(agencyCostStructureTable);
+  res.json(updated);
+});
+
+router.get("/agency/services", requireAdmin, async (req, res): Promise<void> => {
+  await ensureDefaultServices();
+  const services = await db.select().from(serviceCatalogTable).orderBy(serviceCatalogTable.serviceType);
+  res.json(services);
+});
+
+router.put("/agency/services/:id", requireAdmin, async (req, res): Promise<void> => {
+  const body = { ...req.body };
+  delete body.id;
+  await db.update(serviceCatalogTable).set(body).where(eq(serviceCatalogTable.id, req.params.id));
+  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, req.params.id));
+  res.json(updated);
+});
+
+router.post("/agency/analyze-pricing", requireAdmin, async (req, res): Promise<void> => {
+  await ensureDefaultCostStructure();
+  await ensureDefaultServices();
+  const [costs] = await db.select().from(agencyCostStructureTable);
+  const services = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
+
+  const systemPrompt = `Eres Shopy Brain actuando como CFO y Director Comercial experto.
+Analiza la estructura de costes y precios de esta agencia Shopify AI.
+Proporciona recomendaciones específicas de pricing con justificación completa.
+Responde en JSON:
+{
+  "recommendations": [
+    {
+      "serviceId": "...",
+      "serviceName": "...",
+      "currentPrice": 000,
+      "suggestedPrice": 000,
+      "direction": "up|down|ok",
+      "reasoning": "...",
+      "confidence": 0.0-1.0,
+      "marginAnalysis": "..."
+    }
+  ],
+  "overallAssessment": "...",
+  "totalRevenueOpportunity": 000,
+  "priorityActions": ["acción 1", "acción 2", "acción 3"]
+}`;
+
+  const userMsg = `Estructura de costes: ${JSON.stringify(costs)}
+Servicios: ${JSON.stringify(services.map(s => ({ id: s.id, name: s.serviceName, type: s.serviceType, cost: s.totalCost, price: s.priceCurrent, marketAvg: s.marketAvgPrice })))}
+
+Análisis el posicionamiento de precios, márgenes y oportunidades de mejora.`;
+
+  const aiRes = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMsg }],
+  });
+
+  const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
+  let analysis: any = {};
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    analysis = m ? JSON.parse(m[0]) : {};
+  } catch {}
+
+  if (analysis.recommendations?.length) {
+    for (const rec of analysis.recommendations) {
+      if (rec.serviceId) {
+        await db.update(serviceCatalogTable).set({
+          priceSuggested: rec.suggestedPrice,
+          omnicoreRecommendation: rec.reasoning,
+          omnicoreConfidence: rec.confidence,
+          priceChangeSuggested: (rec.suggestedPrice ?? 0) - (rec.currentPrice ?? 0),
+          lastPriceReview: new Date(),
+        }).where(eq(serviceCatalogTable.id, rec.serviceId));
+      }
+    }
+  }
+
+  res.json(analysis);
+});
+
+router.post("/agency/quote", requireAdmin, async (req, res): Promise<void> => {
+  const { clientType, numStores, services: selectedServices, timeline, contractLength, niche, estimatedRevenue } = req.body;
+
+  const servicesList = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
+  const [costs] = await db.select().from(agencyCostStructureTable);
+
+  const systemPrompt = `Eres Shopy Brain como CFO y Director Comercial. 
+Genera una propuesta de precio completa y justificada para este cliente potencial.
+Responde en JSON:
+{
+  "setupPrice": 000,
+  "monthlyRetainer": 000,
+  "annualValue": 000,
+  "yourCosts": 000,
+  "yourMargin": 000,
+  "marginPct": 00,
+  "justification": "...",
+  "discountIfAnnual": 000,
+  "priceAnnual": 000,
+  "upsellOpportunities": ["..."],
+  "riskAssessment": "...",
+  "negotiationFloor": 000,
+  "negotiationNotes": "...",
+  "roiProjection": "...",
+  "recommendedPlan": "starter|agency_pro|enterprise"
+}`;
+
+  const userMsg = `Cliente: ${clientType}, ${numStores} tiendas, nicho: ${niche ?? "general"}, revenue estimado: €${estimatedRevenue}/mes
+Servicios solicitados: ${JSON.stringify(selectedServices)}
+Timeline: ${timeline}, Contrato: ${contractLength}
+Costes plataforma: ${JSON.stringify(costs)}
+Catálogo servicios: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceName, price: s.priceCurrent, cost: s.totalCost })))}`;
+
+  const aiRes = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 1500,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMsg }],
+  });
+
+  const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
+  let quote: any = {};
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    quote = m ? JSON.parse(m[0]) : {};
+  } catch {}
+
+  res.json(quote);
+});
+
+router.post("/agency/proposal", requireAdmin, async (req, res): Promise<void> => {
+  const { clientName, storeName, services: selectedServices, quote, auditResults } = req.body;
+
+  const systemPrompt = `Eres Shopy Brain generando una propuesta comercial profesional en español.
+Genera una propuesta completa y convincente que NO describa lo que haces, sino LO QUE EL CLIENTE GANA.
+Incluye: página de título, resumen ejecutivo, diagnóstico, servicios propuestos, inversión, proyección ROI, próximos pasos.
+Usa markdown con formato claro. Sé conciso pero impactante. Máximo 800 palabras.`;
+
+  const userMsg = `Cliente: ${clientName}
+Tienda: ${storeName}
+Servicios: ${JSON.stringify(selectedServices)}
+Propuesta económica: ${JSON.stringify(quote)}
+${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`;
+
+  const aiRes = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 2000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMsg }],
+  });
+
+  const proposal = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+  res.json({ proposal, tokensUsed: aiRes.usage?.input_tokens + aiRes.usage?.output_tokens });
+});
+
+router.get("/agency/pricing-decisions", requireAdmin, async (req, res): Promise<void> => {
+  const decisions = await db.select().from(pricingDecisionsTable)
+    .orderBy(desc(pricingDecisionsTable.createdAt))
+    .limit(20);
+  res.json(decisions);
+});
+
+export default router;

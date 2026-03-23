@@ -134,6 +134,51 @@ artifacts-monorepo/
 - Contenido almacenado en PostgreSQL (`cms_content` + `cms_versions` tables)
 - Media guardada en `artifacts/shopify-optimizer/public/media/` como WebP
 
+## Admin Exclusivo
+- **Email**: `sadiagiljoan@gmail.com` — ÚNICO administrador de la plataforma
+- **Rol**: admin (acceso total a todas las funcionalidades)
+- **Contraseña**: definida por el administrador (cambio via Admin Clientes > reset)
+- **Login**: Plataforma exclusiva — sin hints de credenciales públicos
+
+## Shopy Brain — Megacerebro de la Plataforma
+
+### OmniCore Memory Engine (Phase A)
+- **DB tables**: `omnicore_memories`, `omnicore_niche_profiles`, `omnicore_prompt_library`, `omnicore_knowledge_domains`, `omnicore_insights`, `omnicore_study_sessions`, `omnicore_cross_connections`
+- **Routes**: `/api/shopybrain/*` — status, memories CRUD, learn, search, insights, study sessions, niche-profiles, prompt-library
+- **Pages**: `/admin/shopybrain` (dashboard), `/admin/shopybrain/memories`, `/admin/shopybrain/insights`, `/admin/shopybrain/study`
+- **Context injection**: `getShopyBrainContext(niche, useCase)` exported for injection into Claude calls
+
+### OmniCore Pricing Intelligence CFO (Phase B)
+- **DB tables**: `agency_cost_structure`, `service_catalog`, `pricing_decisions`, `pricing_rules`
+- **Routes**: `/api/agency/*` — cost-structure, services, analyze-pricing, quote, proposal, pricing-decisions
+- **Pages**: `/admin/my-pricing` — CFO dashboard con tabla precios, análisis automático, generador de presupuestos y propuestas PDF
+- **Catalogo servicios default**: 11 servicios pre-cargados (Setup Starter €297, Agency Pro €597, Enterprise €1.497, retainers €49-399, extras one-shot)
+
+### Business Model (from images)
+- **Starter**: €49/mes + Setup €297 | 1-3 tiendas | M1+M5+M6 | 100 imgs/mes
+- **Agency Pro**: €149/mes + Setup €597 | 4-15 tiendas | 6 motores | 500 imgs/mes | Portal cliente | OmniCore
+- **Enterprise**: €399/mes + Setup €1.497 | Ilimitadas | Todo + White-label | Imgs ilimitadas | OmniCore premium | Slack dedicado
+- **One-Shot**: Setup €797 | Auditoría €197 | Boost único €297 | Imgs pack €97 | Consultoría €150/h | Reporte PDF €97
+
+### Memory Types
+- `niche_keyword`: Keywords que convierten por sector
+- `pricing_pattern`: Precios que funcionan para un tipo de producto
+- `image_pattern`: Tipos/estilos de imagen que convierten
+- `prompt_template`: Prompts Claude que generan resultados óptimos
+- `competitor_intel`: Datos de competencia por nicho
+- `ab_insight`: Ganadores A/B tests por nicho
+- `seasonal_pattern`: Patrones estacionales de ventas
+- `web_research`: Investigación web almacenada para reuso
+
+### Study Sessions
+- Manual trigger via `/admin/shopybrain/study` — selección de dominios + launch
+- Claude genera insights JSON cross-domain por cada sesión
+- 14 dominios: ecommerce, shopify_technical, financial_analysis, trading_markets, investment, marketing, sales, design_ux, merchandising, seo_content, logistics, paid_media, consumer_psychology, pricing_science
+
+### Sidebar Navigation
+- Shopy Brain group (🧠) arriba de Administración en el sidebar
+- Items: Shopy Brain, Memorias, Knowledge Domains, Sesiones Estudio, Mi Pricing CFO
+
 ## 9-Phase Feature Implementation (NEW)
 
 ### Phase 1: Revenue Intelligence 360°

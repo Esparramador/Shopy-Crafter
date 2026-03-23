@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
 import { eq, and, lte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaudeJson, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
+import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -57,7 +57,7 @@ Genera un rediseño COMPLETO y profesional. Devuelve SOLO un JSON con estos camp
   "price_reasoning": "explicación del precio recomendado"
 }`;
 
-  return await askClaudeJson<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, 6000);
+  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 6000);
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {
