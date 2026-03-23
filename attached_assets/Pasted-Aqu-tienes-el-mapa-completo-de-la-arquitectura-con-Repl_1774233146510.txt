@@ -1,0 +1,196 @@
+Aquí tienes el mapa completo de la arquitectura con Replicate integrado, y después los prompts exactos para Replit.
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.25s;
+    animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  }
+VvisualizeVvisualize show_widgetAhora los prompts exactos para Replit, en orden:
+
+PROMPT REPLICATE — Pégalo en Replit como módulo nuevo
+Add Replicate image generation to the Shopify AI platform.
+
+INSTALL: npm install replicate sharp
+
+REPLICATE INTEGRATION:
+- API Token stored per-project alongside Shopify credentials (never shared between stores)
+- Endpoint: POST /api/generate-image
+- All generation is async: poll prediction status every 2s until succeeded/failed
+
+MODELS BY IMAGE TYPE (use exactly these model versions):
+- Hero (studio white bg): "black-forest-labs/flux-1.1-pro"
+- Lifestyle (aspirational context): "black-forest-labs/flux-1.1-pro"  
+- Detail/Macro (texture close-up): "black-forest-labs/flux-dev"
+- Packaging (unboxing): "recraft-ai/recraft-v3"
+- UGC/Social (instagram real): "recraft-ai/recraft-v3"
+- Scale (size reference): "black-forest-labs/flux-dev"
+- Bundle (cross-sell group): "black-forest-labs/flux-1.1-pro"
+- Infographic: SKIP Replicate — generate as SVG via Claude directly
+
+PROMPT ARCHITECTURE:
+Before calling Replicate, Claude builds the prompt via this structure:
+
+const buildImagePrompt = (productName, productType, imageType, storeNiche, brandTone) => {
+  const BASE_QUALITY = "professional product photography, commercial quality, sharp focus, high resolution 4k";
+  
+  const TYPE_CONFIGS = {
+    hero: {
+      prefix: "Professional studio product photo,",
+      scene: "pure white background, 3-point lighting setup, soft shadows, centered composition",
+      suffix: "e-commerce hero shot, Phase One quality, no reflections"
+    },
+    lifestyle: {
+      prefix: "Lifestyle product photography,", 
+      scene: "aspirational real-world context matching brand aesthetic, natural lighting, shallow depth of field",
+      suffix: "editorial magazine quality, authentic atmosphere"
+    },
+    detail: {
+      prefix: "Extreme macro product photography,",
+      scene: "close-up texture detail, micro-lens quality, bokeh background, emphasizing material quality and craftsmanship",
+      suffix: "luxury brand detail shot, 100mm macro lens look"
+    },
+    packaging: {
+      prefix: "Premium unboxing photography,",
+      scene: "branded packaging on neutral surface, tissue paper, branded elements visible, flatlay composition",
+      suffix: "luxury unboxing experience, clean minimal setup"
+    },
+    ugc: {
+      prefix: "Candid lifestyle social media photo,",
+      scene: "authentic user-generated content style, real person context, slightly imperfect composition, genuine feel",
+      suffix: "Instagram organic post quality, trustworthy and relatable"
+    },
+    scale: {
+      prefix: "Product scale reference photography,",
+      scene: "product next to human hand or common everyday object (smartphone, coffee cup, pencil), showing exact proportions",
+      suffix: "clean background, clear size comparison, informative composition"
+    },
+    bundle: {
+      prefix: "Product bundle flat lay photography,",
+      scene: "main product with 2-3 complementary items, styled arrangement, overhead shot, consistent aesthetic",
+      suffix: "cross-selling visual, premium styled flatlay"
+    }
+  };
+  
+  const config = TYPE_CONFIGS[imageType];
+  return `${config.prefix} ${productName} ${productType}, ${config.scene}, niche: ${storeNiche}, brand tone: ${brandTone}, ${BASE_QUALITY}, ${config.suffix}`;
+};
+
+NEGATIVE PROMPT (apply to all types):
+"blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs"
+
+GENERATION PARAMETERS:
+- flux-1.1-pro: { width: 1024, height: 1024, num_outputs: 1, output_format: "webp", output_quality: 95 }
+- recraft-v3: { size: "1024x1024", style: "realistic_image" }
+- flux-dev: { width: 1024, height: 1024, num_inference_steps: 28, guidance_scale: 3.5, output_format: "webp" }
+
+POST-PROCESSING (using sharp):
+After receiving image URL from Replicate:
+1. Download image buffer
+2. Resize to 2048x2048 max (Shopify limit: 20MB, ideal: under 1MB)
+3. Convert to WebP quality 85 for web optimization
+4. Generate SEO alt text via Claude: 
+   prompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${productName}. Image type: ${imageType}. Store niche: ${storeNiche}. Include main keyword naturally. In Spanish.`
+
+SHOPIFY AUTO-UPLOAD:
+After processing:
+1. POST /admin/api/2024-01/products/{productId}/images.json
+   body: { image: { attachment: base64(processedImage), alt: altText, position: imagePosition } }
+2. Update product metafield to track which image types have been generated
+
+RATE LIMITING:
+- Max 3 simultaneous Replicate predictions
+- 500ms delay between Shopify image uploads
+- Queue system for bulk generation (Bull or simple array queue)
+
+PROMPT UI — Panel de imagen en la app
+Build the Image Generation UI module for the platform:
+
+IMAGE DASHBOARD per product showing:
+- Existing images grid (pulled from Shopify product.images)
+- 8 type slots (Hero, Lifestyle, Detalle, Packaging, UGC, Escala, Bundle, Infografía)
+- Each slot shows: thumbnail if exists, "Generar" button if missing, type badge, estimated cost
+- Overall image score (0 imgs=F, 1-2=D, 3=C, 4=B, 5+=A, all 8 types=A+)
+
+GENERATION FLOW:
+1. User clicks "Generar" on a slot → Claude builds the prompt → preview the prompt to user
+2. "Confirmar y Generar" → call Replicate → show live progress bar with polling
+3. On success: show generated image preview with "Subir a Shopify" and "Regenerar" buttons
+4. On upload: show success with Shopify product URL
+
+BULK GENERATION ("Boost Masivo"):
+- Select products via checkbox grid
+- Select which of 8 image types to generate
+- Show cost estimate BEFORE confirming: "Generará X imágenes · Coste estimado: $X.XX"
+- Progress dashboard: product cards updating live as images generate
+- Abort button to cancel queue
+
+INFOGRAPHIC GENERATOR (no Replicate needed):
+When type = "Infografía", instead of calling Replicate:
+1. Claude generates an SVG infographic with:
+   - Dark gradient background (brand colors)
+   - Product name as large headline
+   - 6 feature callout boxes with check icons
+   - "Premium Quality" and category badges
+   - Brand watermark area
+2. Convert SVG to PNG via canvas or sharp
+3. Upload to Shopify as product image
+
+PROMPT PREVIEW MODAL:
+Before generating, show the user:
+- The exact prompt that will be sent to Replicate
+- Estimated generation time (flux ~8s, recraft ~12s)  
+- Estimated cost ($)
+- "Edit Prompt" text area to customize before sending
+- Model being used and why it was chosen for this type
+
+DESIGN:
+- Image slots as cards with dashed border when empty, filled thumbnail when has image
+- Progress: animated shimmer on generating slots
+- Color coding: empty=gray dashed, generating=purple pulse, done=green check, failed=red
+- Each slot shows the image type icon and name
+- Hover shows "Regenerar" and "Eliminar" actions on existing images
+
+PROMPT INTELIGENCIA — Lo que hace la app realmente diferente
+Add the Smart Analysis layer that makes the platform intelligent:
+
+1. PRODUCT IMAGE AUDIT (runs on store scan):
+For each product, analyze existing images and detect:
+- Count of images (0-8+)
+- Estimate which TYPE each image is (hero/lifestyle/etc) using Claude vision if possible, 
+  or heuristics (position=1 likely hero, multiple items likely bundle, etc)
+- Flag missing high-priority types: "Sin hero" / "Sin lifestyle" / "Sin detalle"
+- Calculate revenue impact: products with 5+ images convert 3x better than 1 image
+
+2. SMART PROMPT PERSONALIZATION:
+Claude adapts the image prompt based on:
+- Store niche (moda → include model wearing it; tecnología → clean desk setup; hogar → styled interior)
+- Brand tone (luxury → marble surfaces, gold accents; streetwear → urban backdrop, graffiti walls)
+- Product type (clothing → show on body; electronics → show in use; food → show ingredients)
+- Existing images (if hero exists, prioritize lifestyle next; if all studio, prioritize UGC)
+
+Claude system prompt for image decisions:
+"You are a professional product photographer and Shopify conversion expert. 
+You know that: Hero images increase CTR by 40%, Lifestyle images increase conversion by 65%, 
+UGC-style images increase trust by 78%, products with 5+ images convert 3.4x better.
+Given the product and store context, generate the most effective prompt for [imageType] 
+that will maximize conversions for this specific store."
+
+3. PRIORITY QUEUE INTELLIGENCE:
+When running bulk generation, auto-sort products by:
+Priority Score = (traffic_estimate × conversion_gap × revenue_potential)
+- traffic_estimate: products with more variants/collections get more traffic
+- conversion_gap: products with 0-1 images have highest gap
+- revenue_potential: higher price products have more ROI from better images
+Show this score as "Impact Score" on each product card
+
+4. BEFORE/AFTER COMPARISON:
+After generating images:
+- Show side-by-side: old product page vs new product page preview
+- Calculate projected conversion improvement based on image count change
+- "Esta mejora podría generar +€X/mes adicionales" based on avg conversion rates
+
+5. CONSISTENCY CHECKER:
+After generating images across multiple products:
+- Verify visual consistency (same style, similar background tones)
+- Alert if images look inconsistent: "Los productos del set A tienen fondos blancos pero el producto B tiene fondo gris — ¿unificar?"
+- Option to "Re-generar para consistencia" with unified style prompt

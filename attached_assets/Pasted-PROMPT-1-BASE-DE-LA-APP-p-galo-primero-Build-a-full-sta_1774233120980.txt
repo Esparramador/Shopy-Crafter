@@ -1,0 +1,156 @@
+PROMPT 1 — BASE DE LA APP (pégalo primero)
+Build a full-stack Shopify AI Product Intelligence Platform with Node.js backend + vanilla HTML/CSS/JS frontend.
+
+TECH STACK:
+- Backend: Node.js + Express
+- Frontend: Single HTML file with embedded CSS/JS
+- APIs: Shopify Admin REST API + Anthropic Claude API (claude-sonnet-4-20250514)
+- Storage: JSON files per project (isolated credentials per store)
+
+CORE ARCHITECTURE:
+- Multi-project system: each Shopify store is a separate project with isolated credentials (shop domain, Admin API token, API key stored in /projects/{id}.json)
+- Never mix tokens between projects
+- All Claude calls use the store context injected into the system prompt
+
+SYSTEM PROMPT FOR CLAUDE (inject in every call):
+"You are ShopifyAI Expert — world-class Shopify consultant, expert in: product SEO, conversion copywriting, pricing psychology, Liquid templating, email marketing, UX/CRO. You always know which store you're working on via the context provided. Generate complete, production-ready content — never truncate with '...' or 'rest goes here'. Always respond in Spanish."
+
+PROMPT 2 — MÓDULO DE AUDITORÍA
+Add a Product Audit Engine to the platform:
+
+AUDIT SCORING (0-100 each axis, letter grade A/B/C/D/F overall):
+- TITLE: length 40-70 chars=100, has keyword=+20, generic words ("product","item")=-30
+- DESCRIPTION: char count (<100=F, 100-300=C, 300-600=B, 600+=A), has HTML formatting=+15, has bullet points=+10, emotional hook detected=+15
+- PRICE: has price=+50, compare_at_price set=+25, psychological pricing (x.99)=+15, price in market range=+10
+- IMAGES: 0 images=F(0), 1=D(20), 2=C(40), 3=B(65), 4=B+(80), 5+=A(100)
+- SEO: has meta_description=+30, has alt texts=+20, title has main keyword=+25, 10+ tags=+25
+
+Overall grade: avg of 5 scores → A(90+) B(75+) C(60+) D(45+) F(<45)
+
+Auto-detect problems and show as badges:
+"Sin precio" | "Solo X imagen(s)" | "Descripción pobre (<100 chars)" | "Sin tags SEO" | "Título corto" | "Sin variantes" | "Sin meta description" | "Imágenes sin alt text"
+
+PRODUCT GAP DETECTION:
+Based on the store's niche (from project context), Claude suggests 10-15 product types NOT currently in the store that would sell well. Show as "Oportunidades de catálogo" cards with: suggested product name, estimated price range, why it fits the niche, difficulty to source.
+
+UI: Dashboard with:
+- Top KPI bar: total products, avg score, % needing improvement, projected revenue impact
+- Product grid cards showing: product photo, name, overall grade badge (color-coded), 5 mini progress bars, problem badges, action buttons
+- Filter by grade, sort by score
+- "Scan Store" button that calls GET /products.json and runs audit
+
+PROMPT 3 — MÓDULO REDISEÑO IA
+Add AI Redesign Engine:
+
+ENDPOINT: POST /api/redesign-product
+Body: { productId, shopDomain, accessToken, storeContext }
+
+CLAUDE PROMPT TEMPLATE (send this to Claude for each product):
+"You are redesigning a Shopify product for [store name] ([niche], target: [audience], tone: [brand tone], market: [markets]).
+
+CURRENT PRODUCT DATA:
+Title: [current_title]
+Description: [current_description]  
+Price: [current_price]
+Tags: [current_tags]
+Images count: [image_count]
+
+Generate a COMPLETE professional redesign:
+
+1. SEO TITLE (55-65 chars, main keyword first, brand differentiation)
+2. HTML DESCRIPTION (500-700 words):
+   - Emotional hook paragraph (2-3 sentences, speaks to desire/pain)
+   - '¿Qué incluye?' section with styled list
+   - 'Perfecto para...' use cases (6 bullet points)
+   - 'Características premium' with icons (✓) 
+   - Trust block: garantía, envío, devolución
+   - CTA paragraph
+3. SHORT DESCRIPTION (50 words, for meta)
+4. PRICE RECOMMENDATION: suggest price based on product type and niche, show reasoning, include compare_at_price (25-40% higher)
+5. TAGS: 15 tags mixing Spanish + English keywords, brand terms, long-tail
+6. META TITLE (60 chars) + META DESCRIPTION (155 chars)
+7. PHOTO BRIEF: Describe 4 specific photos needed (angle, lighting, background, model if needed, mood, what to highlight)
+
+Return as JSON with fields: title, body_html, price, compare_at_price, tags, metafields{meta_title, meta_description}, photo_brief[4]"
+
+BULK REDESIGN:
+- Button "Rediseñar Débiles" → processes all products with grade C or below
+- Button "Rediseñar Todo el Catálogo" → processes all products
+- Show progress bar and live log during bulk operation
+- Before/after comparison modal for each product
+- One-click "Aplicar a Shopify" that calls PUT /products/{id}.json with redesigned data
+
+PROMPT 4 — MÓDULO DE IMÁGENES (el correcto)
+Add Image Intelligence Module:
+
+IMPORTANT ARCHITECTURE NOTE: 
+This module does NOT call image generation APIs directly (too expensive/complex).
+Instead it generates ULTRA-DETAILED professional photo briefs + Midjourney/DALL-E prompts
+that the user can use to generate or commission photos.
+
+8 IMAGE TYPES per product:
+1. HERO (Studio): White background, Phase One quality, 3-point lighting, multiple angles
+2. LIFESTYLE: Product in aspirational real context matching brand niche  
+3. DETAIL/MACRO: Extreme close-up textures, materials, quality details
+4. PACKAGING: Unboxing experience, branded packaging, premium feel
+5. SOCIAL/UGC: Instagram "real customer" style, candid, authentic
+6. SCALE: Size reference with hand/phone/common objects
+7. BUNDLE: Product with complementary items for cross-selling
+8. INFOGRAPHIC: Visual card with feature callouts as SVG (generate this directly)
+
+FOR TYPES 1-7: Claude generates:
+- Detailed photo brief (200 words): exact setup, lighting, props, model description, background, mood, composition
+- Midjourney prompt (optimized, under 200 chars)
+- DALL-E 3 prompt (descriptive, under 1000 chars)
+- Photography direction for professional photographer
+
+FOR TYPE 8 (INFOGRAPHIC): Generate actual SVG directly:
+- Dark premium background matching store colors
+- Product name as headline
+- 6 feature callouts with icons
+- Brand colors and typography
+- "AI Generated" + quality badges
+- Return as inline SVG ready to upload
+
+IMAGE AUDIT per product:
+- Count existing images from Shopify
+- Flag: no images, under 3, missing lifestyle, missing detail shot
+- Score: 0 imgs=0, 1=20, 2=40, 3=65, 4=80, 5+=100
+- Show missing types as gray placeholder cards
+
+UI: Per-product image panel with:
+- Existing images grid (from Shopify)
+- Missing types shown as dashed cards with "Generate Brief" button
+- Bulk "Generate All Briefs" button
+- Copy prompt button for Midjourney/DALL-E
+- SVG infographic preview and download
+- Alt text generator (SEO-optimized) for each image slot
+
+PROMPT 5 — PULIDO FINAL Y UX
+Final polish and UX pass:
+
+DESIGN SYSTEM:
+- Dark theme: bg #08080f, surface #0f0f1a, accent #5b4eff
+- Font: Cabinet Grotesk (Google Fonts) for headings, Satoshi for body
+- Grade badges: A=green(#00d68f), B=blue(#00b4d8), C=amber(#ffd32a), D=orange(#ff8c42), F=red(#ff4757)
+- Smooth animations on all state changes
+- Mobile responsive
+
+SMART FEATURES:
+1. "Oportunidades de Catálogo" tab: Claude analyzes store niche and suggests 15 missing products with full reasoning, estimated sell price, sourcing difficulty (Easy/Medium/Hard), and a one-click "Crear Ficha Completa" that generates the full product from scratch
+2. Competitor Gap: input a competitor URL → Claude analyzes and shows what they have that you don't
+3. Revenue Impact Calculator: shows projected revenue increase if weak products are fixed (based on avg conversion rates)
+4. Priority Queue: auto-sorts products by "fix impact" = traffic × quality gap
+
+SECURITY:
+- Validate all Shopify API calls return 200 before processing
+- Never hallucinate product data — always use real data from API
+- Show clear error if product not found
+- Rate limiting on bulk operations (max 2 req/sec to Shopify API)
+- Store credentials encrypted in project files
+
+ERROR HANDLING:
+- Shopify API errors shown clearly with fix suggestions
+- Claude API errors with retry button
+- Network timeout handling
+- Empty store state with onboarding flow
