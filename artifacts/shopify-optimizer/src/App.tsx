@@ -68,7 +68,7 @@ function LoadingScreen() {
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Redirect to="/login" />;
+  if (!user) return <Redirect to="/" />;
   if (user.role !== "admin") return <Redirect to="/client" />;
   return <>{children}</>;
 }
@@ -76,7 +76,7 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 function RequireClient({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Redirect to="/login" />;
+  if (!user) return <Redirect to="/" />;
   if (user.role === "admin") return <Redirect to="/" />;
   return <>{children}</>;
 }

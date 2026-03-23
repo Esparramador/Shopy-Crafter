@@ -76,9 +76,12 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     });
   }
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "http://localhost:3000";
+  const replitDomains = process.env.REPLIT_DOMAINS?.split(",")[0];
+  const replitDev = process.env.REPLIT_DEV_DOMAIN;
+  const baseUrl = process.env.APP_URL
+    ?? (replitDomains ? `https://${replitDomains}` : null)
+    ?? (replitDev ? `https://${replitDev}` : null)
+    ?? "http://localhost:3000";
   const inviteLink = `${baseUrl}/invite/${token}`;
 
   await db.insert(auditLogTable).values({
