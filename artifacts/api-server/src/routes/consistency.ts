@@ -166,21 +166,24 @@ router.get("/projects/:projectId/consistency-scores", async (req, res): Promise<
     let consistencyLevel: "consistent" | "off-brand" | "inconsistent";
     let score: number;
 
+    const altCount = images.filter((img) => img.alt && img.alt.trim() !== "").length;
+    const altRatio = images.length > 0 ? altCount / images.length : 0;
+
     if (!hasImages) {
       consistencyLevel = "inconsistent";
       score = 0;
       inconsistent++;
     } else if (hasMultipleImages && hasAltTexts) {
       consistencyLevel = "consistent";
-      score = 85 + Math.floor(Math.random() * 15);
+      score = Math.min(100, 85 + Math.min(10, (imageCount - 3) * 2) + (altRatio >= 1 ? 5 : 0));
       consistent++;
     } else if (hasImages) {
       consistencyLevel = "off-brand";
-      score = 40 + Math.floor(Math.random() * 30);
+      score = Math.min(69, 40 + imageCount * 6 + Math.floor(altRatio * 10));
       offBrand++;
     } else {
       consistencyLevel = "inconsistent";
-      score = 10 + Math.floor(Math.random() * 20);
+      score = 0;
       inconsistent++;
     }
 
