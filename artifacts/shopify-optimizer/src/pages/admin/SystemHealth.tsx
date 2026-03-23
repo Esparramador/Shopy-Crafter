@@ -35,7 +35,6 @@ export default function SystemHealth() {
       results.push({ name: "API Server", status: "error", message: "No disponible", icon: "🖥" });
     }
 
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
     results.push({
       name: "Claude AI (Anthropic)",
       status: "ok",

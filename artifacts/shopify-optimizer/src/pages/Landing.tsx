@@ -86,8 +86,10 @@ export default function Landing() {
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
     if (!container) return;
-    const sections = container.querySelectorAll<HTMLElement>(".fp-section");
-    if (sections[index]) sections[index].scrollIntoView({ behavior: "smooth" });
+    const sectionH = container.clientHeight;
+    container.scrollTo({ top: index * sectionH, behavior: "smooth" });
+    currentRef.current = index;
+    setCurrentSection(index);
   }, []);
 
   useEffect(() => {
@@ -120,6 +122,59 @@ export default function Landing() {
 
     return () => obs.disconnect();
   }, [content]);
+
+  // Lock document scroll — force all wheel events into fp-container
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, []);
+
+  // Wheel → programmatic section scroll with throttle (re-runs when content loads)
+  useEffect(() => {
+    const container = fpRef.current;
+    if (!container) return;
+    let lastWheel = 0;
+    const THROTTLE = 900;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheel < THROTTLE) return;
+      lastWheel = now;
+      if (e.deltaY > 0) {
+        goToSection(Math.min(currentRef.current + 1, FP_SECTIONS.length - 1));
+      } else if (e.deltaY < 0) {
+        goToSection(Math.max(currentRef.current - 1, 0));
+      }
+    };
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, [goToSection, content]);
+
+  // Touch swipe → section scroll (re-runs when content loads)
+  useEffect(() => {
+    const container = fpRef.current;
+    if (!container) return;
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+    const onTouchEnd = (e: TouchEvent) => {
+      const diff = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(diff) < 50) return;
+      if (diff > 0) goToSection(Math.min(currentRef.current + 1, FP_SECTIONS.length - 1));
+      else goToSection(Math.max(currentRef.current - 1, 0));
+    };
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [goToSection, content]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
