@@ -47,3 +47,13 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Secretos — NUNCA subir a GitHub
+.env
+.env.local
+.env.production
+.env.*.local
+.github/setup-github-secrets.sh
+
+# Android build artifacts (generados por GitHub Actions, no hace falta subir)
+artifacts/shopify-optimizer/dist/
