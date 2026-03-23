@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Loader2, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
+import { ArrowRight, Loader2, ChevronDown, ChevronUp, ArrowLeft, Brain } from "lucide-react";
 import { useCreateProject, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import BrainExtractor from "../components/BrainExtractor";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -12,6 +13,7 @@ export default function NewProject() {
   const createProject = useCreateProject();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "done">("idle");
+  const [extractField, setExtractField] = useState<"name" | "domain" | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     shopDomain: "",
@@ -28,6 +30,15 @@ export default function NewProject() {
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setFormData({ ...formData, [field]: e.target.value });
 
+  const handleAutofill = (data: Record<string, string>) => {
+    setFormData(prev => ({
+      ...prev,
+      ...data,
+      // Only autofill name if it's empty
+      name: data.name && !prev.name ? data.name : prev.name,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createProject.mutate(
@@ -35,7 +46,6 @@ export default function NewProject() {
       {
         onSuccess: async (data) => {
           queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-          // Auto-sync products immediately so they're available on first visit
           setSyncStatus("syncing");
           try {
             await fetch(`${API_BASE}/api/projects/${data.id}/products/sync`, {
@@ -43,7 +53,7 @@ export default function NewProject() {
               credentials: "include",
             });
           } catch {
-            // Non-fatal — user can sync manually from Audit page
+            // Non-fatal
           }
           setSyncStatus("done");
           setLocation(`/projects/${data.id}/audit`);
@@ -63,29 +73,64 @@ export default function NewProject() {
         </button>
         <div className="section-header">
           <h1 className="section-title">Nueva Tienda</h1>
-          <p className="section-subtitle">Conecta las credenciales OAuth de tu Shopify Custom App para comenzar la optimización.</p>
+          <p className="section-subtitle">Conecta tu Shopify. ShopyBrain analizará automáticamente tu marca y extraerá toda la inteligencia disponible.</p>
         </div>
       </div>
 
       <div className="card" style={{ padding: "24px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 18, marginBottom: 20, borderBottom: "1px solid var(--bdr)" }}>
           <div className="logo-gem" style={{ width: 36, height: 36, fontSize: 16 }}>＋</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <p style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 18 }}>Conectar Nueva Tienda</p>
-            <p style={{ fontSize: 12, color: "var(--t2)" }}>Configura las credenciales OAuth de tu Shopify Custom App.</p>
+            <p style={{ fontSize: 12, color: "var(--t2)" }}>ShopyBrain extraerá inteligencia de marca automáticamente desde tu dominio.</p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: "rgba(212,160,23,0.1)", border: "1px solid rgba(212,160,23,0.3)" }}>
+            <Brain size={13} style={{ color: "var(--gold)" }} />
+            <span style={{ fontSize: 11, color: "var(--gold)", fontFamily: "var(--fb)" }}>Extracción IA activa</span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid-2" style={{ marginBottom: 18 }}>
+          {/* Connection fields */}
+          <div className="grid-2" style={{ marginBottom: 0 }}>
             <div className="form-group">
               <label className="form-label">Nombre del Proyecto *</label>
-              <input required className="form-input" value={formData.name} onChange={handleChange("name")} placeholder="Ej: Comic Crafter" />
+              <input
+                required
+                className="form-input"
+                value={formData.name}
+                onChange={handleChange("name")}
+                onBlur={() => formData.name.length >= 2 && setExtractField("name")}
+                placeholder="Ej: Comic Crafter"
+              />
+              {extractField === "name" && formData.name && (
+                <BrainExtractor
+                  value={formData.name}
+                  fieldContext="store_name"
+                  onAutofill={handleAutofill}
+                />
+              )}
             </div>
+
             <div className="form-group">
               <label className="form-label">Dominio Shopify *</label>
-              <input required className="form-input" value={formData.shopDomain} onChange={handleChange("shopDomain")} placeholder="tu-tienda.myshopify.com" />
+              <input
+                required
+                className="form-input"
+                value={formData.shopDomain}
+                onChange={handleChange("shopDomain")}
+                onBlur={() => formData.shopDomain.length >= 3 && setExtractField("domain")}
+                placeholder="tu-tienda.myshopify.com"
+              />
+              {extractField === "domain" && formData.shopDomain && (
+                <BrainExtractor
+                  value={formData.shopDomain}
+                  fieldContext="shopify_domain"
+                  onAutofill={handleAutofill}
+                />
+              )}
             </div>
+
             <div className="form-group">
               <label className="form-label">Client ID (OAuth) *</label>
               <input required className="form-input" style={{ fontFamily: "var(--fm)" }} value={formData.clientId} onChange={handleChange("clientId")} placeholder="Admin API Client ID" />
@@ -96,15 +141,27 @@ export default function NewProject() {
             </div>
           </div>
 
-          <div style={{ paddingTop: 16, borderTop: "1px solid var(--bdr)", marginBottom: 16 }}>
-            <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 14 }}>
-              Contexto de la Tienda{" "}
-              <span style={{ color: "var(--gold)", fontSize: 11 }}>(mejora la calidad de todos los análisis IA)</span>
-            </p>
+          {/* Store context — ShopyBrain can auto-fill these */}
+          <div style={{ paddingTop: 16, borderTop: "1px solid var(--bdr)", marginBottom: 16, marginTop: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <p style={{ fontSize: 12, color: "var(--t2)", margin: 0 }}>
+                Contexto de la Tienda{" "}
+                <span style={{ color: "var(--gold)", fontSize: 11 }}>(ShopyBrain puede auto-rellenar estos campos)</span>
+              </p>
+            </div>
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">Nicho del negocio</label>
-                <input className="form-input" value={formData.storeNiche} onChange={handleChange("storeNiche")} placeholder="Ej: Moda urbana, Gadgets tech..." />
+                <input
+                  className="form-input"
+                  value={formData.storeNiche}
+                  onChange={handleChange("storeNiche")}
+                  onBlur={() => formData.storeNiche.length >= 3 && setExtractField(null)}
+                  placeholder="Ej: Moda urbana, Gadgets tech..."
+                />
+                {formData.storeNiche.length >= 3 && (
+                  <BrainExtractor value={formData.storeNiche} fieldContext="niche" onAutofill={handleAutofill} />
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Tono de marca</label>
@@ -121,6 +178,7 @@ export default function NewProject() {
             </div>
           </div>
 
+          {/* Advanced API keys */}
           <div style={{ paddingTop: 12, borderTop: "1px solid var(--bdr)", marginBottom: 20 }}>
             <button
               type="button"

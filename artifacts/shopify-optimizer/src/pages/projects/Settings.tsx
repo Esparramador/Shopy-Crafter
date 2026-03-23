@@ -4,7 +4,8 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useGetProject, useUpdateProject, useRefreshProjectToken, useTestProjectConnection } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetProjectQueryKey } from "@workspace/api-client-react";
-import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save } from "lucide-react";
+import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain } from "lucide-react";
+import BrainExtractor from "../../components/BrainExtractor";
 
 export default function SettingsPage() {
   const [, params] = useRoute("/projects/:id/settings");
@@ -26,6 +27,28 @@ export default function SettingsPage() {
   });
 
   const [testResult, setTestResult] = useState<any>(null);
+  const [buildingProfile, setBuildingProfile] = useState(false);
+  const [profileResult, setProfileResult] = useState<any>(null);
+
+  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  const buildBrainProfile = async () => {
+    setBuildingProfile(true);
+    setProfileResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/intelligence/build-profile`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      setProfileResult(data);
+    } catch { /* ignore */ }
+    finally { setBuildingProfile(false); }
+  };
+
+  const handleAutofill = (data: Record<string, string>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
 
   useEffect(() => {
     if (project) {
@@ -136,7 +159,31 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/5">
             <Key className="w-6 h-6 text-foreground" />
             <h2 className="text-xl font-bold text-foreground">Configuración General e IA</h2>
+            <button
+              type="button"
+              onClick={buildBrainProfile}
+              disabled={buildingProfile}
+              className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "rgba(212,160,23,0.15)", border: "1px solid rgba(212,160,23,0.35)", color: "var(--gold)" }}
+            >
+              {buildingProfile ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+              {buildingProfile ? "Analizando tienda..." : "ShopyBrain: Analizar tienda completa"}
+            </button>
           </div>
+
+          {profileResult?.profile && (
+            <div style={{ marginBottom: 20, padding: "14px 16px", borderRadius: 10, background: "rgba(212,160,23,0.06)", border: "1px solid rgba(212,160,23,0.25)" }}>
+              <p style={{ fontSize: 12, color: "var(--gold)", fontFamily: "var(--fb)", marginBottom: 8 }}>Perfil de inteligencia generado para {project?.name}</p>
+              {profileResult.profile.executiveSummary && (
+                <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.5, marginBottom: 8 }}>{profileResult.profile.executiveSummary}</p>
+              )}
+              {profileResult.profile.revenueOpportunities?.slice(0, 2).map((op: any, i: number) => (
+                <div key={i} style={{ fontSize: 11, color: "var(--t3)", padding: "4px 8px", background: "rgba(33,197,94,0.07)", borderRadius: 6, marginBottom: 4 }}>
+                  <span style={{ color: "#22c55e" }}>#{i+1}</span> {op.opportunity} — Impacto: {op.estimatedImpact}
+                </div>
+              ))}
+            </div>
+          )}
           
           <div className="space-y-6">
             <div className="space-y-2">
@@ -169,33 +216,45 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Nicho de Tienda</label>
-                <input 
-                  value={formData.storeNiche}
-                  onChange={e => setFormData({...formData, storeNiche: e.target.value})}
-                  placeholder="Ej: Streetwear premium"
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
-                />
+            <div className="pt-4 border-t border-white/5">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <p className="text-sm font-medium text-foreground">Contexto IA de la Tienda</p>
+                <span style={{ fontSize: 11, color: "var(--gold)" }}>— ShopyBrain extrae y aprende de cada campo</span>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Tono de Marca</label>
-                <input 
-                  value={formData.brandTone}
-                  onChange={e => setFormData({...formData, brandTone: e.target.value})}
-                  placeholder="Ej: Exclusivo, minimalista"
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Público Objetivo</label>
-                <input 
-                  value={formData.targetAudience}
-                  onChange={e => setFormData({...formData, targetAudience: e.target.value})}
-                  placeholder="Ej: Hombres 18-35 años"
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Nicho de Tienda</label>
+                  <input
+                    value={formData.storeNiche}
+                    onChange={e => setFormData({...formData, storeNiche: e.target.value})}
+                    placeholder="Ej: Streetwear premium"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
+                  />
+                  {formData.storeNiche.length >= 3 && (
+                    <BrainExtractor value={formData.storeNiche} fieldContext="niche" projectId={projectId} onAutofill={handleAutofill} />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Tono de Marca</label>
+                  <input
+                    value={formData.brandTone}
+                    onChange={e => setFormData({...formData, brandTone: e.target.value})}
+                    placeholder="Ej: Exclusivo, minimalista"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Público Objetivo</label>
+                  <input
+                    value={formData.targetAudience}
+                    onChange={e => setFormData({...formData, targetAudience: e.target.value})}
+                    placeholder="Ej: Hombres 18-35 años"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary"
+                  />
+                  {formData.targetAudience.length >= 3 && (
+                    <BrainExtractor value={formData.targetAudience} fieldContext="target_audience" projectId={projectId} onAutofill={handleAutofill} />
+                  )}
+                </div>
               </div>
             </div>
 

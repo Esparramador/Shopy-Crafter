@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { BookOpen, Play, Brain, CheckCircle, Zap, RefreshCw, Link, Star, Activity } from "lucide-react";
+import { BookOpen, Play, Brain, CheckCircle, Zap, RefreshCw, Link, Star, Activity, Search } from "lucide-react";
+import BrainExtractor from "../../components/BrainExtractor";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -88,6 +89,7 @@ export default function ShopyBrainStudy() {
   const [lastResult, setLastResult] = useState<any>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [extractInput, setExtractInput] = useState("");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/shopybrain/sessions`, { credentials: "include" })
@@ -182,6 +184,68 @@ export default function ShopyBrainStudy() {
           {runMsg}
         </div>
       )}
+
+      {/* Universal Extractor */}
+      <div className="glass-card" style={{ marginBottom: 24, border: "1px solid rgba(212,160,23,0.3)", background: "linear-gradient(135deg, rgba(212,160,23,0.05), rgba(0,0,0,0.4))" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <Brain size={18} style={{ color: "var(--gold)" }} />
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "var(--gold)" }}>Extractor Universal de Inteligencia</h3>
+            <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>
+              Pega cualquier URL, dominio, nombre de empresa o texto — ShopyBrain extraerá todo el conocimiento posible
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <input
+            className="form-input"
+            style={{ flex: 1 }}
+            value={extractInput}
+            onChange={e => setExtractInput(e.target.value)}
+            placeholder="Ej: nike.com · Apple · tienda.myshopify.com · 'moda sostenible para millennials' · https://competidor.com"
+          />
+          {extractInput.trim().length >= 2 && (
+            <button
+              type="button"
+              onClick={() => {}}
+              style={{
+                padding: "0 18px", borderRadius: 8, background: "var(--gold)",
+                border: "none", color: "#000", fontSize: 13, cursor: "pointer",
+                fontFamily: "var(--fb)", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <Search size={14} />
+              Analizar
+            </button>
+          )}
+        </div>
+
+        {extractInput.trim().length >= 2 && (
+          <BrainExtractor
+            value={extractInput}
+            fieldContext="universal_extractor"
+          />
+        )}
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["amazon.com", "zara.com", "shein.com", "apple.com", "tesla.com"].map(example => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => setExtractInput(example)}
+              style={{
+                fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                background: "rgba(255,255,255,0.05)", border: "1px solid var(--bdr)",
+                color: "var(--t3)", cursor: "pointer",
+              }}
+            >
+              {example}
+            </button>
+          ))}
+          <span style={{ fontSize: 11, color: "var(--t3)", paddingTop: 3 }}>— ejemplos rápidos</span>
+        </div>
+      </div>
 
       {/* Ciclos automáticos */}
       <div className="glass-card" style={{ marginBottom: 24 }}>
