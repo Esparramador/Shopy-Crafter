@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable } from "@workspace/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
 let defaultClient: Anthropic | null = null;
@@ -193,4 +194,55 @@ export async function askClaudeJsonWithBrain<T>(
   const brainContext = await buildShopyBrainContext(niche, useCase);
   const enrichedSystem = brainContext ? systemPrompt + brainContext : systemPrompt;
   return askClaudeJson<T>(projectId, prompt, enrichedSystem, maxTokens);
+}
+
+/**
+ * learnFromOperation — fire-and-forget learning after every successful AI operation.
+ * Saves the result as a ShopyBrain memory so future prompts benefit from past successes.
+ * Never throws — completely non-blocking.
+ */
+export function learnFromOperation(params: {
+  operationType: "redesign" | "seo" | "pricing" | "images" | "ab_winner" | "consistency";
+  niche?: string | null;
+  productType?: string | null;
+  title: string;
+  content: string;
+  confidence?: number;
+  tags?: string[];
+}): void {
+  const memTypeMap: Record<string, string> = {
+    redesign: "prompt_template",
+    seo: "niche_keyword",
+    pricing: "pricing_pattern",
+    images: "image_pattern",
+    ab_winner: "ab_insight",
+    consistency: "image_pattern",
+  };
+
+  const memoryType = memTypeMap[params.operationType] ?? "general";
+
+  db.insert(omnicoreMemoriesTable).values({
+    id: randomBytes(16).toString("hex"),
+    memoryType,
+    niche: params.niche ?? null,
+    productType: params.productType ?? null,
+    market: "es",
+    title: params.title.slice(0, 200),
+    content: params.content.slice(0, 2000),
+    confidence: params.confidence ?? 0.65,
+    sourceType: `auto_${params.operationType}`,
+    tags: params.tags ? JSON.stringify(params.tags) : null,
+    isVerified: 0,
+    useCount: 1,
+    successCount: 1,
+    successRate: 1.0,
+  }).then(() => {
+    db.update(omnicoreMemoriesTable)
+      .set({ useCount: sql`use_count + 1`, successCount: sql`success_count + 1` })
+      .where(and(
+        eq(omnicoreMemoriesTable.memoryType, memoryType),
+        gte(omnicoreMemoriesTable.confidence, 0.7),
+      ))
+      .catch(() => {});
+  }).catch(() => {});
 }

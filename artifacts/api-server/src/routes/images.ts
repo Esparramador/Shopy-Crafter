@@ -4,7 +4,7 @@ import { projectsTable, productsTable, generationJobsTable } from "@workspace/db
 import { saveToVault } from "../lib/vault.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson, askClaudeWithBrain } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -225,6 +225,17 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
         productTitle: product.title,
         generatedBy: "images_motor",
         metadata: { model, prompt: finalPrompt, jobId: job.id, estimatedCost },
+      });
+
+      // ShopyBrain aprende del prompt de imagen exitoso (fire-and-forget)
+      learnFromOperation({
+        operationType: "images",
+        niche: project.storeNiche ?? null,
+        productType: product.productType ?? null,
+        title: `Imagen ${imageType} exitosa: ${product.title}`,
+        content: `Tipo: ${imageType}\nProducto: ${product.title}\nModelo: ${model}\nPrompt: ${finalPrompt.slice(0, 500)}\nAlt text: ${altText.slice(0, 125)}`,
+        confidence: 0.70,
+        tags: [imageType, project.storeNiche ?? "ecommerce", product.productType ?? "producto"].filter(Boolean),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";

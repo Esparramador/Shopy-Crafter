@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, visualDnaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaudeJson } from "../lib/claude";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -87,7 +87,7 @@ Devuelve JSON con exactamente estos campos:
   "styleGuide": "guía de estilo en 2-3 frases para el fotógrafo"
 }`;
 
-  const result = await askClaudeJson<{
+  const result = await askClaudeJsonWithBrain<{
     backgroundStyle: string;
     lightingStyle: string;
     colorTemp: string;
@@ -98,7 +98,7 @@ Devuelve JSON con exactamente estos campos:
     consistencyScore: number;
     brandColors: string[];
     styleGuide: string;
-  }>(projectId, prompt, VISION_SYSTEM);
+  }>(projectId, prompt, VISION_SYSTEM, "images", project?.storeNiche ?? undefined);
 
   const [existing] = await db.select({ id: visualDnaTable.id }).from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
 
@@ -120,6 +120,16 @@ Devuelve JSON con exactamente estos campos:
   } else {
     await db.insert(visualDnaTable).values({ projectId, ...dnaValues });
   }
+
+  // ShopyBrain aprende del ADN visual extraído (fire-and-forget)
+  learnFromOperation({
+    operationType: "consistency",
+    niche: project?.storeNiche ?? null,
+    title: `Visual DNA: ${result.mood} · ${result.backgroundStyle}`,
+    content: `Estilo fondo: ${result.backgroundStyle}\nIluminación: ${result.lightingStyle}\nTemp. color: ${result.colorTemp}\nComposición: ${result.composition}\nMood: ${result.mood}\nPresencia humana: ${result.humanPresence}\nGuía: ${result.styleGuide ?? ""}\nScore consistencia: ${result.consistencyScore}%`,
+    confidence: Math.min(0.9, (result.consistencyScore ?? 50) / 100),
+    tags: ["visual_dna", result.mood?.split(" ")[0]?.toLowerCase() ?? "estilo", project?.storeNiche ?? "ecommerce"].filter(Boolean),
+  });
 
   res.json({
     backgroundStyle: result.backgroundStyle,

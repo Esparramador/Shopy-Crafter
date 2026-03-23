@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, abTestsTable, trackEventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude } from "../lib/claude";
+import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 
 const router = Router();
 
@@ -181,6 +181,17 @@ router.post("/projects/:projectId/ab-tests/:testId/declare-winner", async (req, 
     .set({ winner, status: "completed", endDate: new Date() })
     .where(eq(abTestsTable.id, testId))
     .returning();
+
+  // ShopyBrain aprende del ganador del A/B test (fire-and-forget)
+  const [abProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
+  learnFromOperation({
+    operationType: "ab_winner",
+    niche: abProj?.storeNiche ?? null,
+    title: `A/B Winner: Variante ${winner} · ${test.productTitle}`,
+    content: `Producto: ${test.productTitle}\nHipótesis: ${test.hypothesis}\nVariante ganadora: ${winner}\nTipo imagen: ${test.imageType}\nMétrica objetivo: ${test.targetMetric}\nConversiones A: ${test.variantAConversions}/${test.variantAVisitors} · B: ${test.variantBConversions}/${test.variantBVisitors}`,
+    confidence: Math.min(0.95, (test.confidence ?? 50) / 100),
+    tags: ["ab_test", test.imageType ?? "imagen", `winner_${winner.toLowerCase()}`],
+  });
 
   res.json({
     id: String(updated.id),

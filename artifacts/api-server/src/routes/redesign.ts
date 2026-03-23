@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
 import { eq, and, lte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
+import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 
@@ -127,6 +127,18 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
     metaDescription: result.meta_description,
     photoBrief: result.photo_brief,
     priceReasoning: result.price_reasoning,
+  });
+
+  // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
+  const [redesignProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
+  learnFromOperation({
+    operationType: "redesign",
+    niche: redesignProj?.storeNiche ?? null,
+    productType: product.productType ?? null,
+    title: `Rediseño exitoso: ${result.title}`,
+    content: `Título optimizado: ${result.title}\nPrecio: €${result.price}\nRazonamiento: ${result.price_reasoning}\nMeta: ${result.meta_title}\nDescripción corta: ${result.short_description}\nTags: ${result.tags}`,
+    confidence: 0.72,
+    tags: result.tags ? result.tags.split(",").map(t => t.trim()).slice(0, 6) : [],
   });
 
   // Auto-guardar en vault: informe de rediseño completo

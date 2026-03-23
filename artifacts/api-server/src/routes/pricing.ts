@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, cogsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson, askClaudeJsonWithBrain } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 
 const router = Router();
 
@@ -234,6 +234,16 @@ Devuelve JSON: { budgetMin, budgetMax, midMin, midMax, premiumMin, premiumMax, m
   await db.update(cogsTable)
     .set({ lastCompetitorAnalysis: enrichedResult as Record<string, unknown> })
     .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
+
+  // ShopyBrain aprende del análisis de competidores (fire-and-forget)
+  learnFromOperation({
+    operationType: "pricing",
+    niche: project?.storeNiche ?? null,
+    title: `Competidores: precio mediano €${enrichedResult.medianPrice} · ${enrichedResult.dataQuality}`,
+    content: `Mercado: budget €${enrichedResult.budgetMin}-${enrichedResult.budgetMax} | mid €${enrichedResult.midMin}-${enrichedResult.midMax} | premium €${enrichedResult.premiumMin}-${enrichedResult.premiumMax}\nPrecio mediano: €${enrichedResult.medianPrice}\nPosicionamiento: ${enrichedResult.positioningRecommendation}\nCompetidores reales: ${enrichedResult.realPricesCount}/${enrichedResult.fetchedCount}`,
+    confidence: enrichedResult.dataQuality === "real" ? 0.85 : enrichedResult.dataQuality === "partial" ? 0.65 : 0.45,
+    tags: ["pricing", "competidores", project?.storeNiche ?? "ecommerce", enrichedResult.dataQuality],
+  });
 
   res.json(enrichedResult);
 });

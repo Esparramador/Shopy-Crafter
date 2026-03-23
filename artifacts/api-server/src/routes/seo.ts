@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable, bulkJobsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson, askClaudeJsonWithBrain } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 
@@ -184,6 +184,17 @@ Devuelve JSON con:
             body: JSON.stringify({ metafield: { namespace: "seo", key: "description", value: result.metaDescription, type: "single_line_text_field" } }),
           }).catch(() => {});
         }
+
+        // ShopyBrain aprende del SEO generado (fire-and-forget)
+        learnFromOperation({
+          operationType: "seo",
+          niche: project?.storeNiche ?? null,
+          productType: product.productType ?? null,
+          title: `SEO: ${result.metaTitle}`,
+          content: `Meta title: ${result.metaTitle}\nMeta description: ${result.metaDescription}\nProducto: ${product.title}\nNicho: ${project?.storeNiche ?? "general"}`,
+          confidence: 0.68,
+          tags: ["seo", "meta_tags", project?.storeNiche ?? "ecommerce"].filter(Boolean),
+        });
 
         completed++;
         await updateJobProgress(jobId, completed, failed, `✓ ${product.title}`);
