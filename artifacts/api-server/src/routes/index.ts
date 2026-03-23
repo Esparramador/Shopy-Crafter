@@ -8,6 +8,7 @@ import pricingRouter from "./pricing";
 import seoRouter from "./seo";
 import abTestingRouter from "./ab-testing";
 import jobsRouter from "./jobs";
+import consistencyRouter from "./consistency";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(pricingRouter);
 router.use(seoRouter);
 router.use(abTestingRouter);
 router.use(jobsRouter);
+router.use(consistencyRouter);
 
 export default router;
