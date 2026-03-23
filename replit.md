@@ -195,9 +195,38 @@ artifacts-monorepo/
 
 ### Klaviyo Email Marketing Integration
 - **Route**: `artifacts/api-server/src/routes/klaviyo.ts` — montado en routes/index.ts
-- **Endpoints**: GET /api/klaviyo/test, /lists, /campaigns, /flows, /profiles/count, /metrics; POST /api/klaviyo/events, /subscribe, /send-email, /welcome-client
-- **Page**: `/admin/emails` — Dashboard con tabs: Overview, Listas, Campañas, Flows, Enviar
+- **Endpoints generales**: GET /api/klaviyo/test, /lists, /campaigns, /flows, /profiles/count, /metrics; POST /api/klaviyo/events, /subscribe, /send-email, /welcome-client
 - **Password reset**: POST /api/auth/forgot-password y /api/auth/reset-password envían evento Klaviyo si la key está configurada
+
+### Email Flow Builder (OmniCore + Klaviyo)
+- **Route**: `artifacts/api-server/src/routes/emails.ts` — montado en routes/index.ts (requireAdmin)
+- **Endpoints**:
+  - GET /api/emails/flows — lista flows (filtrable por projectId)
+  - GET /api/emails/flows/:id — get flow
+  - POST /api/emails/flows — crear flow
+  - PUT /api/emails/flows/:id — actualizar flow
+  - DELETE /api/emails/flows/:id — eliminar flow
+  - POST /api/emails/generate — Claude genera HTML completo del email (inline CSS, tablas, variables Klaviyo)
+  - POST /api/emails/flows/:id/push — Crea template en Klaviyo + flow + email action (1 solo endpoint)
+  - POST /api/emails/flows/:id/sync — Sync métricas de Klaviyo
+- **DB table**: `email_flows` — id, project_id, name, flow_type/trigger_type, send_delay, subject_a/b, preview_text, tone, language, html_content, text_content, variables_used, from_email/name/reply, klaviyo_template_id, klaviyo_flow_id, klaviyo_status(draft|live|error), klaviyo_error, open_rate, click_rate, pushed_at, timestamps
+- **Page**: `/admin/emails` — 3-tab builder: (1) Diseñar (flow config, tono, asuntos A/B), (2) Contenido (OmniCore genera HTML, vista previa iframe), (3) Activar (push to Klaviyo 1-click)
+- **TRIGGER_MAP**: checkout_abandoned→"Checkout Started", order_placed→"Placed Order", welcome/customer_subscribed→"Subscribed to List", etc.
+
+### Business Model Change (Billing → CRM)
+- **REMOVED**: billing router de index.ts, /admin/billing y /admin/affiliates routes de App.tsx, "Billing & Planes" de AppLayout nav
+- **ADDED CRM columns** en `projects` tabla: service_level(none|maintenance|active|premium), service_start_date, service_monthly_value, service_notes, client_contact_name, client_contact_email, client_contact_phone, contract_start, contract_notes
+- **NEW Page**: `/admin/revenue` — CRM tracker: KPI cards (MRR, clientes activos, ticket medio), filtro por service_level, tabla editable inline con todos los clientes
+- **Sidebar**: "Revenue & CRM" (💰) añadido en ADMIN_NAV; "Tienda / Store" (🛒) enlace directo a /tienda
+
+### Shopify Storefront Store (/tienda)
+- **Route**: `artifacts/api-server/src/routes/store.ts` — montado ANTES de requireAuth (público)
+- **Endpoints**:
+  - GET /api/store/products — lee colección de Shopify via Storefront API (cache 30min), devuelve {products, currency}
+  - POST /api/store/checkout — crea cart en Shopify y devuelve checkoutUrl (redirect)
+- **Env vars** (necesarios): SHOP_DOMAIN=comic-crafter.myshopify.com, STOREFRONT_ACCESS_TOKEN=shpss_..., COLLECTION_HANDLE=shopify-automatization, SHOP_CURRENCY=EUR
+- **Page**: `/tienda` — pública, landing diseño dark gold. Separa productos por tipo (pago único vs suscripción), checkout directo a Shopify Payments, trust badges
+- **Router App.tsx**: `/tienda` es ruta pública (sin RequireAdmin)
 
 ## 9-Phase Feature Implementation (NEW)
 

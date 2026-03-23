@@ -14,7 +14,8 @@ import Inventory from "@/pages/admin/Inventory";
 import Achievements from "@/pages/admin/Achievements";
 import Roadmap from "@/pages/admin/Roadmap";
 import Competitors from "@/pages/admin/Competitors";
-import Billing from "@/pages/admin/Billing";
+import Revenue from "@/pages/admin/Revenue";
+import Tienda from "@/pages/Tienda";
 import Forecast from "@/pages/admin/Forecast";
 import SystemHealth from "@/pages/admin/SystemHealth";
 import ShopyBrain from "@/pages/admin/ShopyBrain";
@@ -139,6 +140,7 @@ function Router() {
         <Route path="/login" component={LoginPage} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/invite/:token" component={InviteSetupPage} />
+        <Route path="/tienda" component={Tienda} />
 
         {/* Root — redirects by role */}
         <Route path="/">
@@ -191,17 +193,10 @@ function Router() {
             </AdminWrapper>
           </RequireAdmin>
         </Route>
-        <Route path="/admin/billing">
+        <Route path="/admin/revenue">
           <RequireAdmin>
             <AdminWrapper>
-              <AppLayout><Billing /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
-        </Route>
-        <Route path="/admin/affiliates">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Billing /></AppLayout>
+              <AppLayout><Revenue /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

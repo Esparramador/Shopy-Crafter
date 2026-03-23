@@ -17,7 +17,8 @@ import intelligenceRouter from "./intelligence.js";
 import inventoryRouter from "./inventory.js";
 import onboardingRouter from "./onboarding.js";
 import competitorsRouter from "./competitors.js";
-import billingRouter from "./billing.js";
+import emailsRouter from "./emails.js";
+import storeRouter from "./store.js";
 import voiceRouter from "./voice.js";
 import pushRouter from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
@@ -36,6 +37,7 @@ router.use("/cms/content", (req, res, next) => {
   return requireAdmin(req, res, next);
 });
 router.use("/cms", cmsRouter);
+router.use(storeRouter);
 
 router.use(requireAuth);
 router.use(projectsRouter);
@@ -51,7 +53,7 @@ router.use(intelligenceRouter);
 router.use(inventoryRouter);
 router.use(onboardingRouter);
 router.use(competitorsRouter);
-router.use(billingRouter);
+router.use(emailsRouter);
 router.use(voiceRouter);
 router.use(pushRouter);
 router.use(shopybrainRouter);

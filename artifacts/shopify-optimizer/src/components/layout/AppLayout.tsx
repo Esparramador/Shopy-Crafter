@@ -28,14 +28,15 @@ const SHOPYBRAIN_NAV = [
 ];
 
 const ADMIN_NAV = [
-  { label: "Gestión Clientes", icon: "👥", href: "/admin/clients" },
+  { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
+  { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
   { label: "M7 Inventario", icon: "📦", href: "/admin/inventory" },
   { label: "Competitor Intel", icon: "🎯", href: "/admin/competitors" },
   { label: "Predicciones ML", icon: "🔮", href: "/admin/forecast" },
-  { label: "Billing & Planes", icon: "💳", href: "/admin/billing" },
   { label: "Logros", icon: "🏆", href: "/admin/achievements" },
   { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
+  { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
 ];
