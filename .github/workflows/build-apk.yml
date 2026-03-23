@@ -2,7 +2,7 @@ name: Build ShopyBrain APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       app_url:
@@ -27,41 +27,34 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      # ── 3. Android SDK (pre-instalado en ubuntu-latest) ───────────────────
+      # ── 3. Aceptar licencias Android (SDK ya preinstalado en ubuntu-latest) ─
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-
-      - name: Install required Android SDK components
         run: |
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || \
+          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses 2>/dev/null || \
+          echo "License acceptance done (or already accepted)"
 
-      # ── 4. Actualizar URL del servidor si hay secret/input configurado ────
+      # ── 4. Actualizar URL del servidor si hay secret/input ────────────────
       - name: Update server URL
         run: |
           FINAL_URL="${{ github.event.inputs.app_url }}"
           if [ -z "$FINAL_URL" ]; then
             FINAL_URL="${{ secrets.APP_URL }}"
           fi
+          CONFIG="artifacts/shopify-optimizer/android/app/src/main/assets/capacitor.config.json"
           if [ -n "$FINAL_URL" ]; then
-            echo "Actualizando URL del servidor a: $FINAL_URL"
-            CONFIG_FILE="artifacts/shopify-optimizer/android/app/src/main/assets/capacitor.config.json"
+            echo "Actualizando URL a: $FINAL_URL"
             node -e "
-              const fs = require('fs');
-              const c = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf8'));
-              if (!c.server) c.server = {};
-              c.server.url = '$FINAL_URL';
-              fs.writeFileSync('$CONFIG_FILE', JSON.stringify(c, null, 2));
+              const fs=require('fs');
+              const c=JSON.parse(fs.readFileSync('$CONFIG','utf8'));
+              if(!c.server) c.server={};
+              c.server.url='$FINAL_URL';
+              fs.writeFileSync('$CONFIG',JSON.stringify(c,null,2));
               console.log('URL actualizada:', '$FINAL_URL');
             "
           else
-            echo "No se especificó APP_URL — se usará la URL por defecto del config"
+            node -e "const c=JSON.parse(require('fs').readFileSync('$CONFIG','utf8')); console.log('URL actual:', c.server?.url||'no configurada');"
           fi
 
       # ── 5. Permisos Gradle ────────────────────────────────────────────────
@@ -101,7 +94,7 @@ jobs:
         run: |
           APK="artifacts/shopify-optimizer/android/app/build/outputs/apk/debug/app-debug.apk"
           SIZE=$(du -sh "$APK" | cut -f1)
-          echo "## ShopyBrain APK listo para descargar" >> $GITHUB_STEP_SUMMARY
+          echo "## ShopyBrain APK listo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| | |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
@@ -110,9 +103,6 @@ jobs:
           echo "| **Build** | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Cómo instalar:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. Ve a la pestaña **Actions** → este workflow → sección **Artifacts**" >> $GITHUB_STEP_SUMMARY
-          echo "2. Descarga **ShopyBrain-v${{ github.run_number }}**" >> $GITHUB_STEP_SUMMARY
-          echo "3. Pasa el .apk a tu Android (por cable o WhatsApp)" >> $GITHUB_STEP_SUMMARY
-          echo "4. En Android: Ajustes → Seguridad → Instalar apps desconocidas → activar" >> $GITHUB_STEP_SUMMARY
-          echo "5. Abre el .apk y pulsa Instalar" >> $GITHUB_STEP_SUMMARY
+          echo "Descarga el APK en la sección **Artifacts** de este workflow." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Instalar en Android:** Ajustes → Seguridad → Fuentes desconocidas → abrir el .apk" >> $GITHUB_STEP_SUMMARY
