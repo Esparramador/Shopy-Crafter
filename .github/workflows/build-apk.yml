@@ -10,6 +10,9 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     name: Build Android APK
@@ -64,7 +67,6 @@ jobs:
           fi
           CONFIG="artifacts/shopify-optimizer/android/app/src/main/assets/capacitor.config.json"
           if [ -n "$FINAL_URL" ]; then
-            echo "Actualizando URL a: $FINAL_URL"
             node -e "
               const fs=require('fs');
               const c=JSON.parse(fs.readFileSync('$CONFIG','utf8'));
@@ -72,11 +74,6 @@ jobs:
               c.server.url='$FINAL_URL';
               fs.writeFileSync('$CONFIG',JSON.stringify(c,null,2));
               console.log('URL configurada:', '$FINAL_URL');
-            "
-          else
-            node -e "
-              const c=JSON.parse(require('fs').readFileSync('artifacts/shopify-optimizer/android/app/src/main/assets/capacitor.config.json','utf8'));
-              console.log('URL actual:', c.server?.url||'default');
             "
           fi
 
@@ -103,27 +100,60 @@ jobs:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
-      # ── 9. Subir APK como artifact descargable ────────────────────────────
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      # ── 9. Publicar GitHub Release con el APK (descargable desde la web) ──
+      - name: Publish GitHub Release (apk-latest)
+        uses: softprops/action-gh-release@v2
         with:
-          name: ShopyBrain-v${{ github.run_number }}
-          path: artifacts/shopify-optimizer/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-          if-no-files-found: error
+          tag_name: apk-latest
+          name: "ShopyBrain APK — Última versión"
+          body: |
+            APK generado automáticamente en el build #${{ github.run_number }}.
+            Fecha: ${{ github.event.head_commit.timestamp || 'manual trigger' }}
+            Commit: ${{ github.sha }}
 
-      # ── 10. Resumen ───────────────────────────────────────────────────────
+            **Instalación en Android:**
+            1. Descarga ShopyBrain.apk
+            2. Ajustes → Seguridad → Fuentes desconocidas → activar
+            3. Abre el .apk → Instalar
+          make_latest: true
+          prerelease: false
+          files: artifacts/shopify-optimizer/android/app/build/outputs/apk/debug/app-debug.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 10. Renombrar el asset en el release a ShopyBrain.apk ─────────────
+      - name: Rename APK asset to ShopyBrain.apk
+        run: |
+          RELEASE_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/apk-latest" \
+            | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.id);")
+          ASSET_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
+            | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); const a=d.find(x=>x.name.endsWith('.apk')); if(a) console.log(a.id); else process.exit(1);" 2>/dev/null || echo "")
+          if [ -n "$ASSET_ID" ]; then
+            curl -s -X PATCH \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID" \
+              -d '{"name":"ShopyBrain.apk","label":"ShopyBrain APK"}' > /dev/null
+            echo "Asset renombrado a ShopyBrain.apk"
+          fi
+
+      # ── 11. Resumen ───────────────────────────────────────────────────────
       - name: Build Summary
         run: |
           APK="artifacts/shopify-optimizer/android/app/build/outputs/apk/debug/app-debug.apk"
           SIZE=$(du -sh "$APK" | cut -f1)
-          echo "## ShopyBrain APK listo para descargar" >> $GITHUB_STEP_SUMMARY
+          echo "## ShopyBrain APK publicado" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| | |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Archivo** | app-debug.apk |" >> $GITHUB_STEP_SUMMARY
           echo "| **Tamaño** | $SIZE |" >> $GITHUB_STEP_SUMMARY
           echo "| **Build** | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release** | apk-latest |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Descarga el APK en la sección **Artifacts** de este workflow." >> $GITHUB_STEP_SUMMARY
-          echo "Para instalar: Ajustes Android → Seguridad → Fuentes desconocidas → abre el .apk" >> $GITHUB_STEP_SUMMARY
+          echo "El APK está disponible en el botón de la web y en la sección Releases del repo." >> $GITHUB_STEP_SUMMARY

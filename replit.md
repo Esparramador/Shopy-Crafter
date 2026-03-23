@@ -147,6 +147,30 @@ pnpm --filter @workspace/db run push-force
 ```
 (not `db:push` — use `push-force`)
 
+## APK Android (ShopyBrain)
+
+### Arquitectura
+- Capacitor WebView que carga la URL de producción → siempre actualizado, requiere internet
+- GitHub Actions build en repo privado `Esparramador/Shopy-Crafter`
+- APK publicado como GitHub Release tag `apk-latest` tras cada build
+
+### Botón de descarga en la landing
+- `ApkDownloadButton` en `Landing.tsx` hero section (línea ~355)  
+- Llama `GET /api/apk/status` → si disponible → descarga via `GET /api/apk/download`
+- El API server actúa como proxy autenticado (repo privado)
+
+### Requiere
+- `GITHUB_API_TOKEN` — PAT con `repo` scope (añadir como secret en Replit)
+- Workflow en `.github/workflows/build-apk.yml` — publica Release `apk-latest` con `softprops/action-gh-release@v2`
+
+### Rutas API APK
+- `GET /api/apk/status` — público, devuelve `{available, building, lastBuild}`
+- `GET /api/apk/download` — público, proxy del asset desde GitHub Release
+- `POST /api/apk/build` — admin only, dispara GitHub Actions workflow
+
+### Trigger manual del build
+Admin puede lanzar build desde: `POST /api/apk/build` (requiere sesión admin)
+
 ## EADDRINUSE Recovery
 ```bash
 pkill -f "dist/index.mjs" && sleep 2

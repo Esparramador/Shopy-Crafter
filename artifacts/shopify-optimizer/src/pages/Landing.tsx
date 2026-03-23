@@ -2,6 +2,74 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import "./landing.css";
 
+const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+function ApkDownloadButton() {
+  const [status, setStatus] = useState<"idle" | "checking" | "downloading" | "unavailable">("idle");
+  const [apkAvailable, setApkAvailable] = useState<boolean | null>(null);
+
+  const handleClick = async () => {
+    if (status === "downloading") return;
+    setStatus("checking");
+    try {
+      const r = await fetch(`${API_BASE_LANDING}/api/apk/status`);
+      const data = await r.json() as { available: boolean; building?: boolean };
+      if (data.available) {
+        setApkAvailable(true);
+        setStatus("downloading");
+        const a = document.createElement("a");
+        a.href = `${API_BASE_LANDING}/api/apk/download`;
+        a.download = "ShopyBrain.apk";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => setStatus("idle"), 3000);
+      } else if (data.building) {
+        setApkAvailable(false);
+        setStatus("unavailable");
+        setTimeout(() => setStatus("idle"), 4000);
+      } else {
+        setApkAvailable(false);
+        setStatus("unavailable");
+        setTimeout(() => setStatus("idle"), 4000);
+      }
+    } catch {
+      setStatus("idle");
+    }
+  };
+
+  const label = status === "checking" ? "Verificando..."
+    : status === "downloading" ? "⬇ Descargando..."
+    : status === "unavailable" ? (apkAvailable === false ? "🔜 Disponible próximamente" : "No disponible")
+    : "📱 Descargar App Android";
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={status !== "idle"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        marginTop: 14,
+        padding: "10px 22px",
+        borderRadius: 10,
+        background: status === "downloading" ? "rgba(45,212,159,0.15)" : "rgba(200,168,75,0.08)",
+        border: `1px solid ${status === "downloading" ? "rgba(45,212,159,0.5)" : "rgba(200,168,75,0.35)"}`,
+        color: status === "downloading" ? "#2dd49f" : "#c8a84b",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: status !== "idle" ? "not-allowed" : "pointer",
+        transition: "all 0.2s",
+        letterSpacing: 0.2,
+        opacity: status !== "idle" && status !== "downloading" ? 0.75 : 1,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 type CMSContent = {
   site: { name: string; tagline: string; logo: { type: string; value: string; imageUrl: string | null }; primaryColor: string; accentColor: string; font_heading: string; font_body: string };
   nav: { links: { id: string; label: string; href: string }[]; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string } };
@@ -352,6 +420,7 @@ export default function Landing() {
                 <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.hero.ctaPrimary.label}</a>
                 <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); goToSection(2); }}>{content.hero.ctaSecondary.label}</a>
               </div>
+              <ApkDownloadButton />
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {content.hero.trustItems.map((item, i) => (
                   <div key={i} className="l-trust-item"><div className="l-trust-check">✓</div>{item}</div>
