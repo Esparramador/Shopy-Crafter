@@ -181,96 +181,96 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
         </div>
 
-        {/* Comic Crafter — promotional links */}
+        {/* Comic Crafter — promotional links (compact icon row) */}
         <div style={{
-          padding: "10px 14px",
+          padding: "8px 14px",
           borderTop: "1px solid var(--bdr)",
-          display: "flex", flexDirection: "column", gap: 5,
         }}>
-          <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 2 }}>
+          <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 6 }}>
             Hecho por
           </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {/* Instagram */}
+            <a
+              href="https://www.instagram.com/comiccrafter_ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="@comiccrafter_ai en Instagram"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 7,
+                background: "rgba(255,255,255,0.025)",
+                border: "1px solid var(--bdr)",
+                textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = "rgba(225,48,108,0.12)")}
+              onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <defs>
+                  <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f09433"/>
+                    <stop offset="25%" stopColor="#e6683c"/>
+                    <stop offset="50%" stopColor="#dc2743"/>
+                    <stop offset="75%" stopColor="#cc2366"/>
+                    <stop offset="100%" stopColor="#bc1888"/>
+                  </linearGradient>
+                </defs>
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-grad)" strokeWidth="2" fill="none"/>
+                <circle cx="12" cy="12" r="4" stroke="url(#ig-grad)" strokeWidth="2" fill="none"/>
+                <circle cx="17.5" cy="6.5" r="1.2" fill="url(#ig-grad)"/>
+              </svg>
+            </a>
 
-          {/* Instagram */}
-          <a
-            href="https://www.instagram.com/comiccrafter_ai/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "5px 8px", borderRadius: 7,
-              background: "rgba(255,255,255,0.025)",
-              border: "1px solid var(--bdr)",
-              textDecoration: "none", transition: "background 0.15s",
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = "rgba(225,48,108,0.07)")}
-            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <defs>
-                <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f09433"/>
-                  <stop offset="25%" stopColor="#e6683c"/>
-                  <stop offset="50%" stopColor="#dc2743"/>
-                  <stop offset="75%" stopColor="#cc2366"/>
-                  <stop offset="100%" stopColor="#bc1888"/>
-                </linearGradient>
-              </defs>
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-grad)" strokeWidth="2" fill="none"/>
-              <circle cx="12" cy="12" r="4" stroke="url(#ig-grad)" strokeWidth="2" fill="none"/>
-              <circle cx="17.5" cy="6.5" r="1.2" fill="url(#ig-grad)"/>
-            </svg>
-            <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500 }}>@comiccrafter_ai</span>
-          </a>
+            {/* Shopify Store */}
+            <a
+              href="https://comic-crafter.myshopify.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Tienda Shopify"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 7,
+                background: "rgba(255,255,255,0.025)",
+                border: "1px solid var(--bdr)",
+                textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = "rgba(150,191,89,0.12)")}
+              onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M15.5 3.5C15.5 3.5 15.1 3.5 14.8 3.7C14.6 2.5 13.9 1.5 12.7 1.5C12.4 1.5 12.1 1.6 11.8 1.8C11.5 1.4 11 1 10.3 1C8.1 1 7 3.7 6.7 5.1L5.1 5.6C4.6 5.8 4.6 5.8 4.5 6.3L3 18.3L14.5 20.5L20.5 19L18.5 5.5C18.4 5.5 15.5 3.5 15.5 3.5Z" fill="#96BF59"/>
+                <path d="M14.8 3.7C14.5 3.9 14.3 4.2 14.1 4.6L9.8 5.9C10.1 4.7 10.8 2.5 12.5 2.5C13.4 2.5 14 3 14.8 3.7Z" fill="#5E8E3E"/>
+                <path d="M12.5 7.5C12.5 7.5 12 7.5 11.5 7.7C11.3 7.2 10.9 7 10.5 7C9.5 7 9 8 9 8.5C9 9.7 12 10.5 12 12.5C12 14 11 14.5 10 14.5C8.6 14.5 7.9 13.5 7.9 13.5L8.3 12C8.3 12 9.1 12.8 10 12.8C10.5 12.8 10.7 12.5 10.7 12.2C10.7 10.5 8.2 10.4 8.2 8.6C8.2 7 9.3 5.5 11.3 5.5C12.1 5.5 12.5 5.8 12.5 5.8V7.5Z" fill="white"/>
+              </svg>
+            </a>
 
-          {/* Shopify Store */}
-          <a
-            href="https://comic-crafter.myshopify.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "5px 8px", borderRadius: 7,
-              background: "rgba(255,255,255,0.025)",
-              border: "1px solid var(--bdr)",
-              textDecoration: "none", transition: "background 0.15s",
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = "rgba(150,191,89,0.07)")}
-            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M15.5 3.5C15.5 3.5 15.1 3.5 14.8 3.7C14.6 2.5 13.9 1.5 12.7 1.5C12.4 1.5 12.1 1.6 11.8 1.8C11.5 1.4 11 1 10.3 1C8.1 1 7 3.7 6.7 5.1L5.1 5.6C4.6 5.8 4.6 5.8 4.5 6.3L3 18.3L14.5 20.5L20.5 19L18.5 5.5C18.4 5.5 15.5 3.5 15.5 3.5Z" fill="#96BF59"/>
-              <path d="M14.8 3.7C14.5 3.9 14.3 4.2 14.1 4.6L9.8 5.9C10.1 4.7 10.8 2.5 12.5 2.5C13.4 2.5 14 3 14.8 3.7Z" fill="#5E8E3E"/>
-              <path d="M12.5 7.5C12.5 7.5 12 7.5 11.5 7.7C11.3 7.2 10.9 7 10.5 7C9.5 7 9 8 9 8.5C9 9.7 12 10.5 12 12.5C12 14 11 14.5 10 14.5C8.6 14.5 7.9 13.5 7.9 13.5L8.3 12C8.3 12 9.1 12.8 10 12.8C10.5 12.8 10.7 12.5 10.7 12.2C10.7 10.5 8.2 10.4 8.2 8.6C8.2 7 9.3 5.5 11.3 5.5C12.1 5.5 12.5 5.8 12.5 5.8V7.5Z" fill="white"/>
-            </svg>
-            <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500 }}>Tienda Shopify</span>
-          </a>
-
-          {/* Comic Crafter App */}
-          <a
-            href="https://comiccrafter.es/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "5px 8px", borderRadius: 7,
-              background: "rgba(255,255,255,0.025)",
-              border: "1px solid var(--bdr)",
-              textDecoration: "none", transition: "background 0.15s",
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = "rgba(147,51,234,0.07)")}
-            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-          >
-            <img
-              src="https://comic-crafter.myshopify.com/cdn/shop/t/10/assets/logo-app.png"
-              alt="Comic Crafter"
-              width={14}
-              height={14}
-              style={{ borderRadius: 3, objectFit: "cover" }}
-              onError={e => { e.currentTarget.style.display = "none"; }}
-            />
-            <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500 }}>comiccrafter.es</span>
-          </a>
+            {/* Comic Crafter App */}
+            <a
+              href="https://comiccrafter.es/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="comiccrafter.es"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 7,
+                background: "rgba(255,255,255,0.025)",
+                border: "1px solid var(--bdr)",
+                textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = "rgba(147,51,234,0.12)")}
+              onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
+            >
+              <img
+                src="https://comic-crafter.myshopify.com/cdn/shop/t/10/assets/logo-app.png"
+                alt="Comic Crafter"
+                width={16}
+                height={16}
+                style={{ borderRadius: 3, objectFit: "cover" }}
+                onError={e => { e.currentTarget.style.display = "none"; }}
+              />
+            </a>
+          </div>
         </div>
 
         {/* Bottom — credits + user */}
