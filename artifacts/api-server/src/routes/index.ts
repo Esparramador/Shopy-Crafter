@@ -32,11 +32,10 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/client", clientRouter);
-router.use("/cms/content", (req, res, next) => {
-  if (req.method === "GET") return next();
+router.use("/cms", (req, res, next) => {
+  if (req.method === "GET" && req.path === "/content") return next();
   return requireAdmin(req, res, next);
-});
-router.use("/cms", cmsRouter);
+}, cmsRouter);
 router.use(storeRouter);
 
 router.use(requireAuth);

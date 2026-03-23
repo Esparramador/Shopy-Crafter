@@ -116,7 +116,7 @@ router.get("/store/products", async (_req, res): Promise<void> => {
   } catch (err: any) {
     logger.error("Storefront API error:", err.message);
     res.set("Cache-Control", "no-cache");
-    res.json({ products: [], currency, error: err.message });
+    res.json({ products: [], currency });
   }
 });
 

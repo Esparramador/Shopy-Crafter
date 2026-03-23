@@ -29,11 +29,14 @@ router.post("/users", async (req, res): Promise<void> => {
     clientId?: string; password?: string;
   };
 
+  // Solo se puede crear el rol "client" desde aquí — el único admin es sadiagiljoan@gmail.com
+  const safeRole: "admin" | "client" = role === "admin" ? "client" : role;
+
   const id = randomBytes(16).toString("hex");
   const hashed = await bcrypt.hash(password ?? randomBytes(16).toString("hex"), 12);
 
   await db.insert(usersTable).values({
-    id, email: email.toLowerCase().trim(), password: hashed, name, role,
+    id, email: email.toLowerCase().trim(), password: hashed, name, role: safeRole,
     clientId: clientId ?? null, isActive: 1,
   });
 
@@ -41,10 +44,10 @@ router.post("/users", async (req, res): Promise<void> => {
     id: randomBytes(8).toString("hex"),
     userId: req.session.userId!,
     action: "create_user",
-    details: `Created user ${email} (${role})`,
+    details: `Created user ${email} (${safeRole})`,
   });
 
-  res.json({ id, email, name, role });
+  res.json({ id, email, name, role: safeRole });
 });
 
 router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
@@ -114,18 +117,6 @@ router.post("/impersonate/:userId", async (req, res): Promise<void> => {
   req.session.clientId = user.clientId;
   req.session.name = user.name;
   res.json({ success: true, clientId: user.clientId });
-});
-
-router.post("/stop-impersonate", requireAuth, async (req, res): Promise<void> => {
-  const adminId = req.session.userId!;
-  const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminId));
-  if (admin) {
-    req.session.role = "admin";
-    req.session.clientId = null;
-    req.session.name = admin.name;
-    delete req.session.impersonating;
-  }
-  res.json({ success: true });
 });
 
 router.get("/audit-log", async (req, res): Promise<void> => {

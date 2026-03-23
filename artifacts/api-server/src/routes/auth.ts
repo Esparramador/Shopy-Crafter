@@ -136,6 +136,24 @@ router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   res.json({ success: true, role: user.role, clientId: user.clientId });
 });
 
+// ─── STOP IMPERSONATION ──────────────────────────────────────────────────────
+router.post("/stop-impersonate", requireAuth, async (req, res): Promise<void> => {
+  const adminId = req.session.userId!;
+  const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminId));
+
+  if (!admin || admin.role !== "admin") {
+    res.status(403).json({ error: "Solo el administrador puede detener la impersonación" });
+    return;
+  }
+
+  req.session.role = "admin";
+  req.session.clientId = null;
+  req.session.name = admin.name;
+  delete req.session.impersonating;
+
+  res.json({ success: true });
+});
+
 // ─── CHANGE PASSWORD (autenticado) ───────────────────────────────────────────
 router.post("/change-password", requireAuth, async (req, res): Promise<void> => {
   const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };

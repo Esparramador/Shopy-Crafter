@@ -93,7 +93,7 @@ function ImpersonationBanner() {
   if (!user?.impersonating) return null;
 
   const stopImpersonating = async () => {
-    await fetch(`${API_BASE}/api/admin/stop-impersonate`, { method: "POST", credentials: "include" });
+    await fetch(`${API_BASE}/api/auth/stop-impersonate`, { method: "POST", credentials: "include" });
     await refresh();
     window.location.href = "/";
   };
