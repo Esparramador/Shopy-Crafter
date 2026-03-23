@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 
 import Home from "@/pages/Home";
+import NewProject from "@/pages/NewProject";
 import Landing from "@/pages/Landing";
 import CMSEditor from "@/pages/admin/CMSEditor";
 import Intelligence from "@/pages/admin/Intelligence";
@@ -150,6 +151,14 @@ function Router() {
         </Route>
 
         {/* Admin routes */}
+        <Route path="/new-project">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><NewProject /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+
         <Route path="/admin/clients">
           <RequireAdmin>
             <AdminWrapper>

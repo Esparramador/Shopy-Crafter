@@ -127,7 +127,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <p style={{ fontSize: 11, color: "var(--t3)", padding: "4px 8px" }}>Sin tiendas aún</p>
           )}
 
-          <Link href="/">
+          <Link href="/new-project">
             <div className="nav-item" style={{ marginTop: 4 }} role="button">
               <span className="nav-icon">＋</span>
               Nueva tienda
