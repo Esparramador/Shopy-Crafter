@@ -247,19 +247,23 @@ export async function runOmniCoreMicroLearning() {
       return;
     }
 
+    const brainCtxMicro = await buildShopyBrainContext(undefined, "ecommerce");
+
     for (const domain of domains) {
       try {
         const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain ?? "ecommerce";
-        const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
         const prompt = `You are an expert in ${label} for Shopify e-commerce agencies in 2026. Generate exactly 3 fresh, actionable insights that a Shopify agency owner can apply directly. Each insight must be specific, data-driven, and novel. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.82,"memoryType":"pricing_pattern","tags":["tag1","tag2"]}]}`;
 
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 1200,
-          system: `You are OmniCore Micro-Learning Engine for ShopifyAI Pro agency platform. You generate precise, actionable Shopify e-commerce knowledge. ${brainCtx}`,
-          messages: [{ role: "user", content: prompt }],
-        });
+        const response = await anthropic.messages.create(
+          {
+            model: "claude-sonnet-4-5",
+            max_tokens: 1200,
+            system: `You are OmniCore Micro-Learning Engine for ShopifyAI Pro agency platform. You generate precise, actionable Shopify e-commerce knowledge. ${brainCtxMicro}`,
+            messages: [{ role: "user", content: prompt }],
+          },
+          { signal: AbortSignal.timeout(90_000) }
+        );
 
         const text = (response.content[0] as { type: string; text: string }).text;
         const match = text.match(/\{[\s\S]*\}/);
@@ -374,12 +378,15 @@ export async function runOmniCoreCrossConnections() {
     const prompt = `Find 3 powerful hidden cross-domain insights connecting these Shopify e-commerce knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy that a Shopify agency can monetize. Return ONLY valid JSON:
 {"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 1200,
-      system: `You are OmniCore Cross-Domain Synthesis Engine. You discover hidden connections between Shopify e-commerce knowledge domains that create compounding agency value. ${brainCtx}`,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: 1200,
+        system: `You are OmniCore Cross-Domain Synthesis Engine. You discover hidden connections between Shopify e-commerce knowledge domains that create compounding agency value. ${brainCtx}`,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: AbortSignal.timeout(90_000) }
+    );
 
     const text = (response.content[0] as { type: string; text: string }).text;
     const match = text.match(/\{[\s\S]*\}/);
@@ -437,19 +444,29 @@ export async function runOmniCoreDailyDeepStudy() {
       trigger: "cron_daily_1am",
     }).onConflictDoNothing();
 
+    const brainCtxDaily = await buildShopyBrainContext(undefined, "ecommerce");
+    let consecutiveFails = 0;
+
     for (const domain of domains) {
+      if (consecutiveFails >= 3) {
+        log("omnicore-daily", "⚠️ Circuit breaker: 3 consecutive Claude failures — aborting cycle early");
+        break;
+      }
       try {
         const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain;
-        const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
         const prompt = `You are a world-class expert in ${label} for Shopify e-commerce agencies in 2026. Generate 5 premium, deeply researched insights that would be worth €500+/hour consulting advice. Include specific tactics, numbers, and frameworks. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.87,"memoryType":"pricing_pattern"}]}`;
 
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 2500,
-          system: `You are OmniCore Daily Deep Study Engine for ShopifyAI Pro. You generate elite-level Shopify agency knowledge. ${brainCtx}`,
-          messages: [{ role: "user", content: prompt }],
-        });
+        const response = await anthropic.messages.create(
+          {
+            model: "claude-sonnet-4-5",
+            max_tokens: 2500,
+            system: `You are OmniCore Daily Deep Study Engine for ShopifyAI Pro. You generate elite-level Shopify agency knowledge. ${brainCtxDaily}`,
+            messages: [{ role: "user", content: prompt }],
+          },
+          { signal: AbortSignal.timeout(90_000) }
+        );
+        consecutiveFails = 0;
 
         const text = (response.content[0] as { type: string; text: string }).text;
         const match = text.match(/\{[\s\S]*\}/);
@@ -495,7 +512,8 @@ export async function runOmniCoreDailyDeepStudy() {
 
         log("omnicore-daily", `✅ ${domain.domain}: ${(parsed.insights ?? []).length} insights → depth ${newDepth}`);
       } catch (err) {
-        logger.warn({ domainId: domain.id, err }, "Daily study failed for domain");
+        consecutiveFails++;
+        logger.warn({ domainId: domain.id, err, consecutiveFails }, "Daily study failed for domain");
       }
     }
 
@@ -541,12 +559,15 @@ ${memorySummary}
 Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.92,"domains":["domain1","domain2"],"priority":"high"}]}`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4000,
-      system: `You are OmniCore Mega-Synthesis Engine — the highest-level reasoning layer of ShopifyAI Pro. You synthesize a week of multi-domain learning into strategic masterclass insights. ${brainCtx}`,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: 4000,
+        system: `You are OmniCore Mega-Synthesis Engine — the highest-level reasoning layer of ShopifyAI Pro. You synthesize a week of multi-domain learning into strategic masterclass insights. ${brainCtx}`,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: AbortSignal.timeout(120_000) }
+    );
 
     const text = (response.content[0] as { type: string; text: string }).text;
     const match = text.match(/\{[\s\S]*\}/);

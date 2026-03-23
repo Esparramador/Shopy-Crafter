@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { inventoryTrackingTable, restockOrdersTable, projectsTable } from "@workspace/db";
 import { eq, desc, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { claude } from "../lib/claude.js";
+import { askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 
 const router = Router();
 
@@ -75,7 +75,14 @@ Write a concise, professional email requesting restock. Include:
 Return JSON: { "subject": "...", "body": "...", "urgency": "critical|high|medium", "suggestedQuantity": 90 }`;
 
   try {
-    const text = await claude(prompt);
+    const niche = project?.storeNiche ?? undefined;
+    const text = await askClaudeWithBrain(
+      parseInt(projectId),
+      [{ role: "user", content: prompt }],
+      `${SHOPIFY_EXPERT_SYSTEM} You are also an expert in supply chain and inventory management for e-commerce. Generate professional supplier communications that reflect the store's brand voice.`,
+      "general",
+      niche
+    );
     const match = text.match(/\{[\s\S]*\}/);
     const email = match ? JSON.parse(match[0]) : { subject: "Restock Request", body: text, urgency: "high", suggestedQuantity: 90 };
 

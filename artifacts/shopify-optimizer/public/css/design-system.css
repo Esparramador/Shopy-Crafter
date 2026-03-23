@@ -233,14 +233,23 @@ body::after {
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
   opacity: 0.1;
 }
-.topbar-breadcrumb { display: flex; align-items: center; gap: 7px; flex: 1; }
+.topbar-breadcrumb {
+  display: flex; align-items: center; gap: 7px;
+  flex: 1; min-width: 0; overflow: hidden;
+}
 .topbar-client {
   font-family: var(--fh); font-style: italic;
   font-size: 16px; color: var(--t);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex-shrink: 1; min-width: 0;
 }
-.topbar-sep { color: var(--t3); font-size: 12px; }
-.topbar-page { font-size: 13px; color: var(--t2); }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
+.topbar-sep { color: var(--t3); font-size: 12px; flex-shrink: 0; }
+.topbar-page {
+  font-size: 13px; color: var(--t2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex-shrink: 2; min-width: 0;
+}
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 /* Status chip */
 .status-chip {
@@ -268,6 +277,17 @@ body::after {
   background: var(--ink2);
   overflow-x: auto;
   flex-shrink: 0;
+  /* Hidden scrollbar + fade-right gradient hint */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  position: relative;
+}
+.module-tabs::-webkit-scrollbar { display: none; }
+.module-tabs::after {
+  content: '';
+  position: absolute; top: 0; right: 0; bottom: 1px;
+  width: 40px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--ink2));
 }
 .module-tab {
   display: flex; align-items: center; gap: 6px;
@@ -744,6 +764,29 @@ code {
   backdrop-filter: blur(2px);
 }
 .sidebar-overlay.visible { display: block; }
+
+/* ── ADAPTIVE HEADER — narrow desktop (≤ 920px) ────────────────────────────── */
+@media (max-width: 920px) {
+  /* Hide status chip label text, keep dot + animation only */
+  .status-chip span:not(.status-pulse) { display: none; }
+  .status-chip { padding: 6px 8px; gap: 0; }
+
+  /* Truncate breadcrumb aggressively — show only page name */
+  .topbar-client { max-width: 120px; }
+  .topbar-sep, .topbar-page { display: none; }
+}
+
+/* ── ADAPTIVE HEADER — very narrow (≤ 800px) ────────────────────────────────── */
+@media (max-width: 800px) {
+  /* Module tabs: icon only, hide label text */
+  .module-tab-label { display: none; }
+  .module-tab { padding: 10px 12px; gap: 0; font-size: 16px; }
+
+  /* Topbar: collapse right side items */
+  .topbar-right .btn-ghost-sm { display: none; }
+  .topbar-client { display: none; }
+  .topbar-sep { display: none; }
+}
 
 /* ── RESPONSIVE TABLET (769px – 1024px) ────────────────────────────────────── */
 @media (min-width: 601px) and (max-width: 1024px) {

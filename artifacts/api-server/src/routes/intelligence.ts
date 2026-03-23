@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, eventsTable, revenueSnapshotsTable, projectsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { claude, learnFromOperation } from "../lib/claude.js";
+import { askClaudeWithBrain, buildShopyBrainContext, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 
 // ─── INTELLIGENCE EXTRACTION ENGINE ─────────────────────────────────────────
@@ -18,7 +18,7 @@ async function scrapeUrl(url: string): Promise<{ html: string; title: string; de
         "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
         "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
       },
-      signal: AbortSignal.timeout(18000),
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return { html: "", title: "", description: "", keywords: "", jsonLd: "" };
     const html = await res.text();
@@ -154,7 +154,20 @@ Si no hay datos web disponibles, usa tu conocimiento sobre la empresa/marca. Si 
 Sé específico y concreto — nada de respuestas genéricas. Este análisis debe ser tan preciso como si hubieras investigado la empresa durante 10 horas.`;
 
   try {
-    const text = await claude(prompt, 3500);
+    const brainCtx = await buildShopyBrainContext(undefined, "intelligence");
+    const intelligenceSystem = `${SHOPIFY_EXPERT_SYSTEM} You are a master brand intelligence analyst with deep expertise in e-commerce, digital marketing, and competitive positioning. You extract maximum strategic value from any input — URLs, brand names, company names, or text.${brainCtx}`;
+    const { getClaudeClient } = await import("../lib/claude.js");
+    const client = await getClaudeClient(0);
+    const response = await client.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: 3500,
+        system: intelligenceSystem,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: AbortSignal.timeout(90_000) }
+    );
+    const text = (response.content[0] as { type: string; text: string }).text;
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     const intelligence = match ? JSON.parse(match[1] ?? match[0]) : { intelligence: { summary: text } };
 
@@ -244,7 +257,14 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
 }`;
 
   try {
-    const text = await claude(prompt, 4096);
+    const text = await askClaudeWithBrain(
+      projectId,
+      [{ role: "user", content: prompt }],
+      `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations.`,
+      "intelligence",
+      project.storeNiche ?? undefined,
+      4096
+    );
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     const profile = match ? JSON.parse(match[1] ?? match[0]) : { executiveSummary: text };
 
@@ -451,7 +471,13 @@ Return JSON:
 }`;
 
   try {
-    const text = await claude(prompt);
+    const text = await askClaudeWithBrain(
+      parseInt(projectId),
+      [{ role: "user", content: prompt }],
+      `${SHOPIFY_EXPERT_SYSTEM} You are also a revenue attribution expert and growth analyst. Identify which AI optimizations generated the most measurable revenue impact and provide specific, data-backed recommendations.`,
+      "general",
+      project?.storeNiche ?? undefined
+    );
     const match = text.match(/\{[\s\S]*\}/);
     const analysis = match ? JSON.parse(match[0]) : { summary: text, topInsights: [], recommendations: [] };
     res.json({ analysis, projectId, analyzedAt: new Date().toISOString() });

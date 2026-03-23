@@ -332,7 +332,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     aria-selected={isActive}
                   >
                     <span style={{ fontSize: 13 }}>{item.icon}</span>
-                    {item.label}
+                    <span className="module-tab-label">{item.label}</span>
                   </div>
                 </Link>
               );

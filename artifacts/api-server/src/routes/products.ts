@@ -4,7 +4,7 @@ import { projectsTable, productsTable, bulkJobsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
-import { askClaudeJson, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
+import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -432,13 +432,19 @@ Para cada uno incluye: productName, estimatedPriceMin, estimatedPriceMax, whyItF
 
 Devuelve SOLO un JSON array con estos campos por objeto. Sin texto adicional.`;
 
-  const opportunities = await askClaudeJson<Array<{
+  const opportunities = await askClaudeJsonWithBrain<Array<{
     productName: string;
     estimatedPriceMin: number;
     estimatedPriceMax: number;
     whyItFits: string;
     sourcingDifficulty: string;
-  }>>(id, prompt);
+  }>>(
+    id,
+    prompt,
+    `${SHOPIFY_EXPERT_SYSTEM} You are also an expert in product sourcing, market trends, and catalog expansion strategy. Use your accumulated knowledge about successful product categories and market demand to give highly targeted recommendations.`,
+    "general",
+    project.storeNiche ?? undefined
+  );
 
   res.json(opportunities);
 });

@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { claude } from "../lib/claude.js";
+import { askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 
 const router = Router();
 
@@ -82,7 +82,14 @@ Analyze the competitor and return competitive intelligence. Extract real prices,
 }`;
 
   try {
-    const text = await claude(prompt);
+    const niche = project?.storeNiche ?? undefined;
+    const text = await askClaudeWithBrain(
+      parseInt(projectId),
+      [{ role: "user", content: prompt }],
+      `${SHOPIFY_EXPERT_SYSTEM} You are also a world-class competitive intelligence analyst. Use your accumulated knowledge about pricing patterns, market positioning, and e-commerce trends to identify real threats and opportunities.`,
+      "general",
+      niche
+    );
     const match = text.match(/\{[\s\S]*\}/);
     const data = match ? JSON.parse(match[0]) : {};
 

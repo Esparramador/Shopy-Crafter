@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable } from "@workspace/db";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable } from "@workspace/db";
+import { eq, desc, and, gte } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
 let defaultClient: Anthropic | null = null;
@@ -39,12 +39,15 @@ export async function askClaude(
 ): Promise<string> {
   const client = await getClaudeClient(projectId);
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: maxTokens,
-    system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
-    messages,
-  });
+  const response = await client.messages.create(
+    {
+      model: "claude-sonnet-4-5",
+      max_tokens: maxTokens,
+      system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
+      messages,
+    },
+    { signal: AbortSignal.timeout(120_000) }
+  );
 
   const content = response.content[0];
   if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
@@ -73,11 +76,14 @@ export async function askClaudeJson<T>(
 
 export async function claude(prompt: string, maxTokens = 2048): Promise<string> {
   const client = getDefaultClient();
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: maxTokens,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const response = await client.messages.create(
+    {
+      model: "claude-sonnet-4-5",
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    },
+    { signal: AbortSignal.timeout(120_000) }
+  );
   const content = response.content[0];
   if (content.type !== "text") throw new Error("Unexpected non-text response");
   return content.text;
@@ -85,78 +91,101 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
 
 /**
  * Builds a ShopyBrain context block to inject into Claude system prompts.
- * Queries the OmniCore memory engine for relevant accumulated knowledge.
+ * Pulls from ALL OmniCore knowledge: memories, top insights, and proven prompt patterns.
  */
 export async function buildShopyBrainContext(
   niche?: string,
-  useCase?: "redesign" | "seo" | "pricing" | "images" | "general"
+  useCase?: "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce"
 ): Promise<string> {
   try {
     const minConfidence = 0.6;
 
-    const memoriesQuery = db
-      .select({
-        memoryType: omnicoreMemoriesTable.memoryType,
-        niche: omnicoreMemoriesTable.niche,
-        content: omnicoreMemoriesTable.content,
-        confidence: omnicoreMemoriesTable.confidence,
-      })
-      .from(omnicoreMemoriesTable)
-      .where(gte(omnicoreMemoriesTable.confidence, minConfidence))
-      .orderBy(desc(omnicoreMemoriesTable.confidence))
-      .limit(12);
+    const [memories, prompts, topInsights] = await Promise.all([
+      db
+        .select({
+          memoryType: omnicoreMemoriesTable.memoryType,
+          niche: omnicoreMemoriesTable.niche,
+          content: omnicoreMemoriesTable.content,
+          confidence: omnicoreMemoriesTable.confidence,
+          title: omnicoreMemoriesTable.title,
+        })
+        .from(omnicoreMemoriesTable)
+        .where(gte(omnicoreMemoriesTable.confidence, minConfidence))
+        .orderBy(desc(omnicoreMemoriesTable.confidence))
+        .limit(15),
 
-    const promptsQuery = db
-      .select({
-        useCase: omnicorePromptLibraryTable.useCase,
-        promptTemplate: omnicorePromptLibraryTable.promptTemplate,
-        avgQualityScore: omnicorePromptLibraryTable.avgQualityScore,
-      })
-      .from(omnicorePromptLibraryTable)
-      .orderBy(desc(omnicorePromptLibraryTable.avgQualityScore))
-      .limit(5);
+      db
+        .select({
+          useCase: omnicorePromptLibraryTable.useCase,
+          promptTemplate: omnicorePromptLibraryTable.promptTemplate,
+          avgQualityScore: omnicorePromptLibraryTable.avgQualityScore,
+        })
+        .from(omnicorePromptLibraryTable)
+        .orderBy(desc(omnicorePromptLibraryTable.avgQualityScore))
+        .limit(5),
 
-    const [memories, prompts] = await Promise.all([memoriesQuery, promptsQuery]);
+      db
+        .select({
+          domain: omnicoreInsightsTable.domain,
+          title: omnicoreInsightsTable.title,
+          insight: omnicoreInsightsTable.insight,
+          confidence: omnicoreInsightsTable.confidence,
+        })
+        .from(omnicoreInsightsTable)
+        .where(gte(omnicoreInsightsTable.confidence, 0.80))
+        .orderBy(desc(omnicoreInsightsTable.confidence))
+        .limit(8),
+    ]);
 
-    if (memories.length === 0 && prompts.length === 0) return "";
+    if (memories.length === 0 && prompts.length === 0 && topInsights.length === 0) return "";
 
-    const lines: string[] = ["", "--- OMNICORE BRAIN CONTEXT (accumulated agency knowledge) ---"];
+    const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — CONOCIMIENTO ACUMULADO ━━━"];
 
-    if (niche) lines.push(`Active niche: ${niche}`);
-    if (useCase) lines.push(`Task context: ${useCase}`);
+    if (niche) lines.push(`Nicho activo: ${niche}`);
+    if (useCase) lines.push(`Contexto de tarea: ${useCase}`);
 
+    // Top strategic insights from continuous learning cycles
+    if (topInsights.length > 0) {
+      lines.push("\n🧠 Insights estratégicos de alta confianza (aprendizaje continuo):");
+      for (const ins of topInsights.slice(0, 6)) {
+        lines.push(`  [${ins.domain ?? "general"}] ${ins.title}: ${(ins.insight ?? "").slice(0, 180)} (conf: ${ins.confidence})`);
+      }
+    }
+
+    // Niche-specific memories first
     const nicheMemories = niche
       ? memories.filter(m => m.niche && m.niche.toLowerCase().includes(niche.toLowerCase()))
       : [];
     const generalMemories = memories.filter(m => !nicheMemories.includes(m));
 
     if (nicheMemories.length > 0) {
-      lines.push(`\nNiche-specific knowledge (${niche}):`);
-      for (const m of nicheMemories.slice(0, 6)) {
-        lines.push(`  [${m.memoryType}] ${m.content} (confidence: ${m.confidence})`);
+      lines.push(`\n📌 Conocimiento específico del nicho (${niche}):`);
+      for (const m of nicheMemories.slice(0, 5)) {
+        lines.push(`  [${m.memoryType}] ${m.title ?? ""}: ${(m.content ?? "").slice(0, 160)}`);
       }
     }
 
     if (generalMemories.length > 0) {
-      lines.push("\nGeneral agency knowledge:");
-      for (const m of generalMemories.slice(0, 6)) {
+      lines.push("\n💡 Patrones y memorias de la agencia:");
+      for (const m of generalMemories.slice(0, 7)) {
         const nicheTag = m.niche ? ` [${m.niche}]` : "";
-        lines.push(`  [${m.memoryType}${nicheTag}] ${m.content}`);
+        lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 160)}`);
       }
     }
 
+    // Proven prompt patterns for this use case
     const useCasePrompts = useCase
       ? prompts.filter(p => p.useCase === useCase || p.useCase === "general")
       : prompts;
 
     if (useCasePrompts.length > 0) {
-      lines.push("\nProven prompt patterns:");
+      lines.push("\n✅ Patrones de prompt probados:");
       for (const p of useCasePrompts.slice(0, 3)) {
-        lines.push(`  [${p.useCase}] ${p.promptTemplate.slice(0, 200)}...`);
+        lines.push(`  [${p.useCase}] ${p.promptTemplate.slice(0, 180)}...`);
       }
     }
 
-    lines.push("--- END OMNICORE CONTEXT ---");
+    lines.push("━━━ FIN CONTEXTO SHOPYBRAIN ━━━");
     return lines.join("\n");
   } catch {
     return "";
@@ -236,13 +265,5 @@ export function learnFromOperation(params: {
     useCount: 1,
     successCount: 1,
     successRate: 1.0,
-  }).then(() => {
-    db.update(omnicoreMemoriesTable)
-      .set({ useCount: sql`use_count + 1`, successCount: sql`success_count + 1` })
-      .where(and(
-        eq(omnicoreMemoriesTable.memoryType, memoryType),
-        gte(omnicoreMemoriesTable.confidence, 0.7),
-      ))
-      .catch(() => {});
   }).catch(() => {});
 }
