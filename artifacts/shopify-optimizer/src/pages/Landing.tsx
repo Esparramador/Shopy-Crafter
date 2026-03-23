@@ -236,7 +236,7 @@ export default function Landing() {
   useEffect(() => {
     if (!content) return;
     const timer = setInterval(() => {
-      setActiveTestimonial(t => (t + 1) % (content.testimonials.items.length || 1));
+      setActiveTestimonial(t => (t + 1) % (content.testimonials?.items?.length || 1));
     }, 4500);
     return () => clearInterval(timer);
   }, [content]);

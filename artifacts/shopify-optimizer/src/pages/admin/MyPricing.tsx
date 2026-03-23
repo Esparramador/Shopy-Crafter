@@ -47,7 +47,9 @@ export default function MyPricing() {
   const [clientName, setClientName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [pushing, setPushing] = useState(false);
-  const [pushResult, setPushResult] = useState<{ success: boolean; message: string; requiresManualImport?: boolean; created?: number; failed?: number; instructions?: string[] } | null>(null);
+  const [pushResult, setPushResult] = useState<{ success: boolean; message: string; requiresManualImport?: boolean; created?: number; failed?: number; instructions?: string[]; storeUrl?: string } | null>(null);
+  const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string | null }>>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
   const [shopifyConfigured, setShopifyConfigured] = useState<boolean | null>(null);
   const [shopifyMsg, setShopifyMsg] = useState("");
@@ -57,11 +59,16 @@ export default function MyPricing() {
 
   const load = async () => {
     setLoading(true);
-    const [c, s] = await Promise.all([
+    const [c, s, p] = await Promise.all([
       fetch(`${API_BASE}/api/agency/cost-structure`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API_BASE}/api/agency/services`, { credentials: "include" }).then(r => r.json()),
+      fetch(`${API_BASE}/api/projects`, { credentials: "include" }).then(r => r.json()).catch(() => []),
     ]);
-    setCosts(c); setServices(s); setEditCosts(c); setLoading(false);
+    setCosts(c); setServices(s); setEditCosts(c);
+    const projectList = Array.isArray(p) ? p : [];
+    setProjects(projectList);
+    if (projectList.length > 0 && !selectedProjectId) setSelectedProjectId(projectList[0].id);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -116,6 +123,8 @@ export default function MyPricing() {
     try {
       const r = await fetch(`${API_BASE}/api/agency/push-services-to-shopify`, {
         method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selectedProjectId ? { projectId: selectedProjectId } : {}),
       });
       const data = await r.json();
       setPushResult(data);
@@ -489,49 +498,81 @@ export default function MyPricing() {
       {/* ── Shopify Sync tab ──────────────────────────────────────────────────── */}
       {tab === "shopify" && (
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>Vincula servicios a productos Shopify</h2>
-              <p style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>
-                Mapea cada servicio de la agencia a un producto de tu tienda para generar links de pago automáticos.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={pushToShopify} disabled={pushing} style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8,
-                background: "rgba(45,212,159,0.1)", border: "1px solid rgba(45,212,159,0.3)",
-                color: "var(--jade)", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              }}>
-                {pushing ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={13} />}
-                {pushing ? "Creando..." : "Crear productos en Shopify"}
-              </button>
-              <button onClick={loadShopifyProducts} disabled={loadingShopify} className="btn-secondary" style={{ fontSize: 12 }}>
-                {loadingShopify ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={13} />}
-                {loadingShopify ? "Cargando..." : "Cargar productos Shopify"}
-              </button>
-            </div>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Crear productos en tu tienda Shopify</h2>
+            <p style={{ fontSize: 12, color: "var(--t3)" }}>
+              Selecciona la tienda conectada y pulsa "Crear productos". Se crearán automáticamente en tu Shopify y se añadirán a la colección <strong style={{ color: "var(--gold2)" }}>shopify-automatization</strong>.
+            </p>
           </div>
 
-          {/* Status banner */}
-          {shopifyConfigured === false && (
-            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.25)", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <AlertTriangle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)", marginBottom: 4 }}>Tienda no configurada</p>
-                <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.5 }}>{shopifyMsg || "Configura SHOP_DOMAIN en las variables de entorno con tu tienda (ej: mi-tienda.myshopify.com)"}</p>
+          {/* Project selector + push button */}
+          <div className="glass-card" style={{ padding: "20px 24px", marginBottom: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 12 }}>
+              Tienda origen (token OAuth)
+            </p>
+            {projects.length === 0 ? (
+              <div style={{ padding: "14px 16px", borderRadius: 10, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.25)", display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <AlertTriangle size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)", marginBottom: 4 }}>Sin tiendas conectadas</p>
+                  <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.5 }}>
+                    Para crear los productos automáticamente, primero conecta <strong>comiccrafter.es</strong> como proyecto.<br />
+                    Ve al botón <strong>"+ Nueva tienda"</strong> en el sidebar → escribe el dominio de tu tienda → conecta via Shopify.
+                    Una vez conectada, el token OAuth se captura automáticamente y puedes hacer el push aquí.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <select
+                  value={selectedProjectId ?? ""}
+                  onChange={e => setSelectedProjectId(Number(e.target.value) || null)}
+                  style={{ flex: 1, minWidth: 220, padding: "10px 12px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t)", fontSize: 13, outline: "none" }}
+                >
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.shopDomain ? ` — ${p.shopDomain}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={pushToShopify}
+                  disabled={pushing || !selectedProjectId}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8,
+                    background: pushing ? "rgba(45,212,159,0.06)" : "rgba(45,212,159,0.12)",
+                    border: "1px solid rgba(45,212,159,0.35)",
+                    color: "var(--jade)", cursor: pushing ? "wait" : "pointer", fontSize: 13, fontWeight: 700,
+                    opacity: (!selectedProjectId && !pushing) ? 0.5 : 1,
+                  }}
+                >
+                  {pushing
+                    ? <><RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> Creando productos…</>
+                    : <><Upload size={13} /> Crear productos en Shopify</>
+                  }
+                </button>
+                <button onClick={loadShopifyProducts} disabled={loadingShopify} className="btn-secondary" style={{ fontSize: 12 }}>
+                  {loadingShopify ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={13} />}
+                  {loadingShopify ? "Cargando..." : "Cargar productos"}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Push result */}
           {pushResult && (
-            <div style={{ padding: "12px 16px", borderRadius: 10, marginBottom: 16,
+            <div style={{ padding: "14px 18px", borderRadius: 10, marginBottom: 16,
               background: pushResult.success ? "rgba(45,212,159,0.06)" : "rgba(200,168,75,0.06)",
-              border: `1px solid ${pushResult.success ? "rgba(45,212,159,0.25)" : "rgba(200,168,75,0.25)"}`,
+              border: `1px solid ${pushResult.success ? "rgba(45,212,159,0.3)" : "rgba(200,168,75,0.3)"}`,
             }}>
-              <p style={{ fontSize: 12.5, fontWeight: 600, color: pushResult.success ? "var(--jade)" : "var(--gold)", marginBottom: 4 }}>
-                {pushResult.success ? "✅" : "⚠️"} {pushResult.message}
+              <p style={{ fontSize: 13, fontWeight: 700, color: pushResult.success ? "var(--jade)" : "var(--gold)", marginBottom: 6 }}>
+                {pushResult.message}
               </p>
+              {pushResult.storeUrl && (
+                <a href={pushResult.storeUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--gold2)", display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
+                  <ExternalLink size={11} /> Ver colección en tu tienda →
+                </a>
+              )}
               {pushResult.instructions?.map((inst, i) => (
                 <p key={i} style={{ fontSize: 11.5, color: "var(--t3)", marginTop: 3 }}>• {inst}</p>
               ))}
