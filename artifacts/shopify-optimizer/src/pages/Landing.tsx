@@ -346,7 +346,7 @@ export default function Landing() {
             </div>
 
             {content.features.items[activeEngine] && (
-              <div className={`fp-engine-panel fp-animate${isAnimated("fp-engines") ? " fp-animated" : ""}`} style={{ animationDelay: "0.2s" }} key={activeEngine}>
+              <div className={`fp-engine-panel${!isAnimated("fp-engines") ? " fp-animate" : " fp-animated"}`} style={{ animationDelay: "0.2s" }} key={activeEngine}>
                 <div className="fp-engine-icon-wrap">
                   <div className="fp-engine-icon-large" style={{ background: content.features.items[activeEngine].iconBg }}>
                     {content.features.items[activeEngine].icon}
