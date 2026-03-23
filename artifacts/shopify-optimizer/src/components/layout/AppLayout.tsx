@@ -182,7 +182,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         {/* Comic Crafter — promotional links (compact icon row) */}
-        <div style={{
+        <div className="sidebar-promo" style={{
           padding: "8px 14px",
           borderTop: "1px solid var(--bdr)",
         }}>
