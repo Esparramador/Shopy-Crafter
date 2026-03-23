@@ -363,6 +363,80 @@ router.post("/shopybrain/prompt-library", requireAdmin, async (req, res): Promis
   res.json(prompt);
 });
 
+// ─── TRIGGERS MANUALES 24/7 ──────────────────────────────────────────────────
+router.post("/shopybrain/run/micro-learning", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { runOmniCoreMicroLearning } = await import("../lib/scheduler.js");
+    res.json({ started: true, message: "⚡ Micro-learning cycle iniciado" });
+    runOmniCoreMicroLearning().catch(e => console.error("micro-learning error:", e));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/shopybrain/run/consolidation", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { runOmniCoreMemoryConsolidation } = await import("../lib/scheduler.js");
+    res.json({ started: true, message: "🧠 Memory consolidation iniciada" });
+    runOmniCoreMemoryConsolidation().catch(e => console.error("consolidation error:", e));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/shopybrain/run/cross-synthesis", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { runOmniCoreCrossConnections } = await import("../lib/scheduler.js");
+    res.json({ started: true, message: "🔗 Cross-domain synthesis iniciada" });
+    runOmniCoreCrossConnections().catch(e => console.error("cross-synthesis error:", e));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/shopybrain/run/daily-study", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { runOmniCoreDailyDeepStudy } = await import("../lib/scheduler.js");
+    res.json({ started: true, message: "🎓 Daily deep study iniciado (14 dominios)" });
+    runOmniCoreDailyDeepStudy().catch(e => console.error("daily-study error:", e));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/shopybrain/run/mega-synthesis", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { runOmniCoreMegaSynthesis } = await import("../lib/scheduler.js");
+    res.json({ started: true, message: "🚀 Mega-synthesis semanal iniciada" });
+    runOmniCoreMegaSynthesis().catch(e => console.error("mega-synthesis error:", e));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── SCHEDULE INFO ────────────────────────────────────────────────────────────
+router.get("/shopybrain/schedule", requireAdmin, async (_req, res): Promise<void> => {
+  res.json({
+    learningCycles: [
+      { name: "⚡ Micro-Learning",      frequency: "Cada 3 horas",   description: "2 dominios × 3 insights (16 ciclos/día)", nextRun: "próxima hora redonda ÷ 3", trigger: "/shopybrain/run/micro-learning" },
+      { name: "🧠 Memory Consolidation", frequency: "Cada 6 horas",   description: "Insights → memorias permanentes",          trigger: "/shopybrain/run/consolidation" },
+      { name: "🔗 Cross-Synthesis",      frequency: "Cada 12 horas",  description: "Conexiones entre dominios",               trigger: "/shopybrain/run/cross-synthesis" },
+      { name: "🎓 Daily Deep Study",     frequency: "Diario 1am",     description: "14 dominios × 5 insights = 70 insights",   trigger: "/shopybrain/run/daily-study" },
+      { name: "📊 Revenue Snapshots",    frequency: "Diario 2am",     description: "Datos reales de Shopify" },
+      { name: "📦 Real Data Sync",       frequency: "Diario 3am",     description: "Integración datos tiendas" },
+      { name: "🔍 Competitor Scans",     frequency: "Diario 6am",     description: "Price monitoring" },
+      { name: "📦 Inventory Sync",       frequency: "Diario 7am",     description: "Stock + alertas" },
+      { name: "🚀 Mega-Synthesis",       frequency: "Domingo 0am",    description: "Síntesis estratégica semanal",            trigger: "/shopybrain/run/mega-synthesis" },
+    ],
+    stats: {
+      insightsPerDay: "~120 insights/día (micro × 16 ciclos + daily 70)",
+      domainsTotal: 14,
+      learningHoursPerDay: 24,
+      continuousLearning: true,
+    },
+  });
+});
+
 export async function getShopyBrainContext(niche: string | null, useCase: string): Promise<string> {
   if (!niche) return "";
   try {

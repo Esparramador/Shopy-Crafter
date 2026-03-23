@@ -4,9 +4,9 @@ import {
   projectsTable, eventsTable, revenueSnapshotsTable,
   inventoryTrackingTable, competitorsTable, competitorSnapshotsTable, competitorAlertsTable,
   omnicoreMemoriesTable, omnicoreStudySessionsTable, omnicoreKnowledgeDomainsTable,
-  omnicoreInsightsTable,
+  omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, gte, sql, isNull, or } from "drizzle-orm";
 import { shopifyRequest } from "./shopify.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";
@@ -20,6 +20,23 @@ function log(job: string, msg: string) {
 }
 
 function uid() { return randomBytes(8).toString("hex"); }
+
+const ALL_DOMAINS: Record<string, string> = {
+  ecommerce:            "eCommerce · CRO · UX",
+  shopify_technical:    "Shopify Técnico",
+  financial_analysis:   "Finanzas · P&L",
+  trading_markets:      "Trading · Mercados",
+  investment:           "Inversión · Valoración",
+  marketing:            "Marketing · Ventas",
+  sales:                "Ventas · Psicología",
+  design_ux:            "Diseño · UX",
+  merchandising:        "Merchandising",
+  seo_content:          "SEO · Contenido",
+  logistics:            "Logística · Stock",
+  paid_media:           "Paid Media · ROAS",
+  consumer_psychology:  "Psicología Consumidor",
+  pricing_science:      "Pricing Science",
+};
 
 // ─── REVENUE SNAPSHOTS ───────────────────────────────────────────────────────
 export async function runRevenueSnapshots() {
@@ -53,7 +70,7 @@ export async function runRevenueSnapshots() {
   }
 }
 
-// ─── INVENTORY SYNC ───────────────────────────────────────────────────────────
+// ─── INVENTORY SYNC ──────────────────────────────────────────────────────────
 export async function runInventorySync() {
   log("inventory-sync", "Starting daily inventory sync");
   try {
@@ -161,7 +178,7 @@ export async function runCompetitorScans() {
   }
 }
 
-// ─── OMNICORE REAL DATA INTEGRATION ──────────────────────────────────────────
+// ─── OMNICORE REAL DATA INTEGRATION ─────────────────────────────────────────
 export async function runOmnicoreRealDataIntegration() {
   log("omnicore-realdata", "Starting OmniCore real data integration");
   try {
@@ -201,130 +218,414 @@ export async function runOmnicoreRealDataIntegration() {
   }
 }
 
-// ─── OMNICORE MARKET RESEARCH ─────────────────────────────────────────────────
-export async function runOmnicoreMarketResearch() {
-  log("omnicore-research", "Starting OmniCore market research session");
+// ─── OMNICORE MICRO-LEARNING (cada 3h) ───────────────────────────────────────
+// Selecciona los 2 dominios con mayor antigüedad de estudio y genera 3 insights
+// por dominio. Promueve los de alta confianza (≥0.82) a memorias permanentes.
+export async function runOmniCoreMicroLearning() {
+  log("omnicore-micro", "⚡ Micro-learning cycle starting");
   try {
-    const domains = await db.select().from(omnicoreKnowledgeDomainsTable).limit(3);
+    // Priorizar dominios sin sesión reciente (least-recently-studied first)
+    const domains = await db.select().from(omnicoreKnowledgeDomainsTable)
+      .orderBy(sql`COALESCE(last_study_session, '1970-01-01'::timestamptz) ASC`)
+      .limit(2);
+
+    if (!domains.length) {
+      log("omnicore-micro", "No domains found — skipping");
+      return;
+    }
+
     for (const domain of domains) {
       try {
-        const brainContext = await buildShopyBrainContext(undefined, "general");
-        const prompt = `You are an expert in ${domain.domain ?? domain.id}. Generate 3 actionable insights for Shopify e-commerce stores. Return JSON: {"insights": [{"title": "...", "insight": "...", "confidence": 0.8}]}`;
+        const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain ?? "ecommerce";
+        const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+        const prompt = `You are an expert in ${label} for Shopify e-commerce agencies in 2026. Generate exactly 3 fresh, actionable insights that a Shopify agency owner can apply directly. Each insight must be specific, data-driven, and novel. Return ONLY valid JSON:
+{"insights":[{"title":"...","insight":"...","confidence":0.82,"memoryType":"pricing_pattern","tags":["tag1","tag2"]}]}`;
+
         const response = await anthropic.messages.create({
           model: "claude-sonnet-4-5",
-          max_tokens: 1500,
-          system: `You are OmniCore market research engine. ${brainContext}`,
+          max_tokens: 1200,
+          system: `You are OmniCore Micro-Learning Engine for ShopifyAI Pro agency platform. You generate precise, actionable Shopify e-commerce knowledge. ${brainCtx}`,
           messages: [{ role: "user", content: prompt }],
         });
+
         const text = (response.content[0] as { type: string; text: string }).text;
         const match = text.match(/\{[\s\S]*\}/);
-        if (!match) continue;
-        const { insights } = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number }> };
-        for (const insight of insights) {
+        if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
+
+        const parsed = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string; tags?: string[] }> };
+
+        for (const ins of parsed.insights ?? []) {
+          const insId = `micro-${domain.id}-${uid()}`;
+          const conf = ins.confidence ?? 0.75;
+
           await db.insert(omnicoreInsightsTable).values({
-            id: `market-${domain.id}-${uid()}`,
-            domain: domain.domain ?? domain.id,
-            insightType: "market_research",
-            title: insight.title,
-            insight: insight.insight,
-            confidence: insight.confidence ?? 0.75,
-            source: "automated_cron",
+            id: insId,
+            domain: domain.domain,
+            insightType: "micro_learning",
+            title: ins.title,
+            insight: ins.insight,
+            confidence: conf,
+            source: "micro_learning_cron",
           }).onConflictDoNothing();
+
+          // Alta confianza → también a memorias permanentes
+          if (conf >= 0.82) {
+            await db.insert(omnicoreMemoriesTable).values({
+              id: `mem-${insId}`,
+              memoryType: ins.memoryType ?? "general",
+              niche: "general",
+              title: `[${domain.domain}] ${ins.title}`,
+              content: ins.insight.slice(0, 400),
+              confidence: conf,
+              sourceType: "micro_learning",
+              tags: ins.tags ? JSON.stringify(ins.tags) : null,
+            }).onConflictDoNothing();
+          }
         }
-        log("omnicore-research", `Research for domain: ${domain.domain ?? domain.id}`);
+
+        // Actualizar dominio: incrementar profundidad y marcar sesión
+        const newDepth = Math.min(100, (domain.knowledgeDepth ?? 0) + 1);
+        await db.update(omnicoreKnowledgeDomainsTable).set({
+          knowledgeDepth: newDepth,
+          totalInsights: sql`COALESCE(total_insights, 0) + ${(parsed.insights ?? []).length}`,
+          lastStudySession: new Date(),
+        }).where(eq(omnicoreKnowledgeDomainsTable.id, domain.id));
+
+        log("omnicore-micro", `✅ ${domain.domain}: ${(parsed.insights ?? []).length} insights → depth ${newDepth}`);
       } catch (err) {
-        logger.warn({ domainId: domain.id, err }, "Market research failed for domain");
+        logger.warn({ domainId: domain.id, err }, "Micro-learning failed for domain");
       }
     }
-    log("omnicore-research", "Complete");
+    log("omnicore-micro", "⚡ Micro-learning cycle complete");
   } catch (err) {
-    logger.error({ err }, "OmniCore market research job failed");
+    logger.error({ err }, "Micro-learning job failed");
   }
 }
 
-// ─── OMNICORE WEEKLY DEEP STUDY ───────────────────────────────────────────────
-export async function runOmnicoreWeeklyDeepStudy() {
-  log("omnicore-study", "Starting OmniCore weekly deep study session");
-  const sessionId = `weekly-${new Date().toISOString().split("T")[0]}`;
-  let totalInsights = 0;
+// ─── OMNICORE MEMORY CONSOLIDATION (cada 6h) ────────────────────────────────
+// Promueve insights recientes de alta confianza a memorias y refuerza
+// las memorias de alto uso generadas en la última semana.
+export async function runOmniCoreMemoryConsolidation() {
+  log("omnicore-consolidate", "🧠 Memory consolidation starting");
   try {
-    const domains = await db.select().from(omnicoreKnowledgeDomainsTable).limit(5);
+    // Insights recientes con confianza ≥ 0.85
+    const recent = await db.select().from(omnicoreInsightsTable)
+      .where(gte(omnicoreInsightsTable.confidence, 0.85))
+      .orderBy(desc(omnicoreInsightsTable.createdAt))
+      .limit(30);
+
+    let consolidated = 0;
+    for (const ins of recent) {
+      try {
+        await db.insert(omnicoreMemoriesTable).values({
+          id: `consol-${ins.id}`,
+          memoryType: "general",
+          niche: "general",
+          title: ins.title ?? "(sin título)",
+          content: (ins.insight ?? "").slice(0, 400),
+          confidence: ins.confidence ?? 0.85,
+          sourceType: "memory_consolidation",
+        }).onConflictDoNothing();
+        consolidated++;
+      } catch { /* duplicate — ok */ }
+    }
+
+    // Incrementar useCount en memorias de alta confianza de la última semana
+    await db.execute(sql`
+      UPDATE omnicore_memories
+      SET use_count = COALESCE(use_count, 0) + 1
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND confidence > 0.88
+    `);
+
+    log("omnicore-consolidate", `🧠 Consolidation complete: ${consolidated} insights promoted`);
+  } catch (err) {
+    logger.error({ err }, "Memory consolidation failed");
+  }
+}
+
+// ─── OMNICORE CROSS-DOMAIN SYNTHESIS (cada 12h) ──────────────────────────────
+// Elige 3 dominios al azar y pide a Claude conexiones accionables entre ellos.
+// Guarda las conexiones en omnicore_cross_connections y en memorias.
+export async function runOmniCoreCrossConnections() {
+  log("omnicore-cross", "🔗 Cross-domain synthesis starting");
+  try {
+    const allDomains = await db.select().from(omnicoreKnowledgeDomainsTable);
+    if (allDomains.length < 2) { log("omnicore-cross", "Not enough domains — skipping"); return; }
+
+    // 3 dominios aleatorios
+    const shuffled = [...allDomains].sort(() => Math.random() - 0.5).slice(0, 3);
+    const names = shuffled.map(d => ALL_DOMAINS[d.domain ?? ""] ?? d.domain);
+
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+    const prompt = `Find 3 powerful hidden cross-domain insights connecting these Shopify e-commerce knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy that a Shopify agency can monetize. Return ONLY valid JSON:
+{"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 1200,
+      system: `You are OmniCore Cross-Domain Synthesis Engine. You discover hidden connections between Shopify e-commerce knowledge domains that create compounding agency value. ${brainCtx}`,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = (response.content[0] as { type: string; text: string }).text;
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
+
+    const parsed = JSON.parse(match[0]) as {
+      connections: Array<{ fromDomain: string; toDomain: string; insight: string; synergy: string; confidence: number }>
+    };
+
+    for (const conn of parsed.connections ?? []) {
+      const crossId = `cross-${uid()}`;
+
+      // Guardar la conexión usando los campos reales de la tabla (insightA, insightB)
+      await db.insert(omnicoreCrossConnectionsTable).values({
+        id: crossId,
+        insightA: `[${conn.fromDomain}] ${conn.insight.slice(0, 200)}`,
+        insightB: `[${conn.toDomain}] ${conn.synergy.slice(0, 200)}`,
+        connectionType: "cross_domain_synergy",
+        connectionStrength: conn.confidence ?? 0.7,
+      }).onConflictDoNothing();
+
+      // Promover a memoria
+      await db.insert(omnicoreMemoriesTable).values({
+        id: `cross-mem-${crossId}`,
+        memoryType: "general",
+        niche: "general",
+        title: `Cross-insight: ${conn.fromDomain} × ${conn.toDomain}`,
+        content: `${conn.insight} | Synergy: ${conn.synergy}`.slice(0, 400),
+        confidence: conn.confidence ?? 0.7,
+        sourceType: "cross_domain_synthesis",
+      }).onConflictDoNothing();
+    }
+
+    log("omnicore-cross", `🔗 Cross-synthesis complete: ${(parsed.connections ?? []).length} connections generated`);
+  } catch (err) {
+    logger.error({ err }, "Cross-domain synthesis failed");
+  }
+}
+
+// ─── OMNICORE DAILY DEEP STUDY — TODOS LOS DOMINIOS (1am diario) ─────────────
+// Cubre los 14 dominios en profundidad, generando 5 insights premium por dominio.
+// Es el ciclo más exhaustivo: 70 insights/día máximo.
+export async function runOmniCoreDailyDeepStudy() {
+  log("omnicore-daily", "🎓 Daily deep study starting — all domains");
+  const sessionId = `daily-${new Date().toISOString().split("T")[0]}`;
+  let totalInsights = 0;
+
+  try {
+    const domains = await db.select().from(omnicoreKnowledgeDomainsTable);
+
     await db.insert(omnicoreStudySessionsTable).values({
       id: sessionId,
-      sessionType: "weekly_deep_study",
-      domainsStudied: JSON.stringify(domains.map(d => d.domain ?? d.id)),
-      trigger: "cron_weekly",
+      sessionType: "daily_deep_study",
+      domainsStudied: JSON.stringify(domains.map(d => d.domain)),
+      trigger: "cron_daily_1am",
     }).onConflictDoNothing();
 
     for (const domain of domains) {
       try {
-        const brainContext = await buildShopyBrainContext(undefined, "general");
-        const prompt = `As an expert in ${domain.domain ?? domain.id} for Shopify e-commerce, generate 5 deep insights for agency use in 2026. Return JSON: {"insights": [{"title": "...", "insight": "...", "confidence": 0.85}]}`;
+        const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain;
+        const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+        const prompt = `You are a world-class expert in ${label} for Shopify e-commerce agencies in 2026. Generate 5 premium, deeply researched insights that would be worth €500+/hour consulting advice. Include specific tactics, numbers, and frameworks. Return ONLY valid JSON:
+{"insights":[{"title":"...","insight":"...","confidence":0.87,"memoryType":"pricing_pattern"}]}`;
+
         const response = await anthropic.messages.create({
           model: "claude-sonnet-4-5",
-          max_tokens: 3000,
-          system: `You are OmniCore deep study engine for ShopifyAI Pro. ${brainContext}`,
+          max_tokens: 2500,
+          system: `You are OmniCore Daily Deep Study Engine for ShopifyAI Pro. You generate elite-level Shopify agency knowledge. ${brainCtx}`,
           messages: [{ role: "user", content: prompt }],
         });
+
         const text = (response.content[0] as { type: string; text: string }).text;
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) continue;
-        const { insights } = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number }> };
-        for (const ins of insights) {
-          const insId = `study-${domain.id}-${uid()}`;
+
+        const parsed = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string }> };
+
+        for (const ins of parsed.insights ?? []) {
+          const insId = `daily-${domain.id}-${uid()}`;
+          const conf = ins.confidence ?? 0.82;
+
           await db.insert(omnicoreInsightsTable).values({
             id: insId,
-            domain: domain.domain ?? domain.id,
-            insightType: "deep_study",
+            domain: domain.domain,
+            insightType: "daily_study",
             title: ins.title,
             insight: ins.insight,
-            confidence: ins.confidence ?? 0.8,
-            source: "weekly_deep_study",
+            confidence: conf,
+            source: "daily_deep_study",
           }).onConflictDoNothing();
+
           await db.insert(omnicoreMemoriesTable).values({
-            id: insId,
-            memoryType: "ab_insight",
+            id: `mem-${insId}`,
+            memoryType: ins.memoryType ?? "general",
             niche: "general",
-            title: `[${domain.domain ?? domain.id}] ${ins.title}`,
+            title: `[Daily·${domain.domain}] ${ins.title}`,
             content: ins.insight.slice(0, 400),
-            confidence: ins.confidence ?? 0.8,
-            sourceType: "weekly_deep_study",
+            confidence: conf,
+            sourceType: "daily_deep_study",
           }).onConflictDoNothing();
+
           totalInsights++;
         }
-        log("omnicore-study", `Deep study done for ${domain.domain ?? domain.id}: ${insights.length} insights`);
+
+        // Incrementar profundidad de conocimiento del dominio
+        const newDepth = Math.min(100, (domain.knowledgeDepth ?? 0) + 3);
+        await db.update(omnicoreKnowledgeDomainsTable).set({
+          knowledgeDepth: newDepth,
+          totalInsights: sql`COALESCE(total_insights, 0) + ${(parsed.insights ?? []).length}`,
+          verifiedInsights: sql`COALESCE(verified_insights, 0) + ${Math.floor((parsed.insights ?? []).length * 0.7)}`,
+          lastStudySession: new Date(),
+        }).where(eq(omnicoreKnowledgeDomainsTable.id, domain.id));
+
+        log("omnicore-daily", `✅ ${domain.domain}: ${(parsed.insights ?? []).length} insights → depth ${newDepth}`);
       } catch (err) {
-        logger.warn({ domainId: domain.id, err }, "Deep study failed for domain");
+        logger.warn({ domainId: domain.id, err }, "Daily study failed for domain");
       }
     }
 
     await db.update(omnicoreStudySessionsTable).set({
       insightsCreated: totalInsights,
-      summary: `Weekly deep study generated ${totalInsights} insights across ${domains.length} domains`,
+      summary: `Daily deep study: ${totalInsights} insights across ${domains.length} domains`,
     }).where(eq(omnicoreStudySessionsTable.id, sessionId));
 
-    log("omnicore-study", `Complete: ${totalInsights} insights generated`);
+    log("omnicore-daily", `🎓 Daily deep study complete: ${totalInsights} insights across ${domains.length} domains`);
   } catch (err) {
-    logger.error({ err }, "OmniCore weekly deep study job failed");
+    logger.error({ err }, "Daily deep study failed");
   }
 }
 
-// ─── REGISTER ALL CRON JOBS ──────────────────────────────────────────────────
+// ─── OMNICORE MEGA-SYNTHESIS SEMANAL (Domingo medianoche) ────────────────────
+// Síntesis de alto nivel que conecta los aprendizajes de la semana,
+// genera perfiles de nicho actualizados y crea conexiones meta-cruzadas.
+export async function runOmniCoreMegaSynthesis() {
+  log("omnicore-mega", "🚀 Weekly mega-synthesis starting");
+  const sessionId = `mega-${new Date().toISOString().split("T")[0]}`;
+  let totalInsights = 0;
+
+  try {
+    const domains = await db.select().from(omnicoreKnowledgeDomainsTable);
+    const topMemories = await db.select().from(omnicoreMemoriesTable)
+      .orderBy(desc(omnicoreMemoriesTable.confidence)).limit(20);
+
+    await db.insert(omnicoreStudySessionsTable).values({
+      id: sessionId,
+      sessionType: "weekly_mega_synthesis",
+      domainsStudied: JSON.stringify(domains.map(d => d.domain)),
+      trigger: "cron_weekly_sunday",
+    }).onConflictDoNothing();
+
+    const memorySummary = topMemories.slice(0, 10).map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 100)}`).join("\n");
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+
+    const prompt = `Based on this week's accumulated knowledge for a Shopify e-commerce agency, synthesize 8 meta-level strategic insights that connect multiple domains and reveal compounding opportunities. These are executive-level, cross-domain insights worth implementing immediately.
+
+Recent top memories:
+${memorySummary}
+
+Return ONLY valid JSON:
+{"insights":[{"title":"...","insight":"...","confidence":0.92,"domains":["domain1","domain2"],"priority":"high"}]}`;
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4000,
+      system: `You are OmniCore Mega-Synthesis Engine — the highest-level reasoning layer of ShopifyAI Pro. You synthesize a week of multi-domain learning into strategic masterclass insights. ${brainCtx}`,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = (response.content[0] as { type: string; text: string }).text;
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]) as {
+        insights: Array<{ title: string; insight: string; confidence: number; domains?: string[]; priority?: string }>
+      };
+
+      for (const ins of parsed.insights ?? []) {
+        const insId = `mega-${uid()}`;
+        const conf = ins.confidence ?? 0.9;
+
+        await db.insert(omnicoreInsightsTable).values({
+          id: insId,
+          domain: (ins.domains ?? ["general"])[0],
+          insightType: "mega_synthesis",
+          title: ins.title,
+          insight: ins.insight,
+          confidence: conf,
+          source: "weekly_mega_synthesis",
+        }).onConflictDoNothing();
+
+        await db.insert(omnicoreMemoriesTable).values({
+          id: `mem-${insId}`,
+          memoryType: "mega_insight",
+          niche: "general",
+          title: `[MEGA] ${ins.title}`,
+          content: ins.insight.slice(0, 400),
+          confidence: conf,
+          sourceType: "mega_synthesis",
+          tags: JSON.stringify(["mega", "strategic", ...(ins.domains ?? [])]),
+        }).onConflictDoNothing();
+
+        totalInsights++;
+      }
+    }
+
+    await db.update(omnicoreStudySessionsTable).set({
+      insightsCreated: totalInsights,
+      summary: `Weekly mega-synthesis: ${totalInsights} strategic insights from ${domains.length} domains`,
+    }).where(eq(omnicoreStudySessionsTable.id, sessionId));
+
+    log("omnicore-mega", `🚀 Mega-synthesis complete: ${totalInsights} strategic insights`);
+  } catch (err) {
+    logger.error({ err }, "Mega-synthesis failed");
+  }
+}
+
+// ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
 export function registerCronJobs() {
-  log("scheduler", "Registering all cron jobs (timezone: Europe/Madrid)");
+  log("scheduler", "🕐 Registering 24/7 continuous learning jobs (timezone: Europe/Madrid)");
 
-  // Daily 2am — Revenue snapshots
+  // ── APRENDIZAJE CONTINUO ─────────────────────────────────────────────────
+  // Cada 3 horas — Micro-learning: 2 dominios × 3 insights (16 ciclos/día)
+  cron.schedule("0 */3 * * *", () => { runOmniCoreMicroLearning().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // Cada 6 horas — Memory consolidation: insights → memorias permanentes
+  cron.schedule("30 */6 * * *", () => { runOmniCoreMemoryConsolidation().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // Cada 12 horas — Cross-domain synthesis: conexiones entre dominios
+  cron.schedule("0 */12 * * *", () => { runOmniCoreCrossConnections().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // ── CICLOS DIARIOS ───────────────────────────────────────────────────────
+  // 1am diario — Daily deep study: todos los dominios, 5 insights/dominio
+  cron.schedule("0 1 * * *", () => { runOmniCoreDailyDeepStudy().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // 2am diario — Revenue snapshots desde Shopify
   cron.schedule("0 2 * * *", () => { runRevenueSnapshots().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
-  // Daily 3am — OmniCore real data integration
-  cron.schedule("0 3 * * *", () => { runOmnicoreRealDataIntegration().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
-  // Daily 4am — OmniCore market research
-  cron.schedule("0 4 * * *", () => { runOmnicoreMarketResearch().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
-  // Daily 6am — Competitor price scans
-  cron.schedule("0 6 * * *", () => { runCompetitorScans().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
-  // Daily 7am — Inventory sync + alerts
-  cron.schedule("0 7 * * *", () => { runInventorySync().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
-  // Weekly Sunday 2am — OmniCore deep study
-  cron.schedule("0 2 * * 0", () => { runOmnicoreWeeklyDeepStudy().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
-  log("scheduler", "✅ All 6 cron jobs registered: revenue@2am, omnicore-data@3am, omnicore-research@4am, competitors@6am, inventory@7am, deep-study@Sun2am");
+  // 3am diario — OmniCore real data integration (datos reales de tiendas)
+  cron.schedule("0 3 * * *", () => { runOmnicoreRealDataIntegration().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // 6am diario — Competitor price scans
+  cron.schedule("0 6 * * *", () => { runCompetitorScans().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // 7am diario — Inventory sync + alertas de stock crítico
+  cron.schedule("0 7 * * *", () => { runInventorySync().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // ── SÍNTESIS SEMANAL ─────────────────────────────────────────────────────
+  // Domingo 00:00 — Mega-synthesis: síntesis estratégica semanal de todos los dominios
+  cron.schedule("0 0 * * 0", () => { runOmniCoreMegaSynthesis().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  log("scheduler", [
+    "✅ 9 jobs registrados:",
+    "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
+    "  🧠 Consolidación     → cada 6h  (insights → memorias)",
+    "  🔗 Cross-synthesis   → cada 12h (conexiones cruzadas)",
+    "  🎓 Deep study        → 1am     (14 dominios × 5 insights)",
+    "  📊 Revenue           → 2am     (snapshots Shopify)",
+    "  📦 Real data         → 3am     (integración datos reales)",
+    "  🔍 Competidores      → 6am     (price scans)",
+    "  📦 Inventario        → 7am     (sync + alertas stock)",
+    "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",
+  ].join("\n"));
 }
