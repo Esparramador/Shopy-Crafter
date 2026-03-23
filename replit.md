@@ -152,7 +152,20 @@ artifacts-monorepo/
 - **DB tables**: `omnicore_memories`, `omnicore_niche_profiles`, `omnicore_prompt_library`, `omnicore_knowledge_domains`, `omnicore_insights`, `omnicore_study_sessions`, `omnicore_cross_connections`
 - **Routes**: `/api/shopybrain/*` — status, memories CRUD, learn, search, insights, study sessions, niche-profiles, prompt-library
 - **Pages**: `/admin/shopybrain` (dashboard), `/admin/shopybrain/memories`, `/admin/shopybrain/insights`, `/admin/shopybrain/study`
-- **Context injection**: `getShopyBrainContext(niche, useCase)` exported for injection into Claude calls
+- **Context injection**: `buildShopyBrainContext(niche, useCase)` in `claude.ts` — injected into ALL generation calls (redesign, seo, pricing, images, emails, intelligence)
+- **Bidirectional learning**: `learnFromOperation()` fires after every successful AI generation; `ingestToShopyBrain()` fires after every reference analysis
+- **Brain Ingester**: `artifacts/api-server/src/lib/brain-ingester.ts` — universal knowledge ingestion engine
+  - Auto-detects 6 domains: `visual_production`, `marketing`, `ecommerce`, `design_ux`, `consumer_psychology`, `seo_content`
+  - Saves raw memories immediately; Claude extracts 3-6 structured insights async (fire-and-forget)
+  - Bumps `omnicore_knowledge_domains` depth counters after each ingestion
+  - Specialized: `ingestImageKnowledge()` + `ingestVideoKnowledge()`
+
+### Reference Intelligence Engine
+- **Route**: `artifacts/api-server/src/routes/reference.ts`
+- **Image analysis** (`POST /api/reference/analyze-image`): 10-section extraction — product, photography technique, lighting, geometric composition, color chemistry, textures/materials, rendering/post-prod, photographic style, brand positioning, ShopyBrain replication synthesis. Auto-ingests to ShopyBrain.
+- **Video analysis** (`POST /api/reference/analyze-video`): 13-section cinematic extraction — narrative arc, cinematography, composition geometry, lighting ratios, color grading/LUTs, textures/materials, VFX/rendering, sound design, editing rhythm, emotional arc, brand chemistry, global system synthesis, and full replication brief for ShopyBrain. Auto-ingests to ShopyBrain.
+- **Manual ingest** (`POST /api/reference/ingest`): Push any text intelligence directly into ShopyBrain
+- Every analysis responds with `learnedByShopyBrain: true`
 
 ### OmniCore Pricing Intelligence CFO (Phase B)
 - **DB tables**: `agency_cost_structure`, `service_catalog`, `pricing_decisions`, `pricing_rules`
@@ -179,7 +192,7 @@ artifacts-monorepo/
 ### Study Sessions
 - Manual trigger via `/admin/shopybrain/study` — selección de dominios + launch
 - Claude genera insights JSON cross-domain por cada sesión
-- 14 dominios: ecommerce, shopify_technical, financial_analysis, trading_markets, investment, marketing, sales, design_ux, merchandising, seo_content, logistics, paid_media, consumer_psychology, pricing_science
+- **15 dominios**: ecommerce, shopify_technical, financial_analysis, trading_markets, investment, marketing, sales, design_ux, merchandising, seo_content, logistics, paid_media, consumer_psychology, pricing_science, **visual_production** (cinematografía, color grading, texturas, renderizado, composición)
 
 ### Sidebar Navigation
 - Shopy Brain group (🧠) arriba de Administración en el sidebar
@@ -206,6 +219,7 @@ artifacts-monorepo/
 
 ### Email Flow Builder (OmniCore + Klaviyo)
 - **Route**: `artifacts/api-server/src/routes/emails.ts` — montado en routes/index.ts (requireAdmin)
+- **ShopyBrain injection**: `buildShopyBrainContext(niche, "general")` inyectado en cada generación de email; `learnFromOperation()` guarda cada email generado como memoria
 - **Endpoints**:
   - GET /api/emails/flows — lista flows (filtrable por projectId)
   - GET /api/emails/flows/:id — get flow

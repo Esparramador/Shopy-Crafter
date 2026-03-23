@@ -4,6 +4,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { safeDecrypt } from "../lib/crypto.js";
+import { buildShopyBrainContext, learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -156,9 +157,11 @@ router.post("/emails/generate", async (req, res): Promise<void> => {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const client = new Anthropic({ apiKey: anthropicKey });
 
+    const brainContext = await buildShopyBrainContext(projectInfo.niche, "general");
+
     const systemPrompt = `Eres un experto en email marketing de eCommerce con años de experiencia creando emails de alta conversión.
 Generas emails HTML completos, profesionales y que realmente convierten para tiendas Shopify.
-SIEMPRE devuelves JSON válido y nada más.`;
+SIEMPRE devuelves JSON válido y nada más.${brainContext}`;
 
     const userPrompt = `Genera un email HTML completo y profesional para la tienda "${projectInfo.name}" (nicho: ${projectInfo.niche}).
 
@@ -198,18 +201,32 @@ Devuelve SOLO este JSON (nada más):
   "variables_used": ["lista de variables Klaviyo usadas"]
 }`;
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    });
+    const message = await client.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      },
+      { signal: AbortSignal.timeout(90_000) }
+    );
 
     const content = message.content[0].type === "text" ? message.content[0].text : "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in Claude response");
 
     const result = JSON.parse(jsonMatch[0]);
+
+    // ShopyBrain learns from every email generated
+    learnFromOperation({
+      operationType: "redesign",
+      niche: projectInfo.niche,
+      title: `Email ${flowType} generado para ${projectInfo.name}`,
+      content: `Flow: ${flowType} | Tone: ${tone} | Subjects: ${result.subject_a ?? ""} / ${result.subject_b ?? ""}`,
+      confidence: 0.68,
+      tags: ["email", flowType, tone, projectInfo.niche],
+    });
+
     res.json(result);
   } catch (err: any) {
     logger.error("Email generate error:", err.message);

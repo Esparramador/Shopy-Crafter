@@ -23,6 +23,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   paid_media: "Paid Media · ROAS",
   consumer_psychology: "Psicología Consumidor",
   pricing_science: "Pricing Science",
+  visual_production: "Producción Visual · Cinematografía",
+  general: "Conocimiento General",
 };
 
 async function ensureDomains() {

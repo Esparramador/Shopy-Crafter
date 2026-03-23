@@ -136,7 +136,11 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
 
 /**
  * Builds a ShopyBrain context block to inject into Claude system prompts.
- * Pulls from ALL OmniCore knowledge: memories, top insights, and proven prompt patterns.
+ * Pulls from ALL OmniCore knowledge: memories (including visual references),
+ * top insights (cross-domain including visual_production), and proven prompt patterns.
+ *
+ * The brain is bidirectional: every analysis enriches it, and every generation
+ * benefits from everything the brain has learned.
  */
 export async function buildShopyBrainContext(
   niche?: string,
@@ -144,8 +148,10 @@ export async function buildShopyBrainContext(
 ): Promise<string> {
   try {
     const minConfidence = 0.6;
+    const isVisualTask = useCase === "images" || useCase === "redesign";
 
-    const [memories, prompts, topInsights] = await Promise.all([
+    const [memories, prompts, topInsights, visualInsights] = await Promise.all([
+      // Standard memories (all types)
       db
         .select({
           memoryType: omnicoreMemoriesTable.memoryType,
@@ -159,6 +165,7 @@ export async function buildShopyBrainContext(
         .orderBy(desc(omnicoreMemoriesTable.confidence))
         .limit(15),
 
+      // Proven prompt patterns
       db
         .select({
           useCase: omnicorePromptLibraryTable.useCase,
@@ -169,6 +176,7 @@ export async function buildShopyBrainContext(
         .orderBy(desc(omnicorePromptLibraryTable.avgQualityScore))
         .limit(5),
 
+      // Top cross-domain strategic insights
       db
         .select({
           domain: omnicoreInsightsTable.domain,
@@ -177,31 +185,66 @@ export async function buildShopyBrainContext(
           confidence: omnicoreInsightsTable.confidence,
         })
         .from(omnicoreInsightsTable)
-        .where(gte(omnicoreInsightsTable.confidence, 0.80))
+        .where(and(
+          gte(omnicoreInsightsTable.confidence, 0.75),
+        ))
         .orderBy(desc(omnicoreInsightsTable.confidence))
-        .limit(8),
+        .limit(10),
+
+      // Visual production insights — from reference image/video analysis
+      // Always included for visual tasks; lightly included for all others
+      db
+        .select({
+          title: omnicoreInsightsTable.title,
+          insight: omnicoreInsightsTable.insight,
+          confidence: omnicoreInsightsTable.confidence,
+        })
+        .from(omnicoreInsightsTable)
+        .where(and(
+          eq(omnicoreInsightsTable.domain, "visual_production"),
+          gte(omnicoreInsightsTable.confidence, 0.65),
+        ))
+        .orderBy(desc(omnicoreInsightsTable.confidence))
+        .limit(isVisualTask ? 6 : 2),
     ]);
 
-    if (memories.length === 0 && prompts.length === 0 && topInsights.length === 0) return "";
+    if (memories.length === 0 && prompts.length === 0 && topInsights.length === 0 && visualInsights.length === 0) return "";
 
-    const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — CONOCIMIENTO ACUMULADO ━━━"];
+    const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — INTELIGENCIA ACUMULADA ━━━"];
 
     if (niche) lines.push(`Nicho activo: ${niche}`);
     if (useCase) lines.push(`Contexto de tarea: ${useCase}`);
 
-    // Top strategic insights from continuous learning cycles
-    if (topInsights.length > 0) {
-      lines.push("\n🧠 Insights estratégicos de alta confianza (aprendizaje continuo):");
-      for (const ins of topInsights.slice(0, 6)) {
+    // Top strategic insights (cross-domain)
+    const nonVisualInsights = topInsights.filter(i => i.domain !== "visual_production");
+    if (nonVisualInsights.length > 0) {
+      lines.push("\n🧠 Insights estratégicos (aprendizaje continuo):");
+      for (const ins of nonVisualInsights.slice(0, 5)) {
         lines.push(`  [${ins.domain ?? "general"}] ${ins.title}: ${(ins.insight ?? "").slice(0, 180)} (conf: ${ins.confidence})`);
       }
     }
 
-    // Niche-specific memories first
+    // Visual production intelligence (from reference analyses)
+    if (visualInsights.length > 0) {
+      lines.push(`\n🎬 Inteligencia visual absorbida de referencias${isVisualTask ? " (alta prioridad)" : ""}:`);
+      for (const v of visualInsights) {
+        lines.push(`  ${v.title}: ${(v.insight ?? "").slice(0, 200)} (conf: ${v.confidence})`);
+      }
+    }
+
+    // Niche-specific memories
     const nicheMemories = niche
       ? memories.filter(m => m.niche && m.niche.toLowerCase().includes(niche.toLowerCase()))
       : [];
-    const generalMemories = memories.filter(m => !nicheMemories.includes(m));
+
+    // Image pattern memories (from reference ingestion) — for visual tasks
+    const imagePatternMemories = isVisualTask
+      ? memories.filter(m => m.memoryType === "image_pattern" && !nicheMemories.includes(m))
+      : [];
+
+    const generalMemories = memories.filter(m =>
+      !nicheMemories.includes(m) && !imagePatternMemories.includes(m)
+    );
 
     if (nicheMemories.length > 0) {
       lines.push(`\n📌 Conocimiento específico del nicho (${niche}):`);
@@ -210,9 +253,16 @@ export async function buildShopyBrainContext(
       }
     }
 
+    if (imagePatternMemories.length > 0) {
+      lines.push("\n🖼 Patrones visuales de referencias analizadas:");
+      for (const m of imagePatternMemories.slice(0, 4)) {
+        lines.push(`  ${m.title ?? ""}: ${(m.content ?? "").slice(0, 180)}`);
+      }
+    }
+
     if (generalMemories.length > 0) {
-      lines.push("\n💡 Patrones y memorias de la agencia:");
-      for (const m of generalMemories.slice(0, 7)) {
+      lines.push("\n💡 Memorias y patrones de la agencia:");
+      for (const m of generalMemories.slice(0, 6)) {
         const nicheTag = m.niche ? ` [${m.niche}]` : "";
         lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 160)}`);
       }
