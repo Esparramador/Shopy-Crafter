@@ -221,7 +221,7 @@ router.get("/agency/shopify-products", requireAdmin, async (_req, res): Promise<
   const shopDomain = process.env.SHOP_DOMAIN;
   const storefrontToken = process.env.STOREFRONT_ACCESS_TOKEN;
 
-  if (!shopDomain || !storefrontToken || shopDomain.includes("comic-crafter")) {
+  if (!shopDomain || !storefrontToken ) {
     res.json({ products: [], configured: false, message: "Configura SHOP_DOMAIN con tu tienda en Ajustes" });
     return;
   }
@@ -257,7 +257,7 @@ router.post("/agency/payment-link", requireAdmin, async (req, res): Promise<void
   const shopDomain = process.env.SHOP_DOMAIN;
   const storefrontToken = process.env.STOREFRONT_ACCESS_TOKEN;
 
-  if (!shopDomain || !storefrontToken || shopDomain.includes("comic-crafter")) {
+  if (!shopDomain || !storefrontToken ) {
     res.status(400).json({ error: "SHOP_DOMAIN no configurado. Ve a Ajustes → Shopify." });
     return;
   }
@@ -318,7 +318,7 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
   await ensureDefaultServices();
   const services = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
 
-  const shopDomain = process.env.SHOP_DOMAIN ?? "comic-crafter.myshopify.com";
+  const shopDomain = process.env.SHOP_DOMAIN ?? "";
   const adminToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ?? "";
 
   const shopifyProducts = services.map((svc) => {

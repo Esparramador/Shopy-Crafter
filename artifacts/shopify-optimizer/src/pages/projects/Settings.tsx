@@ -4,7 +4,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useGetProject, useUpdateProject, useRefreshProjectToken, useTestProjectConnection } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetProjectQueryKey } from "@workspace/api-client-react";
-import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain } from "lucide-react";
+import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain, Eye, EyeOff, Copy } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
 
 export default function SettingsPage() {
@@ -29,6 +29,10 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<any>(null);
   const [buildingProfile, setBuildingProfile] = useState(false);
   const [profileResult, setProfileResult] = useState<any>(null);
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [tokenVisible, setTokenVisible] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(false);
 
   const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -48,6 +52,24 @@ export default function SettingsPage() {
 
   const handleAutofill = (data: Record<string, string>) => {
     setFormData(prev => ({ ...prev, ...data }));
+  };
+
+  const revealToken = async () => {
+    if (revealedToken) { setTokenVisible(!tokenVisible); return; }
+    setLoadingToken(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/reveal-token`, { credentials: "include" });
+      const data = await res.json();
+      if (data.accessToken) { setRevealedToken(data.accessToken); setTokenVisible(true); }
+    } catch { /* ignore */ }
+    finally { setLoadingToken(false); }
+  };
+
+  const copyToken = () => {
+    if (!revealedToken) return;
+    navigator.clipboard.writeText(revealedToken);
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 2500);
   };
 
   useEffect(() => {
@@ -143,9 +165,38 @@ export default function SettingsPage() {
             className="bg-primary/20 border border-primary/30 text-primary px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-primary/30 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshToken.isPending ? 'animate-spin' : ''}`} />
-            Renovar Token Ahora
+            Renovar Token
           </button>
+          {project?.hasAccessToken && (
+            <button
+              onClick={revealToken}
+              disabled={loadingToken}
+              className="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-amber-500/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {loadingToken ? <RefreshCw className="w-4 h-4 animate-spin" /> : tokenVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {revealedToken ? (tokenVisible ? "Ocultar Token" : "Ver Token") : "Ver Token (SHPAT)"}
+            </button>
+          )}
         </div>
+
+        {revealedToken && tokenVisible && (
+          <div className="mt-4 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-amber-400">Admin API Access Token</p>
+              <button
+                onClick={copyToken}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${tokenCopied ? "bg-green-500/15 border-green-500/30 text-green-400" : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground"}`}
+              >
+                <Copy className="w-3 h-3" />
+                {tokenCopied ? "¡Copiado!" : "Copiar"}
+              </button>
+            </div>
+            <div className="font-mono text-xs text-green-400 break-all bg-black/20 rounded-lg p-3 leading-relaxed">
+              {revealedToken}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Guarda este token de forma segura si tu cliente lo necesita para otras integraciones.</p>
+          </div>
+        )}
 
         {testResult && (
           <div className={`mt-4 p-4 rounded-xl text-sm border ${testResult.connected ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>

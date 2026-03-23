@@ -252,6 +252,18 @@ router.delete("/projects/:projectId", async (req, res): Promise<void> => {
   res.json({ success: true, message: "Proyecto eliminado" });
 });
 
+router.get("/projects/:projectId/reveal-token", async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+  if (!project.accessToken) { res.status(404).json({ error: "Sin token de acceso" }); return; }
+  res.json({
+    accessToken: project.accessToken,
+    shopDomain: project.shopDomain,
+    note: "Guarda este token de forma segura. Es el Admin API access token de la tienda.",
+  });
+});
+
 router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
