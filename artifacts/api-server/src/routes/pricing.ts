@@ -109,10 +109,62 @@ router.post("/projects/:projectId/products/:productId/cogs", async (req, res): P
   res.json({ productId: shopifyProductId, ...values });
 });
 
+async function fetchRealCompetitorData(url: string): Promise<{
+  url: string;
+  price: number | null;
+  brand: string | null;
+  htmlSnippet: string | null;
+}> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
+        "Cache-Control": "no-cache",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return { url, price: null, brand: null, htmlSnippet: `HTTP ${res.status}` };
+    const html = await res.text();
+
+    const jsonLdBlocks = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)]
+      .map((m) => m[0].slice(0, 600)).join("\n").slice(0, 1500);
+    const metaPrices = (html.match(/<meta[^>]+(og:price:amount|itemprop="price"|product:price:amount)[^>]*>/gi) ?? []).join("\n");
+    const priceSpans = (html.match(/<[^>]*(class|id)="[^"]*price[^"]*"[^>]*>[^<]{1,30}<\/[^>]+>/gi) ?? []).slice(0, 5).join("\n");
+
+    const htmlSnippet = [jsonLdBlocks, metaPrices, priceSpans].filter(Boolean).join("\n---\n").slice(0, 2000) || null;
+
+    const pricePatterns = [
+      /"price":\s*"?(\d+(?:[.,]\d{1,2})?)"?/,
+      /content="(\d+(?:\.\d{1,2})?)"[^>]*(?:og:price:amount|itemprop="price")/i,
+      /(?:og:price:amount|itemprop="price")[^>]*content="(\d+(?:\.\d{1,2})?)"/i,
+      /"amount":\s*"(\d+(?:\.\d{1,2})?)"/,
+      /"price":\s*(\d+(?:\.\d{1,2})?)\s*[,}]/,
+    ];
+    let price: number | null = null;
+    for (const p of pricePatterns) {
+      const m = html.match(p);
+      if (m) {
+        const raw = parseFloat(m[1].replace(",", "."));
+        price = raw > 500 ? raw / 100 : raw;
+        break;
+      }
+    }
+
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    const brand = titleMatch ? titleMatch[1].split(/[|\-–·]/)[0].trim().slice(0, 60) : null;
+    return { url, price, brand, htmlSnippet };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "timeout";
+    return { url, price: null, brand: null, htmlSnippet: `Error: ${msg}` };
+  }
+}
+
 router.post("/projects/:projectId/products/:productId/analyze-competitors", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-  const { competitorUrls, searchKeywords } = req.body as { competitorUrls: string[]; searchKeywords?: string };
+  const { competitorUrls = [], searchKeywords } = req.body as { competitorUrls?: string[]; searchKeywords?: string };
 
   const [product] = await db
     .select()
@@ -126,29 +178,64 @@ router.post("/projects/:projectId/products/:productId/analyze-competitors", asyn
     return;
   }
 
-  const prompt = `Analiza la competencia de precios para el producto "${product.title}" en el nicho "${project.storeNiche ?? "e-commerce"}".
+  const validUrls = competitorUrls.filter((u) => {
+    try { new URL(u); return true; } catch { return false; }
+  });
+
+  const fetchedData = validUrls.length > 0
+    ? await Promise.all(validUrls.map(fetchRealCompetitorData))
+    : [];
+
+  const realPricesFound = fetchedData.filter((d) => d.price !== null);
+  const realPricesSummary = fetchedData.map((d) =>
+    `URL: ${d.url} | Precio extraído: ${d.price !== null ? `€${d.price}` : "no detectado"} | Brand: ${d.brand ?? "desconocida"}\nHTML snippet: ${d.htmlSnippet ?? "sin datos"}`
+  ).join("\n\n");
+
+  const prompt = `Analiza la competencia de precios para el producto "${product.title}" (precio actual: €${product.price ?? "no configurado"}) en el nicho "${project.storeNiche ?? "e-commerce"}".
 ${searchKeywords ? `Keywords de búsqueda: ${searchKeywords}` : ""}
-${competitorUrls.length > 0 ? `URLs de competidores a analizar: ${competitorUrls.join(", ")}` : ""}
 
-Basándote en tu conocimiento del mercado actual en España/LATAM para este tipo de producto, proporciona:
-1. Rangos de precios por tier (budget, mid, premium)
-2. Precio mediano del mercado
-3. Recomendación de posicionamiento para "${project.name}" (${project.brandTone ?? "profesional"})
+DATOS REALES EXTRAÍDOS DE LAS URLS DE COMPETIDORES (via HTTP fetch real, no inventados):
+${realPricesSummary || "No se proporcionaron URLs de competidores."}
 
-Devuelve JSON con: budgetMin, budgetMax, midMin, midMax, premiumMin, premiumMax, medianPrice, positioningRecommendation, competitorData (array con url, price, brand).`;
+Precios reales encontrados: ${realPricesFound.length > 0 ? realPricesFound.map((d) => `${d.brand ?? d.url}: €${d.price}`).join(", ") : "ninguno extraído automáticamente — usa los HTML snippets para determinar precios manualmente."}
+
+Con base en estos datos REALES (no inventes precios que no están en los snippets), proporciona:
+1. Rangos de precios por tier (budget, mid, premium) basados en los datos reales
+2. Precio mediano del mercado según los datos reales
+3. Recomendación de posicionamiento para "${project.name}" (tono: ${project.brandTone ?? "profesional"})
+
+IMPORTANTE: Los precios en competitorData DEBEN ser los precios reales extraídos, no estimaciones tuyas. Si no tienes el precio real de una URL, pon null.
+
+Devuelve JSON: { budgetMin, budgetMax, midMin, midMax, premiumMin, premiumMax, medianPrice, positioningRecommendation, competitorData: [{ url, price, brand }], dataQuality: "real"|"partial"|"estimated", realPricesCount: number }`;
 
   const result = await askClaudeJsonWithBrain<{
     budgetMin: number; budgetMax: number; midMin: number; midMax: number;
     premiumMin: number; premiumMax: number; medianPrice: number;
     positioningRecommendation: string;
     competitorData: Array<{ url: string; price: number | null; brand: string | null }>;
+    dataQuality: string;
+    realPricesCount: number;
   }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", project?.storeNiche ?? undefined);
 
+  const enrichedResult = {
+    ...result,
+    competitorData: result.competitorData.map((cd) => {
+      const fetched = fetchedData.find((f) => f.url === cd.url);
+      return fetched?.price !== null && fetched
+        ? { ...cd, price: fetched.price, brand: fetched.brand ?? cd.brand, verified: true }
+        : { ...cd, verified: false };
+    }),
+    fetchedCount: fetchedData.length,
+    realPricesCount: realPricesFound.length,
+    dataQuality: realPricesFound.length >= fetchedData.length * 0.5 ? "real" :
+      realPricesFound.length > 0 ? "partial" : "estimated",
+  };
+
   await db.update(cogsTable)
-    .set({ lastCompetitorAnalysis: result as Record<string, unknown> })
+    .set({ lastCompetitorAnalysis: enrichedResult as Record<string, unknown> })
     .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
 
-  res.json(result);
+  res.json(enrichedResult);
 });
 
 router.post("/projects/:projectId/products/:productId/calculate-optimal-price", async (req, res): Promise<void> => {

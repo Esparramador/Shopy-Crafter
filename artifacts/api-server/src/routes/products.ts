@@ -18,7 +18,20 @@ interface ShopifyProductRaw {
   handle: string;
   status: string;
   tags: string;
-  variants: Array<{ price: string; compare_at_price: string | null }>;
+  variants: Array<{
+    id: number;
+    title: string;
+    price: string;
+    compare_at_price: string | null;
+    sku: string | null;
+    option1: string | null;
+    option2: string | null;
+    option3: string | null;
+    inventory_quantity: number | null;
+    weight: number | null;
+    weight_unit: string | null;
+  }>;
+  options: Array<{ id: number; name: string; position: number; values: string[] }>;
   images: Array<{ id: number; src: string; alt: string | null; position: number }>;
 }
 
@@ -217,6 +230,29 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
     return;
   }
 
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+
+  let liveVariants: ShopifyProductRaw["variants"] = [];
+  let liveOptions: ShopifyProductRaw["options"] = [];
+  let liveImages: ShopifyProductRaw["images"] = [];
+
+  if (project) {
+    try {
+      const shopifyData = await shopifyRequest<{ product: ShopifyProductRaw }>(
+        projectId,
+        project.shopDomain,
+        `/products/${shopifyProductId}.json`
+      );
+      if (shopifyData?.product) {
+        liveVariants = shopifyData.product.variants ?? [];
+        liveOptions = shopifyData.product.options ?? [];
+        liveImages = shopifyData.product.images ?? [];
+      }
+    } catch {
+      liveVariants = [];
+    }
+  }
+
   res.json({
     product: {
       id: product.shopifyProductId,
@@ -231,7 +267,9 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
       compareAtPrice: product.compareAtPrice,
       imageCount: product.imageCount,
       variantCount: product.variantCount,
-      images: (product.imagesJson as Array<{ id: number; src: string; alt: string | null; position: number }> | null) ?? [],
+      images: liveImages.length > 0
+        ? liveImages
+        : (product.imagesJson as Array<{ id: number; src: string; alt: string | null; position: number }> | null) ?? [],
       auditScore: product.auditScore,
       auditGrade: product.auditGrade,
       auditProblems: product.auditProblems ?? [],
@@ -240,6 +278,18 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
       priceScore: product.priceScore,
       imageScore: product.imageScore,
       seoScore: product.seoScore,
+      variants: liveVariants.map((v) => ({
+        id: v.id,
+        title: v.title,
+        price: v.price,
+        compareAtPrice: v.compare_at_price,
+        sku: v.sku,
+        option1: v.option1,
+        option2: v.option2,
+        option3: v.option3,
+        inventoryQuantity: v.inventory_quantity,
+      })),
+      options: liveOptions.map((o) => ({ name: o.name, values: o.values })),
     },
     auditResult: product.auditScore !== null ? {
       productId: product.shopifyProductId,

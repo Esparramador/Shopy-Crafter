@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -43,6 +43,8 @@ export default function MyPricing() {
   const [proposalLoading, setProposalLoading] = useState(false);
   const [clientName, setClientName] = useState("");
   const [storeName, setStoreName] = useState("");
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<{ success: boolean; message: string; requiresManualImport?: boolean; created?: number; failed?: number; instructions?: string[] } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -99,6 +101,22 @@ export default function MyPricing() {
     setProposal(data.proposal ?? ""); setProposalLoading(false);
   };
 
+  const pushToShopify = async () => {
+    setPushing(true);
+    setPushResult(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/agency/push-services-to-shopify`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await r.json();
+      setPushResult(data);
+    } catch {
+      setPushResult({ success: false, message: "Error de conexión al intentar hacer push a Shopify" });
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const getServiceMargin = (svc: Service) => {
     if (!svc.priceCurrent || !svc.totalCost) return null;
     return Math.round(((svc.priceCurrent - svc.totalCost) / svc.priceCurrent) * 100);
@@ -127,11 +145,50 @@ export default function MyPricing() {
           </p>
         </div>
         {tab === "services" && (
-          <button onClick={runAnalysis} disabled={analyzing} className="btn-primary">
-            {analyzing ? <><RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> Analizando...</> : <><TrendingUp size={14} /> Analizar precios</>}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={pushToShopify} disabled={pushing} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8,
+              background: "rgba(45,212,159,0.1)", border: "1px solid rgba(45,212,159,0.3)",
+              color: "var(--jade)", cursor: "pointer", fontSize: 13, fontWeight: 600,
+            }}>
+              {pushing ? <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
+              {pushing ? "Subiendo..." : "Push a Shopify"}
+            </button>
+            <button onClick={runAnalysis} disabled={analyzing} className="btn-primary">
+              {analyzing ? <><RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> Analizando...</> : <><TrendingUp size={14} /> Analizar precios</>}
+            </button>
+          </div>
         )}
       </div>
+
+      {pushResult && (
+        <div style={{
+          marginBottom: 16,
+          padding: "12px 16px",
+          borderRadius: 12,
+          background: pushResult.success ? "rgba(45,212,159,0.06)" : pushResult.requiresManualImport ? "rgba(255,211,42,0.06)" : "rgba(232,69,88,0.06)",
+          border: `1px solid ${pushResult.success ? "rgba(45,212,159,0.25)" : pushResult.requiresManualImport ? "rgba(255,211,42,0.25)" : "rgba(232,69,88,0.25)"}`,
+          display: "flex", gap: 12, alignItems: "flex-start",
+        }}>
+          {pushResult.success
+            ? <CheckCircle size={16} style={{ color: "var(--jade)", flexShrink: 0, marginTop: 1 }} />
+            : pushResult.requiresManualImport
+            ? <AlertTriangle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+            : <AlertTriangle size={16} style={{ color: "var(--crim)", flexShrink: 0, marginTop: 1 }} />}
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{pushResult.message}</p>
+            {pushResult.instructions?.map((inst, i) => (
+              <p key={i} style={{ fontSize: 11.5, color: "var(--t2)", margin: "2px 0" }}>{inst}</p>
+            ))}
+            {pushResult.requiresManualImport && (
+              <a href="https://admin.shopify.com/products" target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--gold)", marginTop: 6 }}>
+                <ExternalLink size={11} /> Ir a Shopify Admin → Crear productos manualmente
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {analysis?.overallAssessment && (
         <div className="glass-card" style={{ marginBottom: 20, borderColor: "var(--gold)" }}>

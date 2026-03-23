@@ -27,7 +27,7 @@ const COST_MAP: Record<string, number> = {
   svg_only: 0,
 };
 
-const NEGATIVE_PROMPT = "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs";
+const NEGATIVE_PROMPT = "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs, wrong product, unrelated object, flowers on non-flower product, animals on non-animal product, food on non-food product, random decorations unrelated to subject";
 
 async function buildImagePrompt(
   projectId: number,
@@ -78,7 +78,9 @@ async function buildImagePrompt(
   const config = typeConfigs[imageType] ?? typeConfigs.hero;
   const BASE_QUALITY = "professional product photography, commercial quality, sharp focus, high resolution 4k";
 
-  return `${config.prefix} ${productTitle} ${productType ?? ""}, ${config.scene}, niche: ${storeNiche ?? "e-commerce"}, brand tone: ${brandTone ?? "professional"}, ${BASE_QUALITY}, ${config.suffix}`;
+  const subjectAnchor = `SUBJECT: ${productTitle}${productType ? ` (${productType})` : ""}`;
+
+  return `${config.prefix} ${subjectAnchor}, ${config.scene}, niche: ${storeNiche ?? "e-commerce"}, brand tone: ${brandTone ?? "professional"}, ${BASE_QUALITY}, ${config.suffix}`;
 }
 
 router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise<void> => {

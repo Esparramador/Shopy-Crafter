@@ -222,4 +222,98 @@ router.get("/agency/pricing-decisions", requireAdmin, async (req, res): Promise<
   res.json(decisions);
 });
 
+router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): Promise<void> => {
+  await ensureDefaultServices();
+  const services = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
+
+  const shopDomain = process.env.SHOP_DOMAIN ?? "comic-crafter.myshopify.com";
+  const adminToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ?? "";
+
+  const shopifyProducts = services.map((svc) => {
+    const price = (svc.priceSuggested ?? svc.priceCurrent ?? 0).toFixed(2);
+    const compareAtPrice = svc.priceMax ? (svc.priceMax * 1.2).toFixed(2) : null;
+    const isRecurring = svc.serviceType === "retainer";
+    const typeLabel = svc.serviceType === "retainer" ? "/mes" : svc.serviceType === "consultation" ? "/hora" : "";
+
+    return {
+      title: `${svc.serviceName}${typeLabel ? ` (${typeLabel})` : ""}`,
+      body_html: `<p><strong>${svc.serviceName}</strong></p>
+<p>${svc.omnicoreRecommendation ?? `Servicio de agencia Shopify AI — ${svc.serviceType}.`}</p>
+<ul>
+  <li>✓ Implementación por expertos Shopify AI</li>
+  <li>✓ Resultados medibles y reportados</li>
+  ${isRecurring ? "<li>✓ Optimización continua mensual</li>" : "<li>✓ Entrega en 48-72 horas</li>"}
+  <li>✓ Soporte prioritario incluido</li>
+</ul>
+<p><strong>Precio: €${price}${typeLabel}</strong></p>`,
+      vendor: "ShopyBrain Agency",
+      product_type: svc.serviceType,
+      tags: `shopify-ai, agencia, ${svc.serviceType}, shopify-automatization`,
+      status: "active",
+      variants: [{ price, compare_at_price: compareAtPrice }],
+    };
+  });
+
+  if (!adminToken) {
+    res.json({
+      success: false,
+      message: "SHOPIFY_ADMIN_ACCESS_TOKEN no configurado — devolviendo JSON para importación manual",
+      requiresManualImport: true,
+      shopifyProducts,
+      instructions: [
+        "1. Ve a tu admin de Shopify → Productos → Importar",
+        "2. Crea cada producto manualmente usando los datos de 'shopifyProducts'",
+        "3. O configura SHOPIFY_ADMIN_ACCESS_TOKEN en las variables de entorno para push automático",
+        `4. Tu tienda: ${shopDomain}`,
+        `5. Los productos deben estar en la colección 'shopify-automatization' para aparecer en tu tienda`,
+      ],
+    });
+    return;
+  }
+
+  const results: Array<{ service: string; shopifyId: string | null; status: string; error?: string }> = [];
+  const adminDomain = shopDomain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
+
+  for (const product of shopifyProducts) {
+    try {
+      const response = await fetch(
+        `https://${adminDomain}/admin/api/2024-10/products.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": adminToken,
+          },
+          body: JSON.stringify({ product }),
+        }
+      );
+      const data = await response.json() as { product?: { id: string }; errors?: unknown };
+      if (!response.ok || data.errors) {
+        results.push({ service: product.title, shopifyId: null, status: "error", error: JSON.stringify(data.errors ?? "HTTP error") });
+      } else {
+        results.push({ service: product.title, shopifyId: String(data.product?.id ?? ""), status: "created" });
+      }
+    } catch (err) {
+      results.push({ service: product.title, shopifyId: null, status: "error", error: err instanceof Error ? err.message : "unknown" });
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  const created = results.filter((r) => r.status === "created").length;
+  const failed = results.filter((r) => r.status === "error").length;
+
+  res.json({
+    success: created > 0,
+    created,
+    failed,
+    results,
+    message: `${created} servicios creados en Shopify${failed > 0 ? `, ${failed} fallaron` : ""}`,
+    instructions: created > 0 ? [
+      `Los productos están en tu Shopify admin (${shopDomain})`,
+      "Añádelos a la colección 'shopify-automatization' para que aparezcan en tu tienda",
+      "Los precios son los precomendados por ShopyBrain — puedes ajustarlos en Shopify",
+    ] : [],
+  });
+});
+
 export default router;

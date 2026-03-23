@@ -388,6 +388,26 @@ Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.t
 
 Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 
+## Critical Fixes & Data Integrity (Session 3)
+
+### Real Competitor Price Fetching
+`analyze-competitors` in `pricing.ts` now does a REAL HTTP fetch of each competitor URL, extracts JSON-LD, meta price tags, and price spans from the HTML, passes real content to Claude to extract actual prices — never invents prices. Response includes `dataQuality: "real"|"partial"|"estimated"` and `verified: true/false` per competitor.
+
+### All Product Variants (Live from Shopify)
+`GET /api/projects/:id/products/:productId` now fetches the full product live from Shopify including all variants (id, title, price, compare_at_price, sku, option1/2/3, inventory_quantity) and product options. Falls back to cached data if Shopify is unavailable. Redesign prompt also fetches live variant data to ensure coherence.
+
+### Apply-Redesign updates ALL variants
+`apply-redesign` fetches all variant IDs live from Shopify before applying price changes, and updates every variant with the new price — not just the first one.
+
+### Image Prompt Coherence
+`buildImagePrompt` anchors subject explicitly with `SUBJECT: [product title] ([product type])` prefix. `NEGATIVE_PROMPT` explicitly forbids wrong product images (flowers on non-flower product, etc).
+
+### Redesign Content Coherence  
+`doRedesign` fetches real variant/options data from Shopify before generating content. Prompt explicitly instructs Claude to only describe the exact product found, with photo_brief anchored to the real product title. Prevents generated descriptions/photo briefs for wrong product types.
+
+### ShopyBrain → Shopify Service Push
+`POST /api/agency/push-services-to-shopify` — reads service catalog, formats as Shopify product JSON. If `SHOPIFY_ADMIN_ACCESS_TOKEN` is set, creates products via Admin API automatically. If not, returns JSON + manual instructions. Frontend: MyPricing has "Push a Shopify" button (jade) with result banner showing instructions.
+
 ### `lib/api-zod` (`@workspace/api-zod`)
 
 Generated Zod schemas from the OpenAPI spec. Used by `api-server` for response validation.

@@ -31,31 +31,66 @@ async function doRedesign(projectId: number, shopifyProductId: string): Promise<
 
   if (!product || !project) throw new Error("Producto o proyecto no encontrado");
 
+  let variantsSection = "";
+  let optionsSection = "";
+  let livePrice = product.price;
+
+  try {
+    const liveData = await shopifyRequest<{
+      product: {
+        variants: Array<{ id: number; title: string; price: string; compare_at_price: string | null; sku: string | null; option1: string | null; option2: string | null; option3: string | null }>;
+        options: Array<{ name: string; values: string[] }>;
+      }
+    }>(projectId, project.shopDomain, `/products/${shopifyProductId}.json`);
+
+    if (liveData?.product?.variants?.length) {
+      livePrice = liveData.product.variants[0].price;
+      optionsSection = liveData.product.options
+        .map((o) => `${o.name}: ${o.values.join(", ")}`)
+        .join("\n");
+      variantsSection = liveData.product.variants
+        .map((v) => `  - ${v.title} | Precio: €${v.price}${v.compare_at_price ? ` (antes €${v.compare_at_price})` : ""}${v.sku ? ` | SKU: ${v.sku}` : ""}`)
+        .join("\n");
+    }
+  } catch {
+    variantsSection = "";
+  }
+
   const prompt = `Estás rediseñando un producto de Shopify para la tienda "${project.name}".
 Nicho: ${project.storeNiche ?? "e-commerce"}
 Audiencia: ${project.targetAudience ?? "adultos"}
 Tono de marca: ${project.brandTone ?? "profesional"}
 Mercados: ${project.storeMarkets ?? "España"}
 
-DATOS ACTUALES DEL PRODUCTO:
+DATOS REALES ACTUALES DEL PRODUCTO (extraídos de Shopify en tiempo real):
 Título: ${product.title}
-Descripción: ${product.bodyHtml?.replace(/<[^>]+>/g, "").slice(0, 500) ?? "(vacía)"}
-Precio: ${product.price ?? "no configurado"}
-Tags: ${product.tags ?? "ninguno"}
-Número de imágenes: ${product.imageCount}
+Tipo de producto: ${product.productType ?? "sin definir"}
+Descripción actual: ${product.bodyHtml?.replace(/<[^>]+>/g, "").slice(0, 600) ?? "(vacía)"}
+Precio actual: €${livePrice ?? "no configurado"}
+Tags actuales: ${product.tags ?? "ninguno"}
+Imágenes: ${product.imageCount}
+Vendor: ${product.vendor ?? "no definido"}
+${optionsSection ? `\nOpciones del producto:\n${optionsSection}` : ""}
+${variantsSection ? `\nVariantes reales (IMPORTANTE: el precio sugerido debe ser coherente con estas variantes):\n${variantsSection}` : ""}
+
+INSTRUCCIONES CRÍTICAS:
+1. El título y descripción deben hacer referencia al producto EXACTO que ves arriba (no inventes otro tipo de producto)
+2. Los photo_brief deben describir imágenes de "${product.title}" específicamente — NUNCA objetos no relacionados
+3. El precio recomendado debe ser coherente con las variantes actuales del producto
+4. La descripción HTML debe mencionar las opciones/variantes reales si las hay
 
 Genera un rediseño COMPLETO y profesional. Devuelve SOLO un JSON con estos campos exactos:
 {
   "title": "título SEO 55-65 chars, keyword principal primero",
   "body_html": "descripción HTML completa 500-700 palabras con hook emocional, lista de beneficios, características premium con ✓, bloque de confianza (garantía/envío/devolución), y CTA",
   "short_description": "descripción corta 50 palabras para meta",
-  "price": "precio recomendado como string ej: '29.99'",
+  "price": "precio recomendado como string ej: '29.99' — debe ser coherente con el producto real",
   "compare_at_price": "precio tachado 25-40% más alto como string",
-  "tags": "15 tags separados por coma mezcla español+inglés",
-  "meta_title": "meta title 60 chars exactos",
+  "tags": "15 tags separados por coma mezcla español+inglés, relevantes para el producto exacto",
+  "meta_title": "meta title 60 chars exactos con keyword del producto",
   "meta_description": "meta description 155 chars con keyword, precio, CTA",
-  "photo_brief": ["brief foto 1 detallado 150 palabras", "brief foto 2", "brief foto 3", "brief foto 4"],
-  "price_reasoning": "explicación del precio recomendado"
+  "photo_brief": ["brief foto 1: descripción detallada de cómo fotografiar ${product.title} específicamente", "brief foto 2", "brief foto 3", "brief foto 4"],
+  "price_reasoning": "explicación del precio recomendado basada en el producto real"
 }`;
 
   return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 6000);
@@ -161,13 +196,32 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
 
   if (fields.includes("title")) updateData.title = redesign.newTitle;
   if (fields.includes("description")) updateData.body_html = redesign.newBodyHtml;
-  if (fields.includes("price")) updateData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice }];
   if (fields.includes("tags")) updateData.tags = redesign.newTags;
   if (fields.includes("meta")) {
     metafields.push(
       { namespace: "seo", key: "title", value: redesign.metaTitle, type: "single_line_text_field" },
       { namespace: "seo", key: "description", value: redesign.metaDescription, type: "single_line_text_field" }
     );
+  }
+
+  if (fields.includes("price")) {
+    try {
+      const liveProduct = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
+        projectId, project.shopDomain, `/products/${shopifyProductId}.json`
+      );
+      const variantIds = liveProduct?.product?.variants?.map((v) => v.id) ?? [];
+      if (variantIds.length > 0) {
+        updateData.variants = variantIds.map((id) => ({
+          id,
+          price: redesign.newPrice,
+          compare_at_price: redesign.newCompareAtPrice ?? null,
+        }));
+      } else {
+        updateData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice }];
+      }
+    } catch {
+      updateData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice }];
+    }
   }
 
   if (Object.keys(updateData).length > 0) {
