@@ -48,24 +48,37 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
 
+  let htmlContent = "";
+  let fetchError = "";
+  try {
+    const resp = await fetch(competitor.url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopifyAI-Monitor/1.0)" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const raw = await resp.text();
+    htmlContent = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 6000);
+  } catch (e: any) {
+    fetchError = e.message ?? "fetch failed";
+  }
+
   const prompt = `You are a competitive intelligence analyst for a Shopify store.
 Store: ${project?.name || "Store"}
 Competitor: ${competitor.name} (${competitor.url})
+${htmlContent ? `\nActual page content scraped:\n${htmlContent}` : `\nNote: Could not fetch page (${fetchError}). Use publicly known info about this URL/brand.`}
 
-Simulate a competitive scan and return realistic competitive intelligence data. Return JSON:
+Analyze the competitor and return competitive intelligence. Extract real prices, products, and promotions from the scraped content where available. Return JSON:
 {
-  "productsFound": 120,
-  "priceMin": 29.99,
-  "priceMax": 299.99,
-  "priceMedian": 89.99,
-  "newProducts": ["Product A", "Product B"],
-  "outOfStock": ["Product C"],
-  "promotionsDetected": ["20% off summer sale", "Free shipping over €50"],
+  "productsFound": 0,
+  "priceMin": null,
+  "priceMax": null,
+  "priceMedian": null,
+  "newProducts": [],
+  "outOfStock": [],
+  "promotionsDetected": [],
   "insights": [
-    {"severity": "high", "type": "price_drop", "title": "Bajada de precios detectada", "description": "Han bajado precios un 15% en la categoría principal", "action": "Considera ajustar precios en los productos más competidos"},
-    {"severity": "medium", "type": "new_product", "title": "Nuevo producto lanzado", "description": "Han añadido 2 productos nuevos esta semana", "action": "Evalúa si necesitas responder con nuevos productos"}
+    {"severity": "high|medium|low", "type": "price_drop|new_product|promotion|stock|general", "title": "...", "description": "...", "action": "..."}
   ],
-  "overallThreatLevel": "medium"
+  "overallThreatLevel": "low|medium|high"
 }`;
 
   try {

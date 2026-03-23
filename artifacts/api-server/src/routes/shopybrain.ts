@@ -33,7 +33,7 @@ async function ensureDomains() {
       await db.insert(omnicoreKnowledgeDomainsTable).values({
         id: randomBytes(12).toString("hex"),
         domain,
-        knowledgeDepth: Math.floor(Math.random() * 30) + 10,
+        knowledgeDepth: 0,
         verifiedInsights: 0,
         totalInsights: 0,
       });
