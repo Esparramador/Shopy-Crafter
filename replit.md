@@ -2,7 +2,7 @@
 
 ## Overview
 
-Shopify AI Optimizer — Personal e-commerce platform management tool. Multi-client project management, no user authentication. Each client = one isolated project with per-store Shopify OAuth credentials.
+Shopify AI Optimizer — **Multi-user agency platform** for Shopify AI optimization. Two roles: **admin** (full access, all stores, all 7 AI engines) and **client** (read-only access to their own store metrics and approvals). Session-based auth with bcrypt passwords + AES-256-GCM encrypted credentials. Each project = one client's isolated Shopify store.
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
@@ -87,6 +87,24 @@ artifacts-monorepo/
 5. **A/B Testing** — Image variant A/B testing with z-test statistical significance
 6. **Pricing** — COGS calculator + Claude pricing optimization + margin waterfall
 7. **SEO** — Meta generation, schema markup, alt texts, keyword intelligence, blog strategy
+
+## Auth Architecture
+
+- **Session**: `express-session` + `connect-pg-simple` (table: `user_sessions`), 8h maxAge, httpOnly cookie
+- **Passwords**: `bcryptjs` (12 rounds)
+- **Credential encryption**: AES-256-GCM via `artifacts/api-server/src/lib/crypto.ts` (key: `ENCRYPTION_KEY` env var)
+- **Admin credentials**: `admin@agency.com` / `admin123` (seeded in `users` table)
+- **Roles**: `admin` | `client`
+- **Row-level security**: Clients can only access their own `projectId` (enforced in Express middleware)
+- **Impersonation**: Admin can preview client view via `/api/admin/impersonate/:userId`; red banner shown; stop at `/api/admin/stop-impersonate`
+- **Client invitation**: Admin creates invite → token emailed → client sets password at `/invite/:token`
+- **New DB tables**: `users`, `audit_log`, `approvals`, `messages`
+- **Frontend routes**:
+  - `/login` — Login page (public)
+  - `/invite/:token` — Client invitation setup (public)
+  - `/admin/clients` — Admin client management
+  - `/client/*` — Client dashboard (read-only)
+  - All other routes (`/projects/*`) — Admin only
 
 ## Shopify OAuth Flow
 

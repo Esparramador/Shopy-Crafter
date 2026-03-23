@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
   Wand2, 
@@ -12,11 +12,13 @@ import {
   Plus,
   Store,
   ChevronRight,
-  LogOut
+  LogOut,
+  Users,
 } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -26,7 +28,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { data: projects, isLoading } = useListProjects();
   const [match, params] = useRoute("/projects/:id/*");
   const activeProjectId = match ? parseInt(params.id) : null;
-  const activeProject = projects?.find(p => p.id === activeProjectId);
+  const activeProject = projects?.find((p: { id: number }) => p.id === activeProjectId);
+  const { user, logout } = useAuth();
+  const [, navigate] = useLocation();
 
   const navItems = [
     { id: "audit", label: "Auditoría", icon: LayoutDashboard },
@@ -57,12 +61,23 @@ export function AppLayout({ children }: AppLayoutProps) {
             </Link>
           </div>
 
+          {/* Admin-only links */}
+          <div className="mb-4">
+            <Link
+              href="/admin/clients"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-muted-foreground hover:bg-white/5 hover:text-foreground group"
+            >
+              <Users className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+              <span>Gestión de Clientes</span>
+            </Link>
+          </div>
+
           <div className="space-y-1">
             {isLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map(i => <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />)}
               </div>
-            ) : projects?.map((project) => (
+            ) : projects?.map((project: { id: number; name: string }) => (
               <Link 
                 key={project.id} 
                 href={`/projects/${project.id}/audit`}
@@ -94,21 +109,41 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </div>
 
-        {activeProject && (
-          <div className="p-4 border-t border-white/5">
-            <div className="flex items-center gap-3 mb-4 px-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(0,214,143,0.8)] animate-pulse" />
-              <div className="text-xs text-muted-foreground">Token Activo</div>
+        <div className="p-4 border-t border-white/5">
+          {activeProject && (
+            <>
+              <div className="flex items-center gap-3 mb-3 px-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(0,214,143,0.8)] animate-pulse" />
+                <div className="text-xs text-muted-foreground">Token Activo</div>
+              </div>
+              <Link 
+                href={`/projects/${activeProject.id}/settings`}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-2 rounded-md hover:bg-white/5 transition-colors mb-1"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Configuración</span>
+              </Link>
+            </>
+          )}
+          {user && (
+            <div className="mt-1 px-2 py-2 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                {user.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">Admin</p>
+              </div>
+              <button
+                onClick={() => logout().then(() => navigate("/login"))}
+                className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
-            <Link 
-              href={`/projects/${activeProject.id}/settings`}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-2 rounded-md hover:bg-white/5 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              <span>Configuración</span>
-            </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
