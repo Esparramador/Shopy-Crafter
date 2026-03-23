@@ -234,12 +234,12 @@ export default function Landing() {
           <div className="fp-content fp-hero-layout">
             <div className="fp-hero-left">
               {content.hero.pill.visible && (
-                <div className={`l-hero-pill fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+                <div className={`l-hero-pill ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
                   <div className="l-pill-dot"></div>
                   {content.hero.pill.text}
                 </div>
               )}
-              <h1 className={`l-hero-h1 fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0.1s" }}>
+              <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
                 {hLines.map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
                     {line.includes(content.hero.headlineHighlight)
@@ -250,19 +250,19 @@ export default function Landing() {
                   </span>
                 ))}
               </h1>
-              <p className={`l-hero-sub fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0.22s" }}>{content.hero.subheadline}</p>
-              <div className={`l-hero-ctas fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0.34s" }}>
+              <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }}>{content.hero.subheadline}</p>
+              <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
                 <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.hero.ctaPrimary.label}</a>
                 <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); goToSection(2); }}>{content.hero.ctaSecondary.label}</a>
               </div>
-              <div className={`l-hero-trust fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0.46s" }}>
+              <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {content.hero.trustItems.map((item, i) => (
                   <div key={i} className="l-trust-item"><div className="l-trust-check">✓</div>{item}</div>
                 ))}
               </div>
             </div>
 
-            <div className={`fp-hero-right fp-animate${isAnimated("fp-hero") ? " fp-animated" : ""}`} style={{ animationDelay: "0.2s" }}>
+            <div className={`fp-hero-right ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
               <div className="l-preview-glow"></div>
               <div className="l-preview-frame">
                 <div className="l-preview-topbar">
@@ -329,13 +329,13 @@ export default function Landing() {
         <section className="fp-section fp-section-dark" id="fp-engines" data-nav="Motores">
           <div className="fp-bg-solid"></div>
           <div className="fp-content fp-engines-layout">
-            <div className={`fp-section-header fp-animate${isAnimated("fp-engines") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.features.pill}</div>
               <h2 className="l-h2">{content.features.headline.split(".")[0]}. <em>{content.features.headline.split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub">{content.features.subheadline}</p>
             </div>
 
-            <div className={`fp-engine-tabs fp-animate${isAnimated("fp-engines") ? " fp-animated" : ""}`} style={{ animationDelay: "0.1s" }}>
+            <div className={`fp-engine-tabs ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {content.features.items.map((feat, i) => (
                 <button key={feat.id} className={`fp-etab${activeEngine === i ? " active" : ""}`} onClick={() => setActiveEngine(i)}>
                   <span className="fp-etab-num">{feat.num}</span>
@@ -388,7 +388,7 @@ export default function Landing() {
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
           <div className="fp-content fp-split-layout">
-            <div className={`fp-split-left fp-animate${isAnimated("fp-demo") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-split-left ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.how.pill}</div>
               <h2 className="l-h2">
                 {content.how.headline.split("\n").map((line, i) => (
@@ -413,7 +413,7 @@ export default function Landing() {
                 ))}
               </div>
             </div>
-            <div className={`fp-split-right fp-animate${isAnimated("fp-demo") ? " fp-animated" : ""}`} style={{ animationDelay: "0.15s" }}>
+            <div className={`fp-split-right ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.15s" }}>
               {[
                 { ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f", title: "Auditoría completada", sub: "234 productos analizados · 12 acciones urgentes", barW: "88%", barColor: "linear-gradient(90deg,#2dd49f,#5ee8bc)" },
                 { ico: "🎨", bg: "rgba(200,168,75,.1)", color: "#e6c668", title: "Imágenes generándose", sub: "flux-1.1-pro · 48/234 productos", barW: "21%", barColor: "linear-gradient(90deg,#c8a84b,#e6c668)", animate: true },
@@ -446,11 +446,11 @@ export default function Landing() {
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.72)" }}></div>
           <div className="fp-content fp-results-layout">
-            <div className={`fp-section-header fp-animate${isAnimated("fp-results") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">Resultados probados</div>
               <h2 className="l-h2">Números que <em>hablan solos</em></h2>
             </div>
-            <div className={`fp-stats-grid fp-animate${isAnimated("fp-results") ? " fp-animated" : ""}`} style={{ animationDelay: "0.1s" }}>
+            <div className={`fp-stats-grid ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {[
                 { prefix: "+", num: 234, suffix: "%", label: "Incremento medio en conversión", color: "var(--l-jade)" },
                 { prefix: "€", num: 8400, suffix: "/mes", label: "Ingresos adicionales promedio", color: "var(--l-gold)" },
@@ -465,7 +465,7 @@ export default function Landing() {
                 </div>
               ))}
             </div>
-            <div className={`fp-tech-logos fp-animate${isAnimated("fp-results") ? " fp-animated" : ""}`} style={{ animationDelay: "0.25s" }}>
+            <div className={`fp-tech-logos ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.25s" }}>
               {[["🛍️","Shopify API"],["🤖","Claude AI"],["🎨","Replicate"],["🔍","GSC"],["📧","Klaviyo"],["🔐","AES-256"],["⚡","Shopify Flow"]].map(([icon, label], i) => (
                 <div key={i} className="fp-tech-badge">
                   <span>{icon}</span>
@@ -482,12 +482,12 @@ export default function Landing() {
         <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios">
           <div className="fp-bg-solid"></div>
           <div className="fp-content fp-pricing-layout">
-            <div className={`fp-section-header fp-animate${isAnimated("fp-pricing") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.pricing.pill}</div>
               <h2 className="l-h2">{content.pricing.headline.split(".")[0]}. <em>{content.pricing.headline.split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub">{content.pricing.subheadline}</p>
             </div>
-            <div className={`fp-pricing-row fp-animate${isAnimated("fp-pricing") ? " fp-animated" : ""}`} style={{ animationDelay: "0.1s" }}>
+            <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {content.pricing.plans.map(plan => (
                 <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
                   {plan.badge && <div className="l-pricing-badge">{plan.badge}</div>}
@@ -519,7 +519,7 @@ export default function Landing() {
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.75)" }}></div>
           <div className="fp-content fp-clients-layout">
-            <div className={`fp-section-header fp-animate${isAnimated("fp-clients") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.testimonials.pill}</div>
               <h2 className="l-h2">
                 {content.testimonials.headline.includes(content.testimonials.headlineHighlight)
@@ -530,7 +530,7 @@ export default function Landing() {
               </h2>
             </div>
 
-            <div className={`fp-testi-carousel fp-animate${isAnimated("fp-clients") ? " fp-animated" : ""}`} style={{ animationDelay: "0.1s" }}>
+            <div className={`fp-testi-carousel ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {content.testimonials.items.map((t, i) => (
                 <div key={t.id} className={`fp-testi-card${i === activeTestimonial ? " active" : i === (activeTestimonial - 1 + content.testimonials.items.length) % content.testimonials.items.length ? " prev" : " next"}`}>
                   <div className="l-testi-stars">{Array.from({ length: t.stars }).map((_, si) => <span key={si} className="l-star">★</span>)}</div>
@@ -562,7 +562,7 @@ export default function Landing() {
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.6)" }}></div>
           <div className="fp-content fp-cta-layout">
-            <div className={`fp-cta-content fp-animate${isAnimated("fp-cta") ? " fp-animated" : ""}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-cta-content ${!isAnimated("fp-cta") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill" style={{ margin: "0 auto 24px" }}>{content.cta.pill}</div>
               <h2 className="l-cta-h2">
                 {content.cta.headline.split("\n").map((line, i) => (
@@ -583,7 +583,7 @@ export default function Landing() {
               <p className="l-cta-fine">{content.cta.finePrint}</p>
             </div>
 
-            <footer className={`fp-footer fp-animate${isAnimated("fp-cta") ? " fp-animated" : ""}`} style={{ animationDelay: "0.2s" }}>
+            <footer className={`fp-footer ${!isAnimated("fp-cta") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
