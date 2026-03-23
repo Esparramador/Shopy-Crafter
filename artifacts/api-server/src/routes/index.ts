@@ -26,7 +26,7 @@ import agencyRouter from "./agency.js";
 import klaviyoRouter from "./klaviyo.js";
 import vaultRouter from "./vault.js";
 import referenceRouter from "./reference.js";
-import { requireAuth, requireAdmin } from "../lib/auth.js";
+import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
@@ -40,7 +40,7 @@ router.use("/cms", (req, res, next) => {
 }, cmsRouter);
 router.use(storeRouter);
 
-router.use(requireAuth);
+router.use(requireAdmin);
 router.use(projectsRouter);
 router.use(productsRouter);
 router.use(redesignRouter);
