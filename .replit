@@ -24,3 +24,8 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_PAGESPEED_API_KEY = "AIzaSyA-e_29qy2pUX8jQrq_fhNeL4zKDb9yLI4"

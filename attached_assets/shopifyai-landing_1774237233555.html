@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopifyAI Pro — La Agencia de Shopify del Futuro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:    #080810;
+  --ink2:   #0e0e1a;
+  --ink3:   #151524;
+  --ink4:   #1c1c2e;
+  --ink5:   #242438;
+  --gold:   #c8a84b;
+  --gold2:  #e6c668;
+  --gold3:  #f4dfa0;
+  --gold4:  #fff8e7;
+  --jade:   #2dd49f;
+  --jade2:  #5ee8bc;
+  --sky:    #4a9edd;
+  --crim:   #e84558;
+  --t:      #f2f0ff;
+  --t2:     #9896ba;
+  --t3:     #58567a;
+  --t4:     #35334f;
+  --fh:     'Instrument Serif', serif;
+  --fb:     'Geist', sans-serif;
+  --fm:     'Geist Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--fb);
+  background: var(--ink);
+  color: var(--t);
+  overflow-x: hidden;
+  line-height: 1.6;
+  cursor: none;
+}
+
+/* CUSTOM CURSOR */
+.cursor {
+  width: 8px; height: 8px;
+  background: var(--gold2);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  transition: transform 0.15s ease;
+  mix-blend-mode: difference;
+}
+.cursor-ring {
+  width: 32px; height: 32px;
+  border: 1px solid rgba(200,168,75,0.4);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transition: all 0.12s ease;
+}
+body:has(a:hover) .cursor-ring,
+body:has(button:hover) .cursor-ring { transform: scale(1.8); border-color: rgba(200,168,75,0.8); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--t4); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════
+   NOISE OVERLAY
+═══════════════════════════════════════════ */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.022;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ═══════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 1000;
+  padding: 0 48px;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: all 0.4s ease;
+}
+nav.scrolled {
+  background: rgba(8,8,16,0.85);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid rgba(200,168,75,0.08);
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+}
+.nav-logo-gem {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(200,168,75,0.3);
+}
+.nav-logo-text {
+  font-family: var(--fh);
+  font-size: 19px;
+  color: var(--t);
+  letter-spacing: -0.3px;
+}
+.nav-logo-text em { font-style: italic; color: var(--gold2); }
+.nav-links {
+  display: flex; align-items: center; gap: 32px;
+  list-style: none;
+}
+.nav-links a {
+  font-size: 13.5px;
+  color: var(--t2);
+  text-decoration: none;
+  transition: color 0.2s;
+  letter-spacing: 0.1px;
+}
+.nav-links a:hover { color: var(--t); }
+.nav-ctas { display: flex; align-items: center; gap: 10px; }
+.btn-nav-ghost {
+  padding: 8px 18px;
+  background: transparent;
+  border: 1px solid var(--t4);
+  border-radius: 8px;
+  color: var(--t2);
+  font-size: 13px;
+  font-family: var(--fb);
+  cursor: none;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.btn-nav-ghost:hover { border-color: var(--t3); color: var(--t); }
+.btn-nav-gold {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border: none;
+  border-radius: 8px;
+  color: #0a0800;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--fb);
+  cursor: none;
+  transition: all 0.2s;
+  text-decoration: none;
+  letter-spacing: 0.1px;
+}
+.btn-nav-gold:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(200,168,75,0.35);
+}
+
+/* ═══════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════ */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 120px 48px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* GRID BACKGROUND */
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(200,168,75,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,168,75,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%);
+}
+
+/* RADIAL GLOW */
+.hero-glow {
+  position: absolute;
+  width: 800px; height: 500px;
+  background: radial-gradient(ellipse, rgba(200,168,75,0.06) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.hero-glow2 {
+  position: absolute;
+  width: 400px; height: 400px;
+  background: radial-gradient(ellipse, rgba(45,212,159,0.04) 0%, transparent 70%);
+  top: 30%; left: 20%;
+  pointer-events: none;
+}
+.hero-glow3 {
+  position: absolute;
+  width: 300px; height: 300px;
+  background: radial-gradient(ellipse, rgba(74,158,221,0.04) 0%, transparent 70%);
+  top: 60%; left: 75%;
+  pointer-events: none;
+}
+
+/* FLOATING ORBS */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: float linear infinite;
+}
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(180deg); }
+  100% { transform: translateY(0px) rotate(360deg); }
+}
+
+.hero-content {
+  position: relative; z-index: 2;
+  text-align: center;
+  max-width: 860px;
+}
+
+.hero-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(200,168,75,0.07);
+  border: 1px solid rgba(200,168,75,0.2);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--gold3);
+  margin-bottom: 32px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  animation: fadeUp 0.8s ease both;
+}
+.hero-pill-dot {
+  width: 6px; height: 6px;
+  background: var(--jade);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }
+
+.hero-h1 {
+  font-family: var(--fh);
+  font-size: clamp(52px, 7vw, 84px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -2px;
+  margin-bottom: 24px;
+  animation: fadeUp 0.8s ease 0.1s both;
+}
+.hero-h1 span { color: var(--gold2); font-style: italic; }
+.hero-h1 .line2 { display: block; }
+
+.hero-sub {
+  font-size: 18px;
+  color: var(--t2);
+  max-width: 560px;
+  margin: 0 auto 40px;
+  line-height: 1.7;
+  font-weight: 300;
+  animation: fadeUp 0.8s ease 0.2s both;
+}
+
+.hero-ctas {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  flex-wrap: wrap;
+  animation: fadeUp 0.8s ease 0.3s both;
+}
+
+.btn-primary {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border: none; border-radius: 10px;
+  color: #060500;
+  font-size: 15px; font-weight: 700;
+  font-family: var(--fb);
+  cursor: none;
+  transition: all 0.25s;
+  display: inline-flex; align-items: center; gap: 8px;
+  letter-spacing: 0.1px;
+  text-decoration: none;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(200,168,75,0.4);
+}
+
+.btn-secondary {
+  padding: 14px 28px;
+  background: transparent;
+  border: 1px solid var(--t4);
+  border-radius: 10px;
+  color: var(--t2);
+  font-size: 15px; font-weight: 500;
+  font-family: var(--fb);
+  cursor: none;
+  transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 8px;
+  text-decoration: none;
+}
+.btn-secondary:hover { border-color: var(--t3); color: var(--t); background: rgba(255,255,255,0.02); }
+
+.hero-trust {
+  margin-top: 56px;
+  display: flex; align-items: center; justify-content: center; gap: 32px;
+  animation: fadeUp 0.8s ease 0.4s both;
+  flex-wrap: wrap;
+}
+.hero-trust-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--t3);
+}
+.trust-check {
+  width: 16px; height: 16px;
+  background: rgba(45,212,159,0.12);
+  border: 1px solid rgba(45,212,159,0.25);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--jade);
+  flex-shrink: 0;
+}
+
+/* HERO DASHBOARD PREVIEW */
+.hero-preview {
+  position: relative; z-index: 2;
+  margin-top: 72px;
+  width: 100%; max-width: 1100px;
+  animation: fadeUp 0.8s ease 0.5s both;
+}
+.preview-glow {
+  position: absolute;
+  inset: -40px;
+  background: radial-gradient(ellipse 60% 40% at 50% 100%, rgba(200,168,75,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.preview-frame {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.12);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(200,168,75,0.05),
+    0 40px 80px rgba(0,0,0,0.6),
+    0 80px 120px rgba(0,0,0,0.3);
+}
+.preview-topbar {
+  background: var(--ink3);
+  padding: 12px 20px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid rgba(200,168,75,0.06);
+}
+.preview-dots { display: flex; gap: 6px; }
+.preview-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.preview-url {
+  flex: 1;
+  background: var(--ink4);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--t3);
+  font-family: var(--fm);
+  max-width: 300px;
+}
+.preview-body {
+  display: flex; height: 420px;
+}
+.preview-sb {
+  width: 180px;
+  background: var(--ink2);
+  border-right: 1px solid rgba(200,168,75,0.06);
+  padding: 16px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  flex-shrink: 0;
+}
+.psb-logo {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 6px 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(200,168,75,0.06);
+}
+.psb-gem {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.psb-name {
+  font-family: var(--fh);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--gold2);
+}
+.psb-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--t3);
+}
+.psb-item.on {
+  background: rgba(200,168,75,0.07);
+  color: var(--gold3);
+  border: 1px solid rgba(200,168,75,0.1);
+}
+.psb-dot-item {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.preview-main {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+  background: var(--ink);
+}
+.pm-row {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 10px;
+  margin-bottom: 14px;
+}
+.pm-card {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 8px;
+  padding: 10px;
+}
+.pm-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t3); margin-bottom: 4px; }
+.pm-val { font-family: var(--fh); font-size: 18px; color: var(--t); }
+.pm-ch { font-size: 9px; }
+.pm-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pm-card2 {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 8px;
+  padding: 12px;
+}
+.pm-c2-title { font-size: 10px; font-weight: 600; color: var(--t2); margin-bottom: 10px; }
+.pm-bar-row { display: flex; justify-content: space-between; font-size: 9px; color: var(--t3); margin-bottom: 2px; }
+.pm-bar { height: 3px; background: var(--ink4); border-radius: 2px; overflow: hidden; margin-bottom: 7px; }
+.pm-bar-f { height: 100%; border-radius: 2px; }
+.feed-row { display: flex; gap: 6px; align-items: flex-start; padding: 5px 0; border-bottom: 1px solid rgba(200,168,75,0.05); }
+.feed-ico { width: 18px; height: 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 8px; flex-shrink: 0; }
+.feed-txt { font-size: 9px; color: var(--t2); line-height: 1.4; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════
+   LOGOS MARQUEE
+═══════════════════════════════════════════ */
+.logos-section {
+  padding: 48px 0;
+  border-top: 1px solid rgba(200,168,75,0.06);
+  border-bottom: 1px solid rgba(200,168,75,0.06);
+  overflow: hidden;
+  position: relative;
+}
+.logos-section::before, .logos-section::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; width: 120px; z-index: 2;
+}
+.logos-section::before { left: 0; background: linear-gradient(90deg, var(--ink) 0%, transparent 100%); }
+.logos-section::after { right: 0; background: linear-gradient(270deg, var(--ink) 0%, transparent 100%); }
+.logos-label { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--t3); margin-bottom: 24px; }
+.marquee-track { display: flex; gap: 0; white-space: nowrap; animation: marquee 30s linear infinite; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-item {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0 40px;
+  font-size: 13px; color: var(--t3);
+  font-weight: 500;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.marquee-item:hover { color: var(--t2); }
+.marquee-icon { font-size: 16px; }
+
+/* ═══════════════════════════════════════════
+   SECTION COMMON
+═══════════════════════════════════════════ */
+section { padding: 100px 48px; }
+.section-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(200,168,75,0.06);
+  border: 1px solid rgba(200,168,75,0.15);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 11px;
+  color: var(--gold);
+  margin-bottom: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.section-h2 {
+  font-family: var(--fh);
+  font-size: clamp(36px, 4vw, 56px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -1.5px;
+  margin-bottom: 18px;
+}
+.section-h2 em { font-style: italic; color: var(--gold2); }
+.section-sub {
+  font-size: 17px;
+  color: var(--t2);
+  max-width: 520px;
+  line-height: 1.7;
+  font-weight: 300;
+}
+.text-center { text-align: center; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* ═══════════════════════════════════════════
+   FEATURES — 6 ENGINES
+═══════════════════════════════════════════ */
+.features-section { max-width: 1200px; margin: 0 auto; }
+.features-header { text-align: center; margin-bottom: 64px; }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(200,168,75,0.08);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.feature-card {
+  background: var(--ink2);
+  padding: 36px 32px;
+  transition: background 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.feature-card:hover { background: var(--ink3); }
+.feature-card:hover::before { opacity: 0.5; }
+.feature-num {
+  font-family: var(--fm);
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 500;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+.feature-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--t);
+  letter-spacing: -0.3px;
+}
+.feature-desc {
+  font-size: 13.5px;
+  color: var(--t2);
+  line-height: 1.65;
+}
+.feature-tags {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 20px;
+}
+.feature-tag {
+  font-size: 10px;
+  font-family: var(--fm);
+  padding: 3px 8px;
+  background: var(--ink4);
+  border: 1px solid var(--t4);
+  border-radius: 4px;
+  color: var(--t3);
+}
+
+/* ═══════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════ */
+.stats-section {
+  background: var(--ink2);
+  border-top: 1px solid rgba(200,168,75,0.08);
+  border-bottom: 1px solid rgba(200,168,75,0.08);
+}
+.stats-inner {
+  max-width: 1000px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 1px;
+  background: rgba(200,168,75,0.06);
+}
+.stat-item {
+  background: var(--ink2);
+  padding: 48px 32px;
+  text-align: center;
+  transition: background 0.2s;
+}
+.stat-item:hover { background: var(--ink3); }
+.stat-num {
+  font-family: var(--fh);
+  font-size: 52px;
+  font-weight: 400;
+  line-height: 1;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-label { font-size: 14px; color: var(--t2); font-weight: 400; }
+
+/* ═══════════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════════ */
+.how-section { max-width: 1100px; margin: 0 auto; }
+.how-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 80px; align-items: center;
+  margin-top: 64px;
+}
+.how-steps { display: flex; flex-direction: column; gap: 0; }
+.how-step {
+  display: flex; gap: 20px;
+  padding: 28px 0;
+  border-bottom: 1px solid rgba(200,168,75,0.06);
+  cursor: none;
+  transition: all 0.2s;
+  position: relative;
+}
+.how-step:last-child { border-bottom: none; }
+.how-step:hover .how-step-content { opacity: 1; }
+.how-step-num {
+  font-family: var(--fm);
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 500;
+  width: 28px;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+.how-step-content { opacity: 0.7; transition: opacity 0.2s; }
+.how-step-title {
+  font-size: 16px; font-weight: 700;
+  margin-bottom: 8px; color: var(--t);
+}
+.how-step-desc { font-size: 13.5px; color: var(--t2); line-height: 1.6; }
+.how-visual {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.1);
+  border-radius: 20px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.how-visual::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 20%, rgba(200,168,75,0.04) 0%, transparent 70%);
+}
+.how-card {
+  background: var(--ink3);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.how-card:last-child { margin-bottom: 0; }
+.how-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.how-card-ico {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.how-card-title { font-size: 12.5px; font-weight: 700; }
+.how-card-sub { font-size: 11px; color: var(--t3); }
+.how-bar { height: 4px; background: var(--ink4); border-radius: 2px; overflow: hidden; }
+.how-bar-f { height: 100%; border-radius: 2px; transition: width 2s ease; }
+
+/* ═══════════════════════════════════════════
+   PRICING
+═══════════════════════════════════════════ */
+.pricing-section { max-width: 1100px; margin: 0 auto; }
+.pricing-header { text-align: center; margin-bottom: 56px; }
+.pricing-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 20px;
+}
+.pricing-card {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 20px;
+  padding: 36px 32px;
+  position: relative;
+  transition: transform 0.3s, border-color 0.3s;
+}
+.pricing-card:hover { transform: translateY(-4px); border-color: rgba(200,168,75,0.2); }
+.pricing-card.featured {
+  border-color: rgba(200,168,75,0.3);
+  background: linear-gradient(160deg, rgba(200,168,75,0.04) 0%, var(--ink2) 60%);
+}
+.pricing-card.featured::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--gold2), var(--gold), transparent);
+}
+.pricing-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #060500;
+  font-size: 10px; font-weight: 800;
+  padding: 4px 14px;
+  border-radius: 100px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.pricing-plan {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--t3);
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.pricing-price {
+  font-family: var(--fh);
+  font-size: 52px;
+  font-weight: 400;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.pricing-price span { font-size: 22px; color: var(--t2); font-family: var(--fb); }
+.pricing-period { font-size: 13px; color: var(--t3); margin-bottom: 24px; }
+.pricing-divider {
+  height: 1px;
+  background: rgba(200,168,75,0.08);
+  margin-bottom: 24px;
+}
+.pricing-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.pricing-feature {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13.5px; color: var(--t2);
+}
+.pricing-check {
+  width: 17px; height: 17px;
+  background: rgba(45,212,159,0.1);
+  border: 1px solid rgba(45,212,159,0.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--jade);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pricing-x {
+  width: 17px; height: 17px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--t4);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--t4);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pricing-cta {
+  width: 100%; padding: 13px;
+  border-radius: 10px;
+  font-size: 14px; font-weight: 700;
+  font-family: var(--fb);
+  cursor: none;
+  transition: all 0.2s;
+  text-align: center;
+  border: none;
+}
+.pricing-cta.ghost {
+  background: transparent;
+  border: 1px solid var(--t4);
+  color: var(--t2);
+}
+.pricing-cta.ghost:hover { border-color: var(--t3); color: var(--t); }
+.pricing-cta.gold {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #060500;
+}
+.pricing-cta.gold:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(200,168,75,0.35); }
+
+/* ═══════════════════════════════════════════
+   TESTIMONIALS
+═══════════════════════════════════════════ */
+.testi-section { max-width: 1200px; margin: 0 auto; }
+.testi-header { text-align: center; margin-bottom: 56px; }
+.testi-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 20px;
+}
+.testi-card {
+  background: var(--ink2);
+  border: 1px solid rgba(200,168,75,0.08);
+  border-radius: 18px;
+  padding: 32px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.testi-card:hover {
+  border-color: rgba(200,168,75,0.18);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.4);
+}
+.testi-quote {
+  font-family: var(--fh);
+  font-size: 32px;
+  color: var(--gold);
+  opacity: 0.3;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.testi-text {
+  font-size: 15px;
+  color: var(--t);
+  line-height: 1.7;
+  margin-bottom: 24px;
+  font-style: italic;
+}
+.testi-author { display: flex; align-items: center; gap: 12px; }
+.testi-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  border: 2px solid rgba(200,168,75,0.2);
+  flex-shrink: 0;
+}
+.testi-name { font-size: 13.5px; font-weight: 700; margin-bottom: 2px; }
+.testi-role { font-size: 11.5px; color: var(--t3); }
+.testi-stars { display: flex; gap: 2px; margin-bottom: 16px; }
+.star { color: var(--gold2); font-size: 13px; }
+.testi-metric {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(45,212,159,0.08);
+  border: 1px solid rgba(45,212,159,0.15);
+  border-radius: 100px;
+  padding: 4px 10px;
+  font-size: 11px; color: var(--jade);
+  font-weight: 600;
+  margin-top: 14px;
+}
+
+/* ═══════════════════════════════════════════
+   CTA FINAL
+═══════════════════════════════════════════ */
+.cta-section {
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 20% 80%, rgba(45,212,159,0.03) 0%, transparent 60%);
+}
+.cta-content { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; }
+.cta-h2 {
+  font-family: var(--fh);
+  font-size: clamp(40px, 5vw, 68px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin-bottom: 20px;
+}
+.cta-h2 em { font-style: italic; color: var(--gold2); }
+.cta-sub { font-size: 17px; color: var(--t2); margin-bottom: 40px; font-weight: 300; }
+.cta-form {
+  display: flex; gap: 10px; justify-content: center;
+  max-width: 460px; margin: 0 auto;
+}
+.cta-input {
+  flex: 1;
+  background: var(--ink2);
+  border: 1px solid var(--t4);
+  border-radius: 10px;
+  padding: 13px 18px;
+  color: var(--t);
+  font-size: 14px;
+  font-family: var(--fb);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.cta-input:focus { border-color: var(--gold); }
+.cta-input::placeholder { color: var(--t3); }
+.cta-fine { font-size: 11.5px; color: var(--t3); margin-top: 16px; }
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+footer {
+  border-top: 1px solid rgba(200,168,75,0.08);
+  padding: 60px 48px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.footer-top {
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 48px;
+  margin-bottom: 48px;
+}
+.footer-brand-desc {
+  font-size: 13.5px; color: var(--t3);
+  line-height: 1.7; margin-top: 14px;
+  max-width: 260px;
+}
+.footer-col-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--t3);
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.footer-links a {
+  font-size: 13.5px; color: var(--t3);
+  text-decoration: none; transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--t2); }
+.footer-bottom {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 32px;
+  border-top: 1px solid rgba(200,168,75,0.06);
+}
+.footer-copy { font-size: 12.5px; color: var(--t3); }
+.footer-badges { display: flex; gap: 12px; }
+.footer-badge {
+  font-size: 10px; padding: 3px 9px;
+  border: 1px solid var(--t4);
+  border-radius: 4px;
+  color: var(--t3);
+  font-family: var(--fm);
+}
+
+/* ═══════════════════════════════════════════
+   REVEAL ANIMATIONS
+═══════════════════════════════════════════ */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  nav { padding: 0 24px; }
+  .nav-links { display: none; }
+  section { padding: 72px 24px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .testi-grid { grid-template-columns: 1fr; }
+  .how-grid { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: 1fr 1fr; }
+  .footer-top { grid-template-columns: 1fr 1fr; }
+  .hero { padding: 100px 24px 60px; }
+  .preview-sb { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-gem">⚡</div>
+    <div class="nav-logo-text">Shopify<em>AI</em></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Motores</a></li>
+    <li><a href="#how">Cómo funciona</a></li>
+    <li><a href="#pricing">Precios</a></li>
+    <li><a href="#testimonials">Clientes</a></li>
+  </ul>
+  <div class="nav-ctas">
+    <a href="#" class="btn-nav-ghost">Iniciar sesión</a>
+    <a href="#" class="btn-nav-gold">Solicitar acceso →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-glow2"></div>
+  <div class="hero-glow3"></div>
+
+  <!-- Floating orbs -->
+  <div class="orb" style="width:180px;height:180px;background:radial-gradient(circle,rgba(200,168,75,0.04),transparent);top:15%;left:5%;animation-duration:18s;"></div>
+  <div class="orb" style="width:120px;height:120px;background:radial-gradient(circle,rgba(45,212,159,0.03),transparent);top:70%;right:8%;animation-duration:22s;animation-delay:-8s;"></div>
+  <div class="orb" style="width:200px;height:200px;background:radial-gradient(circle,rgba(74,158,221,0.03),transparent);bottom:20%;left:15%;animation-duration:26s;animation-delay:-12s;"></div>
+
+  <div class="hero-content">
+    <div class="hero-pill">
+      <div class="hero-pill-dot"></div>
+      Nuevo · 6 motores de IA activos · Versión 2.0
+    </div>
+
+    <h1 class="hero-h1">
+      La agencia Shopify
+      <span class="line2">que trabaja <span>24/7</span></span>
+      por ti
+    </h1>
+
+    <p class="hero-sub">
+      ShopifyAI Pro gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma.
+      Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#" class="btn-primary">
+        Empezar gratis 14 días
+        <span>→</span>
+      </a>
+      <a href="#how" class="btn-secondary">
+        <span>▶</span>
+        Ver en acción
+      </a>
+    </div>
+
+    <div class="hero-trust">
+      <div class="hero-trust-item">
+        <div class="trust-check">✓</div>
+        Sin tarjeta de crédito
+      </div>
+      <div class="hero-trust-item">
+        <div class="trust-check">✓</div>
+        Setup en 5 minutos
+      </div>
+      <div class="hero-trust-item">
+        <div class="trust-check">✓</div>
+        Cancela cuando quieras
+      </div>
+      <div class="hero-trust-item">
+        <div class="trust-check">✓</div>
+        RGPD compliant
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Preview -->
+  <div class="hero-preview">
+    <div class="preview-glow"></div>
+    <div class="preview-frame">
+      <div class="preview-topbar">
+        <div class="preview-dots">
+          <div class="preview-dot" style="background:#ff5f57"></div>
+          <div class="preview-dot" style="background:#ffbd2e"></div>
+          <div class="preview-dot" style="background:#28ca41"></div>
+        </div>
+        <div class="preview-url">app.shopifyai.pro/admin — Moda Urbana</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#2dd49f;margin-left:auto;">
+          <div style="width:5px;height:5px;background:#2dd49f;border-radius:50%;animation:pulse 2s infinite"></div>
+          6 motores activos
+        </div>
+      </div>
+      <div class="preview-body">
+        <!-- Sidebar -->
+        <div class="preview-sb">
+          <div class="psb-logo">
+            <div class="psb-gem"></div>
+            <div class="psb-name">ShopifyAI</div>
+          </div>
+          <div class="psb-item on"><div class="psb-dot-item"></div>Overview</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>Productos</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>Imágenes IA</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>Pricing + P&L</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>SEO Técnico</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>A/B Tests</div>
+          <div class="psb-item"><div class="psb-dot-item"></div>Reportes</div>
+        </div>
+        <!-- Main -->
+        <div class="preview-main">
+          <div class="pm-row">
+            <div class="pm-card">
+              <div class="pm-lbl">Revenue</div>
+              <div class="pm-val" style="color:#e6c668">€32.4K</div>
+              <div class="pm-ch up" style="color:#2dd49f;font-size:9px">↑ 22%</div>
+            </div>
+            <div class="pm-card">
+              <div class="pm-lbl">Conversión</div>
+              <div class="pm-val" style="color:#2dd49f">4.2%</div>
+              <div class="pm-ch" style="color:#2dd49f;font-size:9px">↑ 0.9pp</div>
+            </div>
+            <div class="pm-card">
+              <div class="pm-lbl">Margen</div>
+              <div class="pm-val">61%</div>
+              <div class="pm-ch" style="color:#2dd49f;font-size:9px">↑ 8pts</div>
+            </div>
+            <div class="pm-card">
+              <div class="pm-lbl">SEO Score</div>
+              <div class="pm-val" style="color:#4a9edd">88</div>
+              <div class="pm-ch" style="color:#4a9edd;font-size:9px">↑ 23pts</div>
+            </div>
+          </div>
+          <div class="pm-row2">
+            <div class="pm-card2">
+              <div class="pm-c2-title">Salud de tiendas</div>
+              <div class="pm-bar-row"><span>Moda Urbana</span><span style="color:#2dd49f">88</span></div>
+              <div class="pm-bar"><div class="pm-bar-f" style="width:88%;background:linear-gradient(90deg,#2dd49f,#5ee8bc)"></div></div>
+              <div class="pm-bar-row"><span>TechGadgets</span><span style="color:#4a9edd">71</span></div>
+              <div class="pm-bar"><div class="pm-bar-f" style="width:71%;background:linear-gradient(90deg,#4a9edd,#7ec0f0)"></div></div>
+              <div class="pm-bar-row"><span>Casa & Arte</span><span style="color:#e84558">42</span></div>
+              <div class="pm-bar"><div class="pm-bar-f" style="width:42%;background:linear-gradient(90deg,#e84558,#f07080)"></div></div>
+            </div>
+            <div class="pm-card2">
+              <div class="pm-c2-title">Actividad reciente</div>
+              <div class="feed-row">
+                <div class="feed-ico" style="background:rgba(45,212,159,.1);color:#2dd49f">✓</div>
+                <div class="feed-txt">A/B Test ganador · +28% conv.</div>
+              </div>
+              <div class="feed-row">
+                <div class="feed-ico" style="background:rgba(200,168,75,.1);color:#e6c668">★</div>
+                <div class="feed-txt">48 imágenes generadas · €13.44</div>
+              </div>
+              <div class="feed-row">
+                <div class="feed-ico" style="background:rgba(74,158,221,.1);color:#4a9edd">◎</div>
+                <div class="feed-txt">Schema SEO · 234 productos</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS MARQUEE -->
+<div class="logos-section">
+  <p class="logos-label">Tecnología que potencia cada tienda</p>
+  <div class="marquee-track">
+    <span class="marquee-item"><span class="marquee-icon">🛍️</span>Shopify Admin API</span>
+    <span class="marquee-item"><span class="marquee-icon">🤖</span>Claude AI by Anthropic</span>
+    <span class="marquee-item"><span class="marquee-icon">🎨</span>Replicate · flux-1.1-pro</span>
+    <span class="marquee-item"><span class="marquee-icon">🔍</span>Google Search Console</span>
+    <span class="marquee-item"><span class="marquee-icon">📊</span>Shopify Analytics</span>
+    <span class="marquee-item"><span class="marquee-icon">⚡</span>Shopify Flow</span>
+    <span class="marquee-item"><span class="marquee-icon">📧</span>Klaviyo Integration</span>
+    <span class="marquee-item"><span class="marquee-icon">💳</span>Stripe Billing</span>
+    <span class="marquee-item"><span class="marquee-icon">🔐</span>AES-256 Encryption</span>
+    <!-- Duplicate for seamless loop -->
+    <span class="marquee-item"><span class="marquee-icon">🛍️</span>Shopify Admin API</span>
+    <span class="marquee-item"><span class="marquee-icon">🤖</span>Claude AI by Anthropic</span>
+    <span class="marquee-item"><span class="marquee-icon">🎨</span>Replicate · flux-1.1-pro</span>
+    <span class="marquee-item"><span class="marquee-icon">🔍</span>Google Search Console</span>
+    <span class="marquee-item"><span class="marquee-icon">📊</span>Shopify Analytics</span>
+    <span class="marquee-item"><span class="marquee-icon">⚡</span>Shopify Flow</span>
+    <span class="marquee-item"><span class="marquee-icon">📧</span>Klaviyo Integration</span>
+    <span class="marquee-item"><span class="marquee-icon">💳</span>Stripe Billing</span>
+    <span class="marquee-item"><span class="marquee-icon">🔐</span>AES-256 Encryption</span>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="features-section">
+    <div class="features-header reveal">
+      <div class="section-pill">Motores IA</div>
+      <h2 class="section-h2">Seis motores. <em>Una sola plataforma.</em></h2>
+      <p class="section-sub mx-auto" style="text-align:center">Cada motor trabaja de forma autónoma y coordinada para potenciar todos los aspectos de tu tienda.</p>
+    </div>
+
+    <div class="features-grid reveal">
+      <div class="feature-card">
+        <div class="feature-num">M01</div>
+        <div class="feature-icon" style="background:rgba(45,212,159,0.1)">🖼️</div>
+        <div class="feature-title">Generación de Imágenes</div>
+        <div class="feature-desc">8 tipos de imagen profesional por producto usando Replicate flux-1.1-pro. Hero, Lifestyle, Detalle, Packaging, UGC, Escala, Bundle e Infografía SVG generada directamente.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">flux-1.1-pro</span>
+          <span class="feature-tag">recraft-v3</span>
+          <span class="feature-tag">~€0.25/prod</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">M02</div>
+        <div class="feature-icon" style="background:rgba(200,168,75,0.1)">🎨</div>
+        <div class="feature-title">Consistencia Visual</div>
+        <div class="feature-desc">Extrae el ADN visual de tu tienda y aplica StyleLock a todas las generaciones. Garantiza coherencia de marca en cada imagen, colección y set fotográfico.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">StyleLock</span>
+          <span class="feature-tag">Visual DNA</span>
+          <span class="feature-tag">Set Mode</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">M03</div>
+        <div class="feature-icon" style="background:rgba(74,158,221,0.1)">⚗️</div>
+        <div class="feature-title">A/B Testing Automático</div>
+        <div class="feature-desc">Pixel tracker propio, z-test estadístico al 95% de confianza, declaración automática de ganador y generación inmediata del siguiente challenger. Loop infinito de mejora.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">Z-test 95%</span>
+          <span class="feature-tag">Pixel tracker</span>
+          <span class="feature-tag">Auto-winner</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">M04</div>
+        <div class="feature-icon" style="background:rgba(200,168,75,0.08)">⚡</div>
+        <div class="feature-title">Auto-Pilot 24/7</div>
+        <div class="feature-desc">Webhook trigger en cada nuevo producto. Auditoría inmediata, generación automática de Hero y Lifestyle, test A/B creado y activo sin intervención manual.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">Webhook</span>
+          <span class="feature-tag">Cron jobs</span>
+          <span class="feature-tag">Informe mensual</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">M05</div>
+        <div class="feature-icon" style="background:rgba(200,168,75,0.1)">📊</div>
+        <div class="feature-title">Pricing Financiero</div>
+        <div class="feature-desc">Motor COGS completo, análisis de competencia en tiempo real, economista IA con pricing psicológico, dashboard P&L y alertas de margen. Multiplica beneficio con datos.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">COGS Engine</span>
+          <span class="feature-tag">Competencia</span>
+          <span class="feature-tag">P&L en vivo</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">M06</div>
+        <div class="feature-icon" style="background:rgba(45,212,159,0.08)">🔍</div>
+        <div class="feature-title">SEO Técnico</div>
+        <div class="feature-desc">Schema JSON-LD completo, meta tags optimizados por Claude, sitemap dinámico, Core Web Vitals, estrategia de keywords y generación automática de blog posts.</div>
+        <div class="feature-tags">
+          <span class="feature-tag">Schema JSON-LD</span>
+          <span class="feature-tag">CWV</span>
+          <span class="feature-tag">Blog IA</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-section">
+  <div class="stats-inner">
+    <div class="stat-item reveal">
+      <div class="stat-num">3.4×</div>
+      <div class="stat-label">Más conversión con 5+ imágenes</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-1">
+      <div class="stat-num">€0.25</div>
+      <div class="stat-label">Coste por producto optimizado</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-2">
+      <div class="stat-num">95%</div>
+      <div class="stat-label">Confianza estadística en A/B tests</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
+      <div class="stat-num">24/7</div>
+      <div class="stat-label">Auto-pilot completamente autónomo</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="how-section">
+    <div class="reveal">
+      <div class="section-pill">Cómo funciona</div>
+      <h2 class="section-h2">De zero a <em>tienda optimizada</em><br>en minutos</h2>
+    </div>
+
+    <div class="how-grid">
+      <div class="how-steps reveal">
+        <div class="how-step">
+          <div class="how-step-num">01</div>
+          <div class="how-step-content">
+            <div class="how-step-title">Conecta tu tienda Shopify</div>
+            <div class="how-step-desc">Introduce tu dominio y Access Token. La plataforma se conecta al instante con la API de Shopify y escanea todo tu catálogo, configuración y métricas actuales.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">02</div>
+          <div class="how-step-content">
+            <div class="how-step-title">La IA audita cada producto</div>
+            <div class="how-step-desc">Claude analiza título, descripción, precio, imágenes y SEO de cada producto. Asigna una nota A–F y genera una lista priorizada de mejoras con impacto estimado en revenue.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">03</div>
+          <div class="how-step-content">
+            <div class="how-step-title">Activa los 6 motores</div>
+            <div class="how-step-desc">Con un clic, los 6 motores se ponen en marcha: generan imágenes, optimizan precios, aplican SEO técnico, inician tests A/B y configuran automatizaciones.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">04</div>
+          <div class="how-step-content">
+            <div class="how-step-title">Resultados compuestos cada semana</div>
+            <div class="how-step-desc">El sistema mejora solo. Cada test que termina genera el siguiente. Cada precio optimizado se monitoriza. Cada imagen que convierte se convierte en el nuevo estándar.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-visual reveal reveal-delay-1">
+        <div class="how-card">
+          <div class="how-card-h">
+            <div class="how-card-ico" style="background:rgba(45,212,159,.1);color:#2dd49f">✓</div>
+            <div>
+              <div class="how-card-title">Auditoría completada</div>
+              <div class="how-card-sub">234 productos analizados · 12×F → acción urgente</div>
+            </div>
+          </div>
+          <div class="how-bar"><div class="how-bar-f" style="width:88%;background:linear-gradient(90deg,#2dd49f,#5ee8bc)"></div></div>
+        </div>
+        <div class="how-card">
+          <div class="how-card-h">
+            <div class="how-card-ico" style="background:rgba(200,168,75,.1);color:#e6c668">🎨</div>
+            <div>
+              <div class="how-card-title">Imágenes generándose</div>
+              <div class="how-card-sub">flux-1.1-pro · 48/234 productos · ~€67</div>
+            </div>
+          </div>
+          <div class="how-bar"><div class="how-bar-f" id="genBar" style="width:20%;background:linear-gradient(90deg,#c8a84b,#e6c668);transition:width 3s ease"></div></div>
+        </div>
+        <div class="how-card">
+          <div class="how-card-h">
+            <div class="how-card-ico" style="background:rgba(74,158,221,.1);color:#4a9edd">⚗️</div>
+            <div>
+              <div class="how-card-title">A/B Test activo</div>
+              <div class="how-card-sub">Bomber Hero · 342 visitas · 67% confianza</div>
+            </div>
+          </div>
+          <div class="how-bar"><div class="how-bar-f" style="width:67%;background:linear-gradient(90deg,#4a9edd,#7ec0f0)"></div></div>
+        </div>
+        <div class="how-card" style="border-color:rgba(45,212,159,.15);background:rgba(45,212,159,.02)">
+          <div class="how-card-h">
+            <div class="how-card-ico" style="background:rgba(45,212,159,.1);color:#2dd49f">💰</div>
+            <div>
+              <div class="how-card-title">Impacto estimado</div>
+              <div class="how-card-sub" style="color:#2dd49f">+€8,400/mes proyectados este mes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="pricing-section">
+    <div class="pricing-header reveal">
+      <div class="section-pill">Precios</div>
+      <h2 class="section-h2">Transparente. <em>Sin sorpresas.</em></h2>
+      <p class="section-sub mx-auto" style="text-align:center">Elige el plan que se adapta a tu agencia. Cancela cuando quieras.</p>
+    </div>
+
+    <div class="pricing-grid">
+      <div class="pricing-card reveal">
+        <div class="pricing-plan">Starter</div>
+        <div class="pricing-price"><span>€</span>49</div>
+        <div class="pricing-period">por mes · hasta 3 tiendas</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Hasta 3 tiendas Shopify</div>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Auditoría automática completa</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>M1 Generación de imágenes</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>M5 Pricing básico</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>M6 SEO técnico</li>
+          <li class="pricing-feature"><div class="pricing-x">✕</div><span style="color:var(--t3)">A/B Testing automático</span></li>
+          <li class="pricing-feature"><div class="pricing-x">✕</div><span style="color:var(--t3)">Portal cliente</span></li>
+          <li class="pricing-feature"><div class="pricing-x">✕</div><span style="color:var(--t3)">Reportes PDF branded</span></li>
+        </ul>
+        <button class="pricing-cta ghost">Empezar gratis</button>
+      </div>
+
+      <div class="pricing-card featured reveal reveal-delay-1">
+        <div class="pricing-badge">MÁS POPULAR</div>
+        <div class="pricing-plan">Agency Pro</div>
+        <div class="pricing-price"><span>€</span>149</div>
+        <div class="pricing-period">por mes · hasta 15 tiendas</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Hasta 15 tiendas Shopify</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Los 6 motores completos</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>A/B Testing con pixel propio</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Portal cliente read-only</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Reportes PDF con tu branding</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Auto-pilot 24/7</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Aprobaciones de cliente</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Soporte prioritario</li>
+        </ul>
+        <button class="pricing-cta gold">Empezar prueba gratuita</button>
+      </div>
+
+      <div class="pricing-card reveal reveal-delay-2">
+        <div class="pricing-plan">Enterprise</div>
+        <div class="pricing-price"><span>€</span>399</div>
+        <div class="pricing-period">por mes · tiendas ilimitadas</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Tiendas ilimitadas</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Todo de Agency Pro</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>White-label completo</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>API acceso completo</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Onboarding personalizado</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>SLA 99.9% uptime</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Slack dedicado</li>
+          <li class="pricing-feature"><div class="pricing-check">✓</div>Facturación anual disponible</li>
+        </ul>
+        <button class="pricing-cta ghost">Hablar con ventas →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section id="testimonials">
+  <div class="testi-section">
+    <div class="testi-header reveal">
+      <div class="section-pill">Clientes</div>
+      <h2 class="section-h2">Lo que dicen <em>los que ya lo usan</em></h2>
+    </div>
+
+    <div class="testi-grid">
+      <div class="testi-card reveal">
+        <div class="testi-stars">
+          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+        </div>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">En 3 semanas pasamos de una tasa de conversión del 1.8% al 4.1%. Las imágenes generadas por IA parecen de sesión fotográfica profesional. Mis clientes no pueden creer el antes y el después.</p>
+        <div class="testi-metric">↑ +128% conversión en 3 semanas</div>
+        <div class="testi-author" style="margin-top:16px">
+          <div class="testi-avatar" style="background:rgba(200,168,75,0.1);color:var(--gold2)">MR</div>
+          <div>
+            <div class="testi-name">Miguel Rodríguez</div>
+            <div class="testi-role">Agencia eCommerce · Madrid</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testi-card reveal reveal-delay-1">
+        <div class="testi-stars">
+          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+        </div>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">El motor de pricing me descubrió que tenía 6 productos vendiendo por debajo del break-even. Después de aplicar el COGS real y la estrategia de precios, el margen medio subió del 28% al 54%.</p>
+        <div class="testi-metric">↑ +26pts de margen medio</div>
+        <div class="testi-author" style="margin-top:16px">
+          <div class="testi-avatar" style="background:rgba(45,212,159,0.1);color:var(--jade)">AL</div>
+          <div>
+            <div class="testi-name">Ana López</div>
+            <div class="testi-role">Tienda de moda · Barcelona</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testi-card reveal reveal-delay-2">
+        <div class="testi-stars">
+          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+        </div>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">Gestiono 11 tiendas para clientes. Antes me llevaba días actualizar imágenes y precios manualmente. Ahora el sistema lo hace solo y yo solo superviso. Me ha triplicado la capacidad de la agencia.</p>
+        <div class="testi-metric">↑ 3× capacidad de la agencia</div>
+        <div class="testi-author" style="margin-top:16px">
+          <div class="testi-avatar" style="background:rgba(74,158,221,0.1);color:var(--sky)">JM</div>
+          <div>
+            <div class="testi-name">Jordi Martínez</div>
+            <div class="testi-role">Agencia Shopify · Valencia</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-section">
+  <div class="cta-bg"></div>
+  <div class="cta-content reveal">
+    <div class="section-pill" style="margin:0 auto 24px">Empieza hoy</div>
+    <h2 class="cta-h2">Tu tienda merece<br><em>más que esto.</em></h2>
+    <p class="cta-sub">14 días gratis. Sin tarjeta. Cancela cuando quieras.<br>Setup completo en menos de 5 minutos.</p>
+    <div class="cta-form">
+      <input type="email" class="cta-input" placeholder="tu@agencia.com">
+      <a href="#" class="btn-primary" style="padding:13px 24px;font-size:14px">Empezar →</a>
+    </div>
+    <p class="cta-fine">Al registrarte aceptas nuestros Términos de Servicio y Política de Privacidad</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div>
+      <a href="#" class="nav-logo" style="display:inline-flex;margin-bottom:14px">
+        <div class="nav-logo-gem">⚡</div>
+        <div class="nav-logo-text">Shopify<em>AI</em></div>
+      </a>
+      <p class="footer-brand-desc">La plataforma de gestión y optimización de tiendas Shopify más completa. Powered by Claude AI y Replicate.</p>
+    </div>
+    <div>
+      <div class="footer-col-title">Producto</div>
+      <ul class="footer-links">
+        <li><a href="#">Motores IA</a></li>
+        <li><a href="#">Precios</a></li>
+        <li><a href="#">Changelog</a></li>
+        <li><a href="#">Documentación</a></li>
+        <li><a href="#">API Reference</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">Empresa</div>
+      <ul class="footer-links">
+        <li><a href="#">Sobre nosotros</a></li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Casos de éxito</a></li>
+        <li><a href="#">Afiliados</a></li>
+        <li><a href="#">Contacto</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">Legal</div>
+      <ul class="footer-links">
+        <li><a href="#">Privacidad</a></li>
+        <li><a href="#">Términos</a></li>
+        <li><a href="#">Cookies</a></li>
+        <li><a href="#">RGPD</a></li>
+        <li><a href="#">Seguridad</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 ShopifyAI Pro. Todos los derechos reservados.</div>
+    <div class="footer-badges">
+      <span class="footer-badge">RGPD</span>
+      <span class="footer-badge">AES-256</span>
+      <span class="footer-badge">SOC2</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ── CURSOR ── */
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+function animCursor() {
+  cursor.style.left = (mx - 4) + 'px';
+  cursor.style.top = (my - 4) + 'px';
+  rx += (mx - rx) * 0.12;
+  ry += (my - ry) * 0.12;
+  ring.style.left = (rx - 16) + 'px';
+  ring.style.top = (ry - 16) + 'px';
+  requestAnimationFrame(animCursor);
+}
+animCursor();
+
+/* ── NAV SCROLL ── */
+const nav = document.getElementById('mainNav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+/* ── REVEAL ON SCROLL ── */
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+reveals.forEach(el => observer.observe(el));
+
+/* ── ANIMATED PROGRESS BAR ── */
+const genBarObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      setTimeout(() => {
+        document.getElementById('genBar').style.width = '78%';
+      }, 500);
+    }
+  });
+}, { threshold: 0.5 });
+const genBar = document.getElementById('genBar');
+if (genBar) genBarObserver.observe(genBar);
+
+/* ── SMOOTH SCROLL ── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+</script>
+</body>
+</html>

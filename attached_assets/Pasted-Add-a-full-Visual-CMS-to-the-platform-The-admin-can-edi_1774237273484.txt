@@ -1,0 +1,244 @@
+Add a full Visual CMS to the platform. The admin can edit ALL content
+of the landing page and app UI directly from a browser-based editor —
+no code, no file access, no deployment needed.
+Think Webflow Editor + Shopify Theme Editor + Notion, but built-in.
+
+INSTALL: npm install multer sharp fs-extra chokidar
+
+═══════════════════════════════════════════════
+PART 1: CMS ARCHITECTURE
+═══════════════════════════════════════════════
+
+CONTENT STORAGE:
+All editable content stored in /data/cms/content.json
+Versioning: /data/cms/versions/ (last 30 snapshots)
+Media: /data/cms/media/ (uploaded images, logos, icons)
+
+content.json structure:
+{
+  "meta": {
+    "lastUpdated": "ISO timestamp",
+    "updatedBy": "admin user id",
+    "version": 42
+  },
+  "site": {
+    "name": "ShopifyAI Pro",
+    "tagline": "La agencia Shopify del futuro",
+    "logo": { "type": "emoji|image", "value": "⚡", "imageUrl": null },
+    "favicon": "⚡",
+    "primaryColor": "#c8a84b",
+    "accentColor": "#2dd49f",
+    "font_heading": "Instrument Serif",
+    "font_body": "Geist"
+  },
+  "nav": {
+    "links": [
+      { "id": "nav-1", "label": "Motores", "href": "#features" },
+      { "id": "nav-2", "label": "Cómo funciona", "href": "#how" },
+      { "id": "nav-3", "label": "Precios", "href": "#pricing" },
+      { "id": "nav-4", "label": "Clientes", "href": "#testimonials" }
+    ],
+    "ctaPrimary": { "label": "Solicitar acceso →", "href": "#cta" },
+    "ctaSecondary": { "label": "Iniciar sesión", "href": "/login" }
+  },
+  "hero": {
+    "pill": { "text": "Nuevo · 6 motores de IA activos · Versión 2.0", "visible": true },
+    "headline": "La agencia Shopify\nque trabaja 24/7\npor ti",
+    "headlineHighlight": "24/7",
+    "subheadline": "ShopifyAI Pro gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma.",
+    "ctaPrimary": { "label": "Empezar gratis 14 días", "href": "#cta" },
+    "ctaSecondary": { "label": "Ver en acción", "href": "#how" },
+    "trustItems": [
+      "Sin tarjeta de crédito",
+      "Setup en 5 minutos",
+      "Cancela cuando quieras",
+      "RGPD compliant"
+    ]
+  },
+  "features": {
+    "pill": "Motores IA",
+    "headline": "Seis motores. Una sola plataforma.",
+    "subheadline": "Cada motor trabaja de forma autónoma y coordinada.",
+    "items": [
+      {
+        "id": "feat-1",
+        "num": "M01",
+        "icon": "🖼️",
+        "iconBg": "rgba(45,212,159,0.1)",
+        "title": "Generación de Imágenes",
+        "description": "8 tipos de imagen profesional por producto...",
+        "tags": ["flux-1.1-pro", "recraft-v3", "~€0.25/prod"]
+      }
+      // ... rest of features
+    ]
+  },
+  "stats": [
+    { "id": "s1", "num": "3.4×", "label": "Más conversión con 5+ imágenes" },
+    { "id": "s2", "num": "€0.25", "label": "Coste por producto optimizado" },
+    { "id": "s3", "num": "95%", "label": "Confianza estadística en tests" },
+    { "id": "s4", "num": "24/7", "label": "Auto-pilot completamente autónomo" }
+  ],
+  "pricing": {
+    "pill": "Precios",
+    "headline": "Transparente. Sin sorpresas.",
+    "subheadline": "Elige el plan que se adapta a tu agencia.",
+    "plans": [
+      {
+        "id": "plan-starter",
+        "name": "Starter",
+        "price": "49",
+        "currency": "€",
+        "period": "por mes · hasta 3 tiendas",
+        "featured": false,
+        "badge": null,
+        "features": [
+          { "text": "Hasta 3 tiendas Shopify", "included": true },
+          { "text": "A/B Testing automático", "included": false }
+        ],
+        "cta": { "label": "Empezar gratis", "style": "ghost" }
+      }
+    ]
+  },
+  "testimonials": {
+    "pill": "Clientes",
+    "headline": "Lo que dicen los que ya lo usan",
+    "items": [
+      {
+        "id": "testi-1",
+        "stars": 5,
+        "text": "En 3 semanas pasamos de una tasa de conversión del 1.8% al 4.1%...",
+        "metric": "↑ +128% conversión en 3 semanas",
+        "author": "Miguel Rodríguez",
+        "role": "Agencia eCommerce · Madrid",
+        "initials": "MR",
+        "avatarColor": "rgba(200,168,75,0.1)"
+      }
+    ]
+  },
+  "cta": {
+    "pill": "Empieza hoy",
+    "headline": "Tu tienda merece\nmás que esto.",
+    "headlineHighlight": "más que esto.",
+    "subheadline": "14 días gratis. Sin tarjeta. Cancela cuando quieras.",
+    "placeholder": "tu@agencia.com",
+    "buttonLabel": "Empezar →",
+    "finePrint": "Al registrarte aceptas nuestros Términos"
+  },
+  "footer": {
+    "tagline": "La plataforma de gestión y optimización de tiendas Shopify más completa.",
+    "columns": [
+      {
+        "title": "Producto",
+        "links": [
+          { "label": "Motores IA", "href": "#features" },
+          { "label": "Precios", "href": "#pricing" }
+        ]
+      }
+    ],
+    "copyright": "© 2025 ShopifyAI Pro. Todos los derechos reservados.",
+    "badges": ["RGPD", "AES-256", "SOC2"]
+  }
+}
+
+═══════════════════════════════════════════════
+PART 2: CMS API ENDPOINTS
+═══════════════════════════════════════════════
+
+All CMS endpoints require role=admin.
+
+GET  /api/cms/content
+     Returns full content.json
+
+PATCH /api/cms/content
+      Body: { path: "hero.headline", value: "Nueva headline" }
+      - Updates nested path in content.json using lodash _.set()
+      - Creates version snapshot before saving
+      - Broadcasts change via SSE to all open editor tabs
+      - Returns: { success: true, version: 43 }
+
+POST /api/cms/content/batch
+     Body: { changes: [{ path, value }, ...] }
+     - Apply multiple changes atomically
+     - Single version snapshot for the batch
+
+POST /api/cms/media/upload
+     Multipart form: file (image/*, max 5MB)
+     - Process with sharp: resize to max 2400px, convert to WebP
+     - Save to /data/cms/media/{uuid}.webp
+     - Return: { url: "/media/{uuid}.webp", width, height }
+
+DELETE /api/cms/media/:filename
+       - Removes file from disk
+       - Checks it's not referenced anywhere in content.json
+
+GET  /api/cms/versions
+     Returns list of last 30 versions with timestamps
+
+POST /api/cms/versions/:id/restore
+     - Restores content.json to that version
+     - Creates new snapshot of current before restoring
+     - Live reload all open pages
+
+GET  /api/cms/preview
+     Returns rendered HTML of landing page with current content
+     (used by iframe in editor)
+
+POST /api/cms/publish
+     - Marks current content as "published"
+     - Rebuilds static landing page cache
+     - Optional: deploys to CDN if configured
+
+SSE  /api/cms/events
+     Server-Sent Events stream for real-time updates
+     Events: content_updated, media_uploaded, version_restored
+
+═══════════════════════════════════════════════
+PART 3: VISUAL EDITOR UI (/admin/cms)
+═══════════════════════════════════════════════
+
+LAYOUT: Split panel editor (like Webflow/Framer)
+- LEFT PANEL (320px): Content tree + field editors
+- RIGHT PANEL: Live iframe preview of landing page
+- TOP BAR: Save, Publish, Undo/Redo, Version history, Device preview
+
+TOP BAR:
+┌─────────────────────────────────────────────────────┐
+│ ⚡ ShopifyAI CMS  │ ← Undo  Redo →  │ 💻 📱 📟  │
+│ Cambios sin guardar (3)  │  Guardar  │  Publicar  │
+└─────────────────────────────────────────────────────┘
+
+- "Cambios sin guardar (N)" counter
+- Guardar: saves to content.json (PATCH /api/cms/content)
+- Publicar: makes changes live (POST /api/cms/publish)
+- Device toggle: Desktop / Tablet / Mobile (changes iframe width)
+- Undo/Redo: local state history (last 50 actions)
+
+LEFT PANEL — Content Tree:
+Collapsible sections matching the page structure:
+
+▼ 🌐 Sitio
+   ├─ Nombre, Logo, Colores, Fuentes
+▼ 🧭 Navegación
+   ├─ Links (draggable to reorder)
+   ├─ CTA primario, CTA secundario
+▼ 🦸 Hero
+   ├─ Pill, Headline, Subheadline
+   ├─ CTAs, Trust items
+▼ ⭐ Features (draggable items)
+   └─ [＋ Añadir feature]
+▼ 📊 Estadísticas (draggable)
+▼ ❓ Cómo funciona
+▼ 💰 Pricing (draggable plans)
+▼ 💬 Testimonios (draggable)
+▼ 📣 CTA Final
+▼ 🔗 Footer
+
+FIELD EDITORS by type:
+
+TEXT field:
+<input type="text" value="..." oninput="updateField(path, value)">
+Shows character count. Warns if too long for SEO.
+
+TEXTAREA / RICH TEXT:
+<textarea> with markdown support
+Preview rendered below

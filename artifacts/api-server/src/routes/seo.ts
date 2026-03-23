@@ -221,32 +221,136 @@ router.post("/projects/:projectId/seo/generate-sitemap", async (req, res): Promi
 });
 
 router.post("/projects/:projectId/seo/audit-page-speed", async (req, res): Promise<void> => {
-  const { url } = req.body as { url: string };
-  const apiKey = process.env.PAGESPEED_API_KEY ?? "";
+  const { url, strategy = "mobile" } = req.body as { url: string; strategy?: "mobile" | "desktop" };
+  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY ?? "";
 
   try {
-    const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile${apiKey ? `&key=${apiKey}` : ""}`;
+    const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}${apiKey ? `&key=${apiKey}` : ""}`;
     const resp = await fetch(psiUrl);
-    const data = await resp.json() as { lighthouseResult?: { categories?: { performance?: { score?: number } }; audits?: Record<string, { numericValue?: number }> } };
+    const data = await resp.json() as {
+      id?: string;
+      lighthouseResult?: {
+        categories?: {
+          performance?: { score?: number };
+          seo?: { score?: number };
+          accessibility?: { score?: number };
+          "best-practices"?: { score?: number };
+        };
+        audits?: Record<string, {
+          numericValue?: number;
+          displayValue?: string;
+          score?: number;
+          title?: string;
+          description?: string;
+        }>;
+      };
+      loadingExperience?: {
+        overall_category?: string;
+        metrics?: {
+          FIRST_CONTENTFUL_PAINT_MS?: { percentile?: number; category?: string };
+          LARGEST_CONTENTFUL_PAINT_MS?: { percentile?: number; category?: string };
+          CUMULATIVE_LAYOUT_SHIFT_SCORE?: { percentile?: number; category?: string };
+          INTERACTION_TO_NEXT_PAINT?: { percentile?: number; category?: string };
+          FIRST_INPUT_DELAY_MS?: { percentile?: number; category?: string };
+          EXPERIMENTAL_TIME_TO_FIRST_BYTE?: { percentile?: number; category?: string };
+        };
+      };
+    };
 
-    const score = (data.lighthouseResult?.categories?.performance?.score ?? 0) * 100;
-    const lcp = (data.lighthouseResult?.audits?.["largest-contentful-paint"]?.numericValue ?? 0) / 1000;
-    const cls = data.lighthouseResult?.audits?.["cumulative-layout-shift"]?.numericValue ?? 0;
-    const inp = (data.lighthouseResult?.audits?.["interaction-to-next-paint"]?.numericValue ?? 0);
+    const lighthouse = data.lighthouseResult;
+    const audits = lighthouse?.audits ?? {};
+    const cats = lighthouse?.categories ?? {};
+    const fieldData = data.loadingExperience?.metrics ?? {};
+
+    const perfScore = Math.round((cats.performance?.score ?? 0) * 100);
+    const seoScore = Math.round((cats.seo?.score ?? 0) * 100);
+    const accessScore = Math.round((cats.accessibility?.score ?? 0) * 100);
+    const bestScore = Math.round((cats["best-practices"]?.score ?? 0) * 100);
+
+    const lcp = (audits["largest-contentful-paint"]?.numericValue ?? 0) / 1000;
+    const cls = audits["cumulative-layout-shift"]?.numericValue ?? 0;
+    const fcp = (audits["first-contentful-paint"]?.numericValue ?? 0) / 1000;
+    const tbt = audits["total-blocking-time"]?.numericValue ?? 0;
+    const si = (audits["speed-index"]?.numericValue ?? 0) / 1000;
+    const tti = (audits["interactive"]?.numericValue ?? 0) / 1000;
+    const inp = audits["interaction-to-next-paint"]?.numericValue ?? 0;
+    const ttfb = (audits["server-response-time"]?.numericValue ?? 0);
 
     const issues: string[] = [];
     const fixes: string[] = [];
+    const opportunities: Array<{ title: string; savings: string; impact: "high" | "medium" | "low" }> = [];
 
-    if (lcp > 2.5) { issues.push(`LCP lento: ${lcp.toFixed(1)}s (objetivo <2.5s)`); fixes.push("Añade loading='lazy' y width/height a todas las imágenes para mejorar LCP"); }
-    if (cls > 0.1) { issues.push(`CLS alto: ${cls.toFixed(3)} (objetivo <0.1)`); fixes.push("Define dimensiones explícitas en imágenes y embeds para eliminar CLS"); }
-    if (inp > 200) { issues.push(`INP alto: ${inp.toFixed(0)}ms (objetivo <200ms)`); fixes.push("Aplica async/defer a scripts no críticos"); }
+    if (lcp > 2.5) {
+      issues.push(`LCP lento: ${lcp.toFixed(1)}s (objetivo <2.5s)`);
+      fixes.push("Optimiza el elemento más grande de la vista: preload de imagen hero, compresión WebP, CDN con cache-control largo");
+      opportunities.push({ title: "Mejorar LCP", savings: `${(lcp - 2.5).toFixed(1)}s más lento`, impact: "high" });
+    }
+    if (cls > 0.1) {
+      issues.push(`CLS alto: ${cls.toFixed(3)} (objetivo <0.1)`);
+      fixes.push("Define width y height explícitos en imágenes y videos para eliminar layout shifts");
+      opportunities.push({ title: "Reducir CLS", savings: `Score ${cls.toFixed(3)}`, impact: "high" });
+    }
+    if (tbt > 200) {
+      issues.push(`TBT alto: ${tbt.toFixed(0)}ms (objetivo <200ms)`);
+      fixes.push("Divide bundles JS con code splitting, aplica lazy loading de scripts no críticos");
+      opportunities.push({ title: "Reducir TBT", savings: `${tbt.toFixed(0)}ms de bloqueo`, impact: "medium" });
+    }
+    if (inp > 200) {
+      issues.push(`INP alto: ${inp.toFixed(0)}ms (objetivo <200ms)`);
+      fixes.push("Aplica async/defer a scripts no críticos, optimiza event listeners pesados");
+    }
+    if (ttfb > 600) {
+      issues.push(`TTFB lento: ${ttfb.toFixed(0)}ms (objetivo <600ms)`);
+      fixes.push("Activa Shopify CDN en todas las regiones, considera edge caching para páginas de producto");
+      opportunities.push({ title: "Reducir TTFB", savings: `${ttfb.toFixed(0)}ms servidor`, impact: "medium" });
+    }
+    if (fcp > 1.8) {
+      issues.push(`FCP lento: ${fcp.toFixed(1)}s (objetivo <1.8s)`);
+      fixes.push("Inline el CSS crítico, elimina render-blocking resources del <head>");
+    }
 
-    res.json({ url, performanceScore: Math.round(score), lcp, cls, inp, issues, fixes });
-  } catch (err) {
+    const fieldSummary = data.loadingExperience?.overall_category ?? null;
+
     res.json({
-      url, performanceScore: 0, lcp: 0, cls: 0, inp: 0,
-      issues: ["No se pudo obtener datos de PageSpeed. Verifica que la URL sea pública."],
+      url,
+      strategy,
+      performanceScore: perfScore,
+      seoScore,
+      accessibilityScore: accessScore,
+      bestPracticesScore: bestScore,
+      coreWebVitals: {
+        lcp: { value: parseFloat(lcp.toFixed(2)), unit: "s", status: lcp <= 2.5 ? "good" : lcp <= 4 ? "needs-improvement" : "poor" },
+        cls: { value: parseFloat(cls.toFixed(3)), unit: "", status: cls <= 0.1 ? "good" : cls <= 0.25 ? "needs-improvement" : "poor" },
+        inp: { value: inp, unit: "ms", status: inp <= 200 ? "good" : inp <= 500 ? "needs-improvement" : "poor" },
+        fcp: { value: parseFloat(fcp.toFixed(2)), unit: "s", status: fcp <= 1.8 ? "good" : fcp <= 3 ? "needs-improvement" : "poor" },
+        tbt: { value: tbt, unit: "ms", status: tbt <= 200 ? "good" : tbt <= 600 ? "needs-improvement" : "poor" },
+        si: { value: parseFloat(si.toFixed(2)), unit: "s", status: si <= 3.4 ? "good" : si <= 5.8 ? "needs-improvement" : "poor" },
+        tti: { value: parseFloat(tti.toFixed(2)), unit: "s", status: tti <= 3.8 ? "good" : tti <= 7.3 ? "needs-improvement" : "poor" },
+        ttfb: { value: ttfb, unit: "ms", status: ttfb <= 600 ? "good" : ttfb <= 1800 ? "needs-improvement" : "poor" },
+      },
+      fieldData: {
+        category: fieldSummary,
+        lcp: fieldData.LARGEST_CONTENTFUL_PAINT_MS?.category ?? null,
+        cls: fieldData.CUMULATIVE_LAYOUT_SHIFT_SCORE?.category ?? null,
+        inp: fieldData.INTERACTION_TO_NEXT_PAINT?.category ?? null,
+      },
+      issues,
+      fixes,
+      opportunities,
+    });
+  } catch (err) {
+    res.status(500).json({
+      url,
+      strategy: "mobile",
+      performanceScore: 0,
+      seoScore: 0,
+      accessibilityScore: 0,
+      bestPracticesScore: 0,
+      coreWebVitals: {},
+      fieldData: {},
+      issues: ["No se pudo obtener datos de PageSpeed. Verifica que la URL sea pública y accesible desde internet."],
       fixes: [],
+      opportunities: [],
     });
   }
 });

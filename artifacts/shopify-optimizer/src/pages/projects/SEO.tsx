@@ -9,13 +9,13 @@ import {
   useGetKeywordIntelligence,
   useGetBlogStrategy,
   useGenerateBlogPost,
+  useAuditPageSpeed,
 } from "@workspace/api-client-react";
 import {
   Search,
   Globe,
   FileCode2,
   Zap,
-  Link as LinkIcon,
   Edit3,
   Loader2,
   CheckCircle,
@@ -24,6 +24,11 @@ import {
   FileText,
   Image as ImageIcon,
   TrendingUp,
+  Gauge,
+  AlertTriangle,
+  Monitor,
+  Smartphone,
+  ArrowRight,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,6 +56,21 @@ export default function SEOPage() {
   const [generatedPost, setGeneratedPost] = useState<{ title?: string; content?: string } | null>(null);
   const [selectedPillar, setSelectedPillar] = useState<string>("");
 
+  const [psUrl, setPsUrl] = useState("");
+  const [psStrategy, setPsStrategy] = useState<"mobile" | "desktop">("mobile");
+  const [psResult, setPsResult] = useState<{
+    performanceScore?: number;
+    seoScore?: number;
+    accessibilityScore?: number;
+    bestPracticesScore?: number;
+    coreWebVitals?: Record<string, { value: number; unit: string; status: "good" | "needs-improvement" | "poor" }>;
+    fieldData?: { category?: string | null; lcp?: string | null; cls?: string | null; inp?: string | null };
+    issues?: string[];
+    fixes?: string[];
+    opportunities?: Array<{ title: string; savings: string; impact: "high" | "medium" | "low" }>;
+  } | null>(null);
+
+  const auditPageSpeed = useAuditPageSpeed();
   const runSeoAudit = useRunSeoAudit();
   const generateSchemas = useGenerateSchemas();
   const generateMetas = useGenerateMetas();
@@ -122,6 +142,23 @@ export default function SEOPage() {
           toast({ title: `Alt texts corregidos: ${(data as { fixed?: number }).fixed ?? 0} imágenes` });
         },
         onError: () => toast({ title: "Error corrigiendo alt texts", variant: "destructive" }),
+      }
+    );
+  };
+
+  const handlePageSpeed = () => {
+    if (!psUrl.trim()) {
+      toast({ title: "Ingresa una URL para analizar", variant: "destructive" });
+      return;
+    }
+    auditPageSpeed.mutate(
+      { projectId, data: { url: psUrl.trim(), strategy: psStrategy } },
+      {
+        onSuccess: (data) => {
+          setPsResult(data as typeof psResult);
+          toast({ title: "Análisis PageSpeed completado" });
+        },
+        onError: () => toast({ title: "Error al analizar PageSpeed. Verifica que la URL sea pública.", variant: "destructive" }),
       }
     );
   };
@@ -365,6 +402,219 @@ export default function SEOPage() {
           </div>
         </GlassCard>
       )}
+
+      {/* PageSpeed / Core Web Vitals */}
+      <GlassCard className="p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <Gauge className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-lg font-bold text-foreground">Core Web Vitals — PageSpeed Insights</h2>
+          {psResult?.performanceScore != null && (
+            <span
+              className="ml-auto text-xs font-bold px-2 py-1 rounded-md"
+              style={{
+                color: psResult.performanceScore >= 90 ? "#00d68f" : psResult.performanceScore >= 50 ? "#ffd32a" : "#ff4757",
+                background: psResult.performanceScore >= 90 ? "#00d68f20" : psResult.performanceScore >= 50 ? "#ffd32a20" : "#ff475720",
+              }}
+            >
+              {psResult.performanceScore}/100
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="url"
+            value={psUrl}
+            onChange={(e) => setPsUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handlePageSpeed()}
+            placeholder="https://tu-tienda.myshopify.com/products/producto-hero"
+            className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/40 transition-colors"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPsStrategy("mobile")}
+              className={`px-3 py-2.5 rounded-xl text-sm flex items-center gap-1.5 border transition-all ${psStrategy === "mobile" ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400" : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"}`}
+            >
+              <Smartphone className="w-4 h-4" /> Mobile
+            </button>
+            <button
+              onClick={() => setPsStrategy("desktop")}
+              className={`px-3 py-2.5 rounded-xl text-sm flex items-center gap-1.5 border transition-all ${psStrategy === "desktop" ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400" : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"}`}
+            >
+              <Monitor className="w-4 h-4" /> Desktop
+            </button>
+            <button
+              onClick={handlePageSpeed}
+              disabled={auditPageSpeed.isPending}
+              className="bg-cyan-500 text-black px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-cyan-400 disabled:opacity-60 transition-all"
+            >
+              {auditPageSpeed.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {auditPageSpeed.isPending ? "Analizando..." : "Analizar"}
+            </button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {psResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-5"
+            >
+              {/* 4 Lighthouse Scores */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Rendimiento", score: psResult.performanceScore, color: "#00b4d8" },
+                  { label: "SEO", score: psResult.seoScore, color: "#5b4eff" },
+                  { label: "Accesibilidad", score: psResult.accessibilityScore, color: "#00d68f" },
+                  { label: "Best Practices", score: psResult.bestPracticesScore, color: "#ffd32a" },
+                ].map(({ label, score, color }) => {
+                  const s = score ?? 0;
+                  const c = s >= 90 ? "#00d68f" : s >= 50 ? "#ffd32a" : "#ff4757";
+                  return (
+                    <div key={label} className="bg-black/20 rounded-xl p-4 flex flex-col items-center text-center border border-white/5">
+                      <div className="relative w-16 h-16 mb-2">
+                        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffffff10" strokeWidth="3" />
+                          <circle
+                            cx="18" cy="18" r="15.9" fill="none"
+                            stroke={c} strokeWidth="3" strokeLinecap="round"
+                            strokeDasharray={`${s} 100`}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-lg font-bold" style={{ color: c }}>{s}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Core Web Vitals Table */}
+              {psResult.coreWebVitals && Object.keys(psResult.coreWebVitals).length > 0 && (
+                <div className="bg-black/20 rounded-xl border border-white/5 overflow-hidden">
+                  <div className="px-4 py-2.5 bg-white/5 border-b border-white/5">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas</h3>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {Object.entries(psResult.coreWebVitals).map(([key, metric]) => {
+                      const statusColor = metric.status === "good" ? "#00d68f" : metric.status === "needs-improvement" ? "#ffd32a" : "#ff4757";
+                      const labels: Record<string, string> = {
+                        lcp: "LCP — Largest Contentful Paint",
+                        cls: "CLS — Cumulative Layout Shift",
+                        inp: "INP — Interaction to Next Paint",
+                        fcp: "FCP — First Contentful Paint",
+                        tbt: "TBT — Total Blocking Time",
+                        si: "SI — Speed Index",
+                        tti: "TTI — Time to Interactive",
+                        ttfb: "TTFB — Server Response Time",
+                      };
+                      return (
+                        <div key={key} className="px-4 py-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ background: statusColor }} />
+                            <span className="text-sm text-muted-foreground">{labels[key] ?? key.toUpperCase()}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold" style={{ color: statusColor }}>
+                              {metric.value}{metric.unit}
+                            </span>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full"
+                              style={{ color: statusColor, background: `${statusColor}15` }}
+                            >
+                              {metric.status === "good" ? "Bueno" : metric.status === "needs-improvement" ? "Mejorable" : "Malo"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Field Data Label */}
+              {psResult.fieldData?.category && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Datos reales (CrUX):</span>
+                  <span
+                    className="font-semibold px-2 py-0.5 rounded-md text-xs"
+                    style={{
+                      color: psResult.fieldData.category === "FAST" ? "#00d68f" : psResult.fieldData.category === "AVERAGE" ? "#ffd32a" : "#ff4757",
+                      background: psResult.fieldData.category === "FAST" ? "#00d68f20" : psResult.fieldData.category === "AVERAGE" ? "#ffd32a20" : "#ff475720",
+                    }}
+                  >
+                    {psResult.fieldData.category}
+                  </span>
+                </div>
+              )}
+
+              {/* Opportunities */}
+              {psResult.opportunities && psResult.opportunities.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Oportunidades</h3>
+                  {psResult.opportunities.map((opp, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-orange-500/5 border border-orange-500/10 rounded-xl p-3">
+                      <AlertTriangle className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-foreground">{opp.title}</span>
+                        <span className="text-xs text-orange-400 ml-2">{opp.savings}</span>
+                      </div>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-medium"
+                        style={{
+                          color: opp.impact === "high" ? "#ff4757" : opp.impact === "medium" ? "#ffd32a" : "#00d68f",
+                          background: opp.impact === "high" ? "#ff475715" : opp.impact === "medium" ? "#ffd32a15" : "#00d68f15",
+                        }}
+                      >
+                        {opp.impact === "high" ? "Alto impacto" : opp.impact === "medium" ? "Medio" : "Bajo"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Issues + Fixes */}
+              {psResult.issues && psResult.issues.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-black/20 rounded-xl p-4 border border-red-500/10">
+                    <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-3">Problemas</h3>
+                    <div className="space-y-2">
+                      {psResult.issues.map((issue, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <ChevronRight className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                          {issue}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {psResult.fixes && psResult.fixes.length > 0 && (
+                    <div className="bg-black/20 rounded-xl p-4 border border-green-500/10">
+                      <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-3">Cómo Solucionar</h3>
+                      <div className="space-y-2">
+                        {psResult.fixes.map((fix, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <ArrowRight className="w-3.5 h-3.5 text-green-400 flex-shrink-0 mt-0.5" />
+                            {fix}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!psResult && !auditPageSpeed.isPending && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Ingresa la URL de cualquier página de tu tienda para obtener su análisis Core Web Vitals en tiempo real.
+          </p>
+        )}
+      </GlassCard>
 
       {/* Keyword Intelligence */}
       <GlassCard className="p-6">
