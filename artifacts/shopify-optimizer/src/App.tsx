@@ -22,6 +22,8 @@ import ShopyBrainMemories from "@/pages/admin/ShopyBrainMemories";
 import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
 import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
 import MyPricing from "@/pages/admin/MyPricing";
+import Emails from "@/pages/admin/Emails";
+import ForgotPassword from "@/pages/ForgotPassword";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
 import ImagesPage from "@/pages/projects/Images";
@@ -135,6 +137,7 @@ function Router() {
       <Switch>
         {/* Public */}
         <Route path="/login" component={LoginPage} />
+        <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/invite/:token" component={InviteSetupPage} />
 
         {/* Root — redirects by role */}
@@ -248,6 +251,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><MyPricing /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/emails">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Emails /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

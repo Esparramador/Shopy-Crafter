@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
@@ -114,8 +114,18 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Forgot password */}
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <Link
+              href="/forgot-password"
+              style={{ fontSize: 12, color: "var(--t3)", textDecoration: "none" }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
           {/* Footer hint */}
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
             <p style={{ fontSize: 11, color: "var(--t3)" }}>
               Plataforma exclusiva · Solo usuarios autorizados
             </p>

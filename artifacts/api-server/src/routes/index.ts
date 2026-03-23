@@ -22,6 +22,7 @@ import voiceRouter from "./voice.js";
 import pushRouter from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
 import agencyRouter from "./agency.js";
+import klaviyoRouter from "./klaviyo.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -55,5 +56,6 @@ router.use(voiceRouter);
 router.use(pushRouter);
 router.use(shopybrainRouter);
 router.use(agencyRouter);
+router.use(klaviyoRouter);
 
 export default router;

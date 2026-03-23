@@ -181,7 +181,9 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
 
     try {
       const Replicate = (await import("replicate")).default;
-      const replicate = new Replicate({ auth: project.replicateApiToken });
+      const { safeDecrypt } = await import("../lib/crypto.js");
+      const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+      const replicate = new Replicate({ auth: replicateToken });
 
       let output: unknown;
       if (model.includes("flux-1.1-pro")) {

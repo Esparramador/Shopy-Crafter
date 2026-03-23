@@ -11,6 +11,8 @@ export const usersTable = pgTable("users", {
   avatarColor: text("avatar_color").default("#5b4eff"),
   inviteToken: text("invite_token"),
   inviteExpires: timestamp("invite_expires"),
+  resetToken: text("reset_token"),
+  resetExpires: timestamp("reset_expires"),
   lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow(),
 });

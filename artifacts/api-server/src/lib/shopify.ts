@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import { projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { safeDecrypt } from "./crypto.js";
 
 export async function getShopifyHeaders(projectId: number): Promise<Record<string, string>> {
   const [project] = await db
@@ -16,7 +17,8 @@ export async function getShopifyHeaders(projectId: number): Promise<Record<strin
   const isExpired = !token || !expiresAt || new Date(expiresAt) < new Date(Date.now() + 5 * 60 * 1000);
 
   if (isExpired) {
-    token = await refreshToken(projectId, project.shopDomain, project.clientId, project.clientSecret);
+    const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+    token = await refreshToken(projectId, project.shopDomain, project.clientId, plainSecret);
   }
 
   return {

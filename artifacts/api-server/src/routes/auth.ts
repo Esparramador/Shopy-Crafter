@@ -136,4 +136,95 @@ router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   res.json({ success: true, role: user.role, clientId: user.clientId });
 });
 
+// ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
+router.post("/forgot-password", async (req, res): Promise<void> => {
+  const { email } = req.body as { email: string };
+  if (!email) { res.status(400).json({ error: "Email requerido" }); return; }
+
+  // Always respond OK to prevent email enumeration
+  const [user] = await db.select().from(usersTable)
+    .where(eq(usersTable.email, email.toLowerCase().trim()));
+
+  if (user && user.isActive) {
+    const token = randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await db.update(usersTable).set({
+      resetToken: token,
+      resetExpires: expires,
+    }).where(eq(usersTable.id, user.id));
+
+    // Send via Klaviyo if available
+    const klaviyoKey = process.env.KLAVIYO_API_KEY;
+    if (klaviyoKey) {
+      const resetUrl = `${process.env.APP_URL ?? "https://shopifyai.pro"}/reset-password?token=${token}`;
+      try {
+        await fetch("https://a.klaviyo.com/api/events/", {
+          method: "POST",
+          headers: {
+            "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
+            "Content-Type": "application/json",
+            "revision": "2024-02-15",
+          },
+          body: JSON.stringify({
+            data: {
+              type: "event",
+              attributes: {
+                properties: { resetUrl, userName: user.name, expireMinutes: 60 },
+                metric: { data: { type: "metric", attributes: { name: "Password Reset Requested" } } },
+                profile: { data: { type: "profile", attributes: { email: user.email } } },
+              },
+            },
+          }),
+        });
+      } catch (err) {
+        req.log?.warn({ err }, "Klaviyo password reset email failed");
+      }
+    }
+
+    req.log?.info({ userId: user.id }, "Password reset token generated");
+  }
+
+  res.json({ success: true, message: "Si el email existe, recibirás un enlace de recuperación." });
+});
+
+// ─── RESET PASSWORD ──────────────────────────────────────────────────────────
+router.post("/reset-password", async (req, res): Promise<void> => {
+  const { token, password } = req.body as { token: string; password: string };
+
+  if (!token || !password) {
+    res.status(400).json({ error: "Token y contraseña requeridos" });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable)
+    .where(eq(usersTable.resetToken, token));
+
+  if (!user || !user.resetExpires || user.resetExpires < new Date()) {
+    res.status(410).json({ error: "El enlace ha expirado o no es válido" });
+    return;
+  }
+
+  const hashed = await bcrypt.hash(password, 12);
+  await db.update(usersTable).set({
+    password: hashed,
+    resetToken: null,
+    resetExpires: null,
+  }).where(eq(usersTable.id, user.id));
+
+  await db.insert(auditLogTable).values({
+    id: randomBytes(16).toString("hex"),
+    userId: user.id,
+    action: "password_reset",
+    details: "Contraseña restablecida via token",
+    ipAddress: req.ip ?? "unknown",
+  });
+
+  res.json({ success: true, message: "Contraseña actualizada correctamente" });
+});
+
 export default router;

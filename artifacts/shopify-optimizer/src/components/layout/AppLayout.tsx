@@ -24,6 +24,7 @@ const SHOPYBRAIN_NAV = [
   { label: "Knowledge Domains", icon: "⚡", href: "/admin/shopybrain/insights" },
   { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
   { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
+  { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
 ];
 
 const ADMIN_NAV = [

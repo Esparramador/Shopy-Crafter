@@ -177,7 +177,27 @@ artifacts-monorepo/
 
 ### Sidebar Navigation
 - Shopy Brain group (🧠) arriba de Administración en el sidebar
-- Items: Shopy Brain, Memorias, Knowledge Domains, Sesiones Estudio, Mi Pricing CFO
+- Items: Shopy Brain, Memorias, Knowledge Domains, Sesiones Estudio, Mi Pricing CFO, Email Marketing
+
+### OmniCore Seed Data (loaded)
+- **100 memorias** cargadas en `omnicore_memories` cubriendo: pricing psychology, SEO, CRO, email marketing, imágenes, copywriting, upsell, social proof, mobile UX, nichos (fashion, beauty, fitness, hogar, tech, pets, sports), A/B patterns, seasonal patterns, agency insights, técnico, psicología
+- **9 knowledge domains** en `omnicore_knowledge_domains`: Pricing, SEO, CRO, Email, Images, Copy, Upsell, Social Proof, Mobile UX
+
+### Cron Jobs Scheduler
+- **File**: `artifacts/api-server/src/lib/scheduler.ts` — registrado en `index.ts` al startup
+- **Schedule** (Europe/Madrid):
+  - 2am daily: Revenue snapshots (Shopify orders API)
+  - 3am daily: OmniCore real data integration (insights de revenue)
+  - 4am daily: OmniCore market research (Claude genera 3 insights por domain)
+  - 6am daily: Competitor price scans (fetch URL + precio extraído)
+  - 7am daily: Inventory sync + alertas stock crítico
+  - Sunday 2am weekly: OmniCore deep study (5 insights por domain, almacena como insights + memorias)
+
+### Klaviyo Email Marketing Integration
+- **Route**: `artifacts/api-server/src/routes/klaviyo.ts` — montado en routes/index.ts
+- **Endpoints**: GET /api/klaviyo/test, /lists, /campaigns, /flows, /profiles/count, /metrics; POST /api/klaviyo/events, /subscribe, /send-email, /welcome-client
+- **Page**: `/admin/emails` — Dashboard con tabs: Overview, Listas, Campañas, Flows, Enviar
+- **Password reset**: POST /api/auth/forgot-password y /api/auth/reset-password envían evento Klaviyo si la key está configurada
 
 ## 9-Phase Feature Implementation (NEW)
 
@@ -235,19 +255,22 @@ artifacts-monorepo/
 
 - **Session**: `express-session` + `connect-pg-simple` (table: `user_sessions`), 8h maxAge, httpOnly cookie
 - **Passwords**: `bcryptjs` (12 rounds)
-- **Credential encryption**: AES-256-GCM via `artifacts/api-server/src/lib/crypto.ts` (key: `ENCRYPTION_KEY` env var)
-- **Admin credentials**: `admin@agency.com` / `admin123` (seeded in `users` table)
+- **Credential encryption**: AES-256-GCM via `artifacts/api-server/src/lib/crypto.ts` (key: `ENCRYPTION_KEY` env var) — aplicado a `clientSecret`, `replicateApiToken`, `anthropicApiKey` en `projects` tabla. Auto-decrypt en shopify.ts y claude.ts.
+- **Admin**: `sadiagiljoan@gmail.com` — ÚNICO admin de la plataforma
 - **Roles**: `admin` | `client`
 - **Row-level security**: Clients can only access their own `projectId` (enforced in Express middleware)
 - **Impersonation**: Admin can preview client view via `/api/admin/impersonate/:userId`; red banner shown; stop at `/api/admin/stop-impersonate`
 - **Client invitation**: Admin creates invite → token emailed → client sets password at `/invite/:token`
-- **New DB tables**: `users`, `audit_log`, `approvals`, `messages`
+- **Forgot/Reset password**: POST /api/auth/forgot-password (genera token 1h, envía evento Klaviyo), POST /api/auth/reset-password (valida token, actualiza bcrypt hash). Columnas `reset_token` + `reset_expires` en tabla `users`.
+- **DB tables**: `users`, `audit_log`, `approvals`, `messages`
 - **Frontend routes**:
-  - `/login` — Login page (public)
+  - `/login` — Login page con link "¿Olvidaste tu contraseña?" (public)
+  - `/forgot-password` — Formulario de recuperación (public)
   - `/invite/:token` — Client invitation setup (public)
   - `/admin/clients` — Admin client management
+  - `/admin/emails` — Klaviyo email marketing dashboard (admin only)
   - `/client/*` — Client dashboard (read-only)
-  - All other routes (`/projects/*`) — Admin only
+  - All other routes (`/projects/*`, `/admin/*`) — Admin only
 
 ## Shopify OAuth Flow
 

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { refreshToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
+import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
 
@@ -39,17 +40,18 @@ router.post("/projects", async (req, res): Promise<void> => {
     name,
     shopDomain: normalizeShopDomain(shopDomain),
     clientId,
-    clientSecret,
+    clientSecret: encrypt(clientSecret),
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
     targetAudience: targetAudience ?? null,
     storeMarkets: storeMarkets ?? null,
-    replicateApiToken: replicateApiToken ?? null,
-    anthropicApiKey: anthropicApiKey ?? null,
+    replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
+    anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
   }).returning();
 
   try {
-    await refreshToken(project.id, project.shopDomain, project.clientId, project.clientSecret);
+    // Pass original plaintext clientSecret (not the encrypted DB value)
+    await refreshToken(project.id, project.shopDomain, project.clientId, clientSecret);
   } catch (err) {
     req.log.warn({ projectId: project.id, err }, "Initial token fetch failed — can retry later");
   }
@@ -95,13 +97,13 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
   if (name !== undefined) updateData.name = name;
   if (shopDomain !== undefined) updateData.shopDomain = normalizeShopDomain(shopDomain);
   if (clientId !== undefined) updateData.clientId = clientId;
-  if (clientSecret !== undefined) updateData.clientSecret = clientSecret;
+  if (clientSecret !== undefined) updateData.clientSecret = encrypt(clientSecret);
   if (storeNiche !== undefined) updateData.storeNiche = storeNiche;
   if (brandTone !== undefined) updateData.brandTone = brandTone;
   if (targetAudience !== undefined) updateData.targetAudience = targetAudience;
   if (storeMarkets !== undefined) updateData.storeMarkets = storeMarkets;
-  if (replicateApiToken !== undefined) updateData.replicateApiToken = replicateApiToken;
-  if (anthropicApiKey !== undefined) updateData.anthropicApiKey = anthropicApiKey;
+  if (replicateApiToken !== undefined) updateData.replicateApiToken = replicateApiToken ? encrypt(replicateApiToken) : null;
+  if (anthropicApiKey !== undefined) updateData.anthropicApiKey = anthropicApiKey ? encrypt(anthropicApiKey) : null;
   if (autoPilotEnabled !== undefined) updateData.autoPilotEnabled = autoPilotEnabled;
 
   const [updated] = await db

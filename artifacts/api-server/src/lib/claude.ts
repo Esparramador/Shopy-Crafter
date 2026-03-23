@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq, desc, and, gte } from "drizzle-orm";
+import { safeDecrypt } from "./crypto.js";
 
 let defaultClient: Anthropic | null = null;
 
@@ -21,7 +22,8 @@ export async function getClaudeClient(projectId: number): Promise<Anthropic> {
     .where(eq(projectsTable.id, projectId));
 
   if (project?.anthropicApiKey) {
-    return new Anthropic({ apiKey: project.anthropicApiKey });
+    const plainKey = safeDecrypt(project.anthropicApiKey) || project.anthropicApiKey;
+    return new Anthropic({ apiKey: plainKey });
   }
   return getDefaultClient();
 }
