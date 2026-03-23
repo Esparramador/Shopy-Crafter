@@ -113,6 +113,21 @@ export const DEFAULT_CMS_CONTENT = {
         ],
         cta: { label: "Hablar con Joan →", style: "ghost" },
       },
+      {
+        id: "plan-oneshot", name: "One-Shot Audit", price: "197", currency: "€", period: "pago único · sin permanencia",
+        featured: false, badge: "SIN RETAINER",
+        features: [
+          { text: "Auditoría completa de 1 tienda", included: true },
+          { text: "Rediseño IA de hasta 30 productos", included: true },
+          { text: "Pack 30 imágenes profesionales IA", included: true },
+          { text: "Informe SEO + plan de acción", included: true },
+          { text: "Análisis COGS + pricing recomendado", included: true },
+          { text: "Entrega en 48h · Informe PDF premium", included: true },
+          { text: "Sin retainer mensual", included: true },
+          { text: "Soporte post-entrega 15 días", included: false },
+        ],
+        cta: { label: "Solicitar One-Shot →", style: "ghost" },
+      },
     ],
   },
   testimonials: {

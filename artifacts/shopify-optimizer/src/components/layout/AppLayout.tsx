@@ -1,6 +1,6 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { LogOut, Settings, Bell, Sun, Moon } from "lucide-react";
+import { LogOut, Settings, Bell, Sun, Moon, Menu, X } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -63,9 +63,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [location, navigate] = useLocation();
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
   const pageLabel = PAGE_LABELS[currentPage] ?? "Dashboard";
+
+  // Close sidebar when route changes (tablet)
+  useEffect(() => { setSidebarOpen(false); }, [location]);
 
   const toggleDarkMode = () => {
     setDarkMode(d => !d);
@@ -74,8 +78,15 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="app-shell">
+      {/* ── TABLET SIDEBAR OVERLAY ── */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? " visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       {/* ── SIDEBAR ── */}
-      <nav className="sidebar" role="navigation" aria-label="Navegación principal">
+      <nav className={`sidebar${sidebarOpen ? " open" : ""}`} role="navigation" aria-label="Navegación principal">
         {/* Logo */}
         <div className="sidebar-logo">
           <div className="logo-gem">⚡</div>
@@ -246,6 +257,15 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="main-area">
         {/* Topbar */}
         <div className="topbar" role="banner">
+          {/* Hamburger button — visible on tablet via CSS only */}
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
           <div className="topbar-breadcrumb">
             {activeProject ? (
               <>

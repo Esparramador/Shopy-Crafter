@@ -158,7 +158,7 @@ artifacts-monorepo/
 - **Starter**: €49/mes + Setup €297 | 1-3 tiendas | M1+M5+M6 | 100 imgs/mes
 - **Agency Pro**: €149/mes + Setup €597 | 4-15 tiendas | 6 motores | 500 imgs/mes | Portal cliente | OmniCore
 - **Enterprise**: €399/mes + Setup €1.497 | Ilimitadas | Todo + White-label | Imgs ilimitadas | OmniCore premium | Slack dedicado
-- **One-Shot**: Setup €797 | Auditoría €197 | Boost único €297 | Imgs pack €97 | Consultoría €150/h | Reporte PDF €97
+- **One-Shot Audit**: €197 pago único | Auditoría completa + Rediseño 30 prods + 30 imgs IA + SEO + COGS | Entrega 48h | Sin retainer
 
 ### Memory Types
 - `niche_keyword`: Keywords que convierten por sector
@@ -221,7 +221,7 @@ artifacts-monorepo/
 
 ### Landing Page — Fullpage Scroll-Snap (7 secciones)
 - **Arquitectura**: CSS `scroll-snap-type: y mandatory`, `fp-container` fixed (top: 64px), cada sección = `calc(100vh - 64px)`
-- **7 secciones**: Hero (split + dashboard preview) → Engines (6 motores con tab nav) → Demo (split + cards) → Resultados (animated counters) → Precios (3 cards) → Clientes (carousel automático) → CTA + Footer
+- **7 secciones**: Hero (split + dashboard preview) → Engines (6 motores con tab nav) → Demo (split + cards) → Resultados (animated counters) → Precios (4 cards: Starter/Agency Pro/Enterprise/One-Shot) → Clientes (carousel automático) → CTA + Footer
 - **Navegación lateral**: `fp-sidenav` fixed derecha con dots dorados + labels al hover
 - **Barra de progreso**: `fp-progress` fixed izquierda, animada con porcentaje por sección
 - **Contador secciones**: `fp-counter` fixed abajo centro, formato 01/07
