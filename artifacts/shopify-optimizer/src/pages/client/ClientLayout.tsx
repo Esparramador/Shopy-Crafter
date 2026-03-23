@@ -1,16 +1,13 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  LayoutDashboard, Package, CheckSquare, MessageSquare,
-  LogOut, Bell, Store, Zap,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/client", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/client/products", label: "Productos", icon: Package },
-  { href: "/client/approvals", label: "Aprobaciones", icon: CheckSquare },
-  { href: "/client/messages", label: "Mensajes", icon: MessageSquare },
+  { href: "/client",           label: "Dashboard",    icon: "📊" },
+  { href: "/client/products",  label: "Productos",    icon: "📦" },
+  { href: "/client/approvals", label: "Aprobaciones", icon: "✅" },
+  { href: "/client/messages",  label: "Mensajes",     icon: "💬" },
 ];
 
 export function ClientLayout({ children }: { children: ReactNode }) {
@@ -18,91 +15,132 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
   const initials = user?.name
-    ? user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    ? user.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : "CL";
 
   return (
-    <div className="min-h-screen bg-[#08080f] flex">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 border-r border-white/5 flex flex-col">
-        <div className="p-5 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5b4eff]/20 border border-[#5b4eff]/30 flex items-center justify-center">
-              <Store className="w-4 h-4 text-[#5b4eff]" />
+    <div className="app-shell">
+      {/* ── SIDEBAR ── */}
+      <nav className="sidebar">
+        {/* Logo */}
+        <div className="sidebar-logo">
+          <div className="logo-gem">⚡</div>
+          <span className="logo-text">Shopify<em>AI</em></span>
+          <span className="logo-badge">CLIENT</span>
+        </div>
+
+        {/* Client identity */}
+        <div className="sidebar-clients">
+          <span className="sidebar-label">Tu Tienda</span>
+          <div className="client-pill active">
+            <div className="client-dot" style={{ background: "var(--gold)" }} />
+            <div className="client-info">
+              <p className="client-name">{user?.name ?? "Cliente"}</p>
+              <p className="client-domain">Panel de tienda</p>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{user?.name ?? "Cliente"}</p>
-              <p className="text-xs text-white/30 truncate">Panel de tienda</p>
+          </div>
+
+          {/* Agency status pill */}
+          <div
+            style={{
+              margin: "8px 0 4px",
+              padding: "8px 10px",
+              background: "rgba(45,212,159,0.04)",
+              border: "1px solid rgba(45,212,159,0.12)",
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <div className="status-pulse" style={{ width: 5, height: 5, background: "var(--jade)" }} />
+              <span style={{ fontSize: 10.5, color: "var(--t2)" }}>
+                Gestionado por <span style={{ color: "var(--jade)", fontWeight: 600 }}>tu agencia</span>
+              </span>
             </div>
+            <p style={{ fontSize: 10, color: "var(--t3)" }}>6 motores IA activos</p>
           </div>
         </div>
 
-        {/* Agency Banner */}
-        <div className="mx-3 mt-3 px-3 py-2 bg-[#5b4eff]/10 border border-[#5b4eff]/20 rounded-xl">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <p className="text-xs text-white/60">Gestionado por <span className="text-[#5b4eff] font-semibold">tu agencia</span></p>
-          </div>
-          <p className="text-xs text-white/30 mt-0.5">6 motores IA activos</p>
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1 mt-2">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {/* Nav items */}
+        <div className="sidebar-nav">
+          <span className="sidebar-label">Navegación</span>
+          {NAV_ITEMS.map(({ href, label, icon }) => {
             const active = href === "/client" ? location === "/client" : location.startsWith(href);
             return (
               <Link key={href} href={href}>
-                <a className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all cursor-pointer ${
-                  active
-                    ? "bg-[#5b4eff]/15 text-[#5b4eff] border border-[#5b4eff]/20"
-                    : "text-white/50 hover:text-white hover:bg-white/5"
-                }`}>
-                  <Icon className="w-4 h-4 flex-shrink-0" />
+                <div className={`nav-item${active ? " active" : ""}`}>
+                  <span className="nav-icon">{icon}</span>
                   {label}
-                </a>
+                </div>
               </Link>
             );
           })}
-        </nav>
+        </div>
 
-        <div className="p-3 border-t border-white/5">
-          <div className="flex items-center gap-3 px-3 py-2 mb-1">
+        {/* Bottom */}
+        <div className="sidebar-bottom">
+          <div className="credits-bar-label">
+            <span>Optimizaciones IA</span>
+            <span style={{ color: "var(--jade)" }}>∞</span>
+          </div>
+          <div className="credits-bar">
+            <div className="credits-bar-fill" style={{ width: "62%" }} />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: user?.avatarColor ?? "#5b4eff" }}
+              className="logo-gem"
+              style={{
+                width: 28, height: 28, fontSize: 11,
+                background: user?.avatarColor ? `${user.avatarColor}22` : "rgba(200,168,75,0.12)",
+                color: user?.avatarColor ?? "var(--gold2)",
+                flexShrink: 0,
+              }}
             >
               {initials}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-              <p className="text-xs text-white/30 truncate">{user?.email}</p>
+            <div className="client-info">
+              <p className="client-name">{user?.name}</p>
+              <p className="client-domain">{user?.email}</p>
             </div>
-          </div>
-          <button
-            onClick={() => logout().then(() => window.location.href = "/login")}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/40 hover:text-red-400 hover:bg-red-500/5 rounded-xl transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b border-white/5 flex items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-[#5b4eff]" />
-            <span className="text-sm text-white/40">Tu agencia trabaja para ti 24/7</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-all">
-              <Bell className="w-4 h-4" />
+            <button
+              onClick={() => logout().then(() => { window.location.href = "/login"; })}
+              title="Cerrar sesión"
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--t3)", padding: 4, borderRadius: 4,
+                transition: "color 0.15s", flexShrink: 0,
+                display: "flex", alignItems: "center",
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.color = "var(--crim)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = "var(--t3)"; }}
+            >
+              <LogOut size={14} />
             </button>
           </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        </div>
+      </nav>
+
+      {/* ── MAIN AREA ── */}
+      <div className="main-area">
+        {/* Topbar */}
+        <div className="topbar">
+          <div className="topbar-breadcrumb">
+            <span style={{ fontSize: 13, color: "var(--t2)" }}>⚡</span>
+            <span className="topbar-page">Tu agencia trabaja para ti 24/7</span>
+          </div>
+          <div className="topbar-right">
+            <div className="status-chip">
+              <div className="status-pulse" />
+              Online
+            </div>
+            <button className="notif-btn" title="Notificaciones">🔔</button>
+          </div>
+        </div>
+
+        {/* Page content */}
+        <div className="main-content">
           {children}
-        </main>
+        </div>
       </div>
     </div>
   );

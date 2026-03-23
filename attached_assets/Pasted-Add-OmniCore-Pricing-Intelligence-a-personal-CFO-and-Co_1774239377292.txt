@@ -1,0 +1,533 @@
+Add OmniCore Pricing Intelligence — a personal CFO and 
+Commercial Director that manages pricing at 3 levels:
+1. Product prices for Shopify stores
+2. Agency service pricing (YOUR business)
+3. SaaS plan pricing (ShopifyAI Pro itself)
+
+OmniCore has all context needed: market data, margins,
+psychology, competitor intel, conversion data.
+It makes pricing decisions WITH full justification.
+
+═══════════════════════════════════════════════
+PART 1: YOUR AGENCY COST STRUCTURE
+(OmniCore learns your real costs)
+═══════════════════════════════════════════════
+
+DATABASE:
+CREATE TABLE agency_cost_structure (
+  id TEXT PRIMARY KEY,
+  
+  -- YOUR FIXED MONTHLY COSTS
+  cost_claude_api REAL DEFAULT 0,       -- Anthropic API monthly
+  cost_replicate REAL DEFAULT 0,         -- Replicate monthly avg
+  cost_hosting REAL DEFAULT 0,           -- Replit/server
+  cost_stripe_fees REAL DEFAULT 0,       -- 1.4% + €0.25 per transaction
+  cost_domain_tools REAL DEFAULT 0,      -- domains, tools, subscriptions
+  cost_your_time_hourly REAL DEFAULT 0,  -- what YOUR hour is worth
+  avg_hours_per_client REAL DEFAULT 0,   -- hours/month per client
+  
+  -- PER-SERVICE COSTS
+  cost_per_image_generated REAL DEFAULT 0.25,  -- Replicate avg
+  cost_per_audit_run REAL DEFAULT 0.08,         -- Claude tokens
+  cost_per_boost_masivo REAL DEFAULT 2.50,      -- full run
+  cost_per_seo_update REAL DEFAULT 0.15,        -- Claude tokens
+  cost_per_ab_test_setup REAL DEFAULT 0.05,
+  cost_per_report_pdf REAL DEFAULT 0.20,
+  
+  -- YOUR DESIRED MARGINS
+  target_margin_setup REAL DEFAULT 0.70,      -- 70% margin on setup
+  target_margin_retainer REAL DEFAULT 0.65,   -- 65% on monthly
+  target_margin_extras REAL DEFAULT 0.75,     -- 75% on ad-hoc
+  minimum_hourly_rate REAL DEFAULT 80,        -- min €/hr you accept
+  
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE service_catalog (
+  id TEXT PRIMARY KEY,
+  service_name TEXT NOT NULL,
+  service_type TEXT,  -- setup | retainer | extra | consultation
+  
+  -- COSTS (what it costs YOU)
+  cost_time_hours REAL DEFAULT 0,
+  cost_platform REAL DEFAULT 0,      -- API costs
+  cost_tools REAL DEFAULT 0,
+  total_cost REAL DEFAULT 0,         -- calculated
+  
+  -- PRICING (what you charge)
+  price_current REAL,
+  price_suggested REAL,              -- OmniCore suggestion
+  price_min REAL,                    -- never go below this
+  price_max REAL,                    -- market ceiling
+  
+  -- MARKET CONTEXT
+  market_avg_price REAL,             -- what competitors charge
+  market_price_low REAL,
+  market_price_high REAL,
+  our_positioning TEXT,              -- budget|mid|premium|luxury
+  
+  -- PERFORMANCE
+  times_sold INTEGER DEFAULT 0,
+  times_rejected INTEGER DEFAULT 0,  -- lost deals (track manually)
+  avg_client_satisfaction REAL,
+  
+  -- OMNICORE ANALYSIS
+  last_price_review TEXT,
+  omnicore_recommendation TEXT,      -- latest AI recommendation
+  omnicore_confidence REAL,
+  price_change_suggested REAL,       -- delta from current
+  
+  is_active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE pricing_decisions (
+  id TEXT PRIMARY KEY,
+  decision_type TEXT,  -- product|service|saas_plan
+  entity_id TEXT,      -- productId or service id or plan name
+  entity_name TEXT,
+  
+  -- THE DECISION
+  old_price REAL,
+  new_price REAL,
+  price_delta REAL,
+  price_delta_pct REAL,
+  
+  -- OMNICORE REASONING (full transparency)
+  reasoning TEXT,           -- complete justification
+  data_used TEXT,           -- JSON: what data informed this
+  confidence REAL,
+  risk_level TEXT,          -- low|medium|high
+  expected_impact TEXT,     -- what OmniCore predicts will happen
+  
+  -- OUTCOME TRACKING
+  decision_made_at TEXT,
+  decision_by TEXT,         -- omnicore_auto|admin_accepted|admin_override
+  outcome_measured_at TEXT,
+  actual_revenue_change REAL,
+  actual_conversion_change REAL,
+  prediction_accuracy REAL, -- how close was OmniCore's prediction
+  
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+═══════════════════════════════════════════════
+PART 2: YOUR AGENCY PRICING ADVISOR
+(OmniCore tells YOU what to charge)
+═══════════════════════════════════════════════
+
+PAGE: /admin/my-pricing
+This page is YOUR pricing dashboard — for your agency business.
+
+SECTION 1 — COST STRUCTURE SETUP (one-time):
+"Configura tus costes reales para que OmniCore calcule
+ precios con datos precisos"
+
+Form: 
+┌─────────────────────────────────────────────────────┐
+│ Tus costes mensuales fijos                          │
+│ Claude API: €___ / Replicate: €___ / Hosting: €___ │
+│                                                     │
+│ Tu tiempo                                           │
+│ ¿Cuánto vale tu hora? €___                          │
+│ Horas/mes que dedicas por cliente: ___h             │
+│                                                     │
+│ Margen objetivo                                     │
+│ Setup: __% / Retainer: __% / Extras: __%           │
+└─────────────────────────────────────────────────────┘
+
+SECTION 2 — SERVICE PRICING TABLE:
+Table showing all your services with OmniCore analysis:
+
+┌──────────────────┬──────────┬──────────┬──────────┬────────────────────┐
+│ Servicio         │ Tu coste │ Precio   │ Margen   │ OmniCore dice      │
+├──────────────────┼──────────┼──────────┼──────────┼────────────────────┤
+│ Setup Starter    │ €89      │ €297     │ 70%      │ ✓ Correcto         │
+│ Setup Agency Pro │ €167     │ €597     │ 72%      │ ↑ Sube a €697      │
+│ Setup Enterprise │ €280     │ €1,497   │ 81%      │ ✓ Bien posicionado │
+│ Retainer Starter │ €18/mes  │ €49/mes  │ 63%      │ ↑ Sube a €59/mes   │
+│ Retainer Agency  │ €47/mes  │ €149/mes │ 68%      │ ✓ Mercado correcto │
+│ Auditoría manual │ €34      │ €197     │ 83%      │ ✓ Premium correcto │
+│ Consultoría /h   │ €25/h    │ €120/h   │ 79%      │ ↑ Sube a €150/h    │
+│ Pack imágenes 50 │ €12.50   │ €97      │ 87%      │ ✓ Bien             │
+└──────────────────┴──────────┴──────────┴──────────┴────────────────────┘
+
+Color coding:
+Green ✓ = OmniCore validates current price
+Amber ↑ = OmniCore suggests increase (leaving money on table)  
+Red ↓ = OmniCore suggests decrease (losing deals unnecessarily)
+
+SECTION 3 — INSTANT QUOTE GENERATOR:
+Client requests a quote → you fill a form → OmniCore 
+generates the full proposal in 30 seconds.
+
+Form:
+- Client type: [autonomo | pyme | empresa | corporacion]
+- Number of stores to manage: ___
+- Services needed: [checkboxes]
+- Timeline: [normal | express | flexible]
+- Contract length: [monthly | 6months | annual]
+- Client industry/niche: ___
+- Estimated store revenue/month: €___
+
+OmniCore generates:
+{
+  setup_price: 597,
+  monthly_retainer: 149,
+  annual_value: 2385,
+  your_costs: 564,
+  your_margin: 1821,
+  margin_pct: 76,
+  
+  justification: "Para una PYME con 3 tiendas en el sector 
+  moda, el precio de setup de €597 está alineado con el 
+  mercado (rango €400-900 para servicios similares). 
+  El retainer de €149/mes representa el 0.9% de su 
+  revenue mensual estimado — ratio de inversión muy bajo
+  para el valor generado. Setup express (+50%) si urge.",
+  
+  discount_if_annual: 119.40,  // 10% off
+  price_annual: 1788,
+  
+  upsell_opportunities: [
+    "Ofrece el pack de imágenes adicionales (€97/mes) — 
+     si tiene 3 tiendas con 50 productos cada una, 
+     necesitará más del plan base",
+    "Propón auditoría trimestral manual (€197) — 
+     justifica el valor con informe ejecutivo"
+  ],
+  
+  risk_assessment: "Riesgo bajo — cliente con tiendas 
+  establecidas, ingreso recurrente previsible",
+  
+  negotiation_floor: 497,  // minimum you should accept
+  negotiation_notes: "No bajes del €497 en setup — 
+  tus costes son €167 y debajo de €497 tu margen 
+  cae al 66%, por debajo de tu objetivo del 70%"
+}
+
+SECTION 4 — PROPOSAL PDF GENERATOR:
+One click → generates professional PDF proposal:
+[Generate POST /api/agency/proposal]
+
+Claude generates full proposal document:
+
+TITLE PAGE:
+"Propuesta de servicios de optimización Shopify
+ Preparada para: [ClientName]
+ Por: [AgencyName]
+ Fecha: [today]
+ Válida hasta: [today + 14 days]"
+
+EXECUTIVE SUMMARY:
+"Su tienda [StoreName] tiene un potencial de mejora 
+significativo. Nuestro análisis preliminar sugiere 
+que con las optimizaciones correctas, su tienda podría
+pasar de €X/mes a €Y/mes en los próximos 90 días.
+Esta propuesta detalla cómo lo conseguiremos."
+
+DIAGNOSIS (if audit was run):
+Products score, images score, SEO score, pricing score
+"Encontramos estas oportunidades principales:..."
+
+SERVICES PROPOSED:
+Each service with clear description + benefit + price
+NOT what you do — what the CLIENT GETS
+
+INVESTMENT SUMMARY:
+| | Starter | Recomendado | Premium |
+| Setup | €297 | €597 | €1,497 |
+| Mensual | €49 | €149 | €399 |
+| Ahorro vs agencia trad. | 88% | 82% | 70% |
+
+ROI PROJECTION:
+"Con un retainer de €149/mes, si conseguimos 
+aumentar su conversión de 1.8% a 3.5% (realista
+basado en nuestros datos), su revenue extra mensual
+sería de €3,200. ROI: 21x"
+
+NEXT STEPS:
+"Para empezar: [calendly link] / [email] / [phone]"
+
+═══════════════════════════════════════════════
+PART 3: PRODUCT PRICING AUTOMATION
+(OmniCore manages Shopify store prices)
+═══════════════════════════════════════════════
+
+AUTOMATED PRICING RULES ENGINE:
+Admin sets rules once, OmniCore executes:
+
+CREATE TABLE pricing_rules (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  rule_name TEXT,
+  rule_type TEXT,
+  -- Types:
+  -- margin_floor: never below X% margin
+  -- competitor_match: match competitor ± X%
+  -- velocity_based: price up when selling fast
+  -- inventory_based: price down when overstocked
+  -- seasonal: price X% higher in peak months
+  -- psychological: always round to .99/.95/.90
+  -- premium_positioning: always above competitor avg
+  
+  condition_json TEXT,   -- when to trigger
+  action_json TEXT,      -- what price change to make
+  limits_json TEXT,      -- min/max price limits
+  
+  is_active INTEGER DEFAULT 1,
+  auto_apply INTEGER DEFAULT 0,  -- apply without asking
+  requires_approval INTEGER DEFAULT 1,
+  
+  times_triggered INTEGER DEFAULT 0,
+  last_triggered TEXT
+);
+
+EXAMPLE RULES:
+Rule 1 — Margin Floor:
+{
+  name: "Nunca por debajo del 30% de margen",
+  type: "margin_floor",
+  condition: "IF calculated_margin < 0.30",
+  action: "SET price = cogs_total / 0.70",
+  auto_apply: true,
+  requires_approval: false
+}
+
+Rule 2 — Velocity Pricing (trader mindset):
+{
+  name: "Sube precio si vende rápido",
+  type: "velocity_based",
+  condition: "IF daily_sales > avg_daily_sales * 1.5 FOR 3 days",
+  action: "INCREASE price BY 8%",
+  limits: { max_increase_pct: 25 },
+  auto_apply: false,
+  requires_approval: true,
+  message: "Este producto está vendiendo 1.5x su media. 
+            El mercado aguanta una subida de precio."
+}
+
+Rule 3 — Inventory Pressure:
+{
+  name: "Baja precio si hay exceso de stock",
+  type: "inventory_based", 
+  condition: "IF days_remaining > 90 AND sales_velocity = 'slow'",
+  action: "DECREASE price BY 15%",
+  auto_apply: false,
+  message: "90+ días de stock. Una bajada del 15% 
+            aceleraría rotación y libera capital."
+}
+
+Rule 4 — Competitor Monitoring:
+{
+  name: "Mantén precio 5% bajo competencia directa",
+  type: "competitor_match",
+  condition: "IF competitor_price_changed BY more than 5%",
+  action: "SET price = competitor_median * 0.95",
+  limits: { min_margin: 0.25 },
+  requires_approval: true
+}
+
+Rule 5 — Psychological Always-On:
+{
+  name: "Siempre terminar en .99/.95/.90",
+  type: "psychological",
+  condition: "ALWAYS — on any price change",
+  action: "ROUND to nearest psychological price point",
+  auto_apply: true
+}
+
+PRICING DECISION FEED:
+Real-time feed of all pricing activity:
+"⚡ [Auto] Bomber Jacket: €79.99 → €84.99
+ Razón: velocidad de ventas 2.1x media 3 días seguidos"
+
+"⏳ [Pendiente tu aprobación] Sneakers Stock:
+ €119 → €99 — Razón: 87 días de stock al ritmo actual
+ [Aprobar] [Rechazar] [Ver análisis completo]"
+
+"✓ [Aplicado] Camiseta Básica: precio psicológico
+ €34.00 → €33.99 — Aplicado automáticamente"
+
+═══════════════════════════════════════════════
+PART 4: OMNICORE PRICING CONVERSATIONS
+(Talk to your CFO like a human)
+═══════════════════════════════════════════════
+
+A dedicated chat interface where you ask OmniCore
+pricing questions in natural language.
+
+/admin/pricing-advisor — Your personal pricing CFO chat
+
+EXAMPLE CONVERSATIONS:
+
+You: "Tengo un cliente nuevo con 2 tiendas de moda.
+      ¿Cuánto le cobro?"
+
+OmniCore: "Para 2 tiendas de moda, mi recomendación:
+
+📋 SETUP: €497 total
+   • Tienda 1: €297 (setup completo)
+   • Tienda 2: €150 (segunda tienda, 50% dto por volumen)
+   • Configuración OmniCore nicho moda: incluido
+
+💳 RETAINER MENSUAL: €149/mes
+   (las 2 tiendas en plan Agency Pro — más eficiente que 
+    2 Starter separados)
+
+📊 TUS NÚMEROS:
+   • Coste real setup: €167 → Margen: 66% ✓
+   • Coste real mensual: €47 → Margen: 68% ✓
+   • Valor contrato 12 meses: €2,285
+   • Tu beneficio neto año 1: €1,584
+
+⚠️ NEGOCIACIÓN:
+   Mínimo que debes aceptar: setup €397, retainer €119/mes
+   Por debajo rompes tu objetivo de margen del 65%
+
+💡 UPSELL SUGERIDO:
+   Ofrece pack imágenes extra (€97/mes) si tienen más
+   de 30 productos por tienda. Necesitarán más de 
+   las 500 imágenes del plan."
+
+---
+
+You: "¿Estoy cobrando bien mis servicios o estoy
+      dejando dinero sobre la mesa?"
+
+OmniCore: "Análisis honesto de tu pricing actual:
+
+✅ BIEN AJUSTADO:
+   • Setup Enterprise (€1,497) — premium correcto
+   • Pack imágenes 50u (€97) — margen excelente 87%
+   • Auditoría manual (€197) — bien posicionado
+
+⚠️ DEJANDO DINERO:
+   • Consultoría/hora (€120/h):
+     El mercado paga €150-200/h para especialistas Shopify
+     con resultados probados. Con OmniCore tienes resultados
+     probados. Sube a €150/h → +€30 por hora = +€600/mes
+     si facturas 20h de consultoría al mes.
+
+   • Setup Agency Pro (€597):
+     Tu competencia directa cobra €700-900 por menos.
+     Sugiero €697. El cliente que rechaza €100 más
+     probablemente tampoco paga a tiempo.
+
+   • Retainer Starter (€49/mes):
+     Muy bajo para el valor entregado. €69/mes es
+     más honesto. Clientes en €49 infravaloran el servicio.
+
+💰 IMPACTO SI APLICAS TODO:
+   Si tienes 10 clientes activos:
+   Ingresos actuales estimados: ~€2,400/mes
+   Con pricing ajustado: ~€3,100/mes
+   Diferencia: +€700/mes = +€8,400/año
+   Sin un solo cliente nuevo."
+
+---
+
+You: "Tengo miedo de subir precios. ¿Qué riesgo hay?"
+
+OmniCore: "Entiendo. Analicemos el riesgo real:
+
+📊 DATOS DE MERCADO:
+   Las agencias Shopify de referencia cobran:
+   • Gestión básica: €600-1,500/mes
+   • Solo fotografía: €80-200/producto
+   • Solo SEO: €500-2,000/mes
+   Tu plan Agency Pro a €149/mes es un 75-90% más 
+   barato que contratar esos servicios por separado.
+
+🎯 EL RIESGO REAL:
+   Si subes setup de €597 a €697:
+   • Pérdida si el cliente se va: €697 una vez
+   • Ganancia si acepta: €100 extra + relación más sana
+   • Clientes que se van por €100: no eran buenos clientes
+
+📈 LA PSICOLOGÍA:
+   Precio bajo → cliente percibe poco valor
+   → más exigente → más soporte → menos margen real
+   
+   Precio correcto → cliente invierte → más compromiso
+   → mejores resultados → más tiempo para ti
+   → referencias de calidad
+
+⚡ ACCIÓN SUGERIDA:
+   Sube precios SOLO para nuevos clientes.
+   Los actuales quedan en su precio hasta renovación.
+   Esto elimina el riesgo y prueba el mercado."
+
+═══════════════════════════════════════════════
+PART 5: SAAS PRICING OPTIMIZER
+(OmniCore optimizes its OWN pricing)
+═══════════════════════════════════════════════
+
+OmniCore also monitors and suggests optimizations
+for ShopifyAI Pro's own plan pricing.
+
+SAAS METRICS DASHBOARD:
+- MRR (Monthly Recurring Revenue)
+- ARPU (Average Revenue Per User)
+- Churn rate per plan
+- Trial → Paid conversion rate
+- Upgrade rate (Starter → Agency → Enterprise)
+- Feature usage per plan
+
+OMNICORE ANALYZES MONTHLY:
+"Basado en los datos de conversión de este mes:
+
+📊 ANÁLISIS DE PLANES:
+   • Plan Starter (€49): conversión trial→paid: 34%
+     Churn mensual: 8% — ALTO
+     Causa probable: precio no refleja valor
+     Sugerencia: sube a €59 o añade más valor incluido
+   
+   • Plan Agency (€149): conversión: 67% — EXCELENTE
+     Churn: 2% — MUY BAJO
+     Conclusión: precio bien calibrado, clientes satisfechos
+   
+   • Plan Enterprise (€399): conversión: 45%
+     Barrera percibida: salto grande desde Agency
+     Sugerencia: crea plan medio a €249 para capturar
+     a los que no llegan a Enterprise
+
+💡 OPORTUNIDAD DETECTADA:
+   58% de usuarios Starter usan >80% de su límite
+   de imágenes. Están listas para subir.
+   → Activa email automático: 
+   'Estás al 80% de tu límite. Upgrade por solo €10 más/mes'"
+
+═══════════════════════════════════════════════
+PART 6: PRICING JOURNAL — Every decision documented
+═══════════════════════════════════════════════
+
+Every pricing decision (product, service, or SaaS)
+is automatically logged with full context.
+
+PRICING JOURNAL PAGE /admin/pricing-journal:
+
+Timeline view of all pricing decisions:
+┌──────────────────────────────────────────────────────┐
+│ HOY — 14:32                                          │
+│ 📈 Bomber Jacket AW24: €79.99 → €84.99 (+6.3%)      │
+│ Razón: velocidad ventas 2.1x · Aprobado por: admin   │
+│ Predicción OmniCore: +€240/mes · Tracking: activo    │
+├──────────────────────────────────────────────────────┤
+│ AYER — 09:15                                         │
+│ 💼 Propuesta enviada: TechStore SL                   │
+│ Setup €597 + €149/mes · Estado: pendiente respuesta  │
+│ Seguimiento automático en: 3 días                    │
+├──────────────────────────────────────────────────────┤
+│ LUNES — 16:44                                        │
+│ 📉 Sneakers Talla 41: €119 → €99 (-16.8%)            │
+│ Razón: 74 días de stock · Admin rechazó bajada mayor │
+│ Resultado a 7 días: +8 unidades vendidas ✓           │
+└──────────────────────────────────────────────────────┘
+
+PREDICTION ACCURACY TRACKER:
+OmniCore made 47 pricing predictions this month
+Accurate within 10%: 38/47 (81%) ✓
+Most accurate domain: inventory-based pricing (94%)
+Least accurate: competitor reaction to price changes (61%)
+"OmniCore está mejorando su modelo de predicción"

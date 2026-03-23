@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, Store, ArrowRight, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { ArrowRight, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useCreateProject, useListProjects, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -42,227 +40,143 @@ export default function Home() {
     );
   };
 
-  const inputClass =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/50";
-
-  const labelClass = "text-sm font-medium text-foreground";
-
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-16 pb-20 px-4">
-      <div className="w-full max-w-4xl">
-        <div className="text-center mb-12">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-20 h-20 bg-primary/20 border-2 border-primary/30 rounded-2xl mx-auto flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(91,78,255,0.3)]"
-          >
-            <Store className="w-10 h-10 text-primary" />
-          </motion.div>
-          <motion.h1
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl md:text-5xl font-display font-bold text-foreground mb-4"
-          >
-            Shopify <span className="text-gradient-primary">AI Optimizer</span>
-          </motion.h1>
-          <motion.p
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl text-muted-foreground"
-          >
-            Plataforma de inteligencia artificial para optimizar tu catálogo Shopify.
-          </motion.p>
+    <div style={{ maxWidth: 900, margin: "0 auto", paddingBottom: 32 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <div className="section-header">
+          <h1 className="section-title">Nueva Tienda</h1>
+          <p className="section-subtitle">Conecta las credenciales OAuth de tu Shopify Custom App para comenzar la optimización.</p>
+        </div>
+      </div>
+
+      {/* Existing stores quick access */}
+      {projects && projects.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--t3)", marginBottom: 10 }}>
+            Tiendas activas
+          </p>
+          <div className="grid-2" style={{ gap: 8 }}>
+            {projects.map((p: { id: number; name: string; shopDomain?: string }) => (
+              <Link key={p.id} href={`/projects/${p.id}/audit`}>
+                <div className="card card-hover" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className="logo-gem" style={{ width: 28, height: 28, fontSize: 12, background: "rgba(200,168,75,0.1)", color: "var(--gold2)" }}>🛍</div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>{p.name}</p>
+                      <p style={{ fontSize: 11, color: "var(--t3)" }}>{p.shopDomain ?? "—"}</p>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} style={{ color: "var(--t3)" }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create new project form */}
+      <div className="card" style={{ padding: "24px 28px" }}>
+        {/* Form header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 18, marginBottom: 20, borderBottom: "1px solid var(--bdr)" }}>
+          <div className="logo-gem" style={{ width: 36, height: 36, fontSize: 16 }}>＋</div>
+          <div>
+            <p style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 18 }}>Conectar Nueva Tienda</p>
+            <p style={{ fontSize: 12, color: "var(--t2)" }}>Configura las credenciales OAuth de tu Shopify Custom App.</p>
+          </div>
         </div>
 
-        {projects && projects.length > 0 && (
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.25 }}
-            className="mb-8"
-          >
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Tus tiendas activas</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {projects.map((p) => (
-                <Link key={p.id} href={`/projects/${p.id}/audit`}>
-                  <GlassCard className="p-4 flex items-center justify-between cursor-pointer hover:border-primary/30 transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                        <Store className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.shopDomain}</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  </GlassCard>
-                </Link>
-              ))}
+        <form onSubmit={handleSubmit}>
+          {/* Basic fields */}
+          <div className="grid-2" style={{ marginBottom: 18 }}>
+            <div className="form-group">
+              <label className="form-label">Nombre del Proyecto *</label>
+              <input required className="form-input" value={formData.name} onChange={handleChange("name")} placeholder="Ej: Comic Crafter" />
             </div>
-          </motion.div>
-        )}
+            <div className="form-group">
+              <label className="form-label">Dominio Shopify *</label>
+              <input required className="form-input" value={formData.shopDomain} onChange={handleChange("shopDomain")} placeholder="tu-tienda.myshopify.com" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Client ID (OAuth) *</label>
+              <input required className="form-input" style={{ fontFamily: "var(--fm)" }} value={formData.clientId} onChange={handleChange("clientId")} placeholder="Admin API Client ID" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Client Secret (OAuth) *</label>
+              <input required type="password" className="form-input" style={{ fontFamily: "var(--fm)" }} value={formData.clientSecret} onChange={handleChange("clientSecret")} placeholder="shpsa_..." />
+            </div>
+          </div>
 
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
-          <GlassCard className="p-8 md:p-10 border-white/10">
-            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/10">
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center">
-                <Plus className="w-6 h-6 text-foreground" />
+          {/* Context section */}
+          <div style={{ paddingTop: 16, borderTop: "1px solid var(--bdr)", marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 14 }}>
+              Contexto de la Tienda{" "}
+              <span style={{ color: "var(--gold)", fontSize: 11 }}>(mejora la calidad de todos los análisis IA)</span>
+            </p>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Nicho del negocio</label>
+                <input className="form-input" value={formData.storeNiche} onChange={handleChange("storeNiche")} placeholder="Ej: Moda urbana, Gadgets tech..." />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">Conectar Nueva Tienda</h2>
-                <p className="text-muted-foreground">Configura las credenciales OAuth de tu Shopify Custom App.</p>
+              <div className="form-group">
+                <label className="form-label">Tono de marca</label>
+                <input className="form-input" value={formData.brandTone} onChange={handleChange("brandTone")} placeholder="Ej: Premium y sofisticado..." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Audiencia objetivo</label>
+                <input className="form-input" value={formData.targetAudience} onChange={handleChange("targetAudience")} placeholder="Ej: Hombres 25-40 streetwear" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mercados principales</label>
+                <input className="form-input" value={formData.storeMarkets} onChange={handleChange("storeMarkets")} placeholder="Ej: España, México, Colombia" />
               </div>
             </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Row 1 - Basic */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className={labelClass}>Nombre del Proyecto *</label>
-                  <input
-                    required
-                    value={formData.name}
-                    onChange={handleChange("name")}
-                    className={inputClass}
-                    placeholder="Ej: Comic Crafter"
-                  />
+          {/* Advanced API keys */}
+          <div style={{ paddingTop: 12, borderTop: "1px solid var(--bdr)", marginBottom: 20 }}>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                fontSize: 12, color: "var(--t2)", background: "none",
+                border: "none", cursor: "pointer", fontFamily: "var(--fb)",
+                transition: "color 0.15s",
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.color = "var(--t)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = "var(--t2)"; }}
+            >
+              {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              API Keys personales (opcional — sobreescribe las del sistema)
+            </button>
+
+            {showAdvanced && (
+              <div className="grid-2" style={{ marginTop: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">Replicate API Token</label>
+                  <input type="password" className="form-input" style={{ fontFamily: "var(--fm)" }} value={formData.replicateApiToken} onChange={handleChange("replicateApiToken")} placeholder="r8_..." />
                 </div>
-                <div className="space-y-2">
-                  <label className={labelClass}>Dominio Shopify *</label>
-                  <input
-                    required
-                    value={formData.shopDomain}
-                    onChange={handleChange("shopDomain")}
-                    className={inputClass}
-                    placeholder="tu-tienda.myshopify.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className={labelClass}>Client ID (OAuth) *</label>
-                  <input
-                    required
-                    value={formData.clientId}
-                    onChange={handleChange("clientId")}
-                    className={`${inputClass} font-mono text-sm`}
-                    placeholder="Admin API Client ID"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className={labelClass}>Client Secret (OAuth) *</label>
-                  <input
-                    required
-                    type="password"
-                    value={formData.clientSecret}
-                    onChange={handleChange("clientSecret")}
-                    className={`${inputClass} font-mono text-sm`}
-                    placeholder="shpsa_..."
-                  />
+                <div className="form-group">
+                  <label className="form-label">Anthropic API Key</label>
+                  <input type="password" className="form-input" style={{ fontFamily: "var(--fm)" }} value={formData.anthropicApiKey} onChange={handleChange("anthropicApiKey")} placeholder="sk-ant-..." />
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Row 2 - Store Context */}
-              <div className="pt-2 pb-2 border-t border-white/5">
-                <p className="text-sm text-muted-foreground font-medium mb-4">
-                  Contexto de la Tienda{" "}
-                  <span className="text-xs text-primary">(mejora la calidad de todos los análisis IA)</span>
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className={labelClass}>Nicho del negocio</label>
-                    <input
-                      value={formData.storeNiche}
-                      onChange={handleChange("storeNiche")}
-                      className={inputClass}
-                      placeholder="Ej: Moda urbana, Suplementos fitness, Gadgets tech"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Tono de marca</label>
-                    <input
-                      value={formData.brandTone}
-                      onChange={handleChange("brandTone")}
-                      className={inputClass}
-                      placeholder="Ej: Premium y sofisticado, Juvenil y divertido, Profesional"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Audiencia objetivo</label>
-                    <input
-                      value={formData.targetAudience}
-                      onChange={handleChange("targetAudience")}
-                      className={inputClass}
-                      placeholder="Ej: Hombres 25-40 interesados en streetwear"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Mercados principales</label>
-                    <input
-                      value={formData.storeMarkets}
-                      onChange={handleChange("storeMarkets")}
-                      className={inputClass}
-                      placeholder="Ej: España, México, Colombia"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Advanced: API Keys */}
-              <div className="border-t border-white/5 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  API Keys personales (opcional — sobreescribe las del sistema)
-                </button>
-
-                {showAdvanced && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className={labelClass}>Replicate API Token</label>
-                      <input
-                        type="password"
-                        value={formData.replicateApiToken}
-                        onChange={handleChange("replicateApiToken")}
-                        className={`${inputClass} font-mono text-sm`}
-                        placeholder="r8_... (para generación de imágenes)"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className={labelClass}>Anthropic API Key</label>
-                      <input
-                        type="password"
-                        value={formData.anthropicApiKey}
-                        onChange={handleChange("anthropicApiKey")}
-                        className={`${inputClass} font-mono text-sm`}
-                        placeholder="sk-ant-... (para análisis Claude)"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={createProject.isPending}
-                  className="bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-semibold flex items-center gap-2 hover:bg-primary/90 transition-all hover:shadow-[0_0_20px_rgba(91,78,255,0.4)] disabled:opacity-50"
-                >
-                  {createProject.isPending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ArrowRight className="w-5 h-5" />
-                  )}
-                  {createProject.isPending ? "Conectando..." : "Crear Proyecto"}
-                </button>
-              </div>
-            </form>
-          </GlassCard>
-        </motion.div>
+          {/* Submit */}
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="submit"
+              disabled={createProject.isPending}
+              className={`btn btn-gold btn-lg${createProject.isPending ? " loading" : ""}`}
+            >
+              {createProject.isPending ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+              {createProject.isPending ? "Conectando..." : "Crear Proyecto"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

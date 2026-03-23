@@ -16,8 +16,8 @@ export function GlassCard({ children, className, hoverEffect = false, delay = 0 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay, ease: [0.19, 1, 0.22, 1] }}
       className={cn(
-        "glass rounded-2xl overflow-hidden transition-all duration-300",
-        hoverEffect && "hover:border-primary/30 hover:shadow-primary/10 hover:-translate-y-1",
+        "card rounded-2xl overflow-hidden transition-all duration-300",
+        hoverEffect && "card-hover",
         className
       )}
     >

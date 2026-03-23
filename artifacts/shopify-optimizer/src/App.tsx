@@ -33,9 +33,17 @@ const queryClient = new QueryClient({
   },
 });
 
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Loader2 size={28} style={{ color: "var(--gold)", animation: "spin 0.6s linear infinite" }} />
+    </div>
+  );
+}
+
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-[#08080f] flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#5b4eff] animate-spin" /></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
   if (user.role !== "admin") return <Redirect to="/client" />;
   return <>{children}</>;
@@ -43,7 +51,7 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 
 function RequireClient({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-[#08080f] flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#5b4eff] animate-spin" /></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
   if (user.role === "admin") return <Redirect to="/" />;
   return <>{children}</>;
@@ -51,10 +59,10 @@ function RequireClient({ children }: { children: React.ReactNode }) {
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-[#08080f] flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#5b4eff] animate-spin" /></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Landing />;
   if (user.role === "client") return <Redirect to="/client" />;
-  return <Home />;
+  return <AppLayout><Home /></AppLayout>;
 }
 
 function ImpersonationBanner() {
@@ -70,9 +78,17 @@ function ImpersonationBanner() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white text-sm py-2 px-4 flex items-center justify-between">
+    <div style={{
+      position: "fixed", top: 2, left: 0, right: 0, zIndex: 9000,
+      background: "var(--crim)", color: "white", fontSize: 12,
+      padding: "8px 16px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+    }}>
       <span>👁 Viendo como cliente — modo impersonación</span>
-      <button onClick={stopImpersonating} className="underline hover:no-underline font-semibold">
+      <button
+        onClick={stopImpersonating}
+        style={{ background: "none", border: "none", color: "white", cursor: "pointer", textDecoration: "underline", fontWeight: 600, fontSize: 12 }}
+      >
         Salir y volver al admin
       </button>
     </div>
@@ -95,7 +111,9 @@ function Router() {
 
         {/* Admin routes */}
         <Route path="/admin/clients">
-          <RequireAdmin><AdminClients /></RequireAdmin>
+          <RequireAdmin>
+            <AppLayout><AdminClients /></AppLayout>
+          </RequireAdmin>
         </Route>
         <Route path="/admin/cms">
           <RequireAdmin><CMSEditor /></RequireAdmin>
@@ -168,9 +186,7 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <div className="bg-background text-foreground min-h-screen">
-              <Router />
-            </div>
+            <Router />
           </WouterRouter>
         </AuthProvider>
         <Toaster />

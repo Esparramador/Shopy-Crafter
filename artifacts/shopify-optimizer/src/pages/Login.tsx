@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Store, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -17,12 +17,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const { role, clientId } = await login(email, password);
-      if (role === "admin") {
-        navigate("/");
-      } else {
-        navigate("/client");
-      }
+      const { role } = await login(email, password);
+      navigate(role === "admin" ? "/" : "/client");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
@@ -31,74 +27,99 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08080f] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-[#5b4eff]/20 border border-[#5b4eff]/30 flex items-center justify-center mx-auto mb-4">
-            <Store className="w-8 h-8 text-[#5b4eff]" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">
-            Shopify <span className="text-[#5b4eff]">AI</span> Optimizer
-          </h1>
-          <p className="text-white/40 mt-2 text-sm">Plataforma de agencia</p>
+    <div className="login-page">
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        {/* Logo */}
+        <div className="login-logo">
+          <div className="logo-gem">⚡</div>
+          <h1>Shopify<em>AI</em></h1>
+          <p>Plataforma de agencia premium</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
-          <h2 className="text-lg font-semibold text-white mb-6">Iniciar sesión</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-medium text-white/60 uppercase tracking-wider block mb-2">
-                Email
-              </label>
+        {/* Card */}
+        <div className="login-card">
+          <p className="login-title">Iniciar sesión</p>
+
+          <form onSubmit={handleSubmit}>
+            {/* Email */}
+            <div className="form-group">
+              <label className="form-label">Email</label>
               <input
                 type="email"
+                className="form-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="username"
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#5b4eff]/50 transition-colors"
                 placeholder="admin@agency.com"
               />
             </div>
-            <div>
-              <label className="text-xs font-medium text-white/60 uppercase tracking-wider block mb-2">
-                Contraseña
-              </label>
-              <div className="relative">
+
+            {/* Password */}
+            <div className="form-group">
+              <label className="form-label">Contraseña</label>
+              <div style={{ position: "relative" }}>
                 <input
                   type={showPw ? "text" : "password"}
+                  className="form-input"
+                  style={{ paddingRight: 40 }}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder:text-white/30 focus:outline-none focus:border-[#5b4eff]/50 transition-colors"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60 transition-colors"
+                  style={{
+                    position: "absolute", right: 10, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none", border: "none",
+                    cursor: "pointer", color: "var(--t3)",
+                    display: "flex", alignItems: "center",
+                  }}
                 >
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
 
+            {/* Error */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+              <div
+                style={{
+                  background: "rgba(232,69,88,0.08)",
+                  border: "1px solid rgba(232,69,88,0.2)",
+                  borderRadius: "var(--r)",
+                  padding: "10px 12px",
+                  color: "var(--crim)",
+                  fontSize: 13,
+                  marginBottom: 14,
+                }}
+              >
                 {error}
               </div>
             )}
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#5b4eff] text-white py-3 rounded-xl font-semibold hover:bg-[#4a3ef0] transition-all disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+              className={`btn btn-gold${loading ? " loading" : ""}`}
+              style={{ width: "100%", justifyContent: "center", marginTop: 4, padding: "11px 16px" }}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
               {loading ? "Iniciando sesión..." : "Entrar"}
             </button>
           </form>
+
+          {/* Footer hint */}
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
+            <p style={{ fontSize: 11, color: "var(--t3)" }}>
+              Admin: admin@agency.com · admin123
+            </p>
+          </div>
         </div>
       </div>
     </div>

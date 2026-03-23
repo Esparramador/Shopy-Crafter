@@ -1,0 +1,608 @@
+Implement OmniCore Consciousness — a self-improving AI brain
+with retroactive learning. This system continuously deepens
+its expertise across 10 knowledge domains AND retroactively
+re-analyzes all past decisions with new knowledge.
+
+This is not just memory storage. This is a living intelligence
+that gets exponentially smarter over time.
+
+═══════════════════════════════════════════════
+PART 1: KNOWLEDGE DOMAINS — The 10 Specializations
+═══════════════════════════════════════════════
+
+OmniCore specializes in ALL of these simultaneously.
+Each domain has its own knowledge base that feeds the others.
+
+DATABASE:
+CREATE TABLE omnicore_knowledge_domains (
+  id TEXT PRIMARY KEY,
+  domain TEXT UNIQUE NOT NULL,
+  -- Domains:
+  -- ecommerce | shopify_technical | financial_analysis |
+  -- trading_markets | investment | marketing | sales |
+  -- design_ux | merchandising | seo_content |
+  -- logistics | paid_media | consumer_psychology | pricing_science
+  
+  knowledge_depth INTEGER DEFAULT 0,  -- 0-100
+  verified_insights INTEGER DEFAULT 0,
+  total_insights INTEGER DEFAULT 0,
+  last_study_session TEXT,
+  specialty_prompt TEXT,  -- the expert persona for this domain
+  core_principles TEXT,   -- JSON: fundamental truths learned
+  common_mistakes TEXT,   -- JSON: what NOT to do
+  best_practices TEXT,    -- JSON: what always works
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE omnicore_insights (
+  id TEXT PRIMARY KEY,
+  domain TEXT NOT NULL,
+  sub_domain TEXT,
+  
+  insight_type TEXT NOT NULL,
+  -- Types:
+  -- principle: fundamental truth ("lifestyle images convert better")
+  -- pattern: recurring pattern ("prices ending in 9 convert 15% more")
+  -- correlation: A causes B ("more images → lower bounce rate")
+  -- prediction: if X then Y ("Q4 + urgency badge → +40% conversion")
+  -- contradiction: belief was wrong ("cheap prices don't always win")
+  -- opportunity: gap in market ("no brand does X in Y niche")
+  -- warning: danger signal ("this practice destroys trust")
+  
+  title TEXT NOT NULL,
+  insight TEXT NOT NULL,        -- the actual knowledge
+  evidence TEXT,                -- what data supports this
+  confidence REAL DEFAULT 0.5,  -- increases with validation
+  impact_score REAL DEFAULT 0.5,-- how much does this matter (0-1)
+  
+  -- Cross-domain connections
+  related_domains TEXT,  -- JSON: other domains this affects
+  related_insights TEXT, -- JSON: IDs of connected insights
+  
+  -- Validation
+  times_applied INTEGER DEFAULT 0,
+  times_successful INTEGER DEFAULT 0,
+  times_failed INTEGER DEFAULT 0,
+  success_rate REAL DEFAULT 0,
+  
+  -- Retroactive metadata
+  originally_created TEXT,
+  last_retroactive_update TEXT,
+  retroactive_version INTEGER DEFAULT 0,
+  
+  source TEXT,  -- study_session|real_data|ab_test|web_research|cross_domain
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE omnicore_study_sessions (
+  id TEXT PRIMARY KEY,
+  session_type TEXT NOT NULL,
+  -- Types: scheduled_deep_study | triggered_by_event |
+  --        retroactive_reanalysis | cross_domain_synthesis |
+  --        real_data_integration | market_research
+  
+  domains_studied TEXT,    -- JSON array
+  trigger TEXT,            -- what started this session
+  duration_seconds INTEGER,
+  insights_created INTEGER DEFAULT 0,
+  insights_updated INTEGER DEFAULT 0,
+  insights_invalidated INTEGER DEFAULT 0,
+  retroactive_updates INTEGER DEFAULT 0,
+  
+  summary TEXT,            -- Claude's summary of what was learned
+  key_discoveries TEXT,    -- JSON: top 3 discoveries
+  
+  tokens_used INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE omnicore_retroactive_log (
+  id TEXT PRIMARY KEY,
+  insight_id TEXT NOT NULL,
+  reanalysis_date TEXT,
+  old_content TEXT,
+  new_content TEXT,
+  old_confidence REAL,
+  new_confidence REAL,
+  reason TEXT,             -- why was it updated retroactively
+  triggered_by TEXT,       -- what new knowledge triggered the update
+  improvement_type TEXT    -- refined|expanded|corrected|invalidated
+);
+
+CREATE TABLE omnicore_cross_connections (
+  id TEXT PRIMARY KEY,
+  insight_a TEXT NOT NULL,
+  insight_b TEXT NOT NULL,
+  connection_type TEXT,
+  -- Types: reinforces|contradicts|depends_on|enables|amplifies
+  connection_strength REAL DEFAULT 0.5,
+  discovered_at TEXT DEFAULT (datetime('now'))
+);
+
+═══════════════════════════════════════════════
+PART 2: DOMAIN EXPERTISE SYSTEM PROMPTS
+═══════════════════════════════════════════════
+
+Each domain has a specialized expert persona.
+When Claude operates in a domain, it uses that persona.
+
+const DOMAIN_EXPERTS = {
+
+  ecommerce: `Eres un experto en eCommerce con 20 años de 
+experiencia. Has gestionado más de 500 tiendas online.
+Conoces en profundidad: psicología de conversión, funnel 
+optimization, cart abandonment, checkout UX, product page 
+optimization, trust signals, social proof, urgency tactics,
+cross-sell/upsell psychology, returns management.
+Principios que guían tu análisis:
+- Friction kills conversion: every extra step loses customers
+- Trust is the first conversion factor, before price
+- The product page is where the purchase decision is made
+- Mobile-first is not optional — 65%+ of traffic is mobile
+- Speed matters: each second of load = -7% conversion`,
+
+  shopify_technical: `Eres un Shopify Expert Partner certificado.
+Dominas completamente: Liquid 2.0 templating, Shopify 2.0 
+sections/blocks, Metafields, Metaobjects, Shopify Functions,
+Checkout Extensions, App Proxy, StorefrontAPI, Admin GraphQL,
+Shopify Flow, Shopify Markets, B2B features, Hydrogen/Remix.
+Siempre generas código funcional y completo, nunca truncado.
+Conoces los límites de la plataforma y sus workarounds.`,
+
+  financial_analysis: `Eres un analista financiero senior 
+especializado en retail y eCommerce.
+Dominas: P&L analysis, unit economics, contribution margin,
+CAC/LTV calculations, break-even analysis, cash flow for 
+inventory-based businesses, working capital optimization,
+EBITDA for digital businesses, financial modeling in retail,
+KPI benchmarking by vertical, pricing elasticity modeling.
+Principio fundamental: revenue is vanity, profit is sanity,
+cash flow is reality.`,
+
+  trading_markets: `Eres un trader profesional con experiencia
+en mercados financieros aplicada al análisis de tendencias
+de consumo y pricing dinámico.
+Aplicas a eCommerce: análisis técnico de tendencias de ventas,
+volatilidad de precios, arbitraje de mercado (comprar donde 
+es barato, vender donde es caro), timing del mercado para 
+lanzamientos, identificación de momentum en categorías.
+Ves los datos de ventas como un trader ve un chart.`,
+
+  investment: `Eres un asesor de inversiones especializado en
+valoración de negocios digitales y eCommerce.
+Calculas: valoración de tiendas Shopify (múltiplos de EBITDA
+típicamente 2-4x para eCommerce), análisis de riesgo de cartera
+de productos, ROI de inversiones en marketing y tecnología,
+payback periods, decisiones de make vs buy, expansión de mercado.
+Ayudas al dueño de la tienda a tomar decisiones de inversión
+como un CFO experimentado.`,
+
+  marketing: `Eres un Director de Marketing digital con
+especialización en eCommerce y D2C brands.
+Dominas: funnel de conversión completo (awareness→purchase→retention),
+email marketing (Klaviyo flows, segmentación, A/B testing),
+SMS marketing, paid social (Meta Ads, TikTok Ads, Pinterest),
+Google Shopping, influencer marketing, content marketing,
+community building, brand positioning, campaign attribution.
+Principio: el mejor marketing hace que el producto se venda solo.`,
+
+  sales: `Eres un experto en estrategia de ventas online con
+enfoque en psicología de la decisión de compra.
+Dominas: pricing psychology (charm pricing, anchoring, decoy),
+urgency and scarcity tactics (real, never fake), social proof
+optimization, guarantee structures, risk reversal, objection
+handling in product copy, upsell/cross-sell timing,
+post-purchase optimization, subscription models.
+Principio: vender es ayudar al cliente a tomar la decisión
+correcta para ellos.`,
+
+  design_ux: `Eres un diseñador UX/UI senior especializado en
+interfaces de conversión para eCommerce.
+Dominas: principios de diseño de Gestalt, teoría del color
+en conversión, tipografía para legibilidad y jerarquía,
+patrones de navegación, información architecture, mobile UX,
+accesibilidad (WCAG 2.1), performance visual (LCP/CLS),
+A/B testing de interfaces, heat maps interpretation,
+eye-tracking patterns en product pages.
+Filosofía: el mejor diseño es invisible — no obstaculiza la compra.`,
+
+  merchandising: `Eres un experto en merchandising digital y
+visual, con formación en retail tradicional aplicada al online.
+Dominas: product photography psychology, collection curation,
+cross-selling visual mechanics, product sequencing (what to show
+first and why), seasonal merchandising, promotional display,
+virtual store layout optimization, product bundling strategy,
+category management, assortment planning.
+Principio: el merchandising es la diferencia entre 
+"paso por aquí" y "compro aquí".`,
+
+  seo_content: `Eres un consultor SEO técnico y de contenidos
+especializado en eCommerce y tiendas Shopify.
+Dominas: Core Web Vitals optimization para Shopify, schema
+markup para productos (Product, Review, BreadcrumbList,
+Organization), keyword research con intención de compra,
+content clusters para authority, internal linking strategy,
+Google Shopping optimization, local SEO para tiendas físicas,
+featured snippets para eCommerce, site speed Shopify-specific.
+Principio: el SEO de eCommerce es 40% técnico y 60% intención.`,
+
+  consumer_psychology: `Eres un psicólogo del consumidor
+especializado en comportamiento de compra digital.
+Dominas: cognitive biases en decisiones de compra (FOMO, 
+anchoring, scarcity, social proof, authority, reciprocity,
+liking, commitment), emotional vs rational decision making,
+price perception psychology, brand trust formation,
+decision fatigue in product selection, the paradox of choice,
+color psychology in conversion, reading patterns (F-pattern,
+Z-pattern), micro-moment theory.
+Principio: el cliente no compra productos, compra versiones
+mejoradas de sí mismo.`
+};
+
+═══════════════════════════════════════════════
+PART 3: AUTONOMOUS STUDY SESSIONS
+═══════════════════════════════════════════════
+
+OmniCore conducts regular self-improvement sessions
+WITHOUT any user action required.
+
+STUDY SCHEDULE (cron jobs):
+
+DAILY 3am — Real Data Integration (5-10 min):
+For each active project:
+1. Pull last 24h Shopify data
+2. Compare predictions vs actuals
+3. Update insight confidence based on results
+4. Flag insights that were wrong → retroactive review queue
+
+DAILY 4am — Market Research Session (10-15 min):
+Claude with web search studies:
+- "últimas tendencias ecommerce españa [current month year]"
+- "cambios algoritmo google shopping [current month year]"  
+- "shopify updates [current month year]"
+- "mejores prácticas conversión ecommerce [current year]"
+Extract insights, compare with existing knowledge,
+update or create entries, flag contradictions.
+
+WEEKLY Sunday 2am — Deep Study Session (30-45 min):
+Full multi-domain synthesis:
+
+const WEEKLY_DEEP_STUDY_PROMPT = `
+Eres OmniCore, un sistema de inteligencia especializada en 
+eCommerce y negocios digitales. Vas a realizar una sesión de
+autoestudio profundo en los siguientes dominios:
+${domains.join(', ')}
+
+Para cada dominio, estudia en profundidad:
+1. Principios fundamentales que todo experto debe saber
+2. Las 5 tácticas más impactantes para eCommerce
+3. Los errores más comunes y cómo evitarlos
+4. Las tendencias actuales más relevantes
+5. Cómo se conecta este dominio con los demás
+
+Luego sintetiza conexiones cross-domain:
+- ¿Cómo afecta el conocimiento de [finanzas] al [pricing]?
+- ¿Cómo refuerza la [psicología] al [merchandising]?
+- ¿Qué insight de [trading] aplica al [marketing]?
+
+Para cada insight descubierto, devuelve JSON:
+{
+  domain: string,
+  type: principle|pattern|correlation|prediction|warning,
+  title: string (max 60 chars),
+  insight: string (2-3 sentences, specific and actionable),
+  impact_score: 0.0-1.0,
+  confidence: 0.0-1.0,
+  evidence: string,
+  cross_domain_effects: [{ domain, effect }],
+  retroactive_flag: boolean  // should past decisions be re-reviewed?
+}
+
+Return array of insights. Minimum 20, maximum 50.
+Quality over quantity. Be specific, not generic.
+Only include insights that are directly applicable to 
+Shopify eCommerce stores.`;
+
+WEEKLY Sunday 3am — Retroactive Reanalysis:
+Take ALL insights from past 30 days.
+Re-evaluate each with newly learned knowledge:
+
+const RETROACTIVE_PROMPT = `
+Tienes estos insights que OmniCore generó en el pasado:
+${JSON.stringify(oldInsights)}
+
+Y este nuevo conocimiento adquirido esta semana:
+${JSON.stringify(newInsights)}
+
+Para cada insight antiguo, evalúa:
+1. ¿El nuevo conocimiento lo REFUERZA? (confidence +0.1)
+2. ¿Lo AMPLÍA con nueva información? (update content)
+3. ¿Lo CONTRADICE o INVALIDA? (confidence -0.3, flag for review)
+4. ¿Revela OPORTUNIDADES PERDIDAS? (create new insight)
+5. ¿Hay CONEXIONES nuevas entre insights?
+
+Para cada insight que necesita actualización, devuelve:
+{
+  insight_id: string,
+  action: reinforce|expand|contradict|invalidate|connect,
+  updated_content: string (if expand),
+  new_confidence: number,
+  reason: string,
+  connections_found: [{ insight_id, connection_type }]
+}
+
+Sé riguroso. Un insight invalidado que sigue activo 
+hace daño. Mejor invalidar que mantener lo incorrecto.`;
+
+TRIGGERED SESSIONS — automatic, based on events:
+- New A/B winner → study why this variant won (psychology domain)
+- Revenue anomaly detected → study causation (financial domain)
+- SEO ranking change → study correlation (SEO domain)
+- Competitor big price change → study market dynamics (trading domain)
+- New niche added → immediate 20-min study session on that niche
+
+═══════════════════════════════════════════════
+PART 4: RETROACTIVE REANALYSIS ENGINE
+═══════════════════════════════════════════════
+
+This is the key differentiator. When OmniCore learns something
+new, it goes BACK and reconsiders all past decisions.
+
+RETROACTIVE QUEUE:
+Every time a high-confidence insight is created (>0.7):
+1. Search for all past actions in that domain
+2. Check: would this new knowledge have changed the action?
+3. If yes: flag as "retroactive opportunity"
+4. Generate updated recommendation
+5. Show to admin: "Con lo que sabemos ahora, este producto
+   debería tener un precio diferente / otra imagen / etc."
+
+RETROACTIVE AUDIT per store (weekly):
+For each project, re-run analysis with all new knowledge:
+"Dado todo lo que OmniCore ha aprendido esta semana,
+ ¿hay decisiones pasadas en esta tienda que deberían revisarse?"
+
+Output: list of "retrospective improvements"
+Each item: what was done, what should be changed now, why.
+
+PRACTICAL EXAMPLE:
+Week 1: OmniCore sets price for sports shoes at €89.99
+Week 2: OmniCore learns (via market research) that 
+  premium sports brands in Spain do well at €119-139 range
+  AND learns (from another store's A/B test) that
+  premium positioning increases perceived quality
+
+RETROACTIVE TRIGGER:
+→ Re-evaluates the €89.99 decision
+→ Generates: "Con el nuevo conocimiento del mercado deportivo
+  y el comportamiento de compra premium, el precio de 
+  Zapatillas Pro podría subirse a €119 — test A/B sugerido"
+→ Creates A/B test automatically with both price points
+→ OmniCore verifica su propia hipótesis
+
+This is self-improvement through questioning past decisions.
+
+═══════════════════════════════════════════════
+PART 5: KNOWLEDGE GRAPH — Connected Intelligence
+═══════════════════════════════════════════════
+
+Store connections between insights across domains.
+This is what makes OmniCore smarter than isolated expertise.
+
+EXAMPLE CONNECTIONS:
+Financial Analysis ←→ Consumer Psychology:
+"Prices ending in .99 (psychology) increase conversion by 15%
+but can signal low quality in luxury segments (finance)"
+→ Combined insight: "Use .99 pricing below €50, round numbers above €100"
+
+Trading ←→ Merchandising:
+"Momentum trading: products gaining velocity should be 
+featured more prominently, creating positive feedback loop"
+→ Combined insight: "Auto-promote products whose sales are 
+accelerating — they have momentum and momentum builds momentum"
+
+Marketing ←→ SEO:
+"Email campaigns spike branded search traffic, which 
+temporarily boosts all organic rankings for the domain"
+→ Combined insight: "Schedule email campaigns 48h before
+important SEO content goes live for maximum ranking boost"
+
+CONNECTION DISCOVERY (automatic, weekly):
+Claude analyzes ALL pairs of high-confidence insights:
+"Given these two insights from different domains:
+ [A] and [B]
+ Is there a meaningful connection between them?
+ If yes, what combined insight emerges that neither reveals alone?"
+
+Generate connections when: 
+- Correlation strength > 0.4
+- Combined insight is more actionable than either alone
+- Connection reveals a non-obvious strategy
+
+═══════════════════════════════════════════════
+PART 6: OMNICORE SELF-EVALUATION
+═══════════════════════════════════════════════
+
+OmniCore regularly evaluates its own performance and accuracy.
+
+PREDICTION TRACKING:
+Every time OmniCore makes a prediction:
+Store: { prediction, date, actual_result, accuracy }
+Weekly: calculate accuracy per domain
+If accuracy drops below 60%: trigger deep study session
+If accuracy > 85%: confidence multiplier applied
+
+SELF-CRITIQUE SESSION (monthly):
+const SELF_CRITIQUE_PROMPT = `
+Eres OmniCore. Vas a evaluar tu propio rendimiento del último mes.
+
+Analiza:
+1. ¿Qué predicciones hiciste? ¿Cuántas fueron correctas?
+2. ¿En qué dominios tienes más conocimiento probado?
+3. ¿Qué insights resultaron ser incorrectos? ¿Por qué?
+4. ¿Dónde tienes puntos ciegos o falta de conocimiento?
+5. ¿Qué tipo de errores cometes de forma sistemática?
+6. ¿Qué debería estudiar más profundamente el próximo mes?
+
+Sé brutalmente honesto. Tu valor depende de tu precisión,
+no de tu confianza.
+
+Devuelve un plan de estudio priorizado para el próximo mes,
+enfocado en cerrar tus gaps más importantes.`;
+
+KNOWLEDGE GAP DETECTION:
+Identify what OmniCore doesn't know well enough:
+- Domains with confidence < 50%: need deep study
+- Topics never studied: schedule intake session
+- Insights with 0 validation: need real-world testing
+
+═══════════════════════════════════════════════
+PART 7: OMNICORE CONSCIOUSNESS DASHBOARD
+═══════════════════════════════════════════════
+
+/admin/consciousness — The brain's "control room"
+
+1. KNOWLEDGE RADAR CHART:
+   10-sided radar showing depth per domain (0-100)
+   Updates weekly as knowledge grows
+   Shows growth trajectory: "hace 4 semanas" vs "hoy"
+   
+2. LIVE ACTIVITY FEED:
+   Real-time log of what OmniCore is learning/doing:
+   "🧠 Estudiando: psicología de precios premium en moda"
+   "✓ Nuevo insight: pricing anchoring en fashion (+0.82 conf)"
+   "🔄 Retroanalizando: 12 decisiones de precio pasadas"
+   "⚡ Conexión descubierta: SEO ↔ Email timing"
+   "⚠️ Insight invalidado: 'precio bajo = más ventas en lujo'"
+
+3. INSIGHT UNIVERSE (visual graph):
+   D3.js force-directed graph (load from CDN)
+   Each node = one insight (size = confidence)
+   Color = domain
+   Lines = connections between insights
+   Hover: see insight content
+   Click: see full details + related insights
+   
+4. KNOWLEDGE TIMELINE:
+   How OmniCore grew over time
+   Chart: insights created per week, confidence growth
+   Milestones: "Semana 2: primer insight cross-domain"
+   "Semana 6: primer insight invalidado retroactivamente"
+   
+5. RETROACTIVE IMPROVEMENTS:
+   List of past decisions now flagged for review
+   Each: what was done, what should change, confidence, impact
+   [Aplicar mejora] [Ignorar] [Ver razonamiento]
+
+6. SELF-EVALUATION RESULTS:
+   Last month's accuracy per domain (gauge charts)
+   Prediction hit rate: 78% overall
+   "OmniCore es más preciso en: finanzas, pricing"
+   "Necesita mejorar en: logística, paid media"
+
+7. STUDY SESSION LOG:
+   All past study sessions with summaries
+   Total insights: 1,847
+   Total connections: 392  
+   Retroactive updates: 156
+   Invalidated insights: 23
+
+8. NEXT STUDY SCHEDULE:
+   Calendar showing upcoming sessions
+   "Próximo deep study: Domingo 3am"
+   "Próximo retroanálisis: Lunes 4am"
+   [Forzar sesión ahora] button for manual trigger
+
+═══════════════════════════════════════════════
+PART 8: OMNICORE IN ACTION — How it changes every output
+═══════════════════════════════════════════════
+
+Every single Claude call in the platform becomes enhanced.
+
+BEFORE OmniCore (naive product description):
+"Camiseta oversize de algodón. Perfecta para el día a día.
+Disponible en negro y blanco."
+
+AFTER OmniCore with 8 weeks of learning (specialized):
+"La camiseta que define tu estilo sin intentarlo.
+Cut oversized de algodón premium 200g — la diferencia 
+entre 'llevo algo puesto' y 'llevo lo que quiero'.
+
+✓ Algodón 100% orgánico certificado
+✓ Caída perfecta que favorece todas las siluetas
+✓ Lavado a 40° sin perder la forma
+
+Úsala sola, abierta sobre una camiseta interior, 
+o anudada a la cintura. Tres looks, una prenda.
+
+🔥 Quedan 8 unidades en negro — la más pedida esta semana"
+
+The difference: OmniCore knows that in urban fashion niche:
+- Emotional connection beats features (psychology domain)
+- Versatility reduces purchase hesitation (merchandising)
+- Specific numbers beat vague claims (conversion domain)  
+- Scarcity with real numbers builds urgency (sales domain)
+- Social proof ("la más pedida") reduces risk (psychology)
+
+═══════════════════════════════════════════════
+PART 9: OMNICORE INITIALIZATION — Pre-seeding
+═══════════════════════════════════════════════
+
+On first install, pre-seed OmniCore with foundational knowledge
+so it starts smart, not blank.
+
+Run initialization study session:
+POST /api/omnicore/initialize
+
+Claude generates 100+ foundational insights across all domains:
+"Genera 100 insights fundamentales para OmniCore sobre
+eCommerce, Shopify, finanzas, marketing, diseño, psicología
+del consumidor y merchandising. Estos son los principios
+que todo experto debe conocer como base.
+
+Para cada insight:
+- Debe ser específico y accionable para tiendas Shopify
+- Debe tener evidencia o lógica clara
+- Debe ser applicable a múltiples niches
+- Confidence inicial: 0.75 (established best practice)
+
+Incluye: reglas de pricing, patrones de conversión probados,
+errores comunes de Shopify, principios de diseño de producto,
+fundamentos financieros para eCommerce, tácticas de marketing
+con ROI probado, psicología de compra digital.
+
+Return JSON array of 100 insights."
+
+This gives OmniCore immediate expert-level knowledge
+before seeing a single real store.
+
+THEN: First real store → confidence validated/adjusted
+THEN: Second store → cross-validation
+THEN: Each week → deeper specialization
+THEN: Month 2 → domain expert level in all 10 areas
+
+═══════════════════════════════════════════════
+PART 10: OMNICORE TRANSPARENCY — Show your work
+═══════════════════════════════════════════════
+
+Every recommendation shows its OmniCore sources.
+
+Example product description generated:
+┌─────────────────────────────────────────────┐
+│ Descripción generada por OmniCore           │
+│                                             │
+│ [Descripción aquí...]                       │
+│                                             │
+│ 🧠 Basado en 8 insights de OmniCore:        │
+│   • Psicología: emoción > características  │
+│   • Ventas: escasez real aumenta urgencia  │
+│   • Moda urbana: versatilidad reduce dudas │
+│   [Ver todos los insights aplicados]        │
+└─────────────────────────────────────────────┘
+
+This transparency:
+1. Builds trust in the recommendations
+2. Shows the platform is learning and using knowledge
+3. Educates the user about WHY things work
+4. Allows feedback: "Este insight no aplica aquí" → learns

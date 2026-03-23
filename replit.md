@@ -21,12 +21,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **AI**: Anthropic Claude (`claude-sonnet-4-5`) + Replicate (Flux, Recraft)
 - **Image processing**: Sharp (post-process generated images)
 
-## Design Tokens
+## Design System
 
-- Background: `#08080f` (deep space dark)
-- Accent: `#5b4eff` (electric violet)
-- Grade colors: A=`#00d68f` B=`#00b4d8` C=`#ffd32a` D=`#ff8c42` F=`#ff4757`
-- Premium dark glassmorphism panels
+Premium gold/black/jade design system applied to ALL internal app pages.
+
+- **Design system CSS**: `artifacts/shopify-optimizer/public/css/design-system.css` (loaded globally via index.html)
+- **Fonts**: Instrument Serif (headings, italic) + Geist (body) + Geist Mono (code) via Google Fonts
+- **Gold line**: `position:fixed; top:0; height:2px` gold gradient — always visible across all pages
+- **App shell structure**: `.app-shell` → `.sidebar` (220px) → `.main-area` → `.topbar` → `.main-content`
+- **Colors**: `--ink:#080810` bg, `--gold:#c8a84b` accent, `--jade:#2dd49f` success, `--crim:#e84558` error
+- **Key classes**: `.app-shell`, `.sidebar`, `.topbar`, `.main-content`, `.card`, `.metric-card`, `.btn-gold`, `.nav-item`, `.client-pill`, `.module-tab`, `.badge-*`
+- All Tailwind CSS still active alongside the design system for inner page components
 
 ## Structure
 

@@ -1,28 +1,33 @@
 import { ReactNode } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  Wand2, 
-  Image as ImageIcon, 
-  Palette, 
-  SplitSquareHorizontal, 
-  DollarSign, 
-  Search,
-  Settings,
-  Plus,
-  Store,
-  ChevronRight,
-  LogOut,
-  Users,
-} from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
+
+const MODULE_NAV = [
+  { id: "audit",       label: "Auditoría",    icon: "📊" },
+  { id: "redesign",    label: "Rediseño IA",  icon: "✏️" },
+  { id: "images",      label: "Imágenes",     icon: "🖼" },
+  { id: "consistency", label: "Consistencia", icon: "🎨" },
+  { id: "ab-testing",  label: "A/B Testing",  icon: "📈" },
+  { id: "pricing",     label: "Pricing",      icon: "💰" },
+  { id: "seo",         label: "SEO Engine",   icon: "🔍" },
+];
+
+const PAGE_LABELS: Record<string, string> = {
+  audit: "Auditoría",
+  redesign: "Rediseño IA",
+  images: "Imágenes",
+  consistency: "Consistencia",
+  "ab-testing": "A/B Testing",
+  pricing: "Pricing",
+  seo: "SEO Engine",
+  settings: "Configuración",
+};
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { data: projects, isLoading } = useListProjects();
@@ -30,182 +35,182 @@ export function AppLayout({ children }: AppLayoutProps) {
   const activeProjectId = match ? parseInt(params.id) : null;
   const activeProject = projects?.find((p: { id: number }) => p.id === activeProjectId);
   const { user, logout } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
-  const navItems = [
-    { id: "audit", label: "Auditoría", icon: LayoutDashboard },
-    { id: "redesign", label: "Rediseño IA", icon: Wand2 },
-    { id: "images", label: "Imágenes", icon: ImageIcon },
-    { id: "consistency", label: "Consistencia", icon: Palette },
-    { id: "ab-testing", label: "A/B Testing", icon: SplitSquareHorizontal },
-    { id: "pricing", label: "Pricing", icon: DollarSign },
-    { id: "seo", label: "SEO Engine", icon: Search },
-  ];
+  const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
+  const pageLabel = PAGE_LABELS[currentPage] ?? "Dashboard";
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar */}
-      <div className="w-72 flex-shrink-0 border-r border-white/5 bg-sidebar flex flex-col z-20 shadow-2xl relative">
-        <div className="p-6 flex items-center gap-3 border-b border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-            <Wand2 className="w-4 h-4 text-primary" />
-          </div>
-          <span className="font-display font-bold text-lg text-foreground tracking-wide">AI Optimizer</span>
+    <div className="app-shell">
+      {/* ── SIDEBAR ── */}
+      <nav className="sidebar">
+        {/* Logo */}
+        <div className="sidebar-logo">
+          <div className="logo-gem">⚡</div>
+          <span className="logo-text">Shopify<em>AI</em></span>
+          <span className="logo-badge">PRO</span>
         </div>
 
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tus Tiendas</span>
-            <Link href="/" className="text-muted-foreground hover:text-primary transition-colors">
-              <Plus className="w-4 h-4" />
-            </Link>
-          </div>
+        {/* Stores list */}
+        <div className="sidebar-clients">
+          <span className="sidebar-label">Tus Tiendas</span>
 
-          {/* Admin-only links */}
-          <div className="mb-4 space-y-1">
-            <Link
-              href="/admin/clients"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-muted-foreground hover:bg-white/5 hover:text-foreground group"
-            >
-              <Users className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
-              <span>Gestión de Clientes</span>
-            </Link>
-            <Link
-              href="/admin/cms"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-muted-foreground hover:bg-white/5 hover:text-foreground group"
-            >
-              <span className="text-base">⚡</span>
-              <span>Editor de Landing</span>
-            </Link>
-          </div>
-
-          <div className="space-y-1">
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />)}
-              </div>
-            ) : projects?.map((project: { id: number; name: string }) => (
-              <Link 
-                key={project.id} 
-                href={`/projects/${project.id}/audit`}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                  activeProjectId === project.id 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                )}
-              >
-                <div className="flex items-center gap-3 truncate">
-                  <Store className={cn("w-4 h-4", activeProjectId === project.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                  <span className="truncate">{project.name}</span>
-                </div>
-                {activeProjectId === project.id && (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </Link>
-            ))}
-            
-            {projects?.length === 0 && !isLoading && (
-              <div className="text-center p-4 rounded-xl border border-dashed border-white/10">
-                <p className="text-sm text-muted-foreground mb-3">No hay proyectos</p>
-                <Link href="/" className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors inline-block">
-                  Crear Tienda
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-white/5">
-          {activeProject && (
+          {isLoading ? (
             <>
-              <div className="flex items-center gap-3 mb-3 px-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(0,214,143,0.8)] animate-pulse" />
-                <div className="text-xs text-muted-foreground">Token Activo</div>
-              </div>
-              <Link 
-                href={`/projects/${activeProject.id}/settings`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-2 rounded-md hover:bg-white/5 transition-colors mb-1"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Configuración</span>
-              </Link>
+              <div className="skeleton" style={{ height: 36, marginBottom: 4, borderRadius: 8 }} />
+              <div className="skeleton" style={{ height: 36, marginBottom: 4, borderRadius: 8 }} />
             </>
+          ) : (
+            projects?.map((project: { id: number; name: string; shopDomain?: string }) => {
+              const isActive = activeProjectId === project.id;
+              return (
+                <Link key={project.id} href={`/projects/${project.id}/audit`}>
+                  <div className={`client-pill${isActive ? " active" : ""}`}>
+                    <div
+                      className="client-dot"
+                      style={{ background: isActive ? "var(--gold)" : "var(--t4)" }}
+                    />
+                    <div className="client-info">
+                      <p className="client-name">{project.name}</p>
+                      <p className="client-domain">{project.shopDomain ?? "—"}</p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })
           )}
+
+          {projects?.length === 0 && !isLoading && (
+            <p style={{ fontSize: 11, color: "var(--t3)", padding: "4px 8px" }}>Sin tiendas aún</p>
+          )}
+
+          <Link href="/">
+            <div className="nav-item" style={{ marginTop: 4 }}>
+              <span className="nav-icon">＋</span>
+              Nueva tienda
+            </div>
+          </Link>
+        </div>
+
+        {/* Admin nav */}
+        <div className="sidebar-nav">
+          <span className="sidebar-label">Administración</span>
+
+          <Link href="/admin/clients">
+            <div className={`nav-item${location === "/admin/clients" ? " active" : ""}`}>
+              <span className="nav-icon">👥</span>
+              Gestión de Clientes
+            </div>
+          </Link>
+
+          <Link href="/admin/cms">
+            <div className={`nav-item${location === "/admin/cms" ? " active" : ""}`}>
+              <span className="nav-icon">⚡</span>
+              Editor Landing
+            </div>
+          </Link>
+
+          {activeProject && (
+            <Link href={`/projects/${activeProject.id}/settings`}>
+              <div className={`nav-item${currentPage === "settings" ? " active" : ""}`}>
+                <span className="nav-icon"><Settings size={13} /></span>
+                Configuración
+              </div>
+            </Link>
+          )}
+        </div>
+
+        {/* Bottom — credits + user */}
+        <div className="sidebar-bottom">
+          <div className="credits-bar-label">
+            <span>IA Credits</span>
+            <span style={{ color: "var(--jade)" }}>∞ Ilimitados</span>
+          </div>
+          <div className="credits-bar">
+            <div className="credits-bar-fill" style={{ width: "78%" }} />
+          </div>
+
           {user && (
-            <div className="mt-1 px-2 py-2 flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+              <div
+                className="logo-gem"
+                style={{
+                  width: 28, height: 28, fontSize: 11,
+                  background: "rgba(200,168,75,0.12)",
+                  color: "var(--gold2)",
+                  flexShrink: 0,
+                }}
+              >
                 {user.name.slice(0, 2).toUpperCase()}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{user.name}</p>
-                <p className="text-xs text-muted-foreground truncate">Admin</p>
+              <div className="client-info">
+                <p className="client-name">{user.name}</p>
+                <p className="client-domain">Administrador</p>
               </div>
               <button
                 onClick={() => logout().then(() => navigate("/login"))}
-                className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
                 title="Cerrar sesión"
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--t3)", padding: 4, borderRadius: 4,
+                  transition: "color 0.15s", flexShrink: 0,
+                  display: "flex", alignItems: "center",
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.color = "var(--crim)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.color = "var(--t3)"; }}
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut size={14} />
               </button>
             </div>
           )}
         </div>
-      </div>
+      </nav>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[url('/images/hero-bg.png')] bg-cover bg-center bg-no-repeat relative">
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-[100px] z-0" />
-        
-        {activeProject ? (
-          <>
-            {/* Top Navigation */}
-            <div className="h-16 flex-shrink-0 border-b border-white/5 bg-background/40 backdrop-blur-md z-10 px-8 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">{activeProject.name}</span>
-                <span className="text-muted-foreground">/</span>
-                <span className="font-medium text-foreground capitalize">{params['*']}</span>
-              </div>
+      {/* ── MAIN AREA ── */}
+      <div className="main-area">
+        {/* Topbar */}
+        <div className="topbar">
+          <div className="topbar-breadcrumb">
+            {activeProject ? (
+              <>
+                <span className="topbar-client">{activeProject.name}</span>
+                <span className="topbar-sep">/</span>
+                <span className="topbar-page">{pageLabel}</span>
+              </>
+            ) : (
+              <span className="topbar-client">Dashboard</span>
+            )}
+          </div>
+          <div className="topbar-right">
+            <div className="status-chip">
+              <div className="status-pulse" />
+              Activo
             </div>
+            <button className="notif-btn" title="Notificaciones">🔔</button>
+          </div>
+        </div>
 
-            <div className="px-8 pt-6 z-10 flex gap-2 overflow-x-auto no-scrollbar border-b border-white/5">
-              {navItems.map((item) => {
-                const isActive = params['*'] === item.id;
-                return (
-                  <Link
-                    key={item.id}
-                    href={`/projects/${activeProjectId}/${item.id}`}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-3 rounded-t-xl text-sm font-medium transition-all relative",
-                      isActive 
-                        ? "text-primary bg-primary/10" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                    )}
-                  >
-                    <item.icon className="w-4 h-4" />
+        {/* Module tab nav (only when a project is active) */}
+        {activeProject && (
+          <div className="module-tabs">
+            {MODULE_NAV.map((item) => {
+              const isActive = currentPage === item.id;
+              return (
+                <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>
+                  <div className={`module-tab${isActive ? " active" : ""}`}>
+                    <span style={{ fontSize: 13 }}>{item.icon}</span>
                     {item.label}
-                    {isActive && (
-                      <motion.div 
-                        layoutId="activeTab" 
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Scrollable Page Content */}
-            <div className="flex-1 overflow-y-auto p-8 z-10">
-              {children}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 overflow-y-auto z-10 flex items-center justify-center p-8">
-            {children}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
+
+        {/* Page content */}
+        <div className="main-content">
+          {children}
+        </div>
       </div>
     </div>
   );
