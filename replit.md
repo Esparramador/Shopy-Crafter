@@ -4,6 +4,8 @@
 
 Shopify AI Optimizer — **Multi-user agency platform** for Shopify AI optimization. Two roles: **admin** (full access, all stores, all 7 AI engines) and **client** (read-only access to their own store metrics and approvals). Session-based auth with bcrypt passwords + AES-256-GCM encrypted credentials. Each project = one client's isolated Shopify store.
 
+**Admin credentials**: `sadiagiljoan@gmail.com` / `ShopyAdmin2026!` (auto-seeded on startup via `ensureAdminUser()` in `index.ts`)
+
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
 ## Stack
@@ -140,8 +142,9 @@ artifacts-monorepo/
 ## Admin Exclusivo
 - **Email**: `sadiagiljoan@gmail.com` — ÚNICO administrador de la plataforma
 - **Rol**: admin (acceso total a todas las funcionalidades)
-- **Contraseña**: definida por el administrador (cambio via Admin Clientes > reset)
-- **Login**: Plataforma exclusiva — sin hints de credenciales públicos
+- **Contraseña**: `ShopyAdmin2026!` (auto-seeded en cada startup via `ensureAdminUser()` en `index.ts`)
+- **Login**: placeholder del campo email ya muestra `sadiagiljoan@gmail.com`
+- **Seed automático**: Si el usuario admin es borrado accidentalmente, se recrea en el próximo reinicio del servidor
 
 ## Shopy Brain — Megacerebro de la Plataforma
 
