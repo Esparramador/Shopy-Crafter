@@ -26,6 +26,7 @@ const SHOPYBRAIN_NAV = [
   { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
   { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
   { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
+  { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
 ];
 
 const ADMIN_NAV = [
@@ -38,7 +39,6 @@ const ADMIN_NAV = [
   { label: "Logros", icon: "🏆", href: "/admin/achievements" },
   { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
   { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
-  { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
 ];
 
