@@ -22,7 +22,7 @@ export default function SystemHealth() {
 
     try {
       const start = Date.now();
-      const res = await fetch(`${API_BASE}/api/health`, { credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/healthz`, { credentials: "include" });
       const latency = Date.now() - start;
       results.push({
         name: "API Server",
