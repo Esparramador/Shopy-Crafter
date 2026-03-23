@@ -24,6 +24,7 @@ import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
 import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
 import MyPricing from "@/pages/admin/MyPricing";
 import Emails from "@/pages/admin/Emails";
+import ProjectVault from "@/pages/admin/ProjectVault";
 import ForgotPassword from "@/pages/ForgotPassword";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
@@ -318,6 +319,14 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><SettingsPage /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+
+        <Route path="/projects/:id/vault">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ProjectVault /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

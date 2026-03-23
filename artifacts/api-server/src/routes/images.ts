@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, generationJobsTable } from "@workspace/db";
+import { saveToVault } from "../lib/vault.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeJson } from "../lib/claude";
@@ -208,6 +209,21 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
       await db.update(generationJobsTable)
         .set({ status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() })
         .where(eq(generationJobsTable.id, job.id));
+
+      // Auto-guardar en el vault del proyecto
+      await saveToVault({
+        projectId,
+        fileType: "image",
+        category: imageType,
+        title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} — ${product.title}`,
+        description: altText.slice(0, 125),
+        originalUrl: imageUrl,
+        mimeType: "image/webp",
+        productId: shopifyProductId,
+        productTitle: product.title,
+        generatedBy: "images_motor",
+        metadata: { model, prompt: finalPrompt, jobId: job.id, estimatedCost },
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       await db.update(generationJobsTable)

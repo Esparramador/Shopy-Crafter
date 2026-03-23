@@ -24,6 +24,7 @@ import pushRouter from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
 import agencyRouter from "./agency.js";
 import klaviyoRouter from "./klaviyo.js";
+import vaultRouter from "./vault.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -58,5 +59,6 @@ router.use(pushRouter);
 router.use(shopybrainRouter);
 router.use(agencyRouter);
 router.use(klaviyoRouter);
+router.use(vaultRouter);
 
 export default router;
