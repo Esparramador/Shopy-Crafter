@@ -24,17 +24,21 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 function RepairPoller({
+  projectId,
   jobId,
   onComplete,
 }: {
+  projectId: number;
   jobId: string;
   onComplete: () => void;
 }) {
-  const { data } = useGetJobStatus(jobId, {
-    refetchInterval: (query) => {
-      const status = (query.state.data as { status?: string } | undefined)?.status;
-      if (status === "completed" || status === "failed") return false;
-      return 2000;
+  const { data } = useGetJobStatus(projectId, jobId, {
+    query: {
+      refetchInterval: (query: { state: { data: unknown } }) => {
+        const status = (query.state.data as { status?: string } | undefined)?.status;
+        if (status === "completed" || status === "failed") return false;
+        return 2000;
+      },
     },
   });
 
@@ -127,7 +131,7 @@ export default function ConsistencyPage() {
   const [repairJobId, setRepairJobId] = useState<string | null>(null);
 
   const dna = dnaRaw as DnaData | null;
-  const scores = scoresRaw as ScoresData | null;
+  const scores = scoresRaw as unknown as ScoresData | null;
 
   const hasDna = dna?.backgroundStyle;
 
@@ -147,7 +151,7 @@ export default function ConsistencyPage() {
 
   const handleRepair = () => {
     repairConsistency.mutate(
-      { projectId },
+      { projectId, data: { productIds: [] } },
       {
         onSuccess: (data) => {
           const jobId = (data as { jobId?: string }).jobId;
@@ -348,6 +352,7 @@ export default function ConsistencyPage() {
         {/* Repair progress */}
         {repairJobId && (
           <RepairPoller
+            projectId={projectId}
             jobId={repairJobId}
             onComplete={() => {
               setRepairJobId(null);

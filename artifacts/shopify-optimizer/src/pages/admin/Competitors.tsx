@@ -15,7 +15,7 @@ export default function Competitors() {
   const [newComp, setNewComp] = useState({ name: "", url: "", type: "direct" });
 
   useEffect(() => {
-    if (!selectedProject && projects?.length > 0) setSelectedProject(String(projects[0].id));
+    if (!selectedProject && projects && projects.length > 0) setSelectedProject(String(projects[0].id));
   }, [projects]);
 
   useEffect(() => {

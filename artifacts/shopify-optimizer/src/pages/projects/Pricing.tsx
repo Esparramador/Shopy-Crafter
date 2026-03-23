@@ -45,12 +45,13 @@ function CogsModal({
   const applyPrice = useApplyPriceToShopify();
   const { toast } = useToast();
 
+  const existingCogsData = existingCogs as { unitCost?: number; shippingCostDomestic?: number; packagingCost?: number; cac?: number } | undefined;
   const [cogs, setCogs] = useState({
-    productCost: (existingCogs as { productCost?: number } | undefined)?.productCost?.toString() ?? "",
-    shippingCost: (existingCogs as { shippingCost?: number } | undefined)?.shippingCost?.toString() ?? "",
-    packagingCost: (existingCogs as { packagingCost?: number } | undefined)?.packagingCost?.toString() ?? "",
-    adSpend: (existingCogs as { adSpend?: number } | undefined)?.adSpend?.toString() ?? "",
-    targetMarginPct: (existingCogs as { targetMarginPct?: number } | undefined)?.targetMarginPct?.toString() ?? "60",
+    unitCost: existingCogsData?.unitCost?.toString() ?? "",
+    shippingCostDomestic: existingCogsData?.shippingCostDomestic?.toString() ?? "",
+    packagingCost: existingCogsData?.packagingCost?.toString() ?? "",
+    cac: existingCogsData?.cac?.toString() ?? "",
+    targetMarginPct: "60",
   });
 
   const [optimalData, setOptimalData] = useState<{
@@ -61,10 +62,10 @@ function CogsModal({
   } | null>(null);
 
   const totalCogs =
-    parseFloat(cogs.productCost || "0") +
-    parseFloat(cogs.shippingCost || "0") +
+    parseFloat(cogs.unitCost || "0") +
+    parseFloat(cogs.shippingCostDomestic || "0") +
     parseFloat(cogs.packagingCost || "0") +
-    parseFloat(cogs.adSpend || "0");
+    parseFloat(cogs.cac || "0");
 
   const currentMargin = product.price && totalCogs > 0
     ? Math.round(((product.price - totalCogs) / product.price) * 100)
@@ -76,11 +77,12 @@ function CogsModal({
         projectId,
         productId: product.id,
         data: {
-          productCost: parseFloat(cogs.productCost) || 0,
-          shippingCost: parseFloat(cogs.shippingCost) || 0,
+          unitCost: parseFloat(cogs.unitCost) || 0,
+          shippingCostDomestic: parseFloat(cogs.shippingCostDomestic) || 0,
           packagingCost: parseFloat(cogs.packagingCost) || 0,
-          adSpend: parseFloat(cogs.adSpend) || 0,
-          targetMarginPct: parseFloat(cogs.targetMarginPct) || 60,
+          cac: parseFloat(cogs.cac) || 0,
+          fulfillmentFee: 0,
+          returnRate: 0.08,
         },
       },
       {
@@ -112,7 +114,7 @@ function CogsModal({
       {
         projectId,
         productId: product.id,
-        data: { price, compareAtPrice: compareAt },
+        data: { price: String(price), compareAtPrice: String(compareAt) },
       },
       {
         onSuccess: () => {
@@ -151,8 +153,8 @@ function CogsModal({
               <input
                 type="number"
                 step="0.01"
-                value={cogs.productCost}
-                onChange={(e) => setCogs({ ...cogs, productCost: e.target.value })}
+                value={cogs.unitCost}
+                onChange={(e) => setCogs({ ...cogs, unitCost: e.target.value })}
                 className={inputClass}
                 placeholder="0.00"
               />
@@ -162,8 +164,8 @@ function CogsModal({
               <input
                 type="number"
                 step="0.01"
-                value={cogs.shippingCost}
-                onChange={(e) => setCogs({ ...cogs, shippingCost: e.target.value })}
+                value={cogs.shippingCostDomestic}
+                onChange={(e) => setCogs({ ...cogs, shippingCostDomestic: e.target.value })}
                 className={inputClass}
                 placeholder="0.00"
               />
@@ -184,8 +186,8 @@ function CogsModal({
               <input
                 type="number"
                 step="0.01"
-                value={cogs.adSpend}
-                onChange={(e) => setCogs({ ...cogs, adSpend: e.target.value })}
+                value={cogs.cac}
+                onChange={(e) => setCogs({ ...cogs, cac: e.target.value })}
                 className={inputClass}
                 placeholder="0.00"
               />
@@ -319,7 +321,7 @@ export default function PricingPage() {
   const handleCompetitorAnalysis = () => {
     if (!competitorUrl) return;
     analyzeCompetitors.mutate(
-      { projectId, data: { competitorUrl } },
+      { projectId, data: { competitorUrls: [competitorUrl] } },
       {
         onSuccess: (d) => setCompetitorResult(d as typeof competitorResult),
         onError: () => toast({ title: "Error analizando competidores", variant: "destructive" }),

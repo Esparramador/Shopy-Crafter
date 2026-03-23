@@ -76,13 +76,13 @@ export default function SEOPage() {
   const generateMetas = useGenerateMetas();
   const generateSitemap = useGenerateSitemap();
   const fixAltTexts = useFixAltTexts();
-  const getKeywords = useGetKeywordIntelligence(projectId);
-  const getBlogStrategy = useGetBlogStrategy(projectId);
+  const getKeywords = useGetKeywordIntelligence();
+  const getBlogStrategy = useGetBlogStrategy();
   const generateBlogPost = useGenerateBlogPost();
 
   const handleAudit = () => {
     runSeoAudit.mutate(
-      { projectId },
+      { projectId, data: { applyToShopify: false } },
       {
         onSuccess: (data) => {
           setSeoData(data as typeof seoData);
@@ -95,7 +95,7 @@ export default function SEOPage() {
 
   const handleSchemas = () => {
     generateSchemas.mutate(
-      { projectId },
+      { projectId, data: { applyToShopify: false } },
       {
         onSuccess: (data) => {
           setSchemas(data as typeof schemas);
@@ -108,7 +108,7 @@ export default function SEOPage() {
 
   const handleMetas = () => {
     generateMetas.mutate(
-      { projectId },
+      { projectId, data: { applyToShopify: false } },
       {
         onSuccess: (data) => {
           setMetas(data as typeof metas);
@@ -121,7 +121,7 @@ export default function SEOPage() {
 
   const handleSitemap = () => {
     generateSitemap.mutate(
-      { projectId },
+      { projectId, data: { applyToShopify: false } },
       {
         onSuccess: (data) => {
           const url = (data as { sitemapUrl?: string }).sitemapUrl;
@@ -135,7 +135,7 @@ export default function SEOPage() {
 
   const handleFixAlts = () => {
     fixAltTexts.mutate(
-      { projectId },
+      { projectId, data: { applyToShopify: false } },
       {
         onSuccess: (data) => {
           setAltResult(data as typeof altResult);
@@ -152,7 +152,7 @@ export default function SEOPage() {
       return;
     }
     auditPageSpeed.mutate(
-      { projectId, data: { url: psUrl.trim(), strategy: psStrategy } },
+      { projectId, data: { url: psUrl.trim(), strategy: psStrategy } as Parameters<typeof auditPageSpeed.mutate>[0]["data"] },
       {
         onSuccess: (data) => {
           setPsResult(data as typeof psResult);
@@ -164,20 +164,22 @@ export default function SEOPage() {
   };
 
   const handleKeywords = () => {
-    getKeywords.refetch().then(({ data }) => {
-      if (data) setKeywords(data as typeof keywords);
-    });
+    getKeywords.mutate(
+      { projectId, data: { productName: "" } },
+      { onSuccess: (data) => setKeywords(data as typeof keywords) }
+    );
   };
 
   const handleBlogStrategy = () => {
-    getBlogStrategy.refetch().then(({ data }) => {
-      if (data) setBlogStrategy(data as typeof blogStrategy);
-    });
+    getBlogStrategy.mutate(
+      { projectId },
+      { onSuccess: (data) => setBlogStrategy(data as typeof blogStrategy) }
+    );
   };
 
   const handleGenerateBlogPost = (pillarTitle: string) => {
     generateBlogPost.mutate(
-      { projectId, data: { topic: pillarTitle } },
+      { projectId, data: { topic: pillarTitle } as unknown as Parameters<typeof generateBlogPost.mutate>[0]["data"] },
       {
         onSuccess: (data) => {
           setGeneratedPost(data as typeof generatedPost);
@@ -625,10 +627,10 @@ export default function SEOPage() {
           </div>
           <button
             onClick={handleKeywords}
-            disabled={getKeywords.isFetching}
+            disabled={getKeywords.isPending}
             className="text-sm bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-xl hover:bg-primary/20 transition-colors flex items-center gap-2"
           >
-            {getKeywords.isFetching ? (
+            {getKeywords.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Search className="w-4 h-4" />
@@ -689,10 +691,10 @@ export default function SEOPage() {
           </div>
           <button
             onClick={handleBlogStrategy}
-            disabled={getBlogStrategy.isFetching}
+            disabled={getBlogStrategy.isPending}
             className="text-sm bg-white/5 border border-white/10 text-foreground px-4 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-2"
           >
-            {getBlogStrategy.isFetching ? (
+            {getBlogStrategy.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <FileText className="w-4 h-4" />

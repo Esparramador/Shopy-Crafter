@@ -97,7 +97,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid-r3">
-            {projects!.map((p: { id: number; name: string; shopDomain?: string; storeNiche?: string }) => (
+            {projects!.map((p: { id: number; name: string; shopDomain?: string | null; storeNiche?: string | null }) => (
               <Link key={p.id} href={`/projects/${p.id}/audit`}>
                 <div className="glass-card card-hover" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

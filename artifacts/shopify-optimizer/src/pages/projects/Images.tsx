@@ -43,17 +43,21 @@ const IMAGE_TYPES = [
 type JobEntry = { jobId: string; type: string };
 
 function JobPoller({
+  projectId,
   jobId,
   onComplete,
 }: {
+  projectId: number;
   jobId: string;
   onComplete: (data: unknown) => void;
 }) {
-  const { data } = useGetGenerationJob(jobId, {
-    refetchInterval: (query) => {
-      const status = (query.state.data as { status?: string } | undefined)?.status;
-      if (status === "completed" || status === "failed") return false;
-      return 2000;
+  const { data } = useGetGenerationJob(projectId, jobId, {
+    query: {
+      refetchInterval: (query: { state: { data: unknown } }) => {
+        const status = (query.state.data as { status?: string } | undefined)?.status;
+        if (status === "completed" || status === "failed") return false;
+        return 2000;
+      },
     },
   });
 
@@ -90,7 +94,7 @@ function PromptModal({
 
   useEffect(() => {
     buildPrompt.mutate(
-      { projectId, productId, data: { imageType, referenceContext: referenceIntelligence ?? undefined } },
+      { projectId, productId, data: { productId, imageType } },
       {
         onSuccess: (d) => {
           setPromptData(d as typeof promptData);
@@ -129,7 +133,7 @@ function PromptModal({
             onIntelligenceReady={(intel) => {
               setReferenceIntelligence(intel);
               buildPrompt.mutate(
-                { projectId, productId, data: { imageType, referenceContext: intel } },
+                { projectId, productId, data: { productId, imageType } },
                 { onSuccess: (d) => setPromptData(d as typeof promptData) }
               );
             }}
@@ -305,7 +309,7 @@ export default function ImagesPage() {
   const handleBoostMasivo = () => {
     const productIds = (data?.products || []).map((p) => p.id);
     bulkGenerate.mutate(
-      { projectId, data: { imageType: "hero", productIds } },
+      { projectId, data: { imageTypes: ["hero"], productIds } },
       {
         onSuccess: (res) => {
           const jobId = (res as { jobId?: string }).jobId;
@@ -341,12 +345,13 @@ export default function ImagesPage() {
       {Object.entries(jobs)
         .filter(([, e]) => e.jobId && e.jobId !== "infografia")
         .map(([key, entry]) => (
-          <JobPoller key={key} jobId={entry.jobId} onComplete={handleJobComplete(key)} />
+          <JobPoller key={key} projectId={projectId} jobId={entry.jobId} onComplete={handleJobComplete(key)} />
         ))}
 
       {/* Bulk job poller */}
       {bulkJobId && (
         <JobPoller
+          projectId={projectId}
           jobId={bulkJobId}
           onComplete={(d) => {
             setBulkJobId(null);

@@ -31,7 +31,7 @@ export default function Forecast() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedProject && projects?.length > 0) setSelectedProject(String(projects[0].id));
+    if (!selectedProject && projects && projects.length > 0) setSelectedProject(String(projects[0].id));
   }, [projects]);
 
   useEffect(() => {

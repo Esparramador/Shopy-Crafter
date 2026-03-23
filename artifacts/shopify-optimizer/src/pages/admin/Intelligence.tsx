@@ -41,7 +41,7 @@ export default function Intelligence() {
   const [syncResult, setSyncResult] = useState<{ ok: boolean; totalRevenue?: number; totalOrders?: number; daysLoaded?: number; error?: string } | null>(null);
 
   useEffect(() => {
-    if (!selectedProject && projects?.length > 0) {
+    if (!selectedProject && projects && projects.length > 0) {
       setSelectedProject(String(projects[0].id));
     }
   }, [projects]);

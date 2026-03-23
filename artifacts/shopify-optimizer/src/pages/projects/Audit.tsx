@@ -43,7 +43,10 @@ export default function AuditPage() {
 
   const { data, isLoading } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
   const syncProducts = useSyncProducts();
-  const { data: oppsData, isLoading: isLoadingOpps, refetch: refetchOpps } = useGetCatalogOpportunities(projectId);
+  const getCatalogOpps = useGetCatalogOpportunities();
+  const oppsData = getCatalogOpps.data ?? [];
+  const isLoadingOpps = getCatalogOpps.isPending;
+  const refetchOpps = () => getCatalogOpps.mutate({ projectId });
 
   const handleScan = async () => {
     setScanStatus("syncing");
@@ -356,9 +359,9 @@ export default function AuditPage() {
             </div>
           )}
 
-          {oppsData?.opportunities && oppsData.opportunities.length > 0 && (
+          {oppsData && oppsData.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {oppsData.opportunities.map((opp, i) => {
+              {oppsData.map((opp, i) => {
                 const difficulty = opp.sourcingDifficulty as OppDifficulty;
                 const diffClass = DIFFICULTY_COLOR[difficulty] ?? "text-muted-foreground bg-white/5 border-white/10";
                 return (
@@ -386,7 +389,7 @@ export default function AuditPage() {
             </div>
           )}
 
-          {!isLoadingOpps && !oppsData?.opportunities?.length && (
+          {!isLoadingOpps && !oppsData?.length && (
             <div className="py-20 text-center">
               <Lightbulb className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground mb-4">

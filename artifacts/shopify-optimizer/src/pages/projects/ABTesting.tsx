@@ -59,7 +59,7 @@ function NewTestModal({
           variantADescription: form.variantADescription,
           variantBDescription: form.variantBDescription,
           durationDays: parseInt(form.durationDays) || 14,
-        },
+        } as unknown as Parameters<typeof createTest.mutate>[0]["data"],
       },
       {
         onSuccess: () => {
@@ -209,7 +209,7 @@ function TestCard({
 
   const handleDeclareWinner = (winner: "A" | "B") => {
     declareWinner.mutate(
-      { projectId, testId: test.id, data: { winner } },
+      { projectId, testId: test.id, data: { winner, applyToShopify: false } as unknown as Parameters<typeof declareWinner.mutate>[0]["data"] },
       {
         onSuccess: () => {
           queryClient.invalidateQueries();

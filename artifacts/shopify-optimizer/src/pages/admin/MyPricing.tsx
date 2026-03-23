@@ -33,7 +33,7 @@ export default function MyPricing() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [savingCosts, setSavingCosts] = useState(false);
-  const [tab, setTab] = useState<"services" | "costs" | "quote" | "proposal">("services");
+  const [tab, setTab] = useState<"services" | "costs" | "quote" | "proposal" | "shopify">("services");
   const [editCosts, setEditCosts] = useState<Partial<CostStructure>>({});
   const [showCostsForm, setShowCostsForm] = useState(false);
   const [quoteForm, setQuoteForm] = useState({

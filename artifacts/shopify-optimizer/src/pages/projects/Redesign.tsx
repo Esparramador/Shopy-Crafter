@@ -41,17 +41,21 @@ type RedesignResult = {
 };
 
 function BulkProgressPoller({
+  projectId,
   jobId,
   onComplete,
 }: {
+  projectId: number;
   jobId: string;
   onComplete: (data: unknown) => void;
 }) {
-  const { data } = useGetGenerationJob(jobId, {
-    refetchInterval: (query) => {
-      const status = (query.state.data as { status?: string } | undefined)?.status;
-      if (status === "completed" || status === "failed") return false;
-      return 2000;
+  const { data } = useGetGenerationJob(projectId, jobId, {
+    query: {
+      refetchInterval: (query: { state: { data: unknown } }) => {
+        const status = (query.state.data as { status?: string } | undefined)?.status;
+        if (status === "completed" || status === "failed") return false;
+        return 2000;
+      },
     },
   });
 
@@ -177,7 +181,7 @@ export default function RedesignPage() {
       { projectId, productId },
       {
         onSuccess: (res) => {
-          setRedesignResults((prev) => ({ ...prev, [productId]: res as RedesignResult }));
+          setRedesignResults((prev) => ({ ...prev, [productId]: res as unknown as RedesignResult }));
           setActiveRedesign(null);
           toast({ title: "✓ Rediseño generado" });
         },
@@ -274,6 +278,7 @@ export default function RedesignPage() {
       {/* Bulk Progress */}
       {bulkJobId && (
         <BulkProgressPoller
+          projectId={projectId}
           jobId={bulkJobId}
           onComplete={(d) => {
             setBulkJobId(null);

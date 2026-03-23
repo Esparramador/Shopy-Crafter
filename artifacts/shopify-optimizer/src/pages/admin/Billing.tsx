@@ -40,7 +40,7 @@ export default function Billing() {
         body: JSON.stringify({ plan: planId }),
       });
       const data = await res.json();
-      setSubData(prev => ({ ...prev, subscription: data.subscription }));
+      setSubData((prev: Record<string, unknown>) => ({ ...prev, subscription: data.subscription }));
     } finally {
       setUpgrading(null);
     }
