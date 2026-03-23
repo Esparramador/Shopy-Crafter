@@ -26,7 +26,8 @@
   font-family: var(--l-fb);
   background: var(--l-ink);
   color: var(--l-t);
-  overflow-x: hidden;
+  overflow: hidden;
+  height: 100vh;
   line-height: 1.6;
   cursor: none;
   position: relative;
@@ -421,13 +422,13 @@
 .l-nav-active { color: var(--l-gold) !important; }
 
 /* FULLPAGE CONTAINER */
-.l-root { overflow: hidden; height: 100vh; }
 .fp-container {
-  position: fixed;
-  top: 64px; left: 0; right: 0; bottom: 0;
+  margin-top: 64px;
+  height: calc(100vh - 64px);
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 .fp-section {
   height: calc(100vh - 64px);
@@ -534,8 +535,7 @@
   font-weight: 600;
   pointer-events: none;
 }
-.fp-nav-dot:hover .fp-nav-dot-label,
-.fp-nav-dot.active .fp-nav-dot-label {
+.fp-nav-dot:hover .fp-nav-dot-label {
   opacity: 1;
   transform: translateX(0);
   color: var(--l-gold3);
@@ -589,7 +589,7 @@
 /* ── SCROLL HINT ── */
 .fp-scroll-hint {
   position: absolute;
-  bottom: 32px; left: 50%;
+  bottom: 56px; left: 50%;
   transform: translateX(-50%);
   text-align: center;
   z-index: 5;

@@ -97,7 +97,7 @@ export default function Landing() {
 
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
-        if (e.isIntersecting && (e.intersectionRatio ?? 0) > 0.4) {
+        if (e.isIntersecting && (e.intersectionRatio ?? 0) > 0.3) {
           const idx = sections.indexOf(e.target as HTMLElement);
           if (idx !== -1) {
             currentRef.current = idx;
@@ -106,9 +106,18 @@ export default function Landing() {
           }
         }
       });
-    }, { threshold: 0.5, root: container });
+    }, { threshold: [0.3, 0.5], root: container });
 
     sections.forEach(s => obs.observe(s));
+
+    // Trigger first section immediately — don't wait for scroll
+    const firstId = sections[0]?.id;
+    if (firstId) {
+      setAnimatedSections(prev => new Set([...prev, firstId]));
+      setCurrentSection(0);
+      currentRef.current = 0;
+    }
+
     return () => obs.disconnect();
   }, [content]);
 
