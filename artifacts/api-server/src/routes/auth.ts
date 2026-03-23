@@ -136,6 +136,47 @@ router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   res.json({ success: true, role: user.role, clientId: user.clientId });
 });
 
+// ─── CHANGE PASSWORD (autenticado) ───────────────────────────────────────────
+router.post("/change-password", requireAuth, async (req, res): Promise<void> => {
+  const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Contraseña actual y nueva son obligatorias" });
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "La nueva contraseña debe tener al menos 8 caracteres" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+
+  if (!user) {
+    res.status(404).json({ error: "Usuario no encontrado" });
+    return;
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) {
+    res.status(401).json({ error: "La contraseña actual no es correcta" });
+    return;
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 12);
+  await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, user.id));
+
+  await db.insert(auditLogTable).values({
+    id: randomBytes(16).toString("hex"),
+    userId: user.id,
+    action: "password_changed",
+    details: "Contraseña cambiada por el usuario",
+    ipAddress: req.ip ?? "unknown",
+  });
+
+  res.json({ success: true, message: "Contraseña actualizada correctamente" });
+});
+
 // ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
 router.post("/forgot-password", async (req, res): Promise<void> => {
   const { email } = req.body as { email: string };

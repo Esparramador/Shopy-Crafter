@@ -37,6 +37,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/Login";
 import InviteSetupPage from "@/pages/InviteSetup";
 import AdminClients from "@/pages/AdminClients";
+import AdminSettings from "@/pages/admin/AdminSettings";
 
 import ClientDashboard from "@/pages/client/ClientDashboard";
 import ClientApprovals from "@/pages/client/ClientApprovals";
@@ -253,6 +254,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><Emails /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/settings">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><AdminSettings /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

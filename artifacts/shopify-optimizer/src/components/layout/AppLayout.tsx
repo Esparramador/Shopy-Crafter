@@ -196,6 +196,17 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <p className="client-name">{user.name}</p>
                 <p className="client-domain">Administrador</p>
               </div>
+              <Link href="/admin/settings" title="Ajustes de cuenta" aria-label="Ajustes de cuenta">
+                <div style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: location === "/admin/settings" ? "var(--gold2)" : "var(--t3)",
+                  padding: 4, borderRadius: 4,
+                  transition: "color 0.15s", flexShrink: 0,
+                  display: "flex", alignItems: "center",
+                }}>
+                  <Settings size={13} />
+                </div>
+              </Link>
               <button
                 onClick={toggleDarkMode}
                 title={darkMode ? "Modo claro" : "Modo oscuro"}
