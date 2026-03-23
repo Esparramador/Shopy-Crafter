@@ -30,10 +30,10 @@ export default function ClientMessages() {
   const load = () => {
     fetch(`${API_BASE}/api/client/messages`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setMessages(d); setLoading(false); });
+      .then((d) => { setMessages(Array.isArray(d) ? d : []); setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const send = async () => {
@@ -52,73 +52,123 @@ export default function ClientMessages() {
 
   return (
     <ClientLayout>
-      <div className="max-w-2xl flex flex-col h-[calc(100vh-8rem)]">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-white">Mensajes</h1>
-          <p className="text-white/40 text-sm mt-1">Comunicación directa con tu agencia.</p>
+      <div style={{ maxWidth: 680, display: "flex", flexDirection: "column", height: "calc(100vh - 8rem)" }}>
+        {/* Header */}
+        <div style={{ marginBottom: 16 }}>
+          <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 4 }}>
+            Mensajes
+          </h1>
+          <p style={{ fontSize: 12, color: "var(--t3)" }}>Comunicación directa con tu agencia.</p>
         </div>
 
-        <div className="flex-1 bg-white/5 border border-white/8 rounded-2xl overflow-hidden flex flex-col">
+        {/* Chat container */}
+        <div style={{
+          flex: 1, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 14,
+          overflow: "hidden", display: "flex", flexDirection: "column",
+        }}>
           {/* Agency header */}
-          <div className="px-5 py-3 border-b border-white/5 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#5b4eff]/20 border border-[#5b4eff]/30 flex items-center justify-center text-sm font-bold text-[#5b4eff]">A</div>
+          <div style={{
+            padding: "12px 16px", borderBottom: "1px solid var(--bdr)",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 14, fontWeight: 800, color: "#0a0a14", flexShrink: 0,
+            }}>
+              A
+            </div>
             <div>
-              <p className="text-sm font-semibold text-white">Tu Agencia</p>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                <p className="text-xs text-white/40">En línea</p>
+              <p style={{ fontSize: 13, fontWeight: 700 }}>Tu Agencia</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div className="status-pulse" style={{ width: 5, height: 5, background: "var(--jade)", flexShrink: 0 }} />
+                <p style={{ fontSize: 11, color: "var(--t3)" }}>En línea · Respuesta en &lt;24h</p>
               </div>
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* Messages area */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px" }}>
             {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <Loader2 className="w-6 h-6 animate-spin text-[#5b4eff]" />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 120 }}>
+                <Loader2 size={22} style={{ color: "var(--gold)", animation: "spin 0.6s linear infinite" }} />
               </div>
             ) : messages.length === 0 ? (
-              <div className="text-center py-12 text-white/30 text-sm">
-                No hay mensajes aún. ¡Escribe a tu agencia!
+              <div style={{ textAlign: "center", padding: "40px 0" }}>
+                <p style={{ fontSize: 28, marginBottom: 10 }}>💬</p>
+                <p style={{ fontSize: 13, color: "var(--t3)" }}>No hay mensajes aún. ¡Escribe a tu agencia!</p>
               </div>
             ) : (
-              messages.map((msg) => {
-                const isOwn = msg.fromRole === "client";
-                return (
-                  <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-xs md:max-w-sm ${isOwn ? "order-2" : "order-1"}`}>
-                      {!isOwn && (
-                        <p className="text-xs text-white/30 mb-1 ml-1">{msg.fromName}</p>
-                      )}
-                      <div className={`rounded-2xl px-4 py-2.5 text-sm ${isOwn ? "bg-[#5b4eff] text-white rounded-tr-md" : "bg-white/10 text-white/80 rounded-tl-md"}`}>
-                        {msg.content}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {messages.map((msg) => {
+                  const isOwn = msg.fromRole === "client";
+                  return (
+                    <div key={msg.id} style={{ display: "flex", justifyContent: isOwn ? "flex-end" : "flex-start" }}>
+                      <div style={{ maxWidth: "72%" }}>
+                        {!isOwn && (
+                          <p style={{ fontSize: 10, color: "var(--t3)", marginBottom: 3, marginLeft: 2 }}>{msg.fromName}</p>
+                        )}
+                        <div style={{
+                          padding: "9px 13px", borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                          background: isOwn
+                            ? "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)"
+                            : "var(--ink3)",
+                          border: isOwn ? "none" : "1px solid var(--bdr)",
+                          fontSize: 13.5,
+                          color: isOwn ? "#0a0a14" : "var(--t1)",
+                          fontWeight: isOwn ? 500 : 400,
+                          lineHeight: 1.5,
+                        }}>
+                          {msg.content}
+                        </div>
+                        <p style={{
+                          fontSize: 10, color: "var(--t3)", marginTop: 3,
+                          textAlign: isOwn ? "right" : "left",
+                          marginLeft: isOwn ? 0 : 2, marginRight: isOwn ? 2 : 0,
+                        }}>
+                          {formatTime(msg.createdAt)}
+                        </p>
                       </div>
-                      <p className={`text-xs text-white/20 mt-1 ${isOwn ? "text-right" : "text-left"} mx-1`}>
-                        {formatTime(msg.createdAt)}
-                      </p>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+                <div ref={bottomRef} />
+              </div>
             )}
-            <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="px-4 py-3 border-t border-white/5 flex gap-3">
+          {/* Input area */}
+          <div style={{
+            padding: "10px 12px", borderTop: "1px solid var(--bdr)",
+            display: "flex", gap: 10, alignItems: "center",
+          }}>
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
               placeholder="Escribe tu mensaje..."
-              className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20 transition-colors"
+              style={{
+                flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid var(--bdr)",
+                borderRadius: 10, padding: "10px 14px", fontSize: 13.5, color: "var(--t1)",
+                outline: "none", transition: "border-color 0.15s",
+              }}
+              onFocus={(e) => { e.target.style.borderColor = "var(--gold)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--bdr)"; }}
             />
             <button
               onClick={send}
               disabled={sending || !text.trim()}
-              className="w-10 h-10 bg-[#5b4eff] text-white rounded-xl flex items-center justify-center hover:bg-[#4a3ef0] disabled:opacity-60 transition-all flex-shrink-0"
+              style={{
+                width: 40, height: 40, borderRadius: 10, border: "none",
+                background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
+                color: "#0a0a14", cursor: sending || !text.trim() ? "not-allowed" : "pointer",
+                opacity: sending || !text.trim() ? 0.5 : 1,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, transition: "opacity 0.15s",
+              }}
             >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {sending ? <Loader2 size={15} style={{ animation: "spin 0.6s linear infinite" }} /> : <Send size={15} />}
             </button>
           </div>
         </div>

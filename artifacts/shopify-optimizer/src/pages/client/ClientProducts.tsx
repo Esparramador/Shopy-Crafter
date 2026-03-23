@@ -14,7 +14,7 @@ interface Product {
 }
 
 const GRADE_COLORS: Record<string, string> = {
-  A: "#00d68f", B: "#00b4d8", C: "#ffd32a", D: "#ff8c42", F: "#ff4757",
+  A: "var(--jade)", B: "var(--sky)", C: "var(--amber)", D: "#ff8c42", F: "var(--crim)",
 };
 
 export default function ClientProducts() {
@@ -24,15 +24,15 @@ export default function ClientProducts() {
   useEffect(() => {
     fetch(`${API_BASE}/api/client/products`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setProducts(d); setLoading(false); })
+      .then((d) => { setProducts(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
       <ClientLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#5b4eff]" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 240 }}>
+          <Loader2 size={26} style={{ color: "var(--gold)", animation: "spin 0.6s linear infinite" }} />
         </div>
       </ClientLayout>
     );
@@ -40,54 +40,73 @@ export default function ClientProducts() {
 
   return (
     <ClientLayout>
-      <div className="max-w-4xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">Tus Productos</h1>
-          <p className="text-white/40 text-sm mt-1">
+      <div style={{ maxWidth: 960 }}>
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 4 }}>
+            Tus Productos
+          </h1>
+          <p style={{ fontSize: 12, color: "var(--t3)" }}>
             {products.length} productos en tu catálogo, ordenados por score de calidad.
           </p>
         </div>
 
         {products.length === 0 ? (
-          <div className="bg-white/5 border border-white/8 rounded-2xl p-12 text-center">
-            <Package className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white font-semibold">Sin productos todavía</p>
-            <p className="text-white/40 text-sm mt-1">Tu agencia aún no ha sincronizado tu catálogo.</p>
+          <div className="card empty-state">
+            <div className="empty-icon">📦</div>
+            <p className="empty-title">Sin productos todavía</p>
+            <p className="empty-desc">Tu agencia aún no ha sincronizado tu catálogo.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
             {products.map((p) => {
               const img = Array.isArray(p.images) ? p.images[0] : null;
-              const color = p.auditGrade ? GRADE_COLORS[p.auditGrade] ?? "#666" : "#666";
+              const gradeColor = p.auditGrade ? GRADE_COLORS[p.auditGrade] ?? "var(--t3)" : "var(--t3)";
               return (
-                <div key={p.id} className="bg-white/5 border border-white/8 rounded-2xl overflow-hidden">
-                  <div className="aspect-square bg-black/20 relative">
+                <div key={p.id} className="card" style={{ padding: 0, overflow: "hidden" }}>
+                  {/* Image */}
+                  <div style={{ aspectRatio: "1/1", background: "var(--ink3)", position: "relative" }}>
                     {img ? (
-                      <img src={img} alt={p.title} className="w-full h-full object-cover" />
+                      <img src={img} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-12 h-12 text-white/10" />
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Package size={36} style={{ color: "var(--t3)", opacity: 0.3 }} />
                       </div>
                     )}
                     {p.auditGrade && (
-                      <div
-                        className="absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-black"
-                        style={{ backgroundColor: color }}
-                      >
+                      <div style={{
+                        position: "absolute", top: 10, right: 10,
+                        width: 30, height: 30, borderRadius: 8,
+                        background: gradeColor, color: "#0a0a14",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 800,
+                      }}>
                         {p.auditGrade}
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-white truncate">{p.title}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-lg font-bold text-white">
+
+                  {/* Info */}
+                  <div style={{ padding: "12px 14px" }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.title}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: "var(--gold2)" }}>
                         {p.price ? `€${parseFloat(p.price).toFixed(2)}` : "–"}
                       </span>
                       {p.auditScore != null && (
-                        <span className="text-xs text-white/40">{p.auditScore}/100</span>
+                        <span style={{ fontSize: 11, color: "var(--t3)" }}>{p.auditScore}/100</span>
                       )}
                     </div>
+                    {p.auditScore != null && (
+                      <div style={{ marginTop: 8, height: 3, background: "var(--ink3)", borderRadius: 2 }}>
+                        <div style={{
+                          height: "100%", width: `${p.auditScore}%`, borderRadius: 2,
+                          background: gradeColor, transition: "width 0.3s",
+                        }} />
+                      </div>
+                    )}
                   </div>
                 </div>
               );

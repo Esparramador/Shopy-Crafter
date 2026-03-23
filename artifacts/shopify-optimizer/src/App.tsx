@@ -133,11 +133,17 @@ function AdminWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AdminOnlyExtras() {
+  const { user } = useAuth();
+  if (!user || user.role !== "admin") return null;
+  return <CommandPalette />;
+}
+
 function Router() {
   return (
     <>
       <ImpersonationBanner />
-      <CommandPalette />
+      <AdminOnlyExtras />
       <Switch>
         {/* Public */}
         <Route path="/login" component={LoginPage} />
