@@ -62,13 +62,20 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           {/* Admin-only links */}
-          <div className="mb-4">
+          <div className="mb-4 space-y-1">
             <Link
               href="/admin/clients"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-muted-foreground hover:bg-white/5 hover:text-foreground group"
             >
               <Users className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
               <span>Gestión de Clientes</span>
+            </Link>
+            <Link
+              href="/admin/cms"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-muted-foreground hover:bg-white/5 hover:text-foreground group"
+            >
+              <span className="text-base">⚡</span>
+              <span>Editor de Landing</span>
             </Link>
           </div>
 

@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 
 import Home from "@/pages/Home";
+import Landing from "@/pages/Landing";
+import CMSEditor from "@/pages/admin/CMSEditor";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
 import ImagesPage from "@/pages/projects/Images";
@@ -50,7 +52,7 @@ function RequireClient({ children }: { children: React.ReactNode }) {
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen bg-[#08080f] flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#5b4eff] animate-spin" /></div>;
-  if (!user) return <Redirect to="/login" />;
+  if (!user) return <Landing />;
   if (user.role === "client") return <Redirect to="/client" />;
   return <Home />;
 }
@@ -94,6 +96,9 @@ function Router() {
         {/* Admin routes */}
         <Route path="/admin/clients">
           <RequireAdmin><AdminClients /></RequireAdmin>
+        </Route>
+        <Route path="/admin/cms">
+          <RequireAdmin><CMSEditor /></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/audit">

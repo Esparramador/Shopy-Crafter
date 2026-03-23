@@ -88,6 +88,47 @@ artifacts-monorepo/
 6. **Pricing** — COGS calculator + Claude pricing optimization + margin waterfall
 7. **SEO** — Meta generation, schema markup, alt texts, keyword intelligence, blog strategy
 
+## Landing Page & Visual CMS
+
+**Landing pública** (`/`) — Visible para usuarios no autenticados. Identidad visual premium:
+- Tipografía: **Instrument Serif** (titulares elegantes) + **Geist** (UI técnica) + **Geist Mono** (tags)
+- Paleta: dorado `#c8a84b` / `#e6c668` sobre negro profundo `#080810`
+- Textura de ruido sutil (SVG filter, opacity 0.022)
+- Cursor personalizado con anillo de seguimiento fluido (inercia 0.12)
+- Nav transparente → glass con blur al hacer scroll
+- Hero: grid SVG, orbs flotantes, gradientes radiales, dashboard preview real
+- Marquee de tecnologías con fade en extremos
+- 6 motores IA en grid con hover effect + top-line dorada
+- Stats con números grandes en Instrument Serif con gradient dorado
+- How it works con barra de progreso animada (IntersectionObserver)
+- Pricing con badge "MÁS POPULAR", top-line gold, feature list check/cross
+- Testimoniales con métricas de impacto y avatares
+- CTA final con campo de email
+- Footer 4 columnas con badges legales (RGPD, AES-256, SOC2)
+
+**CMS Visual** (`/admin/cms`) — Editor split-panel (solo admin):
+- Panel izquierdo (320px): árbol de contenido + editores de campo por tipo
+- Panel derecho: iframe live preview de la landing
+- Tipos de campo: texto, textarea, color picker, toggle boolean
+- IA por campo: botón "✨ IA" abre popover con Claude → presets + instrucción personalizada
+- Historial de versiones: 30 snapshots, restauración 1 clic
+- Reset a defaults
+- Auto-broadcast SSE a todas las pestañas abiertas
+- Saves batch via `POST /api/cms/content/batch`
+
+**CMS Backend** (`/api/cms/*`):
+- `GET /api/cms/content` — Público, sin auth requerida
+- `PATCH /api/cms/content` — Requiere admin (path + value)
+- `POST /api/cms/content/batch` — Requiere admin (array de cambios)
+- `POST /api/cms/content/reset` — Restaura defaults
+- `POST /api/cms/media/upload` — Multipart, sharp → WebP, max 5MB
+- `GET /api/cms/versions` — Historial últimas 30 versiones
+- `POST /api/cms/versions/:id/restore` — Restaura versión
+- `POST /api/cms/ai/improve` — Claude mejora texto con instrucción
+- `GET /api/cms/events` — SSE stream de cambios en tiempo real
+- Contenido almacenado en PostgreSQL (`cms_content` + `cms_versions` tables)
+- Media guardada en `artifacts/shopify-optimizer/public/media/` como WebP
+
 ## Auth Architecture
 
 - **Session**: `express-session` + `connect-pg-simple` (table: `user_sessions`), 8h maxAge, httpOnly cookie

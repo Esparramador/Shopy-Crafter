@@ -12,7 +12,8 @@ import consistencyRouter from "./consistency.js";
 import authRouter from "./auth.js";
 import adminRouter from "./admin.js";
 import clientRouter from "./client.js";
-import { requireAuth } from "../lib/auth.js";
+import cmsRouter from "./cms.js";
+import { requireAuth, requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
@@ -20,6 +21,11 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/client", clientRouter);
+router.use("/cms/content", (req, res, next) => {
+  if (req.method === "GET") return next();
+  return requireAdmin(req, res, next);
+});
+router.use("/cms", cmsRouter);
 
 router.use(requireAuth);
 router.use(projectsRouter);
