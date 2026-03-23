@@ -72,8 +72,9 @@ const aiLimiter = rateLimit({
 });
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+// 50mb to support up to 5 base64-encoded high-res images in reference analysis
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ── Session ───────────────────────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;

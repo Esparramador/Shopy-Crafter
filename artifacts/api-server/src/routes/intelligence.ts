@@ -18,7 +18,7 @@ async function scrapeUrl(url: string): Promise<{ html: string; title: string; de
         "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
         "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return { html: "", title: "", description: "", keywords: "", jsonLd: "" };
     const html = await res.text();

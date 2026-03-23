@@ -150,6 +150,17 @@ function Router() {
           <HomeRedirect />
         </Route>
 
+        {/* Admin base redirects — /admin → home, /admin/projects → home */}
+        <Route path="/admin">
+          <RequireAdmin><Redirect to="/admin/shopybrain" /></RequireAdmin>
+        </Route>
+        <Route path="/admin/projects">
+          <RequireAdmin><Redirect to="/" /></RequireAdmin>
+        </Route>
+        <Route path="/dashboard">
+          <RequireAdmin><Redirect to="/" /></RequireAdmin>
+        </Route>
+
         {/* Admin routes */}
         <Route path="/new-project">
           <RequireAdmin>

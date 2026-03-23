@@ -4,10 +4,12 @@ import { projectsTable, productsTable, generationJobsTable } from "@workspace/db
 import { saveToVault } from "../lib/vault.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson, askClaudeWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaude, askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
+
+// ── Constants ───────────────────────────────────────────────────────────────
 
 const MODEL_MAP: Record<string, string> = {
   hero: "black-forest-labs/flux-1.1-pro",
@@ -27,7 +29,26 @@ const COST_MAP: Record<string, number> = {
   svg_only: 0,
 };
 
-const NEGATIVE_PROMPT = "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs, wrong product, unrelated object, flowers on non-flower product, animals on non-animal product, food on non-food product, random decorations unrelated to subject";
+const NEGATIVE_PROMPT =
+  "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs, wrong product, unrelated object, flowers on non-flower product, animals on non-animal product, food on non-food product, random decorations unrelated to subject";
+
+// Replicate can take up to 3 minutes for complex models — allow 5 min max
+const REPLICATE_TIMEOUT_MS = 5 * 60_000;
+// Fetching generated image to upload to Shopify
+const FETCH_IMAGE_TIMEOUT_MS = 30_000;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Wraps a promise with a maximum timeout.
+ * Rejects with a descriptive Error if the operation exceeds the limit.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Operation timed out after ${ms / 1000}s: ${label}`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
 
 async function buildImagePrompt(
   projectId: number,
@@ -77,11 +98,107 @@ async function buildImagePrompt(
 
   const config = typeConfigs[imageType] ?? typeConfigs.hero;
   const BASE_QUALITY = "professional product photography, commercial quality, sharp focus, high resolution 4k";
-
   const subjectAnchor = `SUBJECT: ${productTitle}${productType ? ` (${productType})` : ""}`;
 
   return `${config.prefix} ${subjectAnchor}, ${config.scene}, niche: ${storeNiche ?? "e-commerce"}, brand tone: ${brandTone ?? "professional"}, ${BASE_QUALITY}, ${config.suffix}`;
 }
+
+/**
+ * Core image generation logic — shared by single and bulk generators.
+ * Handles Replicate call with proper timeout, DB updates, vault save, and learning.
+ */
+async function runImageGeneration(params: {
+  job: { id: number };
+  projectId: number;
+  shopifyProductId: string;
+  imageType: string;
+  finalPrompt: string;
+  model: string;
+  estimatedCost: number;
+  product: { title: string; productType: string | null };
+  project: { storeNiche: string | null; brandTone: string | null; replicateApiToken: string | null };
+}): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
+  const { job, projectId, shopifyProductId, imageType, finalPrompt, model, estimatedCost, product, project } = params;
+
+  await db.update(generationJobsTable).set({ status: "generating" }).where(eq(generationJobsTable.id, job.id));
+
+  if (!project.replicateApiToken) {
+    const msg = "No hay Replicate API token configurado en el proyecto";
+    await db.update(generationJobsTable)
+      .set({ status: "failed", errorMessage: msg })
+      .where(eq(generationJobsTable.id, job.id));
+    return { success: false, error: msg };
+  }
+
+  try {
+    const Replicate = (await import("replicate")).default;
+    const { safeDecrypt } = await import("../lib/crypto.js");
+    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicate = new Replicate({ auth: replicateToken });
+
+    let runPromise: Promise<unknown>;
+    if (model.includes("flux-1.1-pro")) {
+      runPromise = replicate.run(model as `${string}/${string}`, {
+        input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
+      });
+    } else if (model.includes("recraft")) {
+      runPromise = replicate.run(model as `${string}/${string}`, {
+        input: { prompt: finalPrompt, size: "1365x1365", style: "realistic_image" },
+      });
+    } else {
+      runPromise = replicate.run(model as `${string}/${string}`, {
+        input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
+      });
+    }
+
+    // ── Replicate timeout (5 minutes) ───────────────────────────────────────
+    const output = await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model}`);
+    const imageUrl = Array.isArray(output) ? (output[0] as string) : (output as string);
+
+    const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
+    const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
+
+    await db.update(generationJobsTable)
+      .set({ status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() })
+      .where(eq(generationJobsTable.id, job.id));
+
+    // Auto-guardar en el vault del proyecto
+    await saveToVault({
+      projectId,
+      fileType: "image",
+      category: imageType,
+      title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} — ${product.title}`,
+      description: altText.slice(0, 125),
+      originalUrl: imageUrl,
+      mimeType: "image/png",
+      productId: shopifyProductId,
+      productTitle: product.title,
+      generatedBy: "images_motor",
+      metadata: { model, prompt: finalPrompt, jobId: job.id, estimatedCost },
+    });
+
+    // ShopyBrain aprende del prompt de imagen exitoso (fire-and-forget)
+    learnFromOperation({
+      operationType: "images",
+      niche: project.storeNiche ?? null,
+      productType: product.productType ?? null,
+      title: `Imagen ${imageType} exitosa: ${product.title}`,
+      content: `Tipo: ${imageType}\nProducto: ${product.title}\nModelo: ${model}\nPrompt: ${finalPrompt.slice(0, 500)}\nAlt text: ${altText.slice(0, 125)}`,
+      confidence: 0.70,
+      tags: [imageType, project.storeNiche ?? "ecommerce", product.productType ?? "producto"].filter(Boolean),
+    });
+
+    return { success: true, imageUrl };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    await db.update(generationJobsTable)
+      .set({ status: "failed", errorMessage: msg })
+      .where(eq(generationJobsTable.id, job.id));
+    return { success: false, error: msg };
+  }
+}
+
+// ── Routes ────────────────────────────────────────────────────────────────────
 
 router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
@@ -103,12 +220,7 @@ router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise
   const estimatedTime = model.includes("flux-dev") ? 20 : model.includes("recraft") ? 15 : 10;
 
   const prompt = await buildImagePrompt(
-    projectId,
-    product.title,
-    product.productType,
-    imageType,
-    project.storeNiche,
-    project.brandTone
+    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone
   );
 
   const modelReasons: Record<string, string> = {
@@ -131,6 +243,8 @@ router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise
   });
 });
 
+// ── Single image generation ──────────────────────────────────────────────────
+
 router.post("/projects/:projectId/products/:productId/images/generate", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
@@ -151,12 +265,7 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
   const estimatedCost = COST_MAP[model] ?? 0.04;
 
   const finalPrompt = customPrompt ?? await buildImagePrompt(
-    projectId,
-    product.title,
-    product.productType,
-    imageType,
-    project.storeNiche,
-    project.brandTone
+    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone
   );
 
   const [job] = await db.insert(generationJobsTable).values({
@@ -170,83 +279,9 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
     estimatedCost,
   }).returning();
 
-  const jobId = String(job.id);
-
-  runAsync(async () => {
-    await db.update(generationJobsTable).set({ status: "generating" }).where(eq(generationJobsTable.id, job.id));
-
-    if (!project.replicateApiToken) {
-      await db.update(generationJobsTable)
-        .set({ status: "failed", errorMessage: "No hay Replicate API token configurado en el proyecto" })
-        .where(eq(generationJobsTable.id, job.id));
-      return;
-    }
-
-    try {
-      const Replicate = (await import("replicate")).default;
-      const { safeDecrypt } = await import("../lib/crypto.js");
-      const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
-      const replicate = new Replicate({ auth: replicateToken });
-
-      let output: unknown;
-      if (model.includes("flux-1.1-pro")) {
-        output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
-        });
-      } else if (model.includes("recraft")) {
-        output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, size: "1365x1365", style: "realistic_image" },
-        });
-      } else {
-        output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
-        });
-      }
-
-      const imageUrl = Array.isArray(output) ? (output[0] as string) : (output as string);
-
-      const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
-      const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
-
-      await db.update(generationJobsTable)
-        .set({ status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() })
-        .where(eq(generationJobsTable.id, job.id));
-
-      // Auto-guardar en el vault del proyecto
-      await saveToVault({
-        projectId,
-        fileType: "image",
-        category: imageType,
-        title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} — ${product.title}`,
-        description: altText.slice(0, 125),
-        originalUrl: imageUrl,
-        mimeType: "image/png",
-        productId: shopifyProductId,
-        productTitle: product.title,
-        generatedBy: "images_motor",
-        metadata: { model, prompt: finalPrompt, jobId: job.id, estimatedCost },
-      });
-
-      // ShopyBrain aprende del prompt de imagen exitoso (fire-and-forget)
-      learnFromOperation({
-        operationType: "images",
-        niche: project.storeNiche ?? null,
-        productType: product.productType ?? null,
-        title: `Imagen ${imageType} exitosa: ${product.title}`,
-        content: `Tipo: ${imageType}\nProducto: ${product.title}\nModelo: ${model}\nPrompt: ${finalPrompt.slice(0, 500)}\nAlt text: ${altText.slice(0, 125)}`,
-        confidence: 0.70,
-        tags: [imageType, project.storeNiche ?? "ecommerce", product.productType ?? "producto"].filter(Boolean),
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      await db.update(generationJobsTable)
-        .set({ status: "failed", errorMessage: msg })
-        .where(eq(generationJobsTable.id, job.id));
-    }
-  });
-
+  // Respond immediately with job ID — client polls for completion
   res.json({
-    id: jobId,
+    id: String(job.id),
     projectId,
     productId: shopifyProductId,
     imageType,
@@ -261,7 +296,24 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
     createdAt: job.createdAt.toISOString(),
     completedAt: null,
   });
+
+  // Run generation in background — fully async
+  runAsync(() =>
+    runImageGeneration({
+      job,
+      projectId,
+      shopifyProductId,
+      imageType,
+      finalPrompt,
+      model,
+      estimatedCost,
+      product: { title: product.title, productType: product.productType },
+      project: { storeNiche: project.storeNiche, brandTone: project.brandTone, replicateApiToken: project.replicateApiToken },
+    }).then(() => {})
+  );
 });
+
+// ── Poll job status ──────────────────────────────────────────────────────────
 
 router.get("/projects/:projectId/generation-jobs/:jobId", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
@@ -296,6 +348,8 @@ router.get("/projects/:projectId/generation-jobs/:jobId", async (req, res): Prom
   });
 });
 
+// ── Upload generated image to Shopify ────────────────────────────────────────
+
 router.post("/projects/:projectId/products/:productId/images/:imageId/upload-to-shopify", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
@@ -309,7 +363,16 @@ router.post("/projects/:projectId/products/:productId/images/:imageId/upload-to-
     return;
   }
 
-  const imgResp = await fetch(job.imageUrl);
+  // ── Fetch generated image with timeout ──────────────────────────────────
+  const imgResp = await fetch(job.imageUrl, {
+    signal: AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS),
+  });
+
+  if (!imgResp.ok) {
+    res.status(502).json({ error: `No se pudo descargar la imagen generada (${imgResp.status})` });
+    return;
+  }
+
   const buffer = await imgResp.arrayBuffer();
   const base64 = Buffer.from(buffer).toString("base64");
 
@@ -331,6 +394,8 @@ router.post("/projects/:projectId/products/:productId/images/:imageId/upload-to-
 
   res.json({ success: true, message: "Imagen subida a Shopify correctamente" });
 });
+
+// ── SVG Infographic ──────────────────────────────────────────────────────────
 
 router.post("/projects/:projectId/products/:productId/images/generate-infographic", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
@@ -365,9 +430,16 @@ Devuelve SOLO el SVG completo, sin markdown, sin explicaciones. Empieza con <svg
   res.json({ svgContent: cleanSvg, pngBase64: null, uploaded: false });
 });
 
+// ── Bulk image generation (FIXED: actually runs Replicate per product) ───────
+
 router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const { productIds, imageTypes } = req.body as { productIds: string[]; imageTypes: string[] };
+
+  if (!productIds?.length || !imageTypes?.length) {
+    res.status(400).json({ error: "Se requiere al menos un producto y un tipo de imagen" });
+    return;
+  }
 
   const totalItems = productIds.length * imageTypes.length;
   const jobId = await createBulkJob(projectId, "bulk_image_generation", totalItems);
@@ -379,7 +451,19 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
     message: `Generando ${totalItems} imágenes para ${productIds.length} productos...`,
   });
 
+  // ── Background: actually generate each image ──────────────────────────────
   runAsync(async () => {
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) {
+      await completeJob(jobId, { error: "Proyecto no encontrado" });
+      return;
+    }
+
+    if (!project.replicateApiToken) {
+      await completeJob(jobId, { error: "No hay Replicate API token configurado" });
+      return;
+    }
+
     let completed = 0;
     let failed = 0;
 
@@ -389,32 +473,70 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
         .from(productsTable)
         .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, productId)));
 
-      for (const imageType of imageTypes) {
-        try {
-          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-          const model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
-          const prompt = await buildImagePrompt(projectId, product?.title ?? productId, product?.productType ?? null, imageType, project?.storeNiche ?? null, project?.brandTone ?? null);
+      if (!product) {
+        failed += imageTypes.length;
+        await updateJobProgress(jobId, completed, failed, `✗ Producto ${productId} no encontrado`);
+        continue;
+      }
 
-          await db.insert(generationJobsTable).values({
+      for (const imageType of imageTypes) {
+        const model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
+        const estimatedCost = COST_MAP[model] ?? 0.04;
+
+        try {
+          const finalPrompt = await buildImagePrompt(
+            projectId, product.title, product.productType, imageType,
+            project.storeNiche, project.brandTone
+          );
+
+          // Insert the job record
+          const [genJob] = await db.insert(generationJobsTable).values({
             projectId,
             shopifyProductId: productId,
             imageType,
             status: "pending",
-            prompt,
+            prompt: finalPrompt,
+            negativePrompt: NEGATIVE_PROMPT,
             model,
-            estimatedCost: COST_MAP[model] ?? 0.04,
+            estimatedCost,
+          }).returning();
+
+          // Actually run Replicate generation
+          const result = await runImageGeneration({
+            job: genJob,
+            projectId,
+            shopifyProductId: productId,
+            imageType,
+            finalPrompt,
+            model,
+            estimatedCost,
+            product: { title: product.title, productType: product.productType },
+            project: {
+              storeNiche: project.storeNiche,
+              brandTone: project.brandTone,
+              replicateApiToken: project.replicateApiToken,
+            },
           });
-          completed++;
-          await updateJobProgress(jobId, completed, failed, `✓ ${product?.title} — ${imageType}`);
+
+          if (result.success) {
+            completed++;
+            await updateJobProgress(jobId, completed, failed, `✓ ${product.title} — ${imageType}`);
+          } else {
+            failed++;
+            await updateJobProgress(jobId, completed, failed, `✗ ${product.title} — ${imageType}: ${result.error}`);
+          }
         } catch (err) {
           failed++;
-          const msg = err instanceof Error ? err.message : "Error";
-          await updateJobProgress(jobId, completed, failed, `✗ ${productId} — ${imageType}: ${msg}`);
+          const msg = err instanceof Error ? err.message : "Error desconocido";
+          await updateJobProgress(jobId, completed, failed, `✗ ${product.title} — ${imageType}: ${msg}`);
         }
-        await new Promise((r) => setTimeout(r, 300));
+
+        // Small delay between Replicate calls to avoid rate limiting
+        await new Promise((r) => setTimeout(r, 500));
       }
     }
-    await completeJob(jobId, { completed, failed });
+
+    await completeJob(jobId, { completed, failed, total: totalItems });
   });
 });
 

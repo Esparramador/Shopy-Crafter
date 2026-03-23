@@ -4,6 +4,9 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { safeDecrypt } from "./crypto.js";
 
+const SHOPIFY_FETCH_TIMEOUT = 30_000; // 30 seconds per Shopify API call
+const TOKEN_REFRESH_TIMEOUT = 15_000; // 15 seconds for token operations
+
 export async function getShopifyHeaders(projectId: number): Promise<Record<string, string>> {
   const [project] = await db
     .select()
@@ -46,6 +49,7 @@ export async function refreshToken(
       client_id: clientId,
       client_secret: clientSecret,
     }),
+    signal: AbortSignal.timeout(TOKEN_REFRESH_TIMEOUT),
   });
 
   if (!resp.ok) {
@@ -57,14 +61,14 @@ export async function refreshToken(
   const token = data.access_token;
 
   const expiresIn = data.expires_in ?? 3600;
-  const expiresAt = new Date(Date.now() + expiresIn * 1000);
+  const expiresAtDate = new Date(Date.now() + expiresIn * 1000);
 
   await db
     .update(projectsTable)
-    .set({ accessToken: token, tokenExpiresAt: expiresAt })
+    .set({ accessToken: token, tokenExpiresAt: expiresAtDate })
     .where(eq(projectsTable.id, projectId));
 
-  logger.info({ projectId, expiresAt }, "Token refreshed successfully");
+  logger.info({ projectId, expiresAt: expiresAtDate }, "Token refreshed successfully");
   return token;
 }
 
@@ -81,13 +85,18 @@ export async function shopifyRequest<T>(
   const resp = await fetch(url, {
     ...options,
     headers: { ...headers, ...(options.headers as Record<string, string> || {}) },
+    signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
   });
 
   if (resp.status === 401) {
     logger.warn({ projectId, url }, "Shopify 401 — attempting token refresh");
     const newToken = await refreshToken(projectId, shopDomain, "", "");
     const retryHeaders = { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" };
-    const retryResp = await fetch(url, { ...options, headers: retryHeaders });
+    const retryResp = await fetch(url, {
+      ...options,
+      headers: retryHeaders,
+      signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+    });
     if (!retryResp.ok) {
       throw new Error(`Shopify API error ${retryResp.status} at ${path}`);
     }
