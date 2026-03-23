@@ -189,15 +189,15 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
       let output: unknown;
       if (model.includes("flux-1.1-pro")) {
         output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1024, height: 1024, num_outputs: 1, output_format: "webp", output_quality: 95 },
+          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
         });
       } else if (model.includes("recraft")) {
         output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, size: "1024x1024", style: "realistic_image" },
+          input: { prompt: finalPrompt, size: "1365x1365", style: "realistic_image" },
         });
       } else {
         output = await replicate.run(model as `${string}/${string}`, {
-          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1024, height: 1024, num_inference_steps: 28, guidance_scale: 3.5, output_format: "webp" },
+          input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
         });
       }
 
@@ -218,7 +218,7 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
         title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} — ${product.title}`,
         description: altText.slice(0, 125),
         originalUrl: imageUrl,
-        mimeType: "image/webp",
+        mimeType: "image/png",
         productId: shopifyProductId,
         productTitle: product.title,
         generatedBy: "images_motor",

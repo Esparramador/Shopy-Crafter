@@ -5,6 +5,7 @@ import { eq, and, lte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -92,6 +93,33 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
     photoBrief: result.photo_brief,
     priceReasoning: result.price_reasoning,
   });
+
+  // Auto-guardar en vault: informe de rediseño completo
+  saveToVault({
+    projectId,
+    fileType: "redesign",
+    category: "full_redesign",
+    title: `Rediseño — ${product.title}`,
+    description: `Nuevo título: ${result.title} · Precio: €${result.price}`,
+    mimeType: "application/json",
+    productId: shopifyProductId,
+    productTitle: product.title,
+    generatedBy: "redesign_motor",
+    metadata: {
+      originalTitle: product.title,
+      originalPrice: product.price,
+      newTitle: result.title,
+      newPrice: result.price,
+      newCompareAtPrice: result.compare_at_price,
+      metaTitle: result.meta_title,
+      metaDescription: result.meta_description,
+      photoBrief: result.photo_brief,
+      priceReasoning: result.price_reasoning,
+      body_html: result.body_html,
+      short_description: result.short_description,
+      tags: result.tags,
+    },
+  }).catch(() => {});
 
   res.json({
     productId: shopifyProductId,

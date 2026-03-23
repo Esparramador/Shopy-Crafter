@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeJson, askClaudeJsonWithBrain } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -194,6 +195,38 @@ Devuelve JSON con:
       }
     }
     await completeJob(jobId, { completed, failed });
+
+    // Auto-guardar reporte SEO completo en vault
+    if (completed > 0) {
+      try {
+        const allSeoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+        const seoReport = {
+          projectId,
+          generatedAt: new Date().toISOString(),
+          totalProducts: products.length,
+          completed,
+          failed,
+          appliedToShopify: applyToShopify ?? false,
+          products: allSeoData.map(s => ({
+            shopifyProductId: s.shopifyProductId,
+            metaTitle: s.metaTitle,
+            metaDescription: s.metaDescription,
+            seoScore: s.seoScore,
+            lastAuditedAt: s.lastAuditedAt,
+          })),
+        };
+        await saveToVault({
+          projectId,
+          fileType: "seo_report",
+          category: "bulk_seo",
+          title: `Reporte SEO — ${completed} productos · ${new Date().toLocaleDateString("es-ES")}`,
+          description: `${completed} meta tags generados · ${failed} fallidos · ${applyToShopify ? "Aplicado a Shopify" : "Solo guardado"}`,
+          mimeType: "application/json",
+          generatedBy: "seo_engine",
+          metadata: seoReport,
+        });
+      } catch {}
+    }
   });
 });
 

@@ -139,6 +139,26 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
     } catch {}
   }
 
+  // Para archivos solo-metadata (rediseños, reportes SEO, etc.) — servir metadata como JSON
+  if (file.metadata) {
+    try {
+      const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+      const jsonFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.json`;
+      res.setHeader("Content-Disposition", `attachment; filename="${jsonFilename}"`);
+      res.setHeader("Content-Type", "application/json");
+      res.json({
+        title: file.title,
+        fileType: file.fileType,
+        category: file.category,
+        productTitle: file.productTitle,
+        generatedBy: file.generatedBy,
+        createdAt: file.createdAt,
+        data: meta,
+      });
+      return;
+    } catch {}
+  }
+
   res.status(410).json({ error: "Archivo ya no disponible en origen" });
 });
 
@@ -186,6 +206,21 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
           archive.append(buffer, { name: entryName });
           added++;
         }
+      } else if (file.metadata) {
+        // Archivos solo-metadata (rediseños, reportes SEO): serializar como JSON
+        const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+        const jsonContent = JSON.stringify({
+          title: file.title,
+          fileType: file.fileType,
+          category: file.category,
+          productTitle: file.productTitle,
+          generatedBy: file.generatedBy,
+          createdAt: file.createdAt,
+          data: meta,
+        }, null, 2);
+        const jsonName = `${file.fileType}/${safeTitle}_${file.id}.json`;
+        archive.append(jsonContent, { name: jsonName });
+        added++;
       }
     } catch { /* skip failed file */ }
   }
