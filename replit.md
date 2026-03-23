@@ -31,6 +31,9 @@ Premium gold/black/jade design system applied to ALL internal app pages.
 - **App shell structure**: `.app-shell` → `.sidebar` (220px) → `.main-area` → `.topbar` → `.main-content`
 - **Colors**: `--ink:#080810` bg, `--gold:#c8a84b` accent, `--jade:#2dd49f` success, `--crim:#e84558` error
 - **Key classes**: `.app-shell`, `.sidebar`, `.topbar`, `.main-content`, `.card`, `.metric-card`, `.btn-gold`, `.nav-item`, `.client-pill`, `.module-tab`, `.badge-*`
+- **Responsive grid utilities** (defined in `design-system.css`): `.grid-r4` (4→2→1 col), `.grid-r3` (3→2→1 col), `.grid-r2` (2→1 col), `.page-inner` (max-width 1100px centered with padding), `.flex-header` (flex space-between that stacks on mobile), `.table-wrap` (overflow-x scroll container), `.modal-overlay/.modal-box` (responsive modal pattern)
+- **Email page mobile pattern**: `.emails-mobile-tabs` tab bar + `mobilePanel` state switches between sidebar ("Flujos") and editor ("Editor") on screens ≤768px
+- **CMS editor**: Mobile tab bar (✏️ Editar / 🖼️ Vista previa) replaces broken 3-pane layout on small screens
 - All Tailwind CSS still active alongside the design system for inner page components
 
 ## Structure

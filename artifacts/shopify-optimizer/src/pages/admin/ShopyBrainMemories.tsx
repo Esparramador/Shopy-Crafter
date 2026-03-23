@@ -66,8 +66,8 @@ export default function ShopyBrainMemories() {
   );
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+    <div className="page-inner">
+      <div className="flex-header" style={{ marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800 }}>🧠 Memorias de Shopy Brain</h1>
           <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>Conocimiento acumulado que hace más inteligente cada respuesta</p>
@@ -80,7 +80,7 @@ export default function ShopyBrainMemories() {
       {showAdd && (
         <div className="glass-card" style={{ marginBottom: 20, borderColor: "var(--gold)" }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Añadir memoria manual</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div className="grid-r2" style={{ marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 11, color: "var(--t2)", display: "block", marginBottom: 4 }}>TIPO</label>
               <select className="input-field" value={form.memoryType} onChange={e => setForm(f => ({ ...f, memoryType: e.target.value }))}>
@@ -103,7 +103,7 @@ export default function ShopyBrainMemories() {
             <label style={{ fontSize: 11, color: "var(--t2)", display: "block", marginBottom: 4 }}>CONTENIDO</label>
             <textarea className="input-field" rows={4} placeholder="El conocimiento específico..." value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div className="grid-r2" style={{ marginBottom: 16 }}>
             <div>
               <label style={{ fontSize: 11, color: "var(--t2)", display: "block", marginBottom: 4 }}>CONFIANZA ({Math.round(form.confidence * 100)}%)</label>
               <input type="range" min={0} max={1} step={0.05} value={form.confidence} onChange={e => setForm(f => ({ ...f, confidence: parseFloat(e.target.value) }))} style={{ width: "100%" }} />

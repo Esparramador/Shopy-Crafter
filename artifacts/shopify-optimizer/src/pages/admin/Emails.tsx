@@ -138,6 +138,7 @@ export default function Emails() {
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"flows" | "editor">("flows");
 
   const [form, setForm] = useState({
     name: "", flow_type: "checkout_abandoned" as FlowType, send_delay: "1h" as Delay,
@@ -321,9 +322,28 @@ export default function Emails() {
   const currentStatus = (liveFlow?.klaviyo_status || "draft") as KlaviyoStatus;
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+      {/* Mobile tab bar — only visible on mobile via CSS */}
+      <div className="emails-mobile-tabs" style={{ borderBottom: "1px solid var(--bdr)", background: "var(--ink)" }}>
+        {(["flows", "editor"] as const).map(panel => (
+          <button key={panel} onClick={() => { setMobilePanel(panel); if (panel === "editor" && !showBuilder) openNew(); }}
+            style={{
+              flex: 1, padding: "11px 0", fontSize: 13, fontWeight: 600,
+              border: "none", cursor: "pointer", background: "transparent",
+              color: mobilePanel === panel ? "var(--gold)" : "var(--t3)",
+              borderBottom: mobilePanel === panel ? "2px solid var(--gold)" : "2px solid transparent",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            {panel === "flows" ? "📋 Flows" : "✏️ Editor"}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {/* Left sidebar */}
-      <div style={{ width: 260, borderRight: "1px solid var(--bdr)", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 }}>
+      <div className={`emails-sidebar${mobilePanel === "flows" ? " mobile-visible" : ""}`}
+        style={{ width: 260, borderRight: "1px solid var(--bdr)", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 }}>
         <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--bdr)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--t1)" }}>Email Flows</span>
@@ -682,6 +702,7 @@ export default function Emails() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

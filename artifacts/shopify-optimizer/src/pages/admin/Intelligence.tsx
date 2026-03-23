@@ -117,11 +117,11 @@ export default function Intelligence() {
       </div>
 
       {loading ? (
-        <div className="grid-4" style={{ gridTemplateColumns: "repeat(4, 1fr)", display: "grid", gap: 16, marginBottom: 24 }}>
+        <div className="grid-r4" style={{ marginBottom: 24 }}>
           {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 110, borderRadius: 12 }} />)}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+        <div className="grid-r4" style={{ marginBottom: 24 }}>
           <StatCard icon="💰" label="Revenue Atribuido (30d)" value={`€${(summary?.totalAttributedRevenue ?? 0).toFixed(0)}`} delta={summary?.trend} />
           <StatCard icon="⚡" label="Eventos Registrados" value={summary?.totalEvents ?? 0} color="var(--jade)" />
           <StatCard icon="📈" label="Tendencia Semanal" value={summary?.trend ? `${summary.trend.toFixed(1)}%` : "—"} delta={summary?.trend} />
@@ -129,7 +129,7 @@ export default function Intelligence() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="grid-r2">
         <div className="glass-card">
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--ink3)" }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--t)" }}>

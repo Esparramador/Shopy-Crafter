@@ -178,7 +178,8 @@ export default function MyPricing() {
                 {type === "setup" ? "Servicios de Setup" : type === "retainer" ? "Retainers Mensuales" : type === "extra" ? "Servicios Extra" : "Consultoría"}
               </h3>
               <div style={{ background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 12, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "var(--ink3)", borderBottom: "1px solid var(--bdr)" }}>
                       {["Servicio", "Tu coste", "Precio actual", "Margen", "Mercado avg", "OmniCore dice"].map(h => (
@@ -228,6 +229,7 @@ export default function MyPricing() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           ))}

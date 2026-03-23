@@ -84,7 +84,7 @@ export default function Roadmap() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+      <div className="grid-r3" style={{ gap: 20 }}>
         {ROADMAP_PHASES.map(phase => {
           const completedTasks = phase.tasks.filter(t => isCompleted(t.key)).length;
           const pct = Math.round((completedTasks / phase.tasks.length) * 100);

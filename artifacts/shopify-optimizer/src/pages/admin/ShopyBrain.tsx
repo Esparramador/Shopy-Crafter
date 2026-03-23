@@ -61,8 +61,8 @@ export default function ShopyBrain() {
   const healthColor = (h: number) => h >= 70 ? "var(--jade)" : h >= 40 ? "var(--gold)" : "var(--crim)";
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+    <div className="page-inner">
+      <div className="flex-header" style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{
             width: 56, height: 56, borderRadius: "50%",
@@ -115,7 +115,7 @@ export default function ShopyBrain() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+          <div className="grid-r4" style={{ marginBottom: 24 }}>
             {[
               { label: "Memorias totales", value: status?.totalMemories ?? 0, icon: <Database size={20} />, color: "var(--gold)", sub: "Conocimiento acumulado" },
               { label: "Insights activos", value: status?.totalInsights ?? 0, icon: <Zap size={20} />, color: "var(--jade)", sub: "10 dominios de expertise" },
@@ -131,7 +131,7 @@ export default function ShopyBrain() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div className="grid-r2" style={{ marginBottom: 20 }}>
             <div className="glass-card">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700 }}>🧠 Dominios de conocimiento</h3>

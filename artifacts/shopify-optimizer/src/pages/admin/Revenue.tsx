@@ -97,16 +97,18 @@ export default function Revenue() {
   );
 
   return (
-    <div style={{ padding: "32px", maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--t1)", margin: 0 }}>Revenue & CRM</h1>
-        <p style={{ color: "var(--t2)", margin: "6px 0 0", fontSize: 14 }}>
-          Seguimiento de clientes y servicios mensuales — facturación vía Shopify Payments
-        </p>
+    <div className="page-inner">
+      <div className="flex-header" style={{ marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Revenue & CRM</h1>
+          <p style={{ color: "var(--t2)", margin: "4px 0 0", fontSize: 13 }}>
+            Seguimiento de clientes y servicios mensuales
+          </p>
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
+      <div className="grid-r4" style={{ marginBottom: 24 }}>
         {[
           { label: "MRR Total", value: `€${totalMRR.toLocaleString("es", { minimumFractionDigits: 0 })}`, icon: <DollarSign size={20} />, color: "#c8a84b" },
           { label: "Clientes activos", value: activeProjects.length, icon: <Users size={20} />, color: "#10b981" },
@@ -127,7 +129,7 @@ export default function Revenue() {
       </div>
 
       {/* Service breakdown */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+      <div className="grid-r4" style={{ marginBottom: 20 }}>
         {(Object.entries(byLevel) as [ServiceLevel, number][]).map(([level, count]) => (
           <button
             key={level}

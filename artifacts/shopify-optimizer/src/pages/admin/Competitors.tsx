@@ -190,11 +190,8 @@ export default function Competitors() {
       )}
 
       {showAdd && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }} onClick={() => setShowAdd(false)}>
-          <div style={{ background: "var(--ink2)", borderRadius: 16, padding: 28, width: 480 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--t)", marginBottom: 20 }}>Añadir Competidor</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input

@@ -15,7 +15,7 @@ export default function Achievements() {
   }, []);
 
   if (loading) return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+    <div className="grid-r3">
       {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton" style={{ height: 140, borderRadius: 12 }} />)}
     </div>
   );
@@ -56,7 +56,7 @@ export default function Achievements() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      <div className="grid-r3">
         {achievements.map((a: any) => (
           <div key={a.key} className="glass-card" style={{
             padding: 20,

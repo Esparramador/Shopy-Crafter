@@ -85,7 +85,7 @@ export default function Forecast() {
       </div>
 
       {loading ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+        <div className="grid-r2">
           {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 160, borderRadius: 12 }} />)}
         </div>
       ) : forecasts.length === 0 ? (
@@ -102,7 +102,7 @@ export default function Forecast() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16, marginBottom: 20 }}>
+          <div className="grid-r2" style={{ marginBottom: 20 }}>
             {forecasts.slice(0, 4).map((f, i) => {
               const metric = METRICS[i % METRICS.length];
               return (
@@ -149,7 +149,7 @@ export default function Forecast() {
                 Metodología del Modelo
               </h3>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+            <div className="grid-r3">
               {[
                 { title: "Regresión Temporal", description: "Análisis de series temporales con datos históricos de ventas y eventos" },
                 { title: "NLP Semántico", description: "Claude analiza texto de productos y tendencias de mercado para ajustar predicciones" },

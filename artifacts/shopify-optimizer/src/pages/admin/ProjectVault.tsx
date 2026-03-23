@@ -146,7 +146,7 @@ export default function ProjectVault() {
   );
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="page-inner">
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
