@@ -1,8 +1,8 @@
 {
-  "name": "ShopifyAI Pro",
-  "short_name": "ShopifyAI",
-  "description": "Gestión inteligente de tiendas Shopify con IA",
-  "start_url": "/admin/intelligence",
+  "name": "ShopyBrain",
+  "short_name": "ShopyBrain",
+  "description": "Agencia Shopify AI — optimización inteligente con OmniCore",
+  "start_url": "./admin/intelligence",
   "display": "standalone",
   "background_color": "#080810",
   "theme_color": "#c8a84b",
