@@ -493,11 +493,15 @@ export default function ImagesPage() {
                       />
                     )}
 
-                    {/* SVG preview */}
+                    {/* SVG preview — sanitized before rendering */}
                     {svgContent && (
                       <div
                         className="w-full aspect-square overflow-hidden bg-black/50"
-                        dangerouslySetInnerHTML={{ __html: svgContent }}
+                        dangerouslySetInnerHTML={{ __html: svgContent
+                          .replace(/<script[\s\S]*?<\/script>/gi, "")
+                          .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+                          .replace(/javascript:/gi, "")
+                        }}
                       />
                     )}
 

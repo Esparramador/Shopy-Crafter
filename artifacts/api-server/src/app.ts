@@ -41,7 +41,18 @@ app.use(
 );
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
-app.use(cors({ origin: true, credentials: true }));
+// In production: only allow requests from the app's own Replit domain.
+// sameSite:strict on the session cookie provides a second layer of protection.
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // same-origin or server-to-server
+    if (process.env.NODE_ENV !== "production") return callback(null, true); // dev: allow all
+    const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+    if (domain && origin === `https://${domain}`) return callback(null, true);
+    callback(null, false);
+  },
+  credentials: true,
+}));
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const authLimiter = rateLimit({

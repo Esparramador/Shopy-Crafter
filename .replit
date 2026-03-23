@@ -29,7 +29,7 @@ timeoutMs = 20000
 
 [userenv.shared]
 GOOGLE_PAGESPEED_API_KEY = "AIzaSyA-e_29qy2pUX8jQrq_fhNeL4zKDb9yLI4"
-ENCRYPTION_KEY = "993bd86918e96e3d56785a55df39b6ecb823deb814bc02746566ce9f19490783"
+ENCRYPTION_KEY = "6d79f5ceb6b2278e76e9b07d67bfc95bd78dec9b8120587f453ccb0ec8d3e035"
 SHOP_DOMAIN = "comic-crafter.myshopify.com"
 COLLECTION_HANDLE = "shopify-automatization"
 SHOP_CURRENCY = "EUR"
