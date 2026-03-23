@@ -1,0 +1,596 @@
+PROMPT C — Motor de Pricing Financiero + Economista IA
+Add the Financial Intelligence & Dynamic Pricing Engine.
+This is the most critical revenue module of the entire platform.
+Claude acts as a world-class financial analyst, economist, and pricing strategist.
+
+INSTALL: npm install axios cheerio node-cron
+
+═══════════════════════════════════════════════
+PART 1: COST STRUCTURE BUILDER (COGS Engine)
+═══════════════════════════════════════════════
+
+Each product gets a full cost breakdown stored in metafields.
+User inputs via a professional cost form:
+
+COST MODEL DATA STRUCTURE:
+{
+  productId: string,
+  costStructure: {
+    // DIRECT COSTS
+    unitCost: number,          // Cost to manufacture or buy (ex-factory)
+    packagingCost: number,     // Boxes, bags, tissue, inserts
+    labelCost: number,         // Labels, hangtags, stickers
+    
+    // FULFILLMENT COSTS
+    shippingCostDomestic: number,    // Avg cost to ship one unit domestically
+    shippingCostInternational: number,
+    fulfillmentFee: number,          // 3PL fee or own warehouse cost per order
+    returnRate: number,              // % of orders returned (default 8%)
+    returnProcessingCost: number,    // Cost to process one return
+    
+    // PLATFORM COSTS (auto-calculated)
+    shopifyPaymentFee: 0.015,        // 1.5% Shopify Payments (ES)
+    shopifyTransactionFee: 0,        // 0% if using Shopify Payments
+    shopifyPlanCostPerOrder: number, // Monthly plan cost ÷ avg monthly orders
+    
+    // MARKETING COSTS
+    cac: number,                     // Customer Acquisition Cost (ads spend ÷ customers)
+    affiliateFee: number,            // If using affiliates/influencers
+    
+    // OVERHEAD ALLOCATION
+    overheadPerUnit: number,         // Monthly fixed costs ÷ monthly units sold
+  },
+  
+  // AUTO-CALCULATED
+  totalCOGS: number,          // Sum of all above
+  breakEvenPrice: number,     // COGS × 1.0 (zero profit)
+  minimumViablePrice: number, // COGS × 1.15 (15% minimum margin)
+}
+
+COGS CALCULATOR FORMULA:
+totalCOGS = unitCost + packagingCost + labelCost 
+           + shippingCostDomestic 
+           + fulfillmentFee 
+           + (returnRate × returnProcessingCost)
+           + (finalPrice × shopifyPaymentFee)  // iterative calculation
+           + shopifyPlanCostPerOrder
+           + cac
+           + overheadPerUnit
+
+Claude explains each cost field with examples when user hovers:
+"Coste de devolución: si tu tasa de devolución es 8% y cada devolución 
+te cuesta €4 procesar, añade €0.32 por unidad vendida (0.08 × €4)"
+
+═══════════════════════════════════════════════
+PART 2: COMPETITOR PRICE INTELLIGENCE
+═══════════════════════════════════════════════
+
+POST /api/analyze-competitor-prices
+Body: { productName, productCategory, storeNiche, competitorUrls[] }
+
+STEP 1 — Web search via Claude with search tool:
+Claude searches: "[productName] precio comprar online España site:shopify OR site:woocommerce"
+Also searches: "[productName] [category] mejor precio [current year]"
+Extracts: min price, max price, median price, premium price, budget price
+
+STEP 2 — Direct URL scraping (if URLs provided):
+Use cheerio to extract prices from competitor product pages:
+- Look for: .price, [class*="price"], [itemprop="price"], meta[property="product:price:amount"]
+- Handle dynamic prices: if JS-rendered, use Claude to estimate from URL context
+
+STEP 3 — Market positioning map:
+Claude analyzes: "Given these competitor prices for [productName]:
+Budget tier: €X-Y (brands: ...)
+Mid tier: €Y-Z (brands: ...)  
+Premium tier: €Z-W (brands: ...)
+Ultra-premium: €W+ (brands: ...)
+
+Where should [storeName] position itself given:
+- Brand tone: [brandTone]
+- Target audience: [audience]
+- Product quality level: [qualityLevel]
+- COGS: €[totalCOGS]
+- Desired margin: [desiredMarginPct]%
+
+Return positioning recommendation with justification."
+
+═══════════════════════════════════════════════
+PART 3: OPTIMAL PRICE CALCULATOR
+═══════════════════════════════════════════════
+
+PRICING MODELS (Claude selects the right one per product):
+
+1. COST-PLUS PRICING (for commodity/volume products):
+   price = COGS × multiplier
+   Multiplier guide by category (hardcoded defaults, user can override):
+   - Clothing/Fashion: 3.5x - 5x COGS
+   - Electronics: 1.8x - 2.5x COGS
+   - Beauty/Cosmetics: 4x - 7x COGS
+   - Home Decor: 3x - 4.5x COGS
+   - Food/Consumables: 3x - 6x COGS
+   - Handmade/Artisan: 5x - 10x COGS
+   - Digital Products: 10x - 50x COGS (marginal cost near zero)
+   - Supplements: 5x - 8x COGS
+   - Jewelry: 4x - 8x COGS
+   - Sports/Fitness: 2.5x - 4x COGS
+
+2. COMPETITIVE PRICING (for market-defined products):
+   price = competitorMedian × positionMultiplier
+   positionMultiplier: budget=0.85, parity=1.0, premium=1.15, luxury=1.35
+
+3. VALUE-BASED PRICING (for unique/branded products):
+   Claude estimates perceived value: "What would a customer in [audience] 
+   be willing to pay for this product given its benefits?"
+   Anchors: pain_solved × willingness_to_pay
+
+4. PSYCHOLOGICAL PRICING (always applied as final step):
+   Round to nearest psychological price point:
+   - Under €10: round to x.99 (€8.99, €9.99)
+   - €10-50: round to x.95 or x.99 (€24.95, €34.99)
+   - €50-100: round to x.90 or x.95 (€79.90, €89.95)
+   - €100-500: round to x9 or x5 (€149, €199, €249)
+   - Over €500: round to clean numbers (€599, €799, €999)
+   
+   COMPARE_AT_PRICE (fake original price for FOMO):
+   compare_at = optimal_price × 1.30 (30% "discount" minimum)
+   Also round psychologically. Never show <20% discount (weak) or >60% (suspicious)
+
+MARGIN WATERFALL VISUALIZATION:
+Show the user a breakdown of every €1 of revenue:
+Revenue: €100
+- Platform fees: -€1.50 (1.5%)
+- COGS unit: -€18.00 (18%)
+- Packaging: -€2.00 (2%)
+- Shipping: -€4.50 (4.5%)
+- Returns provision: -€1.60 (1.6%)
+- Marketing (CAC): -€12.00 (12%)
+- Overhead: -€5.00 (5%)
+═══════════════════
+NET MARGIN: €55.40 (55.4%) ← color-coded green/amber/red
+
+═══════════════════════════════════════════════
+PART 4: CLAUDE AS FINANCIAL ANALYST
+═══════════════════════════════════════════════
+
+System prompt injection for all pricing decisions:
+"You are a senior financial analyst and pricing strategist with 20 years 
+experience in e-commerce and retail economics. You combine:
+
+ECONOMICS: Price elasticity, supply/demand curves, market equilibrium, 
+consumer surplus, willingness-to-pay theory, Veblen goods, Giffen goods.
+
+FINANCE: Contribution margin, gross margin, EBITDA, break-even analysis, 
+unit economics, LTV/CAC ratio, payback period, working capital optimization.
+
+STRATEGY: Porter's Five Forces applied to pricing, competitive moats, 
+price positioning, premium vs penetration vs skimming strategies.
+
+PSYCHOLOGY: Anchoring effect, charm pricing, decoy pricing (good/better/best), 
+bundle psychology, perceived value, scarcity pricing, social proof pricing.
+
+SHOPIFY SPECIFICS: Shopify fee structures, payment processor margins, 
+return rate benchmarks by category, average AOV by niche, 
+seasonal pricing patterns, promotional cadence.
+
+Given COGS data and competitor intelligence, you will:
+1. Calculate the mathematically optimal price for maximum profit
+2. Suggest the psychologically optimal price for maximum conversion  
+3. Recommend a pricing strategy that balances both
+4. Flag any margin red flags (price below break-even, margin <20%)
+5. Suggest bundle pricing to increase AOV
+6. Project monthly/annual revenue at the recommended price point
+Always show your reasoning with specific numbers. Never give vague advice."
+
+═══════════════════════════════════════════════
+PART 5: DYNAMIC PRICING MONITOR
+═══════════════════════════════════════════════
+
+CRON JOB (runs daily at 6am per store):
+node-cron: '0 6 * * *'
+
+For each product with competitor URLs:
+1. Re-scrape competitor prices
+2. Compare to current price
+3. If competitor dropped price >10%: alert "Competidor bajó precio. ¿Ajustar?"
+4. If competitor raised price >10%: alert "Oportunidad: competidor subió. Puedes subir también"
+5. If stock-out detected at competitor: "Competidor sin stock. Momento de subir precio y aumentar ads"
+
+REPRICING RULES ENGINE (user configures):
+{
+  autoReprice: true/false,
+  minMarginPct: 25,           // Never go below 25% margin
+  maxPriceIncrease: 15,       // Never increase more than 15% automatically
+  maxPriceDecrease: 10,       // Never decrease more than 10% automatically
+  repriceStrategy: "match_median" | "beat_by_5pct" | "hold_premium",
+  notifyBeforeApplying: true  // Always show alert before changing prices
+}
+
+═══════════════════════════════════════════════
+PART 6: FINANCIAL DASHBOARD
+═══════════════════════════════════════════════
+
+P&L DASHBOARD (pulls from Shopify Orders API + COGS data):
+Real-time metrics updated every 6 hours:
+
+TOP ROW KPIs:
+- Gross Revenue (period)
+- Total COGS (calculated)
+- Gross Profit = Revenue - COGS
+- Gross Margin % = Gross Profit / Revenue × 100
+- Net Margin % (after all costs)
+- Average Order Value (AOV)
+- Customer Acquisition Cost (CAC)
+- LTV/CAC ratio (target: >3x)
+- Break-even units/month
+
+PRODUCT-LEVEL PROFITABILITY TABLE:
+Columns: Product | Units Sold | Revenue | COGS | Gross Profit | Margin% | Grade
+Sortable by margin%, revenue, units
+Color: green >40% margin, amber 20-40%, red <20%
+Action: "Repricing" button on red products
+
+PRICING HEALTH ALERTS:
+- "3 productos con margen <15% — riesgo de pérdidas con devoluciones"
+- "El producto X genera 67% del margen total — diversifica"
+- "Tu CAC de €18 con LTV de €42 da ratio 2.3x — por debajo del objetivo 3x"
+- "Subiendo el precio de X en €5 mantendría competitividad y añadiría €840/mes"
+
+BUNDLE OPTIMIZER:
+Claude analyzes purchase patterns from Shopify orders:
+"Los clientes que compran A también compran B en el 34% de casos.
+Un bundle A+B a €[price] con descuento 15% aumentaría tu AOV 
+de €[current] a €[projected] (+€X/mes estimado)"
+
+═══════════════════════════════════════════════
+PART 7: PRICING REPORT (Monthly Auto-Generate)
+═══════════════════════════════════════════════
+
+On 1st of each month, Claude generates full pricing report:
+- Market position vs last month (have competitors changed?)
+- Margin evolution per product
+- Recommended price adjustments with impact estimate
+- Top 3 pricing opportunities
+- Products to consider discontinuing (margin <10% + low volume)
+- New product opportunities based on market gaps detected
+
+Format: structured HTML email sent via Shopify Email API
+Tone: CFO-level executive briefing, data-driven, actionable
+
+PROMPT D — SEO Técnico Automatizado
+Add the Technical SEO Automation Engine for Shopify.
+Every element that affects Google ranking is automated, monitored and optimized.
+
+INSTALL: npm install sitemap xmlbuilder2
+
+═══════════════════════════════════════════════
+PART 1: SCHEMA MARKUP ENGINE (JSON-LD)
+═══════════════════════════════════════════════
+
+Generate complete JSON-LD for every product page.
+Inject via Shopify ScriptTag API or theme metafield.
+
+PRODUCT SCHEMA (most complete possible):
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "[SEO optimized product title]",
+  "description": "[150 char meta description]",
+  "brand": { "@type": "Brand", "name": "[store name]" },
+  "sku": "[product SKU]",
+  "gtin13": "[barcode if available]",
+  "image": ["[img1_url]", "[img2_url]", "[img3_url]"],
+  "offers": {
+    "@type": "Offer",
+    "url": "[canonical product URL]",
+    "priceCurrency": "EUR",
+    "price": "[price]",
+    "priceValidUntil": "[90 days from now]",
+    "availability": "https://schema.org/InStock",
+    "itemCondition": "https://schema.org/NewCondition",
+    "seller": { "@type": "Organization", "name": "[store name]" },
+    "hasMerchantReturnPolicy": {
+      "@type": "MerchantReturnPolicy",
+      "returnPolicyCategory": "MerchantReturnFiniteReturnWindow",
+      "merchantReturnDays": 30,
+      "returnMethod": "ReturnByMail"
+    },
+    "shippingDetails": {
+      "@type": "OfferShippingDetails",
+      "shippingRate": {
+        "@type": "MonetaryAmount",
+        "value": "0",
+        "currency": "EUR"
+      },
+      "deliveryTime": {
+        "@type": "ShippingDeliveryTime",
+        "handlingTime": { "@type": "QuantitativeValue", "minValue": 0, "maxValue": 1, "unitCode": "DAY" },
+        "transitTime": { "@type": "QuantitativeValue", "minValue": 2, "maxValue": 5, "unitCode": "DAY" }
+      }
+    }
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "[avg_rating]",
+    "reviewCount": "[review_count]"
+  },
+  "review": [ /* inject real reviews from Shopify */ ]
+}
+
+ORGANIZATION SCHEMA (inject on every page):
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "[store name]",
+  "url": "[store URL]",
+  "logo": "[logo URL]",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "customer service",
+    "availableLanguage": "Spanish"
+  },
+  "sameAs": ["[instagram URL]", "[facebook URL]"]
+}
+
+BREADCRUMB SCHEMA (for collection pages):
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "[domain]" },
+    { "@type": "ListItem", "position": 2, "name": "[collection]", "item": "[collection URL]" },
+    { "@type": "ListItem", "position": 3, "name": "[product]", "item": "[product URL]" }
+  ]
+}
+
+Claude validates each schema against Google's Rich Results requirements before injecting.
+Log: "Schema válido ✓ — elegible para rich snippet en Google Shopping"
+
+═══════════════════════════════════════════════
+PART 2: META TAGS OPTIMIZER
+═══════════════════════════════════════════════
+
+Claude system prompt for meta generation:
+"You are an expert SEO copywriter specializing in Shopify e-commerce.
+Generate meta tags that maximize CTR in Google search results.
+
+Rules:
+- META TITLE: 50-60 characters. Format: [Main Keyword] | [Brand USP] | [Store Name]
+  Must include: primary keyword (first), emotional trigger, brand name.
+  Example: 'Bomber Jacket Mujer Negro | Envío 24h Gratis | Moda Urbana'
+  
+- META DESCRIPTION: 140-155 characters. Must include:
+  Primary keyword naturally, price anchor (desde €X), 
+  main benefit, urgency/social proof, CTA.
+  Example: 'Bomber jacket premium mujer desde €89. +500 reseñas ⭐⭐⭐⭐⭐. 
+  Envío gratis 24h. Tallas XS-XXL. ¡Añade al carrito ahora!'
+  
+- OG TITLE: same as meta title
+- OG DESCRIPTION: same as meta description  
+- OG IMAGE: product hero image URL (1200×630 preferred)
+- TWITTER:CARD: summary_large_image
+
+Generate for the product: [productName]
+Store: [storeName] | Niche: [niche] | Target: [audience]
+Primary keyword: [keyword] | Secondary keywords: [keywords array]"
+
+BATCH META GENERATION:
+POST /api/seo/generate-all-metas
+- Loops through all products missing meta tags
+- Rate: 1 product per 2 seconds (respect API limits)
+- Progress bar with live log
+- Apply to Shopify via: PUT /products/{id}.json 
+  body: { product: { metafields: [{ namespace: "seo", key: "title", value: metaTitle }, 
+                                   { namespace: "seo", key: "description", value: metaDesc }] } }
+
+═══════════════════════════════════════════════
+PART 3: URL STRUCTURE & CANONICALS
+═══════════════════════════════════════════════
+
+SHOPIFY URL AUDIT:
+Scan all products and detect:
+- URLs with special characters → flag for handle cleanup
+- Duplicate content (same product in multiple collections) → add canonical
+- Old URLs that return 404 → suggest redirect
+- URLs over 75 chars → suggest shorter handle
+
+HANDLE OPTIMIZER:
+Claude generates SEO-optimal handles:
+"jacket-bomber-mujer-negro" (not "product-123" or "jacket_bomber_mujer")
+Rules: lowercase, hyphens only, include primary keyword, max 60 chars, no stop words
+
+301 REDIRECT MANAGER:
+When handle changes, automatically create redirect:
+POST /admin/api/2024-01/redirects.json
+{ "redirect": { "path": "/products/old-handle", "target": "/products/new-handle", "body": "" } }
+
+CANONICAL TAG INJECTION:
+For products appearing in multiple collections, inject canonical pointing to main URL:
+<link rel="canonical" href="https://[domain]/products/[handle]" />
+Via theme metafield injection.
+
+INTERNAL LINKING MAP:
+Claude analyzes product catalog and builds optimal internal link structure:
+- Each product page links to 3-5 related products (semantic clusters)
+- Collection pages link to each other where relevant
+- Blog posts link to featured products
+Output: JSON map of recommended internal links → inject via theme section
+
+═══════════════════════════════════════════════
+PART 4: SITEMAP GENERATOR
+═══════════════════════════════════════════════
+
+DYNAMIC SITEMAP (regenerated daily via cron):
+Pulls from Shopify:
+- All published products (priority: 0.8, changefreq: weekly)
+- All collections (priority: 0.9, changefreq: weekly)  
+- All blog posts (priority: 0.6, changefreq: monthly)
+- Static pages (priority: 0.5, changefreq: monthly)
+- Homepage (priority: 1.0, changefreq: daily)
+
+Generates sitemap_index.xml referencing:
+- sitemap_products_1.xml (max 1000 URLs per file)
+- sitemap_collections.xml
+- sitemap_pages.xml
+- sitemap_blog.xml
+
+IMAGE SITEMAP (critical for Google Images):
+Each product gets image entries:
+<image:image>
+  <image:loc>[image URL]</image:loc>
+  <image:caption>[alt text]</image:caption>
+  <image:title>[product name]</image:title>
+</image:image>
+
+AUTO-PING GOOGLE on sitemap update:
+GET https://www.google.com/ping?sitemap=[sitemap URL]
+Log: "Sitemap enviado a Google · [timestamp]"
+
+GOOGLE SEARCH CONSOLE INTEGRATION (via API):
+If user provides GSC credentials:
+- Auto-submit new product URLs for indexing via Indexing API
+- Pull ranking data for each product keyword
+- Show: "El producto X rankea posición 18 para '[keyword]' — optimizando meta..."
+
+═══════════════════════════════════════════════
+PART 5: CORE WEB VITALS ANALYZER
+═══════════════════════════════════════════════
+
+POST /api/seo/audit-page-speed
+Uses PageSpeed Insights API (free, no auth needed):
+GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
+  ?url=[product URL]&strategy=mobile&key=[PSI_API_KEY]
+
+Extract and display:
+- LCP (Largest Contentful Paint) — target <2.5s
+- CLS (Cumulative Layout Shift) — target <0.1
+- FID/INP (Interaction to Next Paint) — target <200ms
+- Performance Score (0-100)
+
+Claude diagnoses issues and generates Liquid/CSS fixes:
+Common Shopify issues Claude auto-fixes:
+1. Unoptimized images → generate <img loading="lazy" width="X" height="Y"> snippet
+2. Render-blocking JS → generate async/defer script loading code
+3. Missing image dimensions → scan and add width/height to all img tags
+4. Large CSS → identify unused CSS rules to remove
+5. No preconnect → generate <link rel="preconnect"> for Google Fonts, CDN
+
+Output: Liquid code snippets ready to paste in theme editor + step-by-step guide
+
+═══════════════════════════════════════════════
+PART 6: KEYWORD INTELLIGENCE ENGINE
+═══════════════════════════════════════════════
+
+Claude with web search builds keyword strategy per product:
+
+KEYWORD RESEARCH PROMPT:
+"You are an expert SEO strategist for Shopify e-commerce in Spain/Latin America.
+For the product [productName] in niche [niche]:
+
+1. PRIMARY KEYWORD: highest volume transactional keyword (buying intent)
+   Format: [adjective] [product] [modifier] — e.g. 'bomber jacket mujer barata'
+   
+2. SECONDARY KEYWORDS (5): related transactional terms, long-tail variations
+   Include: 'comprar [product]', '[product] precio', '[product] online España'
+   
+3. SEMANTIC KEYWORDS (8): related terms Google associates with this product
+   Build topical authority beyond exact match
+   
+4. NEGATIVE KEYWORDS: terms to avoid in content (wrong intent)
+
+5. KEYWORD DIFFICULTY ESTIMATE: easy (<30 KD), medium (30-60), hard (>60)
+
+6. CONTENT OPPORTUNITIES: 
+   - Blog post idea that ranks for informational keyword and funnels to product
+   - FAQ schema questions real users ask about this product
+   - Comparison angle: '[product] vs [alternative]' content idea
+
+Return as JSON for all fields."
+
+KEYWORD → CONTENT PIPELINE:
+For each product, Claude generates:
+- H1 tag (includes primary keyword)
+- H2 tags for product description sections (include secondary keywords)
+- FAQ section (5 Q&As with schema markup ready)
+- Alt texts for all images (include keyword naturally)
+- URL handle (primary keyword formatted)
+
+═══════════════════════════════════════════════
+PART 7: BLOG CONTENT STRATEGY
+═══════════════════════════════════════════════
+
+BLOG PILLAR STRATEGY:
+Claude maps the store's full content universe:
+
+"For [storeName] in [niche] targeting [audience]:
+
+PILLAR PAGE (cornerstone content):
+Topic: 'Guía completa de [main product category] [year]'
+Length: 3000+ words
+Links to: all main product collections
+Purpose: rank for high-volume category keyword
+
+CLUSTER POSTS (support the pillar):
+5 posts that link back to pillar:
+1. 'Cómo elegir [product] — [X] claves' (informational, top funnel)
+2. 'Los [X] mejores [products] de [year]' (comparison, mid funnel)
+3. '[Product A] vs [Product B] — cuál comprar' (decision, bottom funnel)
+4. 'Opiniones [product category] reales — [year]' (review aggregator)
+5. '[Use case] con [product]' (lifestyle, awareness)
+
+PRODUCT-LINKED POSTS:
+Each main product gets 1 dedicated blog post:
+'Por qué el [productName] es el mejor para [use case]'
+Length: 800-1200 words, includes buy CTA, links to product page.
+
+Generate full blog post outlines with: title, H2 structure, 
+word count target, primary keyword, internal links map, 
+and the first 200 words as sample."
+
+AUTOMATED BLOG POST GENERATION:
+Button: "Generar artículo" per cluster post topic
+Claude writes full blog post (800-1200 words) including:
+- SEO-optimized title and meta
+- Hook introduction
+- Structured body with H2/H3
+- Product mentions with Shopify product URLs
+- FAQ section
+- Conclusion with CTA
+- Ready to paste in Shopify Blog admin
+
+═══════════════════════════════════════════════
+PART 8: SEO AUDIT DASHBOARD
+═══════════════════════════════════════════════
+
+SEO SCORE per product (0-100):
+- Meta title present + optimized: 20pts
+- Meta description present + optimized: 15pts
+- Schema markup: 15pts
+- Primary keyword in title: 10pts
+- Alt texts on all images: 10pts
+- URL handle clean: 5pts
+- Internal links (at least 2): 5pts
+- Description length >300 words: 10pts
+- Page speed score >70: 10pts
+
+Overall store SEO grade: A/B/C/D/F
+
+ISSUES PANEL (sorted by impact):
+Critical (red): "47 productos sin meta description — impacto crítico en CTR"
+High (orange): "Schema markup faltante en 23 productos — sin rich snippets"
+Medium (amber): "31 imágenes sin alt text — oportunidad perdida Google Images"
+Low (gray): "12 handles con más de 60 caracteres — truncado en URLs"
+
+ONE-CLICK FIX BUTTONS:
+- "Generar todas las metas faltantes" → batch Claude generation
+- "Aplicar schema a todos los productos" → batch injection
+- "Generar todos los alt texts" → batch from image + product data
+- "Limpiar todos los handles" → generate + apply clean URLs + create redirects
+
+MONTHLY SEO REPORT (auto-generated):
+- Ranking evolution (if GSC connected)
+- Pages indexed vs total
+- New keywords appearing
+- Top performing content
+- Recommended next actions
+Claude formats as executive report: "Este mes tu tienda ganó X posiciones 
+para Y keywords. Tu mejor producto SEO es Z con posición media W."
