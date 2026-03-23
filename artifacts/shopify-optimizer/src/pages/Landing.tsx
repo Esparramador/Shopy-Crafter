@@ -86,10 +86,17 @@ export default function Landing() {
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
     if (!container) return;
-    const sectionH = container.clientHeight;
-    container.scrollTo({ top: index * sectionH, behavior: "smooth" });
     currentRef.current = index;
     setCurrentSection(index);
+    if (window.innerWidth <= 768) {
+      // Mobile: sections are auto-height, scroll the body via scrollIntoView
+      const sections = container.querySelectorAll<HTMLElement>(".fp-section");
+      const section = sections[index];
+      if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      // Desktop: fp-container is fixed-height scroll box, use direct scrollTo
+      container.scrollTo({ top: index * container.clientHeight, behavior: "smooth" });
+    }
   }, []);
 
   useEffect(() => {
@@ -123,20 +130,34 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
-  // Lock document scroll — force all wheel events into fp-container
+  // Lock body scroll ONLY on desktop — mobile uses native scroll
   useEffect(() => {
+    const isMobile = () => window.innerWidth <= 768;
+    if (isMobile()) return;
     const prev = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
+    const onResize = () => {
+      if (isMobile()) {
+        document.body.style.overflow = prev;
+        document.documentElement.style.overflow = prevHtml;
+      } else {
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+      }
+    };
+    window.addEventListener("resize", onResize);
     return () => {
+      window.removeEventListener("resize", onResize);
       document.body.style.overflow = prev;
       document.documentElement.style.overflow = prevHtml;
     };
   }, []);
 
-  // Wheel → programmatic section scroll with throttle (re-runs when content loads)
+  // Wheel → section scroll (desktop only, re-runs when content loads)
   useEffect(() => {
+    if (window.innerWidth <= 768) return;
     const container = fpRef.current;
     if (!container) return;
     let lastWheel = 0;
@@ -154,26 +175,6 @@ export default function Landing() {
     };
     container.addEventListener("wheel", onWheel, { passive: false });
     return () => container.removeEventListener("wheel", onWheel);
-  }, [goToSection, content]);
-
-  // Touch swipe → section scroll (re-runs when content loads)
-  useEffect(() => {
-    const container = fpRef.current;
-    if (!container) return;
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
-    const onTouchEnd = (e: TouchEvent) => {
-      const diff = touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(diff) < 50) return;
-      if (diff > 0) goToSection(Math.min(currentRef.current + 1, FP_SECTIONS.length - 1));
-      else goToSection(Math.max(currentRef.current - 1, 0));
-    };
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchend", onTouchEnd, { passive: true });
-    return () => {
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("touchend", onTouchEnd);
-    };
   }, [goToSection, content]);
 
   useEffect(() => {
