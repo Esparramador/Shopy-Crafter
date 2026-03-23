@@ -67,3 +67,15 @@ export async function askClaudeJson<T>(
   }
   return JSON.parse(jsonMatch[1]) as T;
 }
+
+export async function claude(prompt: string, maxTokens = 2048): Promise<string> {
+  const client = getDefaultClient();
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: maxTokens,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const content = response.content[0];
+  if (content.type !== "text") throw new Error("Unexpected non-text response");
+  return content.text;
+}

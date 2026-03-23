@@ -9,6 +9,14 @@ import { Loader2 } from "lucide-react";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import CMSEditor from "@/pages/admin/CMSEditor";
+import Intelligence from "@/pages/admin/Intelligence";
+import Inventory from "@/pages/admin/Inventory";
+import Achievements from "@/pages/admin/Achievements";
+import Roadmap from "@/pages/admin/Roadmap";
+import Competitors from "@/pages/admin/Competitors";
+import Billing from "@/pages/admin/Billing";
+import Forecast from "@/pages/admin/Forecast";
+import SystemHealth from "@/pages/admin/SystemHealth";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
 import ImagesPage from "@/pages/projects/Images";
@@ -26,6 +34,10 @@ import ClientDashboard from "@/pages/client/ClientDashboard";
 import ClientApprovals from "@/pages/client/ClientApprovals";
 import ClientMessages from "@/pages/client/ClientMessages";
 import ClientProducts from "@/pages/client/ClientProducts";
+
+import { VoiceButton } from "@/components/VoiceButton";
+import { CommandPalette } from "@/components/CommandPalette";
+import { OnboardingWidget } from "@/components/OnboardingWidget";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,10 +107,26 @@ function ImpersonationBanner() {
   );
 }
 
+function AdminWrapper({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return (
+    <>
+      {children}
+      {user?.role === "admin" && (
+        <>
+          <VoiceButton />
+          <OnboardingWidget />
+        </>
+      )}
+    </>
+  );
+}
+
 function Router() {
   return (
     <>
       <ImpersonationBanner />
+      <CommandPalette />
       <Switch>
         {/* Public */}
         <Route path="/login" component={LoginPage} />
@@ -112,51 +140,132 @@ function Router() {
         {/* Admin routes */}
         <Route path="/admin/clients">
           <RequireAdmin>
-            <AppLayout><AdminClients /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><AdminClients /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/admin/cms">
           <RequireAdmin><CMSEditor /></RequireAdmin>
         </Route>
+        <Route path="/admin/intelligence">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Intelligence /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/inventory">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Inventory /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/achievements">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Achievements /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/roadmap">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Roadmap /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/competitors">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Competitors /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/billing">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Billing /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/affiliates">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Billing /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/forecast">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><Forecast /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/system">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><SystemHealth /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
 
         <Route path="/projects/:id/audit">
           <RequireAdmin>
-            <AppLayout><AuditPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><AuditPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/redesign">
           <RequireAdmin>
-            <AppLayout><RedesignPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><RedesignPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/images">
           <RequireAdmin>
-            <AppLayout><ImagesPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><ImagesPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/consistency">
           <RequireAdmin>
-            <AppLayout><ConsistencyPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><ConsistencyPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/ab-testing">
           <RequireAdmin>
-            <AppLayout><ABTestingPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><ABTestingPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/pricing">
           <RequireAdmin>
-            <AppLayout><PricingPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><PricingPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/seo">
           <RequireAdmin>
-            <AppLayout><SEOPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><SEOPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
         <Route path="/projects/:id/settings">
           <RequireAdmin>
-            <AppLayout><SettingsPage /></AppLayout>
+            <AdminWrapper>
+              <AppLayout><SettingsPage /></AppLayout>
+            </AdminWrapper>
           </RequireAdmin>
         </Route>
 

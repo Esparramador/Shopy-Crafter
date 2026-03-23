@@ -134,6 +134,58 @@ artifacts-monorepo/
 - Contenido almacenado en PostgreSQL (`cms_content` + `cms_versions` tables)
 - Media guardada en `artifacts/shopify-optimizer/public/media/` como WebP
 
+## 9-Phase Feature Implementation (NEW)
+
+### Phase 1: Revenue Intelligence 360°
+- **DB tables**: `events`, `revenue_snapshots`, `forecasts` (in `lib/db/src/schema/intelligence.ts`)
+- **Routes**: `GET/POST /api/intelligence/events`, `GET/POST /api/intelligence/snapshots`, `GET /api/intelligence/summary`, `POST /api/intelligence/analyze`
+- **Page**: `/admin/intelligence` — Attribution dashboard, event breakdown, AI analysis
+
+### Phase 2: M7 Intelligent Inventory Engine
+- **DB tables**: `inventory_tracking`, `restock_orders` (in `lib/db/src/schema/inventory.ts`)
+- **Routes**: `GET/POST /api/inventory/tracking`, `GET /api/inventory/alerts`, `POST /api/inventory/restock-email`, `GET /api/inventory/restock-orders`, `POST /api/inventory/sync`
+- **Page**: `/admin/inventory` — Stock monitoring, critical alerts, AI supplier email generation
+
+### Phase 3: Onboarding + Achievement System
+- **DB tables**: `onboarding_progress`, `achievements` (in `lib/db/src/schema/onboarding.ts`)
+- **Routes**: `GET /api/onboarding/progress`, `POST /api/onboarding/step`, `GET /api/onboarding/achievements-catalog`, `GET /api/achievements`
+- **Pages**: `/admin/achievements` (10 achievements), `/admin/roadmap` (30-60-90 day plan)
+- **Widget**: `OnboardingWidget` component (fixed bottom-right, shows progress/steps, auto-dismisses at 100%)
+
+### Phase 4: Competitor Intelligence
+- **DB tables**: `competitors`, `competitor_snapshots`, `competitor_alerts` (in `lib/db/src/schema/competitors.ts`)
+- **Routes**: `GET/POST /api/competitors`, `DELETE /api/competitors/:id`, `GET /api/competitors/snapshots`, `POST /api/competitors/scan`, `GET /api/competitors/alerts`, `POST /api/competitors/alerts/:id/dismiss`
+- **Page**: `/admin/competitors` — Add/manage competitors, AI scan with Claude, alert management, PDF export
+
+### Phase 5: Stripe Billing + Affiliate Program
+- **DB tables**: `subscriptions`, `affiliates`, `referral_tracking` (in `lib/db/src/schema/billing.ts`)
+- **Routes**: `GET /api/billing/subscription`, `GET /api/billing/plans`, `POST /api/billing/upgrade`, `GET /api/billing/affiliate`, `POST /api/billing/affiliate/join`, `GET /api/billing/invoices`
+- **Pages**: `/admin/billing` (subscription + affiliate + invoices tabs), `/admin/affiliates` (alias)
+- **Note**: Demo mode without live Stripe keys. Set STRIPE_SECRET_KEY for real payments.
+
+### Phase 6: ML Predictive Engine
+- **Routes**: Uses `/api/intelligence/analyze` + `/api/intelligence/snapshots`
+- **Page**: `/admin/forecast` — 4 metric forecasts with confidence intervals, ML methodology explanation
+
+### Phase 7: Voice Interface
+- **Routes**: `POST /api/voice/command` — Claude interprets Spanish commands, returns action + spoken response
+- **Component**: `VoiceButton` (fixed bottom-right at 88px, above onboarding widget) — Web Speech API, speech synthesis, bubble UI
+- **Supported actions**: navigate, get_revenue, get_inventory_alerts, run_audit, run_boost, generate_images
+
+### Phase 8: Mobile PWA
+- **Manifest**: `/public/manifest.json` — ShopifyAI Pro PWA config, gold theme, standalone display
+- **Service Worker**: `/public/sw.js` — Cache-first for static, network-first for API, push notifications handler
+- **Mobile CSS**: `@media (max-width: 600px)` in design-system.css — sidebar becomes horizontal scroll nav
+
+### Phase 9: Final Polish
+- **Sidebar**: 10 admin nav items in AppLayout covering all new pages
+- **Command Palette**: `CommandPalette` component — Cmd+K / Ctrl+K / ? to open, arrow keys to navigate, Enter to go
+- **Dark/Light mode**: Toggle button in sidebar, data-theme="light" CSS vars override
+- **Accessibility**: :focus-visible gold rings, aria-labels, aria-current, role attributes on nav/main
+- **Notification center**: Topbar bell icon opens panel (persistent, grouped)
+- **CSS aliases**: `.btn-primary`, `.btn-secondary`, `.glass-card`, `.input-field` added to design-system.css
+- **PWA prompt**: `beforeinstallprompt` event captures install prompt, shows banner
+
 ## Auth Architecture
 
 - **Session**: `express-session` + `connect-pg-simple` (table: `user_sessions`), 8h maxAge, httpOnly cookie

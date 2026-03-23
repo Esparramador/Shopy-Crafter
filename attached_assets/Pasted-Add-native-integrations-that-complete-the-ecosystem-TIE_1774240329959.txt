@@ -1,0 +1,244 @@
+Add native integrations that complete the ecosystem:
+
+TIER 1 — Críticas (sin estas falta funcionalidad core):
+
+1. KLAVIYO / OMNISEND:
+   Instead of just generating email HTML, actually
+   CREATE the flows in Klaviyo via API:
+   POST https://a.klaviyo.com/api/flows/
+   OmniCore generates the flow logic + emails +
+   pushes them live to Klaviyo. Zero copy-paste.
+
+2. GOOGLE ANALYTICS 4:
+   Pull real traffic data per product:
+   - Sessions per product page
+   - Bounce rate per product
+   - Revenue from organic vs paid
+   Use this in A/B test attribution and SEO scoring
+   GA4 Data API: analyticsdata.googleapis.com
+
+3. META ADS (Facebook/Instagram):
+   Create and manage product catalog for
+   Dynamic Product Ads automatically:
+   - Auto-sync Shopify catalog to Meta catalog
+   - Generate ad copy per product via Claude
+   - Monitor ROAS per product
+   When OmniCore detects high-velocity product:
+   "Este producto convierte bien orgánico —
+    sugerimos activar Dynamic Ads con €15/día"
+
+4. GOOGLE SEARCH CONSOLE:
+   Pull real ranking data:
+   GET https://searchconsole.googleapis.com/
+   Show per-product: position, clicks, impressions
+   OmniCore correlates SEO changes with ranking moves
+   "Aplicamos schema hace 12 días → posición mejoró
+    de 18 a 7 para 'bomber jacket mujer'"
+
+5. MAILCHIMP / RESEND:
+   For sending the actual monthly PDF reports
+   and system notifications via proper email:
+   npm install resend
+   Replace console.log email drafts with real sends
+
+TIER 2 — Importantes (multiplican el valor):
+
+6. WHATSAPP BUSINESS API (Twilio / 360dialog):
+   Send critical alerts via WhatsApp:
+   Stock crítico → WhatsApp al propietario
+   A/B test ganador → WhatsApp con resultado
+   Revenue milestone → WhatsApp celebración
+   Much higher open rate than email (98% vs 20%)
+
+7. SLACK WEBHOOK:
+   Enterprise clients want Slack notifications:
+   POST to Slack webhook for all significant events
+   Each client configures their own webhook URL
+   Especially valuable for Agency Enterprise plan
+
+8. ZAPIER WEBHOOK OUTPUT:
+   Expose outbound webhooks so clients can connect
+   ShopifyAI events to their own tools:
+   "When A/B test winner declared → update Notion"
+   "When stock critical → create Asana task"
+   Admin configures webhook URL per event type
+
+TIER 3 — Diferenciadoras:
+
+9. TRUSTPILOT / JUDGE.ME / STAMPED:
+   Pull real reviews via API
+   Show in product audit: review count, avg rating
+   OmniCore uses reviews as conversion signal
+   Generate review request emails on schedule
+
+10. GOOGLE MERCHANT CENTER:
+    Submit product feed for Google Shopping
+    Auto-generate optimized product titles/descriptions
+    for Shopping (different format than Shopify)
+    Monitor Shopping campaign performance
+
+POTENCIACIÓN 2 — Email Marketing nativo completo
+Build native email marketing so clients don't need
+Klaviyo for basic flows. OmniCore writes everything.
+
+INSTALL: npm install resend (€0 up to 3000 emails/month)
+
+EMAIL FLOWS ENGINE:
+CREATE TABLE email_flows (
+  id, project_id, flow_name, flow_type,
+  trigger_event, trigger_conditions,
+  emails JSON, -- array of email steps
+  is_active, stats JSON,
+  created_at
+);
+
+CREATE TABLE email_sends (
+  id, flow_id, project_id,
+  recipient_email, subject, status,
+  opened_at, clicked_at, sent_at
+);
+
+FLOW BUILDER UI /admin/email-flows:
+Visual flow builder (no code):
+[Trigger] → [Wait X days] → [Send email] →
+           → [If opened] → [Send followup]
+           → [If not opened] → [Different email]
+
+OmniCore generates ALL email content:
+For each flow, Claude writes:
+- 3 subject line variations (A/B test)
+- Full HTML email body (branded)
+- Preview text
+- Personalization tokens
+
+PRE-BUILT FLOWS (one-click activate):
+1. Welcome series (5 emails, 14 days)
+2. Abandoned cart (3 emails: 1h/24h/72h)
+3. Post-purchase (review request + upsell)
+4. Win-back (3 emails for dormant customers)
+5. VIP upgrade notification
+6. Stock back in stock alert
+7. Price drop alert (for wishlist items)
+8. Birthday discount (if DOB collected)
+
+PERSONALIZATION with Shopify data:
+{{ customer.first_name }}
+{{ product.title }} (last viewed/purchased)
+{{ discount_code }} (dynamic generation)
+{{ store.name }}
+
+EMAIL ANALYTICS:
+Open rate, click rate, revenue attributed
+Per-flow and per-email breakdown
+OmniCore optimizes subject lines based on open rates
+
+POTENCIACIÓN 3 — Multilenguaje automático
+Make the platform fully multilingual.
+Target markets: España, México, Colombia, Argentina,
+Chile, Perú — all Spanish but different expressions.
+Also: English for international clients.
+
+LANGUAGE ARCHITECTURE:
+Store language preference per:
+- Platform UI (admin/client interface)
+- Generated content (product descriptions, emails)
+- Store market (content generated in store's market language)
+
+DATABASE:
+ALTER TABLE projects ADD COLUMN content_language TEXT DEFAULT 'es-ES';
+ALTER TABLE users ADD COLUMN ui_language TEXT DEFAULT 'es';
+
+TRANSLATION FILES:
+/locales/es.json — Español (España) default
+/locales/es-mx.json — Español (México)  
+/locales/es-co.json — Español (Colombia)
+/locales/en.json — English
+
+Content varies by market:
+España: "tío", "guay", "mola" — informal Spanish
+México: "chido", "padre", "cuate" — MX informal
+Colombia: "bacano", "chimba" — CO informal
+Or formal tone for all — configurable per store
+
+CLAUDE LANGUAGE INJECTION:
+When generating content, inject market:
+"Generate content for market: [market].
+Use vocabulary and expressions natural for 
+[España/México/Colombia] consumers.
+Prices in [€/MXN/COP]. 
+Cultural references appropriate for [market]."
+
+UI LANGUAGE SWITCHER:
+Small flag dropdown in topbar
+Changes all UI strings instantly
+User preference saved to DB
+
+OmniCore learns per market:
+Separate memory entries per market:
+{ niche: 'moda', market: 'mx', insight: '...' }
+Mexican fashion uses different price psychology
+than Spanish fashion — OmniCore knows both
+
+POTENCIACIÓN 4 — El que más potencia el negocio: Marketplace de Plantillas
+Create a template marketplace where:
+- You sell pre-built OmniCore configurations
+- Other agencies share (paid) their best setups
+- Clients can buy "instant store setups" by niche
+
+This transforms ShopifyAI Pro from a TOOL
+into a PLATFORM with network effects.
+
+MARKETPLACE ARCHITECTURE:
+
+TEMPLATE TYPES:
+1. Niche Starter Pack:
+   "Tienda de Moda Urbana — Lista en 24h"
+   Includes: 50 OmniCore memories seeded,
+   product description templates, pricing rules,
+   email flows, image style guide, competitor list
+   Price: €47-97 one-time
+
+2. Email Flow Bundle:
+   "7 flows de email para moda — 
+    copiados de tiendas que venden €50K/mes"
+   Price: €27-47
+
+3. SEO Bundle by Niche:
+   "300 keywords + schema templates para 
+    tienda de suplementos deportivos"
+   Price: €37-67
+
+4. Pricing Playbook:
+   "Estrategia de precios probada para 
+    electrónica de consumo — márgenes del 45%+"
+   Price: €57-97
+
+DATABASE:
+CREATE TABLE marketplace_templates (
+  id, creator_id, template_type, niche,
+  title, description, preview_data,
+  price, currency, sales_count,
+  rating, is_approved, is_featured,
+  created_at
+);
+
+REVENUE SPLIT:
+You: 70% of each sale
+Creator (other agency): 30%
+Handled via Stripe Connect
+
+TEMPLATE INSTALLER:
+One-click install into any project:
+"Instalar plantilla en: [select store]"
+→ Imports OmniCore memories
+→ Configures pricing rules
+→ Activates email flows
+→ Sets up competitor list
+→ Shows what was installed
+
+WHY THIS IS HUGE:
+- Network effect: more templates = more value
+- Passive income: you earn on every sale
+- Moat: competitors can't replicate your template library
+- Speeds up onboarding: new client live in hours
+- OmniCore gets smarter: templates seed initial knowledge

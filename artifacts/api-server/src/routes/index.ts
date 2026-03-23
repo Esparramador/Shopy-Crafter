@@ -13,6 +13,13 @@ import authRouter from "./auth.js";
 import adminRouter from "./admin.js";
 import clientRouter from "./client.js";
 import cmsRouter from "./cms.js";
+import intelligenceRouter from "./intelligence.js";
+import inventoryRouter from "./inventory.js";
+import onboardingRouter from "./onboarding.js";
+import competitorsRouter from "./competitors.js";
+import billingRouter from "./billing.js";
+import voiceRouter from "./voice.js";
+import pushRouter from "./push.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -37,5 +44,12 @@ router.use(seoRouter);
 router.use(abTestingRouter);
 router.use(jobsRouter);
 router.use(consistencyRouter);
+router.use(intelligenceRouter);
+router.use(inventoryRouter);
+router.use(onboardingRouter);
+router.use(competitorsRouter);
+router.use(billingRouter);
+router.use(voiceRouter);
+router.use(pushRouter);
 
 export default router;
