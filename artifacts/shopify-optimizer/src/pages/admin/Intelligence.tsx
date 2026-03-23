@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Zap, BarChart3, DollarSign, RefreshCw, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, Zap, BarChart3, DollarSign, RefreshCw, Download, ShoppingCart } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -34,6 +34,8 @@ export default function Intelligence() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; totalRevenue?: number; totalOrders?: number; daysLoaded?: number; error?: string } | null>(null);
 
   useEffect(() => {
     if (!selectedProject && projects?.length > 0) {
@@ -75,6 +77,27 @@ export default function Intelligence() {
     }
   };
 
+  const syncShopifyRevenue = async () => {
+    if (!selectedProject) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/intelligence/sync-revenue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId: parseInt(selectedProject), days: 90 }),
+      });
+      const data = await res.json();
+      setSyncResult(data);
+      if (data.ok) await loadData();
+    } catch {
+      setSyncResult({ ok: false, error: "Error de conexión" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const exportCSV = () => {
     const rows = [["Fecha", "Tipo", "Producto", "Revenue Delta"]];
     events.forEach(e => rows.push([
@@ -108,6 +131,21 @@ export default function Intelligence() {
           <button className="btn-secondary" onClick={exportCSV} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Download size={14} /> CSV
           </button>
+          <button
+            onClick={syncShopifyRevenue}
+            disabled={syncing || !selectedProject}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: syncing ? "var(--ink3)" : "rgba(45,212,159,0.12)",
+              border: "1px solid rgba(45,212,159,0.3)",
+              color: "var(--jade)", borderRadius: 8, padding: "8px 14px",
+              cursor: syncing ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            <ShoppingCart size={14} />
+            {syncing ? "Sincronizando..." : "Sincronizar desde Shopify"}
+          </button>
           <button className="btn-primary" onClick={runAnalysis} disabled={analyzing || !selectedProject}
             style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Zap size={14} />
@@ -115,6 +153,26 @@ export default function Intelligence() {
           </button>
         </div>
       </div>
+
+      {syncResult && (
+        <div style={{
+          marginBottom: 16, padding: "12px 18px", borderRadius: 10,
+          background: syncResult.ok ? "rgba(45,212,159,0.08)" : "rgba(232,69,88,0.08)",
+          border: `1px solid ${syncResult.ok ? "rgba(45,212,159,0.25)" : "rgba(232,69,88,0.25)"}`,
+          color: syncResult.ok ? "var(--jade)" : "var(--crim)",
+          fontSize: 13, display: "flex", alignItems: "center", gap: 10,
+        }}>
+          {syncResult.ok ? (
+            <>
+              ✓ Sincronización completada — {syncResult.daysLoaded} días importados · {syncResult.totalOrders?.toLocaleString("es")} órdenes ·
+              €{syncResult.totalRevenue?.toLocaleString("es", { minimumFractionDigits: 2 })} revenue real
+            </>
+          ) : (
+            <>✕ Error sincronizando: {syncResult.error}</>
+          )}
+          <button onClick={() => setSyncResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 16 }}>×</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid-r4" style={{ marginBottom: 24 }}>

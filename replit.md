@@ -249,8 +249,9 @@ artifacts-monorepo/
 
 ### Phase 1: Revenue Intelligence 360°
 - **DB tables**: `events`, `revenue_snapshots`, `forecasts` (in `lib/db/src/schema/intelligence.ts`)
-- **Routes**: `GET/POST /api/intelligence/events`, `GET/POST /api/intelligence/snapshots`, `GET /api/intelligence/summary`, `POST /api/intelligence/analyze`
+- **Routes**: `GET/POST /api/intelligence/events`, `GET/POST /api/intelligence/snapshots`, `GET /api/intelligence/summary`, `POST /api/intelligence/analyze`, `POST /api/intelligence/sync-revenue`
 - **Page**: `/admin/intelligence` — Attribution dashboard, event breakdown, AI analysis
+- **On-demand sync**: `POST /api/intelligence/sync-revenue { projectId, days=90 }` — pulls real Shopify paid orders and stores as daily snapshots. No need to wait for 2am cron. Upserts existing dates. Used by the "Sincronizar desde Shopify" button in Intelligence.tsx.
 
 ### Phase 2: M7 Intelligent Inventory Engine
 - **DB tables**: `inventory_tracking`, `restock_orders` (in `lib/db/src/schema/inventory.ts`)

@@ -49,16 +49,29 @@ export async function runRevenueSnapshots() {
         const now = new Date();
         const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
         const data = await shopifyRequest<{ orders: Array<{ total_price: string }> }>(
-          project.id, `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`
+          project.id, project.shopDomain, `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`
         );
         const revenue = data.orders.reduce((sum, o) => sum + parseFloat(o.total_price || "0"), 0);
-        await db.insert(revenueSnapshotsTable).values({
-          projectId: project.id,
-          date: new Date().toISOString().split("T")[0],
-          revenue: String(revenue),
-          orderCount: data.orders.length,
-          source: "shopify_api",
-        }).onConflictDoNothing();
+        const today = new Date().toISOString().split("T")[0];
+        const existing = await db.select({ id: revenueSnapshotsTable.id })
+          .from(revenueSnapshotsTable)
+          .where(and(eq(revenueSnapshotsTable.projectId, String(project.id)), eq(revenueSnapshotsTable.date, today)))
+          .limit(1);
+        const aov = data.orders.length > 0 ? revenue / data.orders.length : 0;
+        if (existing.length > 0) {
+          await db.update(revenueSnapshotsTable)
+            .set({ revenue, orders: data.orders.length, aov })
+            .where(eq(revenueSnapshotsTable.id, existing[0].id));
+        } else {
+          await db.insert(revenueSnapshotsTable).values({
+            id: randomBytes(16).toString("hex"),
+            projectId: String(project.id),
+            date: today,
+            revenue,
+            orders: data.orders.length,
+            aov,
+          });
+        }
         log("revenue-snapshots", `Project ${project.id}: €${revenue.toFixed(2)}, ${data.orders.length} orders`);
       } catch (err) {
         logger.warn({ projectId: project.id, err }, "Revenue snapshot failed for project");
@@ -79,7 +92,7 @@ export async function runInventorySync() {
       if (!project.accessToken) continue;
       try {
         const data = await shopifyRequest<{ variants: Array<{ id: number; inventory_quantity: number; sku: string; product_id: number }> }>(
-          project.id, "/variants.json?limit=250"
+          project.id, project.shopDomain, "/variants.json?limit=250"
         );
         for (const variant of data.variants) {
           const existing = await db.select().from(inventoryTrackingTable)

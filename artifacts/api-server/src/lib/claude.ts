@@ -163,6 +163,23 @@ export async function buildShopyBrainContext(
 }
 
 /**
+ * askClaude enhanced with ShopyBrain context injection (returns raw string).
+ */
+export async function askClaudeWithBrain(
+  projectId: number,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  systemPrompt?: string,
+  useCase: "redesign" | "seo" | "pricing" | "images" | "general" = "general",
+  niche?: string,
+  maxTokens = 4096
+): Promise<string> {
+  const brainContext = await buildShopyBrainContext(niche, useCase);
+  const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
+  const enrichedSystem = brainContext ? base + brainContext : base;
+  return askClaude(projectId, messages, enrichedSystem, maxTokens);
+}
+
+/**
  * askClaudeJson enhanced with ShopyBrain context injection.
  */
 export async function askClaudeJsonWithBrain<T>(

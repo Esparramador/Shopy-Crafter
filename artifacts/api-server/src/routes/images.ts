@@ -4,7 +4,7 @@ import { projectsTable, productsTable, generationJobsTable } from "@workspace/db
 import { saveToVault } from "../lib/vault.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson } from "../lib/claude";
+import { askClaude, askClaudeJson, askClaudeWithBrain } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -204,7 +204,7 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
       const imageUrl = Array.isArray(output) ? (output[0] as string) : (output as string);
 
       const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
-      const altText = await askClaude(projectId, [{ role: "user", content: altTextPrompt }]);
+      const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
 
       await db.update(generationJobsTable)
         .set({ status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() })

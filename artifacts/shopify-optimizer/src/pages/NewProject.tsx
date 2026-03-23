@@ -4,11 +4,14 @@ import { ArrowRight, Loader2, ChevronDown, ChevronUp, ArrowLeft } from "lucide-r
 import { useCreateProject, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export default function NewProject() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createProject = useCreateProject();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "done">("idle");
   const [formData, setFormData] = useState({
     name: "",
     shopDomain: "",
@@ -30,8 +33,19 @@ export default function NewProject() {
     createProject.mutate(
       { data: formData },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          // Auto-sync products immediately so they're available on first visit
+          setSyncStatus("syncing");
+          try {
+            await fetch(`${API_BASE}/api/projects/${data.id}/products/sync`, {
+              method: "POST",
+              credentials: "include",
+            });
+          } catch {
+            // Non-fatal — user can sync manually from Audit page
+          }
+          setSyncStatus("done");
           setLocation(`/projects/${data.id}/audit`);
         },
       }
@@ -141,11 +155,12 @@ export default function NewProject() {
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="submit"
-              disabled={createProject.isPending}
-              className={`btn btn-gold btn-lg${createProject.isPending ? " loading" : ""}`}
+              disabled={createProject.isPending || syncStatus === "syncing"}
+              className={`btn btn-gold btn-lg${(createProject.isPending || syncStatus === "syncing") ? " loading" : ""}`}
             >
-              {createProject.isPending ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-              {createProject.isPending ? "Conectando..." : "Crear Proyecto"}
+              <Loader2 size={16} className={`animate-spin${createProject.isPending || syncStatus === "syncing" ? "" : " hidden"}`} style={{ display: createProject.isPending || syncStatus === "syncing" ? "block" : "none" }} />
+              {!createProject.isPending && syncStatus !== "syncing" && <ArrowRight size={16} />}
+              {createProject.isPending ? "Conectando..." : syncStatus === "syncing" ? "Importando productos..." : "Crear Proyecto"}
             </button>
           </div>
         </form>

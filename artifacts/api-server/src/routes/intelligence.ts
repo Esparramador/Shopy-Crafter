@@ -4,6 +4,7 @@ import { eventsTable, revenueSnapshotsTable, forecastsTable, projectsTable } fro
 import { eq, desc, and, gte } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { claude } from "../lib/claude.js";
+import { shopifyRequest } from "../lib/shopify.js";
 
 const router = Router();
 
@@ -78,6 +79,90 @@ router.get("/intelligence/summary", async (req, res): Promise<void> => {
       ? ((snapshots[0]?.revenue ?? 0) - (snapshots[1]?.revenue ?? 0)) / Math.max(snapshots[1]?.revenue ?? 1, 1) * 100
       : 0,
   });
+});
+
+// ─── ON-DEMAND SHOPIFY REVENUE SYNC ────────────────────────────────────────
+// Pulls real orders from Shopify for the last N days and stores as snapshots.
+// Called immediately when a project is connected or on user demand.
+router.post("/intelligence/sync-revenue", async (req, res): Promise<void> => {
+  const { projectId, days = 90 } = req.body;
+  if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+  if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+  if (!project.accessToken) { res.status(400).json({ error: "No Shopify token — connect your store first" }); return; }
+
+  try {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    let page = 1;
+    const dailyMap: Record<string, { revenue: number; orders: number; total_price_sum: number }> = {};
+    let hasMore = true;
+    let pageInfo: string | null = null;
+
+    // Fetch all paid orders page by page (max 250/page)
+    while (hasMore) {
+      const url = pageInfo
+        ? `/orders.json?status=any&financial_status=paid&limit=250&page_info=${pageInfo}`
+        : `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`;
+
+      const data = await shopifyRequest<{
+        orders: Array<{ id: number; created_at: string; total_price: string; subtotal_price: string }>;
+        link?: string;
+      }>(parseInt(projectId), project.shopDomain, url);
+
+      for (const order of data.orders) {
+        const date = order.created_at.split("T")[0];
+        if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0, total_price_sum: 0 };
+        dailyMap[date].revenue += parseFloat(order.total_price || "0");
+        dailyMap[date].orders += 1;
+      }
+
+      // Shopify pagination — stop when no more pages
+      hasMore = data.orders.length === 250 && page < 10;
+      page++;
+      pageInfo = null; // simple pagination by page count
+    }
+
+    let inserted = 0;
+    for (const [date, vals] of Object.entries(dailyMap)) {
+      const aov = vals.orders > 0 ? vals.revenue / vals.orders : 0;
+      // Check if snapshot already exists for this date+project
+      const existing = await db.select({ id: revenueSnapshotsTable.id })
+        .from(revenueSnapshotsTable)
+        .where(and(eq(revenueSnapshotsTable.projectId, String(projectId)), eq(revenueSnapshotsTable.date, date)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db.update(revenueSnapshotsTable)
+          .set({ revenue: vals.revenue, orders: vals.orders, aov })
+          .where(eq(revenueSnapshotsTable.id, existing[0].id));
+      } else {
+        await db.insert(revenueSnapshotsTable).values({
+          id: randomUUID(),
+          projectId: String(projectId),
+          date,
+          revenue: vals.revenue,
+          orders: vals.orders,
+          aov,
+        });
+      }
+      inserted++;
+    }
+
+    const totalRevenue = Object.values(dailyMap).reduce((s, v) => s + v.revenue, 0);
+    const totalOrders = Object.values(dailyMap).reduce((s, v) => s + v.orders, 0);
+
+    res.json({
+      ok: true,
+      daysLoaded: inserted,
+      totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+      totalOrders,
+      storeName: project.name,
+      syncedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? "Shopify sync failed" });
+  }
 });
 
 router.post("/intelligence/analyze", async (req, res): Promise<void> => {
