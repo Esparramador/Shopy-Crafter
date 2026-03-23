@@ -219,6 +219,20 @@ artifacts-monorepo/
 - **NEW Page**: `/admin/revenue` — CRM tracker: KPI cards (MRR, clientes activos, ticket medio), filtro por service_level, tabla editable inline con todos los clientes
 - **Sidebar**: "Revenue & CRM" (💰) añadido en ADMIN_NAV; "Tienda / Store" (🛒) enlace directo a /tienda
 
+### Landing Page — Fullpage Scroll-Snap (7 secciones)
+- **Arquitectura**: CSS `scroll-snap-type: y mandatory`, `fp-container` fixed (top: 64px), cada sección = `calc(100vh - 64px)`
+- **7 secciones**: Hero (split + dashboard preview) → Engines (6 motores con tab nav) → Demo (split + cards) → Resultados (animated counters) → Precios (3 cards) → Clientes (carousel automático) → CTA + Footer
+- **Navegación lateral**: `fp-sidenav` fixed derecha con dots dorados + labels al hover
+- **Barra de progreso**: `fp-progress` fixed izquierda, animada con porcentaje por sección
+- **Contador secciones**: `fp-counter` fixed abajo centro, formato 01/07
+- **Navegación teclado**: ArrowDown/Up, PageDown/Up navegan entre secciones
+- **IntersectionObserver**: Detecta sección activa con threshold 0.5, activa animaciones `fp-animate → fp-animated`
+- **AnimatedCounter**: Componente React que cuenta hacia el número objetivo cuando la sección entra en viewport
+- **Testimonials carousel**: Auto-rotación cada 4.5s, dots de control manual
+- **Engines tab**: 6 motores con tab navigation, panel animado por motor seleccionado
+- **Archivo**: `artifacts/shopify-optimizer/src/pages/Landing.tsx` (completamente reescrito, 7 secciones)
+- **CSS**: `landing.css` — añadidas 350+ líneas de estilos fp-* (fullpage engine, secciones, responsive)
+
 ### Shopify Storefront Store (/tienda)
 - **Route**: `artifacts/api-server/src/routes/store.ts` — montado ANTES de requireAuth (público)
 - **Endpoints**:

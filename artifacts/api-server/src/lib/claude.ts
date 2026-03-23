@@ -96,23 +96,23 @@ export async function buildShopyBrainContext(
     const memoriesQuery = db
       .select({
         memoryType: omnicoreMemoriesTable.memoryType,
-        nicheContext: omnicoreMemoriesTable.nicheContext,
+        niche: omnicoreMemoriesTable.niche,
         content: omnicoreMemoriesTable.content,
-        confidence: omnicoreMemoriesTable.confidenceScore,
+        confidence: omnicoreMemoriesTable.confidence,
       })
       .from(omnicoreMemoriesTable)
-      .where(gte(omnicoreMemoriesTable.confidenceScore, String(minConfidence)))
-      .orderBy(desc(omnicoreMemoriesTable.confidenceScore))
+      .where(gte(omnicoreMemoriesTable.confidence, minConfidence))
+      .orderBy(desc(omnicoreMemoriesTable.confidence))
       .limit(12);
 
     const promptsQuery = db
       .select({
         useCase: omnicorePromptLibraryTable.useCase,
         promptTemplate: omnicorePromptLibraryTable.promptTemplate,
-        performanceScore: omnicorePromptLibraryTable.performanceScore,
+        avgQualityScore: omnicorePromptLibraryTable.avgQualityScore,
       })
       .from(omnicorePromptLibraryTable)
-      .orderBy(desc(omnicorePromptLibraryTable.performanceScore))
+      .orderBy(desc(omnicorePromptLibraryTable.avgQualityScore))
       .limit(5);
 
     const [memories, prompts] = await Promise.all([memoriesQuery, promptsQuery]);
@@ -125,7 +125,7 @@ export async function buildShopyBrainContext(
     if (useCase) lines.push(`Task context: ${useCase}`);
 
     const nicheMemories = niche
-      ? memories.filter(m => m.nicheContext && m.nicheContext.toLowerCase().includes(niche.toLowerCase()))
+      ? memories.filter(m => m.niche && m.niche.toLowerCase().includes(niche.toLowerCase()))
       : [];
     const generalMemories = memories.filter(m => !nicheMemories.includes(m));
 
@@ -139,7 +139,7 @@ export async function buildShopyBrainContext(
     if (generalMemories.length > 0) {
       lines.push("\nGeneral agency knowledge:");
       for (const m of generalMemories.slice(0, 6)) {
-        const nicheTag = m.nicheContext ? ` [${m.nicheContext}]` : "";
+        const nicheTag = m.niche ? ` [${m.niche}]` : "";
         lines.push(`  [${m.memoryType}${nicheTag}] ${m.content}`);
       }
     }
