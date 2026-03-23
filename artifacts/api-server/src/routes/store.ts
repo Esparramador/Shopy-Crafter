@@ -12,55 +12,53 @@ const STOREFRONT_TOKEN = () =>
 const COLLECTION_HANDLE = () =>
   process.env.COLLECTION_HANDLE || "shopify-automatization";
 
-const PRODUCTS_QUERY = `
+const PRODUCT_FIELDS = `
+  id
+  title
+  handle
+  descriptionHtml
+  productType
+  tags
+  priceRange {
+    minVariantPrice { amount currencyCode }
+  }
+  compareAtPriceRange {
+    minVariantPrice { amount currencyCode }
+  }
+  images(first: 3) {
+    edges {
+      node { url altText width height }
+    }
+  }
+  variants(first: 5) {
+    edges {
+      node {
+        id
+        title
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+        availableForSale
+        selectedOptions { name value }
+      }
+    }
+  }
+`;
+
+const COLLECTION_QUERY = `
   query getCollectionProducts($handle: String!) {
     collectionByHandle(handle: $handle) {
       title
       products(first: 20) {
-        edges {
-          node {
-            id
-            title
-            handle
-            descriptionHtml
-            productType
-            tags
-            priceRange {
-              minVariantPrice { amount currencyCode }
-            }
-            compareAtPriceRange {
-              minVariantPrice { amount currencyCode }
-            }
-            images(first: 3) {
-              edges {
-                node { url altText width height }
-              }
-            }
-            variants(first: 5) {
-              edges {
-                node {
-                  id
-                  title
-                  price { amount currencyCode }
-                  compareAtPrice { amount currencyCode }
-                  availableForSale
-                  selectedOptions { name value }
-                }
-              }
-            }
-            metafields(
-              identifiers: [
-                {namespace: "custom", key: "features"},
-                {namespace: "custom", key: "highlight"},
-                {namespace: "custom", key: "badge"}
-              ]
-            ) {
-              key
-              value
-            }
-          }
-        }
+        edges { node { ${PRODUCT_FIELDS} } }
       }
+    }
+  }
+`;
+
+const ALL_PRODUCTS_QUERY = `
+  query getAllProducts {
+    products(first: 20, sortKey: BEST_SELLING) {
+      edges { node { ${PRODUCT_FIELDS} } }
     }
   }
 `;
@@ -80,36 +78,45 @@ const CHECKOUT_MUTATION = `
   }
 `;
 
+async function shopifyFetch(query: string, variables?: Record<string, any>) {
+  const response = await fetch(STOREFRONT_ENDPOINT(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN(),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const data = await response.json() as any;
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (data.errors) throw new Error(JSON.stringify(data.errors));
+  return data.data;
+}
+
 router.get("/store/products", async (_req, res): Promise<void> => {
+  const currency = process.env.SHOP_CURRENCY || "EUR";
   try {
-    const response = await fetch(STOREFRONT_ENDPOINT(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN(),
-      },
-      body: JSON.stringify({
-        query: PRODUCTS_QUERY,
-        variables: { handle: COLLECTION_HANDLE() },
-      }),
-    });
+    // Try collection first
+    const collectionData = await shopifyFetch(COLLECTION_QUERY, { handle: COLLECTION_HANDLE() });
+    const collectionProducts = collectionData?.collectionByHandle?.products?.edges?.map((e: any) => e.node) || [];
 
-    const data = await response.json() as any;
-
-    if (!response.ok || data.errors) {
-      logger.error("Storefront API error:", JSON.stringify(data.errors || response.status));
-      res.set("Cache-Control", "no-cache");
-      res.json({ products: [], currency: process.env.SHOP_CURRENCY || "EUR", error: "collection_not_found" });
+    if (collectionProducts.length > 0) {
+      res.set("Cache-Control", "public, max-age=1800");
+      res.json({ products: collectionProducts, currency });
       return;
     }
 
-    const products = data.data?.collectionByHandle?.products?.edges?.map((e: any) => e.node) || [];
+    // Fallback: all products (collection doesn't exist or is empty)
+    logger.info("Collection not found or empty — fetching all products");
+    const allData = await shopifyFetch(ALL_PRODUCTS_QUERY);
+    const allProducts = allData?.products?.edges?.map((e: any) => e.node) || [];
 
     res.set("Cache-Control", "public, max-age=1800");
-    res.json({ products, currency: process.env.SHOP_CURRENCY || "EUR" });
+    res.json({ products: allProducts, currency });
   } catch (err: any) {
-    logger.error("Store products error:", err.message);
-    res.status(500).json({ error: "Store temporarily unavailable" });
+    logger.error("Storefront API error:", err.message);
+    res.set("Cache-Control", "no-cache");
+    res.json({ products: [], currency, error: err.message });
   }
 });
 
