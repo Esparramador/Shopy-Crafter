@@ -7,7 +7,7 @@ const STOREFRONT_ENDPOINT = () =>
   `https://${process.env.SHOP_DOMAIN || "comic-crafter.myshopify.com"}/api/2024-10/graphql.json`;
 
 const STOREFRONT_TOKEN = () =>
-  process.env.STOREFRONT_ACCESS_TOKEN || "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";
+  process.env.STOREFRONT_ACCESS_TOKEN || "";
 
 const COLLECTION_HANDLE = () =>
   process.env.COLLECTION_HANDLE || "shopify-automatization";
