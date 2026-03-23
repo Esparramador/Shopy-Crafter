@@ -1,5 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import session from "express-session";
 import ConnectPg from "connect-pg-simple";
 import pinoHttp from "pino-http";
@@ -13,6 +15,12 @@ const PgSession = ConnectPg(session);
 const app: Express = express();
 
 app.set("trust proxy", 1);
+
+// ── Security headers (Helmet) ─────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 
 // ── Gzip compression for all responses ──────────────────────────────────────
 app.use(compression());
@@ -34,6 +42,34 @@ app.use(
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos. Espera 15 minutos antes de reintentar.", code: "RATE_LIMITED" },
+  skip: (req) => process.env.NODE_ENV !== "production",
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Límite de peticiones alcanzado. Inténtalo en un momento.", code: "RATE_LIMITED" },
+  skip: (req) => process.env.NODE_ENV !== "production",
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes de IA simultáneas. Espera un momento.", code: "AI_RATE_LIMITED" },
+  skip: (req) => process.env.NODE_ENV !== "production",
+});
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
@@ -71,6 +107,16 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use("/api/auth", authLimiter);
+app.use("/api/shopybrain/study", aiLimiter);
+app.use("/api/intelligence", aiLimiter);
+app.use("/api/redesign", aiLimiter);
+app.use("/api/seo", aiLimiter);
+app.use("/api/emails", aiLimiter);
+app.use("/api/reference", aiLimiter);
+app.use("/api/agency/analyze", aiLimiter);
+app.use("/api/agency/proposal", aiLimiter);
+app.use("/api", apiLimiter);
 app.use("/api", router);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
