@@ -2,6 +2,8 @@
 
 ## Overview
 
+Shopify AI Optimizer — Personal e-commerce platform management tool. Multi-client project management, no user authentication. Each client = one isolated project with per-store Shopify OAuth credentials.
+
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
 ## Stack
@@ -15,33 +17,97 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend**: React 19 + Vite + TailwindCSS + Framer Motion + Recharts
+- **AI**: Anthropic Claude (`claude-sonnet-4-5`) + Replicate (Flux, Recraft)
+- **Image processing**: Sharp (post-process generated images)
+
+## Design Tokens
+
+- Background: `#08080f` (deep space dark)
+- Accent: `#5b4eff` (electric violet)
+- Grade colors: A=`#00d68f` B=`#00b4d8` C=`#ffd32a` D=`#ff8c42` F=`#ff4757`
+- Premium dark glassmorphism panels
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── artifacts/
+│   ├── api-server/             # Express API server (port 8080)
+│   │   └── src/
+│   │       ├── lib/
+│   │       │   ├── shopify.ts  # Shopify OAuth + API client
+│   │       │   ├── claude.ts   # Anthropic Claude client
+│   │       │   ├── audit.ts    # Product scoring algorithm
+│   │       │   ├── bulk-queue.ts # Background job management
+│   │       │   └── logger.ts   # Pino structured logging
+│   │       └── routes/
+│   │           ├── projects.ts     # Project CRUD + token management
+│   │           ├── products.ts     # Product sync + audit
+│   │           ├── redesign.ts     # AI redesign + bulk redesign
+│   │           ├── images.ts       # AI image generation + upload
+│   │           ├── pricing.ts      # COGS + pricing calculator
+│   │           ├── seo.ts          # SEO audit + generation
+│   │           ├── ab-testing.ts   # A/B test management + tracking
+│   │           └── jobs.ts         # Bulk job status polling
+│   ├── shopify-optimizer/      # React+Vite frontend (port 19080)
+│   │   └── src/
+│   │       ├── pages/projects/ # Audit, Redesign, Images, Consistency, ABTesting, Pricing, SEO, Settings
+│   │       ├── components/ui/  # GlassCard, GradeBadge
+│   │       └── components/layout/ # AppLayout
+│   └── mockup-sandbox/         # Component preview server (port 8081)
+├── lib/
+│   ├── api-spec/               # OpenAPI spec + Orval codegen config
+│   ├── api-client-react/       # Generated React Query hooks
+│   ├── api-zod/                # Generated Zod schemas from OpenAPI
+│   └── db/
+│       └── src/schema/
+│           ├── projects.ts         # Store project + OAuth tokens
+│           ├── products.ts         # Shopify product cache + audit scores
+│           ├── redesigns.ts        # AI redesign results
+│           ├── generation_jobs.ts  # Image generation job tracking
+│           ├── ab_tests.ts         # A/B tests + tracking events
+│           ├── cogs.ts             # Cost of goods sold data
+│           ├── visual_dna.ts       # Visual brand DNA profiles
+│           ├── seo_data.ts         # SEO meta data + scores
+│           └── bulk_jobs.ts        # Bulk operation tracking
+├── scripts/                    # Utility scripts
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── tsconfig.json
+└── package.json
 ```
+
+## Modules (Frontend Tabs per Project)
+
+1. **Auditoría** — Product audit with A-F scoring (5 axes: title/desc/price/images/seo)
+2. **Rediseño IA** — Claude AI product title/description/price redesign, apply to Shopify
+3. **Imágenes** — Replicate AI image generation (8 types: hero/lifestyle/detail/packaging/ugc/scale/bundle/infographic)
+4. **Consistencia** — Visual brand DNA extraction + store consistency scoring
+5. **A/B Testing** — Image variant A/B testing with z-test statistical significance
+6. **Pricing** — COGS calculator + Claude pricing optimization + margin waterfall
+7. **SEO** — Meta generation, schema markup, alt texts, keyword intelligence, blog strategy
+
+## Shopify OAuth Flow
+
+Projects store `clientId` + `clientSecret`. On use, POST to `https://{shopDomain}/admin/oauth/access_token` with `grant_type=client_credentials` to get a short-lived access token. Auto-refresh on 401 + manual "Refresh Token" button. Token stored in DB with `tokenExpiresAt`.
+
+## AI Models
+
+- **Claude**: `claude-sonnet-4-5` via `@anthropic-ai/sdk` — redesign, SEO, pricing, alt text, infographics
+- **Replicate**:
+  - Hero/Lifestyle/Bundle → `black-forest-labs/flux-1.1-pro`
+  - Detail/Scale → `black-forest-labs/flux-dev`
+  - Packaging/UGC → `recraft-ai/recraft-v3`
+  - Infographic → SVG via Claude only
 
 ## TypeScript & Composite Projects
 
 Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`).
+- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite.
+- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array.
 
 ## Root Scripts
 
@@ -57,10 +123,19 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
 - Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
+- Depends on: `@workspace/db`, `@workspace/api-zod`, `@anthropic-ai/sdk`, `replicate`, `sharp`, `axios`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+- `pnpm --filter @workspace/api-server run build` — production esbuild bundle
+
+### `artifacts/shopify-optimizer` (`@workspace/shopify-optimizer`)
+
+React 19 + Vite frontend. Multi-project sidebar layout with 7 module tabs per project.
+
+- Entry: `src/main.tsx`
+- App: `src/App.tsx` — routing + React Query setup
+- Layout: `src/components/layout/AppLayout.tsx` — sidebar + project selector
+- Pages: `src/pages/projects/` — one file per module
+- Uses: `@workspace/api-client-react` React Query hooks
 
 ### `lib/db` (`@workspace/db`)
 
@@ -68,11 +143,10 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 
 - `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
 - `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)
+- Schema: 9 tables (projects, products, redesigns, generation_jobs, ab_tests, track_events, cogs, visual_dna, seo_data, bulk_jobs)
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+Production migrations are handled by Replit when publishing. In development: `pnpm --filter @workspace/db run push`.
 
 ### `lib/api-spec` (`@workspace/api-spec`)
 
@@ -85,12 +159,8 @@ Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 
 ### `lib/api-zod` (`@workspace/api-zod`)
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+Generated Zod schemas from the OpenAPI spec. Used by `api-server` for response validation.
 
 ### `lib/api-client-react` (`@workspace/api-client-react`)
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+Generated React Query hooks and fetch client from the OpenAPI spec.

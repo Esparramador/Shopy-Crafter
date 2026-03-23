@@ -1,22 +1,38 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Shopify AI Optimizer Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: projects
+    description: Project management (one per Shopify store)
+  - name: products
+    description: Shopify product operations
+  - name: audit
+    description: Product audit and scoring
+  - name: redesign
+    description: AI-powered product redesign with Claude
+  - name: images
+    description: Image generation with Replicate
+  - name: consistency
+    description: Visual consistency engine
+  - name: ab-testing
+    description: A/B image testing
+  - name: pricing
+    description: Financial pricing engine
+  - name: seo
+    description: Technical SEO automation
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +40,924 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── PROJECTS ───────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project (one per Shopify store)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectInput"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project by ID
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project configuration
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectInput"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /projects/{projectId}/refresh-token:
+    post:
+      operationId: refreshProjectToken
+      tags: [projects]
+      summary: Refresh Shopify OAuth access token using client_credentials
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRefreshResult"
+        "400":
+          description: Token refresh failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{projectId}/test-connection:
+    post:
+      operationId: testProjectConnection
+      tags: [projects]
+      summary: Test Shopify connection and token validity
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResult"
+
+  # ─── PRODUCTS ────────────────────────────────────────────────
+  /projects/{projectId}/products:
+    get:
+      operationId: getProjectProducts
+      tags: [products]
+      summary: Get all products from Shopify store (with local audit data)
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: grade
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list with audit scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListResponse"
+
+  /projects/{projectId}/products/sync:
+    post:
+      operationId: syncProducts
+      tags: [products]
+      summary: Sync all products from Shopify and run audit
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /projects/{projectId}/products/{productId}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get single product with full audit data
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+
+  # ─── AUDIT ───────────────────────────────────────────────────
+  /projects/{projectId}/audit:
+    post:
+      operationId: runAudit
+      tags: [audit]
+      summary: Run product audit for entire store
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Audit summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditSummary"
+
+  /projects/{projectId}/products/{productId}/audit:
+    post:
+      operationId: auditProduct
+      tags: [audit]
+      summary: Run audit for a single product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: Product audit result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductAuditResult"
+
+  /projects/{projectId}/catalog-opportunities:
+    post:
+      operationId: getCatalogOpportunities
+      tags: [audit]
+      summary: Get AI-suggested missing products for the store niche
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Catalog opportunities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogOpportunity"
+
+  # ─── REDESIGN ────────────────────────────────────────────────
+  /projects/{projectId}/products/{productId}/redesign:
+    post:
+      operationId: redesignProduct
+      tags: [redesign]
+      summary: AI redesign a single product with Claude
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: Redesigned product data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedesignResult"
+
+  /projects/{projectId}/products/{productId}/apply-redesign:
+    post:
+      operationId: applyRedesign
+      tags: [redesign]
+      summary: Apply redesign to Shopify product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyRedesignInput"
+      responses:
+        "200":
+          description: Apply result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /projects/{projectId}/bulk-redesign:
+    post:
+      operationId: bulkRedesign
+      tags: [redesign]
+      summary: Bulk redesign products (all weak or all)
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRedesignInput"
+      responses:
+        "200":
+          description: Bulk redesign job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  # ─── IMAGES ──────────────────────────────────────────────────
+  /projects/{projectId}/products/{productId}/images/generate:
+    post:
+      operationId: generateImage
+      tags: [images]
+      summary: Generate a single product image with Replicate
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateImageInput"
+      responses:
+        "200":
+          description: Generation job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationJob"
+
+  /projects/{projectId}/products/{productId}/images/generate-infographic:
+    post:
+      operationId: generateInfographic
+      tags: [images]
+      summary: Generate SVG infographic for a product via Claude
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: SVG infographic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfographicResult"
+
+  /projects/{projectId}/generation-jobs/{jobId}:
+    get:
+      operationId: getGenerationJob
+      tags: [images]
+      summary: Poll image generation job status
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationJob"
+
+  /projects/{projectId}/products/{productId}/images/{imageId}/upload-to-shopify:
+    post:
+      operationId: uploadImageToShopify
+      tags: [images]
+      summary: Upload a generated image to Shopify product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /projects/{projectId}/bulk-generate-images:
+    post:
+      operationId: bulkGenerateImages
+      tags: [images]
+      summary: Bulk image generation (Boost Masivo)
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkGenerateInput"
+      responses:
+        "200":
+          description: Bulk generation job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  /projects/{projectId}/build-image-prompt:
+    post:
+      operationId: buildImagePrompt
+      tags: [images]
+      summary: Preview the image prompt Claude will generate before sending to Replicate
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildPromptInput"
+      responses:
+        "200":
+          description: Preview prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptPreview"
+
+  # ─── VISUAL CONSISTENCY ──────────────────────────────────────
+  /projects/{projectId}/visual-dna:
+    get:
+      operationId: getVisualDna
+      tags: [consistency]
+      summary: Get stored visual DNA for the store
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Visual DNA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisualDna"
+    post:
+      operationId: extractVisualDna
+      tags: [consistency]
+      summary: Extract visual DNA from store images via Claude Vision
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Extracted visual DNA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisualDna"
+
+  /projects/{projectId}/consistency-scores:
+    get:
+      operationId: getConsistencyScores
+      tags: [consistency]
+      summary: Get consistency scores for all products
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Consistency scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsistencyDashboard"
+
+  /projects/{projectId}/repair-consistency:
+    post:
+      operationId: repairConsistency
+      tags: [consistency]
+      summary: Repair off-brand product images with StyleLock
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairConsistencyInput"
+      responses:
+        "200":
+          description: Repair job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  # ─── A/B TESTING ─────────────────────────────────────────────
+  /projects/{projectId}/ab-tests:
+    get:
+      operationId: listAbTests
+      tags: [ab-testing]
+      summary: List all A/B tests for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A/B tests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AbTest"
+    post:
+      operationId: createAbTest
+      tags: [ab-testing]
+      summary: Create a new A/B test
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAbTestInput"
+      responses:
+        "201":
+          description: Test created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AbTest"
+
+  /projects/{projectId}/ab-tests/{testId}:
+    get:
+      operationId: getAbTest
+      tags: [ab-testing]
+      summary: Get A/B test details
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/testId"
+      responses:
+        "200":
+          description: Test detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AbTest"
+
+  /projects/{projectId}/ab-tests/{testId}/declare-winner:
+    post:
+      operationId: declareAbTestWinner
+      tags: [ab-testing]
+      summary: Manually declare winner or auto-process stats
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/testId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeclareWinnerInput"
+      responses:
+        "200":
+          description: Winner declared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AbTest"
+
+  /projects/{projectId}/ab-dashboard:
+    get:
+      operationId: getAbDashboard
+      tags: [ab-testing]
+      summary: Get A/B testing revenue impact dashboard
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AbDashboard"
+
+  /track:
+    post:
+      operationId: trackEvent
+      tags: [ab-testing]
+      summary: Pixel tracker endpoint (receives events from tracker.js)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrackEvent"
+      responses:
+        "200":
+          description: Tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── PRICING ─────────────────────────────────────────────────
+  /projects/{projectId}/products/{productId}/cogs:
+    get:
+      operationId: getProductCogs
+      tags: [pricing]
+      summary: Get COGS structure for a product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: COGS data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CogsData"
+    post:
+      operationId: saveProductCogs
+      tags: [pricing]
+      summary: Save COGS structure for a product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCogsInput"
+      responses:
+        "200":
+          description: COGS saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CogsData"
+
+  /projects/{projectId}/products/{productId}/analyze-competitors:
+    post:
+      operationId: analyzeCompetitorPrices
+      tags: [pricing]
+      summary: Scrape and analyze competitor pricing
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompetitorAnalysisInput"
+      responses:
+        "200":
+          description: Competitor price analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitorAnalysisResult"
+
+  /projects/{projectId}/products/{productId}/calculate-optimal-price:
+    post:
+      operationId: calculateOptimalPrice
+      tags: [pricing]
+      summary: Calculate optimal price using Claude as financial analyst
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      responses:
+        "200":
+          description: Pricing recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRecommendation"
+
+  /projects/{projectId}/products/{productId}/apply-price:
+    post:
+      operationId: applyPriceToShopify
+      tags: [pricing]
+      summary: Apply recommended price to Shopify product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/productId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyPriceInput"
+      responses:
+        "200":
+          description: Price applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /projects/{projectId}/financial-dashboard:
+    get:
+      operationId: getFinancialDashboard
+      tags: [pricing]
+      summary: Get P&L dashboard with live Shopify orders data
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Financial dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialDashboard"
+
+  # ─── SEO ─────────────────────────────────────────────────────
+  /projects/{projectId}/seo/audit:
+    post:
+      operationId: runSeoAudit
+      tags: [seo]
+      summary: Run full SEO audit for the store
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: SEO audit results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeoAuditResult"
+
+  /projects/{projectId}/seo/generate-schemas:
+    post:
+      operationId: generateSchemas
+      tags: [seo]
+      summary: Generate JSON-LD schemas and inject to Shopify
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeoActionInput"
+      responses:
+        "200":
+          description: Schema generation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  /projects/{projectId}/seo/generate-metas:
+    post:
+      operationId: generateMetas
+      tags: [seo]
+      summary: Batch generate meta tags for all products missing them
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeoActionInput"
+      responses:
+        "200":
+          description: Meta generation job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  /projects/{projectId}/seo/generate-sitemap:
+    post:
+      operationId: generateSitemap
+      tags: [seo]
+      summary: Generate XML sitemap and ping Google
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Sitemap result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SitemapResult"
+
+  /projects/{projectId}/seo/audit-page-speed:
+    post:
+      operationId: auditPageSpeed
+      tags: [seo]
+      summary: Audit Core Web Vitals via PageSpeed Insights
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageSpeedInput"
+      responses:
+        "200":
+          description: PageSpeed results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageSpeedResult"
+
+  /projects/{projectId}/seo/keyword-intelligence:
+    post:
+      operationId: getKeywordIntelligence
+      tags: [seo]
+      summary: Get keyword strategy for a product
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeywordInput"
+      responses:
+        "200":
+          description: Keyword strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeywordStrategy"
+
+  /projects/{projectId}/seo/blog-strategy:
+    post:
+      operationId: getBlogStrategy
+      tags: [seo]
+      summary: Generate blog content strategy for the store
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Blog strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogStrategy"
+
+  /projects/{projectId}/seo/generate-blog-post:
+    post:
+      operationId: generateBlogPost
+      tags: [seo]
+      summary: Generate a full blog post with Claude
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogPostInput"
+      responses:
+        "200":
+          description: Generated blog post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPost"
+
+  /projects/{projectId}/seo/fix-alt-texts:
+    post:
+      operationId: fixAltTexts
+      tags: [seo]
+      summary: Batch generate and apply SEO alt texts for all product images
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: Alt text fix job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobResponse"
+
+  /projects/{projectId}/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags: [images]
+      summary: Get background job status (bulk operations)
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+
 components:
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: integer
+    productId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+    testId:
+      name: testId
+      in: path
+      required: true
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +967,1451 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    # ─── PROJECT ───────────────────────────────────────────
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        shopDomain:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        hasAccessToken:
+          type: boolean
+        tokenExpiresAt:
+          type: ["string", "null"]
+        storeNiche:
+          type: ["string", "null"]
+        brandTone:
+          type: ["string", "null"]
+        targetAudience:
+          type: ["string", "null"]
+        storeMarkets:
+          type: ["string", "null"]
+        replicateApiToken:
+          type: ["string", "null"]
+        anthropicApiKey:
+          type: ["string", "null"]
+        autoPilotEnabled:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        productCount:
+          type: ["integer", "null"]
+        avgAuditScore:
+          type: ["number", "null"]
+      required:
+        - id
+        - name
+        - shopDomain
+        - clientId
+        - clientSecret
+        - hasAccessToken
+        - autoPilotEnabled
+        - createdAt
+        - updatedAt
+
+    CreateProjectInput:
+      type: object
+      properties:
+        name:
+          type: string
+        shopDomain:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        storeNiche:
+          type: string
+        brandTone:
+          type: string
+        targetAudience:
+          type: string
+        storeMarkets:
+          type: string
+        replicateApiToken:
+          type: string
+        anthropicApiKey:
+          type: string
+      required:
+        - name
+        - shopDomain
+        - clientId
+        - clientSecret
+
+    UpdateProjectInput:
+      type: object
+      properties:
+        name:
+          type: string
+        shopDomain:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        storeNiche:
+          type: string
+        brandTone:
+          type: string
+        targetAudience:
+          type: string
+        storeMarkets:
+          type: string
+        replicateApiToken:
+          type: string
+        anthropicApiKey:
+          type: string
+        autoPilotEnabled:
+          type: boolean
+
+    TokenRefreshResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        expiresAt:
+          type: ["string", "null"]
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        storeName:
+          type: ["string", "null"]
+        planName:
+          type: ["string", "null"]
+        productCount:
+          type: ["integer", "null"]
+        tokenValid:
+          type: boolean
+        tokenExpiresAt:
+          type: ["string", "null"]
+        error:
+          type: ["string", "null"]
+      required:
+        - connected
+        - tokenValid
+
+    # ─── PRODUCTS ──────────────────────────────────────────
+    ShopifyProduct:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        bodyHtml:
+          type: ["string", "null"]
+        vendor:
+          type: ["string", "null"]
+        productType:
+          type: ["string", "null"]
+        handle:
+          type: string
+        status:
+          type: string
+        tags:
+          type: string
+        price:
+          type: ["string", "null"]
+        compareAtPrice:
+          type: ["string", "null"]
+        imageCount:
+          type: integer
+        variantCount:
+          type: integer
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShopifyImage"
+        auditScore:
+          type: ["number", "null"]
+        auditGrade:
+          type: ["string", "null"]
+        auditProblems:
+          type: array
+          items:
+            type: string
+        titleScore:
+          type: ["number", "null"]
+        descriptionScore:
+          type: ["number", "null"]
+        priceScore:
+          type: ["number", "null"]
+        imageScore:
+          type: ["number", "null"]
+        seoScore:
+          type: ["number", "null"]
+      required:
+        - id
+        - title
+        - handle
+        - status
+        - tags
+        - imageCount
+        - variantCount
+        - images
+
+    ShopifyImage:
+      type: object
+      properties:
+        id:
+          type: ["integer", "null"]
+        src:
+          type: string
+        alt:
+          type: ["string", "null"]
+        position:
+          type: integer
+      required:
+        - src
+        - position
+
+    ProductListResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShopifyProduct"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+        avgScore:
+          type: ["number", "null"]
+        gradeCounts:
+          $ref: "#/components/schemas/GradeCounts"
+      required:
+        - products
+        - total
+        - page
+        - totalPages
+
+    GradeCounts:
+      type: object
+      properties:
+        A:
+          type: integer
+        B:
+          type: integer
+        C:
+          type: integer
+        D:
+          type: integer
+        F:
+          type: integer
+      required:
+        - A
+        - B
+        - C
+        - D
+        - F
+
+    ProductDetail:
+      type: object
+      properties:
+        product:
+          $ref: "#/components/schemas/ShopifyProduct"
+        auditResult:
+          $ref: "#/components/schemas/ProductAuditResult"
+        redesignResult:
+          type: ["object", "null"]
+        cogsData:
+          type: ["object", "null"]
+        generatedImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenerationJob"
+      required:
+        - product
+
+    SyncResult:
+      type: object
+      properties:
+        synced:
+          type: integer
+        auditedCount:
+          type: integer
+        avgScore:
+          type: ["number", "null"]
+        message:
+          type: string
+      required:
+        - synced
+        - auditedCount
+        - message
+
+    # ─── AUDIT ─────────────────────────────────────────────
+    ProductAuditResult:
+      type: object
+      properties:
+        productId:
+          type: string
+        overallScore:
+          type: number
+        grade:
+          type: string
+        titleScore:
+          type: number
+        descriptionScore:
+          type: number
+        priceScore:
+          type: number
+        imageScore:
+          type: number
+        seoScore:
+          type: number
+        problems:
+          type: array
+          items:
+            type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+        revenueImpact:
+          type: ["string", "null"]
+      required:
+        - productId
+        - overallScore
+        - grade
+        - titleScore
+        - descriptionScore
+        - priceScore
+        - imageScore
+        - seoScore
+        - problems
+        - suggestions
+
+    AuditSummary:
+      type: object
+      properties:
+        totalProducts:
+          type: integer
+        avgScore:
+          type: number
+        gradeCounts:
+          $ref: "#/components/schemas/GradeCounts"
+        criticalIssues:
+          type: integer
+        projectedRevenueImpact:
+          type: string
+        topIssues:
+          type: array
+          items:
+            type: string
+      required:
+        - totalProducts
+        - avgScore
+        - gradeCounts
+        - criticalIssues
+        - projectedRevenueImpact
+        - topIssues
+
+    CatalogOpportunity:
+      type: object
+      properties:
+        productName:
+          type: string
+        estimatedPriceMin:
+          type: number
+        estimatedPriceMax:
+          type: number
+        whyItFits:
+          type: string
+        sourcingDifficulty:
+          type: string
+      required:
+        - productName
+        - estimatedPriceMin
+        - estimatedPriceMax
+        - whyItFits
+        - sourcingDifficulty
+
+    # ─── REDESIGN ──────────────────────────────────────────
+    RedesignResult:
+      type: object
+      properties:
+        productId:
+          type: string
+        title:
+          type: string
+        bodyHtml:
+          type: string
+        shortDescription:
+          type: string
+        price:
+          type: string
+        compareAtPrice:
+          type: string
+        tags:
+          type: string
+        metaTitle:
+          type: string
+        metaDescription:
+          type: string
+        photoBrief:
+          type: array
+          items:
+            type: string
+        originalTitle:
+          type: string
+        originalPrice:
+          type: string
+        priceReasoning:
+          type: string
+      required:
+        - productId
+        - title
+        - bodyHtml
+        - shortDescription
+        - price
+        - compareAtPrice
+        - tags
+        - metaTitle
+        - metaDescription
+        - photoBrief
+        - originalTitle
+        - originalPrice
+
+    ApplyRedesignInput:
+      type: object
+      properties:
+        redesignId:
+          type: integer
+        fields:
+          type: array
+          items:
+            type: string
+      required:
+        - fields
+
+    BulkRedesignInput:
+      type: object
+      properties:
+        mode:
+          type: string
+        minGrade:
+          type: string
+      required:
+        - mode
+
+    BulkJobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+        totalItems:
+          type: integer
+        message:
+          type: string
+      required:
+        - jobId
+        - status
+        - totalItems
+        - message
+
+    # ─── IMAGES ────────────────────────────────────────────
+    GenerateImageInput:
+      type: object
+      properties:
+        imageType:
+          type: string
+        customPrompt:
+          type: ["string", "null"]
+        styleOverrides:
+          type: ["object", "null"]
+      required:
+        - imageType
+
+    GenerationJob:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: integer
+        productId:
+          type: string
+        imageType:
+          type: string
+        status:
+          type: string
+        prompt:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        shopifyImageId:
+          type: ["integer", "null"]
+        altText:
+          type: ["string", "null"]
+        estimatedCost:
+          type: ["number", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - projectId
+        - productId
+        - imageType
+        - status
+        - createdAt
+
+    InfographicResult:
+      type: object
+      properties:
+        svgContent:
+          type: string
+        pngBase64:
+          type: ["string", "null"]
+        uploaded:
+          type: boolean
+      required:
+        - svgContent
+        - uploaded
+
+    BulkGenerateInput:
+      type: object
+      properties:
+        productIds:
+          type: array
+          items:
+            type: string
+        imageTypes:
+          type: array
+          items:
+            type: string
+        estimatedCost:
+          type: number
+      required:
+        - productIds
+        - imageTypes
+
+    BuildPromptInput:
+      type: object
+      properties:
+        productId:
+          type: string
+        imageType:
+          type: string
+      required:
+        - productId
+        - imageType
+
+    PromptPreview:
+      type: object
+      properties:
+        prompt:
+          type: string
+        negativePrompt:
+          type: string
+        model:
+          type: string
+        modelReason:
+          type: string
+        estimatedTime:
+          type: integer
+        estimatedCost:
+          type: number
+      required:
+        - prompt
+        - negativePrompt
+        - model
+        - modelReason
+        - estimatedTime
+        - estimatedCost
+
+    # ─── CONSISTENCY ───────────────────────────────────────
+    VisualDna:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        backgroundStyle:
+          type: ["string", "null"]
+        lightingStyle:
+          type: ["string", "null"]
+        colorTemp:
+          type: ["string", "null"]
+        composition:
+          type: ["string", "null"]
+        mood:
+          type: ["string", "null"]
+        props:
+          type: array
+          items:
+            type: string
+        humanPresence:
+          type: ["string", "null"]
+        consistencyScore:
+          type: ["number", "null"]
+        brandColors:
+          type: array
+          items:
+            type: string
+        extractedAt:
+          type: ["string", "null"]
+      required:
+        - projectId
+        - props
+        - brandColors
+
+    ConsistencyDashboard:
+      type: object
+      properties:
+        storeScore:
+          type: number
+        totalProducts:
+          type: integer
+        consistent:
+          type: integer
+        offBrand:
+          type: integer
+        inconsistent:
+          type: integer
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductConsistencyScore"
+      required:
+        - storeScore
+        - totalProducts
+        - consistent
+        - offBrand
+        - inconsistent
+        - products
+
+    ProductConsistencyScore:
+      type: object
+      properties:
+        productId:
+          type: string
+        productTitle:
+          type: string
+        score:
+          type: number
+        status:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+      required:
+        - productId
+        - productTitle
+        - score
+        - status
+        - issues
+
+    RepairConsistencyInput:
+      type: object
+      properties:
+        productIds:
+          type: array
+          items:
+            type: string
+      required:
+        - productIds
+
+    # ─── A/B TESTING ───────────────────────────────────────
+    AbTest:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: integer
+        productId:
+          type: string
+        productTitle:
+          type: string
+        imageType:
+          type: string
+        hypothesis:
+          type: string
+        variantAUrl:
+          type: ["string", "null"]
+        variantBUrl:
+          type: ["string", "null"]
+        variantAVisitors:
+          type: integer
+        variantBVisitors:
+          type: integer
+        variantAConversions:
+          type: integer
+        variantBConversions:
+          type: integer
+        variantARevenue:
+          type: number
+        variantBRevenue:
+          type: number
+        confidence:
+          type: number
+        winner:
+          type: ["string", "null"]
+        status:
+          type: string
+        targetMetric:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: ["string", "null"]
+      required:
+        - id
+        - projectId
+        - productId
+        - imageType
+        - hypothesis
+        - variantAVisitors
+        - variantBVisitors
+        - variantAConversions
+        - variantBConversions
+        - variantARevenue
+        - variantBRevenue
+        - confidence
+        - status
+        - targetMetric
+        - startDate
+
+    CreateAbTestInput:
+      type: object
+      properties:
+        productId:
+          type: string
+        imageType:
+          type: string
+        hypothesis:
+          type: string
+        variantAImageId:
+          type: string
+        variantBImageId:
+          type: string
+        targetMetric:
+          type: string
+      required:
+        - productId
+        - imageType
+        - hypothesis
+        - targetMetric
+
+    DeclareWinnerInput:
+      type: object
+      properties:
+        winner:
+          type: string
+        applyToShopify:
+          type: boolean
+      required:
+        - winner
+        - applyToShopify
+
+    AbDashboard:
+      type: object
+      properties:
+        activeTests:
+          type: integer
+        completedTests:
+          type: integer
+        winRate:
+          type: number
+        totalRevenueImpact:
+          type: number
+        avgConversionLift:
+          type: number
+        insight:
+          type: string
+        recentWinners:
+          type: array
+          items:
+            $ref: "#/components/schemas/AbTest"
+      required:
+        - activeTests
+        - completedTests
+        - winRate
+        - totalRevenueImpact
+        - avgConversionLift
+        - insight
+        - recentWinners
+
+    TrackEvent:
+      type: object
+      properties:
+        testId:
+          type: string
+        variant:
+          type: string
+        eventType:
+          type: string
+        productId:
+          type: string
+        sessionId:
+          type: string
+        revenue:
+          type: ["number", "null"]
+      required:
+        - testId
+        - variant
+        - eventType
+        - productId
+        - sessionId
+
+    # ─── PRICING ───────────────────────────────────────────
+    CogsData:
+      type: object
+      properties:
+        productId:
+          type: string
+        unitCost:
+          type: number
+        packagingCost:
+          type: number
+        labelCost:
+          type: number
+        shippingCostDomestic:
+          type: number
+        shippingCostInternational:
+          type: number
+        fulfillmentFee:
+          type: number
+        returnRate:
+          type: number
+        returnProcessingCost:
+          type: number
+        shopifyPaymentFee:
+          type: number
+        shopifyPlanCostPerOrder:
+          type: number
+        cac:
+          type: number
+        affiliateFee:
+          type: number
+        overheadPerUnit:
+          type: number
+        totalCogs:
+          type: number
+        breakEvenPrice:
+          type: number
+        minimumViablePrice:
+          type: number
+      required:
+        - productId
+        - unitCost
+        - packagingCost
+        - labelCost
+        - shippingCostDomestic
+        - shippingCostInternational
+        - fulfillmentFee
+        - returnRate
+        - returnProcessingCost
+        - shopifyPaymentFee
+        - shopifyPlanCostPerOrder
+        - cac
+        - affiliateFee
+        - overheadPerUnit
+        - totalCogs
+        - breakEvenPrice
+        - minimumViablePrice
+
+    SaveCogsInput:
+      type: object
+      properties:
+        unitCost:
+          type: number
+        packagingCost:
+          type: number
+        labelCost:
+          type: number
+        shippingCostDomestic:
+          type: number
+        shippingCostInternational:
+          type: number
+        fulfillmentFee:
+          type: number
+        returnRate:
+          type: number
+        returnProcessingCost:
+          type: number
+        shopifyPlanCostPerOrder:
+          type: number
+        cac:
+          type: number
+        affiliateFee:
+          type: number
+        overheadPerUnit:
+          type: number
+      required:
+        - unitCost
+        - packagingCost
+        - shippingCostDomestic
+        - fulfillmentFee
+        - returnRate
+        - cac
+        - overheadPerUnit
+
+    CompetitorAnalysisInput:
+      type: object
+      properties:
+        competitorUrls:
+          type: array
+          items:
+            type: string
+        searchKeywords:
+          type: ["string", "null"]
+      required:
+        - competitorUrls
+
+    CompetitorAnalysisResult:
+      type: object
+      properties:
+        budgetMin:
+          type: ["number", "null"]
+        budgetMax:
+          type: ["number", "null"]
+        midMin:
+          type: ["number", "null"]
+        midMax:
+          type: ["number", "null"]
+        premiumMin:
+          type: ["number", "null"]
+        premiumMax:
+          type: ["number", "null"]
+        medianPrice:
+          type: ["number", "null"]
+        positioningRecommendation:
+          type: string
+        competitorData:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+              price:
+                type: ["number", "null"]
+              brand:
+                type: ["string", "null"]
+            required:
+              - url
+      required:
+        - positioningRecommendation
+        - competitorData
+
+    PricingRecommendation:
+      type: object
+      properties:
+        optimalPrice:
+          type: number
+        psychologicalPrice:
+          type: number
+        compareAtPrice:
+          type: number
+        recommendedStrategy:
+          type: string
+        marginWaterfall:
+          type: object
+          properties:
+            revenue:
+              type: number
+            platformFees:
+              type: number
+            cogs:
+              type: number
+            packaging:
+              type: number
+            shipping:
+              type: number
+            returns:
+              type: number
+            marketing:
+              type: number
+            overhead:
+              type: number
+            netMargin:
+              type: number
+            netMarginPct:
+              type: number
+          required:
+            - revenue
+            - netMargin
+            - netMarginPct
+        reasoning:
+          type: string
+        marginWarnings:
+          type: array
+          items:
+            type: string
+        bundleSuggestions:
+          type: array
+          items:
+            type: string
+        monthlyRevenueProjection:
+          type: ["number", "null"]
+      required:
+        - optimalPrice
+        - psychologicalPrice
+        - compareAtPrice
+        - recommendedStrategy
+        - reasoning
+        - marginWarnings
+        - bundleSuggestions
+
+    ApplyPriceInput:
+      type: object
+      properties:
+        price:
+          type: string
+        compareAtPrice:
+          type: ["string", "null"]
+      required:
+        - price
+
+    FinancialDashboard:
+      type: object
+      properties:
+        grossRevenue:
+          type: number
+        totalCogs:
+          type: number
+        grossProfit:
+          type: number
+        grossMarginPct:
+          type: number
+        netMarginPct:
+          type: number
+        aov:
+          type: number
+        cac:
+          type: ["number", "null"]
+        ltvCacRatio:
+          type: ["number", "null"]
+        productProfitability:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductProfitRow"
+        alerts:
+          type: array
+          items:
+            type: string
+      required:
+        - grossRevenue
+        - totalCogs
+        - grossProfit
+        - grossMarginPct
+        - netMarginPct
+        - aov
+        - productProfitability
+        - alerts
+
+    ProductProfitRow:
+      type: object
+      properties:
+        productId:
+          type: string
+        title:
+          type: string
+        unitsSold:
+          type: integer
+        revenue:
+          type: number
+        cogs:
+          type: number
+        grossProfit:
+          type: number
+        marginPct:
+          type: number
+        grade:
+          type: string
+      required:
+        - productId
+        - title
+        - unitsSold
+        - revenue
+        - cogs
+        - grossProfit
+        - marginPct
+        - grade
+
+    # ─── SEO ───────────────────────────────────────────────
+    SeoAuditResult:
+      type: object
+      properties:
+        storeScore:
+          type: number
+        storeGrade:
+          type: string
+        totalProducts:
+          type: integer
+        criticalIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeoIssue"
+        highIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeoIssue"
+        mediumIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeoIssue"
+        lowIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeoIssue"
+        productScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductSeoScore"
+      required:
+        - storeScore
+        - storeGrade
+        - totalProducts
+        - criticalIssues
+        - highIssues
+        - mediumIssues
+        - lowIssues
+        - productScores
+
+    SeoIssue:
+      type: object
+      properties:
+        type:
+          type: string
+        message:
+          type: string
+        affectedCount:
+          type: integer
+        impact:
+          type: string
+      required:
+        - type
+        - message
+        - affectedCount
+        - impact
+
+    ProductSeoScore:
+      type: object
+      properties:
+        productId:
+          type: string
+        title:
+          type: string
+        score:
+          type: number
+        grade:
+          type: string
+        hasMetaTitle:
+          type: boolean
+        hasMetaDesc:
+          type: boolean
+        hasSchema:
+          type: boolean
+        hasAltTexts:
+          type: boolean
+        cleanHandle:
+          type: boolean
+        descriptionLength:
+          type: integer
+      required:
+        - productId
+        - title
+        - score
+        - grade
+        - hasMetaTitle
+        - hasMetaDesc
+        - hasSchema
+        - hasAltTexts
+        - cleanHandle
+        - descriptionLength
+
+    SeoActionInput:
+      type: object
+      properties:
+        productIds:
+          type: array
+          items:
+            type: string
+        applyToShopify:
+          type: boolean
+      required:
+        - applyToShopify
+
+    SitemapResult:
+      type: object
+      properties:
+        sitemapUrl:
+          type: string
+        productsCount:
+          type: integer
+        collectionsCount:
+          type: integer
+        pagesCount:
+          type: integer
+        googlePinged:
+          type: boolean
+        generatedAt:
+          type: string
+      required:
+        - sitemapUrl
+        - productsCount
+        - googlePinged
+        - generatedAt
+
+    PageSpeedInput:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    PageSpeedResult:
+      type: object
+      properties:
+        url:
+          type: string
+        performanceScore:
+          type: number
+        lcp:
+          type: number
+        cls:
+          type: number
+        inp:
+          type: number
+        issues:
+          type: array
+          items:
+            type: string
+        fixes:
+          type: array
+          items:
+            type: string
+      required:
+        - url
+        - performanceScore
+        - lcp
+        - cls
+        - inp
+        - issues
+        - fixes
+
+    KeywordInput:
+      type: object
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+      required:
+        - productName
+
+    KeywordStrategy:
+      type: object
+      properties:
+        primaryKeyword:
+          type: string
+        secondaryKeywords:
+          type: array
+          items:
+            type: string
+        semanticKeywords:
+          type: array
+          items:
+            type: string
+        negativeKeywords:
+          type: array
+          items:
+            type: string
+        difficulty:
+          type: string
+        h1Tag:
+          type: string
+        h2Tags:
+          type: array
+          items:
+            type: string
+        faqSchema:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+              answer:
+                type: string
+            required:
+              - question
+              - answer
+        urlHandle:
+          type: string
+        blogPostIdea:
+          type: string
+      required:
+        - primaryKeyword
+        - secondaryKeywords
+        - semanticKeywords
+        - negativeKeywords
+        - difficulty
+        - h1Tag
+        - h2Tags
+        - faqSchema
+        - urlHandle
+        - blogPostIdea
+
+    BlogStrategy:
+      type: object
+      properties:
+        pillarPage:
+          $ref: "#/components/schemas/BlogPostOutline"
+        clusterPosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogPostOutline"
+        productPosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogPostOutline"
+      required:
+        - pillarPage
+        - clusterPosts
+        - productPosts
+
+    BlogPostOutline:
+      type: object
+      properties:
+        title:
+          type: string
+        primaryKeyword:
+          type: string
+        wordCountTarget:
+          type: integer
+        h2Structure:
+          type: array
+          items:
+            type: string
+        internalLinks:
+          type: array
+          items:
+            type: string
+        sampleIntro:
+          type: string
+        funnel:
+          type: string
+      required:
+        - title
+        - primaryKeyword
+        - wordCountTarget
+        - h2Structure
+        - internalLinks
+        - sampleIntro
+        - funnel
+
+    BlogPostInput:
+      type: object
+      properties:
+        title:
+          type: string
+        primaryKeyword:
+          type: string
+        outline:
+          $ref: "#/components/schemas/BlogPostOutline"
+      required:
+        - title
+        - primaryKeyword
+
+    BlogPost:
+      type: object
+      properties:
+        title:
+          type: string
+        metaTitle:
+          type: string
+        metaDescription:
+          type: string
+        bodyHtml:
+          type: string
+        wordCount:
+          type: integer
+        readyForShopify:
+          type: boolean
+      required:
+        - title
+        - metaTitle
+        - metaDescription
+        - bodyHtml
+        - wordCount
+        - readyForShopify
+
+    JobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+        progress:
+          type: integer
+        total:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+        log:
+          type: array
+          items:
+            type: string
+        result:
+          type: ["object", "null"]
+      required:
+        - jobId
+        - status
+        - progress
+        - total
+        - completed
+        - failed
+        - log

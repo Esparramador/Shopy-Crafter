@@ -1,0 +1,24 @@
+packages:
+  "framer-motion": "For premium smooth page transitions and micro-interactions"
+  "recharts": "For the pricing/P&L financial dashboard and A/B testing revenue charts"
+  "@hookform/resolvers": "Zod validation for forms (project creation, COGS)"
+  "react-hook-form": "Form state management"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to merge tailwind classes without style conflicts"
+  "date-fns": "For formatting dates in A/B tests and background jobs"
+
+images:
+  - path: "artifacts/shopify-optimizer/public/images/hero-bg.png"
+    description: "Deep space abstract gradient mesh background with dark navy, black, and subtle electric violet light leaks, premium 8k resolution"
+    aspect_ratio: "16:9"
+  - path: "artifacts/shopify-optimizer/public/images/logo-icon.png"
+    description: "Minimalist geometric icon representing artificial intelligence and e-commerce, electric violet glowing on pure black background, simple clean logo mark"
+    aspect_ratio: "1:1"
+  - path: "artifacts/shopify-optimizer/public/images/empty-state.png"
+    description: "Premium abstract 3D illustration of a floating glass cube with a glowing purple core, dark background, suitable for an empty state in a luxury SaaS app"
+    aspect_ratio: "1:1"
+
+notes:
+  - Hooks from @workspace/api-client-react are used directly per the generated orval output.
+  - Using framer-motion to achieve the 'premium SaaS' feel with smooth stagger animations.
+  - The UI uses a 'glassmorphism' deep-space theme matching the design requirements.

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Shopify AI Optimizer"
+version = "1.0.0"
+id = "artifacts/shopify-optimizer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19080
+
+[services.development]
+run = "pnpm --filter @workspace/shopify-optimizer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/shopify-optimizer", "run", "build" ]
+publicDir = "artifacts/shopify-optimizer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19080"
+BASE_PATH = "/"
