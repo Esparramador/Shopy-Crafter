@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -24,6 +24,15 @@ interface Message {
   createdAt: string;
 }
 
+interface Service {
+  id: string;
+  serviceName: string;
+  serviceType: string;
+  priceCurrent: number | null;
+  priceSuggested: number | null;
+  shopifyVariantId: string | null;
+}
+
 function timeSince(dateStr: string | null) {
   if (!dateStr) return "Nunca";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -39,10 +48,7 @@ function formatTime(dateStr: string) {
 }
 
 // ─── Invite Modal ─────────────────────────────────────────────────────────────
-interface InviteModalProps {
-  onClose: () => void;
-  onInvited: (link: string, email: string) => void;
-}
+interface InviteModalProps { onClose: () => void; onInvited: (link: string, email: string) => void; }
 
 function InviteModal({ onClose, onInvited }: InviteModalProps) {
   const [email, setEmail] = useState("");
@@ -57,9 +63,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/admin/projects/${projectId.trim()}/invite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify({ email, name }),
       });
       const data = await res.json();
@@ -67,9 +71,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
       onInvited(data.inviteLink, email);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al invitar");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -88,11 +90,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
               <input type={type} className="form-input" value={value} onChange={(e) => onChange(e.target.value)} required placeholder={placeholder} />
             </div>
           ))}
-          {error && (
-            <div style={{ background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.2)", borderRadius: 8, padding: "8px 12px", color: "var(--crim)", fontSize: 12.5, marginBottom: 14 }}>
-              {error}
-            </div>
-          )}
+          {error && <div style={{ background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.2)", borderRadius: 8, padding: "8px 12px", color: "var(--crim)", fontSize: 12.5, marginBottom: 14 }}>{error}</div>}
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
             <button type="submit" disabled={loading} className={`btn btn-gold${loading ? " loading" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
@@ -106,19 +104,187 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
   );
 }
 
-// ─── Chat Panel ───────────────────────────────────────────────────────────────
-interface ChatPanelProps {
-  client: User;
-  onClose: () => void;
+// ─── Payment Link Modal ───────────────────────────────────────────────────────
+interface PaymentLinkModalProps { client: User; onClose: () => void; onSendToChat?: (msg: string) => void; }
+
+function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalProps) {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [note, setNote] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState<{ checkoutUrl?: string | null; error?: string; requiresMapping?: boolean; service?: { name: string; price: number } } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/agency/services`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { setServices(Array.isArray(d) ? d : []); setLoadingServices(false); });
+  }, []);
+
+  const generate = async () => {
+    if (!selectedServiceId) return;
+    setGenerating(true);
+    setResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/agency/payment-link`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ serviceId: selectedServiceId, clientName: client.name, note }),
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch {
+      setResult({ error: "Error de red al generar el link" });
+    } finally { setGenerating(false); }
+  };
+
+  const copy = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const sendViaChat = () => {
+    if (!result?.checkoutUrl || !onSendToChat) return;
+    const svc = services.find((s) => s.id === selectedServiceId);
+    const msg = `💳 Link de pago para ${svc?.serviceName ?? "servicio"} — €${(svc?.priceSuggested ?? svc?.priceCurrent ?? 0).toFixed(0)}/mes:\n${result.checkoutUrl}`;
+    onSendToChat(msg);
+    onClose();
+  };
+
+  const price = (svc: Service) => (svc.priceSuggested ?? svc.priceCurrent ?? 0).toFixed(0);
+
+  const typeLabel: Record<string, string> = {
+    setup: "Setup único", retainer: "Retainer/mes", extra: "Extra/único", consultation: "Consultoría",
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ width: "100%", maxWidth: 520, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(200,168,75,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ShoppingCart size={17} style={{ color: "var(--gold)" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>Generar Link de Pago</p>
+            <p style={{ fontSize: 12, color: "var(--t3)" }}>{client.name} · {client.email}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", padding: 4 }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          {/* Service selector */}
+          {loadingServices ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "var(--t3)", fontSize: 13 }}>
+              <Loader2 size={16} style={{ animation: "spin 0.6s linear infinite", color: "var(--gold)" }} />
+              Cargando servicios...
+            </div>
+          ) : (
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label">Servicio a cobrar</label>
+              <select
+                className="form-input"
+                value={selectedServiceId}
+                onChange={(e) => { setSelectedServiceId(e.target.value); setResult(null); }}
+              >
+                <option value="">— Selecciona un servicio —</option>
+                {services.map((svc) => (
+                  <option key={svc.id} value={svc.id}>
+                    {svc.serviceName} — €{price(svc)} {typeLabel[svc.serviceType] ?? ""}{!svc.shopifyVariantId ? " ⚠ sin vincular" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-group" style={{ marginBottom: 18 }}>
+            <label className="form-label">Nota interna (opcional)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ej: Pago mes de abril, 2 tiendas..."
+            />
+          </div>
+
+          {/* Result */}
+          {result && (
+            <div style={{
+              borderRadius: 10, padding: 14, marginBottom: 16,
+              background: result.checkoutUrl ? "rgba(45,212,159,0.06)" : "rgba(200,168,75,0.06)",
+              border: `1px solid ${result.checkoutUrl ? "rgba(45,212,159,0.25)" : result.requiresMapping ? "rgba(200,168,75,0.25)" : "rgba(232,69,88,0.25)"}`,
+            }}>
+              {result.checkoutUrl ? (
+                <>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--jade)", marginBottom: 8 }}>
+                    ✅ Link generado — {result.service?.name} · €{result.service?.price?.toFixed(0)}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--ink3)", borderRadius: 8, padding: "8px 10px", border: "1px solid var(--bdr)", marginBottom: 10 }}>
+                    <code style={{ flex: 1, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--t2)" }}>
+                      {result.checkoutUrl}
+                    </code>
+                    <button onClick={() => copy(result.checkoutUrl!)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gold)", display: "flex", flexShrink: 0 }}>
+                      {copied ? <CheckCircle size={13} style={{ color: "var(--jade)" }} /> : <Copy size={13} />}
+                    </button>
+                    <a href={result.checkoutUrl} target="_blank" rel="noreferrer" style={{ color: "var(--t3)", display: "flex", flexShrink: 0 }}>
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => copy(result.checkoutUrl!)} className="btn btn-jade btn-sm" style={{ flex: 1, justifyContent: "center" }}>
+                      {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
+                      {copied ? "¡Copiado!" : "Copiar link"}
+                    </button>
+                    {onSendToChat && client.clientId && (
+                      <button onClick={sendViaChat} className="btn btn-gold btn-sm" style={{ flex: 1, justifyContent: "center" }}>
+                        <Send size={12} />
+                        Enviar por chat
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <AlertCircle size={16} style={{ color: result.requiresMapping ? "var(--gold)" : "var(--crim)", flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 12.5, color: result.requiresMapping ? "var(--gold)" : "var(--crim)", lineHeight: 1.5 }}>
+                    {result.error}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cerrar</button>
+            <button
+              onClick={generate}
+              disabled={!selectedServiceId || generating}
+              className={`btn btn-gold${generating ? " loading" : ""}`}
+              style={{ flex: 2, justifyContent: "center" }}
+            >
+              {generating ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
+              {generating ? "Generando..." : "Generar link Shopify"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function ChatPanel({ client, onClose }: ChatPanelProps) {
+// ─── Chat Panel ───────────────────────────────────────────────────────────────
+interface ChatPanelProps { client: User; onClose: () => void; initialMessage?: string; }
+
+function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialMessage ?? "");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-
   const projectId = client.clientId;
 
   const load = () => {
@@ -135,42 +301,21 @@ function ChatPanel({ client, onClose }: ChatPanelProps) {
     if (!text.trim() || !projectId) return;
     setSending(true);
     await fetch(`${API_BASE}/api/admin/projects/${projectId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ content: text.trim() }),
     });
-    setText("");
-    setSending(false);
-    load();
+    setText(""); setSending(false); load();
   };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)",
-      backdropFilter: "blur(4px)", zIndex: 400,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-    }}>
-      <div style={{
-        width: "100%", maxWidth: 540, height: "80vh", maxHeight: 680,
-        background: "var(--srf)", border: "1px solid var(--bdr)",
-        borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 540, height: "80vh", maxHeight: 680, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Header */}
-        <div style={{
-          padding: "14px 16px", borderBottom: "1px solid var(--bdr)",
-          display: "flex", alignItems: "center", gap: 10,
-        }}>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", padding: 4 }}>
             <ArrowLeft size={16} />
           </button>
-          <div style={{
-            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-            background: client.avatarColor ? `${client.avatarColor}22` : "rgba(200,168,75,0.1)",
-            color: client.avatarColor ?? "var(--gold2)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 700,
-          }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: client.avatarColor ? `${client.avatarColor}22` : "rgba(200,168,75,0.1)", color: client.avatarColor ?? "var(--gold2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
             {client.name.slice(0, 2).toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -189,9 +334,7 @@ function ChatPanel({ client, onClose }: ChatPanelProps) {
               <Loader2 size={20} style={{ color: "var(--gold)", animation: "spin 0.6s linear infinite" }} />
             </div>
           ) : !projectId ? (
-            <div style={{ textAlign: "center", padding: 32, color: "var(--t3)", fontSize: 13 }}>
-              Este cliente no tiene un proyecto asignado.
-            </div>
+            <div style={{ textAlign: "center", padding: 32, color: "var(--t3)", fontSize: 13 }}>Este cliente no tiene un proyecto asignado.</div>
           ) : messages.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <p style={{ fontSize: 24, marginBottom: 8 }}>💬</p>
@@ -204,28 +347,19 @@ function ChatPanel({ client, onClose }: ChatPanelProps) {
                 return (
                   <div key={msg.id} style={{ display: "flex", justifyContent: isAdmin ? "flex-end" : "flex-start" }}>
                     <div style={{ maxWidth: "74%" }}>
-                      {!isAdmin && (
-                        <p style={{ fontSize: 10, color: "var(--t3)", marginBottom: 3, marginLeft: 2 }}>{msg.fromName}</p>
-                      )}
+                      {!isAdmin && <p style={{ fontSize: 10, color: "var(--t3)", marginBottom: 3, marginLeft: 2 }}>{msg.fromName}</p>}
                       <div style={{
                         padding: "8px 12px",
                         borderRadius: isAdmin ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-                        background: isAdmin
-                          ? "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)"
-                          : "var(--ink3)",
+                        background: isAdmin ? "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)" : "var(--ink3)",
                         border: isAdmin ? "none" : "1px solid var(--bdr)",
-                        fontSize: 13, color: isAdmin ? "#0a0a14" : "var(--t1)",
-                        fontWeight: isAdmin ? 500 : 400, lineHeight: 1.5,
+                        fontSize: 13, color: isAdmin ? "#0a0a14" : "var(--t1)", fontWeight: isAdmin ? 500 : 400, lineHeight: 1.5,
+                        whiteSpace: "pre-wrap", wordBreak: "break-word",
                       }}>
                         {msg.content}
                       </div>
-                      <p style={{
-                        fontSize: 10, color: "var(--t3)", marginTop: 2,
-                        textAlign: isAdmin ? "right" : "left",
-                        marginRight: isAdmin ? 2 : 0, marginLeft: isAdmin ? 0 : 2,
-                      }}>
-                        {formatTime(msg.createdAt)}
-                        {isAdmin && <span style={{ marginLeft: 4, opacity: 0.7 }}>· Tú</span>}
+                      <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 2, textAlign: isAdmin ? "right" : "left", marginRight: isAdmin ? 2 : 0, marginLeft: isAdmin ? 0 : 2 }}>
+                        {formatTime(msg.createdAt)}{isAdmin && <span style={{ marginLeft: 4, opacity: 0.7 }}>· Tú</span>}
                       </p>
                     </div>
                   </div>
@@ -238,30 +372,27 @@ function ChatPanel({ client, onClose }: ChatPanelProps) {
 
         {/* Input */}
         {projectId && (
-          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--bdr)", display: "flex", gap: 8, alignItems: "center" }}>
-            <input
+          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--bdr)", display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
               placeholder={`Mensaje a ${client.name.split(" ")[0]}...`}
+              rows={text.split("\n").length > 2 ? 3 : 1}
               style={{
                 flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid var(--bdr)",
                 borderRadius: 9, padding: "9px 13px", fontSize: 13, color: "var(--t1)", outline: "none",
+                resize: "none", lineHeight: 1.5, fontFamily: "inherit",
               }}
               onFocus={(e) => { e.target.style.borderColor = "var(--gold)"; }}
               onBlur={(e) => { e.target.style.borderColor = "var(--bdr)"; }}
             />
-            <button
-              onClick={send}
-              disabled={sending || !text.trim()}
-              style={{
-                width: 38, height: 38, borderRadius: 9, border: "none",
-                background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
-                color: "#0a0a14", cursor: sending || !text.trim() ? "not-allowed" : "pointer",
-                opacity: sending || !text.trim() ? 0.5 : 1,
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              }}
-            >
+            <button onClick={send} disabled={sending || !text.trim()} style={{
+              width: 38, height: 38, borderRadius: 9, border: "none",
+              background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
+              color: "#0a0a14", cursor: sending || !text.trim() ? "not-allowed" : "pointer",
+              opacity: sending || !text.trim() ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
               {sending ? <Loader2 size={13} style={{ animation: "spin 0.6s linear infinite" }} /> : <Send size={13} />}
             </button>
           </div>
@@ -280,6 +411,8 @@ export default function AdminClients() {
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [chatClient, setChatClient] = useState<User | null>(null);
+  const [chatInitialMsg, setChatInitialMsg] = useState<string | undefined>(undefined);
+  const [paymentClient, setPaymentClient] = useState<User | null>(null);
 
   const load = () => {
     fetch(`${API_BASE}/api/admin/users`, { credentials: "include" })
@@ -293,14 +426,18 @@ export default function AdminClients() {
     setProcessing(u.id);
     const action = u.isActive ? "deactivate" : "activate";
     await fetch(`${API_BASE}/api/admin/users/${u.id}/${action}`, { method: "POST", credentials: "include" });
-    setProcessing(null);
-    load();
+    setProcessing(null); load();
   };
 
   const copyLink = async (link: string) => {
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openPaymentForChat = (client: User, msg: string) => {
+    setChatInitialMsg(msg);
+    setChatClient(client);
   };
 
   const clients = users.filter((u) => u.role === "client");
@@ -313,8 +450,19 @@ export default function AdminClients() {
           onInvited={(link, email) => { setShowInvite(false); setInviteLink({ link, email }); load(); }}
         />
       )}
+      {paymentClient && (
+        <PaymentLinkModal
+          client={paymentClient}
+          onClose={() => setPaymentClient(null)}
+          onSendToChat={paymentClient.clientId ? (msg) => openPaymentForChat(paymentClient, msg) : undefined}
+        />
+      )}
       {chatClient && (
-        <ChatPanel client={chatClient} onClose={() => setChatClient(null)} />
+        <ChatPanel
+          client={chatClient}
+          onClose={() => { setChatClient(null); setChatInitialMsg(undefined); }}
+          initialMessage={chatInitialMsg}
+        />
       )}
 
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -332,11 +480,7 @@ export default function AdminClients() {
 
         {/* Invite link banner */}
         {inviteLink && (
-          <div style={{
-            background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.2)",
-            borderRadius: "var(--r3)", padding: 16,
-            display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20,
-          }}>
+          <div style={{ background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: "var(--r3)", padding: 16, display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
             <CheckCircle size={18} style={{ color: "var(--jade)", flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Invitación creada para {inviteLink.email}</p>
@@ -405,13 +549,18 @@ export default function AdminClients() {
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <div style={{ display: "flex", gap: 5, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => setPaymentClient(u)}
+                          className="btn btn-sm btn-ghost"
+                          title="Generar link de pago Shopify"
+                          style={{ borderColor: "rgba(200,168,75,0.25)", color: "var(--gold)" }}
+                        >
+                          <ShoppingCart size={11} />
+                          Cobrar
+                        </button>
                         {u.clientId && (
-                          <button
-                            onClick={() => setChatClient(u)}
-                            className="btn btn-sm btn-ghost"
-                            title="Ver mensajes"
-                          >
+                          <button onClick={() => { setChatInitialMsg(undefined); setChatClient(u); }} className="btn btn-sm btn-ghost" title="Ver mensajes">
                             <MessageSquare size={11} />
                             Chat
                           </button>
@@ -421,13 +570,7 @@ export default function AdminClients() {
                           disabled={processing === u.id}
                           className={`btn btn-sm ${u.isActive ? "btn-danger" : "btn-jade"}`}
                         >
-                          {processing === u.id ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : u.isActive ? (
-                            <UserX size={11} />
-                          ) : (
-                            <UserCheck size={11} />
-                          )}
+                          {processing === u.id ? <Loader2 size={11} className="animate-spin" /> : u.isActive ? <UserX size={11} /> : <UserCheck size={11} />}
                           {u.isActive ? "Revocar" : "Activar"}
                         </button>
                       </div>

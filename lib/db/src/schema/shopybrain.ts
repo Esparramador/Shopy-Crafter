@@ -167,6 +167,8 @@ export const serviceCatalogTable = pgTable("service_catalog", {
   omnicoreConfidence: real("omnicore_confidence"),
   priceChangeSuggested: real("price_change_suggested"),
   isActive: integer("is_active").default(1),
+  shopifyVariantId: text("shopify_variant_id"),
+  shopifyProductId: text("shopify_product_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

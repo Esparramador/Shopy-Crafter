@@ -1,70 +1,109 @@
-# Shopify AI Optimizer
+# Shopify AI Optimizer — ShopyBrain Agency Platform
 
 ## Overview
-Shopify AI Optimizer is a multi-user agency platform designed for optimizing Shopify stores using AI. It supports two roles: an **admin** with full access to all stores and 7 AI engines, and **clients** with read-only access to their specific store metrics and approval workflows. The platform focuses on enhancing various aspects of e-commerce, including product auditing, AI-driven redesigns, image generation, visual brand consistency, A/B testing, pricing optimization, and SEO. It aims to provide a comprehensive solution for agencies to manage and optimize multiple Shopify stores efficiently.
+Multi-user Shopify AI optimization agency platform. Admin: `sadiagiljoan@gmail.com` / `ShopyAdmin2026!` (auto-seeded on startup). Two roles: **admin** (full access, all stores, all engines) and **client** (read-only per-store, approval workflows). Zero simulation — all data is real.
 
-The project's vision is to empower e-commerce businesses with advanced AI tools to boost sales, improve customer engagement, and streamline operations, ultimately increasing market potential through data-driven decisions and automated optimizations.
+### Key Names
+- **UI name**: ShopyBrain (public-facing branding)
+- **Internal name**: OmniCore (technical, in code)
 
 ## User Preferences
-Not specified.
+- Admin credentials: `sadiagiljoan@gmail.com` / `ShopyAdmin2026!`
+- Design: gold/black/jade premium dark theme
+- Language: Spanish (UI), code in English
+- Zero mocked data — all real
+- Shopify billing (not Stripe) — generates checkout links per service/client
 
 ## System Architecture
 
-The platform is built as a pnpm workspace monorepo using TypeScript, Node.js 24, and pnpm.
+pnpm workspace monorepo, TypeScript, Node.js 24.
 
-**UI/UX Decisions:**
-A premium gold/black/jade design system is applied across all internal application pages.
-- **Color Palette**: `--ink:#080810` (background), `--gold:#c8a84b` (accent), `--jade:#2dd49f` (success), `--crim:#e84558` (error).
-- **Typography**: Instrument Serif (headings, italic), Geist (body), Geist Mono (code).
-- **Layout**: Fixed `2px` gold gradient line at the top of the viewport. App shell features a 220px sidebar, a main content area with a topbar.
-- **Responsiveness**: Utilizes CSS grid utilities (`.grid-r4`, `.grid-r3`, `.grid-r2`), page container (`.page-inner`), and mobile-specific patterns for email pages and CMS editor.
-- **Landing Page**: Features a full-page scroll-snap experience with 7 sections, including a hero section, AI engines overview, demo, results, pricing, testimonials, and a CTA. It incorporates custom cursor, SVG grid, floating orbs, marquee technologies, animated progress bars, and a dynamic section counter.
-- **Accessibility**: Includes `:focus-visible` gold rings, `aria-labels`, `aria-current`, and `role` attributes.
-- **Theming**: Dark/Light mode toggle.
+### Artifacts
+| Artifact | Port | Path |
+|---|---|---|
+| `api-server` | 8080 | `/api/*` |
+| `shopify-optimizer` (React+Vite) | 19080 | `/` |
+| `mockup-sandbox` | 8081 | `/__mockup` |
 
-**Technical Implementations:**
-- **API Framework**: Express 5.
-- **Database**: PostgreSQL with Drizzle ORM for data persistence.
-- **Validation**: Zod for schema validation.
-- **API Codegen**: Orval generates API clients and Zod schemas from an OpenAPI spec.
-- **Frontend**: React 19 with Vite, TailwindCSS, Framer Motion, and Recharts.
-- **AI Models**: Anthropic Claude (`claude-sonnet-4-5`) for text generation (redesign, SEO, pricing) and Replicate (Flux, Recraft) for image generation.
-- **Image Processing**: Sharp for post-processing generated images.
-- **Authentication**: Session-based with `bcryptjs` for passwords and AES-256-GCM for encrypting sensitive credentials. Supports `admin` and `client` roles with row-level security and admin impersonation.
-- **CMS**: A visual CMS with a split-panel editor for admins to manage public landing page content, supporting various field types and AI-driven content improvement. Content is versioned and stored in PostgreSQL.
-- **Shopy Brain**: An "OmniCore Memory Engine" designed for knowledge ingestion, storage, and retrieval, enabling bidirectional learning from AI operations. It includes a Reference Intelligence Engine for image and video analysis, and an OmniCore Pricing Intelligence CFO module for agency pricing and service catalog management.
-- **Email Flow Builder**: Integrates with Klaviyo, allowing admins to design, generate (via OmniCore), and push email flows.
-- **Scheduled Jobs**: Cron jobs for daily revenue snapshots, market research, competitor price scans, and inventory sync.
-- **Feature Modules**:
-    1.  **Revenue Intelligence 360°**: Attribution dashboard, event tracking, AI analysis of Shopify order data.
-    2.  **Intelligent Inventory Engine**: Stock monitoring, critical alerts, AI-generated restock emails.
-    3.  **Onboarding + Achievement System**: Tracks user progress and awards achievements.
-    4.  **Competitor Intelligence**: Manages competitors, performs AI-powered scans, and generates alerts.
-    5.  **Stripe Billing + Affiliate Program**: Manages subscriptions, plans, and an affiliate system (demo mode).
-    6.  **ML Predictive Engine**: Forecasts key metrics with confidence intervals.
-    7.  **Voice Interface**: Claude interprets Spanish commands for platform actions.
-    8.  **Mobile PWA**: Progressive Web App features for mobile access.
-    9.  **Final Polish**: Includes a command palette, notification center, and enhanced accessibility.
+### Design System
+- **Colors**: `--ink:#080810`, `--gold:#c8a84b`, `--jade:#2dd49f`, `--crim:#e84558`
+- **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
+- **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
+
+### Database — 42 Tables (PostgreSQL + Drizzle ORM)
+Key tables: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insights`, `omnicore_knowledge_domains`, `omnicore_niche_profiles`, `omnicore_prompt_library`, `omnicore_study_sessions`, `omnicore_cross_connections`, `service_catalog`, `agency_cost_structure`, `revenue_snapshots`, `email_flows`, `user_sessions`, `cms_content`, `competitors`, `inventory_tracking`, `ab_tests`, `forecasts`, `project_files`, `achievements`
+
+**Important**: `email_flows` uses raw `pool.query()` (not Drizzle ORM). `user_sessions` is the connect-pg-simple session store table (created directly via SQL, not via Drizzle schema).
+
+### Security
+- AES-256-GCM encryption via `ENCRYPTION_KEY` env var (64-char hex) — `encrypt()` on write, `safeDecrypt()` on read for ALL credentials
+- All admin routes behind `requireAdmin` middleware
+- CORS locked to `REPLIT_DOMAINS` in production
+- Session: `httpOnly`, `sameSite: strict`, `secure: true` in production
+- SVG from AI sanitized (strips `<script>`, `on*`, `javascript:`)
+
+### AI Stack
+- Claude `claude-sonnet-4-5` — text generation with `buildShopyBrainContext()` injection
+- Replicate (Flux, Recraft) — image generation
+- `learnFromOperation()` + `ingestToShopyBrain()` — always fire-and-forget, NEVER awaited
+
+### OmniCore / ShopyBrain Cron Jobs (9 total)
+| Schedule | Job |
+|---|---|
+| Every 3h | Micro-learning (2 domains × 3 insights) |
+| Every 6h | Consolidation (insights → memories) |
+| Every 12h | Cross-synthesis (cross connections) |
+| 1am | Deep study (14 domains × 5 insights) |
+| 2am | Revenue snapshots |
+| 3am | Real data integration |
+| 6am | Competitor price scans |
+| 7am | Inventory sync + alerts |
+| Sun 0am | Weekly mega-synthesis |
+
+### Shopify Billing Flow (no Stripe)
+Admin goes to Clients → "Cobrar" button → selects service → `POST /api/agency/payment-link` → Shopify checkout URL → copy or send via chat.
+
+**Prerequisite**: Map each service to a Shopify product variant in `Mi Pricing CFO → 🛍 Shopify Sync` tab FIRST.
+
+**Required env vars for billing**:
+- `SHOP_DOMAIN` — e.g. `mi-tienda.myshopify.com` (currently falls back to demo value)
+- `STOREFRONT_ACCESS_TOKEN` — already set ✅
+- `SHOPIFY_ADMIN_ACCESS_TOKEN` — needed for push-services-to-shopify auto-creation
+
+### Shopify Sync (MyPricing.tsx — tab "🛍 Shopify Sync")
+1. Click "Crear productos en Shopify" to auto-create products in your store
+2. Click "Cargar productos Shopify" to load existing store products
+3. Map each service to a Shopify variant using the selectors
+4. Then "Cobrar" button in AdminClients generates checkout links automatically
+
+## Key Files
+| File | Purpose |
+|---|---|
+| `artifacts/api-server/src/routes/agency.ts` | Shopify billing: `shopify-products`, `payment-link`, `shopify-variant`, `push-services-to-shopify` |
+| `artifacts/api-server/src/routes/shopybrain.ts` | Memories, insights, study, niche-profiles, prompt-library |
+| `artifacts/api-server/src/lib/claude.ts` | Claude calls + `buildShopyBrainContext()` |
+| `artifacts/api-server/src/lib/crypto.ts` | AES-256-GCM encrypt/safeDecrypt |
+| `artifacts/api-server/src/lib/auth.ts` | requireAuth, requireAdmin, requireClientAccess |
+| `artifacts/api-server/src/app.ts` | CORS, Helmet, rate limiting, session config |
+| `artifacts/api-server/src/routes/index.ts` | Security gate, all route mounts |
+| `artifacts/shopify-optimizer/src/pages/AdminClients.tsx` | PaymentLinkModal + ChatPanel with billing |
+| `artifacts/shopify-optimizer/src/pages/admin/MyPricing.tsx` | CFO dashboard + Shopify Sync tab |
+| `artifacts/shopify-optimizer/src/pages/admin/ShopyBrain.tsx` | OmniCore dashboard |
+| `artifacts/shopify-optimizer/src/components/layout/AppLayout.tsx` | Sidebar + nav (includes ShopyBrain group) |
+| `lib/db/src/schema/shopybrain.ts` | All 13 ShopyBrain tables schema |
 
 ## External Dependencies
-- **Database**: PostgreSQL
-- **AI Services**:
-    - Anthropic Claude (`claude-sonnet-4-5`)
-    - Replicate (Flux, Recraft)
-- **E-commerce Platform**: Shopify (OAuth, Storefront API, Admin API)
-- **Email Marketing**: Klaviyo
-- **Payment Gateway**: Stripe (for billing, currently in demo mode)
-- **Other Libraries/Tools**:
-    - `bcryptjs`
-    - `express-session`
-    - `connect-pg-simple`
-    - `sharp` (for image processing)
-    - `axios` (for HTTP requests)
-    - `vite`
-    - `tailwindcss`
-    - `framer-motion`
-    - `recharts`
-    - `zod`
-    - `drizzle-orm`
-    - `orval`
-    - `pino` (for logging)
+- **PostgreSQL** — primary DB
+- **Anthropic Claude** (`claude-sonnet-4-5`)
+- **Replicate** (Flux, Recraft) — image generation
+- **Shopify** — Storefront API (checkout links), Admin API (product creation)
+- **Klaviyo** — email flow integration
+- **Stripe** — demo mode only (not used for billing)
+- **connect-pg-simple** — PostgreSQL session store
+- **express-session**, **bcryptjs**, **sharp**, **pino**, **zod**, **drizzle-orm**, **orval**
+
+## DB Push Command
+```bash
+pnpm --filter @workspace/db run push-force
+```
+(not `db:push` — use `push-force`)

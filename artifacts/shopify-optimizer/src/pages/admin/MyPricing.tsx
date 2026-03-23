@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink, Link, ShoppingBag } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -15,7 +15,10 @@ interface Service {
   priceCurrent: number; priceSuggested?: number; priceMin: number; priceMax: number;
   marketAvgPrice: number; ourPositioning: string; timesSold: number;
   omnicoreRecommendation?: string; omnicoreConfidence?: number; priceChangeSuggested?: number;
+  shopifyVariantId?: string | null; shopifyProductId?: string | null;
 }
+interface ShopifyVariant { id: string; title: string; price: { amount: string; currencyCode: string }; availableForSale: boolean; }
+interface ShopifyProduct { id: string; title: string; productType: string; priceRange: { minVariantPrice: { amount: string; currencyCode: string } }; variants: { edges: { node: ShopifyVariant }[] }; }
 
 const DIRECTION_CONFIG = {
   up: { icon: TrendingUp, color: "var(--gold)", label: "↑ Sube precio" },
@@ -45,6 +48,12 @@ export default function MyPricing() {
   const [storeName, setStoreName] = useState("");
   const [pushing, setPushing] = useState(false);
   const [pushResult, setPushResult] = useState<{ success: boolean; message: string; requiresManualImport?: boolean; created?: number; failed?: number; instructions?: string[] } | null>(null);
+  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
+  const [shopifyConfigured, setShopifyConfigured] = useState<boolean | null>(null);
+  const [shopifyMsg, setShopifyMsg] = useState("");
+  const [loadingShopify, setLoadingShopify] = useState(false);
+  const [savingVariant, setSavingVariant] = useState<string | null>(null);
+  const [variantSelections, setVariantSelections] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
@@ -129,10 +138,37 @@ export default function MyPricing() {
     return acc;
   }, {} as Record<string, Service[]>);
 
+  const loadShopifyProducts = async () => {
+    setLoadingShopify(true);
+    const r = await fetch(`${API_BASE}/api/agency/shopify-products`, { credentials: "include" });
+    const data = await r.json();
+    setShopifyProducts(data.products ?? []);
+    setShopifyConfigured(data.configured ?? false);
+    setShopifyMsg(data.message ?? "");
+    const initial: Record<string, string> = {};
+    services.forEach((svc) => { if (svc.shopifyVariantId) initial[svc.id] = svc.shopifyVariantId; });
+    setVariantSelections(initial);
+    setLoadingShopify(false);
+  };
+
+  const saveVariant = async (serviceId: string) => {
+    setSavingVariant(serviceId);
+    const variantId = variantSelections[serviceId] ?? "";
+    const product = shopifyProducts.find((p) => p.variants.edges.some((e) => e.node.id === variantId));
+    await fetch(`${API_BASE}/api/agency/services/${serviceId}/shopify-variant`, {
+      method: "PUT", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variantId: variantId || null, productId: product?.id ?? null }),
+    });
+    await load();
+    setSavingVariant(null);
+  };
+
   const TABS = [
     { id: "services", label: "Tabla de precios" },
     { id: "costs", label: "Estructura de costes" },
     { id: "quote", label: "Generar propuesta" },
+    { id: "shopify", label: "🛍 Shopify Sync" },
   ];
 
   return (
@@ -439,18 +475,148 @@ export default function MyPricing() {
               <div className="glass-card">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <h3 style={{ fontSize: 13, fontWeight: 700 }}>📄 Propuesta generada</h3>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(proposal); }}
-                    className="btn-secondary" style={{ fontSize: 11 }}
-                  >Copiar</button>
+                  <button onClick={() => { navigator.clipboard.writeText(proposal); }} className="btn-secondary" style={{ fontSize: 11 }}>Copiar</button>
                 </div>
                 <div style={{ background: "var(--ink3)", borderRadius: 8, padding: 16, maxHeight: 400, overflowY: "auto" }}>
-                  <pre style={{ fontSize: 12, color: "var(--t)", lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: "var(--fb)" }}>
-                    {proposal}
-                  </pre>
+                  <pre style={{ fontSize: 12, color: "var(--t)", lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: "var(--fb)" }}>{proposal}</pre>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Shopify Sync tab ──────────────────────────────────────────────────── */}
+      {tab === "shopify" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>Vincula servicios a productos Shopify</h2>
+              <p style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>
+                Mapea cada servicio de la agencia a un producto de tu tienda para generar links de pago automáticos.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={pushToShopify} disabled={pushing} style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8,
+                background: "rgba(45,212,159,0.1)", border: "1px solid rgba(45,212,159,0.3)",
+                color: "var(--jade)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+              }}>
+                {pushing ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={13} />}
+                {pushing ? "Creando..." : "Crear productos en Shopify"}
+              </button>
+              <button onClick={loadShopifyProducts} disabled={loadingShopify} className="btn-secondary" style={{ fontSize: 12 }}>
+                {loadingShopify ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={13} />}
+                {loadingShopify ? "Cargando..." : "Cargar productos Shopify"}
+              </button>
+            </div>
+          </div>
+
+          {/* Status banner */}
+          {shopifyConfigured === false && (
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.25)", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <AlertTriangle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)", marginBottom: 4 }}>Tienda no configurada</p>
+                <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.5 }}>{shopifyMsg || "Configura SHOP_DOMAIN en las variables de entorno con tu tienda (ej: mi-tienda.myshopify.com)"}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Push result */}
+          {pushResult && (
+            <div style={{ padding: "12px 16px", borderRadius: 10, marginBottom: 16,
+              background: pushResult.success ? "rgba(45,212,159,0.06)" : "rgba(200,168,75,0.06)",
+              border: `1px solid ${pushResult.success ? "rgba(45,212,159,0.25)" : "rgba(200,168,75,0.25)"}`,
+            }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: pushResult.success ? "var(--jade)" : "var(--gold)", marginBottom: 4 }}>
+                {pushResult.success ? "✅" : "⚠️"} {pushResult.message}
+              </p>
+              {pushResult.instructions?.map((inst, i) => (
+                <p key={i} style={{ fontSize: 11.5, color: "var(--t3)", marginTop: 3 }}>• {inst}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Services mapping table */}
+          <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--bdr)" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>
+                {shopifyProducts.length > 0 ? `${shopifyProducts.length} productos en tu tienda Shopify` : "Carga los productos de tu tienda para vincularlos"}
+              </p>
+            </div>
+            {services.map((svc, i) => {
+              const allVariants: { variantId: string; label: string }[] = [];
+              shopifyProducts.forEach((p) => {
+                p.variants.edges.forEach((e) => {
+                  const currency = e.node.price.currencyCode === "EUR" ? "€" : e.node.price.currencyCode;
+                  allVariants.push({ variantId: e.node.id, label: `${p.title} — ${e.node.title !== "Default Title" ? e.node.title + " — " : ""}${currency}${parseFloat(e.node.price.amount).toFixed(0)}` });
+                });
+              });
+              const isLinked = !!(svc.shopifyVariantId);
+              const selection = variantSelections[svc.id] ?? svc.shopifyVariantId ?? "";
+              const isDirty = selection !== (svc.shopifyVariantId ?? "");
+              return (
+                <div key={svc.id} style={{ padding: "12px 16px", borderBottom: i < services.length - 1 ? "1px solid var(--bdr)" : "none", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: isLinked ? "var(--jade)" : "var(--bdr)", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", marginBottom: 2 }}>{svc.serviceName}</p>
+                    <p style={{ fontSize: 11, color: "var(--t3)" }}>€{(svc.priceSuggested ?? svc.priceCurrent ?? 0).toFixed(0)} · {svc.serviceType}</p>
+                  </div>
+                  <div style={{ flex: 2, minWidth: 0 }}>
+                    <select
+                      className="form-input"
+                      style={{ fontSize: 12, padding: "6px 10px" }}
+                      value={selection}
+                      onChange={(e) => setVariantSelections((prev) => ({ ...prev, [svc.id]: e.target.value }))}
+                      disabled={allVariants.length === 0}
+                    >
+                      <option value="">{allVariants.length === 0 ? "Carga productos primero →" : "— Sin vincular —"}</option>
+                      {allVariants.map((v) => (
+                        <option key={v.variantId} value={v.variantId}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {isLinked && !isDirty && (
+                      <span style={{ fontSize: 11, color: "var(--jade)", display: "flex", alignItems: "center", gap: 3 }}>
+                        <CheckCircle size={12} /> Vinculado
+                      </span>
+                    )}
+                    {(isDirty || !isLinked) && selection !== (svc.shopifyVariantId ?? "") && (
+                      <button
+                        onClick={() => saveVariant(svc.id)}
+                        disabled={savingVariant === svc.id}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
+                          borderRadius: 7, border: "1px solid rgba(200,168,75,0.4)",
+                          background: "rgba(200,168,75,0.1)", color: "var(--gold)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        }}
+                      >
+                        {savingVariant === svc.id ? <RefreshCw size={11} style={{ animation: "spin 0.8s linear infinite" }} /> : <Save size={11} />}
+                        Guardar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--bdr)" }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t)", marginBottom: 8 }}>
+              <ShoppingBag size={13} style={{ display: "inline", marginRight: 6 }} />
+              Cómo funciona el cobro con Shopify
+            </p>
+            {[
+              "1. Crea los productos en tu tienda con 'Crear productos en Shopify' (botón arriba)",
+              "2. Carga los productos de tu tienda con 'Cargar productos Shopify'",
+              "3. Vincula cada servicio a su producto/variante de Shopify usando los selectores",
+              "4. En Gestión de Clientes → botón 'Cobrar' → selecciona el servicio → genera el link de pago",
+              "5. Copia el link o envíalo directamente por chat al cliente. El cliente paga en tu tienda Shopify.",
+            ].map((step, i) => (
+              <p key={i} style={{ fontSize: 12, color: "var(--t2)", marginBottom: 4, lineHeight: 1.5 }}>{step}</p>
+            ))}
           </div>
         </div>
       )}

@@ -215,6 +215,98 @@ ${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`
   res.json({ proposal, tokensUsed: aiRes.usage?.input_tokens + aiRes.usage?.output_tokens });
 });
 
+// ─── Shopify Billing Integration ───────────────────────────────────────────
+
+router.get("/agency/shopify-products", requireAdmin, async (_req, res): Promise<void> => {
+  const shopDomain = process.env.SHOP_DOMAIN;
+  const storefrontToken = process.env.STOREFRONT_ACCESS_TOKEN;
+
+  if (!shopDomain || !storefrontToken || shopDomain.includes("comic-crafter")) {
+    res.json({ products: [], configured: false, message: "Configura SHOP_DOMAIN con tu tienda en Ajustes" });
+    return;
+  }
+
+  const domain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  try {
+    const response = await fetch(`https://${domain}/api/2024-10/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Storefront-Access-Token": storefrontToken },
+      body: JSON.stringify({
+        query: `query {
+          products(first: 50) {
+            edges { node {
+              id title productType
+              priceRange { minVariantPrice { amount currencyCode } }
+              variants(first: 5) { edges { node { id title price { amount currencyCode } availableForSale } } }
+            } }
+          }
+        }`
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json() as any;
+    const products = data.data?.products?.edges?.map((e: any) => e.node) ?? [];
+    res.json({ products, configured: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, configured: true });
+  }
+});
+
+router.post("/agency/payment-link", requireAdmin, async (req, res): Promise<void> => {
+  const { serviceId, clientName, note } = req.body;
+  const shopDomain = process.env.SHOP_DOMAIN;
+  const storefrontToken = process.env.STOREFRONT_ACCESS_TOKEN;
+
+  if (!shopDomain || !storefrontToken || shopDomain.includes("comic-crafter")) {
+    res.status(400).json({ error: "SHOP_DOMAIN no configurado. Ve a Ajustes → Shopify." });
+    return;
+  }
+
+  const [service] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, serviceId));
+  if (!service) { res.status(404).json({ error: "Servicio no encontrado" }); return; }
+
+  if (!service.shopifyVariantId) {
+    res.json({
+      checkoutUrl: null,
+      service: { name: service.serviceName, price: service.priceCurrent },
+      requiresMapping: true,
+      error: `"${service.serviceName}" no tiene producto Shopify vinculado. Ve a Mi Pricing → Shopify Sync para vincularlo.`,
+    });
+    return;
+  }
+
+  const domain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const customNote = [clientName && `Cliente: ${clientName}`, note].filter(Boolean).join(" — ");
+
+  try {
+    const response = await fetch(`https://${domain}/api/2024-10/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Storefront-Access-Token": storefrontToken },
+      body: JSON.stringify({
+        query: `mutation cartCreate($lines:[CartLineInput!]!,$note:String){cartCreate(input:{lines:$lines,note:$note}){cart{id checkoutUrl}userErrors{field message}}}`,
+        variables: { lines: [{ merchandiseId: service.shopifyVariantId, quantity: 1 }], note: customNote },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json() as any;
+    const checkoutUrl = data.data?.cartCreate?.cart?.checkoutUrl;
+    const errors = data.data?.cartCreate?.userErrors;
+    if (!checkoutUrl || errors?.length) throw new Error(errors?.[0]?.message ?? "Checkout no creado");
+    res.json({ checkoutUrl, service: { name: service.serviceName, price: service.priceCurrent } });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put("/agency/services/:id/shopify-variant", requireAdmin, async (req, res): Promise<void> => {
+  const { variantId, productId } = req.body;
+  await db.update(serviceCatalogTable)
+    .set({ shopifyVariantId: variantId ?? null, shopifyProductId: productId ?? null })
+    .where(eq(serviceCatalogTable.id, req.params.id));
+  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, req.params.id));
+  res.json(updated);
+});
+
 router.get("/agency/pricing-decisions", requireAdmin, async (req, res): Promise<void> => {
   const decisions = await db.select().from(pricingDecisionsTable)
     .orderBy(desc(pricingDecisionsTable.createdAt))
