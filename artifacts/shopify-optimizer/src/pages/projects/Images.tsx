@@ -9,6 +9,8 @@ import {
   useGetGenerationJob,
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
+import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
+import GenerationProgress from "@/components/GenerationProgress";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
@@ -83,11 +85,12 @@ function PromptModal({
     dallePrompt?: string;
     photographerDirection?: string;
   } | null>(null);
+  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     buildPrompt.mutate(
-      { projectId, productId, data: { imageType } },
+      { projectId, productId, data: { imageType, referenceContext: referenceIntelligence ?? undefined } },
       {
         onSuccess: (d) => {
           setPromptData(d as typeof promptData);
@@ -121,6 +124,19 @@ function PromptModal({
         </div>
 
         <div className="p-6 space-y-5">
+          <ReferenceMediaPanel
+            projectId={projectId}
+            onIntelligenceReady={(intel) => {
+              setReferenceIntelligence(intel);
+              buildPrompt.mutate(
+                { projectId, productId, data: { imageType, referenceContext: intel } },
+                { onSuccess: (d) => setPromptData(d as typeof promptData) }
+              );
+            }}
+            context={`Generación de imagen tipo "${IMAGE_TYPES.find(t => t.id === imageType)?.label}" para producto Shopify`}
+            collapsed
+          />
+
           {buildPrompt.isPending && (
             <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -365,6 +381,13 @@ export default function ImagesPage() {
           </button>
         </div>
       </div>
+
+      <GenerationProgress
+        active={bulkGenerate.isPending || (!!bulkJobId)}
+        operation="images"
+        title="Motor de Imágenes generando en masa..."
+        subtitle="Flux IA procesa cada producto del catálogo con prompts optimizados por ShopyBrain"
+      />
 
       {/* Legend */}
       <GlassCard className="p-4">

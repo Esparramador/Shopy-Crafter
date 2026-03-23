@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Zap, BarChart3, DollarSign, RefreshCw, Download, ShoppingCart } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
+import GenerationProgress from "@/components/GenerationProgress";
+import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -35,6 +37,7 @@ export default function Intelligence() {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<{ ok: boolean; totalRevenue?: number; totalOrders?: number; daysLoaded?: number; error?: string } | null>(null);
 
   useEffect(() => {
@@ -68,7 +71,10 @@ export default function Intelligence() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ projectId: selectedProject }),
+        body: JSON.stringify({
+          projectId: selectedProject,
+          referenceContext: referenceIntelligence ?? undefined,
+        }),
       });
       const data = await res.json();
       setAnalysis(data.analysis);
@@ -173,6 +179,20 @@ export default function Intelligence() {
           <button onClick={() => setSyncResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 16 }}>×</button>
         </div>
       )}
+
+      <ReferenceMediaPanel
+        projectId={selectedProject ? parseInt(selectedProject) : undefined}
+        onIntelligenceReady={setReferenceIntelligence}
+        context="Análisis de revenue e inteligencia de negocio Shopify"
+        collapsed
+      />
+
+      <GenerationProgress
+        active={analyzing}
+        operation="analysis"
+        title="ShopyBrain analizando tu tienda..."
+        subtitle="Procesando revenue, atribución y oportunidades de crecimiento"
+      />
 
       {loading ? (
         <div className="grid-r4" style={{ marginBottom: 24 }}>

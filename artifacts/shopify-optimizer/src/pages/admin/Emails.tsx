@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Zap, RefreshCw, Trash2, Eye, Send, ChevronRight, CheckCircle, AlertCircle, Clock, Loader2 } from "lucide-react";
+import GenerationProgress from "@/components/GenerationProgress";
+import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -134,6 +136,7 @@ export default function Emails() {
   const [tab, setTab] = useState<"disenar" | "contenido" | "activar">("disenar");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const [pushing, setPushing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -255,6 +258,7 @@ export default function Emails() {
           flowType: FLOW_TYPES[form.flow_type]?.label || form.flow_type,
           tone: form.tone, projectId: selectedProjectId,
           includeOptions, language: form.language,
+          referenceContext: referenceIntelligence ?? undefined,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -526,6 +530,18 @@ export default function Emails() {
               {/* TAB 2: Contenido */}
               {tab === "contenido" && (
                 <div style={{ maxWidth: 780, display: "flex", flexDirection: "column", gap: 18 }}>
+                  <ReferenceMediaPanel
+                    projectId={selectedProjectId ?? undefined}
+                    onIntelligenceReady={setReferenceIntelligence}
+                    context="Email marketing de ecommerce Shopify"
+                    collapsed
+                  />
+                  <GenerationProgress
+                    active={generating}
+                    operation="email"
+                    title="OmniCore escribiendo tu email..."
+                    subtitle="ShopyBrain genera copy persuasivo, subject lines A/B y HTML para Klaviyo"
+                  />
                   <div style={{ background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 14, padding: 20 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                       <div>

@@ -12,6 +12,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import GenerationProgress from "@/components/GenerationProgress";
+import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
 import {
   Wand2,
   Check,
@@ -161,6 +163,7 @@ export default function RedesignPage() {
   const [activeRedesign, setActiveRedesign] = useState<string | null>(null);
   const [redesignResults, setRedesignResults] = useState<Record<string, RedesignResult>>({});
   const [bulkJobId, setBulkJobId] = useState<string | null>(null);
+  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const [expandedHtml, setExpandedHtml] = useState<Record<string, boolean>>({});
   const [photoBriefsModal, setPhotoBriefsModal] = useState<{
     productId: string;
@@ -224,6 +227,7 @@ export default function RedesignPage() {
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Cargando...</div>;
 
   const products = data?.products || [];
+  const isAnyRedesigning = redesign.isPending || bulkRedesign.isPending;
 
   return (
     <div className="space-y-8 pb-12">
@@ -252,6 +256,20 @@ export default function RedesignPage() {
           </button>
         </div>
       </div>
+
+      {/* Reference media + generation progress */}
+      <ReferenceMediaPanel
+        projectId={projectId}
+        onIntelligenceReady={setReferenceIntelligence}
+        context="Rediseño de producto Shopify — título, descripción, pricing y photo briefs"
+        collapsed
+      />
+      <GenerationProgress
+        active={isAnyRedesigning}
+        operation="redesign"
+        title={bulkRedesign.isPending ? "Rediseño masivo en progreso..." : "Rediseñando producto con IA..."}
+        subtitle="Claude reescribe título SEO, descripción HTML, precio y genera photo briefs"
+      />
 
       {/* Bulk Progress */}
       {bulkJobId && (
