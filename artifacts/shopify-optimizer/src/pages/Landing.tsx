@@ -23,8 +23,9 @@ const FP_SECTIONS = [
   { id: "fp-demo",   nav: "Demo" },
   { id: "fp-results", nav: "Resultados" },
   { id: "fp-pricing", nav: "Precios" },
-  { id: "fp-clients", nav: "Clientes" },
-  { id: "fp-cta",    nav: "Empezar" },
+  { id: "fp-clients",  nav: "Clientes" },
+  { id: "fp-contact",  nav: "Contactar" },
+  { id: "fp-cta",     nav: "Empezar" },
 ];
 
 function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
@@ -60,6 +61,37 @@ export default function Landing() {
   const [activeEngine, setActiveEngine] = useState(0);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "" });
+  const [contactServices, setContactServices] = useState<string[]>([]);
+  const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [contactError, setContactError] = useState("");
+
+  const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setContactForm(f => ({ ...f, [field]: e.target.value }));
+
+  const toggleService = (s: string) =>
+    setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
+
+  const submitContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (contactStatus === "sending") return;
+    setContactStatus("sending");
+    setContactError("");
+    try {
+      const res = await fetch(`${BASE_URL}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...contactForm, services: contactServices }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
+      setContactStatus("sent");
+    } catch (err: unknown) {
+      setContactStatus("error");
+      setContactError(err instanceof Error ? err.message : "Error inesperado. Inténtalo de nuevo.");
+    }
+  };
+
   const cursorRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const fpRef = useRef<HTMLDivElement>(null);
@@ -212,7 +244,7 @@ export default function Landing() {
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
 
-  if (!content) {
+  if (!content?.hero) {
     return (
       <div className="l-loading">
         <div className="l-loader"></div>
@@ -614,6 +646,180 @@ export default function Landing() {
               {content.testimonials.items.map((_, i) => (
                 <button key={i} className={`fp-testi-dot${i === activeTestimonial ? " active" : ""}`} onClick={() => setActiveTestimonial(i)}></button>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════
+            SECTION 06 — FORMULARIO DE CONTACTO
+        ══════════════════════════════════════ */}
+        <section className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar">
+          <div className="fp-bg">
+            <div className="l-contact-bg" style={{
+              position: "absolute", inset: 0,
+              background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",
+            }} />
+          </div>
+          <div className="fp-content" style={{ maxWidth: 900, padding: "0 24px" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
+              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }}>Trabaja con nosotros</div>
+              <h2 className="l-h2">Cuéntanos sobre tu negocio.<br /><em>Te contactamos en menos de 24h.</em></h2>
+              <p className="l-sub">Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio.</p>
+            </div>
+
+            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
+              {contactStatus === "sent" ? (
+                <div style={{
+                  background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)",
+                  borderRadius: 16, padding: "48px 32px", textAlign: "center",
+                }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+                  <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--jade)", marginBottom: 8 }}>¡Solicitud recibida!</h3>
+                  <p style={{ color: "var(--t3)", fontSize: 15 }}>Te contactaremos en menos de 24h. Revisa también tu carpeta de spam.</p>
+                </div>
+              ) : (
+                <form onSubmit={submitContact} style={{
+                  background: "var(--ink2)", border: "1px solid var(--ink3)",
+                  borderRadius: 20, padding: "40px 36px",
+                  display: "grid", gap: 24,
+                }}>
+                  {/* Row 1: Nombre + Email */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nombre completo *</label>
+                      <input
+                        type="text" required value={contactForm.name} onChange={CF("name")}
+                        placeholder="Tu nombre y apellidos"
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Email de contacto *</label>
+                      <input
+                        type="email" required value={contactForm.email} onChange={CF("email")}
+                        placeholder="tu@email.com"
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Teléfono + URL tienda */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Teléfono</label>
+                      <input
+                        type="tel" value={contactForm.phone} onChange={CF("phone")}
+                        placeholder="+34 600 000 000"
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>URL de tu tienda Shopify</label>
+                      <input
+                        type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
+                        placeholder="mitienda.myshopify.com"
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Nicho + Facturación */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nicho / tipo de productos</label>
+                      <select
+                        value={contactForm.niche} onChange={CF("niche")}
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.niche ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
+                      >
+                        <option value="">Selecciona tu nicho</option>
+                        <option>Moda y ropa</option>
+                        <option>Electrónica y gadgets</option>
+                        <option>Hogar y decoración</option>
+                        <option>Belleza y cosmética</option>
+                        <option>Deporte y fitness</option>
+                        <option>Alimentación y gourmet</option>
+                        <option>Arte y coleccionismo</option>
+                        <option>Mascotas</option>
+                        <option>Joyería y accesorios</option>
+                        <option>Otro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Facturación mensual aprox.</label>
+                      <select
+                        value={contactForm.revenue} onChange={CF("revenue")}
+                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.revenue ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
+                      >
+                        <option value="">Selecciona rango</option>
+                        <option>Menos de €1.000</option>
+                        <option>€1.000 – €5.000</option>
+                        <option>€5.000 – €15.000</option>
+                        <option>€15.000 – €50.000</option>
+                        <option>Más de €50.000</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Servicios */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 12 }}>Servicios que necesitas</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {["SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes", "Email marketing", "A/B Testing", "Auditoría completa"].map(s => {
+                        const active = contactServices.includes(s);
+                        return (
+                          <button
+                            key={s} type="button" onClick={() => toggleService(s)}
+                            style={{
+                              padding: "7px 14px", borderRadius: 20, fontSize: 13, cursor: "pointer",
+                              border: `1px solid ${active ? "rgba(200,168,75,0.5)" : "var(--ink3)"}`,
+                              background: active ? "rgba(200,168,75,0.1)" : "transparent",
+                              color: active ? "#e6c668" : "var(--t3)",
+                              transition: "all 0.15s",
+                            }}
+                          >{s}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mensaje */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Mensaje adicional</label>
+                    <textarea
+                      rows={3} value={contactForm.message} onChange={CF("message")}
+                      placeholder="Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"
+                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                    />
+                  </div>
+
+                  {contactStatus === "error" && (
+                    <div style={{ padding: "10px 14px", background: "rgba(232,69,88,0.1)", border: "1px solid rgba(232,69,88,0.3)", borderRadius: 8, color: "#e84558", fontSize: 13 }}>
+                      {contactError}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                    <p style={{ fontSize: 12, color: "var(--t4)", flex: 1 }}>Sin spam. Solo te contactamos para hablar de tu proyecto. Puedes darte de baja en cualquier momento.</p>
+                    <button
+                      type="submit" disabled={contactStatus === "sending"}
+                      className="l-btn-gold"
+                      style={{ opacity: contactStatus === "sending" ? 0.7 : 1, minWidth: 200, padding: "13px 28px", fontSize: 14 }}
+                    >
+                      {contactStatus === "sending" ? "Enviando…" : "Solicitar acceso gratuito →"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </section>
