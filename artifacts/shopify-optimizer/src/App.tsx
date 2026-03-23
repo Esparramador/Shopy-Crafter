@@ -27,6 +27,7 @@ import MyPricing from "@/pages/admin/MyPricing";
 import Emails from "@/pages/admin/Emails";
 import ProjectVault from "@/pages/admin/ProjectVault";
 import ForgotPassword from "@/pages/ForgotPassword";
+import OAuthSuccess from "@/pages/OAuthSuccess";
 import AuditPage from "@/pages/projects/Audit";
 import RedesignPage from "@/pages/projects/Redesign";
 import ImagesPage from "@/pages/projects/Images";
@@ -150,6 +151,7 @@ function Router() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/invite/:token" component={InviteSetupPage} />
         <Route path="/tienda" component={Tienda} />
+        <Route path="/oauth-success" component={OAuthSuccess} />
 
         {/* Root — redirects by role */}
         <Route path="/">

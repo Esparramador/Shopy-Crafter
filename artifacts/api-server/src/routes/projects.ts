@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -6,6 +7,123 @@ import { refreshToken, shopifyRequest, normalizeShopDomain } from "../lib/shopif
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
+
+const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? "";
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? "";
+
+const OAUTH_SCOPES = [
+  "read_products", "write_products",
+  "read_orders", "read_customers",
+  "read_analytics", "read_inventory", "write_inventory",
+  "read_price_rules", "write_price_rules",
+  "read_content", "write_content",
+  "read_themes",
+].join(",");
+
+const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string }>();
+
+function getAppUrl() {
+  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+  return domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
+}
+
+router.get("/shopify/oauth/start", (req, res): void => {
+  const { shop, name, storeNiche, brandTone, targetAudience, storeMarkets } = req.query as Record<string, string>;
+  if (!shop) { res.status(400).json({ error: "shop es obligatorio" }); return; }
+  if (!SHOPIFY_CLIENT_ID) { res.status(500).json({ error: "SHOPIFY_CLIENT_ID no configurado" }); return; }
+
+  const shopDomain = normalizeShopDomain(shop);
+  const state = crypto.randomBytes(16).toString("hex");
+  oauthState.set(state, {
+    shop: shopDomain,
+    projectName: name ?? shopDomain.split(".")[0],
+    storeNiche: storeNiche ?? "",
+    brandTone: brandTone ?? "",
+    targetAudience: targetAudience ?? "",
+    storeMarkets: storeMarkets ?? "",
+  });
+  setTimeout(() => oauthState.delete(state), 10 * 60 * 1000);
+
+  const redirectUri = `${getAppUrl()}/api/shopify/oauth/callback`;
+  const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  res.json({ authUrl, state });
+});
+
+router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
+  const { code, state, shop, hmac } = req.query as Record<string, string>;
+
+  if (!state || !oauthState.has(state)) {
+    res.status(400).send("OAuth state inválido o expirado. Vuelve a intentarlo.");
+    return;
+  }
+
+  const saved = oauthState.get(state)!;
+  oauthState.delete(state);
+
+  if (hmac) {
+    const params = Object.entries(req.query as Record<string, string>)
+      .filter(([k]) => k !== "hmac")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&");
+    const digest = crypto.createHmac("sha256", SHOPIFY_CLIENT_SECRET).update(params).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac))) {
+      res.status(400).send("Verificación HMAC fallida.");
+      return;
+    }
+  }
+
+  const shopDomain = normalizeShopDomain(shop ?? saved.shop);
+  const tokenUrl = `https://${shopDomain}/admin/oauth/access_token`;
+  const tokenRes = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: SHOPIFY_CLIENT_ID, client_secret: SHOPIFY_CLIENT_SECRET, code }),
+  });
+
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text();
+    res.status(400).send(`Error obteniendo token: ${text}`);
+    return;
+  }
+
+  const { access_token } = await tokenRes.json() as { access_token: string };
+
+  const existingProjects = await db.select().from(projectsTable).where(eq(projectsTable.shopDomain, shopDomain));
+  let projectId: number;
+
+  if (existingProjects.length > 0) {
+    const [updated] = await db.update(projectsTable)
+      .set({ accessToken: access_token, tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000) })
+      .where(eq(projectsTable.shopDomain, shopDomain))
+      .returning();
+    projectId = updated.id;
+  } else {
+    const [created] = await db.insert(projectsTable).values({
+      name: saved.projectName || shopDomain.split(".")[0],
+      shopDomain,
+      clientId: SHOPIFY_CLIENT_ID,
+      clientSecret: encrypt(SHOPIFY_CLIENT_SECRET),
+      accessToken: access_token,
+      tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
+      storeNiche: saved.storeNiche || null,
+      brandTone: saved.brandTone || null,
+      targetAudience: saved.targetAudience || null,
+      storeMarkets: saved.storeMarkets || null,
+    }).returning();
+    projectId = created.id;
+  }
+
+  const appUrl = getAppUrl();
+  res.redirect(`${appUrl}/oauth-success?projectId=${projectId}&shop=${encodeURIComponent(shopDomain)}`);
+});
+
+router.get("/shopify/oauth/check", (_req, res): void => {
+  res.json({
+    configured: !!(SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET),
+    clientId: SHOPIFY_CLIENT_ID ? SHOPIFY_CLIENT_ID.slice(0, 8) + "••••••••" : null,
+  });
+});
 
 router.get("/projects", async (req, res): Promise<void> => {
   const projects = await db
