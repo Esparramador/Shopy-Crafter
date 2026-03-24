@@ -208,7 +208,7 @@ router.get("/projects", async (req, res): Promise<void> => {
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
-  const { name, shopDomain, clientId, clientSecret, accessToken, storeNiche, brandTone, targetAudience, storeMarkets, replicateApiToken, anthropicApiKey } = req.body;
+  const { name, shopDomain, clientId, clientSecret, storeNiche, brandTone, targetAudience, storeMarkets, replicateApiToken, anthropicApiKey } = req.body;
 
   if (!name || !shopDomain || !clientId || !clientSecret) {
     res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
@@ -220,9 +220,6 @@ router.post("/projects", async (req, res): Promise<void> => {
     shopDomain: normalizeShopDomain(shopDomain),
     clientId,
     clientSecret: encrypt(clientSecret),
-    // If access token is provided directly (custom app), save it immediately
-    accessToken: accessToken ? accessToken : null,
-    tokenExpiresAt: accessToken ? new Date(Date.now() + 365 * 24 * 3600 * 1000) : null,
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
     targetAudience: targetAudience ?? null,
@@ -231,13 +228,11 @@ router.post("/projects", async (req, res): Promise<void> => {
     anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
   }).returning();
 
-  // Only try OAuth token refresh if no direct access token was provided
-  if (!accessToken) {
-    try {
-      await refreshToken(project.id, project.shopDomain, project.clientId, clientSecret);
-    } catch (err) {
-      req.log.warn({ projectId: project.id, err }, "Initial token fetch failed — can retry later");
-    }
+  // Auto-generate access token immediately using client credentials
+  try {
+    await refreshToken(project.id, project.shopDomain, project.clientId, clientSecret);
+  } catch (err) {
+    req.log.warn({ projectId: project.id, err }, "Initial token generation failed — will retry on first API call");
   }
 
   const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));

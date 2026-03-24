@@ -19,7 +19,6 @@ export default function NewProject() {
     shopDomain: "",
     clientId: "",
     clientSecret: "",
-    accessToken: "",
     storeNiche: "",
     brandTone: "",
     targetAudience: "",
@@ -51,7 +50,6 @@ export default function NewProject() {
           shopDomain: formData.shopDomain,
           clientId: formData.clientId,
           clientSecret: formData.clientSecret,
-          accessToken: formData.accessToken || undefined,
           storeNiche: formData.storeNiche || undefined,
           brandTone: formData.brandTone || undefined,
           targetAudience: formData.targetAudience || undefined,
@@ -87,7 +85,7 @@ export default function NewProject() {
         <div className="section-header">
           <h1 className="section-title">Añadir Tienda</h1>
           <p className="section-subtitle">
-            Introduce las credenciales de la app personalizada de Shopify creada en el admin de la tienda.
+            Con el API Key y la Clave Secreta, el sistema genera y renueva el token de acceso automáticamente. No necesitas copiarlo manualmente.
           </p>
         </div>
       </div>
@@ -161,27 +159,6 @@ export default function NewProject() {
                 autoComplete="new-password"
               />
             </div>
-          </div>
-
-          <div className="form-group" style={{ marginTop: 4 }}>
-            <label className="form-label">
-              Token de acceso Admin API
-              <span style={{ marginLeft: 8, fontFamily: "var(--fr)", color: "var(--t3)", fontSize: 11, fontWeight: 400 }}>
-                (recomendado — lo encuentras en Apps → tu app → Credenciales)
-              </span>
-            </label>
-            <input
-              type="password"
-              className="form-input"
-              style={{ fontFamily: "var(--fm)" }}
-              value={formData.accessToken}
-              onChange={handleChange("accessToken")}
-              placeholder="shpat_••••••••••••••••••••••••••••••••"
-              autoComplete="new-password"
-            />
-            <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>
-              Empieza por <code style={{ background: "var(--ink2)", padding: "1px 4px", borderRadius: 3 }}>shpat_</code>. Si no lo tienes aún, puedes añadirlo más tarde desde la configuración del proyecto.
-            </p>
           </div>
 
           <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 8 }}>

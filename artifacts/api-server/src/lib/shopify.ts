@@ -89,8 +89,12 @@ export async function shopifyRequest<T>(
   });
 
   if (resp.status === 401) {
-    logger.warn({ projectId, url }, "Shopify 401 — attempting token refresh");
-    const newToken = await refreshToken(projectId, shopDomain, "", "");
+    logger.warn({ projectId, url }, "Shopify 401 — attempting token refresh with stored credentials");
+    // Reload credentials from DB for the refresh
+    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
+    const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
+    const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
     const retryHeaders = { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" };
     const retryResp = await fetch(url, {
       ...options,
