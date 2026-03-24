@@ -37,20 +37,27 @@ const OAUTH_SCOPES = [
   "read_themes",
 ].join(",");
 
-const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string }>();
+const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string; clientId: string; clientSecret: string }>();
 
 function getAppUrl() {
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
   return domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
 }
 
-router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
-  const { shop, name, storeNiche, brandTone, targetAudience, storeMarkets } = req.query as Record<string, string>;
+router.post("/shopify/oauth/start", async (req, res): Promise<void> => {
+  const {
+    shop, name, storeNiche, brandTone, targetAudience, storeMarkets,
+    clientId: bodyClientId, clientSecret: bodyClientSecret,
+  } = req.body as Record<string, string>;
   if (!shop) { res.status(400).json({ error: "shop es obligatorio" }); return; }
 
-  const { clientId, clientSecret } = await getShopifyCredentials();
+  // Per-project credentials take priority, fall back to platform/env credentials
+  const platform = await getShopifyCredentials();
+  const clientId = (bodyClientId ?? "").trim() || platform.clientId;
+  const clientSecret = (bodyClientSecret ?? "").trim() || platform.clientSecret;
+
   if (!clientId || !clientSecret) {
-    res.status(500).json({ error: "Credenciales de Shopify no configuradas. Ve a Ajustes → Conexión Shopify OAuth." });
+    res.status(400).json({ error: "Se requiere el Client ID y Client Secret de Shopify. Introdúcelos en el formulario o configúralos en Ajustes." });
     return;
   }
 
@@ -63,6 +70,34 @@ router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
     brandTone: brandTone ?? "",
     targetAudience: targetAudience ?? "",
     storeMarkets: storeMarkets ?? "",
+    clientId,
+    clientSecret,
+  });
+  setTimeout(() => oauthState.delete(state), 10 * 60 * 1000);
+
+  const redirectUri = `${getAppUrl()}/api/shopify/oauth/callback`;
+  const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  res.json({ authUrl, state });
+});
+
+// Keep GET for backwards compatibility (uses platform credentials only)
+router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
+  const { shop, name, storeNiche, brandTone, targetAudience, storeMarkets } = req.query as Record<string, string>;
+  if (!shop) { res.status(400).json({ error: "shop es obligatorio" }); return; }
+
+  const { clientId, clientSecret } = await getShopifyCredentials();
+  if (!clientId || !clientSecret) {
+    res.status(400).json({ error: "Se requiere el Client ID y Client Secret de Shopify. Introdúcelos en el formulario o configúralos en Ajustes." });
+    return;
+  }
+
+  const shopDomain = normalizeShopDomain(shop);
+  const state = crypto.randomBytes(16).toString("hex");
+  oauthState.set(state, {
+    shop: shopDomain, projectName: name ?? shopDomain.split(".")[0],
+    storeNiche: storeNiche ?? "", brandTone: brandTone ?? "",
+    targetAudience: targetAudience ?? "", storeMarkets: storeMarkets ?? "",
+    clientId, clientSecret,
   });
   setTimeout(() => oauthState.delete(state), 10 * 60 * 1000);
 
@@ -82,7 +117,8 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
   const saved = oauthState.get(state)!;
   oauthState.delete(state);
 
-  const { clientId, clientSecret } = await getShopifyCredentials();
+  // Use credentials that were stored in the state (per-project or platform fallback)
+  const { clientId, clientSecret } = saved;
 
   if (hmac) {
     const params = Object.entries(req.query as Record<string, string>)
