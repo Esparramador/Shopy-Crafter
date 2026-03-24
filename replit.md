@@ -61,12 +61,29 @@ Key tables: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insi
 - `analyzeProductTrends()` — Gemini: product trend analysis → auto-saved to OmniCore
 - `learnFromOperation()` + `ingestToShopyBrain()` — always fire-and-forget, NEVER awaited
 
-**Gemini integration**: Replit AI Integrations proxy — no API key required, billed to Replit credits.
-- `AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY` — auto-provisioned
-- Package: `@workspace/integrations-gemini-ai` + `@google/genai` (direct dep in api-server)
+**Gemini integration**: Direct API key (`GEMINI_API_KEY`) preferred; falls back to Replit AI Integrations proxy.
+- `GEMINI_API_KEY` — user's own Google Gemini API key (priority)
+- `AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY` — Replit proxy fallback
+- Package: `@google/genai` (direct dep in api-server)
+- Models: `gemini-2.5-flash` (fast), `gemini-2.5-pro` (deep research)
 - Library: `artifacts/api-server/src/lib/gemini.ts`
 - Route: `artifacts/api-server/src/routes/gemini-research.ts` → `/api/gemini/*`
 - Frontend: `/admin/gemini-intel` → `GeminiIntelligence.tsx`
+
+### OmniCore Floating AI Chatbot
+Multi-model floating chatbot accessible from all admin pages.
+- **Component**: `artifacts/shopify-optimizer/src/components/OmniChatbot.tsx`
+- **Models**: Gemini (research) + Claude (answers) + OmniCore Brain (memory)
+- **Capabilities**:
+  - Full Klaviyo workflow generation (6 flows, complete HTML email templates)
+  - Gemini market intelligence for any niche
+  - Direct Claude+Brain answers for strategy/SEO/pricing
+  - Flow modal: view and copy-paste complete HTML email bodies
+- **Klaviyo AI routes**: `artifacts/api-server/src/routes/klaviyo-ai.ts`
+  - `POST /api/klaviyo-ai/generate-workflow` — full workflow plan (Gemini+Claude)
+  - `POST /api/klaviyo-ai/generate-email` — single email template
+  - `POST /api/klaviyo-ai/push-flow` — create flow draft in Klaviyo
+  - `GET /api/klaviyo-ai/status` — Klaviyo account status
 
 ### OmniCore / ShopyBrain Cron Jobs (9 total)
 | Schedule | Job |

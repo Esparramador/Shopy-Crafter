@@ -27,6 +27,7 @@ import klaviyoRouter from "./klaviyo.js";
 import vaultRouter from "./vault.js";
 import referenceRouter from "./reference.js";
 import geminiResearchRouter from "./gemini-research.js";
+import klaviyoAiRouter from "./klaviyo-ai.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -68,5 +69,6 @@ router.use(klaviyoRouter);
 router.use(vaultRouter);
 router.use(referenceRouter);
 router.use("/gemini", geminiResearchRouter);
+router.use(klaviyoAiRouter);
 
 export default router;

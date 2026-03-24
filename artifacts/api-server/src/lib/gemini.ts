@@ -5,20 +5,28 @@ let _ai: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!_ai) {
-    const baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
-    const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-    if (!baseUrl || !apiKey) throw new Error("Gemini AI integration not configured");
-    _ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "", baseUrl } });
+    // Prefer direct API key (user's own key), fallback to Replit AI Integrations proxy
+    const directKey = process.env.GEMINI_API_KEY;
+    const proxyKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+    const proxyUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+
+    if (directKey) {
+      _ai = new GoogleGenAI({ apiKey: directKey });
+    } else if (proxyKey && proxyUrl) {
+      _ai = new GoogleGenAI({ apiKey: proxyKey, httpOptions: { apiVersion: "", baseUrl: proxyUrl } });
+    } else {
+      throw new Error("Gemini not configured: set GEMINI_API_KEY or Replit AI Integrations");
+    }
   }
   return _ai;
 }
 
 export function isGeminiAvailable(): boolean {
-  return !!(process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY);
+  return !!(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY));
 }
 
 const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_PRO_MODEL = "gemini-3.1-pro-preview";
+const GEMINI_PRO_MODEL = "gemini-2.5-pro";
 
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
   const ai = getGeminiClient();

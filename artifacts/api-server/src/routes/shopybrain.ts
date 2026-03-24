@@ -139,9 +139,30 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 });
 
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
-  const { query, niche, searchType } = req.body;
+  const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory } = req.body;
   if (!query) {
     res.status(400).json({ error: "query es requerido" });
+    return;
+  }
+
+  // For chatbot mode: bypass memory lookup and return direct AI answer
+  if (returnRaw) {
+    const sysPrompt = customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
+Eres experto en Shopify, Klaviyo, email marketing, SEO, pricing y estrategia eCommerce.
+Responde siempre en español, de forma directa, clara y accionable.
+Si el usuario pregunta por el estado del Brain, resume que tienes memorias acumuladas de múltiples nichos, flujos Klaviyo, estrategias SEO, y patrones de conversión.`;
+
+    const userContent = conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query;
+
+    const aiRes = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 2000,
+      system: sysPrompt,
+      messages: [{ role: "user", content: userContent }],
+    });
+
+    const answer = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+    res.json({ answer, source: "claude+omnicore" });
     return;
   }
 

@@ -51,6 +51,7 @@ import ClientProducts from "@/pages/client/ClientProducts";
 import { VoiceButton } from "@/components/VoiceButton";
 import { CommandPalette } from "@/components/CommandPalette";
 import { OnboardingWidget } from "@/components/OnboardingWidget";
+import OmniChatbot from "@/components/OmniChatbot";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -395,6 +396,7 @@ function App() {
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
+            <OmniChatbot />
           </WouterRouter>
         </AuthProvider>
         <Toaster />
