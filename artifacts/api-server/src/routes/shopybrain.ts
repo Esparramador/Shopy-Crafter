@@ -5,6 +5,7 @@ import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
+import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -140,17 +141,13 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 });
 
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
-  const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory } = req.body;
+  const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute } = req.body;
   if (!query) {
     res.status(400).json({ error: "query es requerido" });
     return;
   }
 
-  // For chatbot mode: bypass memory lookup and return direct AI answer
-  // Enhanced: also checks ShopyBrain memory for entity-specific knowledge
   if (returnRaw) {
-    // ── SMART CONTEXT INJECTION: Check if query mentions any known entity ───
-    // Extract potential entity names from query (brands, names, handles, URLs)
     let entityKnowledgeContext = "";
     const entityMatches = query.match(/[@]([a-zA-Z0-9_.]+)|(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]{3,})\.[a-zA-Z]{2,}|(?:sobre|investigar?|analiza|dame información de|qué sabes de|qué tienes sobre)\s+([^\?\.]+)/i);
     const potentialEntity = entityMatches?.[1] ?? entityMatches?.[2] ?? entityMatches?.[3]?.trim();
@@ -168,11 +165,9 @@ ${entityKnowledge.summary.slice(0, 3000)}
 INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es información real ya investigada y verificada por ShopyBrain. Complementa con tu propio conocimiento si es necesario.`;
         }
       } catch {
-        // Non-critical: continue without entity context
       }
     }
 
-    // Also load general relevant memories for context
     const relevantMemories = await db.select()
       .from(omnicoreMemoriesTable)
       .where(gte(omnicoreMemoriesTable.confidence, 0.6))
@@ -183,11 +178,18 @@ INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es inf
       ? `\n\nCONOCIMIENTO RECIENTE EN SHOPYBRAIN:\n${relevantMemories.map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 200)}`).join("\n")}`
       : "";
 
+    const isGuideRequest = detectGuideRequest(query);
+    const pageContext = currentRoute ? getPageContextForRoute(currentRoute) : "";
+    const guideBlock = isGuideRequest ? `\n\n${APP_GUIDE_KNOWLEDGE}` : "";
+    const pageBlock = pageContext ? `\n\nPÁGINA ACTUAL DEL USUARIO: ${pageContext}\nRuta: ${currentRoute}\nINSTRUCCIÓN: Si el usuario pregunta algo, ten en cuenta que está en esta página. Si pide ayuda, guíale con los botones y opciones EXACTOS de esta página. Sé muy específico con nombres de botones, ubicaciones y orden de pasos.` : "";
+
     const sysPrompt = (customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
 Eres experto en Shopify, Klaviyo, email marketing, SEO, pricing y estrategia eCommerce.
 Tienes acceso al conocimiento acumulado de ShopyBrain — memorias de investigaciones anteriores sobre marcas, nichos y estrategias.
 Responde siempre en español, de forma directa, clara y accionable.
-Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.`) + entityKnowledgeContext + memoriesContext;
+Cuando el usuario pida ayuda o pregunte cómo hacer algo, actúa como GUÍA INTERACTIVA: da instrucciones paso a paso con los nombres EXACTOS de botones, páginas y secciones de la app.
+Si conoces la página actual del usuario, contextualiza tu respuesta a esa página.
+Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.`) + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext;
 
     const userContent = conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query;
 

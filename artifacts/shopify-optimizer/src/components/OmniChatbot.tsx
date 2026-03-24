@@ -7,9 +7,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Brain, X, Send, Loader2, Minimize2, Maximize2, Sparkles, ChevronDown,
   Link, Image, Video, Upload, Eye, Palette, Layers, Cpu, Globe,
-  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon
+  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -552,21 +553,24 @@ function AttachmentPreview({ file, url, onRemove }: {
 
 // ─── QUICK ACTIONS ─────────────────────────────────────────────────────────────
 const QUICK_ACTIONS = [
+  { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
   { icon: "🔬", label: "Investigar marca completa", prompt: "__RESEARCH__", isResearch: true },
   { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
   { icon: "🧠", label: "Estado del Brain", prompt: "¿Qué conocimiento ha absorbido el ShopyBrain? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
-  { icon: "🔍", label: "Investigar mercado", prompt: "Analiza el mercado de comics y arte en España para una tienda Shopify. Dame inteligencia de mercado completa con oportunidades." },
+  { icon: "📘", label: "Cómo configurar Klaviyo", prompt: "Explícame paso a paso cómo configurar Klaviyo desde cero para enviar emails automatizados desde esta app." },
 ];
 
 const SYSTEM_PROMPT = `Eres OmniCore AI — la inteligencia central de ShopyBrain para agencias Shopify.
 Tienes acceso a tres motores: 🔬 Gemini (investigación), 🧠 Claude (análisis), 💾 ShopyBrain (memoria permanente).
 Eres experto en: Shopify, Klaviyo, email marketing, SEO, pricing, eCommerce, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
 Cuando el usuario comparte una imagen o URL, puedes absorberla al ShopyBrain y extraer TODA la inteligencia posible.
+También eres el ASISTENTE DE NAVEGACIÓN de la app: conoces TODAS las páginas, botones y funciones. Cuando te pregunten cómo hacer algo, guía paso a paso con nombres EXACTOS de botones y secciones.
 Responde siempre en español. Sé directo, técnico y accionable.`;
 
 // ─── MAIN CHATBOT ─────────────────────────────────────────────────────────────
 export default function OmniChatbot() {
   const { user } = useAuth();
+  const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
@@ -578,6 +582,11 @@ Puedo absorber y analizar **cualquier cosa**:
 · 🎬 Vídeos — técnica, estilo, señales de conversión
 · 🌐 URLs — cualquier web, tienda, artículo
 · 📱 Instagram, Facebook, X, YouTube — inteligencia de marca y contenido
+
+**Soy tu guía de la app** — pregúntame:
+· ❓ "¿Qué puedo hacer aquí?" — te explico la página actual
+· 📘 "¿Cómo creo un email en Klaviyo?" — paso a paso exacto
+· 🛠️ "¿Cómo configuro X?" — cualquier función de la app
 
 Usa el 📎 **botón de adjuntar** para subir archivos o pegar URLs.
 Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
@@ -759,7 +768,7 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
           const followUp = await fetch(`${API}/api/shopybrain/search`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT }),
+            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
           });
           if (followUp.ok) {
             const d = await followUp.json();
@@ -824,7 +833,7 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
           const followUp = await fetch(`${API}/api/shopybrain/search`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT }),
+            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
           });
           if (followUp.ok) { const d = await followUp.json(); assistantContent += d.answer ?? ""; }
         }
@@ -838,7 +847,7 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
         const res = await fetch(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location }),
         });
         if (res.ok) {
           const d = await res.json();

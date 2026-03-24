@@ -1,11 +1,9 @@
-# Shopify AI Optimizer — ShopyBrain Agency Platform
+# ShopyBrain Agency Platform
 
 ## Overview
-Multi-user Shopify AI optimization agency platform. Admin: `sadiagiljoan@gmail.com` / `ShopyAdmin2026!` (auto-seeded on startup). Two roles: **admin** (full access, all stores, all engines) and **client** (read-only per-store, approval workflows). Zero simulation — all data is real.
+ShopyBrain is a multi-user Shopify AI optimization agency platform designed to enhance e-commerce operations. It operates with two primary roles: `admin` (full access across all stores and AI engines) and `client` (read-only, per-store access with approval workflows). The platform uses real data exclusively, with no simulations.
 
-### Key Names
-- **UI name**: ShopyBrain (public-facing branding)
-- **Internal name**: OmniCore (technical, in code)
+Its core purpose is to leverage advanced AI models (Gemini, Claude, OmniCore) for in-depth market research, competitor analysis, product trend identification, and content generation, all integrated with Shopify's ecosystem. ShopyBrain aims to provide comprehensive business intelligence and automation for Shopify stores, driving optimization and strategic growth for agencies and their clients.
 
 ## User Preferences
 - Admin credentials: `sadiagiljoan@gmail.com` / `ShopyAdmin2026!`
@@ -17,270 +15,79 @@ Multi-user Shopify AI optimization agency platform. Admin: `sadiagiljoan@gmail.c
 
 ## System Architecture
 
-pnpm workspace monorepo, TypeScript, Node.js 24.
+The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 
 ### Artifacts
-| Artifact | Port | Path |
-|---|---|---|
-| `api-server` | 8080 | `/api/*` |
-| `shopify-optimizer` (React+Vite) | 19080 | `/` |
-| `mockup-sandbox` | 8081 | `/__mockup` |
+- `api-server` (Port 8080, Path `/api/*`)
+- `shopify-optimizer` (React+Vite, Port 19080, Path `/`)
+- `mockup-sandbox` (Port 8081, Path `/__mockup`)
 
 ### Design System
 - **Colors**: `--ink:#080810`, `--gold:#c8a84b`, `--jade:#2dd49f`, `--crim:#e84558`
 - **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
 - **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
 
-### Database — 42+ Tables (PostgreSQL + Drizzle ORM)
-Key tables: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insights`, `omnicore_knowledge_domains`, `omnicore_niche_profiles`, `omnicore_prompt_library`, `omnicore_study_sessions`, `omnicore_cross_connections`, `service_catalog`, `agency_cost_structure`, `revenue_snapshots`, `email_flows`, `user_sessions`, `cms_content`, `competitors`, `inventory_tracking`, `ab_tests`, `forecasts`, `project_files`, `achievements`
-
-**Important**: `email_flows` uses raw `pool.query()` (not Drizzle ORM). `user_sessions` is the connect-pg-simple session store table (created directly via SQL, not via Drizzle schema).
+### Database
+PostgreSQL with Drizzle ORM, featuring over 42 tables, including: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insights`, `omnicore_knowledge_domains`, `omnicore_niche_profiles`, `omnicore_prompt_library`, `omnicore_study_sessions`, `omnicore_cross_connections`, `service_catalog`, `agency_cost_structure`, `revenue_snapshots`, `email_flows`, `user_sessions`, `cms_content`, `competitors`, `inventory_tracking`, `ab_tests`, `forecasts`, `project_files`, `achievements`.
 
 ### Security
-- AES-256-GCM encryption via `ENCRYPTION_KEY` env var (64-char hex) — `encrypt()` on write, `safeDecrypt()` on read for ALL credentials
-- All admin routes behind `requireAdmin` middleware
-- CORS locked to `REPLIT_DOMAINS` in production
-- Session: `httpOnly`, `sameSite: strict`, `secure: true` in production
-- SVG from AI sanitized (strips `<script>`, `on*`, `javascript:`)
+- AES-256-GCM encryption for all credentials using `ENCRYPTION_KEY`.
+- Admin routes are protected by `requireAdmin` middleware.
+- CORS is restricted to `REPLIT_DOMAINS` in production.
+- Session management uses `httpOnly`, `sameSite: strict`, `secure: true` in production.
+- SVG content from AI is sanitized to remove scripts.
 
 ### AI Stack — OmniCore (ShopyBrain) + Gemini Research
-**Three-model pipeline: Gemini → Claude → OmniCore**
+A three-model pipeline: Gemini → Claude → OmniCore, with integrations for image generation.
+- **Gemini (`gemini-3.1-pro-preview`, `gemini-2.5-flash`)**: Primarily for research, market intelligence, competitor analysis, and product trends.
+- **Claude (`claude-sonnet-4-5`)**: Used for strategic analysis, content generation, and incorporating ShopyBrain context.
+- **Replicate (Flux, Recraft)**: For generating product and lifestyle images.
+- **OmniCore**: The central "brain" for permanent memory, absorbing all AI outputs and analysis into `omnicore_memories` or `omnicore_absorbed_content`.
 
-| Model | Role | Use Case |
-|---|---|---|
-| Gemini `gemini-3.1-pro-preview` | Research & Intelligence | Business research, market intel, competitor analysis, product trends |
-| Gemini `gemini-2.5-flash` | Fast research | Competitor gaps, product trends (batch) |
-| Claude `claude-sonnet-4-5` | Analysis & Content | Strategy, content generation, ShopyBrain context injection |
-| Replicate (Flux, Recraft) | Image generation | Product images, lifestyle shots |
+### OmniCore Floating AI Chatbot
+A universal, multi-model chatbot accessible from all admin pages, capable of absorbing and analyzing various content types:
+- **Images/Videos**: Analyzed by Claude Opus Vision and Gemini for composition, style, brand, and eCommerce signals.
+- **URLs (Websites, Social Media)**: Fetched and analyzed by Gemini for content, brand identity, marketing strategy, and audience engagement.
+- **Text**: Analyzed by Gemini for themes and insights.
+All findings are permanently stored in `omnicore_absorbed_content` for ShopyBrain's memory.
 
-- `askClaudeJsonWithBrain()` — main Claude call (injects OmniCore context in system prompt)
-- `askClaudeWithBrain()` — vision variant
-- `researchBusiness()` — Gemini: full business intelligence profile
-- `gatherMarketIntelligence()` — Gemini: market data → auto-saved to OmniCore niche profiles
-- `analyzeCompetitor()` — Gemini: competitor intel + Claude gap analysis
-- `analyzeProductTrends()` — Gemini: product trend analysis → auto-saved to OmniCore
-- `learnFromOperation()` + `ingestToShopyBrain()` — always fire-and-forget, NEVER awaited
+### Entity Research Engine
+A deep absorption engine for brands, competitors, or influencers triggered via the chatbot. It follows an 8-phase flow:
+1. Entity detection.
+2. Loading existing knowledge.
+3. Parallel Google Search Grounding across 8 categories.
+4. Gemini identifies knowledge gaps.
+5. Claude synthesizes structured JSON profiles.
+6. Upserting entity memories and absorbed content.
+7. Responding with `knowledgeReuse` metrics.
 
-**Gemini integration**: Direct API key (`GEMINI_API_KEY`) preferred; falls back to Replit AI Integrations proxy.
-- `GEMINI_API_KEY` — user's own Google Gemini API key (priority)
-- `AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY` — Replit proxy fallback
-- Package: `@google/genai` (direct dep in api-server)
-- Models: `gemini-2.5-flash` (fast), `gemini-2.5-pro` (deep research)
-- Library: `artifacts/api-server/src/lib/gemini.ts`
-- Route: `artifacts/api-server/src/routes/gemini-research.ts` → `/api/gemini/*`
-- Frontend: `/admin/gemini-intel` → `GeminiIntelligence.tsx`
+### OmniCore Chatbot Guide Assistant
+The OmniChatbot has full app-guide knowledge injected (via `app-guide.ts`). It detects the current page route (`useLocation` from wouter) and sends it to the backend. When users ask help questions (detected by `detectGuideRequest`), the full APP_GUIDE_KNOWLEDGE is injected into Claude's system prompt along with PAGE_CONTEXT for the current route. This makes the chatbot a context-aware assistant that guides users step-by-step with exact button names and locations.
 
-### ShopyBrain — ONE Brain, ONE Truth
-**There is only one brain: ShopyBrain = OmniCore.** No duplicates exist.
-- `intelligence.ts` route uses ShopyBrain via `buildShopyBrainContext()` / `askClaudeWithBrain()` — not a separate brain
-- `geminiConversations/Messages` tables are Gemini chat history only, not a brain
-- ALL AI outputs are saved to `omnicore_memories` or `omnicore_absorbed_content`
+### ShopyBrain Cron Jobs (9 total)
+Automated tasks for continuous learning, consolidation, cross-synthesis, revenue snapshots, data integration, competitor scans, and inventory sync.
 
-### OmniCore Floating AI Chatbot — Universal Absorber
-Multi-model floating chatbot (gold brain button, bottom-right) accessible from all admin pages.
-- **Component**: `artifacts/shopify-optimizer/src/components/OmniChatbot.tsx`
-- **Models**: Gemini (research) + Claude Opus Vision (images) + ShopyBrain (permanent memory)
+### Pricing Model
+A multi-tiered pricing structure (Starter, Agency Pro, Enterprise, One-Shot Audit) with monthly retainers and one-time setup fees, visible on the landing page and managed through the CMS.
 
-**ABSORBS EVERYTHING:**
-| Source Type | How | What it Extracts |
-|---|---|---|
-| 📸 Images (upload) | Claude Opus Vision (base64) | Composition, colors, textures, topology, rendering, chemical/technical, brand, eCommerce signals |
-| 🎬 Videos (upload) | Gemini analysis | Style, production quality, marketing approach, conversion signals |
-| 🌐 Any URL | Fetch + Gemini | Content, brand, products, pricing, marketing strategy, audience |
-| 📱 Instagram | Fetch + Gemini social | Brand identity, content strategy, posting patterns, engagement |
-| 👤 Facebook | Fetch + Gemini social | Same as Instagram |
-| 🐦 X / Twitter | Fetch + Gemini social | Brand voice, audience, viral content patterns |
-| 📺 YouTube | Gemini video URL | Visual style, product demos, marketing technique |
-| 💬 Text | Gemini analysis | Themes, insights, marketing angles |
+### Shopify Billing Flow
+Admins can generate Shopify checkout links for services, linking directly to Shopify product variants configured in the CFO dashboard.
 
-**ALL FINDINGS → ShopyBrain memory permanently**
-
-- **DB table**: `omnicore_absorbed_content` (new) — tracks all absorbed content with full analysis
-- **Absorber routes**: `artifacts/api-server/src/routes/absorber.ts`
-  - `POST /api/shopybrain/absorb-url` — absorb any URL (auto-classifies type)
-  - `POST /api/shopybrain/absorb-image` — absorb image/video file (multipart)
-  - `POST /api/shopybrain/absorb-text` — absorb raw text
-  - `GET /api/shopybrain/absorbed-content` — list all absorbed content
-- **Claude Vision prompt**: 10-dimension analysis (composition, colors, textures, topology, rendering, chemical/technical, brand, eCommerce, emotional, Shopify insights)
-- **Drag-and-drop** support directly onto chatbot window
-
-- **Klaviyo AI routes**: `artifacts/api-server/src/routes/klaviyo-ai.ts`
-  - `POST /api/klaviyo-ai/generate-workflow` — full workflow plan (Gemini+Claude)
-  - `POST /api/klaviyo-ai/generate-email` — single email template
-  - `POST /api/klaviyo-ai/push-flow` — create flow draft in Klaviyo
-  - `GET /api/klaviyo-ai/status` — Klaviyo account status
-
-### Entity Research Engine — Investigación Exhaustiva de Marcas
-Absorción profunda de cualquier marca/competidor/influencer con memoria acumulativa.
-
-**Trigger desde chatbot**: cuando el usuario escribe `@marca`, una URL, "investiga X", "todo sobre X" o "🔬 Investigar marca completa"
-
-**Flujo de 8 fases**:
-1. Detecta entidad (URL, handle, nombre)
-2. Phase 0 → `loadExistingEntityKnowledge()` — carga conocimiento previo
-3. 8× Google Search Grounding en paralelo (overview, productos, social, noticias, reviews, competidores, ecommerce, visual)
-4. Gemini focaliza en GAPS (ignora lo ya conocido)
-5. Claude sintetiza → perfil JSON estructurado
-6. `upsertEntityMemory()` — actualiza existentes / crea nuevas memorias
-7. Upsert en `omnicore_absorbed_content`
-8. Respuesta con `knowledgeReuse` metrics
-
-**Rutas**:
-- `POST /api/shopybrain/research-entity-sync` — investigación completa (sync)
-- `GET /api/shopybrain/entity-knowledge/:name` — todo lo que ShopyBrain sabe de una entidad
-- `GET /api/shopybrain/research-entity/:name` — legacy quick lookup
-
-**Chatbot `returnRaw` mode mejorado**: detecta automáticamente si la query menciona una entidad conocida e inyecta su conocimiento acumulado en el system prompt de Claude.
-
-**Archivo**: `artifacts/api-server/src/routes/entity-research.ts`
-**Funciones exportadas**: `loadExistingEntityKnowledge()`, `upsertEntityMemory()`
-
-### OmniCore / ShopyBrain Cron Jobs (9 total)
-| Schedule | Job |
-|---|---|
-| Every 3h | Micro-learning (2 domains × 3 insights) |
-| Every 6h | Consolidation (insights → memories) |
-| Every 12h | Cross-synthesis (cross connections) |
-| 1am | Deep study (14 domains × 5 insights) |
-| 2am | Revenue snapshots |
-| 3am | Real data integration |
-| 6am | Competitor price scans |
-| 7am | Inventory sync + alerts |
-| Sun 0am | Weekly mega-synthesis |
-
-### ShopyBrain Dashboard Routes
-- `/admin/shopybrain` — brain overview + domain visualization
-- `/admin/shopybrain/memories` — memory explorer (filter by niche/type/confidence)
-- `/admin/shopybrain/insights` — 16 knowledge domains
-- `/admin/shopybrain/study` — study sessions + manual trigger
-- `/admin/my-pricing` — CFO dashboard (cost structure, service catalog, Shopify sync)
-- `/admin/apk` — APK Android build manager (trigger build, status, download, install guide)
-
-### Pricing Model (real — visible in landing and CMS)
-| Plan | Retainer | Setup único |
-|---|---|---|
-| Starter | €49/mes | +€297 |
-| Agency Pro | €149/mes | +€597 |
-| Enterprise | €399/mes | +€1.497 |
-| One-Shot Audit | €197 pago único | — |
-
-### Shopify Billing Flow (no Stripe)
-Admin goes to Clients → "Cobrar" button → selects service → `POST /api/agency/payment-link` → Shopify checkout URL → copy or send via chat.
-
-**Prerequisite**: Map each service to a Shopify product variant in `Mi Pricing CFO → 🛍 Shopify Sync` tab FIRST.
-
-**Required env vars for billing**:
-- `SHOP_DOMAIN` — e.g. `mi-tienda.myshopify.com` (currently falls back to demo value)
-- `STOREFRONT_ACCESS_TOKEN` — already set ✅
-- `SHOPIFY_ADMIN_ACCESS_TOKEN` — needed for push-services-to-shopify auto-creation (MISSING)
-
-### Landing Page Sections (8 total)
-1. Inicio (fp-hero)
-2. Motores (fp-engines)
-3. Demo (fp-demo)
-4. Resultados (fp-results)
-5. Precios (fp-pricing)
-6. Clientes (fp-clients)
-7. **Contactar (fp-contact)** — contact form → `POST /api/contact` → audit_log + Klaviyo event
-8. Empezar (fp-cta) + footer
-
-### Store Disconnect / Reconnect (Agency Model)
-Allows disconnecting a Shopify store without losing ANY generated data (images, redesigns, SEO, vault files).
-- `POST /api/projects/:id/disconnect` — clears `clientId`, `clientSecret`, `accessToken`, `tokenExpiresAt`. Preserves `shopDomain`, `name`, all products, vault, redesigns, etc.
-- `POST /api/projects/:id/reconnect` — accepts new `clientId`, `clientSecret`, optional `shopDomain`. Generates token and re-links.
-- `DELETE /api/projects/:id` — full delete with CASCADE (products, redesigns, jobs, vault, etc.)
-- UI: Settings page → "Zona de gestión" section with Desconectar (gold), Reconectar, and Eliminar (red) options.
+### Store Disconnect / Reconnect
+Provides functionality to disconnect a Shopify store without data loss and to reconnect with new credentials, or to fully delete a project and its associated data.
 
 ### Shopify Pagination
-All Shopify product listing uses cursor-based pagination (`page_info` from `Link` header). The deprecated `?page=N` parameter is NOT used anywhere. Function: `shopifyRequestPaged()` in `shopify.ts`.
+Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopify product listings.
 
-### Admin Navigation — Key Routes
-- `/admin/clients` — **default after login** (client management + billing)
-- `/home` — projects dashboard (also accessible via sidebar logo click)
-- `/admin/shopybrain` — OmniCore brain overview
-- `/admin/my-pricing` — CFO pricing dashboard
-- `/new-project` — add new Shopify store
-
-### Public Routes (no auth required)
-- `GET /api/cms/content` — landing CMS content
-- `POST /api/contact` — lead form submission (saved to audit_log + Klaviyo events)
-- `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
-- `GET /api/shopify/oauth/callback` — OAuth return
-
-### Tienda Route
-`/tienda` — immediately redirects to `https://comiccrafter.es/account/login?return_url=/collections/shopify-automatization`
-
-### Vite Proxy (dev only)
-`/api` and `/shopify` paths forwarded to `localhost:8080` in `vite.config.ts`.
-
-### OAuth Callback URL
-`https://c104008b-b6fa-4bd6-96fb-4cf699ca4074-00-1ypcyhx9r8nw8.kirk.replit.dev/api/shopify/oauth/callback`
-
-## Key Files
-| File | Purpose |
-|---|---|
-| `artifacts/api-server/src/routes/agency.ts` | Shopify billing: `shopify-products`, `payment-link`, `shopify-variant`, `push-services-to-shopify` |
-| `artifacts/api-server/src/routes/shopybrain.ts` | Memories, insights, study, niche-profiles, prompt-library |
-| `artifacts/api-server/src/routes/contact.ts` | Lead form: public `POST /api/contact` → audit_log + Klaviyo |
-| `artifacts/api-server/src/lib/claude.ts` | Claude calls + `buildShopyBrainContext()` |
-| `artifacts/api-server/src/lib/crypto.ts` | AES-256-GCM encrypt/safeDecrypt |
-| `artifacts/api-server/src/lib/auth.ts` | requireAuth, requireAdmin, requireClientAccess |
-| `artifacts/api-server/src/app.ts` | CORS, Helmet, rate limiting, session config |
-| `artifacts/api-server/src/routes/index.ts` | Security gate, all route mounts |
-| `artifacts/shopify-optimizer/src/pages/Landing.tsx` | Public landing (8 sections, CMS-driven, contact form) |
-| `artifacts/shopify-optimizer/src/pages/Tienda.tsx` | Redirect to comiccrafter.es/collections/shopify-automatization |
-| `artifacts/shopify-optimizer/src/pages/AdminClients.tsx` | PaymentLinkModal + ChatPanel with billing |
-| `artifacts/shopify-optimizer/src/pages/admin/MyPricing.tsx` | CFO dashboard + Shopify Sync tab |
-| `artifacts/shopify-optimizer/src/pages/admin/ShopyBrain.tsx` | OmniCore dashboard |
-| `artifacts/shopify-optimizer/src/components/layout/AppLayout.tsx` | Sidebar + nav (ShopyBrain + Admin groups) |
-| `lib/db/src/schema/shopybrain.ts` | All 13 OmniCore tables schema |
+### Landing Page Sections
+8 core sections: Hero, Engines, Demo, Results, Pricing, Clients, Contact (with lead form integration), and CTA.
 
 ## External Dependencies
-- **PostgreSQL** — primary DB
-- **Anthropic Claude** (`claude-sonnet-4-5`)
-- **Replicate** (Flux, Recraft) — image generation
-- **Shopify** — Storefront API (checkout links), Admin API (product creation)
-- **Klaviyo** — email flow integration + lead form notifications (`KLAVIYO_API_KEY`)
-- **connect-pg-simple** — PostgreSQL session store
-- **express-session**, **bcryptjs**, **sharp**, **pino**, **zod**, **drizzle-orm**, **orval**
-
-## DB Push Command
-```bash
-pnpm --filter @workspace/db run push-force
-```
-(not `db:push` — use `push-force`)
-
-## APK Android (ShopyBrain)
-
-### Arquitectura
-- Capacitor WebView que carga la URL de producción → siempre actualizado, requiere internet
-- GitHub Actions build en repo privado `Esparramador/Shopy-Crafter`
-- APK publicado como GitHub Release tag `apk-latest` tras cada build
-
-### Botón de descarga en la landing
-- `ApkDownloadButton` en `Landing.tsx` hero section (línea ~355)  
-- Llama `GET /api/apk/status` → si disponible → descarga via `GET /api/apk/download`
-- El API server actúa como proxy autenticado (repo privado)
-
-### Requiere
-- `GITHUB_API_TOKEN` — PAT con `repo` scope (añadir como secret en Replit)
-- Workflow en `.github/workflows/build-apk.yml` — publica Release `apk-latest` con `softprops/action-gh-release@v2`
-
-### Rutas API APK
-- `GET /api/apk/status` — público, devuelve `{available, building, lastBuild}`
-- `GET /api/apk/download` — público, proxy del asset desde GitHub Release
-- `POST /api/apk/build` — admin only, dispara GitHub Actions workflow
-
-### Trigger manual del build
-Admin puede lanzar build desde: `POST /api/apk/build` (requiere sesión admin)
-
-### Panel de Gestión APK (Admin)
-- Ruta: `/admin/apk` → `artifacts/shopify-optimizer/src/pages/admin/ApkManager.tsx`
-- Muestra estado del build, botón lanzar build, checklist de configuración, guía de instalación Android
-- Accesible desde sidebar → "APK Android 📱"
-
-## EADDRINUSE Recovery
-```bash
-pkill -f "dist/index.mjs" && sleep 2
-```
-Then restart the API Server workflow.
+- **PostgreSQL**: Primary database.
+- **Anthropic Claude**: AI model for analysis and content generation.
+- **Replicate**: For image generation (Flux, Recraft).
+- **Shopify**: Storefront API for checkout links and Admin API for product creation.
+- **Klaviyo**: For email flow integration and lead form notifications.
+- **connect-pg-simple**: PostgreSQL session store.
+- **express-session**, **bcryptjs**, **sharp**, **pino**, **zod**, **drizzle-orm**, **orval**: Core libraries and utilities.
+- **@google/genai**: For direct Gemini API integration.
