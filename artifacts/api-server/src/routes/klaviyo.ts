@@ -180,7 +180,7 @@ router.post("/klaviyo/send-email", requireAdmin, async (req, res): Promise<void>
 // ─── TEST CONNECTION ──────────────────────────────────────────────────────────
 router.get("/klaviyo/test", requireAdmin, async (req, res): Promise<void> => {
   try {
-    const data = await klaviyoGet<{ data: Array<{ id: string; attributes: { name: string } }> }>("/lists/?page[size]=1");
+    const data = await klaviyoGet<{ data: Array<{ id: string; attributes: { name: string } }>; meta?: { total: number } }>("/lists/");
     res.json({
       connected: true,
       listCount: data.data?.length ?? 0,
