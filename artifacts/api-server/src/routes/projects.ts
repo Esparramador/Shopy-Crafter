@@ -344,10 +344,6 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
 
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
-  if (!project.accessToken) {
-    res.status(400).json({ error: "Sin token de acceso. Añade el Admin API Access Token en la configuración del proyecto." });
-    return;
-  }
 
   // Allow manual token update via body
   const { newAccessToken } = req.body as { newAccessToken?: string };

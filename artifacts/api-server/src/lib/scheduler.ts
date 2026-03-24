@@ -627,40 +627,36 @@ export async function runTokenRefresh() {
   try {
     const projects = await db.select().from(projectsTable);
     let valid = 0;
-    let rotated = 0;
+    let refreshed = 0;
     let failed = 0;
-    let noToken = 0;
 
     for (const project of projects) {
-      if (!project.accessToken) {
-        noToken++;
-        logger.warn({ projectId: project.id, domain: project.shopDomain }, "Project has no access token — add it in project settings");
-        continue;
-      }
-
       try {
-        const isValid = await validateToken(project.shopDomain, project.accessToken);
-        if (isValid) {
-          valid++;
-          continue;
+        // If token exists and is valid, skip
+        if (project.accessToken) {
+          const isValid = await validateToken(project.shopDomain, project.accessToken);
+          if (isValid) {
+            valid++;
+            continue;
+          }
         }
 
-        // Token failed — attempt rotation (only works if rotation is enabled in Shopify)
-        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting rotation`);
+        // Token missing or invalid — regenerate via client_credentials
+        log("token-refresh", `⚠️ Regenerating token for project ${project.id} (${project.shopDomain})`);
         const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-        await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
-        rotated++;
-        log("token-refresh", `✅ Token rotated: project ${project.id} (${project.shopDomain})`);
+        await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
+        refreshed++;
+        log("token-refresh", `✅ Token refreshed: project ${project.id} (${project.shopDomain})`);
       } catch (err) {
         failed++;
         logger.error(
           { projectId: project.id, domain: project.shopDomain, err },
-          "Token invalid and rotation failed — manual token update required in project settings"
+          "Token refresh failed for project"
         );
       }
     }
 
-    log("token-refresh", `🔑 Done: ${valid} valid, ${rotated} rotated, ${failed} failed, ${noToken} missing`);
+    log("token-refresh", `🔑 Done: ${valid} valid, ${refreshed} refreshed, ${failed} failed`);
   } catch (err) {
     logger.error({ err }, "Token validation job failed");
   }
