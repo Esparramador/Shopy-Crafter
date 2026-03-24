@@ -32,6 +32,7 @@ GOOGLE_PAGESPEED_API_KEY = "AIzaSyA-e_29qy2pUX8jQrq_fhNeL4zKDb9yLI4"
 ENCRYPTION_KEY = "6d79f5ceb6b2278e76e9b07d67bfc95bd78dec9b8120587f453ccb0ec8d3e035"
 COLLECTION_HANDLE = "shopify-automatization"
 SHOP_CURRENCY = "EUR"
+REPLICATE_API_TOKEN = "r8_05gIqMb0EddW99oq5eOrdIwsBbkkrkb4Y1Egb"
 
 [nix]
 channel = "stable-25_05"
