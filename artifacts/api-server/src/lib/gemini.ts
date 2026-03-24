@@ -389,4 +389,121 @@ Provide a single cohesive combined intelligence report that takes the best insig
   return { geminiFindings, claudeAnalysis, combined };
 }
 
+// ─── GEMINI WITH GOOGLE SEARCH GROUNDING ─────────────────────────────────────
+// Uses real Google Search to find information — not hallucinated, actually searched
+export async function askGeminiWithSearch(
+  prompt: string,
+  systemInstruction?: string,
+): Promise<{ text: string; sources: string[]; queries: string[] }> {
+  const ai = getGeminiClient();
+  const response = await ai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Search thoroughly and return comprehensive, factual findings.",
+      tools: [{ googleSearch: {} }],
+      maxOutputTokens: 8192,
+    },
+  });
+
+  // Extract discovered source URLs from grounding metadata
+  const candidate = response.candidates?.[0];
+  const groundingMetadata = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+  const groundingChunks = groundingMetadata?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
+  const searchQueries = groundingMetadata?.webSearchQueries as string[] | undefined;
+
+  const sources = (groundingChunks ?? [])
+    .map(c => c.web?.uri ?? "")
+    .filter(Boolean);
+
+  return {
+    text: response.text ?? "",
+    sources,
+    queries: searchQueries ?? [],
+  };
+}
+
+// ─── DEEP ENTITY RESEARCH — searches EVERYTHING about a brand/person/business ─
+export async function deepEntityResearch(entityName: string, entityUrl?: string): Promise<{
+  overview: string;
+  products: string;
+  social: string;
+  news: string;
+  reviews: string;
+  competitors: string;
+  ecommerce: string;
+  allSources: string[];
+  allQueries: string[];
+}> {
+  const entity = entityUrl ? `${entityName} (${entityUrl})` : entityName;
+
+  logger.info({ entityName, entityUrl }, "Deep parallel entity research with Google Search Grounding");
+
+  // 8 parallel searches — each targets a different dimension of intelligence
+  const [overview, products, social, news, reviews, competitors, ecommerce, visual] = await Promise.allSettled([
+    askGeminiWithSearch(
+      `Research everything about this brand/company/person: "${entity}". Find: founding story, mission, team, locations, size, legal name, history, key milestones, notable facts.`,
+      "Deep brand intelligence analyst. Search and synthesize all public information."
+    ),
+    askGeminiWithSearch(
+      `Find all products and services offered by "${entity}". Research: product catalog, pricing strategy, best sellers, unique selling propositions, materials used, manufacturing, certifications, quality indicators.`,
+      "Product intelligence analyst. Find detailed product and service information."
+    ),
+    askGeminiWithSearch(
+      `Find ALL social media profiles and online presence of "${entity}". Research: Instagram, Facebook, X/Twitter, TikTok, YouTube, LinkedIn, Pinterest accounts. Find follower counts, posting frequency, content style, engagement rates, hashtags used.`,
+      "Social media intelligence analyst. Find all social profiles and content strategy."
+    ),
+    askGeminiWithSearch(
+      `Find recent news, press coverage, articles, blog posts, interviews about "${entity}". Find: press releases, media mentions, partnerships announced, awards won, controversies, community presence.`,
+      "News and press intelligence analyst."
+    ),
+    askGeminiWithSearch(
+      `Find customer reviews, testimonials, and sentiment about "${entity}". Search: Google reviews, Trustpilot, social media comments, forum mentions, Reddit threads, customer complaints, NPS signals.`,
+      "Customer sentiment analyst. Find reviews and public opinion."
+    ),
+    askGeminiWithSearch(
+      `Find competitors and market positioning of "${entity}". Identify: direct competitors, indirect competitors, market share signals, competitive advantages, pricing compared to competitors, unique differentiation.`,
+      "Competitive intelligence analyst."
+    ),
+    askGeminiWithSearch(
+      `Research the eCommerce strategy, tech stack, and online marketing of "${entity}". Find: Shopify/platform used, email marketing tools, advertising channels, SEO keywords, conversion tactics, Klaviyo/email flows, influencer partnerships, discount strategies.`,
+      "eCommerce strategy analyst."
+    ),
+    askGeminiWithSearch(
+      `Find visual identity, brand aesthetics, and design language of "${entity}". Find: color palette used, logo style, photography style, packaging, brand guidelines if public, font choices, visual references.`,
+      "Visual brand identity analyst."
+    ),
+  ]);
+
+  // Extract results and aggregate all sources discovered
+  const allSources: string[] = [];
+  const allQueries: string[] = [];
+
+  const get = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>, fallback = "") => {
+    if (r.status === "fulfilled") {
+      allSources.push(...r.value.sources);
+      allQueries.push(...r.value.queries);
+      return r.value.text;
+    }
+    logger.warn({ reason: r.reason }, "Entity research search failed (non-critical)");
+    return fallback;
+  };
+
+  return {
+    overview: get(overview),
+    products: get(products),
+    social: get(social),
+    news: get(news),
+    reviews: get(reviews),
+    competitors: get(competitors),
+    ecommerce: get(ecommerce),
+    visual: get(visual),
+    allSources: [...new Set(allSources)], // deduplicate
+    allQueries: [...new Set(allQueries)],
+  } as {
+    overview: string; products: string; social: string; news: string;
+    reviews: string; competitors: string; ecommerce: string; allSources: string[]; allQueries: string[];
+  };
+}
+
 export { askGemini, askGeminiJson };

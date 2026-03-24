@@ -26,9 +26,41 @@ interface Message {
 }
 
 interface ChatAction {
-  type: "klaviyo-workflow" | "absorb-result" | "research";
+  type: "klaviyo-workflow" | "absorb-result" | "entity-research";
   label: string;
   data: unknown;
+}
+
+interface EntityResearchResult {
+  success: boolean;
+  researchId: string;
+  entity: string;
+  entityUrl?: string;
+  handles?: Record<string, string>;
+  profile: {
+    entityType?: string;
+    description?: string;
+    socialProfiles?: Record<string, string>;
+    socialMetrics?: Record<string, unknown>;
+    products?: Array<{ name: string; category: string; priceRange: string; keyFeature: string }>;
+    pricing?: { strategy: string; avgTicket: string };
+    ecommerceStack?: { platform: string; emailTool: string };
+    marketingChannels?: string[];
+    sentiment?: { overall: string; topCompliments: string[]; topComplaints: string[] };
+    competitors?: Array<{ name: string; url: string; advantage: string }>;
+    differentiators?: string[];
+    visualIdentity?: { primaryColors: string[]; style: string };
+    shopifyOpportunities?: string[];
+    klaviyoOpportunities?: string[];
+    confidenceLevel?: string;
+  };
+  sourcesFound: number;
+  queriesExecuted: number;
+  memoriesSaved: number;
+  allSources: string[];
+  allQueries: string[];
+  elapsed: string;
+  message: string;
 }
 
 interface AbsorbResult {
@@ -142,6 +174,203 @@ function AbsorbResultCard({ data }: { data: AbsorbResult }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── ENTITY RESEARCH CARD ─────────────────────────────────────────────────────
+function EntityResearchCard({ data }: { data: EntityResearchResult }) {
+  const [tab, setTab] = useState<"overview" | "social" | "products" | "competitors" | "opportunities" | "sources">("overview");
+  const p = data.profile;
+
+  const tabs = [
+    { id: "overview", label: "📊 Overview" },
+    { id: "social", label: "📱 Social" },
+    { id: "products", label: "🛍️ Productos" },
+    { id: "competitors", label: "⚔️ Competencia" },
+    { id: "opportunities", label: "🚀 Oportunidades" },
+    { id: "sources", label: `🔗 Fuentes (${data.sourcesFound})` },
+  ] as const;
+
+  const sentimentColor = p.sentiment?.overall === "positive" ? "var(--jade)" : p.sentiment?.overall === "negative" ? "#ff6b6b" : "var(--gold)";
+
+  return (
+    <div style={{ marginTop: 10, border: "1px solid rgba(200,168,75,0.35)", borderRadius: 12, overflow: "hidden", fontSize: 10 }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg, rgba(200,168,75,0.12), rgba(200,168,75,0.04))", padding: "10px 12px", borderBottom: "1px solid rgba(200,168,75,0.2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "var(--gold)" }}>🔬 {data.entity}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 9, color: "var(--t3)" }}>
+              {p.entityType} · {p.ecommerceStack?.platform ?? "Plataforma desconocida"} · {p.ecommerceStack?.emailTool ?? ""}
+            </p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ margin: 0, fontSize: 9, color: "var(--jade)", fontWeight: 700 }}>{data.queriesExecuted} búsquedas Google</p>
+            <p style={{ margin: "1px 0 0", fontSize: 9, color: "var(--t4)" }}>{data.sourcesFound} fuentes · {data.elapsed}</p>
+          </div>
+        </div>
+        {p.description && (
+          <p style={{ margin: "6px 0 0", fontSize: 10, color: "var(--t2)", lineHeight: 1.4 }}>{p.description}</p>
+        )}
+        {/* Stats row */}
+        <div style={{ display: "flex", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
+          {p.pricing?.strategy && (
+            <span style={{ padding: "2px 7px", background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.25)", borderRadius: 20, color: "var(--gold)", fontSize: 9, fontWeight: 700 }}>
+              {p.pricing.strategy} · {p.pricing.avgTicket}
+            </span>
+          )}
+          {p.sentiment?.overall && (
+            <span style={{ padding: "2px 7px", background: `rgba(0,0,0,0.2)`, border: `1px solid ${sentimentColor}`, borderRadius: 20, color: sentimentColor, fontSize: 9, fontWeight: 700 }}>
+              {p.sentiment.overall === "positive" ? "😊" : p.sentiment.overall === "negative" ? "😠" : "😐"} sentimiento {p.sentiment.overall}
+            </span>
+          )}
+          {p.confidenceLevel && (
+            <span style={{ padding: "2px 7px", background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: 20, color: "var(--jade)", fontSize: 9 }}>
+              confianza: {p.confidenceLevel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", overflowX: "auto", borderBottom: "1px solid var(--ink3)", background: "var(--ink2)" }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
+            style={{ flexShrink: 0, padding: "6px 10px", background: "none", border: "none", cursor: "pointer", fontSize: 9, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? "var(--gold)" : "var(--t3)", borderBottom: tab === t.id ? "2px solid var(--gold)" : "2px solid transparent", transition: "0.15s" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div style={{ padding: 10, maxHeight: 260, overflowY: "auto" }}>
+        {tab === "overview" && (
+          <div>
+            {p.differentiators && p.differentiators.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>Diferenciadores clave</p>
+                {p.differentiators.slice(0, 5).map((d, i) => <p key={i} style={{ margin: "2px 0", color: "var(--t2)" }}>· {d}</p>)}
+              </div>
+            )}
+            {p.marketingChannels && p.marketingChannels.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>Canales de marketing</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {p.marketingChannels.map((c, i) => <span key={i} style={{ padding: "1px 6px", background: "var(--ink3)", borderRadius: 3, color: "var(--t3)" }}>{c}</span>)}
+                </div>
+              </div>
+            )}
+            {p.visualIdentity && (
+              <div>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>Identidad visual</p>
+                <p style={{ margin: 0, color: "var(--t2)" }}>{p.visualIdentity.style}</p>
+                {p.visualIdentity.primaryColors?.length > 0 && (
+                  <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                    {p.visualIdentity.primaryColors.slice(0, 6).map((c, i) => <span key={i} style={{ padding: "2px 6px", background: "var(--ink3)", borderRadius: 3, fontSize: 9, color: "var(--t2)" }}>{c}</span>)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "social" && (
+          <div>
+            {p.socialProfiles && Object.entries(p.socialProfiles).filter(([, v]) => v && v !== "N/A" && v !== "Unknown").map(([platform, url]) => (
+              <div key={platform} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid var(--ink3)" }}>
+                <span style={{ color: "var(--gold)", fontWeight: 700, textTransform: "capitalize" }}>📲 {platform}</span>
+                <a href={url.startsWith("http") ? url : `https://${url}`} target="_blank" rel="noreferrer" style={{ color: "var(--jade)", fontSize: 9, textDecoration: "none", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url}</a>
+              </div>
+            ))}
+            {p.socialMetrics && (
+              <div style={{ marginTop: 8 }}>
+                {Object.entries(p.socialMetrics).filter(([, v]) => v && v !== "Unknown").map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: "1px solid var(--ink3)" }}>
+                    <span style={{ color: "var(--t3)", textTransform: "capitalize" }}>{k.replace(/([A-Z])/g, " $1").toLowerCase()}</span>
+                    <span style={{ color: "var(--t2)", fontWeight: 600 }}>{typeof v === "object" ? JSON.stringify(v).slice(0, 60) : String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "products" && (
+          <div>
+            {p.products && p.products.length > 0 ? p.products.map((prod, i) => (
+              <div key={i} style={{ padding: "6px 8px", background: "var(--ink2)", borderRadius: 6, marginBottom: 5, border: "1px solid var(--ink3)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700, color: "var(--t)" }}>{prod.name}</span>
+                  <span style={{ color: "var(--gold)", fontSize: 9 }}>{prod.priceRange}</span>
+                </div>
+                <p style={{ margin: "2px 0 0", color: "var(--t3)", fontSize: 9 }}>{prod.category} · {prod.keyFeature}</p>
+              </div>
+            )) : <p style={{ color: "var(--t4)" }}>No se encontraron productos específicos.</p>}
+          </div>
+        )}
+
+        {tab === "competitors" && (
+          <div>
+            {p.competitors && p.competitors.length > 0 ? p.competitors.map((comp, i) => (
+              <div key={i} style={{ padding: "6px 8px", background: "var(--ink2)", borderRadius: 6, marginBottom: 5, border: "1px solid var(--ink3)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700, color: "var(--t)" }}>⚔️ {comp.name}</span>
+                  {comp.url && <a href={comp.url} target="_blank" rel="noreferrer" style={{ fontSize: 9, color: "var(--jade)", textDecoration: "none" }}>ver →</a>}
+                </div>
+                {comp.advantage && <p style={{ margin: "2px 0 0", color: "var(--t3)", fontSize: 9 }}>ventaja: {comp.advantage}</p>}
+              </div>
+            )) : <p style={{ color: "var(--t4)" }}>No se identificaron competidores.</p>}
+            {p.sentiment && (
+              <div style={{ marginTop: 8, padding: "7px 10px", background: "rgba(45,212,159,0.05)", borderRadius: 6, border: "1px solid rgba(45,212,159,0.15)" }}>
+                <p style={{ margin: "0 0 5px", fontWeight: 700, color: "var(--jade)", textTransform: "uppercase", fontSize: 9 }}>💬 Sentimiento clientes</p>
+                {p.sentiment.topCompliments?.slice(0, 3).map((c, i) => <p key={i} style={{ margin: "2px 0", color: "var(--t2)", fontSize: 9 }}>✅ {c}</p>)}
+                {p.sentiment.topComplaints?.slice(0, 3).map((c, i) => <p key={i} style={{ margin: "2px 0", color: "#ff6b6b", fontSize: 9 }}>⚠️ {c}</p>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "opportunities" && (
+          <div>
+            {p.shopifyOpportunities && p.shopifyOpportunities.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 5px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>🛒 Shopify</p>
+                {p.shopifyOpportunities.map((o, i) => <p key={i} style={{ margin: "3px 0", color: "var(--t2)", lineHeight: 1.4 }}>· {o}</p>)}
+              </div>
+            )}
+            {p.klaviyoOpportunities && p.klaviyoOpportunities.length > 0 && (
+              <div>
+                <p style={{ margin: "0 0 5px", fontWeight: 700, color: "var(--jade)", fontSize: 9, textTransform: "uppercase" }}>📧 Klaviyo / Email</p>
+                {p.klaviyoOpportunities.map((o, i) => <p key={i} style={{ margin: "3px 0", color: "var(--t2)", lineHeight: 1.4 }}>· {o}</p>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "sources" && (
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 9, color: "var(--t3)" }}>Google realizó {data.queriesExecuted} búsquedas y encontró {data.sourcesFound} fuentes relevantes:</p>
+            {data.allQueries.slice(0, 8).map((q, i) => (
+              <p key={i} style={{ margin: "2px 0", fontSize: 9, color: "var(--jade)" }}>🔍 "{q}"</p>
+            ))}
+            <div style={{ marginTop: 6 }}>
+              {data.allSources.slice(0, 15).map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noreferrer"
+                  style={{ display: "block", fontSize: 9, color: "var(--t3)", textDecoration: "none", padding: "2px 0", borderBottom: "1px solid var(--ink3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  🔗 {src}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "6px 12px", background: "rgba(200,168,75,0.04)", borderTop: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 9, color: "var(--t4)" }}>💾 {data.memoriesSaved} memorias guardadas en ShopyBrain</span>
+        <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700 }}>#{data.researchId.slice(0, 8)}</span>
+      </div>
     </div>
   );
 }
@@ -274,10 +503,10 @@ function AttachmentPreview({ file, url, onRemove }: {
 
 // ─── QUICK ACTIONS ─────────────────────────────────────────────────────────────
 const QUICK_ACTIONS = [
-  { icon: "📧", label: "Flujos Klaviyo Comic Crafter", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
-  { icon: "🔍", label: "Investigar mercado", prompt: "Analiza el mercado de comics y arte en España para una tienda Shopify. Dame inteligencia de mercado completa con oportunidades." },
+  { icon: "🔬", label: "Investigar marca completa", prompt: "__RESEARCH__", isResearch: true },
+  { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
   { icon: "🧠", label: "Estado del Brain", prompt: "¿Qué conocimiento ha absorbido el ShopyBrain? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
-  { icon: "🎨", label: "Analizar imagen de URL", prompt: "Absorbe y analiza esta imagen: https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png — extrae composición, texturas, topología y señales eCommerce." },
+  { icon: "🔍", label: "Investigar mercado", prompt: "Analiza el mercado de comics y arte en España para una tienda Shopify. Dame inteligencia de mercado completa con oportunidades." },
 ];
 
 const SYSTEM_PROMPT = `Eres OmniCore AI — la inteligencia central de ShopyBrain para agencias Shopify.
@@ -359,6 +588,37 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, niche }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  };
+
+  // ─── Detect entity research request ───────────────────────────────────────
+  const detectEntityResearch = (text: string): string | null => {
+    const lower = text.toLowerCase();
+    // Explicit research commands
+    if (lower.match(/\b(investiga|researcha|busca todo|búscalo todo|investigaci[oó]n exhaustiva|investigar (en profundidad|completamente|todo sobre|a fondo)|deep research|d[ée]jame saber todo|qu[eé]ro saber todo|todo sobre|analiza (la )?marca|perfil (de )?marca)\b/)) {
+      // Extract the entity name from the text (after the command)
+      const entityMatch = text.match(/(?:investiga|researcha|busca todo sobre|investigaci[oó]n de|todo sobre|analiza(?:\s+la\s+marca)?)\s+(.+?)(?:\s+(?:en profundidad|completamente|a fondo|exhaustiv))?$/i);
+      return entityMatch?.[1]?.trim() ?? text;
+    }
+    // @handle pattern
+    if (text.match(/^@[a-zA-Z0-9_.]{2,}$/)) {
+      return text.trim();
+    }
+    // Pure domain or myshopify
+    if (text.match(/^(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/.*)?$/) && !lower.includes("absorb")) {
+      return text.trim();
+    }
+    return null;
+  };
+
+  // ─── Exhautive entity research API call ────────────────────────────────────
+  const researchEntity = async (input: string, niche?: string): Promise<EntityResearchResult> => {
+    const res = await fetch(`${API}/api/shopybrain/research-entity-sync`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input, niche, market: "es" }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -474,20 +734,31 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
           assistantContent = "❌ Error en el servidor. Revisa los logs.";
         }
 
-      // ── CASE 3: Check for URL in message ──
-      } else if (content.match(/https?:\/\/[^\s]+/)) {
-        const urlMatch = content.match(/https?:\/\/[^\s]+/)?.[0] ?? "";
-        const urlInfo = classifyUrl(urlMatch);
+      // ── CASE 3: Entity research — URL, @handle, brand name, "investiga X" ──
+      } else if (content.match(/https?:\/\/[^\s]+/) || detectEntityResearch(content)) {
+        const entityInput = content.match(/https?:\/\/[^\s]+/)?.[0] ?? detectEntityResearch(content) ?? content;
+        const entityDisplay = entityInput.length > 50 ? entityInput.slice(0, 50) + "..." : entityInput;
+
         setMessages(m => [...m, {
           id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
-          content: `${urlInfo.label} detectada. Absorbiendo al ShopyBrain: **${urlMatch}**\n\n_Extrayendo inteligencia con Gemini..._`
+          content: `🔬 **Investigación exhaustiva paralela iniciada**\n\n**Objetivo:** ${entityDisplay}\n\n**Ejecutando en paralelo:**\n· 🌐 8 búsquedas Google con IA (brand overview, productos, redes sociales, noticias, reviews, competidores, eCommerce, identidad visual)\n· 🔗 Descubrimiento y análisis de fuentes relacionadas\n· 🧠 Claude sintetiza todo el conocimiento\n· 💾 Guardado permanente en ShopyBrain\n\n_⏱️ Esto toma 30-90 segundos. Ejecutando todas las búsquedas simultáneamente..._`
         }]);
 
-        const absorbResult = await absorbUrl(urlMatch);
-        const a2 = absorbResult.analysis as Record<string, unknown>;
-        assistantContent = `✅ **${urlInfo.label} absorbida al ShopyBrain**\n\n**Marca:** ${JSON.stringify(a2.brand_identity ?? a2.brand_elements ?? "").slice(0, 200)}\n\n**Insights eCommerce:** ${JSON.stringify(a2.ecommerce_insights ?? a2.ecommerce_conversion_signals ?? "").slice(0, 300)}\n\n${content !== urlMatch ? `\n**Respuesta a tu pregunta:** ` : ""}`;
+        const researchResult = await researchEntity(entityInput);
 
-        if (content !== urlMatch) {
+        assistantContent = `✅ **Investigación completada: ${researchResult.entity}**\n\n`;
+        assistantContent += `📊 **${researchResult.queriesExecuted} búsquedas Google** ejecutadas en paralelo\n`;
+        assistantContent += `🔗 **${researchResult.sourcesFound} fuentes** descubiertas y analizadas\n`;
+        assistantContent += `💾 **${researchResult.memoriesSaved} memorias** guardadas en ShopyBrain\n`;
+        assistantContent += `⏱️ Completado en **${researchResult.elapsed}**\n\n`;
+
+        const p = researchResult.profile;
+        if (p.description) assistantContent += `**Descripción:** ${p.description}\n\n`;
+        if (p.ecommerceStack?.platform) assistantContent += `**Plataforma:** ${p.ecommerceStack.platform} · Email: ${p.ecommerceStack.emailTool}\n`;
+        if (p.shopifyOpportunities?.[0]) assistantContent += `\n**Top oportunidad Shopify:** ${p.shopifyOpportunities[0]}\n`;
+
+        if (content !== entityInput && !content.startsWith("http")) {
+          assistantContent += `\n**Tu pregunta:** `;
           const followUp = await fetch(`${API}/api/shopybrain/search`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -495,7 +766,9 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
           });
           if (followUp.ok) { const d = await followUp.json(); assistantContent += d.answer ?? ""; }
         }
-        action = { type: "absorb-result", label: "Ver análisis completo", data: absorbResult };
+
+        assistantContent += `\n_Explora las pestañas del panel para ver social, productos, competidores y más._`;
+        action = { type: "entity-research", label: "Ver perfil completo", data: researchResult };
 
       // ── CASE 4: Regular chat ──
       } else {
@@ -514,7 +787,7 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
       }
 
       setMessages(m => {
-        const filtered = m.filter(msg => !(msg.role === "assistant" && (msg.content.includes("Absorbiendo") || msg.content.includes("Generando workflow") || msg.content.includes("detectada. Absorbiendo"))));
+        const filtered = m.filter(msg => !(msg.role === "assistant" && (msg.content.includes("Absorbiendo") || msg.content.includes("Generando workflow") || msg.content.includes("detectada. Absorbiendo") || msg.content.includes("Investigación exhaustiva paralela iniciada"))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });
     } catch (err) {
@@ -628,6 +901,9 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
                       {msg.action?.type === "klaviyo-workflow" && (
                         <KlaviyoResultCard data={msg.action.data as KlaviyoWorkflowResult} onViewFlow={setSelectedFlow} />
                       )}
+                      {msg.action?.type === "entity-research" && (
+                        <EntityResearchCard data={msg.action.data as EntityResearchResult} />
+                      )}
                     </div>
                     <span style={{ fontSize: 9, color: "var(--t4)", marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
                       {msg.timestamp.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
@@ -654,8 +930,23 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
                 {showActions && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
                     {QUICK_ACTIONS.map((action, i) => (
-                      <button key={i} onClick={() => { setShowActions(false); sendMessage(action.prompt); }}
-                        style={{ textAlign: "left", padding: "6px 8px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, cursor: "pointer", fontSize: 10, color: "var(--t2)", display: "flex", alignItems: "center", gap: 5 }}>
+                      <button key={i} onClick={() => {
+                        setShowActions(false);
+                        if ("isResearch" in action && action.isResearch) {
+                          const entity = prompt("¿Qué marca, empresa o persona quieres investigar?\n\nPuedes escribir: URL, nombre, @instagram, dominio...");
+                          if (entity?.trim()) sendMessage(entity.trim());
+                        } else {
+                          sendMessage(action.prompt);
+                        }
+                      }}
+                        style={{
+                          textAlign: "left", padding: "6px 8px",
+                          background: "isResearch" in action && action.isResearch ? "rgba(200,168,75,0.1)" : "var(--ink2)",
+                          border: `1px solid ${"isResearch" in action && action.isResearch ? "rgba(200,168,75,0.4)" : "var(--ink3)"}`,
+                          borderRadius: 6, cursor: "pointer", fontSize: 10,
+                          color: "isResearch" in action && action.isResearch ? "var(--gold)" : "var(--t2)",
+                          display: "flex", alignItems: "center", gap: 5,
+                        }}>
                         <span>{action.icon}</span>
                         <span style={{ lineHeight: 1.2 }}>{action.label}</span>
                       </button>

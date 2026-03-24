@@ -29,6 +29,7 @@ import referenceRouter from "./reference.js";
 import geminiResearchRouter from "./gemini-research.js";
 import klaviyoAiRouter from "./klaviyo-ai.js";
 import absorberRouter from "./absorber.js";
+import entityResearchRouter from "./entity-research.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -72,5 +73,6 @@ router.use(referenceRouter);
 router.use("/gemini", geminiResearchRouter);
 router.use(klaviyoAiRouter);
 router.use(absorberRouter);
+router.use(entityResearchRouter);
 
 export default router;
