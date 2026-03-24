@@ -23,7 +23,7 @@ import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, omnicoreNicheProfi
 import { deepEntityResearch, askGeminiWithSearch, askGeminiJson } from "../lib/gemini.js";
 import { askClaude, getClaudeClient } from "../lib/claude.js";
 import { randomUUID } from "crypto";
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -112,6 +112,104 @@ async function saveMemory(params: {
   return id;
 }
 
+// ─── HELPER: Load ALL existing ShopyBrain knowledge about an entity ───────────
+// This is Phase 0 — always run before any research to avoid redundant searches
+export async function loadExistingEntityKnowledge(entityName: string): Promise<{
+  memories: typeof omnicoreMemoriesTable.$inferSelect[];
+  absorbed: typeof omnicoreAbsorbedContentTable.$inferSelect[];
+  summary: string;
+  knowledgeAge: string | null;
+  hasKnowledge: boolean;
+  dimensions: string[];
+}> {
+  const searchTerm = entityName.toLowerCase().split(/\s+/)[0]; // Use first word for broader match
+
+  // Search all memories mentioning this entity
+  const memories = await db.select()
+    .from(omnicoreMemoriesTable)
+    .where(sql`lower(${omnicoreMemoriesTable.title}) like ${'%' + searchTerm + '%'} 
+              OR lower(${omnicoreMemoriesTable.content}) like ${'%' + searchTerm + '%'}`)
+    .orderBy(desc(omnicoreMemoriesTable.updatedAt))
+    .limit(20);
+
+  // Search absorbed content records
+  const absorbed = await db.select()
+    .from(omnicoreAbsorbedContentTable)
+    .where(sql`lower(${omnicoreAbsorbedContentTable.sourceLabel}) like ${'%' + searchTerm + '%'}
+              OR lower(${omnicoreAbsorbedContentTable.sourceUrl}) like ${'%' + searchTerm + '%'}`)
+    .orderBy(desc(omnicoreAbsorbedContentTable.createdAt))
+    .limit(5);
+
+  if (memories.length === 0 && absorbed.length === 0) {
+    return { memories: [], absorbed: [], summary: "", knowledgeAge: null, hasKnowledge: false, dimensions: [] };
+  }
+
+  // Build dimensions known
+  const dimensions = [...new Set(memories.map(m => m.memoryType).filter(Boolean))] as string[];
+
+  // Calculate knowledge age
+  const mostRecent = memories[0]?.updatedAt ?? absorbed[0]?.createdAt ?? null;
+  const ageMs = mostRecent ? Date.now() - new Date(mostRecent).getTime() : null;
+  const knowledgeAge = ageMs !== null
+    ? ageMs < 3600000 ? "< 1 hora"
+    : ageMs < 86400000 ? `${Math.round(ageMs / 3600000)}h`
+    : `${Math.round(ageMs / 86400000)} días`
+    : null;
+
+  // Build a rich summary for Gemini context injection
+  const memorySummary = memories
+    .slice(0, 8)
+    .map(m => `[${m.memoryType ?? "memoria"}] ${m.title}:\n${(m.content ?? "").slice(0, 500)}`)
+    .join("\n\n---\n\n");
+
+  const absorbedSummary = absorbed
+    .map(a => `[absorbido: ${a.sourceType}] ${a.sourceLabel ?? a.sourceUrl}\n${JSON.stringify(a.fullAnalysis ?? {}).slice(0, 400)}`)
+    .join("\n\n");
+
+  const summary = `ShopyBrain tiene ${memories.length} memorias y ${absorbed.length} registros absorbidos sobre "${entityName}".
+Conocimiento de: ${dimensions.join(", ") || "varios dominios"}.
+Última actualización: ${knowledgeAge ?? "desconocida"}.
+
+MEMORIAS EXISTENTES:
+${memorySummary}
+
+${absorbed.length > 0 ? `CONTENIDO ABSORBIDO:\n${absorbedSummary}` : ""}`;
+
+  return { memories, absorbed, summary, knowledgeAge, hasKnowledge: true, dimensions };
+}
+
+// ─── HELPER: Enrich or update existing memory (avoid duplicates) ───────────────
+async function upsertEntityMemory(params: {
+  entityName: string; title: string; content: string; memoryType: string;
+  niche?: string; sourceType?: string; confidence?: number; tags?: string[];
+}): Promise<{ id: string; action: "created" | "updated" }> {
+  // Check if we already have a memory of this type for this entity
+  const existing = await db.select({ id: omnicoreMemoriesTable.id })
+    .from(omnicoreMemoriesTable)
+    .where(sql`lower(${omnicoreMemoriesTable.title}) like ${'%' + params.entityName.toLowerCase().slice(0, 20) + '%'}
+              AND ${omnicoreMemoriesTable.memoryType} = ${params.memoryType}`)
+    .orderBy(desc(omnicoreMemoriesTable.updatedAt))
+    .limit(1);
+
+  if (existing[0]) {
+    // UPDATE the existing memory with enriched content
+    await db.update(omnicoreMemoriesTable)
+      .set({
+        title: params.title.slice(0, 200),
+        content: params.content.slice(0, 12000),
+        confidence: params.confidence ?? 0.85,
+        updatedAt: new Date(),
+        tags: params.tags ? JSON.stringify(params.tags) : null,
+      })
+      .where(eq(omnicoreMemoriesTable.id, existing[0].id));
+    return { id: existing[0].id, action: "updated" };
+  }
+
+  // CREATE new memory
+  const id = await saveMemory(params);
+  return { id, action: "created" };
+}
+
 // ─── POST /api/shopybrain/research-entity ─────────────────────────────────────
 // The main exhaustive parallel research endpoint
 router.post("/shopybrain/research-entity", requireAdmin, async (req: Request, res: Response): Promise<void> => {
@@ -171,9 +269,30 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
     const entity = await extractEntityName(input.trim());
     const entityDisplay = entity.name || input;
 
+    // PHASE 0: Check what ShopyBrain ALREADY KNOWS about this entity
+    // ─────────────────────────────────────────────────────────────────────────
+    logger.info({ entityDisplay }, "Phase 0: Consulting existing ShopyBrain knowledge");
+    const existingKnowledge = await loadExistingEntityKnowledge(entityDisplay);
+
+    if (existingKnowledge.hasKnowledge) {
+      logger.info({
+        memoriesFound: existingKnowledge.memories.length,
+        absorbedFound: existingKnowledge.absorbed.length,
+        dimensions: existingKnowledge.dimensions,
+        age: existingKnowledge.knowledgeAge,
+      }, "✅ Existing knowledge found — enriching instead of starting from scratch");
+    } else {
+      logger.info("📭 No existing knowledge — full virgin research");
+    }
+
     // PHASE 2: 8 parallel Google searches (real web search grounding)
-    logger.info("Phase 2: 8 parallel Google searches");
-    const research = await deepEntityResearch(entityDisplay, entity.url);
+    // Gemini knows about existing knowledge and focuses on GAPS + NEW info
+    logger.info("Phase 2: 8 parallel Google searches (context-aware)");
+    const research = await deepEntityResearch(
+      entityDisplay,
+      entity.url,
+      existingKnowledge.hasKnowledge ? existingKnowledge.summary : undefined
+    );
 
     // PHASE 3: Fetch discovered source URLs in parallel (up to 12)
     logger.info({ sourceCount: research.allSources.length }, "Phase 3: Fetching discovered URLs");
@@ -331,22 +450,26 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       .map(r => { research.allSources.push(...r.value.sources); return r.value.text; })
       .join("\n\n---\n\n");
 
-    // PHASE 6: Save EVERYTHING to ShopyBrain
+    // PHASE 6: Save/ENRICH EVERYTHING to ShopyBrain
+    // ─── Uses UPSERT: updates existing memories if found, creates new if not ───
     const memoryIds: string[] = [];
+    const upsertActions: Array<"created" | "updated"> = [];
 
-    // Main comprehensive profile
-    const mainMemoryId = await saveMemory({
+    // Main comprehensive profile — upsert (update if already researched, create if new)
+    const mainResult = await upsertEntityMemory({
+      entityName: entityDisplay,
       title: `[DEEP RESEARCH] ${entityDisplay}`,
-      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\n\nCOMPREHENSIVE PROFILE:\n${JSON.stringify(profile, null, 2)}\n\nEXTRA INSIGHTS:\n${extraInsights.slice(0, 3000)}`,
+      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\nPREVIOUS KNOWLEDGE: ${existingKnowledge.hasKnowledge ? `${existingKnowledge.memories.length} memorias previas` : "primera investigación"}\n\nCOMPREHENSIVE PROFILE:\n${JSON.stringify(profile, null, 2)}\n\nEXTRA INSIGHTS:\n${extraInsights.slice(0, 3000)}`,
       memoryType: "brand_intelligence",
       niche,
       sourceType: "deep_entity_research",
-      confidence: 0.88,
+      confidence: existingKnowledge.hasKnowledge ? 0.93 : 0.88, // Higher confidence on repeated research
       tags: ["deep_research", "brand_profile", entityDisplay.toLowerCase(), niche ?? "general", "exhaustive"],
     });
-    memoryIds.push(mainMemoryId);
+    memoryIds.push(mainResult.id);
+    upsertActions.push(mainResult.action);
 
-    // Individual dimension memories for granular retrieval
+    // Individual dimension memories — each upserted by type
     const dimensions = [
       { key: "overview", label: "brand_overview" },
       { key: "products", label: "products_catalog" },
@@ -360,7 +483,8 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
     for (const dim of dimensions) {
       const content = research[dim.key as keyof typeof research];
       if (typeof content === "string" && content.length > 100) {
-        const id = await saveMemory({
+        const result = await upsertEntityMemory({
+          entityName: entityDisplay,
           title: `[${dim.label.toUpperCase()}] ${entityDisplay}`,
           content: `Entity: ${entityDisplay}\n\n${content}`,
           memoryType: dim.label,
@@ -369,34 +493,59 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
           confidence: 0.82,
           tags: [dim.label, entityDisplay.toLowerCase(), niche ?? "general"],
         });
-        memoryIds.push(id);
+        memoryIds.push(result.id);
+        upsertActions.push(result.action);
       }
     }
 
-    // Save absorbed content record
-    await db.insert(omnicoreAbsorbedContentTable).values({
-      id: researchId,
-      sourceType: "entity_research",
-      sourceUrl: entity.url ?? null,
-      sourceLabel: entityDisplay,
-      rawContent: `Research on: ${entityDisplay}\nSources: ${research.allSources.length}\nQueries: ${research.allQueries.length}`,
-      mainThemes: JSON.stringify([entityDisplay, ...(profile.differentiators as string[] ?? [])]),
-      ecommerceInsights: JSON.stringify(profile.shopifyOpportunities ?? []),
-      marketingAngles: JSON.stringify(profile.klaviyoOpportunities ?? []),
-      competitiveData: JSON.stringify(profile.competitors ?? []),
-      audienceSignals: JSON.stringify(profile.sentiment ?? {}),
-      brandElements: JSON.stringify(profile.visualIdentity ?? {}),
-      fullAnalysis: profile as Record<string, unknown>,
-      niche: niche ?? null,
-      confidence: 0.88,
-      absorbedToMemory: 1,
-      memoryIds: memoryIds.join(","),
-      processingModel: "gemini-search-grounding+claude",
-      createdAt: new Date(),
-    });
+    // Save/update absorbed content record — upsert by sourceLabel
+    const existingAbsorbed = existingKnowledge.absorbed.find(a => a.sourceLabel?.toLowerCase() === entityDisplay.toLowerCase());
+    if (existingAbsorbed) {
+      await db.update(omnicoreAbsorbedContentTable)
+        .set({
+          rawContent: `Research on: ${entityDisplay}\nSources: ${research.allSources.length}\nQueries: ${research.allQueries.length}\nPrevious research: enriched`,
+          fullAnalysis: profile as Record<string, unknown>,
+          confidence: 0.93,
+          memoryIds: memoryIds.join(","),
+          processingModel: "gemini-search-grounding+claude+enriched",
+        })
+        .where(eq(omnicoreAbsorbedContentTable.id, existingAbsorbed.id));
+    } else {
+      await db.insert(omnicoreAbsorbedContentTable).values({
+        id: researchId,
+        sourceType: "entity_research",
+        sourceUrl: entity.url ?? null,
+        sourceLabel: entityDisplay,
+        rawContent: `Research on: ${entityDisplay}\nSources: ${research.allSources.length}\nQueries: ${research.allQueries.length}`,
+        mainThemes: JSON.stringify([entityDisplay, ...(profile.differentiators as string[] ?? [])]),
+        ecommerceInsights: JSON.stringify(profile.shopifyOpportunities ?? []),
+        marketingAngles: JSON.stringify(profile.klaviyoOpportunities ?? []),
+        competitiveData: JSON.stringify(profile.competitors ?? []),
+        audienceSignals: JSON.stringify(profile.sentiment ?? {}),
+        brandElements: JSON.stringify(profile.visualIdentity ?? {}),
+        fullAnalysis: profile as Record<string, unknown>,
+        niche: niche ?? null,
+        confidence: 0.88,
+        absorbedToMemory: 1,
+        memoryIds: memoryIds.join(","),
+        processingModel: "gemini-search-grounding+claude",
+        createdAt: new Date(),
+      });
+    }
 
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    logger.info({ entityDisplay, memoryCount: memoryIds.length, sourcesFound: research.allSources.length, elapsed }, "Entity research complete");
+    const memoriesCreated = upsertActions.filter(a => a === "created").length;
+    const memoriesUpdated = upsertActions.filter(a => a === "updated").length;
+
+    logger.info({
+      entityDisplay,
+      memoryCount: memoryIds.length,
+      memoriesCreated,
+      memoriesUpdated,
+      reusingKnowledge: existingKnowledge.hasKnowledge,
+      sourcesFound: research.allSources.length,
+      elapsed,
+    }, "✅ Entity research + memory enrichment complete");
 
     res.json({
       success: true,
@@ -418,10 +567,22 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       sourcesFound: research.allSources.length,
       queriesExecuted: research.allQueries.length,
       memoriesSaved: memoryIds.length,
+      memoriesCreated,
+      memoriesUpdated,
       allSources: research.allSources.slice(0, 30),
       allQueries: research.allQueries,
       elapsed: `${elapsed}s`,
-      message: `✅ Investigación exhaustiva completada: ${research.allSources.length} fuentes descubiertas, ${memoryIds.length} memorias guardadas en ShopyBrain en ${elapsed}s`,
+      // Knowledge reuse metrics
+      knowledgeReuse: {
+        hadPreviousKnowledge: existingKnowledge.hasKnowledge,
+        previousMemories: existingKnowledge.memories.length,
+        previousDimensions: existingKnowledge.dimensions,
+        knowledgeAge: existingKnowledge.knowledgeAge,
+        action: existingKnowledge.hasKnowledge ? "enriched" : "virgin_research",
+      },
+      message: existingKnowledge.hasKnowledge
+        ? `✅ Conocimiento enriquecido: ${existingKnowledge.memories.length} memorias previas + ${research.allSources.length} fuentes nuevas. ${memoriesUpdated} memorias actualizadas, ${memoriesCreated} nuevas. ${elapsed}s`
+        : `✅ Primera investigación completada: ${research.allSources.length} fuentes, ${memoryIds.length} memorias creadas en ShopyBrain. ${elapsed}s`,
     });
 
   } catch (err) {
@@ -430,21 +591,60 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
   }
 });
 
-// ─── GET /api/shopybrain/research-entity/:name — quick lookup in memory ────────
+// ─── GET /api/shopybrain/entity-knowledge/:name ───────────────────────────────
+// Returns ALL accumulated knowledge about an entity — for UI display + AI context
+router.get("/shopybrain/entity-knowledge/:name", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { name } = req.params;
+  try {
+    const knowledge = await loadExistingEntityKnowledge(decodeURIComponent(name));
+
+    if (!knowledge.hasKnowledge) {
+      res.json({
+        found: false,
+        entity: name,
+        message: `ShopyBrain no tiene conocimiento previo sobre "${name}". Usa POST /research-entity-sync para investigar.`,
+      });
+      return;
+    }
+
+    res.json({
+      found: true,
+      entity: name,
+      memoriesCount: knowledge.memories.length,
+      absorbedCount: knowledge.absorbed.length,
+      dimensions: knowledge.dimensions,
+      knowledgeAge: knowledge.knowledgeAge,
+      memories: knowledge.memories.map(m => ({
+        id: m.id,
+        type: m.memoryType,
+        title: m.title,
+        content: (m.content ?? "").slice(0, 800),
+        confidence: m.confidence,
+        updatedAt: m.updatedAt,
+      })),
+      absorbed: knowledge.absorbed.map(a => ({
+        id: a.id,
+        sourceType: a.sourceType,
+        sourceLabel: a.sourceLabel,
+        sourceUrl: a.sourceUrl,
+        confidence: a.confidence,
+        profile: a.fullAnalysis,
+        createdAt: a.createdAt,
+      })),
+      summary: knowledge.summary.slice(0, 2000),
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── GET /api/shopybrain/research-entity/:name — legacy quick lookup ───────────
 router.get("/shopybrain/research-entity/:name", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
   try {
-    // Check if we already have research on this entity
-    const existing = await db.select().from(omnicoreAbsorbedContentTable)
-      .where(eq(omnicoreAbsorbedContentTable.sourceType, "entity_research"));
-
-    const match = existing.find(e =>
-      e.sourceLabel?.toLowerCase().includes(name.toLowerCase()) ||
-      e.sourceUrl?.toLowerCase().includes(name.toLowerCase())
-    );
-
-    if (match) {
-      res.json({ found: true, cached: true, data: match });
+    const knowledge = await loadExistingEntityKnowledge(name);
+    if (knowledge.hasKnowledge) {
+      res.json({ found: true, cached: true, memoriesFound: knowledge.memories.length, knowledgeAge: knowledge.knowledgeAge });
     } else {
       res.json({ found: false, cached: false, message: `No research found for "${name}". Use POST to research.` });
     }

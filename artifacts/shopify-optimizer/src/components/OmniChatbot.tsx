@@ -613,7 +613,20 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
     return null;
   };
 
-  // ─── Exhautive entity research API call ────────────────────────────────────
+  // ─── Quick knowledge check before full research ────────────────────────────
+  const checkExistingKnowledge = async (name: string): Promise<{
+    found: boolean; memoriesFound?: number; knowledgeAge?: string;
+  }> => {
+    try {
+      const res = await fetch(`${API}/api/shopybrain/research-entity/${encodeURIComponent(name)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return { found: false };
+      return res.json();
+    } catch { return { found: false }; }
+  };
+
+  // ─── Exhaustive entity research API call ───────────────────────────────────
   const researchEntity = async (input: string, niche?: string): Promise<EntityResearchResult> => {
     const res = await fetch(`${API}/api/shopybrain/research-entity-sync`, {
       method: "POST", credentials: "include",

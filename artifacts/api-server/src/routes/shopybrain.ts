@@ -4,6 +4,7 @@ import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLi
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
+import { loadExistingEntityKnowledge } from "./entity-research.js";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -146,11 +147,47 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   }
 
   // For chatbot mode: bypass memory lookup and return direct AI answer
+  // Enhanced: also checks ShopyBrain memory for entity-specific knowledge
   if (returnRaw) {
-    const sysPrompt = customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
+    // ── SMART CONTEXT INJECTION: Check if query mentions any known entity ───
+    // Extract potential entity names from query (brands, names, handles, URLs)
+    let entityKnowledgeContext = "";
+    const entityMatches = query.match(/[@]([a-zA-Z0-9_.]+)|(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]{3,})\.[a-zA-Z]{2,}|(?:sobre|investigar?|analiza|dame información de|qué sabes de|qué tienes sobre)\s+([^\?\.]+)/i);
+    const potentialEntity = entityMatches?.[1] ?? entityMatches?.[2] ?? entityMatches?.[3]?.trim();
+
+    if (potentialEntity && potentialEntity.length > 2) {
+      try {
+        const entityKnowledge = await loadExistingEntityKnowledge(potentialEntity);
+        if (entityKnowledge.hasKnowledge) {
+          entityKnowledgeContext = `\n\n═══ CONOCIMIENTO ACUMULADO EN SHOPYBRAIN SOBRE "${potentialEntity.toUpperCase()}" ═══
+[${entityKnowledge.memories.length} memorias · ${entityKnowledge.dimensions.join(", ")} · última actualización: ${entityKnowledge.knowledgeAge}]
+
+${entityKnowledge.summary.slice(0, 3000)}
+═══ FIN DE CONOCIMIENTO PREVIO ═══
+
+INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es información real ya investigada y verificada por ShopyBrain. Complementa con tu propio conocimiento si es necesario.`;
+        }
+      } catch {
+        // Non-critical: continue without entity context
+      }
+    }
+
+    // Also load general relevant memories for context
+    const relevantMemories = await db.select()
+      .from(omnicoreMemoriesTable)
+      .where(gte(omnicoreMemoriesTable.confidence, 0.6))
+      .orderBy(desc(omnicoreMemoriesTable.updatedAt))
+      .limit(5);
+
+    const memoriesContext = relevantMemories.length > 0
+      ? `\n\nCONOCIMIENTO RECIENTE EN SHOPYBRAIN:\n${relevantMemories.map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 200)}`).join("\n")}`
+      : "";
+
+    const sysPrompt = (customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
 Eres experto en Shopify, Klaviyo, email marketing, SEO, pricing y estrategia eCommerce.
+Tienes acceso al conocimiento acumulado de ShopyBrain — memorias de investigaciones anteriores sobre marcas, nichos y estrategias.
 Responde siempre en español, de forma directa, clara y accionable.
-Si el usuario pregunta por el estado del Brain, resume que tienes memorias acumuladas de múltiples nichos, flujos Klaviyo, estrategias SEO, y patrones de conversión.`;
+Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.`) + entityKnowledgeContext + memoriesContext;
 
     const userContent = conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query;
 
@@ -162,7 +199,12 @@ Si el usuario pregunta por el estado del Brain, resume que tienes memorias acumu
     });
 
     const answer = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
-    res.json({ answer, source: "claude+omnicore" });
+    res.json({
+      answer,
+      source: "claude+omnicore",
+      entityKnowledgeUsed: !!entityKnowledgeContext,
+      potentialEntity: potentialEntity ?? null,
+    });
     return;
   }
 

@@ -710,7 +710,7 @@ export default function Emails() {
                     </button>
 
                     <p style={{ textAlign: "center", fontSize: 11, color: "var(--t3)", marginTop: 12, lineHeight: 1.5 }}>
-                      Nunca necesitas abrir Klaviyo · ShopifyAI Pro controla todo el contenido y la lógica
+                      Nunca necesitas abrir Klaviyo · ShopyBrain controla todo el contenido y la lógica
                     </p>
                   </div>
                 </div>

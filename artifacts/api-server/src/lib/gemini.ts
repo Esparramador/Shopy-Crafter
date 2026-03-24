@@ -424,7 +424,7 @@ export async function askGeminiWithSearch(
 }
 
 // ─── DEEP ENTITY RESEARCH — searches EVERYTHING about a brand/person/business ─
-export async function deepEntityResearch(entityName: string, entityUrl?: string): Promise<{
+export async function deepEntityResearch(entityName: string, entityUrl?: string, existingKnowledge?: string): Promise<{
   overview: string;
   products: string;
   social: string;
@@ -437,41 +437,46 @@ export async function deepEntityResearch(entityName: string, entityUrl?: string)
 }> {
   const entity = entityUrl ? `${entityName} (${entityUrl})` : entityName;
 
-  logger.info({ entityName, entityUrl }, "Deep parallel entity research with Google Search Grounding");
+  logger.info({ entityName, entityUrl, hasExistingKnowledge: !!existingKnowledge }, "Deep parallel entity research with Google Search Grounding");
+
+  // If we have existing knowledge, inject it so Gemini focuses on GAPS and NEW information
+  const knowledgeCtx = existingKnowledge
+    ? `\n\n[CONOCIMIENTO PREVIO EN SHOPYBRAIN — busca información NUEVA o ACTUALIZADA que no esté ya cubierta, contrasta y complementa]:\n${existingKnowledge.slice(0, 2500)}\n\nFOCUS: Find what's MISSING, UPDATED, or CHANGED since last research.`
+    : "";
 
   // 8 parallel searches — each targets a different dimension of intelligence
   const [overview, products, social, news, reviews, competitors, ecommerce, visual] = await Promise.allSettled([
     askGeminiWithSearch(
-      `Research everything about this brand/company/person: "${entity}". Find: founding story, mission, team, locations, size, legal name, history, key milestones, notable facts.`,
-      "Deep brand intelligence analyst. Search and synthesize all public information."
+      `Research everything about this brand/company/person: "${entity}". Find: founding story, mission, team, locations, size, legal name, history, key milestones, notable facts.${knowledgeCtx}`,
+      "Deep brand intelligence analyst. Search and synthesize all public information. Prioritize finding NEW information not previously documented."
     ),
     askGeminiWithSearch(
-      `Find all products and services offered by "${entity}". Research: product catalog, pricing strategy, best sellers, unique selling propositions, materials used, manufacturing, certifications, quality indicators.`,
-      "Product intelligence analyst. Find detailed product and service information."
+      `Find all products and services offered by "${entity}". Research: product catalog, pricing strategy, best sellers, unique selling propositions, materials used, manufacturing, certifications, quality indicators. Find any NEW launches or price changes.${knowledgeCtx}`,
+      "Product intelligence analyst. Find new or updated product and service information."
     ),
     askGeminiWithSearch(
-      `Find ALL social media profiles and online presence of "${entity}". Research: Instagram, Facebook, X/Twitter, TikTok, YouTube, LinkedIn, Pinterest accounts. Find follower counts, posting frequency, content style, engagement rates, hashtags used.`,
-      "Social media intelligence analyst. Find all social profiles and content strategy."
+      `Find ALL social media profiles and online presence of "${entity}". Research: Instagram, Facebook, X/Twitter, TikTok, YouTube, LinkedIn, Pinterest accounts. Find follower counts, posting frequency, content style, engagement rates, hashtags used. Find any NEW profiles or metrics updates.${knowledgeCtx}`,
+      "Social media intelligence analyst. Find all social profiles and new content strategy developments."
     ),
     askGeminiWithSearch(
-      `Find recent news, press coverage, articles, blog posts, interviews about "${entity}". Find: press releases, media mentions, partnerships announced, awards won, controversies, community presence.`,
-      "News and press intelligence analyst."
+      `Find recent news, press coverage, articles, blog posts, interviews about "${entity}". Find: press releases, media mentions, partnerships announced, awards won, controversies, community presence. FOCUS on RECENT news.${knowledgeCtx}`,
+      "News and press intelligence analyst. Prioritize the most recent developments."
     ),
     askGeminiWithSearch(
-      `Find customer reviews, testimonials, and sentiment about "${entity}". Search: Google reviews, Trustpilot, social media comments, forum mentions, Reddit threads, customer complaints, NPS signals.`,
-      "Customer sentiment analyst. Find reviews and public opinion."
+      `Find customer reviews, testimonials, and sentiment about "${entity}". Search: Google reviews, Trustpilot, social media comments, forum mentions, Reddit threads, customer complaints, NPS signals. Find RECENT trends in sentiment.${knowledgeCtx}`,
+      "Customer sentiment analyst. Find recent reviews and evolving public opinion."
     ),
     askGeminiWithSearch(
-      `Find competitors and market positioning of "${entity}". Identify: direct competitors, indirect competitors, market share signals, competitive advantages, pricing compared to competitors, unique differentiation.`,
-      "Competitive intelligence analyst."
+      `Find competitors and market positioning of "${entity}". Identify: direct competitors, indirect competitors, market share signals, competitive advantages, pricing compared to competitors, unique differentiation. Find any NEW competitors or market shifts.${knowledgeCtx}`,
+      "Competitive intelligence analyst. Find current market landscape."
     ),
     askGeminiWithSearch(
-      `Research the eCommerce strategy, tech stack, and online marketing of "${entity}". Find: Shopify/platform used, email marketing tools, advertising channels, SEO keywords, conversion tactics, Klaviyo/email flows, influencer partnerships, discount strategies.`,
-      "eCommerce strategy analyst."
+      `Research the eCommerce strategy, tech stack, and online marketing of "${entity}". Find: Shopify/platform used, email marketing tools, advertising channels, SEO keywords, conversion tactics, Klaviyo/email flows, influencer partnerships, discount strategies. Find any RECENT changes.${knowledgeCtx}`,
+      "eCommerce strategy analyst. Find current and evolving marketing strategies."
     ),
     askGeminiWithSearch(
-      `Find visual identity, brand aesthetics, and design language of "${entity}". Find: color palette used, logo style, photography style, packaging, brand guidelines if public, font choices, visual references.`,
-      "Visual brand identity analyst."
+      `Find visual identity, brand aesthetics, and design language of "${entity}". Find: color palette used, logo style, photography style, packaging, brand guidelines if public, font choices, visual references. Find any RECENT brand refreshes or identity changes.${knowledgeCtx}`,
+      "Visual brand identity analyst. Find current brand aesthetics."
     ),
   ]);
 

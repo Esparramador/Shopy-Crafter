@@ -110,6 +110,31 @@ Multi-model floating chatbot (gold brain button, bottom-right) accessible from a
   - `POST /api/klaviyo-ai/push-flow` — create flow draft in Klaviyo
   - `GET /api/klaviyo-ai/status` — Klaviyo account status
 
+### Entity Research Engine — Investigación Exhaustiva de Marcas
+Absorción profunda de cualquier marca/competidor/influencer con memoria acumulativa.
+
+**Trigger desde chatbot**: cuando el usuario escribe `@marca`, una URL, "investiga X", "todo sobre X" o "🔬 Investigar marca completa"
+
+**Flujo de 8 fases**:
+1. Detecta entidad (URL, handle, nombre)
+2. Phase 0 → `loadExistingEntityKnowledge()` — carga conocimiento previo
+3. 8× Google Search Grounding en paralelo (overview, productos, social, noticias, reviews, competidores, ecommerce, visual)
+4. Gemini focaliza en GAPS (ignora lo ya conocido)
+5. Claude sintetiza → perfil JSON estructurado
+6. `upsertEntityMemory()` — actualiza existentes / crea nuevas memorias
+7. Upsert en `omnicore_absorbed_content`
+8. Respuesta con `knowledgeReuse` metrics
+
+**Rutas**:
+- `POST /api/shopybrain/research-entity-sync` — investigación completa (sync)
+- `GET /api/shopybrain/entity-knowledge/:name` — todo lo que ShopyBrain sabe de una entidad
+- `GET /api/shopybrain/research-entity/:name` — legacy quick lookup
+
+**Chatbot `returnRaw` mode mejorado**: detecta automáticamente si la query menciona una entidad conocida e inyecta su conocimiento acumulado en el system prompt de Claude.
+
+**Archivo**: `artifacts/api-server/src/routes/entity-research.ts`
+**Funciones exportadas**: `loadExistingEntityKnowledge()`, `upsertEntityMemory()`
+
 ### OmniCore / ShopyBrain Cron Jobs (9 total)
 | Schedule | Job |
 |---|---|

@@ -39,8 +39,8 @@ const SECTIONS: SectionDef[] = [
   {
     id: "site", icon: "🌐", label: "Sitio",
     fields: [
-      { label: "Nombre", path: "site.name", type: "text", placeholder: "ShopifyAI Pro" },
-      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "La agencia Shopify del futuro" },
+      { label: "Nombre", path: "site.name", type: "text", placeholder: "ShopyBrain" },
+      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "La plataforma de agencia Shopify más completa" },
       { label: "Emoji/Logo", path: "site.logo.value", type: "text", placeholder: "⚡" },
       { label: "Color primario", path: "site.primaryColor", type: "color" },
       { label: "Color acento", path: "site.accentColor", type: "color" },
