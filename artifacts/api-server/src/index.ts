@@ -23,7 +23,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function ensureAdminUser() {
   try {
     const ADMIN_EMAIL = "sadiagiljoan@gmail.com";
-    const ADMIN_NAME  = "Joan Sàdia Gil";
+    const ADMIN_NAME  = "Joan Sadia Gil";
     const ADMIN_PASS  = process.env.ADMIN_PASSWORD ?? "ShopyAdmin2026!";
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL));
