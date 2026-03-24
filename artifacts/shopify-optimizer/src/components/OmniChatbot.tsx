@@ -1,22 +1,44 @@
+/**
+ * OmniCore AI — Chatbot Universal ShopyBrain
+ * ONE brain. Absorbs EVERYTHING: images, videos, URLs, Instagram, Facebook, X, YouTube...
+ * Gemini + Claude + ShopyBrain Memory
+ */
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, X, Send, Loader2, Minimize2, Maximize2, Bot, Sparkles, Brain, Zap, ChevronDown } from "lucide-react";
+import {
+  Brain, X, Send, Loader2, Minimize2, Maximize2, Sparkles, ChevronDown,
+  Link, Image, Video, Upload, Eye, Palette, Layers, Cpu, Globe,
+  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
   model?: string;
+  attachmentType?: "image" | "video" | "url";
+  attachmentName?: string;
   action?: ChatAction;
 }
 
 interface ChatAction {
-  type: "klaviyo-workflow" | "research" | "analysis";
+  type: "klaviyo-workflow" | "absorb-result" | "research";
   label: string;
   data: unknown;
+}
+
+interface AbsorbResult {
+  success: boolean;
+  sourceType: string;
+  title: string;
+  analysis: Record<string, unknown>;
+  highlights?: Record<string, unknown>;
+  message: string;
+  memoryId?: string;
 }
 
 interface KlaviyoWorkflowResult {
@@ -24,78 +46,116 @@ interface KlaviyoWorkflowResult {
     storeName: string;
     shopDomain: string;
     flows: Array<{
-      id: string;
-      name: string;
-      trigger: string;
-      description: string;
-      priority: string;
-      estimated_revenue: string;
-      emails: Array<{
-        position: number;
-        delay: string;
-        subject: string;
-        preview_text: string;
-        html_body: string;
-        purpose: string;
-        key_cta: string;
-      }>;
+      id: string; name: string; trigger: string; description: string;
+      priority: string; estimated_revenue: string;
+      emails: Array<{ position: number; delay: string; subject: string; preview_text: string; html_body: string; purpose: string; key_cta: string }>;
     }>;
     segments: Array<{ name: string; definition: string; use_case: string }>;
     expected_revenue_impact: string;
     implementation_order: string[];
   };
-  marketIntel: {
-    topFlows: string[];
-    avgCartValue: string;
-    conversionTips: string[];
-  };
+  marketIntel: { topFlows: string[]; avgCartValue: string; conversionTips: string[] };
 }
 
-const QUICK_ACTIONS = [
-  { icon: "📧", label: "Flujos Klaviyo para Comic Crafter", prompt: "Genera un workflow completo de Klaviyo para la tienda comic-crafter.myshopify.com (Comic Crafter, nicho: comics y arte). Crea todos los flujos esenciales con las plantillas de email completas." },
-  { icon: "🔍", label: "Analizar mercado", prompt: "Analiza el mercado de comics y arte en España para una tienda Shopify. Dame inteligencia de mercado completa." },
-  { icon: "🧠", label: "Estado OmniCore", prompt: "¿Qué memorias y conocimiento tiene ahora mismo el OmniCore Brain? Dame un resumen del estado actual." },
-  { icon: "💡", label: "Estrategia SEO", prompt: "Dame una estrategia SEO completa para la tienda comic-crafter.myshopify.com en el nicho de comics, arte y cultura pop." },
-];
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
-const SYSTEM_PROMPT = `Eres OmniCore AI — el asistente central de la plataforma ShopyBrain para agencias Shopify.
-Tienes acceso a tres inteligencias artificiales:
-- 🔬 Gemini (Google) — investigación de mercado, análisis de negocios, inteligencia competitiva
-- 🧠 Claude (Anthropic) — estrategia, contenido de calidad, análisis profundo
-- 💾 OmniCore Brain — memoria acumulada de todos los nichos, clientes y patrones de éxito
-
-Eres experto en:
-- Shopify (optimización, SEO, productos, conversión)
-- Klaviyo (flows, segmentación, email marketing, templates)
-- eCommerce (pricing, COGS, márgenes, A/B testing)
-- Marketing digital (SEO técnico, imágenes IA, copy de producto)
-- Generación de contenido (descripciones, títulos, emails, anuncios)
-
-Cuando el usuario pide generar workflows de Klaviyo, primero confirma los detalles (tienda, nicho, mercado) y luego lanza el generador.
-Cuando el usuario pide investigación, usa tu conocimiento combinado Gemini+Claude.
-Siempre responde en español, de forma directa, clara y accionable.
-Si hay acciones disponibles (generar workflow, investigar mercado, etc.), indícalas claramente.`;
+function classifyUrl(url: string): { type: string; icon: React.ReactNode; label: string } {
+  const u = url.toLowerCase();
+  if (u.includes("instagram.com")) return { type: "social_instagram", icon: <Instagram size={12} />, label: "Instagram" };
+  if (u.includes("facebook.com") || u.includes("fb.com")) return { type: "social_facebook", icon: <Facebook size={12} />, label: "Facebook" };
+  if (u.includes("twitter.com") || u.includes("x.com")) return { type: "social_x", icon: <Twitter size={12} />, label: "X / Twitter" };
+  if (u.includes("youtube.com") || u.includes("youtu.be")) return { type: "youtube", icon: <Youtube size={12} />, label: "YouTube" };
+  return { type: "url", icon: <Globe size={12} />, label: "Web URL" };
+}
 
 function formatMessage(content: string): React.ReactNode {
-  const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`|\n)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
+  return content.split(/(\*\*[^*]+\*\*|`[^`]+`|\n)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**"))
       return <strong key={i} style={{ color: "var(--gold)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith("`") && part.endsWith("`")) {
+    if (part.startsWith("`") && part.endsWith("`"))
       return <code key={i} style={{ background: "var(--ink3)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "monospace", color: "var(--jade)" }}>{part.slice(1, -1)}</code>;
-    }
     if (part === "\n") return <br key={i} />;
     return part;
   });
 }
 
-function KlaviyoResultCard({ data, onViewFlow }: { data: KlaviyoWorkflowResult; onViewFlow: (flow: KlaviyoWorkflowResult["plan"]["flows"][0]) => void }) {
+// ─── ABSORB RESULT CARD ───────────────────────────────────────────────────────
+function AbsorbResultCard({ data }: { data: AbsorbResult }) {
+  const [expanded, setExpanded] = useState(false);
+  const a = data.analysis as Record<string, unknown>;
+
+  const sections = [
+    { key: "visual_composition", label: "Composición Visual", icon: <Eye size={10} /> },
+    { key: "colors_palette", label: "Paleta de Colores", icon: <Palette size={10} /> },
+    { key: "textures_surfaces", label: "Texturas & Superficies", icon: <Layers size={10} /> },
+    { key: "topology_geometry", label: "Topología & Geometría", icon: <Layers size={10} /> },
+    { key: "rendering_production", label: "Rendering & Producción", icon: <Cpu size={10} /> },
+    { key: "technical_chemical_composition", label: "Composición Técnica/Química", icon: <Cpu size={10} /> },
+    { key: "brand_marketing_intelligence", label: "Inteligencia de Marca", icon: <ZapIcon size={10} /> },
+    { key: "ecommerce_conversion_signals", label: "Señales eCommerce", icon: <ZapIcon size={10} /> },
+    { key: "actionable_insights_for_shopify", label: "Insights Shopify", icon: <Brain size={10} /> },
+  ].filter(s => a[s.key]);
+
+  return (
+    <div style={{ marginTop: 10, border: "1px solid rgba(45,212,159,0.25)", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: "rgba(45,212,159,0.06)", padding: "10px 13px", borderBottom: "1px solid rgba(45,212,159,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--jade)" }}>
+            🧠 Absorbido al ShopyBrain
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: 9, color: "var(--t3)" }}>{data.title} · {data.sourceType}</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <CheckCircle size={14} style={{ color: "var(--jade)" }} />
+          <button onClick={() => setExpanded(!expanded)}
+            style={{ background: "var(--ink3)", border: "none", color: "var(--t3)", cursor: "pointer", fontSize: 9, padding: "2px 6px", borderRadius: 4 }}>
+            {expanded ? "Ocultar" : `Ver análisis (${sections.length} dimensiones)`}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: 10 }}>
+          {sections.map(section => {
+            const value = a[section.key];
+            const display = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+            return (
+              <div key={section.key} style={{ marginBottom: 8, padding: "7px 10px", background: "var(--ink2)", borderRadius: 6, border: "1px solid var(--ink3)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4, color: "var(--gold)" }}>
+                  {section.icon}
+                  <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>{section.label}</span>
+                </div>
+                <pre style={{ margin: 0, fontSize: 9, color: "var(--t3)", whiteSpace: "pre-wrap", lineHeight: 1.5, fontFamily: "monospace", maxHeight: 120, overflowY: "auto" }}>
+                  {display.slice(0, 600)}
+                </pre>
+              </div>
+            );
+          })}
+          {data.highlights?.marketingAngles && (
+            <div style={{ padding: "7px 10px", background: "rgba(200,168,75,0.06)", borderRadius: 6, border: "1px solid rgba(200,168,75,0.2)" }}>
+              <p style={{ margin: "0 0 4px", fontSize: 9, fontWeight: 700, color: "var(--gold)", textTransform: "uppercase" }}>💡 Marketing Angles</p>
+              {(Array.isArray(data.highlights.marketingAngles) ? data.highlights.marketingAngles : [data.highlights.marketingAngles]).map((angle, i) => (
+                <p key={i} style={{ margin: "2px 0", fontSize: 10, color: "var(--t2)" }}>· {String(angle)}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── KLAVIYO RESULT CARD ──────────────────────────────────────────────────────
+function KlaviyoResultCard({ data, onViewFlow }: {
+  data: KlaviyoWorkflowResult;
+  onViewFlow: (flow: KlaviyoWorkflowResult["plan"]["flows"][0]) => void;
+}) {
   const { plan, marketIntel } = data;
   return (
     <div style={{ marginTop: 12, border: "1px solid rgba(200,168,75,0.3)", borderRadius: 10, overflow: "hidden" }}>
       <div style={{ background: "rgba(200,168,75,0.08)", padding: "10px 14px", borderBottom: "1px solid rgba(200,168,75,0.2)" }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "var(--gold)" }}>📧 Klaviyo Workflow Plan — {plan.storeName}</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "var(--gold)" }}>📧 Klaviyo Workflow — {plan.storeName}</p>
         <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--t3)" }}>{plan.expected_revenue_impact}</p>
       </div>
       <div style={{ padding: 10 }}>
@@ -106,12 +166,16 @@ function KlaviyoResultCard({ data, onViewFlow }: { data: KlaviyoWorkflowResult; 
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--t)" }}>{flow.name}</span>
               <span style={{ fontSize: 10, color: "var(--t3)", marginLeft: 6 }}>· {flow.emails?.length ?? 0} emails · {flow.estimated_revenue}</span>
             </div>
-            <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 8, background: flow.priority === "critical" ? "rgba(232,69,88,0.15)" : flow.priority === "high" ? "rgba(200,168,75,0.15)" : "rgba(45,212,159,0.15)", color: flow.priority === "critical" ? "var(--crim)" : flow.priority === "high" ? "var(--gold)" : "var(--jade)", fontWeight: 700 }}>{flow.priority}</span>
+            <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 8, fontWeight: 700,
+              background: flow.priority === "critical" ? "rgba(232,69,88,0.15)" : flow.priority === "high" ? "rgba(200,168,75,0.15)" : "rgba(45,212,159,0.15)",
+              color: flow.priority === "critical" ? "var(--crim)" : flow.priority === "high" ? "var(--gold)" : "var(--jade)" }}>
+              {flow.priority}
+            </span>
           </div>
         ))}
         {marketIntel?.conversionTips?.length > 0 && (
           <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 6, background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.15)" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "var(--jade)" }}>💡 Tips de conversión para {plan.storeName}</p>
+            <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "var(--jade)" }}>💡 Tips de conversión</p>
             {marketIntel.conversionTips.slice(0, 2).map((tip, i) => <p key={i} style={{ margin: "2px 0", fontSize: 10, color: "var(--t3)" }}>· {tip}</p>)}
           </div>
         )}
@@ -120,81 +184,58 @@ function KlaviyoResultCard({ data, onViewFlow }: { data: KlaviyoWorkflowResult; 
   );
 }
 
+// ─── FLOW MODAL ───────────────────────────────────────────────────────────────
 function FlowModal({ flow, onClose }: { flow: KlaviyoWorkflowResult["plan"]["flows"][0]; onClose: () => void }) {
   const [activeEmail, setActiveEmail] = useState(0);
   const [copied, setCopied] = useState(false);
-
   const copyHtml = async () => {
-    const email = flow.emails?.[activeEmail];
-    if (!email) return;
-    await navigator.clipboard.writeText(email.html_body);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    await navigator.clipboard.writeText(flow.emails?.[activeEmail]?.html_body ?? "");
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
-
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 14, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--t)" }}>{flow.name}</h3>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{flow.name}</h3>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--t3)" }}>Trigger: {flow.trigger} · {flow.emails?.length} emails</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={copyHtml} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--ink3)", background: copied ? "var(--jade)" : "var(--ink2)", color: copied ? "var(--ink)" : "var(--t)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
               {copied ? "✓ Copiado" : "📋 Copiar HTML"}
             </button>
-            <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} /></button>
+            <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}><X size={14} /></button>
           </div>
         </div>
-
-        <div style={{ display: "flex", gap: 0, flex: 1, overflow: "hidden" }}>
-          <div style={{ width: 200, borderRight: "1px solid var(--ink3)", padding: 12, overflowY: "auto", flexShrink: 0 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px" }}>Emails del flow</p>
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          <div style={{ width: 180, borderRight: "1px solid var(--ink3)", padding: 12, overflowY: "auto", flexShrink: 0 }}>
             {flow.emails?.map((email, i) => (
               <button key={i} onClick={() => setActiveEmail(i)}
                 style={{ width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 6, marginBottom: 4, border: "none", cursor: "pointer", background: activeEmail === i ? "rgba(200,168,75,0.12)" : "transparent", color: activeEmail === i ? "var(--gold)" : "var(--t3)" }}>
                 <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>Email {email.position}</p>
-                <p style={{ margin: "2px 0 0", fontSize: 9, opacity: 0.7 }}>📅 {email.delay}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 9, opacity: 0.7 }}>⏱ {email.delay}</p>
               </button>
             ))}
           </div>
-
           <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
             {flow.emails?.[activeEmail] && (() => {
               const email = flow.emails[activeEmail];
               return (
-                <div>
-                  <div style={{ marginBottom: 14 }}>
-                    <p style={{ fontSize: 10, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Asunto</p>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--t)", margin: 0, background: "var(--ink2)", padding: "8px 12px", borderRadius: 6 }}>{email.subject}</p>
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Asunto</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", margin: 0, background: "var(--ink2)", padding: "8px 12px", borderRadius: 6 }}>{email.subject}</p>
                   </div>
-                  <div style={{ marginBottom: 14 }}>
-                    <p style={{ fontSize: 10, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Preview text</p>
-                    <p style={{ fontSize: 12, color: "var(--t2)", margin: 0, background: "var(--ink2)", padding: "6px 12px", borderRadius: 6 }}>{email.preview_text}</p>
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Preview Text</p>
+                    <p style={{ fontSize: 11, color: "var(--t2)", margin: 0, background: "var(--ink2)", padding: "6px 12px", borderRadius: 6 }}>{email.preview_text}</p>
                   </div>
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <p style={{ fontSize: 10, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: 0 }}>HTML Template</p>
-                      <span style={{ fontSize: 10, color: "var(--jade)", background: "rgba(45,212,159,0.1)", padding: "2px 8px", borderRadius: 10 }}>Copia y pega en Klaviyo</span>
-                    </div>
-                    <textarea
-                      readOnly
-                      value={email.html_body}
-                      style={{ width: "100%", minHeight: 200, padding: "10px 12px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t3)", fontSize: 10, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box" }}
-                    />
+                  <div>
+                    <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 6px" }}>HTML Template</p>
+                    <textarea readOnly value={email.html_body}
+                      style={{ width: "100%", minHeight: 200, padding: "10px 12px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t3)", fontSize: 10, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box" }} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div style={{ background: "var(--ink2)", padding: "8px 12px", borderRadius: 6 }}>
-                      <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Propósito</p>
-                      <p style={{ fontSize: 11, color: "var(--t)", margin: 0 }}>{email.purpose}</p>
-                    </div>
-                    <div style={{ background: "var(--ink2)", padding: "8px 12px", borderRadius: 6 }}>
-                      <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>CTA Principal</p>
-                      <p style={{ fontSize: 11, color: "var(--gold)", margin: 0 }}>{email.key_cta}</p>
-                    </div>
-                  </div>
-                </div>
+                </>
               );
             })()}
           </div>
@@ -204,153 +245,285 @@ function FlowModal({ flow, onClose }: { flow: KlaviyoWorkflowResult["plan"]["flo
   );
 }
 
+// ─── ATTACHMENT PREVIEW ────────────────────────────────────────────────────────
+function AttachmentPreview({ file, url, onRemove }: {
+  file?: File | null; url?: string; onRemove: () => void;
+}) {
+  if (!file && !url) return null;
+  const isImage = file?.type.startsWith("image/") || (url && /\.(jpg|jpeg|png|gif|webp)/i.test(url));
+  const isVideo = file?.type.startsWith("video/") || (url && /\.(mp4|webm|mov)/i.test(url));
+  const urlInfo = url ? classifyUrl(url) : null;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--ink2)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.25)", marginBottom: 6 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(200,168,75,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)" }}>
+        {isImage ? <Image size={14} /> : isVideo ? <Video size={14} /> : urlInfo ? urlInfo.icon : <Globe size={14} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {file?.name ?? url}
+        </p>
+        <p style={{ margin: 0, fontSize: 9, color: "var(--t3)" }}>
+          {file ? `${(file.size / 1024).toFixed(0)} KB · ${file.type}` : urlInfo?.label}
+        </p>
+      </div>
+      <button onClick={onRemove} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 2 }}><X size={12} /></button>
+    </div>
+  );
+}
+
+// ─── QUICK ACTIONS ─────────────────────────────────────────────────────────────
+const QUICK_ACTIONS = [
+  { icon: "📧", label: "Flujos Klaviyo Comic Crafter", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
+  { icon: "🔍", label: "Investigar mercado", prompt: "Analiza el mercado de comics y arte en España para una tienda Shopify. Dame inteligencia de mercado completa con oportunidades." },
+  { icon: "🧠", label: "Estado del Brain", prompt: "¿Qué conocimiento ha absorbido el ShopyBrain? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
+  { icon: "🎨", label: "Analizar imagen de URL", prompt: "Absorbe y analiza esta imagen: https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png — extrae composición, texturas, topología y señales eCommerce." },
+];
+
+const SYSTEM_PROMPT = `Eres OmniCore AI — la inteligencia central de ShopyBrain para agencias Shopify.
+Tienes acceso a tres motores: 🔬 Gemini (investigación), 🧠 Claude (análisis), 💾 ShopyBrain (memoria permanente).
+Eres experto en: Shopify, Klaviyo, email marketing, SEO, pricing, eCommerce, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
+Cuando el usuario comparte una imagen o URL, puedes absorberla al ShopyBrain y extraer TODA la inteligencia posible.
+Responde siempre en español. Sé directo, técnico y accionable.`;
+
+// ─── MAIN CHATBOT ─────────────────────────────────────────────────────────────
 export default function OmniChatbot() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy **OmniCore AI**, tu asistente central conectado a **Gemini**, **Claude** y el **Brain**.
+  const [messages, setMessages] = useState<Message[]>([{
+    id: "welcome", role: "assistant", timestamp: new Date(), model: "omnicore",
+    content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy **OmniCore AI** — el cerebro central ShopyBrain.
 
-Puedo ayudarte con:
-· 📧 Generar flujos completos de Klaviyo con plantillas HTML listas
-· 🔍 Investigar mercados y competidores (Gemini Research)
-· 🧠 Estrategia de pricing, SEO, conversión y contenido
-· 💡 Cualquier tarea de optimización Shopify
+Puedo absorber y analizar **cualquier cosa**:
+· 📸 Fotos/imágenes — composición, texturas, topología, química, colores
+· 🎬 Vídeos — técnica, estilo, señales de conversión
+· 🌐 URLs — cualquier web, tienda, artículo
+· 📱 Instagram, Facebook, X, YouTube — inteligencia de marca y contenido
 
-¿Con qué empezamos?`,
-      timestamp: new Date(),
-      model: "omnicore",
-    }
-  ]);
+Usa el 📎 **botón de adjuntar** para subir archivos o pegar URLs.
+Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
+  }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [showAttach, setShowAttach] = useState(false);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachUrl, setAttachUrl] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
 
-  const detectKlaviyoRequest = (text: string): { isKlaviyo: boolean; shopDomain?: string; storeName?: string; niche?: string } => {
+  // ─── Drag & drop ──────────────────────────────────────────────────────────
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) {
+      setAttachFile(file); setAttachUrl(""); setShowAttach(true);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) { setAttachFile(file); setAttachUrl(""); setShowAttach(true); }
+  };
+
+  const handleUrlAdd = () => {
+    if (urlInput.trim()) { setAttachUrl(urlInput.trim()); setAttachFile(null); setUrlInput(""); }
+  };
+
+  // ─── Absorb image/video file ───────────────────────────────────────────────
+  const absorbFile = async (file: File, niche?: string): Promise<AbsorbResult> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("label", file.name);
+    if (niche) formData.append("niche", niche);
+    const res = await fetch(`${API}/api/shopybrain/absorb-image`, {
+      method: "POST", credentials: "include", body: formData,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  };
+
+  // ─── Absorb URL ────────────────────────────────────────────────────────────
+  const absorbUrl = async (url: string, niche?: string): Promise<AbsorbResult> => {
+    const res = await fetch(`${API}/api/shopybrain/absorb-url`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, niche }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  };
+
+  // ─── Detect Klaviyo request ────────────────────────────────────────────────
+  const detectKlaviyo = (text: string) => {
     const lower = text.toLowerCase();
-    const isKlaviyo = lower.includes("klaviyo") || lower.includes("flow") || lower.includes("email marketing") || lower.includes("plantilla") || lower.includes("workflow") || lower.includes("flujo");
-    if (!isKlaviyo) return { isKlaviyo: false };
-
+    const isKlaviyo = lower.includes("klaviyo") || lower.includes("workflow") || lower.includes("flujo") || lower.includes("email marketing");
+    if (!isKlaviyo) return null;
     const domainMatch = text.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
     const shopDomain = domainMatch?.[1] ?? "comic-crafter.myshopify.com";
     const storeName = shopDomain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-
-    const nicheKeywords: Record<string, string> = {
-      comic: "Comics y Arte", arte: "Arte y Cultura", moda: "Moda y Ropa", tech: "Electrónica", joya: "Joyería",
-      belleza: "Belleza", cosmet: "Cosmética", mascota: "Mascotas", deport: "Deportes", hogar: "Hogar y Decoración",
-    };
-    let niche = "Comics y Arte";
-    for (const [key, val] of Object.entries(nicheKeywords)) {
-      if (lower.includes(key)) { niche = val; break; }
-    }
-
-    return { isKlaviyo: true, shopDomain, storeName, niche };
+    return { shopDomain, storeName, niche: "Comics y Arte" };
   };
 
-  const generateKlaviyoWorkflow = async (shopDomain: string, storeName: string, niche: string): Promise<KlaviyoWorkflowResult | null> => {
-    try {
-      const res = await fetch(`${API}/api/klaviyo-ai/generate-workflow`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ shopDomain, storeName, niche, market: "es" }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return await res.json();
-    } catch (err) {
-      console.error("Klaviyo workflow failed:", err);
-      return null;
-    }
-  };
-
+  // ─── Send message ──────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if (loading) return;
+    if (!content && !attachFile && !attachUrl) return;
 
-    const userMsg: Message = { id: uuid(), role: "user", content, timestamp: new Date() };
+    const hasAttach = !!(attachFile || attachUrl);
+    const attachType = attachFile ? (attachFile.type.startsWith("video/") ? "video" : "image") : "url";
+    const attachName = attachFile?.name ?? attachUrl;
+
+    const userMsg: Message = {
+      id: uuid(), role: "user", content: content || `📎 ${attachName}`, timestamp: new Date(),
+      attachmentType: hasAttach ? attachType as never : undefined,
+      attachmentName: hasAttach ? attachName : undefined,
+    };
     setMessages(m => [...m, userMsg]);
-    setInput("");
+    setInput(""); setAttachFile(null); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
-
-    const klaviyoInfo = detectKlaviyoRequest(content);
 
     try {
       let assistantContent = "";
       let action: ChatAction | undefined;
 
-      if (klaviyoInfo.isKlaviyo) {
-        const { shopDomain, storeName, niche } = klaviyoInfo;
-        assistantContent = `🔄 Lanzando generación de workflow Klaviyo para **${storeName}** (${shopDomain}) en el nicho **${niche}**...\n\n**Paso 1:** Gemini analiza el mercado de ${niche} en España\n**Paso 2:** Claude diseña los 6 flujos esenciales con emails completos\n**Paso 3:** OmniCore guarda el conocimiento en el Brain\n\nEsto puede tardar 30-60 segundos...`;
+      // ── CASE 1: Has file or URL attachment → ABSORB ──
+      if (hasAttach) {
+        const absorbingMsg = attachType === "image"
+          ? `🔬 Absorbiendo imagen **${attachName}** al ShopyBrain...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
+          : attachType === "video"
+          ? `🎬 Absorbiendo vídeo **${attachName}** al ShopyBrain...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
+          : (() => {
+              const urlInfo = classifyUrl(attachUrl);
+              return `${urlInfo.icon} Absorbiendo **${urlInfo.label}**: ${attachUrl}\n\nExtrayendo: contenido, marca, productos, audiencia, estrategia, señales eCommerce...\n\n_Analizando con Gemini + Claude..._`;
+            })();
 
+        setMessages(m => [...m, { id: uuid(), role: "assistant", content: absorbingMsg, timestamp: new Date(), model: "gemini+claude+brain" }]);
+
+        let result: AbsorbResult;
+        if (attachFile) {
+          result = await absorbFile(attachFile);
+        } else {
+          result = await absorbUrl(attachUrl);
+        }
+
+        const isImage = attachType === "image";
+        const a = result.analysis as Record<string, Record<string, string[]>>;
+        const angles = a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
+
+        assistantContent = `✅ **Absorbido al ShopyBrain**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
+        if (isImage && a.visual_composition) {
+          assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
+        }
+        if (a.technical_chemical_composition) {
+          assistantContent += `**Material/Técnica:** ${typeof a.technical_chemical_composition === "object" ? (a.technical_chemical_composition.manufacturing_process_indicators ?? JSON.stringify(a.technical_chemical_composition).slice(0, 150)) : a.technical_chemical_composition}\n\n`;
+        }
+        if (angles?.length > 0) {
+          assistantContent += `**Top Marketing Angles:**\n${(Array.isArray(angles) ? angles : []).slice(0, 3).map(a => `· ${a}`).join("\n")}\n\n`;
+        }
+        if (content) {
+          assistantContent += `\n**Tu pregunta:** ${content}\n\n`;
+          const followUp = await fetch(`${API}/api/shopybrain/search`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT }),
+          });
+          if (followUp.ok) {
+            const d = await followUp.json();
+            assistantContent += d.answer ?? "";
+          }
+        }
+        assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
+        action = { type: "absorb-result", label: "Ver análisis completo", data: result };
+
+      // ── CASE 2: Klaviyo workflow request ──
+      } else if (detectKlaviyo(content)) {
+        const kInfo = detectKlaviyo(content)!;
         setMessages(m => [...m, {
-          id: uuid(), role: "assistant", content: assistantContent, timestamp: new Date(), model: "gemini+claude"
+          id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+          content: `🔄 Generando workflow Klaviyo para **${kInfo.storeName}**...\n\n**Paso 1** — Gemini investiga el nicho ${kInfo.niche} en España\n**Paso 2** — Claude diseña 6 flujos con emails HTML completos\n**Paso 3** — ShopyBrain guarda el conocimiento permanentemente\n\n_30-60 segundos..._`
         }]);
 
-        const result = await generateKlaviyoWorkflow(shopDomain!, storeName!, niche!);
-
-        if (result?.plan) {
-          const flowNames = result.plan.flows?.map(f => `· **${f.name}** — ${f.emails?.length} emails`).join("\n") ?? "";
-          assistantContent = `✅ **Workflow completo generado para ${storeName}!**\n\n**${result.plan.flows?.length ?? 0} flujos creados:**\n${flowNames}\n\n**Impacto esperado:** ${result.plan.expected_revenue_impact}\n\nHaz clic en cualquier flow para ver y copiar las plantillas HTML completas. Están listas para pegar en el editor de Klaviyo.`;
-          action = { type: "klaviyo-workflow", label: "Ver flows generados", data: result };
-        } else {
-          assistantContent = "❌ Error generando el workflow. Verifica que KLAVIYO_API_KEY y GEMINI_API_KEY estén configuradas.";
-        }
-      } else {
-        const conversationHistory = messages.slice(-10).map(m => `${m.role === "user" ? "Usuario" : "OmniCore"}: ${m.content}`).join("\n\n");
-        const res = await fetch(`${API}/api/shopybrain/search`, {
-          method: "POST",
+        const wfRes = await fetch(`${API}/api/klaviyo-ai/generate-workflow`, {
+          method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            query: content,
-            systemPrompt: SYSTEM_PROMPT,
-            conversationHistory,
-            returnRaw: true,
-          }),
+          body: JSON.stringify({ shopDomain: kInfo.shopDomain, storeName: kInfo.storeName, niche: kInfo.niche, market: "es" }),
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          assistantContent = data.answer ?? data.result ?? data.content ?? "No pude procesar la respuesta.";
+        if (wfRes.ok) {
+          const wfData = await wfRes.json();
+          if (wfData.plan) {
+            const flowNames = wfData.plan.flows?.map((f: { name: string; emails?: unknown[] }) => `· **${f.name}** — ${f.emails?.length ?? 0} emails`).join("\n") ?? "";
+            assistantContent = `✅ **Workflow completo para ${kInfo.storeName}**\n\n${wfData.plan.flows?.length ?? 0} flujos creados:\n${flowNames}\n\n**Impacto esperado:** ${wfData.plan.expected_revenue_impact}\n\nHaz clic en cada flow para ver y copiar los templates HTML.`;
+            action = { type: "klaviyo-workflow", label: "Ver flows", data: wfData };
+          } else {
+            assistantContent = "❌ Error generando workflow. Verifica KLAVIYO_API_KEY y GEMINI_API_KEY.";
+          }
         } else {
-          assistantContent = "Lo siento, hubo un error procesando tu mensaje. El servidor está ocupado.";
+          assistantContent = "❌ Error en el servidor. Revisa los logs.";
+        }
+
+      // ── CASE 3: Check for URL in message ──
+      } else if (content.match(/https?:\/\/[^\s]+/)) {
+        const urlMatch = content.match(/https?:\/\/[^\s]+/)?.[0] ?? "";
+        const urlInfo = classifyUrl(urlMatch);
+        setMessages(m => [...m, {
+          id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+          content: `${urlInfo.label} detectada. Absorbiendo al ShopyBrain: **${urlMatch}**\n\n_Extrayendo inteligencia con Gemini..._`
+        }]);
+
+        const absorbResult = await absorbUrl(urlMatch);
+        const a2 = absorbResult.analysis as Record<string, unknown>;
+        assistantContent = `✅ **${urlInfo.label} absorbida al ShopyBrain**\n\n**Marca:** ${JSON.stringify(a2.brand_identity ?? a2.brand_elements ?? "").slice(0, 200)}\n\n**Insights eCommerce:** ${JSON.stringify(a2.ecommerce_insights ?? a2.ecommerce_conversion_signals ?? "").slice(0, 300)}\n\n${content !== urlMatch ? `\n**Respuesta a tu pregunta:** ` : ""}`;
+
+        if (content !== urlMatch) {
+          const followUp = await fetch(`${API}/api/shopybrain/search`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT }),
+          });
+          if (followUp.ok) { const d = await followUp.json(); assistantContent += d.answer ?? ""; }
+        }
+        action = { type: "absorb-result", label: "Ver análisis completo", data: absorbResult };
+
+      // ── CASE 4: Regular chat ──
+      } else {
+        const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "OmniCore"}: ${m.content}`).join("\n\n");
+        const res = await fetch(`${API}/api/shopybrain/search`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory }),
+        });
+        if (res.ok) {
+          const d = await res.json();
+          assistantContent = d.answer ?? d.result ?? "No pude procesar la respuesta.";
+        } else {
+          assistantContent = "Error de conexión con el servidor. Intenta de nuevo.";
         }
       }
 
       setMessages(m => {
-        const filtered = m.filter(msg => !(msg.role === "assistant" && msg.content.includes("Paso 1")));
-        return [...filtered, {
-          id: uuid(),
-          role: "assistant",
-          content: assistantContent,
-          timestamp: new Date(),
-          model: klaviyoInfo.isKlaviyo ? "gemini+claude+omnicore" : "claude+omnicore",
-          action,
-        }];
+        const filtered = m.filter(msg => !(msg.role === "assistant" && (msg.content.includes("Absorbiendo") || msg.content.includes("Generando workflow") || msg.content.includes("detectada. Absorbiendo"))));
+        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });
     } catch (err) {
-      setMessages(m => [...m, {
-        id: uuid(), role: "assistant",
-        content: `Error: ${err instanceof Error ? err.message : "Fallo de conexión"}`,
-        timestamp: new Date(),
-      }]);
+      setMessages(m => [...m, { id: uuid(), role: "assistant" as const, content: `❌ Error: ${err instanceof Error ? err.message : "Fallo de conexión"}`, timestamp: new Date() }]);
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages]);
-
-  function uuid() { return Math.random().toString(36).slice(2); }
+  }, [input, loading, messages, attachFile, attachUrl]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -362,40 +535,46 @@ Puedo ayudarte con:
     <>
       {selectedFlow && <FlowModal flow={selectedFlow} onClose={() => setSelectedFlow(null)} />}
 
+      {/* Floating button */}
       {!open && (
         <button onClick={() => setOpen(true)} style={{
-          position: "fixed", bottom: 24, right: 24, width: 56, height: 56,
-          borderRadius: "50%", background: "linear-gradient(135deg, var(--gold), #e6c668)",
-          border: "none", cursor: "pointer", zIndex: 1000, boxShadow: "0 4px 20px rgba(200,168,75,0.4)",
+          position: "fixed", bottom: 24, right: 24, width: 58, height: 58,
+          borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
+          border: "none", cursor: "pointer", zIndex: 1000,
+          boxShadow: "0 4px 24px rgba(200,168,75,0.45), 0 0 0 0 rgba(200,168,75,0.3)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          animation: "pulse-gold 3s ease-in-out infinite",
+          animation: "pulseGold 3s ease-in-out infinite",
         }}>
-          <Brain size={24} style={{ color: "var(--ink)" }} />
+          <Brain size={26} style={{ color: "#0a0a0f" }} />
         </button>
       )}
 
+      {/* Chat window */}
       {open && (
-        <div style={{
-          position: "fixed", bottom: 24, right: 24,
-          width: minimized ? 280 : 420,
-          height: minimized ? 52 : 620,
-          background: "var(--ink)", border: "1px solid rgba(200,168,75,0.3)",
-          borderRadius: 16, zIndex: 1000, display: "flex", flexDirection: "column",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(200,168,75,0.1)",
-          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-          overflow: "hidden",
-        }}>
-          <div style={{
-            padding: "12px 14px", borderBottom: minimized ? "none" : "1px solid var(--ink3)",
-            background: "linear-gradient(135deg, rgba(200,168,75,0.08), rgba(200,168,75,0.04))",
-            display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+        <div
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{
+            position: "fixed", bottom: 24, right: 24,
+            width: minimized ? 290 : 440,
+            height: minimized ? 52 : 640,
+            background: "var(--ink)",
+            border: `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
+            borderRadius: 16, zIndex: 1000, display: "flex", flexDirection: "column",
+            boxShadow: isDragging ? "0 0 0 2px var(--jade), 0 8px 40px rgba(0,0,0,0.6)" : "0 8px 40px rgba(0,0,0,0.6)",
+            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", overflow: "hidden",
           }}>
+
+          {/* Header */}
+          <div style={{ padding: "12px 14px", borderBottom: minimized ? "none" : "1px solid var(--ink3)", background: "linear-gradient(135deg, rgba(200,168,75,0.07), rgba(200,168,75,0.03))", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, var(--gold), #a07830)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Brain size={16} style={{ color: "#fff" }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>OmniCore AI</p>
-              {!minimized && <p style={{ margin: 0, fontSize: 10, color: "var(--jade)" }}>Gemini · Claude · Brain — Online</p>}
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>OmniCore AI · ShopyBrain</p>
+              {!minimized && <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>🔬 Gemini · 🧠 Claude · 💾 Brain — Listo</p>}
             </div>
             <div style={{ display: "flex", gap: 4 }}>
               <button onClick={() => setMinimized(!minimized)} style={{ width: 24, height: 24, borderRadius: 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -409,24 +588,43 @@ Puedo ayudarte con:
 
           {!minimized && (
             <>
+              {/* Drag overlay indicator */}
+              {isDragging && (
+                <div style={{ position: "absolute", inset: 52, background: "rgba(45,212,159,0.08)", border: "2px dashed var(--jade)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
+                  <div style={{ textAlign: "center" }}>
+                    <Upload size={28} style={{ color: "var(--jade)", marginBottom: 8 }} />
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--jade)" }}>Suelta para absorber al ShopyBrain</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Messages */}
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
                 {messages.map(msg => (
                   <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
                     <div style={{
-                      maxWidth: "88%", padding: "10px 12px", borderRadius: msg.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-                      background: msg.role === "user" ? "rgba(200,168,75,0.15)" : "var(--ink2)",
-                      border: `1px solid ${msg.role === "user" ? "rgba(200,168,75,0.3)" : "var(--ink3)"}`,
+                      maxWidth: "90%", padding: "10px 12px",
+                      borderRadius: msg.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                      background: msg.role === "user" ? "rgba(200,168,75,0.12)" : "var(--ink2)",
+                      border: `1px solid ${msg.role === "user" ? "rgba(200,168,75,0.25)" : "var(--ink3)"}`,
                       fontSize: 12, lineHeight: 1.6, color: "var(--t)",
                     }}>
                       {msg.role === "assistant" && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
                           <Brain size={10} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            {msg.model === "gemini+claude+omnicore" ? "Gemini + Claude + Brain" : msg.model === "claude+omnicore" ? "Claude + Brain" : "OmniCore"}
-                          </span>
+                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>ShopyBrain</span>
+                        </div>
+                      )}
+                      {msg.attachmentType && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "rgba(200,168,75,0.08)", borderRadius: 5, marginBottom: 6, width: "fit-content" }}>
+                          {msg.attachmentType === "image" ? <Image size={10} style={{ color: "var(--gold)" }} /> : msg.attachmentType === "video" ? <Video size={10} style={{ color: "var(--gold)" }} /> : <Link size={10} style={{ color: "var(--gold)" }} />}
+                          <span style={{ fontSize: 9, color: "var(--gold)" }}>{msg.attachmentName?.slice(0, 40)}</span>
                         </div>
                       )}
                       <div>{formatMessage(msg.content)}</div>
+                      {msg.action?.type === "absorb-result" && (
+                        <AbsorbResultCard data={msg.action.data as AbsorbResult} />
+                      )}
                       {msg.action?.type === "klaviyo-workflow" && (
                         <KlaviyoResultCard data={msg.action.data as KlaviyoWorkflowResult} onViewFlow={setSelectedFlow} />
                       )}
@@ -439,20 +637,22 @@ Puedo ayudarte con:
                 {loading && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--ink2)", borderRadius: "12px 12px 12px 3px", border: "1px solid var(--ink3)", maxWidth: "60%", alignSelf: "flex-start" }}>
                     <Loader2 size={12} style={{ color: "var(--gold)", animation: "spin 1s linear infinite" }} />
-                    <span style={{ fontSize: 11, color: "var(--t3)" }}>OmniCore pensando...</span>
+                    <span style={{ fontSize: 11, color: "var(--t3)" }}>ShopyBrain procesando...</span>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
-              <div style={{ padding: "8px 12px", borderTop: "1px solid var(--ink3)", flexShrink: 0 }}>
-                <button onClick={() => setShowActions(!showActions)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--t3)", fontSize: 10, cursor: "pointer", marginBottom: 6, padding: "2px 0" }}>
+              {/* Input area */}
+              <div style={{ padding: "8px 12px 10px", borderTop: "1px solid var(--ink3)", flexShrink: 0 }}>
+                {/* Quick actions */}
+                <button onClick={() => setShowActions(!showActions)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--t3)", fontSize: 10, cursor: "pointer", marginBottom: 5, padding: "2px 0" }}>
                   <Sparkles size={10} />
                   Acciones rápidas
                   <ChevronDown size={9} style={{ transform: showActions ? "rotate(180deg)" : "rotate(0)", transition: "0.2s" }} />
                 </button>
                 {showActions && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
                     {QUICK_ACTIONS.map((action, i) => (
                       <button key={i} onClick={() => { setShowActions(false); sendMessage(action.prompt); }}
                         style={{ textAlign: "left", padding: "6px 8px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, cursor: "pointer", fontSize: 10, color: "var(--t2)", display: "flex", alignItems: "center", gap: 5 }}>
@@ -462,39 +662,64 @@ Puedo ayudarte con:
                     ))}
                   </div>
                 )}
+
+                {/* Attach panel */}
+                {showAttach && (
+                  <div style={{ marginBottom: 8, padding: 10, background: "var(--ink2)", borderRadius: 8, border: "1px solid var(--ink3)" }}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                      <button onClick={() => fileInputRef.current?.click()}
+                        style={{ flex: 1, padding: "7px 10px", background: "rgba(200,168,75,0.07)", border: "1px dashed rgba(200,168,75,0.3)", borderRadius: 6, cursor: "pointer", fontSize: 10, color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                        <Upload size={12} /> Subir imagen/vídeo
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={urlInput} onChange={e => setUrlInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleUrlAdd(); } }}
+                        placeholder="Pega URL: Instagram, Facebook, X, YouTube, web..."
+                        style={{ flex: 1, padding: "6px 10px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 6, color: "var(--t)", fontSize: 11, outline: "none" }} />
+                      <button onClick={handleUrlAdd} disabled={!urlInput.trim()}
+                        style={{ padding: "6px 10px", background: urlInput.trim() ? "var(--jade)" : "var(--ink3)", border: "none", borderRadius: 6, cursor: urlInput.trim() ? "pointer" : "not-allowed", color: urlInput.trim() ? "var(--ink)" : "var(--t4)", fontSize: 11, fontWeight: 600 }}>
+                        Añadir
+                      </button>
+                    </div>
+                    <p style={{ margin: "6px 0 0", fontSize: 9, color: "var(--t4)" }}>
+                      También puedes <strong style={{ color: "var(--t3)" }}>arrastrar y soltar</strong> archivos directamente en el chat
+                    </p>
+                  </div>
+                )}
+
+                {/* Attachment preview */}
+                {(attachFile || attachUrl) && (
+                  <AttachmentPreview file={attachFile} url={attachUrl} onRemove={() => { setAttachFile(null); setAttachUrl(""); }} />
+                )}
+
+                {/* Text input row */}
                 <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={loading}
-                    placeholder="Escribe o usa acciones rápidas..."
+                  <button onClick={() => setShowAttach(!showAttach)}
+                    style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14 }}>
+                    📎
+                  </button>
+                  <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading}
+                    placeholder={attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
                     rows={1}
-                    style={{
-                      flex: 1, padding: "8px 10px", background: "var(--ink2)", border: "1px solid var(--ink3)",
-                      borderRadius: 8, color: "var(--t)", fontSize: 12, resize: "none", outline: "none",
-                      fontFamily: "inherit", lineHeight: 1.4, maxHeight: 80, overflowY: "auto",
-                    }}
-                    onInput={e => {
-                      const el = e.target as HTMLTextAreaElement;
-                      el.style.height = "auto";
-                      el.style.height = `${Math.min(el.scrollHeight, 80)}px`;
-                    }}
+                    style={{ flex: 1, padding: "8px 10px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t)", fontSize: 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: 80, overflowY: "auto" }}
+                    onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 80)}px`; }}
                   />
-                  <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
+                  <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)}
                     style={{
                       width: 32, height: 32, borderRadius: 8, border: "none", flexShrink: 0,
-                      background: loading || !input.trim() ? "var(--ink3)" : "var(--gold)",
-                      color: loading || !input.trim() ? "var(--t4)" : "var(--ink)",
-                      cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+                      background: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--ink3)" : "var(--gold)",
+                      color: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--t4)" : "var(--ink)",
+                      cursor: loading || (!input.trim() && !attachFile && !attachUrl) ? "not-allowed" : "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                     }}>
                     {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={14} />}
                   </button>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, justifyContent: "center" }}>
-                  {[["🔬", "Gemini"], ["🧠", "Claude"], ["💾", "Brain"]].map(([icon, label]) => (
+
+                {/* Footer badges */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, justifyContent: "center" }}>
+                  {[["🔬", "Gemini"], ["🧠", "Claude"], ["💾", "Brain"], ["👁", "Visión"]].map(([icon, label]) => (
                     <span key={label} style={{ fontSize: 9, color: "var(--t4)", display: "flex", alignItems: "center", gap: 3 }}>{icon} {label}</span>
                   ))}
                 </div>
@@ -504,10 +729,13 @@ Puedo ayudarte con:
         </div>
       )}
 
+      {/* Hidden file input */}
+      <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleFileSelect} />
+
       <style>{`
-        @keyframes pulse-gold {
-          0%, 100% { box-shadow: 0 4px 20px rgba(200,168,75,0.4); }
-          50% { box-shadow: 0 4px 30px rgba(200,168,75,0.7), 0 0 0 8px rgba(200,168,75,0.1); }
+        @keyframes pulseGold {
+          0%, 100% { box-shadow: 0 4px 24px rgba(200,168,75,0.4), 0 0 0 0 rgba(200,168,75,0.3); }
+          50% { box-shadow: 0 4px 32px rgba(200,168,75,0.7), 0 0 0 10px rgba(200,168,75,0.05); }
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>

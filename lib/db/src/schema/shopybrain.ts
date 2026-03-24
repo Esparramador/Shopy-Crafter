@@ -1,4 +1,4 @@
-import { pgTable, text, real, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, real, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 export const omnicoreMemoriesTable = pgTable("omnicore_memories", {
   id: text("id").primaryKey(),
@@ -192,6 +192,41 @@ export const pricingDecisionsTable = pgTable("pricing_decisions", {
   actualRevenueChange: real("actual_revenue_change"),
   actualConversionChange: real("actual_conversion_change"),
   predictionAccuracy: real("prediction_accuracy"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ─── UNIVERSAL CONTENT ABSORBER ───────────────────────────────────────────────
+// Everything ShopyBrain has seen and absorbed: images, videos, URLs, social profiles
+export const omnicoreAbsorbedContentTable = pgTable("omnicore_absorbed_content", {
+  id: text("id").primaryKey(),
+  sourceType: text("source_type").notNull(), // image | video | url | social_instagram | social_facebook | social_x | youtube | text
+  sourceUrl: text("source_url"),
+  sourceLabel: text("source_label"),
+  rawContent: text("raw_content"),
+  // Vision extraction results
+  visualComposition: text("visual_composition"),
+  colorPalette: text("color_palette"),
+  textureAnalysis: text("texture_analysis"),
+  topologyStructure: text("topology_structure"),
+  renderingTechnique: text("rendering_technique"),
+  technicalSpecs: text("technical_specs"),
+  chemicalComposition: text("chemical_composition"),
+  brandElements: text("brand_elements"),
+  // Semantic extraction
+  mainThemes: text("main_themes"),
+  ecommerceInsights: text("ecommerce_insights"),
+  marketingAngles: text("marketing_angles"),
+  competitiveData: text("competitive_data"),
+  audienceSignals: text("audience_signals"),
+  // Structured JSON from AI
+  fullAnalysis: jsonb("full_analysis"),
+  extractedEntities: jsonb("extracted_entities"),
+  // Classification
+  niche: text("niche"),
+  confidence: real("confidence").default(0.7),
+  absorbedToMemory: integer("absorbed_to_memory").default(0),
+  memoryIds: text("memory_ids"),
+  processingModel: text("processing_model"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -70,15 +70,40 @@ Key tables: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insi
 - Route: `artifacts/api-server/src/routes/gemini-research.ts` → `/api/gemini/*`
 - Frontend: `/admin/gemini-intel` → `GeminiIntelligence.tsx`
 
-### OmniCore Floating AI Chatbot
-Multi-model floating chatbot accessible from all admin pages.
+### ShopyBrain — ONE Brain, ONE Truth
+**There is only one brain: ShopyBrain = OmniCore.** No duplicates exist.
+- `intelligence.ts` route uses ShopyBrain via `buildShopyBrainContext()` / `askClaudeWithBrain()` — not a separate brain
+- `geminiConversations/Messages` tables are Gemini chat history only, not a brain
+- ALL AI outputs are saved to `omnicore_memories` or `omnicore_absorbed_content`
+
+### OmniCore Floating AI Chatbot — Universal Absorber
+Multi-model floating chatbot (gold brain button, bottom-right) accessible from all admin pages.
 - **Component**: `artifacts/shopify-optimizer/src/components/OmniChatbot.tsx`
-- **Models**: Gemini (research) + Claude (answers) + OmniCore Brain (memory)
-- **Capabilities**:
-  - Full Klaviyo workflow generation (6 flows, complete HTML email templates)
-  - Gemini market intelligence for any niche
-  - Direct Claude+Brain answers for strategy/SEO/pricing
-  - Flow modal: view and copy-paste complete HTML email bodies
+- **Models**: Gemini (research) + Claude Opus Vision (images) + ShopyBrain (permanent memory)
+
+**ABSORBS EVERYTHING:**
+| Source Type | How | What it Extracts |
+|---|---|---|
+| 📸 Images (upload) | Claude Opus Vision (base64) | Composition, colors, textures, topology, rendering, chemical/technical, brand, eCommerce signals |
+| 🎬 Videos (upload) | Gemini analysis | Style, production quality, marketing approach, conversion signals |
+| 🌐 Any URL | Fetch + Gemini | Content, brand, products, pricing, marketing strategy, audience |
+| 📱 Instagram | Fetch + Gemini social | Brand identity, content strategy, posting patterns, engagement |
+| 👤 Facebook | Fetch + Gemini social | Same as Instagram |
+| 🐦 X / Twitter | Fetch + Gemini social | Brand voice, audience, viral content patterns |
+| 📺 YouTube | Gemini video URL | Visual style, product demos, marketing technique |
+| 💬 Text | Gemini analysis | Themes, insights, marketing angles |
+
+**ALL FINDINGS → ShopyBrain memory permanently**
+
+- **DB table**: `omnicore_absorbed_content` (new) — tracks all absorbed content with full analysis
+- **Absorber routes**: `artifacts/api-server/src/routes/absorber.ts`
+  - `POST /api/shopybrain/absorb-url` — absorb any URL (auto-classifies type)
+  - `POST /api/shopybrain/absorb-image` — absorb image/video file (multipart)
+  - `POST /api/shopybrain/absorb-text` — absorb raw text
+  - `GET /api/shopybrain/absorbed-content` — list all absorbed content
+- **Claude Vision prompt**: 10-dimension analysis (composition, colors, textures, topology, rendering, chemical/technical, brand, eCommerce, emotional, Shopify insights)
+- **Drag-and-drop** support directly onto chatbot window
+
 - **Klaviyo AI routes**: `artifacts/api-server/src/routes/klaviyo-ai.ts`
   - `POST /api/klaviyo-ai/generate-workflow` — full workflow plan (Gemini+Claude)
   - `POST /api/klaviyo-ai/generate-email` — single email template
