@@ -7,7 +7,7 @@ import {
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
 import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
-import { refreshToken, validateToken, shopifyRequest } from "./shopify.js";
+import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";
@@ -627,36 +627,40 @@ export async function runTokenRefresh() {
   try {
     const projects = await db.select().from(projectsTable);
     let valid = 0;
-    let refreshed = 0;
+    let rotated = 0;
     let failed = 0;
+    let noToken = 0;
 
     for (const project of projects) {
+      if (!project.accessToken) {
+        noToken++;
+        logger.warn({ projectId: project.id, domain: project.shopDomain }, "Project has no access token");
+        continue;
+      }
+
       try {
-        // If token exists and is valid, skip
-        if (project.accessToken) {
-          const isValid = await validateToken(project.shopDomain, project.accessToken);
-          if (isValid) {
-            valid++;
-            continue;
-          }
+        const isValid = await validateToken(project.shopDomain, project.accessToken);
+        if (isValid) {
+          valid++;
+          continue;
         }
 
-        // Token missing or invalid — regenerate via client_credentials
-        log("token-refresh", `⚠️ Regenerating token for project ${project.id} (${project.shopDomain})`);
+        // Token invalid — attempt rotation
+        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting rotation`);
         const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-        await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
-        refreshed++;
-        log("token-refresh", `✅ Token refreshed: project ${project.id} (${project.shopDomain})`);
+        await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
+        rotated++;
+        log("token-refresh", `✅ Token rotated: project ${project.id} (${project.shopDomain})`);
       } catch (err) {
         failed++;
         logger.error(
           { projectId: project.id, domain: project.shopDomain, err },
-          "Token refresh failed for project"
+          "Token invalid and rotation failed — manual update required"
         );
       }
     }
 
-    log("token-refresh", `🔑 Done: ${valid} valid, ${refreshed} refreshed, ${failed} failed`);
+    log("token-refresh", `🔑 Done: ${valid} valid, ${rotated} rotated, ${failed} failed, ${noToken} missing`);
   } catch (err) {
     logger.error({ err }, "Token validation job failed");
   }

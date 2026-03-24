@@ -131,6 +131,52 @@ export async function shopifyRequest<T>(
 }
 
 /**
+ * Rotates a Shopify access token using the official rotation endpoint.
+ * POST https://{shop}/admin/oauth/access_token/rotate
+ * Requires token rotation to be enabled for the app in Shopify Partners.
+ */
+export async function rotateToken(
+  projectId: number,
+  shopDomain: string,
+  clientId: string,
+  clientSecret: string,
+  currentAccessToken: string
+): Promise<string> {
+  const domain = normalizeShopDomain(shopDomain);
+  const url = `https://${domain}/admin/oauth/access_token/rotate`;
+
+  logger.info({ projectId, domain }, "Rotating Shopify token");
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": currentAccessToken,
+    },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, access_token: currentAccessToken }),
+    signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Token rotation failed (${resp.status}): ${text}`);
+  }
+
+  const data = (await resp.json()) as { access_token: string; expires_in?: number };
+  const token = data.access_token;
+  const expiresIn = data.expires_in ?? 86_400;
+  const expiresAtDate = new Date(Date.now() + expiresIn * 1000);
+
+  await db
+    .update(projectsTable)
+    .set({ accessToken: token, tokenExpiresAt: expiresAtDate })
+    .where(eq(projectsTable.id, projectId));
+
+  logger.info({ projectId, expiresAt: expiresAtDate }, "Token rotated successfully");
+  return token;
+}
+
+/**
  * Validates a token with a lightweight API call. Returns true if valid.
  */
 export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
