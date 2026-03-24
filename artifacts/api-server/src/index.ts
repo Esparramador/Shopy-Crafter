@@ -2,7 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { registerCronJobs } from "./lib/scheduler.js";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
@@ -18,6 +18,28 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+async function deduplicateProducts() {
+  try {
+    const result = await db.execute(sql`
+      DELETE FROM products a USING products b
+      WHERE a.id < b.id
+        AND a.project_id = b.project_id
+        AND a.shopify_product_id = b.shopify_product_id
+    `);
+    const count = (result as any).rowCount ?? 0;
+    if (count > 0) {
+      logger.info({ removed: count }, "🧹 Duplicate products cleaned");
+    }
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS products_project_shopify_unique
+      ON products (project_id, shopify_product_id)
+    `);
+  } catch (err) {
+    logger.error({ err }, "⚠️  deduplicateProducts failed — continuing startup");
+  }
 }
 
 async function ensureAdminUser() {
@@ -57,7 +79,7 @@ const server = app.listen(port, (err?: Error) => {
   }
 
   logger.info({ port }, "Server listening");
-  ensureAdminUser();
+  deduplicateProducts().then(() => ensureAdminUser());
   registerCronJobs();
 });
 
