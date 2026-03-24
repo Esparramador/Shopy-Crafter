@@ -1,9 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable } from "@workspace/db";
+import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
+import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -189,6 +190,55 @@ router.post("/projects/:projectId/messages", async (req, res): Promise<void> => 
     id, projectId, fromRole: "admin", fromName: req.session.name ?? "Admin", content,
   });
   res.json({ id });
+});
+
+// ─── Shopify OAuth Platform Configuration ────────────────────────────────────
+router.get("/shopify-config", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(platformSettingsTable)
+    .where(eq(platformSettingsTable.key, "shopify_client_id"))
+    .limit(1);
+  const secretRow = await db.select().from(platformSettingsTable)
+    .where(eq(platformSettingsTable.key, "shopify_client_secret"))
+    .limit(1);
+
+  const envClientId = process.env.SHOPIFY_CLIENT_ID ?? "";
+  const envClientSecret = process.env.SHOPIFY_CLIENT_SECRET ?? "";
+
+  const dbClientId = rows[0]?.value ?? "";
+  const dbClientSecret = secretRow[0]?.value ? safeDecrypt(secretRow[0].value) : "";
+
+  const clientId = dbClientId || envClientId;
+  const clientSecret = dbClientSecret || envClientSecret;
+  const configured = !!(clientId && clientSecret);
+
+  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+  const appUrl = domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
+  const callbackUrl = `${appUrl}/api/shopify/oauth/callback`;
+
+  res.json({
+    configured,
+    clientIdPreview: clientId ? `${clientId.slice(0, 8)}••••••••` : null,
+    callbackUrl,
+    source: dbClientId ? "database" : (envClientId ? "environment" : "none"),
+  });
+});
+
+router.put("/shopify-config", async (req, res): Promise<void> => {
+  const { clientId, clientSecret } = req.body as { clientId: string; clientSecret: string };
+  if (!clientId || !clientSecret) {
+    res.status(400).json({ error: "clientId y clientSecret son obligatorios" });
+    return;
+  }
+
+  await db.insert(platformSettingsTable)
+    .values({ key: "shopify_client_id", value: clientId.trim() })
+    .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value: clientId.trim(), updatedAt: new Date() } });
+
+  await db.insert(platformSettingsTable)
+    .values({ key: "shopify_client_secret", value: encrypt(clientSecret.trim()) })
+    .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value: encrypt(clientSecret.trim()), updatedAt: new Date() } });
+
+  res.json({ success: true, message: "Credenciales de Shopify OAuth guardadas correctamente" });
 });
 
 export default router;

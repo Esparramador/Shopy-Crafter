@@ -1,15 +1,32 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { db } from "@workspace/db";
-import { projectsTable } from "@workspace/db";
+import { projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { refreshToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
 
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? "";
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? "";
+async function getShopifyCredentials(): Promise<{ clientId: string; clientSecret: string }> {
+  try {
+    const rows = await db.select().from(platformSettingsTable)
+      .where(eq(platformSettingsTable.key, "shopify_client_id")).limit(1);
+    const secretRows = await db.select().from(platformSettingsTable)
+      .where(eq(platformSettingsTable.key, "shopify_client_secret")).limit(1);
+    const dbId = rows[0]?.value ?? "";
+    const dbSecret = secretRows[0]?.value ? safeDecrypt(secretRows[0].value) : "";
+    return {
+      clientId: dbId || (process.env.SHOPIFY_CLIENT_ID ?? ""),
+      clientSecret: dbSecret || (process.env.SHOPIFY_CLIENT_SECRET ?? ""),
+    };
+  } catch {
+    return {
+      clientId: process.env.SHOPIFY_CLIENT_ID ?? "",
+      clientSecret: process.env.SHOPIFY_CLIENT_SECRET ?? "",
+    };
+  }
+}
 
 const OAUTH_SCOPES = [
   "read_products", "write_products",
@@ -27,10 +44,15 @@ function getAppUrl() {
   return domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
 }
 
-router.get("/shopify/oauth/start", (req, res): void => {
+router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
   const { shop, name, storeNiche, brandTone, targetAudience, storeMarkets } = req.query as Record<string, string>;
   if (!shop) { res.status(400).json({ error: "shop es obligatorio" }); return; }
-  if (!SHOPIFY_CLIENT_ID) { res.status(500).json({ error: "SHOPIFY_CLIENT_ID no configurado" }); return; }
+
+  const { clientId, clientSecret } = await getShopifyCredentials();
+  if (!clientId || !clientSecret) {
+    res.status(500).json({ error: "Credenciales de Shopify no configuradas. Ve a Ajustes → Conexión Shopify OAuth." });
+    return;
+  }
 
   const shopDomain = normalizeShopDomain(shop);
   const state = crypto.randomBytes(16).toString("hex");
@@ -45,7 +67,7 @@ router.get("/shopify/oauth/start", (req, res): void => {
   setTimeout(() => oauthState.delete(state), 10 * 60 * 1000);
 
   const redirectUri = `${getAppUrl()}/api/shopify/oauth/callback`;
-  const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+  const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
   res.json({ authUrl, state });
 });
 
@@ -60,13 +82,15 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
   const saved = oauthState.get(state)!;
   oauthState.delete(state);
 
+  const { clientId, clientSecret } = await getShopifyCredentials();
+
   if (hmac) {
     const params = Object.entries(req.query as Record<string, string>)
       .filter(([k]) => k !== "hmac")
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join("&");
-    const digest = crypto.createHmac("sha256", SHOPIFY_CLIENT_SECRET).update(params).digest("hex");
+    const digest = crypto.createHmac("sha256", clientSecret).update(params).digest("hex");
     if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac))) {
       res.status(400).send("Verificación HMAC fallida.");
       return;
@@ -78,7 +102,7 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
   const tokenRes = await fetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: SHOPIFY_CLIENT_ID, client_secret: SHOPIFY_CLIENT_SECRET, code }),
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
   });
 
   if (!tokenRes.ok) {
@@ -102,8 +126,8 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
     const [created] = await db.insert(projectsTable).values({
       name: saved.projectName || shopDomain.split(".")[0],
       shopDomain,
-      clientId: SHOPIFY_CLIENT_ID,
-      clientSecret: encrypt(SHOPIFY_CLIENT_SECRET),
+      clientId,
+      clientSecret: encrypt(clientSecret),
       accessToken: access_token,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
       storeNiche: saved.storeNiche || null,
@@ -118,10 +142,11 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
   res.redirect(`${appUrl}/oauth-success?projectId=${projectId}&shop=${encodeURIComponent(shopDomain)}`);
 });
 
-router.get("/shopify/oauth/check", (_req, res): void => {
+router.get("/shopify/oauth/check", async (_req, res): Promise<void> => {
+  const { clientId, clientSecret } = await getShopifyCredentials();
   res.json({
-    configured: !!(SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET),
-    clientId: SHOPIFY_CLIENT_ID ? SHOPIFY_CLIENT_ID.slice(0, 8) + "••••••••" : null,
+    configured: !!(clientId && clientSecret),
+    clientId: clientId ? clientId.slice(0, 8) + "••••••••" : null,
   });
 });
 
