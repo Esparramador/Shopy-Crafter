@@ -174,40 +174,52 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
         auditProblems: audit.problems,
         lastAuditedAt: new Date(),
       })
-      .onConflictDoNothing();
-
-    await db
-      .update(productsTable)
-      .set({
-        title: sp.title,
-        handle: sp.handle,
-        bodyHtml: sp.body_html,
-        vendor: sp.vendor,
-        productType: sp.product_type,
-        status: sp.status,
-        tags: sp.tags,
-        price: sp.variants?.[0]?.price ?? null,
-        compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
-        imageCount: sp.images?.length ?? 0,
-        variantCount: sp.variants?.length ?? 1,
-        imagesJson: sp.images ?? [],
-        auditScore: audit.overallScore,
-        auditGrade: audit.grade,
-        titleScore: audit.titleScore,
-        descriptionScore: audit.descriptionScore,
-        priceScore: audit.priceScore,
-        imageScore: audit.imageScore,
-        seoScore: audit.seoScore,
-        auditProblems: audit.problems,
-        lastAuditedAt: new Date(),
-      })
-      .where(and(
-        eq(productsTable.projectId, id),
-        eq(productsTable.shopifyProductId, String(sp.id))
-      ));
+      .onConflictDoUpdate({
+        target: [productsTable.projectId, productsTable.shopifyProductId],
+        set: {
+          title: sp.title,
+          handle: sp.handle,
+          bodyHtml: sp.body_html,
+          vendor: sp.vendor,
+          productType: sp.product_type,
+          status: sp.status,
+          tags: sp.tags,
+          price: sp.variants?.[0]?.price ?? null,
+          compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
+          imageCount: sp.images?.length ?? 0,
+          variantCount: sp.variants?.length ?? 1,
+          imagesJson: sp.images ?? [],
+          auditScore: audit.overallScore,
+          auditGrade: audit.grade,
+          titleScore: audit.titleScore,
+          descriptionScore: audit.descriptionScore,
+          priceScore: audit.priceScore,
+          imageScore: audit.imageScore,
+          seoScore: audit.seoScore,
+          auditProblems: audit.problems,
+          lastAuditedAt: new Date(),
+        },
+      });
 
     auditedCount++;
     totalScore += audit.overallScore;
+  }
+
+  const shopifyIds = allProducts.map(p => String(p.id));
+  const localProducts = await db.select({ shopifyProductId: productsTable.shopifyProductId })
+    .from(productsTable)
+    .where(eq(productsTable.projectId, id));
+  const orphanIds = localProducts
+    .filter(lp => !shopifyIds.includes(lp.shopifyProductId))
+    .map(lp => lp.shopifyProductId);
+  let removedCount = 0;
+  if (orphanIds.length > 0) {
+    for (const orphanId of orphanIds) {
+      await db.delete(productsTable).where(
+        and(eq(productsTable.projectId, id), eq(productsTable.shopifyProductId, orphanId))
+      );
+    }
+    removedCount = orphanIds.length;
   }
 
   const avgScore = auditedCount > 0 ? totalScore / auditedCount : null;
@@ -216,8 +228,9 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   res.json({
     synced: allProducts.length,
     auditedCount,
+    removed: removedCount,
     avgScore,
-    message: `${allProducts.length} productos sincronizados y auditados`,
+    message: `${allProducts.length} productos sincronizados, ${removedCount > 0 ? `${removedCount} eliminados de BD` : "0 eliminados"}`,
   });
 });
 
