@@ -6,3 +6,9 @@ id = "9EyhiMCidMT9gdjJwunVq"
 uri = "file://all-css-for-claude.txt"
 type = "text"
 title = "Los 3 CSS completos (1879 líneas) — para Claude"
+
+[[outputs]]
+id = "yfw292hTbdy9RCRREuGH2"
+uri = "file://MANUAL_AUTOMATIZACION_COMPLETO.md"
+type = "text"
+title = "Manual Completo de Automatizacion — ShopyBrain"
