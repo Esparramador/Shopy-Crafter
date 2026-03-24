@@ -15,6 +15,7 @@ import GeminiIntelligence from "@/pages/admin/GeminiIntelligence";
 import Inventory from "@/pages/admin/Inventory";
 import Achievements from "@/pages/admin/Achievements";
 import Roadmap from "@/pages/admin/Roadmap";
+import ApkManager from "@/pages/admin/ApkManager";
 import Competitors from "@/pages/admin/Competitors";
 import Revenue from "@/pages/admin/Revenue";
 import Tienda from "@/pages/Tienda";
@@ -223,6 +224,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><Roadmap /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/apk">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><ApkManager /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

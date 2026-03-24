@@ -154,6 +154,7 @@ Absorción profunda de cualquier marca/competidor/influencer con memoria acumula
 - `/admin/shopybrain/insights` — 16 knowledge domains
 - `/admin/shopybrain/study` — study sessions + manual trigger
 - `/admin/my-pricing` — CFO dashboard (cost structure, service catalog, Shopify sync)
+- `/admin/apk` — APK Android build manager (trigger build, status, download, install guide)
 
 ### Pricing Model (real — visible in landing and CMS)
 | Plan | Retainer | Setup único |
@@ -262,6 +263,11 @@ pnpm --filter @workspace/db run push-force
 
 ### Trigger manual del build
 Admin puede lanzar build desde: `POST /api/apk/build` (requiere sesión admin)
+
+### Panel de Gestión APK (Admin)
+- Ruta: `/admin/apk` → `artifacts/shopify-optimizer/src/pages/admin/ApkManager.tsx`
+- Muestra estado del build, botón lanzar build, checklist de configuración, guía de instalación Android
+- Accesible desde sidebar → "APK Android 📱"
 
 ## EADDRINUSE Recovery
 ```bash

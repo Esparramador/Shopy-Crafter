@@ -39,6 +39,7 @@ const ADMIN_NAV = [
   { label: "Predicciones ML", icon: "🔮", href: "/admin/forecast" },
   { label: "Logros", icon: "🏆", href: "/admin/achievements" },
   { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
+  { label: "APK Android", icon: "📱", href: "/admin/apk" },
   { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
 ];
