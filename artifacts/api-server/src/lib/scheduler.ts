@@ -7,7 +7,8 @@ import {
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
 import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
-import { shopifyRequest } from "./shopify.js";
+import { refreshToken, shopifyRequest } from "./shopify.js";
+import { safeDecrypt } from "./crypto.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -618,6 +619,47 @@ Return ONLY valid JSON:
   }
 }
 
+// ─── TOKEN AUTO-REFRESH ───────────────────────────────────────────────────────
+// Cada hora revisa todos los proyectos y renueva el token si está caducado
+// o le quedan menos de 2 horas de validez. Garantiza acceso continuo a la API.
+export async function runTokenRefresh() {
+  log("token-refresh", "🔑 Checking tokens for all projects");
+  try {
+    const projects = await db.select().from(projectsTable);
+    const soon = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
+
+    let refreshed = 0;
+    let skipped = 0;
+
+    for (const project of projects) {
+      // Renew if: no token, no expiry date, or expiry within 2h
+      const needsRefresh =
+        !project.accessToken ||
+        !project.tokenExpiresAt ||
+        new Date(project.tokenExpiresAt) <= soon;
+
+      if (!needsRefresh) { skipped++; continue; }
+
+      try {
+        const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+        if (!plainSecret || !project.clientId) {
+          logger.warn({ projectId: project.id }, "Token refresh skipped — missing credentials");
+          continue;
+        }
+        await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
+        refreshed++;
+        log("token-refresh", `✅ Token renewed: project ${project.id} (${project.shopDomain})`);
+      } catch (err) {
+        logger.warn({ projectId: project.id, err }, "Token refresh failed for project — will retry next hour");
+      }
+    }
+
+    log("token-refresh", `🔑 Done: ${refreshed} renewed, ${skipped} still valid`);
+  } catch (err) {
+    logger.error({ err }, "Token refresh job failed");
+  }
+}
+
 // ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
 export function registerCronJobs() {
   log("scheduler", "🕐 Registering 24/7 continuous learning jobs (timezone: Europe/Madrid)");
@@ -652,8 +694,15 @@ export function registerCronJobs() {
   // Domingo 00:00 — Mega-synthesis: síntesis estratégica semanal de todos los dominios
   cron.schedule("0 0 * * 0", () => { runOmniCoreMegaSynthesis().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
+  // ── TOKENS SHOPIFY ────────────────────────────────────────────────────────
+  // Cada hora — Renovar tokens Shopify próximos a caducar (o ya caducados)
+  cron.schedule("5 * * * *", () => { runTokenRefresh().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+  // También ejecutar al arrancar para renovar tokens caducados tras reinicio
+  setTimeout(() => { runTokenRefresh().catch(e => logger.error(e)); }, 10_000);
+
   log("scheduler", [
-    "✅ 9 jobs registrados:",
+    "✅ 10 jobs registrados:",
+    "  🔑 Tokens Shopify    → cada 1h  (renovación automática)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
     "  🔗 Cross-synthesis   → cada 12h (conexiones cruzadas)",
