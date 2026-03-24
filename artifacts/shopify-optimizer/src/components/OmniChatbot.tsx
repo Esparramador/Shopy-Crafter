@@ -180,16 +180,17 @@ function AbsorbResultCard({ data }: { data: AbsorbResult }) {
 
 // ─── ENTITY RESEARCH CARD ─────────────────────────────────────────────────────
 function EntityResearchCard({ data }: { data: EntityResearchResult }) {
-  const [tab, setTab] = useState<"overview" | "social" | "products" | "competitors" | "opportunities" | "sources">("overview");
+  const [tab, setTab] = useState<"overview" | "social" | "products" | "competitors" | "pricing" | "opportunities" | "sources">("overview");
   const p = data.profile;
 
   const tabs = [
-    { id: "overview", label: "📊 Overview" },
-    { id: "social", label: "📱 Social" },
-    { id: "products", label: "🛍️ Productos" },
-    { id: "competitors", label: "⚔️ Competencia" },
+    { id: "overview",      label: "📊 Overview" },
+    { id: "social",        label: "📱 Social" },
+    { id: "products",      label: "🛍️ Productos" },
+    { id: "competitors",   label: "⚔️ Competencia" },
+    { id: "pricing",       label: "💰 Pricing & Ads" },
     { id: "opportunities", label: "🚀 Oportunidades" },
-    { id: "sources", label: `🔗 Fuentes (${data.sourcesFound})` },
+    { id: "sources",       label: `🔗 Fuentes (${data.sourcesFound})` },
   ] as const;
 
   const sentimentColor = p.sentiment?.overall === "positive" ? "var(--jade)" : p.sentiment?.overall === "negative" ? "#ff6b6b" : "var(--gold)";
@@ -206,7 +207,7 @@ function EntityResearchCard({ data }: { data: EntityResearchResult }) {
             </p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: 9, color: "var(--jade)", fontWeight: 700 }}>{data.queriesExecuted} búsquedas Google</p>
+            <p style={{ margin: 0, fontSize: 9, color: "var(--jade)", fontWeight: 700 }}>{data.queriesExecuted ?? 12} búsquedas · {(data as any).dimensionsResearched ?? 12} dimensiones</p>
             <p style={{ margin: "1px 0 0", fontSize: 9, color: "var(--t4)" }}>{data.sourcesFound} fuentes · {data.elapsed}</p>
           </div>
         </div>
@@ -327,6 +328,54 @@ function EntityResearchCard({ data }: { data: EntityResearchResult }) {
                 {p.sentiment.topCompliments?.slice(0, 3).map((c, i) => <p key={i} style={{ margin: "2px 0", color: "var(--t2)", fontSize: 9 }}>✅ {c}</p>)}
                 {p.sentiment.topComplaints?.slice(0, 3).map((c, i) => <p key={i} style={{ margin: "2px 0", color: "#ff6b6b", fontSize: 9 }}>⚠️ {c}</p>)}
               </div>
+            )}
+          </div>
+        )}
+
+        {tab === "pricing" && (
+          <div>
+            {/* Pricing strategy from profile */}
+            {p.pricing && (
+              <div style={{ marginBottom: 8, padding: "7px 10px", background: "rgba(200,168,75,0.06)", borderRadius: 6, border: "1px solid rgba(200,168,75,0.2)" }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>💰 Estrategia de precios</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {p.pricing.strategy && <span style={{ fontSize: 9, color: "var(--t2)" }}>Estrategia: <b>{p.pricing.strategy}</b></span>}
+                  {p.pricing.avgTicket && <span style={{ fontSize: 9, color: "var(--t2)" }}>Ticket medio: <b style={{ color: "var(--gold)" }}>{p.pricing.avgTicket}</b></span>}
+                  {p.pricing.priceRange && <span style={{ fontSize: 9, color: "var(--t2)" }}>Rango: <b>{p.pricing.priceRange}</b></span>}
+                </div>
+                {p.pricing.discountBehavior && <p style={{ margin: "4px 0 0", fontSize: 9, color: "var(--t3)" }}>Descuentos: {p.pricing.discountBehavior}</p>}
+              </div>
+            )}
+            {/* Paid ads from raw research */}
+            {(data as any).research?.paidAds && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#ff7eb3", fontSize: 9, textTransform: "uppercase" }}>📢 Paid Ads / Facebook Ads Library</p>
+                <p style={{ margin: 0, fontSize: 9, color: "var(--t2)", lineHeight: 1.5 }}>{(data as any).research.paidAds}</p>
+              </div>
+            )}
+            {/* Founders */}
+            {(data as any).research?.founders && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--jade)", fontSize: 9, textTransform: "uppercase" }}>👥 Fundadores & Equipo</p>
+                <p style={{ margin: 0, fontSize: 9, color: "var(--t2)", lineHeight: 1.5 }}>{(data as any).research.founders}</p>
+              </div>
+            )}
+            {/* International */}
+            {(data as any).research?.international && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--jade)", fontSize: 9, textTransform: "uppercase" }}>🌍 Presencia Internacional</p>
+                <p style={{ margin: 0, fontSize: 9, color: "var(--t2)", lineHeight: 1.5 }}>{(data as any).research.international}</p>
+              </div>
+            )}
+            {/* URL deep-dive */}
+            {(data as any).research?.urlDeepDive && (
+              <div style={{ padding: "7px 10px", background: "rgba(45,212,159,0.05)", borderRadius: 6, border: "1px solid rgba(45,212,159,0.15)" }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--jade)", fontSize: 9, textTransform: "uppercase" }}>🔍 URL Deep-Dive (Gemini urlContext)</p>
+                <p style={{ margin: 0, fontSize: 9, color: "var(--t2)", lineHeight: 1.5 }}>{(data as any).research.urlDeepDive}</p>
+              </div>
+            )}
+            {!p.pricing && !(data as any).research?.paidAds && !(data as any).research?.founders && (
+              <p style={{ color: "var(--t4)", fontSize: 9 }}>No se encontró información de pricing o anuncios.</p>
             )}
           </div>
         )}

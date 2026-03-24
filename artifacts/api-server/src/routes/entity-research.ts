@@ -67,11 +67,13 @@ async function extractEntityName(input: string): Promise<{ name: string; url?: s
 }
 
 // ─── HELPER: Fetch URL safely ──────────────────────────────────────────────────
+// 25s timeout — Gemini's urlContext handles the heavy lifting; this is only for
+// quick metadata extraction (title, og:description) when needed as fallback
 async function safeFetch(url: string): Promise<{ text: string; title: string }> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyBrainBot/1.0; +https://shopybrain.ai)" },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(25_000),  // 25s — generous for slow servers
     });
     if (!res.ok) return { text: "", title: url };
     const html = await res.text();
@@ -294,50 +296,77 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
       existingKnowledge.hasKnowledge ? existingKnowledge.summary : undefined
     );
 
-    // PHASE 3: Fetch discovered source URLs in parallel (up to 12)
-    logger.info({ sourceCount: research.allSources.length }, "Phase 3: Fetching discovered URLs");
-    const urlsToFetch = research.allSources
-      .filter(u => u.startsWith("http") && !u.includes("instagram.com") && !u.includes("facebook.com"))
-      .slice(0, 12);
+    // PHASE 3: Gemini already did deep URL reading via urlContext in deepEntityResearch
+    // safeFetch is only used here as a lightweight fallback for any remaining important URLs
+    // that Gemini might have missed (e.g. brand's main website for basic metadata)
+    logger.info({
+      sourcesFound: research.allSources.length,
+      queriesExecuted: research.allQueries.length,
+      dimensions: 12,
+      urlDeepDiveChars: research.urlDeepDive?.length ?? 0,
+    }, "Phase 3: Gemini URL deep-dive complete (via urlContext tool)");
 
-    const fetchedPages = await Promise.allSettled(urlsToFetch.map(url => safeFetch(url)));
-    const pageContents = fetchedPages
-      .filter((r): r is PromiseFulfilledResult<{ text: string; title: string }> => r.status === "fulfilled" && r.value.text.length > 100)
-      .map((r, i) => `SOURCE [${urlsToFetch[i]}]:\nTitle: ${r.value.title}\n${r.value.text.slice(0, 1500)}`)
-      .join("\n\n---\n\n");
+    // Light fallback: fetch the brand's main URL for metadata only if not already in urlDeepDive
+    let fallbackPageContent = "";
+    if (entity.url && research.urlDeepDive.length < 500) {
+      try {
+        const mainPage = await safeFetch(entity.url);
+        if (mainPage.text.length > 200) {
+          fallbackPageContent = `MAIN WEBSITE [${entity.url}]:\nTitle: ${mainPage.title}\n${mainPage.text.slice(0, 2000)}`;
+        }
+      } catch { /* non-critical */ }
+    }
 
     // PHASE 4: Claude synthesizes everything into ONE comprehensive intelligence profile
-    logger.info("Phase 4: Claude synthesis");
-    const synthPrompt = `You are ShopyBrain's master intelligence synthesizer. You have been given exhaustive research about this entity: "${entityDisplay}"
+    // Now with 12 dimensions + Gemini's direct URL reads
+    logger.info("Phase 4: Claude master synthesis (12 dimensions)");
+    const synthPrompt = `You are ShopyBrain's master intelligence synthesizer. You have been given exhaustive multi-source research about this entity: "${entityDisplay}"
 
-RESEARCH DATA (from 8 parallel Google searches + ${urlsToFetch.length} fetched web pages):
+RESEARCH DATA (from 12 parallel Google Search Grounding searches + Gemini URL deep-dive + ${research.allSources.length} discovered sources):
 
-=== BRAND OVERVIEW ===
+=== BRAND OVERVIEW & HISTORY ===
 ${research.overview.slice(0, 2000)}
 
-=== PRODUCTS & SERVICES ===
+=== PRODUCTS, CATALOG & PRICING ===
 ${research.products.slice(0, 2000)}
 
-=== SOCIAL MEDIA PRESENCE ===
+=== SOCIAL MEDIA & ONLINE PRESENCE ===
 ${research.social.slice(0, 2000)}
 
-=== NEWS & PRESS ===
+=== NEWS & PRESS (RECENT) ===
 ${research.news.slice(0, 1500)}
 
 === CUSTOMER REVIEWS & SENTIMENT ===
 ${research.reviews.slice(0, 1500)}
 
-=== COMPETITORS & MARKET POSITION ===
+=== COMPETITORS & MARKET POSITIONING ===
 ${research.competitors.slice(0, 1500)}
 
-=== ECOMMERCE STRATEGY ===
+=== ECOMMERCE STRATEGY & TECH STACK ===
 ${research.ecommerce.slice(0, 1500)}
 
-=== FETCHED WEB PAGES (${fetchedPages.filter(r => r.status === "fulfilled").length} pages) ===
-${pageContents.slice(0, 3000)}
+=== VISUAL IDENTITY & BRAND DESIGN ===
+${(research as Record<string, string>).visual?.slice(0, 1000) ?? ""}
 
-=== DISCOVERED SOURCES (${research.allSources.length} URLs found) ===
-${research.allSources.slice(0, 20).join("\n")}
+=== PRICING STRATEGY & PSYCHOLOGY ===
+${research.pricing?.slice(0, 1200) ?? ""}
+
+=== PAID ADVERTISING & CAMPAIGNS ===
+${research.paidAds?.slice(0, 1200) ?? ""}
+
+=== FOUNDERS, TEAM & CULTURE ===
+${research.founders?.slice(0, 1000) ?? ""}
+
+=== INTERNATIONAL PRESENCE ===
+${research.international?.slice(0, 1000) ?? ""}
+
+=== GEMINI URL DEEP-DIVE (Direct reading of top discovered URLs) ===
+${research.urlDeepDive?.slice(0, 3000) ?? ""}
+
+${fallbackPageContent ? `=== MAIN WEBSITE FALLBACK ===\n${fallbackPageContent}` : ""}
+
+=== ALL DISCOVERED SOURCES (${research.allSources.length} URLs) ===
+${research.allSources.slice(0, 25).join("\n")}
 
 Create the most comprehensive brand intelligence profile possible in JSON format:
 {
@@ -427,75 +456,88 @@ Create the most comprehensive brand intelligence profile possible in JSON format
 
 Return ONLY valid JSON. Populate every field with real found data or "Unknown" if not found.`;
 
-    const profile = await askGeminiJson<Record<string, unknown>>(synthPrompt, "Master intelligence synthesizer. Create comprehensive, factual brand profiles. Return only JSON.");
+    const profile = await askGeminiJson<Record<string, unknown>>(synthPrompt, "Master intelligence synthesizer. Create comprehensive, factual brand profiles. Populate every field. Return only valid JSON.", true);
 
-    // PHASE 5: Additional deep searches based on discovered handles
-    const extraSearches: Promise<{ text: string; sources: string[]; queries: string[] }>[] = [];
-
-    if (entity.handles.instagram) {
-      extraSearches.push(askGeminiWithSearch(`Everything about Instagram account @${entity.handles.instagram}: top posts, story highlights, bio, link in bio, collaboration partners, sponsored content, follower demographics, growth trajectory.`, "Social media deep analyst"));
+    // PHASE 5: Bonus Instagram deep-dive (only if handle found and not in urlDeepDive)
+    // Other extra searches are now covered by the 12 parallel searches
+    let extraInsights = "";
+    if (entity.handles.instagram && research.urlDeepDive.length < 1000) {
+      try {
+        const igRes = await askGeminiWithSearch(
+          `Deep analysis of Instagram @${entity.handles.instagram}: follower count, top performing posts, story strategy, bio link, Linktree/Beacons content, brand collaborations, sponsored posts, UGC campaigns, engagement rate vs industry average, posting cadence, reel performance.`,
+          "Instagram intelligence specialist."
+        );
+        extraInsights = igRes.text;
+        research.allSources.push(...igRes.sources);
+      } catch { /* non-critical */ }
     }
 
-    // Find tech stack and marketing automation
-    if (entity.url) {
-      extraSearches.push(askGeminiWithSearch(`What eCommerce tools, apps, and marketing automation does ${entityDisplay} (${entity.url}) use? Find: Shopify apps, email marketing platform, CRM, analytics tools, chatbots, loyalty programs.`, "Tech stack analyst"));
-    }
-
-    // Ad intelligence
-    extraSearches.push(askGeminiWithSearch(`What kind of ads is ${entityDisplay} running? Find: Facebook Ads Library data, Google ads, influencer campaigns, user-generated content strategy, promotional calendar.`, "Advertising intelligence analyst"));
-
-    const extraResults = await Promise.allSettled(extraSearches);
-    const extraInsights = extraResults
-      .filter((r): r is PromiseFulfilledResult<{ text: string; sources: string[]; queries: string[] }> => r.status === "fulfilled")
-      .map(r => { research.allSources.push(...r.value.sources); return r.value.text; })
-      .join("\n\n---\n\n");
-
-    // PHASE 6: Save/ENRICH EVERYTHING to ShopyBrain
-    // ─── Uses UPSERT: updates existing memories if found, creates new if not ───
+    // PHASE 6: Save/ENRICH EVERYTHING to ShopyBrain (UPSERT — never duplicates)
     const memoryIds: string[] = [];
     const upsertActions: Array<"created" | "updated"> = [];
 
-    // Main comprehensive profile — upsert (update if already researched, create if new)
+    // Main comprehensive profile
     const mainResult = await upsertEntityMemory({
       entityName: entityDisplay,
       title: `[DEEP RESEARCH] ${entityDisplay}`,
-      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\nPREVIOUS KNOWLEDGE: ${existingKnowledge.hasKnowledge ? `${existingKnowledge.memories.length} memorias previas` : "primera investigación"}\n\nCOMPREHENSIVE PROFILE:\n${JSON.stringify(profile, null, 2)}\n\nEXTRA INSIGHTS:\n${extraInsights.slice(0, 3000)}`,
+      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\nREPEAT RESEARCH: ${existingKnowledge.hasKnowledge ? `${existingKnowledge.memories.length} memorias previas enriquecidas` : "primera investigación — 12 dimensiones + URL deep-dive"}\n\nPROFILE:\n${JSON.stringify(profile, null, 2).slice(0, 8000)}\n\nEXTRA (Instagram):\n${extraInsights.slice(0, 2000)}`,
       memoryType: "brand_intelligence",
       niche,
       sourceType: "deep_entity_research",
-      confidence: existingKnowledge.hasKnowledge ? 0.93 : 0.88, // Higher confidence on repeated research
-      tags: ["deep_research", "brand_profile", entityDisplay.toLowerCase(), niche ?? "general", "exhaustive"],
+      confidence: existingKnowledge.hasKnowledge ? 0.95 : 0.90,
+      tags: ["deep_research", "brand_profile", entityDisplay.toLowerCase(), niche ?? "general", "12_dimensions", "url_deep_dive"],
     });
     memoryIds.push(mainResult.id);
     upsertActions.push(mainResult.action);
 
-    // Individual dimension memories — each upserted by type
+    // All 12 dimension memories — each upserted individually by dimension type
     const dimensions = [
-      { key: "overview", label: "brand_overview" },
-      { key: "products", label: "products_catalog" },
-      { key: "social", label: "social_presence" },
-      { key: "news", label: "press_mentions" },
-      { key: "reviews", label: "customer_sentiment" },
-      { key: "competitors", label: "competitive_intel" },
-      { key: "ecommerce", label: "ecommerce_strategy" },
+      { key: "overview",      label: "brand_overview",      confidence: 0.88 },
+      { key: "products",      label: "products_catalog",     confidence: 0.88 },
+      { key: "social",        label: "social_presence",      confidence: 0.85 },
+      { key: "news",          label: "press_mentions",       confidence: 0.82 },
+      { key: "reviews",       label: "customer_sentiment",   confidence: 0.85 },
+      { key: "competitors",   label: "competitive_intel",    confidence: 0.82 },
+      { key: "ecommerce",     label: "ecommerce_strategy",   confidence: 0.85 },
+      { key: "visual",        label: "visual_identity",      confidence: 0.80 },
+      { key: "pricing",       label: "pricing_strategy",     confidence: 0.88 },
+      { key: "paidAds",       label: "paid_advertising",     confidence: 0.80 },
+      { key: "founders",      label: "founders_team",        confidence: 0.82 },
+      { key: "international", label: "international_presence", confidence: 0.78 },
     ];
 
     for (const dim of dimensions) {
-      const content = research[dim.key as keyof typeof research];
+      const content = (research as Record<string, unknown>)[dim.key];
       if (typeof content === "string" && content.length > 100) {
         const result = await upsertEntityMemory({
           entityName: entityDisplay,
           title: `[${dim.label.toUpperCase()}] ${entityDisplay}`,
-          content: `Entity: ${entityDisplay}\n\n${content}`,
+          content: `Entity: ${entityDisplay}\nDimension: ${dim.label}\n\n${content}`,
           memoryType: dim.label,
           niche,
           sourceType: "google_search_grounding",
-          confidence: 0.82,
+          confidence: dim.confidence,
           tags: [dim.label, entityDisplay.toLowerCase(), niche ?? "general"],
         });
         memoryIds.push(result.id);
         upsertActions.push(result.action);
       }
+    }
+
+    // URL deep-dive as its own memory if substantial
+    if (research.urlDeepDive && research.urlDeepDive.length > 200) {
+      const urlResult = await upsertEntityMemory({
+        entityName: entityDisplay,
+        title: `[URL_DEEP_DIVE] ${entityDisplay} — Direct Web Reading`,
+        content: `Entity: ${entityDisplay}\nSource: Gemini urlContext (direct URL reading)\n\n${research.urlDeepDive}`,
+        memoryType: "web_content",
+        niche,
+        sourceType: "gemini_url_context",
+        confidence: 0.92,
+        tags: ["url_context", "direct_reading", entityDisplay.toLowerCase(), "gemini"],
+      });
+      memoryIds.push(urlResult.id);
+      upsertActions.push(urlResult.action);
     }
 
     // Save/update absorbed content record — upsert by sourceLabel
@@ -516,7 +558,7 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
         sourceType: "entity_research",
         sourceUrl: entity.url ?? null,
         sourceLabel: entityDisplay,
-        rawContent: `Research on: ${entityDisplay}\nSources: ${research.allSources.length}\nQueries: ${research.allQueries.length}`,
+        rawContent: `Research on: ${entityDisplay}\n12 dimensions · ${research.allSources.length} sources · ${research.allQueries.length} queries · urlDeepDive: ${research.urlDeepDive?.length ?? 0} chars`,
         mainThemes: JSON.stringify([entityDisplay, ...(profile.differentiators as string[] ?? [])]),
         ecommerceInsights: JSON.stringify(profile.shopifyOpportunities ?? []),
         marketingAngles: JSON.stringify(profile.klaviyoOpportunities ?? []),
@@ -525,10 +567,10 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
         brandElements: JSON.stringify(profile.visualIdentity ?? {}),
         fullAnalysis: profile as Record<string, unknown>,
         niche: niche ?? null,
-        confidence: 0.88,
+        confidence: 0.90,
         absorbedToMemory: 1,
         memoryIds: memoryIds.join(","),
-        processingModel: "gemini-search-grounding+claude",
+        processingModel: "gemini-2.5-flash-search+urlContext+thinkingBudget+claude-pro",
         createdAt: new Date(),
       });
     }
@@ -554,35 +596,43 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       entityUrl: entity.url,
       handles: entity.handles,
       profile,
+      // All 12 research dimensions + URL deep-dive
       research: {
-        overview: research.overview.slice(0, 1000),
-        products: research.products.slice(0, 800),
-        social: research.social.slice(0, 800),
-        news: research.news.slice(0, 600),
-        reviews: research.reviews.slice(0, 600),
-        competitors: research.competitors.slice(0, 600),
-        ecommerce: research.ecommerce.slice(0, 600),
-        extraInsights: extraInsights.slice(0, 800),
+        overview:      research.overview.slice(0, 1200),
+        products:      research.products.slice(0, 1000),
+        social:        research.social.slice(0, 1000),
+        news:          research.news.slice(0, 800),
+        reviews:       research.reviews.slice(0, 800),
+        competitors:   research.competitors.slice(0, 800),
+        ecommerce:     research.ecommerce.slice(0, 800),
+        pricing:       research.pricing?.slice(0, 800) ?? "",
+        paidAds:       research.paidAds?.slice(0, 800) ?? "",
+        founders:      research.founders?.slice(0, 600) ?? "",
+        international: research.international?.slice(0, 600) ?? "",
+        urlDeepDive:   research.urlDeepDive?.slice(0, 1000) ?? "",
+        extraInsights: extraInsights.slice(0, 600),
       },
-      sourcesFound: research.allSources.length,
+      sourcesFound:    research.allSources.length,
       queriesExecuted: research.allQueries.length,
-      memoriesSaved: memoryIds.length,
+      memoriesSaved:   memoryIds.length,
       memoriesCreated,
       memoriesUpdated,
-      allSources: research.allSources.slice(0, 30),
-      allQueries: research.allQueries,
+      dimensionsResearched: 12,
+      urlDeepDiveChars: research.urlDeepDive?.length ?? 0,
+      allSources:  research.allSources.slice(0, 40),
+      allQueries:  research.allQueries,
       elapsed: `${elapsed}s`,
-      // Knowledge reuse metrics
+      pipeline: "gemini-2.5-flash (12×search+urlContext+thinking) → claude-sonnet-4-5 (pro synthesis)",
       knowledgeReuse: {
         hadPreviousKnowledge: existingKnowledge.hasKnowledge,
-        previousMemories: existingKnowledge.memories.length,
-        previousDimensions: existingKnowledge.dimensions,
-        knowledgeAge: existingKnowledge.knowledgeAge,
-        action: existingKnowledge.hasKnowledge ? "enriched" : "virgin_research",
+        previousMemories:     existingKnowledge.memories.length,
+        previousDimensions:   existingKnowledge.dimensions,
+        knowledgeAge:         existingKnowledge.knowledgeAge,
+        action: existingKnowledge.hasKnowledge ? "enriched_cumulative" : "virgin_research",
       },
       message: existingKnowledge.hasKnowledge
-        ? `✅ Conocimiento enriquecido: ${existingKnowledge.memories.length} memorias previas + ${research.allSources.length} fuentes nuevas. ${memoriesUpdated} memorias actualizadas, ${memoriesCreated} nuevas. ${elapsed}s`
-        : `✅ Primera investigación completada: ${research.allSources.length} fuentes, ${memoryIds.length} memorias creadas en ShopyBrain. ${elapsed}s`,
+        ? `✅ Conocimiento enriquecido: ${existingKnowledge.memories.length} memorias previas + ${research.allSources.length} fuentes nuevas · 12 dimensiones · URL deep-dive · ${memoriesUpdated} actualizadas, ${memoriesCreated} nuevas · ${elapsed}s`
+        : `✅ Primera investigación: ${research.allSources.length} fuentes · 12 dimensiones · URL deep-dive Gemini · ${memoryIds.length} memorias permanentes en ShopyBrain · ${elapsed}s`,
     });
 
   } catch (err) {

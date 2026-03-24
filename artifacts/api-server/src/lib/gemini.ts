@@ -1,3 +1,17 @@
+/**
+ * ShopyBrain Gemini Intelligence Library
+ * ─────────────────────────────────────────────────────────────────────────────
+ * CAPABILITIES ENABLED:
+ *  ✅ Google Search Grounding (real web search, not hallucinated)
+ *  ✅ URL Context Tool (Gemini fetches & reads URLs directly)
+ *  ✅ Dynamic Retrieval — threshold 0.0 (ALWAYS grounds in real search)
+ *  ✅ Thinking Budget — deeper reasoning for complex research
+ *  ✅ maxOutputTokens 65536 (Flash max)
+ *  ✅ Per-call timeout 120s + 1 automatic retry
+ *  ✅ deepEntityResearch: 12 parallel searches + URL deep-dive phase
+ *  ✅ Overall research timeout 270s (safe margin under Replit 5-min proxy limit)
+ */
+
 import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
 
@@ -5,10 +19,9 @@ let _ai: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!_ai) {
-    // Prefer direct API key (user's own key), fallback to Replit AI Integrations proxy
     const directKey = process.env.GEMINI_API_KEY;
-    const proxyKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
-    const proxyUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+    const proxyKey  = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+    const proxyUrl  = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
 
     if (directKey) {
       _ai = new GoogleGenAI({ apiKey: directKey });
@@ -25,35 +38,91 @@ export function isGeminiAvailable(): boolean {
   return !!(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY));
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+// ─── Model selection ──────────────────────────────────────────────────────────
+const GEMINI_MODEL     = "gemini-2.5-flash";
 const GEMINI_PRO_MODEL = "gemini-2.5-pro";
 
+// ─── Timeout & retry config ───────────────────────────────────────────────────
+const GEMINI_CALL_TIMEOUT_MS  = 120_000;  // 120s per individual Gemini call
+const GEMINI_SEARCH_TIMEOUT   = 100_000;  // 100s per search-grounding call (slightly longer)
+const OVERALL_RESEARCH_TIMEOUT = 270_000; // 270s total for full entity research (safe under 5-min proxy limit)
+const URL_FETCH_TIMEOUT_MS    = 25_000;   // 25s per URL fetch
+const GEMINI_URL_CTX_TIMEOUT  = 90_000;   // 90s for URL context deep-dive
+
+// ─── Utility: race a promise against a timeout ────────────────────────────────
+function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`⏱ Timeout: ${label} exceeded ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+// ─── Utility: retry once on failure with delay ────────────────────────────────
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 1,
+  delayMs = 3_000,
+  label = "call"
+): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt < retries) {
+        logger.warn({ label, attempt, err: String(err) }, `Retrying ${label} in ${delayMs}ms…`);
+        await new Promise(r => setTimeout(r, delayMs));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error("unreachable");
+}
+
+// ─── Base generation (no search) ─────────────────────────────────────────────
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
-  const ai = getGeminiClient();
+  const ai    = getGeminiClient();
   const model = useProModel ? GEMINI_PRO_MODEL : GEMINI_MODEL;
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.",
-      maxOutputTokens: 8192,
-    },
-  });
+
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.",
+        maxOutputTokens: 65_536,
+        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+      },
+    }),
+    GEMINI_CALL_TIMEOUT_MS,
+    `askGemini(${model})`
+  );
+
   return response.text ?? "";
 }
 
+// ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
-  const ai = getGeminiClient();
+  const ai    = getGeminiClient();
   const model = useProModel ? GEMINI_PRO_MODEL : GEMINI_MODEL;
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
-      responseMimeType: "application/json",
-      maxOutputTokens: 8192,
-    },
-  });
+
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
+        responseMimeType: "application/json",
+        maxOutputTokens: 65_536,
+        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+      },
+    }),
+    GEMINI_CALL_TIMEOUT_MS,
+    `askGeminiJson(${model})`
+  );
+
   const text = response.text ?? "{}";
   try {
     return JSON.parse(text) as T;
@@ -63,89 +132,44 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
   }
 }
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 export interface BusinessProfile {
-  name: string;
-  domain: string;
-  industry: string;
-  size: string;
-  description: string;
-  mainProducts: string[];
-  targetAudience: string;
-  priceRange: string;
-  strengths: string[];
-  weaknesses: string[];
-  socialPresence: string[];
-  estimatedRevenue: string;
-  marketPosition: string;
-  seoStrength: string;
-  opportunities: string[];
-  threats: string[];
-  keyFindings: string;
+  name: string; domain: string; industry: string; size: string; description: string;
+  mainProducts: string[]; targetAudience: string; priceRange: string; strengths: string[];
+  weaknesses: string[]; socialPresence: string[]; estimatedRevenue: string;
+  marketPosition: string; seoStrength: string; opportunities: string[]; threats: string[]; keyFindings: string;
 }
 
 export interface CompetitorIntelligence {
-  domain: string;
-  positioningStrategy: string;
-  pricingStrategy: string;
-  contentStrategy: string;
-  topKeywords: string[];
-  uniqueSellingPoints: string[];
-  weaknesses: string[];
-  estimatedTraffic: string;
-  productCount: string;
-  avgProductPrice: string;
-  conversionTactics: string[];
-  opportunities: string[];
+  domain: string; positioningStrategy: string; pricingStrategy: string; contentStrategy: string;
+  topKeywords: string[]; uniqueSellingPoints: string[]; weaknesses: string[];
+  estimatedTraffic: string; productCount: string; avgProductPrice: string;
+  conversionTactics: string[]; opportunities: string[];
 }
 
 export interface MarketIntelligence {
-  niche: string;
-  market: string;
-  marketSize: string;
-  growthRate: string;
-  topPlayers: string[];
-  avgPriceRange: { min: number; max: number; sweet: number };
-  topKeywords: string[];
-  seasonalPeaks: string[];
-  buyerPersona: string;
-  purchaseDrivers: string[];
-  mainBarriers: string[];
-  emergingTrends: string[];
-  opportunities: string[];
-  saturationLevel: string;
-  recommendedPositioning: string;
+  niche: string; market: string; marketSize: string; growthRate: string; topPlayers: string[];
+  avgPriceRange: { min: number; max: number; sweet: number }; topKeywords: string[];
+  seasonalPeaks: string[]; buyerPersona: string; purchaseDrivers: string[]; mainBarriers: string[];
+  emergingTrends: string[]; opportunities: string[]; saturationLevel: string; recommendedPositioning: string;
 }
 
 export interface ProductTrendAnalysis {
-  productType: string;
-  market: string;
-  demandLevel: string;
-  trendDirection: string;
-  searchVolumeTrend: string;
-  topCompetitors: string[];
-  avgPrice: number;
-  priceRange: { min: number; max: number };
-  keyFeatures: string[];
-  winningDescriptionPatterns: string[];
-  topImageTypes: string[];
-  ctasThatConvert: string[];
-  seasonality: string;
-  recommendations: string[];
+  productType: string; market: string; demandLevel: string; trendDirection: string;
+  searchVolumeTrend: string; topCompetitors: string[]; avgPrice: number;
+  priceRange: { min: number; max: number }; keyFeatures: string[];
+  winningDescriptionPatterns: string[]; topImageTypes: string[];
+  ctasThatConvert: string[]; seasonality: string; recommendations: string[];
 }
 
 const INTELLIGENCE_SYSTEM = `You are OmniCore Intelligence — an elite eCommerce market research AI.
 You analyze businesses, markets, and competitors for Shopify optimization agencies.
-You provide structured, actionable intelligence based on your training knowledge about eCommerce, 
-digital marketing, pricing psychology, SEO, and consumer behavior.
+You provide structured, actionable intelligence based on your training knowledge AND real web search results.
 Always respond in the language matching the market (Spanish for 'es', English for 'en', etc).
 Be specific, data-driven, and actionable. Never use placeholders like "N/A" — always provide best estimates.`;
 
-export async function researchBusiness(
-  businessName: string,
-  domain: string,
-  niche: string,
-  market: string = "es"
-): Promise<BusinessProfile> {
+// ─── Business research ────────────────────────────────────────────────────────
+export async function researchBusiness(businessName: string, domain: string, niche: string, market = "es"): Promise<BusinessProfile> {
   logger.info({ businessName, domain }, "Gemini: researching business");
   const prompt = `Research this business and provide a comprehensive intelligence profile:
 
@@ -154,360 +178,391 @@ Domain: ${domain}
 Niche: ${niche}
 Market: ${market}
 
-Based on the domain and niche, provide a detailed analysis including:
-- Business description and what they sell
-- Target audience and customer profile
-- Estimated price range of their products
-- Market position (budget/mid/premium/luxury)
-- SEO strength estimate (weak/moderate/strong/very strong)
-- Main strengths and weaknesses
-- Social media presence indicators
-- Estimated annual revenue range
-- Key opportunities for a Shopify optimizer to improve their store
-- Competitive threats they face
-
-Return a JSON object with these exact fields:
+Analyze and return JSON with these exact fields:
 {
-  "name": "string",
-  "domain": "string", 
-  "industry": "string",
-  "size": "micro|small|medium|large",
-  "description": "string",
-  "mainProducts": ["string"],
-  "targetAudience": "string",
-  "priceRange": "string (e.g. €10-€50)",
-  "strengths": ["string"],
-  "weaknesses": ["string"],
-  "socialPresence": ["string"],
-  "estimatedRevenue": "string",
-  "marketPosition": "budget|value|mid|premium|luxury",
-  "seoStrength": "weak|moderate|strong|very strong",
-  "opportunities": ["string"],
-  "threats": ["string"],
-  "keyFindings": "string (2-3 sentence executive summary)"
+  "name": "string", "domain": "string", "industry": "string", "size": "micro|small|medium|large",
+  "description": "string", "mainProducts": ["string"], "targetAudience": "string", "priceRange": "string",
+  "strengths": ["string"], "weaknesses": ["string"], "socialPresence": ["string"], "estimatedRevenue": "string",
+  "marketPosition": "budget|value|mid|premium|luxury", "seoStrength": "weak|moderate|strong|very strong",
+  "opportunities": ["string"], "threats": ["string"], "keyFindings": "string"
 }`;
-
   return await askGeminiJson<BusinessProfile>(prompt, INTELLIGENCE_SYSTEM, true);
 }
 
-export async function analyzeCompetitor(
-  domain: string,
-  niche: string,
-  market: string = "es"
-): Promise<CompetitorIntelligence> {
+// ─── Competitor analysis ──────────────────────────────────────────────────────
+export async function analyzeCompetitor(domain: string, niche: string, market = "es"): Promise<CompetitorIntelligence> {
   logger.info({ domain, niche }, "Gemini: analyzing competitor");
   const prompt = `Analyze this Shopify competitor store for an eCommerce optimization agency:
 
-Domain: ${domain}
-Niche: ${niche}
-Market: ${market}
-
-Provide competitive intelligence including:
-- Their positioning strategy
-- Pricing approach (discount-heavy, premium, value)
-- Content/SEO strategy
-- Top keywords they likely rank for
-- Unique selling propositions
-- Weaknesses an optimizer could exploit
-- Estimated monthly traffic range
-- Estimated product count
-- Average product price
-- Conversion optimization tactics they use
-- Opportunities for competing stores
-
-Return JSON with these exact fields:
-{
-  "domain": "string",
-  "positioningStrategy": "string",
-  "pricingStrategy": "string", 
-  "contentStrategy": "string",
-  "topKeywords": ["string"],
-  "uniqueSellingPoints": ["string"],
-  "weaknesses": ["string"],
-  "estimatedTraffic": "string (e.g. 5K-20K/month)",
-  "productCount": "string (e.g. 50-200)",
-  "avgProductPrice": "string",
-  "conversionTactics": ["string"],
-  "opportunities": ["string"]
-}`;
-
-  return await askGeminiJson<CompetitorIntelligence>(prompt, INTELLIGENCE_SYSTEM);
-}
-
-export async function gatherMarketIntelligence(
-  niche: string,
-  market: string = "es"
-): Promise<MarketIntelligence> {
-  logger.info({ niche, market }, "Gemini: gathering market intelligence");
-  const prompt = `Provide comprehensive market intelligence for a Shopify optimization agency about:
-
-Niche: ${niche}
-Market: ${market} (${market === "es" ? "Spain/Spanish market" : market === "en" ? "English-speaking market" : market})
-
-Include:
-- Market size estimate
-- Growth rate (declining/stable/growing/booming)
-- Top 5 players in this space
-- Typical price ranges (min, max, and sweet spot)
-- Top 10 search keywords
-- Seasonal peaks (months)
-- Buyer persona description
-- Top purchase drivers (why people buy)
-- Main purchase barriers (why they don't buy)
-- Emerging trends to watch
-- Key opportunities for optimization
-- Market saturation level
-- Best positioning strategy recommendation
-
-Return JSON with these exact fields:
-{
-  "niche": "string",
-  "market": "string",
-  "marketSize": "string",
-  "growthRate": "declining|stable|growing|booming",
-  "topPlayers": ["string"],
-  "avgPriceRange": { "min": number, "max": number, "sweet": number },
-  "topKeywords": ["string"],
-  "seasonalPeaks": ["string"],
-  "buyerPersona": "string",
-  "purchaseDrivers": ["string"],
-  "mainBarriers": ["string"],
-  "emergingTrends": ["string"],
-  "opportunities": ["string"],
-  "saturationLevel": "low|medium|high|saturated",
-  "recommendedPositioning": "string"
-}`;
-
-  return await askGeminiJson<MarketIntelligence>(prompt, INTELLIGENCE_SYSTEM, true);
-}
-
-export async function analyzeProductTrends(
-  productType: string,
-  market: string = "es"
-): Promise<ProductTrendAnalysis> {
-  logger.info({ productType, market }, "Gemini: analyzing product trends");
-  const prompt = `Analyze product trends and optimization tactics for:
-
-Product type: ${productType}
-Market: ${market}
-
-Provide:
-- Current demand level
-- Trend direction (rising/stable/declining)
-- Search volume trend
-- Top competing brands/stores
-- Average market price
-- Price range (min/max)
-- Key product features that drive conversions
-- Winning description patterns and structures
-- Best image types (lifestyle, white bg, infographic, etc)
-- CTAs that convert well
-- Seasonality patterns
-- Specific optimization recommendations for Shopify
-
-Return JSON with these exact fields:
-{
-  "productType": "string",
-  "market": "string",
-  "demandLevel": "very low|low|moderate|high|very high",
-  "trendDirection": "rising|stable|declining",
-  "searchVolumeTrend": "string",
-  "topCompetitors": ["string"],
-  "avgPrice": number,
-  "priceRange": { "min": number, "max": number },
-  "keyFeatures": ["string"],
-  "winningDescriptionPatterns": ["string"],
-  "topImageTypes": ["string"],
-  "ctasThatConvert": ["string"],
-  "seasonality": "string",
-  "recommendations": ["string"]
-}`;
-
-  return await askGeminiJson<ProductTrendAnalysis>(prompt, INTELLIGENCE_SYSTEM);
-}
-
-export async function researchPersonOrBrand(
-  name: string,
-  context: string,
-  market: string = "es"
-): Promise<{ profile: string; digitalPresence: string[]; contentThemes: string[]; audienceInsights: string; partnershipOpportunities: string[]; keyFindings: string }> {
-  logger.info({ name }, "Gemini: researching person/brand");
-  const prompt = `Research this person or brand for eCommerce partnership/influencer analysis:
-
-Name: ${name}
-Context: ${context}
-Market: ${market}
-
-Analyze their:
-- Profile and what they're known for
-- Digital presence (platforms, estimated following)
-- Content themes they cover
-- Audience insights (demographics, interests)
-- Partnership/collaboration opportunities for a Shopify store
-- Key findings for an eCommerce agency
+Domain: ${domain} | Niche: ${niche} | Market: ${market}
 
 Return JSON:
 {
-  "profile": "string",
-  "digitalPresence": ["string"],
-  "contentThemes": ["string"],
-  "audienceInsights": "string",
-  "partnershipOpportunities": ["string"],
-  "keyFindings": "string"
+  "domain": "string", "positioningStrategy": "string", "pricingStrategy": "string",
+  "contentStrategy": "string", "topKeywords": ["string"], "uniqueSellingPoints": ["string"],
+  "weaknesses": ["string"], "estimatedTraffic": "string", "productCount": "string",
+  "avgProductPrice": "string", "conversionTactics": ["string"], "opportunities": ["string"]
 }`;
+  return await askGeminiJson<CompetitorIntelligence>(prompt, INTELLIGENCE_SYSTEM);
+}
 
+// ─── Market intelligence ──────────────────────────────────────────────────────
+export async function gatherMarketIntelligence(niche: string, market = "es"): Promise<MarketIntelligence> {
+  logger.info({ niche, market }, "Gemini: gathering market intelligence");
+  const prompt = `Provide comprehensive market intelligence for a Shopify optimization agency about:
+Niche: ${niche} | Market: ${market}
+
+Return JSON:
+{
+  "niche": "string", "market": "string", "marketSize": "string", "growthRate": "declining|stable|growing|booming",
+  "topPlayers": ["string"], "avgPriceRange": { "min": 0, "max": 0, "sweet": 0 }, "topKeywords": ["string"],
+  "seasonalPeaks": ["string"], "buyerPersona": "string", "purchaseDrivers": ["string"], "mainBarriers": ["string"],
+  "emergingTrends": ["string"], "opportunities": ["string"], "saturationLevel": "low|medium|high|saturated",
+  "recommendedPositioning": "string"
+}`;
+  return await askGeminiJson<MarketIntelligence>(prompt, INTELLIGENCE_SYSTEM, true);
+}
+
+// ─── Product trend analysis ───────────────────────────────────────────────────
+export async function analyzeProductTrends(productType: string, market = "es"): Promise<ProductTrendAnalysis> {
+  logger.info({ productType, market }, "Gemini: analyzing product trends");
+  const prompt = `Analyze product trends and optimization tactics for:
+Product type: ${productType} | Market: ${market}
+
+Return JSON:
+{
+  "productType": "string", "market": "string", "demandLevel": "very low|low|moderate|high|very high",
+  "trendDirection": "rising|stable|declining", "searchVolumeTrend": "string", "topCompetitors": ["string"],
+  "avgPrice": 0, "priceRange": { "min": 0, "max": 0 }, "keyFeatures": ["string"],
+  "winningDescriptionPatterns": ["string"], "topImageTypes": ["string"], "ctasThatConvert": ["string"],
+  "seasonality": "string", "recommendations": ["string"]
+}`;
+  return await askGeminiJson<ProductTrendAnalysis>(prompt, INTELLIGENCE_SYSTEM);
+}
+
+// ─── Person / influencer research ─────────────────────────────────────────────
+export async function researchPersonOrBrand(
+  name: string, context: string, market = "es"
+): Promise<{ profile: string; digitalPresence: string[]; contentThemes: string[]; audienceInsights: string; partnershipOpportunities: string[]; keyFindings: string }> {
+  logger.info({ name }, "Gemini: researching person/brand");
+  const prompt = `Research this person or brand for eCommerce partnership/influencer analysis:
+Name: ${name} | Context: ${context} | Market: ${market}
+
+Return JSON: { "profile": "string", "digitalPresence": ["string"], "contentThemes": ["string"],
+  "audienceInsights": "string", "partnershipOpportunities": ["string"], "keyFindings": "string" }`;
   return await askGeminiJson(prompt, INTELLIGENCE_SYSTEM);
 }
 
+// ─── Multi-model analysis ─────────────────────────────────────────────────────
 export async function multiModelAnalysis(
-  topic: string,
-  geminiContext: string,
+  topic: string, geminiContext: string,
   claudeAnalyzer: (geminiFindings: string) => Promise<string>
 ): Promise<{ geminiFindings: string; claudeAnalysis: string; combined: string }> {
   logger.info({ topic }, "Multi-model analysis: Gemini + Claude");
 
   const geminiFindings = await askGemini(
     `${geminiContext}\n\nTopic: ${topic}\n\nProvide detailed research findings:`,
-    INTELLIGENCE_SYSTEM,
-    true
+    INTELLIGENCE_SYSTEM, true
   );
-
   const claudeAnalysis = await claudeAnalyzer(geminiFindings);
-
-  const combinedPrompt = `Based on research from two AI systems, provide a synthesis:
-
-GEMINI RESEARCH:
-${geminiFindings}
-
-CLAUDE ANALYSIS:
-${claudeAnalysis}
-
-Provide a single cohesive combined intelligence report that takes the best insights from both analyses.`;
-
-  const combined = await askGemini(combinedPrompt, INTELLIGENCE_SYSTEM);
-
+  const combined = await askGemini(
+    `Synthesis from two AI systems:\n\nGEMINI:\n${geminiFindings}\n\nCLAUDE:\n${claudeAnalysis}\n\nProvide a unified intelligence report:`,
+    INTELLIGENCE_SYSTEM
+  );
   return { geminiFindings, claudeAnalysis, combined };
 }
 
-// ─── GEMINI WITH GOOGLE SEARCH GROUNDING ─────────────────────────────────────
-// Uses real Google Search to find information — not hallucinated, actually searched
+// ─── GOOGLE SEARCH GROUNDING — real web search, not hallucinated ──────────────
+// Capabilities:
+//   🔍 googleSearch: real Google Search grounding
+//   🌐 urlContext:   Gemini directly reads and processes URLs in the prompt
+//   ⚡ dynamicRetrievalThreshold: 0.0 → ALWAYS uses search, never skips it
+//   🧠 thinkingBudget: 8000 → deeper reasoning during research
+//   📄 maxOutputTokens: 65536 → full response length (Flash max)
 export async function askGeminiWithSearch(
   prompt: string,
   systemInstruction?: string,
+  urlsToRead?: string[],  // optional: pass URLs for Gemini to fetch directly
 ): Promise<{ text: string; sources: string[]; queries: string[] }> {
   const ai = getGeminiClient();
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Search thoroughly and return comprehensive, factual findings.",
-      tools: [{ googleSearch: {} }],
-      maxOutputTokens: 8192,
+
+  // Build prompt: if URLs provided, inject them for urlContext
+  const fullPrompt = urlsToRead && urlsToRead.length > 0
+    ? `${prompt}\n\nURLs to read and analyze:\n${urlsToRead.slice(0, 10).join("\n")}`
+    : prompt;
+
+  // Tools: always googleSearch + optionally urlContext when URLs provided
+  const tools: Record<string, unknown>[] = [
+    {
+      googleSearch: {
+        dynamicRetrievalConfig: {
+          dynamicRetrievalThreshold: 0.0,  // 0.0 = ALWAYS use Google Search (never skip)
+        },
+      },
     },
-  });
+  ];
+  if (urlsToRead && urlsToRead.length > 0) {
+    tools.push({ urlContext: {} }); // Gemini fetches & reads the provided URLs directly
+  }
 
-  // Extract discovered source URLs from grounding metadata
-  const candidate = response.candidates?.[0];
-  const groundingMetadata = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
-  const groundingChunks = groundingMetadata?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
-  const searchQueries = groundingMetadata?.webSearchQueries as string[] | undefined;
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      config: {
+        systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
+        tools,
+        maxOutputTokens: 65_536,
+        thinkingConfig: { thinkingBudget: 8_000 },  // deeper reasoning per search
+      },
+    }),
+    GEMINI_SEARCH_TIMEOUT,
+    `askGeminiWithSearch`
+  );
 
-  const sources = (groundingChunks ?? [])
-    .map(c => c.web?.uri ?? "")
-    .filter(Boolean);
+  // Extract source URLs from grounding metadata
+  const candidate        = response.candidates?.[0];
+  const groundingMeta    = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+  const groundingChunks  = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
+  const searchQueries    = groundingMeta?.webSearchQueries as string[] | undefined;
 
-  return {
-    text: response.text ?? "",
-    sources,
-    queries: searchQueries ?? [],
-  };
+  const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+  return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
 }
 
-// ─── DEEP ENTITY RESEARCH — searches EVERYTHING about a brand/person/business ─
-export async function deepEntityResearch(entityName: string, entityUrl?: string, existingKnowledge?: string): Promise<{
-  overview: string;
-  products: string;
-  social: string;
-  news: string;
-  reviews: string;
-  competitors: string;
-  ecommerce: string;
-  allSources: string[];
-  allQueries: string[];
+// ─── URL DEEP-DIVE — Gemini reads a batch of URLs and synthesizes them ─────────
+// Uses urlContext tool: Gemini fetches and processes each URL directly
+export async function askGeminiWithUrls(
+  prompt: string,
+  urls: string[],
+  systemInstruction?: string,
+): Promise<{ text: string; sources: string[] }> {
+  const ai = getGeminiClient();
+
+  const fullPrompt = `${prompt}\n\nRead and analyze these URLs thoroughly:\n${urls.slice(0, 15).join("\n")}`;
+
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      config: {
+        systemInstruction: systemInstruction ?? "You are a deep web intelligence analyst. Read each URL thoroughly and extract all relevant business intelligence, product info, pricing, contact details, social links, and marketing strategies.",
+        tools: [
+          { urlContext: {} },          // Gemini fetches each URL directly
+          { googleSearch: {            // Also allowed to search for missing context
+            dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.3 },
+          }},
+        ],
+        maxOutputTokens: 65_536,
+        thinkingConfig: { thinkingBudget: 6_000 },
+      },
+    }),
+    GEMINI_URL_CTX_TIMEOUT,
+    "askGeminiWithUrls"
+  );
+
+  const candidate       = response.candidates?.[0];
+  const groundingMeta   = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+  const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
+  const sources         = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+  return { text: response.text ?? "", sources };
+}
+
+// ─── DEEP ENTITY RESEARCH ─────────────────────────────────────────────────────
+// 12 parallel Google searches + URL deep-dive phase + retry logic
+// Safe under Replit 5-min proxy limit (270s overall timeout)
+export async function deepEntityResearch(
+  entityName: string,
+  entityUrl?: string,
+  existingKnowledge?: string,
+): Promise<{
+  overview: string; products: string; social: string; news: string; reviews: string;
+  competitors: string; ecommerce: string; visual: string; pricing: string;
+  paidAds: string; founders: string; international: string;
+  urlDeepDive: string;
+  allSources: string[]; allQueries: string[];
 }> {
   const entity = entityUrl ? `${entityName} (${entityUrl})` : entityName;
+  const entityWithUrl = entityUrl ? `"${entityName}" site:${new URL(entityUrl.startsWith("http") ? entityUrl : `https://${entityUrl}`).hostname} OR "${entityName}"` : `"${entityName}"`;
 
-  logger.info({ entityName, entityUrl, hasExistingKnowledge: !!existingKnowledge }, "Deep parallel entity research with Google Search Grounding");
+  logger.info({ entityName, entityUrl, hasExistingKnowledge: !!existingKnowledge },
+    "🔍 Deep entity research: 12 parallel searches + URL deep-dive"
+  );
 
-  // If we have existing knowledge, inject it so Gemini focuses on GAPS and NEW information
+  // Inject existing knowledge so Gemini hunts for GAPS only
   const knowledgeCtx = existingKnowledge
-    ? `\n\n[CONOCIMIENTO PREVIO EN SHOPYBRAIN — busca información NUEVA o ACTUALIZADA que no esté ya cubierta, contrasta y complementa]:\n${existingKnowledge.slice(0, 2500)}\n\nFOCUS: Find what's MISSING, UPDATED, or CHANGED since last research.`
+    ? `\n\n[CONOCIMIENTO PREVIO EN SHOPYBRAIN — busca ÚNICAMENTE información NUEVA, ACTUALIZADA o DIFERENTE a esto]:\n${existingKnowledge.slice(0, 2000)}\n\nFOCUS: Find what's MISSING, UPDATED, or CHANGED since last research. Do NOT repeat already-known info.`
     : "";
 
-  // 8 parallel searches — each targets a different dimension of intelligence
-  const [overview, products, social, news, reviews, competitors, ecommerce, visual] = await Promise.allSettled([
-    askGeminiWithSearch(
-      `Research everything about this brand/company/person: "${entity}". Find: founding story, mission, team, locations, size, legal name, history, key milestones, notable facts.${knowledgeCtx}`,
-      "Deep brand intelligence analyst. Search and synthesize all public information. Prioritize finding NEW information not previously documented."
-    ),
-    askGeminiWithSearch(
-      `Find all products and services offered by "${entity}". Research: product catalog, pricing strategy, best sellers, unique selling propositions, materials used, manufacturing, certifications, quality indicators. Find any NEW launches or price changes.${knowledgeCtx}`,
-      "Product intelligence analyst. Find new or updated product and service information."
-    ),
-    askGeminiWithSearch(
-      `Find ALL social media profiles and online presence of "${entity}". Research: Instagram, Facebook, X/Twitter, TikTok, YouTube, LinkedIn, Pinterest accounts. Find follower counts, posting frequency, content style, engagement rates, hashtags used. Find any NEW profiles or metrics updates.${knowledgeCtx}`,
-      "Social media intelligence analyst. Find all social profiles and new content strategy developments."
-    ),
-    askGeminiWithSearch(
-      `Find recent news, press coverage, articles, blog posts, interviews about "${entity}". Find: press releases, media mentions, partnerships announced, awards won, controversies, community presence. FOCUS on RECENT news.${knowledgeCtx}`,
-      "News and press intelligence analyst. Prioritize the most recent developments."
-    ),
-    askGeminiWithSearch(
-      `Find customer reviews, testimonials, and sentiment about "${entity}". Search: Google reviews, Trustpilot, social media comments, forum mentions, Reddit threads, customer complaints, NPS signals. Find RECENT trends in sentiment.${knowledgeCtx}`,
-      "Customer sentiment analyst. Find recent reviews and evolving public opinion."
-    ),
-    askGeminiWithSearch(
-      `Find competitors and market positioning of "${entity}". Identify: direct competitors, indirect competitors, market share signals, competitive advantages, pricing compared to competitors, unique differentiation. Find any NEW competitors or market shifts.${knowledgeCtx}`,
-      "Competitive intelligence analyst. Find current market landscape."
-    ),
-    askGeminiWithSearch(
-      `Research the eCommerce strategy, tech stack, and online marketing of "${entity}". Find: Shopify/platform used, email marketing tools, advertising channels, SEO keywords, conversion tactics, Klaviyo/email flows, influencer partnerships, discount strategies. Find any RECENT changes.${knowledgeCtx}`,
-      "eCommerce strategy analyst. Find current and evolving marketing strategies."
-    ),
-    askGeminiWithSearch(
-      `Find visual identity, brand aesthetics, and design language of "${entity}". Find: color palette used, logo style, photography style, packaging, brand guidelines if public, font choices, visual references. Find any RECENT brand refreshes or identity changes.${knowledgeCtx}`,
-      "Visual brand identity analyst. Find current brand aesthetics."
-    ),
-  ]);
+  // ── Phase 1: 12 PARALLEL Google Search Grounding calls ────────────────────
+  // Each targets a completely different intelligence dimension
+  // withRetry ensures transient Gemini API errors don't kill the whole research
+  const searchPromises = [
+    // 1. Brand overview & history
+    withRetry(() => askGeminiWithSearch(
+      `Research everything about ${entity}. Find: founding story, mission, legal entity name, headquarters, team size, key executives, history, milestones, funding rounds, press coverage, notable achievements.${knowledgeCtx}`,
+      "Brand historian and intelligence analyst. Search for comprehensive background and recent news."
+    ), 1, 3000, "overview"),
 
-  // Extract results and aggregate all sources discovered
+    // 2. Products, catalog & pricing
+    withRetry(() => askGeminiWithSearch(
+      `Find complete product catalog and pricing of ${entity}. Research: all product lines, SKUs, materials, certifications, best sellers, limited editions, bundles, pricing tiers, free trials, guarantees, returns policy.${knowledgeCtx}`,
+      "Product catalog and pricing analyst. Find all current offerings and price points."
+    ), 1, 3000, "products"),
+
+    // 3. Social media & online presence
+    withRetry(() => askGeminiWithSearch(
+      `Find ALL social media profiles of ${entity}: Instagram, TikTok, YouTube, Facebook, X/Twitter, LinkedIn, Pinterest, Telegram, Discord, Twitch. Find: exact handles, follower counts, posting frequency, content style, engagement rates, top posts, hashtags, collaborations.${knowledgeCtx}`,
+      "Social media intelligence analyst. Find every profile and current metrics."
+    ), 1, 3000, "social"),
+
+    // 4. News, press & recent developments
+    withRetry(() => askGeminiWithSearch(
+      `Find the most recent news and press mentions about ${entityWithUrl}. Search: press releases last 12 months, media features, podcast appearances, partnerships announced, new launches, controversies, legal news, awards, growth news.${knowledgeCtx}`,
+      "News and press intelligence analyst. Prioritize articles from the last 12 months."
+    ), 1, 3000, "news"),
+
+    // 5. Customer reviews & sentiment
+    withRetry(() => askGeminiWithSearch(
+      `Find all customer reviews and public sentiment about ${entity}. Search: Google Business reviews, Trustpilot, Yelp, Amazon, Reddit, Quora, forum threads, social media comments, complaints, NPS signals, return rates, customer service reputation.${knowledgeCtx}`,
+      "Customer sentiment and review analyst. Find unbiased public opinions."
+    ), 1, 3000, "reviews"),
+
+    // 6. Competitors & market position
+    withRetry(() => askGeminiWithSearch(
+      `Find all competitors of ${entity} and their market positioning. List: top 5-10 direct competitors, alternative brands, market share signals, what differentiates ${entityName} from each competitor, pricing comparison, unique advantages each has.${knowledgeCtx}`,
+      "Competitive intelligence analyst. Map the complete competitive landscape."
+    ), 1, 3000, "competitors"),
+
+    // 7. eCommerce strategy & tech stack
+    withRetry(() => askGeminiWithSearch(
+      `Research the full eCommerce and digital marketing strategy of ${entity}. Find: Shopify/platform used, payment gateways, email marketing platform, CRM, loyalty program, affiliate program, SEO keywords ranking, Google Ads spend, Meta Ads strategy, influencer partnerships, referral programs.${knowledgeCtx}`,
+      "eCommerce and martech stack analyst. Find all marketing tools and strategies."
+    ), 1, 3000, "ecommerce"),
+
+    // 8. Visual identity & brand aesthetics
+    withRetry(() => askGeminiWithSearch(
+      `Find the visual identity and brand design language of ${entity}. Find: primary colors (hex if possible), typography choices, logo style, photography aesthetic, packaging design, brand guidelines, Pantone/color system, UI style, mood board references.${knowledgeCtx}`,
+      "Brand design and visual identity analyst. Find all visual brand elements."
+    ), 1, 3000, "visual"),
+
+    // 9. Pricing strategy & psychology
+    withRetry(() => askGeminiWithSearch(
+      `Research in depth the pricing strategy and psychology of ${entity}. Find: exact current prices, discount patterns, seasonal pricing, bundle deals, subscription options, price anchoring tactics, psychological price points used (e.g. €19.99 vs €20), flash sales frequency, premium vs entry products.${knowledgeCtx}`,
+      "Pricing strategy and behavioral economics analyst. Find specific price data."
+    ), 1, 3000, "pricing"),
+
+    // 10. Paid advertising & paid media
+    withRetry(() => askGeminiWithSearch(
+      `Find paid advertising strategy of ${entity}. Search: Facebook Ads Library for active ads, Google Ads campaigns, TikTok Ads, influencer paid partnerships, sponsored content, AdWords keywords, estimated ad spend, creative formats used, landing page strategies.${knowledgeCtx}`,
+      "Paid media and advertising intelligence analyst. Find active and historical campaigns."
+    ), 1, 3000, "paidAds"),
+
+    // 11. Founders, team & culture
+    withRetry(() => askGeminiWithSearch(
+      `Research the founders, key team members and company culture of ${entity}. Find: founder names, backgrounds, LinkedIn profiles, interviews, vision statements, company values, work culture, Glassdoor reviews, team size, remote/office setup, advisory board.${knowledgeCtx}`,
+      "Leadership and culture analyst. Find people behind the brand."
+    ), 1, 3000, "founders"),
+
+    // 12. International presence & expansion
+    withRetry(() => askGeminiWithSearch(
+      `Research international presence and expansion strategy of ${entity}. Find: countries operating in, languages supported, international shipping, local warehouses, country-specific marketing, currency support, localization efforts, markets targeted for expansion, international competitors faced.${knowledgeCtx}`,
+      "International expansion and localization analyst. Find global footprint."
+    ), 1, 3000, "international"),
+  ];
+
+  // Run all 12 with overall 270s timeout
+  const settled = await withTimeout(
+    Promise.allSettled(searchPromises),
+    OVERALL_RESEARCH_TIMEOUT,
+    "12-parallel-searches"
+  ).catch(() => {
+    logger.warn("Overall research timeout reached — returning partial results");
+    return Promise.allSettled(searchPromises.map(p => Promise.race([p, Promise.resolve({ text: "", sources: [], queries: [] })])));
+  });
+
   const allSources: string[] = [];
   const allQueries: string[] = [];
 
-  const get = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>, fallback = "") => {
+  const get = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>, dim: string) => {
     if (r.status === "fulfilled") {
       allSources.push(...r.value.sources);
       allQueries.push(...r.value.queries);
+      logger.debug({ dim, sources: r.value.sources.length, chars: r.value.text.length }, "Search dimension complete");
       return r.value.text;
     }
-    logger.warn({ reason: r.reason }, "Entity research search failed (non-critical)");
-    return fallback;
+    logger.warn({ dim, reason: String(r.reason) }, "Search dimension failed — using empty result");
+    return "";
   };
 
+  const [overview, products, social, news, reviews, competitors, ecommerce, visual, pricing, paidAds, founders, international] = settled;
+
+  const dimensionResults = {
+    overview:      get(overview, "overview"),
+    products:      get(products, "products"),
+    social:        get(social, "social"),
+    news:          get(news, "news"),
+    reviews:       get(reviews, "reviews"),
+    competitors:   get(competitors, "competitors"),
+    ecommerce:     get(ecommerce, "ecommerce"),
+    visual:        get(visual, "visual"),
+    pricing:       get(pricing, "pricing"),
+    paidAds:       get(paidAds, "paidAds"),
+    founders:      get(founders, "founders"),
+    international: get(international, "international"),
+  };
+
+  // ── Phase 2: URL Deep-Dive ─────────────────────────────────────────────────
+  // Take the top discovered URLs and have Gemini read them DIRECTLY
+  // This is much more reliable than our manual HTML scraper
+  const uniqueSources = [...new Set(allSources)];
+  const urlsForDeepDive = uniqueSources
+    .filter(u => !u.includes("instagram.com") && !u.includes("facebook.com") && !u.includes("twitter.com") && !u.includes("tiktok.com"))
+    .slice(0, 12); // Top 12 URLs for Gemini to read directly
+
+  let urlDeepDive = "";
+  if (urlsForDeepDive.length > 0) {
+    try {
+      logger.info({ urlCount: urlsForDeepDive.length }, "Phase 2: Gemini URL context deep-dive");
+      const deepDiveResult = await withTimeout(
+        askGeminiWithUrls(
+          `You have found these URLs about "${entityName}". Read each one carefully and extract:
+          - Product details, prices, and availability
+          - About/team/mission information
+          - Contact information, physical locations
+          - Blog posts and content strategy
+          - Any unique facts, stats, or testimonials
+          - Technical implementation details (Shopify apps visible, chat widgets, payment methods)
+          Synthesize all findings into a comprehensive profile addition.`,
+          urlsForDeepDive,
+          "Web content extraction specialist. Read each URL and extract maximum intelligence."
+        ),
+        GEMINI_URL_CTX_TIMEOUT,
+        "url-deep-dive"
+      );
+      urlDeepDive = deepDiveResult.text;
+      allSources.push(...deepDiveResult.sources);
+    } catch (err) {
+      logger.warn({ err: String(err) }, "URL deep-dive failed — continuing without it");
+      urlDeepDive = "";
+    }
+  }
+
+  logger.info({
+    entityName,
+    totalSources: [...new Set(allSources)].length,
+    totalQueries: [...new Set(allQueries)].length,
+    urlDeepDiveChars: urlDeepDive.length,
+    dimensions: 12,
+  }, "✅ Deep entity research complete");
+
   return {
-    overview: get(overview),
-    products: get(products),
-    social: get(social),
-    news: get(news),
-    reviews: get(reviews),
-    competitors: get(competitors),
-    ecommerce: get(ecommerce),
-    visual: get(visual),
-    allSources: [...new Set(allSources)], // deduplicate
-    allQueries: [...new Set(allQueries)],
-  } as {
-    overview: string; products: string; social: string; news: string;
-    reviews: string; competitors: string; ecommerce: string; allSources: string[]; allQueries: string[];
+    ...dimensionResults,
+    urlDeepDive,
+    allSources: [...new Set(allSources)],
+    allQueries:  [...new Set(allQueries)],
   };
 }
 

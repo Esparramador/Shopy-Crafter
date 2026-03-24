@@ -39,7 +39,6 @@ async function ensureAdminUser() {
       });
       logger.info({ email: ADMIN_EMAIL }, "✅ Admin user created on startup");
     } else {
-      // Ensure name is set (fix for deployments where name was missing)
       if (!existing[0].name) {
         await db.update(usersTable).set({ name: ADMIN_NAME }).where(eq(usersTable.email, ADMIN_EMAIL));
         logger.info({ email: ADMIN_EMAIL }, "✅ Admin name patched");
@@ -51,7 +50,7 @@ async function ensureAdminUser() {
   }
 }
 
-app.listen(port, (err) => {
+const server = app.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -61,3 +60,17 @@ app.listen(port, (err) => {
   ensureAdminUser();
   registerCronJobs();
 });
+
+// ── Extended timeouts for long-running AI research tasks ─────────────────────
+// Entity research can take up to 4-5 minutes (8+ parallel Gemini searches + Claude)
+// These prevent 504 Gateway Timeout errors from the Replit proxy
+server.timeout          = 600_000;   // 10 min — max time for a single request socket
+server.headersTimeout   = 660_000;   // 11 min — must be > timeout
+server.keepAliveTimeout = 65_000;    // 65s   — keep-alive between requests
+server.requestTimeout   = 600_000;   // 10 min — full request completion budget
+
+logger.info({
+  timeout: "10min",
+  headersTimeout: "11min",
+  keepAliveTimeout: "65s",
+}, "⏱ Server timeout config applied");
