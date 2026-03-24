@@ -131,6 +131,54 @@ export async function shopifyRequest<T>(
 }
 
 /**
+ * Shopify cursor-based pagination (REST Admin API 2022+).
+ * Returns the page data AND the next page_info token extracted from the Link header.
+ * Usage: pass `page_info` as the only pagination param on subsequent calls.
+ * NOTE: when using page_info, do NOT include status/other filters — Shopify rejects them.
+ */
+export async function shopifyRequestPaged<T>(
+  projectId: number,
+  shopDomain: string,
+  path: string,
+): Promise<{ data: T; nextPageInfo: string | null }> {
+  const domain = normalizeShopDomain(shopDomain);
+  const headers = await getShopifyHeaders(projectId);
+  const url = `https://${domain}/admin/api/2024-01${path}`;
+
+  let resp = await fetch(url, {
+    headers,
+    signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+  });
+
+  if (resp.status === 401) {
+    logger.warn({ projectId, url }, "Shopify 401 (paged) — force-regenerating token");
+    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
+    const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
+    const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
+    resp = await fetch(url, {
+      headers: { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+    });
+  }
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+  }
+
+  // Parse Link header for cursor-based next page
+  // Format: <https://shop.myshopify.com/admin/api/.../products.json?limit=250&page_info=TOKEN>; rel="next"
+  const linkHeader = resp.headers.get("Link") ?? "";
+  let nextPageInfo: string | null = null;
+  const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+  if (nextMatch) nextPageInfo = nextMatch[1];
+
+  const data = await resp.json() as T;
+  return { data, nextPageInfo };
+}
+
+/**
  * Rotates a Shopify access token using the official rotation endpoint.
  * POST https://{shop}/admin/oauth/access_token/rotate
  * Requires token rotation to be enabled for the app in Shopify Partners.

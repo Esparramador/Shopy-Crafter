@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, bulkJobsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { shopifyRequest } from "../lib/shopify";
+import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
 import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
@@ -108,22 +108,30 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
     return;
   }
 
+  // Use cursor-based pagination (Shopify deprecated ?page=N in 2022+)
   let allProducts: ShopifyProductRaw[] = [];
-  let page = 1;
   const limit = 250;
+  let nextPageInfo: string | null = null;
+  let isFirst = true;
 
   while (true) {
-    const data = await shopifyRequest<{ products: ShopifyProductRaw[] }>(
+    // First page: filter by status. Subsequent pages: ONLY page_info (no other params allowed)
+    const path = isFirst
+      ? `/products.json?limit=${limit}&status=active`
+      : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
+
+    const { data, nextPageInfo: next } = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
       id,
       project.shopDomain,
-      `/products.json?limit=${limit}&page=${page}&status=active`
+      path
     );
 
+    isFirst = false;
     if (!data.products?.length) break;
     allProducts = allProducts.concat(data.products);
-    if (data.products.length < limit) break;
-    page++;
-    await new Promise((r) => setTimeout(r, 500));
+    nextPageInfo = next;
+    if (!nextPageInfo) break;
+    await new Promise((r) => setTimeout(r, 300));
   }
 
   let auditedCount = 0;
