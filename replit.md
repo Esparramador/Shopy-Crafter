@@ -184,6 +184,16 @@ Admin goes to Clients → "Cobrar" button → selects service → `POST /api/age
 7. **Contactar (fp-contact)** — contact form → `POST /api/contact` → audit_log + Klaviyo event
 8. Empezar (fp-cta) + footer
 
+### Store Disconnect / Reconnect (Agency Model)
+Allows disconnecting a Shopify store without losing ANY generated data (images, redesigns, SEO, vault files).
+- `POST /api/projects/:id/disconnect` — clears `clientId`, `clientSecret`, `accessToken`, `tokenExpiresAt`. Preserves `shopDomain`, `name`, all products, vault, redesigns, etc.
+- `POST /api/projects/:id/reconnect` — accepts new `clientId`, `clientSecret`, optional `shopDomain`. Generates token and re-links.
+- `DELETE /api/projects/:id` — full delete with CASCADE (products, redesigns, jobs, vault, etc.)
+- UI: Settings page → "Zona de gestión" section with Desconectar (gold), Reconectar, and Eliminar (red) options.
+
+### Shopify Pagination
+All Shopify product listing uses cursor-based pagination (`page_info` from `Link` header). The deprecated `?page=N` parameter is NOT used anywhere. Function: `shopifyRequestPaged()` in `shopify.ts`.
+
 ### Admin Navigation — Key Routes
 - `/admin/clients` — **default after login** (client management + billing)
 - `/home` — projects dashboard (also accessible via sidebar logo click)

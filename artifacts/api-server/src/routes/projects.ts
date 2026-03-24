@@ -326,6 +326,61 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
   });
 });
 
+router.post("/projects/:projectId/disconnect", async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  await db.update(projectsTable).set({
+    accessToken: null,
+    clientId: "",
+    clientSecret: "",
+    tokenExpiresAt: null,
+  }).where(eq(projectsTable.id, id));
+
+  req.log.info({ projectId: id, domain: project.shopDomain }, "Store disconnected (credentials cleared, data preserved)");
+  res.json({
+    success: true,
+    message: "Tienda desconectada. Las credenciales se han eliminado pero todo el trabajo generado (imágenes, rediseños, SEO, etc.) se conserva.",
+  });
+});
+
+router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const { clientId, clientSecret, shopDomain } = req.body as { clientId?: string; clientSecret?: string; shopDomain?: string };
+  if (!clientId || !clientSecret) {
+    res.status(400).json({ error: "Se requieren clientId y clientSecret para reconectar." });
+    return;
+  }
+
+  const rawDomain = shopDomain || project.shopDomain;
+  const domain = normalizeShopDomain(rawDomain);
+  if (!domain) {
+    res.status(400).json({ error: "Dominio Shopify inválido." });
+    return;
+  }
+
+  try {
+    const encSecret = encrypt(clientSecret);
+    await db.update(projectsTable).set({
+      clientId,
+      clientSecret: encSecret,
+      shopDomain: domain,
+    }).where(eq(projectsTable.id, id));
+
+    const token = await refreshToken(id, domain, clientId, clientSecret);
+
+    req.log.info({ projectId: id, domain }, "Store reconnected with new credentials");
+    res.json({ success: true, message: "Tienda reconectada correctamente.", tokenPreview: token.slice(0, 12) + "••••••••" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error desconocido";
+    res.status(400).json({ error: `No se pudo reconectar: ${message}` });
+  }
+});
+
 router.delete("/projects/:projectId", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   await db.delete(projectsTable).where(eq(projectsTable.id, id));

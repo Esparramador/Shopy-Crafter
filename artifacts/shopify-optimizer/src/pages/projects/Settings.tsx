@@ -4,7 +4,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useGetProject, useUpdateProject, useRefreshProjectToken, useTestProjectConnection } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetProjectQueryKey } from "@workspace/api-client-react";
-import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain, Eye, EyeOff, Copy } from "lucide-react";
+import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain, Eye, EyeOff, Copy, Unplug, PlugZap, Trash2 } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
 
 export default function SettingsPage() {
@@ -33,6 +33,13 @@ export default function SettingsPage() {
   const [tokenVisible, setTokenVisible] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
   const [loadingToken, setLoadingToken] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [reconnectMode, setReconnectMode] = useState(false);
+  const [reconnectData, setReconnectData] = useState({ clientId: "", clientSecret: "", shopDomain: "" });
+  const [reconnecting, setReconnecting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -71,6 +78,60 @@ export default function SettingsPage() {
     setTokenCopied(true);
     setTimeout(() => setTokenCopied(false), 2500);
   };
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/disconnect`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+        setShowDisconnectConfirm(false);
+        setRevealedToken(null);
+        setTokenVisible(false);
+      } else {
+        alert(data.error || "Error al desconectar");
+      }
+    } catch { alert("Error de red"); }
+    finally { setDisconnecting(false); }
+  };
+
+  const handleReconnect = async () => {
+    if (!reconnectData.clientId || !reconnectData.clientSecret) { alert("Client ID y Client Secret son obligatorios"); return; }
+    setReconnecting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/reconnect`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reconnectData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+        setReconnectMode(false);
+        setReconnectData({ clientId: "", clientSecret: "", shopDomain: "" });
+      } else {
+        alert(data.error || "Error al reconectar");
+      }
+    } catch { alert("Error de red"); }
+    finally { setReconnecting(false); }
+  };
+
+  const handleDeleteProject = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = `${API_BASE}/home`;
+      } else {
+        alert(data.error || "Error al eliminar");
+      }
+    } catch { alert("Error de red"); }
+    finally { setDeleting(false); }
+  };
+
+  const isDisconnected = project && !project.clientId;
 
   useEffect(() => {
     if (project) {
@@ -322,6 +383,99 @@ export default function SettingsPage() {
           </div>
         </GlassCard>
       </form>
+
+      {isDisconnected && (
+        <GlassCard className="p-6 mt-6" style={{ border: "1px solid rgba(200,168,75,.3)", background: "rgba(200,168,75,.05)" }}>
+          <div className="flex items-center gap-3 mb-4">
+            <Unplug className="w-5 h-5" style={{ color: "#c8a84b" }} />
+            <h3 className="text-lg font-bold" style={{ color: "#c8a84b" }}>Tienda desconectada</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Las credenciales Shopify fueron eliminadas. Todo el trabajo generado (imágenes, rediseños, SEO, etc.) se conserva intacto. Para volver a operar con esta tienda, reconecta con nuevas credenciales.
+          </p>
+          {!reconnectMode ? (
+            <button onClick={() => setReconnectMode(true)} className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all">
+              <PlugZap className="w-4 h-4" /> Reconectar tienda
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Dominio Shopify (opcional, mantiene el actual)</label>
+                  <input value={reconnectData.shopDomain} onChange={e => setReconnectData({ ...reconnectData, shopDomain: e.target.value })} placeholder={project?.shopDomain || "mi-tienda.myshopify.com"} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Client ID *</label>
+                  <input value={reconnectData.clientId} onChange={e => setReconnectData({ ...reconnectData, clientId: e.target.value })} placeholder="Nuevo Client ID" className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-mono" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Client Secret *</label>
+                  <input type="password" value={reconnectData.clientSecret} onChange={e => setReconnectData({ ...reconnectData, clientSecret: e.target.value })} placeholder="Nuevo Client Secret" className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-mono" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleReconnect} disabled={reconnecting} className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
+                  <PlugZap className="w-4 h-4" /> {reconnecting ? "Reconectando..." : "Reconectar"}
+                </button>
+                <button onClick={() => { setReconnectMode(false); setReconnectData({ clientId: "", clientSecret: "", shopDomain: "" }); }} className="px-6 py-2.5 rounded-xl font-medium text-muted-foreground hover:text-foreground transition-all border border-border">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      <GlassCard className="p-6 mt-6" style={{ border: "1px solid rgba(255,255,255,.06)" }}>
+        <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-muted-foreground" /> Zona de gestión
+        </h3>
+        <div className="space-y-4">
+          {!isDisconnected && (
+            <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.15)" }}>
+              <div>
+                <p className="font-medium text-foreground text-sm">Desconectar tienda</p>
+                <p className="text-xs text-muted-foreground mt-1">Elimina las credenciales Shopify pero conserva todo el trabajo generado (imágenes, rediseños, auditorías, SEO, etc.)</p>
+              </div>
+              {!showDisconnectConfirm ? (
+                <button onClick={() => setShowDisconnectConfirm(true)} className="px-5 py-2 rounded-xl font-medium text-sm flex items-center gap-2 transition-all" style={{ border: "1px solid rgba(200,168,75,.4)", color: "#c8a84b" }}>
+                  <Unplug className="w-4 h-4" /> Desconectar
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={handleDisconnect} disabled={disconnecting} className="px-4 py-2 rounded-xl font-bold text-sm text-white transition-all" style={{ background: "#c8a84b" }}>
+                    {disconnecting ? "..." : "Sí, desconectar"}
+                  </button>
+                  <button onClick={() => setShowDisconnectConfirm(false)} className="px-4 py-2 rounded-xl font-medium text-sm text-muted-foreground border border-border">
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "rgba(232,69,88,.04)", border: "1px solid rgba(232,69,88,.15)" }}>
+            <div>
+              <p className="font-medium text-foreground text-sm">Eliminar proyecto completo</p>
+              <p className="text-xs text-muted-foreground mt-1">Borra el proyecto y TODO su contenido: productos, imágenes, rediseños, SEO, vault. Esta acción es irreversible.</p>
+            </div>
+            {!showDeleteConfirm ? (
+              <button onClick={() => setShowDeleteConfirm(true)} className="px-5 py-2 rounded-xl font-medium text-sm flex items-center gap-2 transition-all" style={{ border: "1px solid rgba(232,69,88,.3)", color: "#e84558" }}>
+                <Trash2 className="w-4 h-4" /> Eliminar
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={handleDeleteProject} disabled={deleting} className="px-4 py-2 rounded-xl font-bold text-sm text-white transition-all" style={{ background: "#e84558" }}>
+                  {deleting ? "..." : "Sí, eliminar todo"}
+                </button>
+                <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-xl font-medium text-sm text-muted-foreground border border-border">
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </GlassCard>
     </div>
   );
 }
