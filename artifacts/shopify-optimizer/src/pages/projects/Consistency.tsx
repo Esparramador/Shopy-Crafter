@@ -34,6 +34,7 @@ function RepairPoller({
 }) {
   const { data } = useGetJobStatus(projectId, jobId, {
     query: {
+      queryKey: ["job-status", projectId, jobId],
       refetchInterval: (query: { state: { data: unknown } }) => {
         const status = (query.state.data as { status?: string } | undefined)?.status;
         if (status === "completed" || status === "failed") return false;

@@ -82,7 +82,7 @@ export default function SEOPage() {
 
   const handleAudit = () => {
     runSeoAudit.mutate(
-      { projectId, data: { applyToShopify: false } },
+      { projectId },
       {
         onSuccess: (data) => {
           setSeoData(data as typeof seoData);
@@ -121,7 +121,7 @@ export default function SEOPage() {
 
   const handleSitemap = () => {
     generateSitemap.mutate(
-      { projectId, data: { applyToShopify: false } },
+      { projectId },
       {
         onSuccess: (data) => {
           const url = (data as { sitemapUrl?: string }).sitemapUrl;
@@ -135,7 +135,7 @@ export default function SEOPage() {
 
   const handleFixAlts = () => {
     fixAltTexts.mutate(
-      { projectId, data: { applyToShopify: false } },
+      { projectId },
       {
         onSuccess: (data) => {
           setAltResult(data as typeof altResult);

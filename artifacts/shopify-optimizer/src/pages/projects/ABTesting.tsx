@@ -209,7 +209,7 @@ function TestCard({
 
   const handleDeclareWinner = (winner: "A" | "B") => {
     declareWinner.mutate(
-      { projectId, testId: test.id, data: { winner, applyToShopify: false } as unknown as Parameters<typeof declareWinner.mutate>[0]["data"] },
+      { projectId, testId: String(test.id), data: { winner, applyToShopify: false } as unknown as Parameters<typeof declareWinner.mutate>[0]["data"] },
       {
         onSuccess: () => {
           queryClient.invalidateQueries();

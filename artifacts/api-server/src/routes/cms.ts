@@ -129,7 +129,7 @@ router.post("/media/upload", upload.single("file"), async (req: Request, res: Re
 
 router.delete("/media/:filename", async (req: Request, res: Response) => {
   try {
-    const filename = path.basename(req.params.filename);
+    const filename = path.basename(String(req.params.filename));
     const filepath = path.join(MEDIA_DIR, filename);
     if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
     res.json({ success: true });
@@ -149,7 +149,7 @@ router.get("/versions", async (req: Request, res: Response) => {
 
 router.post("/versions/:id/restore", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [ver] = await db.select().from(cmsVersions).where(eq(cmsVersions.id, id));
     if (!ver) { res.status(404).json({ error: "Version not found" }); return; }
     const row = await getOrInitContent();

@@ -83,6 +83,7 @@ function CogsModal({
           cac: parseFloat(cogs.cac) || 0,
           fulfillmentFee: 0,
           returnRate: 0.08,
+          overheadPerUnit: 0,
         },
       },
       {
@@ -97,10 +98,6 @@ function CogsModal({
       {
         projectId,
         productId: product.id,
-        data: {
-          cogs: totalCogs,
-          targetMarginPct: parseFloat(cogs.targetMarginPct) || 60,
-        },
       },
       {
         onSuccess: (d) => setOptimalData(d as typeof optimalData),
@@ -321,7 +318,7 @@ export default function PricingPage() {
   const handleCompetitorAnalysis = () => {
     if (!competitorUrl) return;
     analyzeCompetitors.mutate(
-      { projectId, data: { competitorUrls: [competitorUrl] } },
+      { projectId, productId: selectedProduct?.id ?? "", data: { competitorUrls: [competitorUrl] } },
       {
         onSuccess: (d) => setCompetitorResult(d as typeof competitorResult),
         onError: () => toast({ title: "Error analizando competidores", variant: "destructive" }),

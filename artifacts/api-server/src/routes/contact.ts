@@ -77,7 +77,7 @@ router.post("/contact", async (req, res): Promise<void> => {
                       storeUrl: leadData.storeUrl,
                       niche: leadData.niche,
                       revenue: leadData.revenue,
-                      services: leadData.servicesStr,
+                      services: Array.isArray(leadData.services) ? leadData.services.join(", ") : (leadData.services ?? ""),
                       source: "Landing Form",
                     },
                   },

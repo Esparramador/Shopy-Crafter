@@ -43,7 +43,7 @@ interface EntityResearchResult {
     socialProfiles?: Record<string, string>;
     socialMetrics?: Record<string, unknown>;
     products?: Array<{ name: string; category: string; priceRange: string; keyFeature: string }>;
-    pricing?: { strategy: string; avgTicket: string };
+    pricing?: { strategy?: string; avgTicket?: string; priceRange?: string; discountBehavior?: string };
     ecommerceStack?: { platform: string; emailTool: string };
     marketingChannels?: string[];
     sentiment?: { overall: string; topCompliments: string[]; topComplaints: string[] };
@@ -164,7 +164,7 @@ function AbsorbResultCard({ data }: { data: AbsorbResult }) {
               </div>
             );
           })}
-          {data.highlights?.marketingAngles && (
+          {!!(data.highlights?.marketingAngles) && (
             <div style={{ padding: "7px 10px", background: "rgba(200,168,75,0.06)", borderRadius: 6, border: "1px solid rgba(200,168,75,0.2)" }}>
               <p style={{ margin: "0 0 4px", fontSize: 9, fontWeight: 700, color: "var(--gold)", textTransform: "uppercase" }}>💡 Marketing Angles</p>
               {(Array.isArray(data.highlights.marketingAngles) ? data.highlights.marketingAngles : [data.highlights.marketingAngles]).map((angle, i) => (

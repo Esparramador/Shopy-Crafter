@@ -25,27 +25,20 @@ router.get("/status", (_req: Request, res: Response) => {
   });
 });
 
-router.post("/research/business", async (req: Request, res: Response) => {
+router.post("/research/business", async (req: Request, res: Response): Promise<void> => {
   try {
     const { businessName, domain, niche, market = "es" } = req.body as {
       businessName: string; domain: string; niche: string; market?: string;
     };
-    if (!businessName || !domain || !niche) return res.status(400).json({ error: "businessName, domain and niche are required" });
+    if (!businessName || !domain || !niche) { res.status(400).json({ error: "businessName, domain and niche are required" }); return; }
 
     const profile = await researchBusiness(businessName, domain, niche, market);
 
     const claudeEnhancement = await askClaude(
-      `You are OmniCore, an elite Shopify optimization AI. Based on this Gemini intelligence report about ${businessName}:
-
-${JSON.stringify(profile, null, 2)}
-
-Provide a strategic action plan (3-5 specific recommendations) for how a Shopify optimization agency could:
-1. Identify their biggest conversion/revenue opportunities
-2. Position against their weaknesses
-3. The one most impactful optimization to apply first
-
-Be specific and actionable. 2-3 sentences per recommendation.`,
-      undefined, undefined, 1500
+      0,
+      [{ role: "user", content: `You are OmniCore, an elite Shopify optimization AI. Based on this Gemini intelligence report about ${businessName}:\n\n${JSON.stringify(profile, null, 2)}\n\nProvide a strategic action plan (3-5 specific recommendations) for how a Shopify optimization agency could:\n1. Identify their biggest conversion/revenue opportunities\n2. Position against their weaknesses\n3. The one most impactful optimization to apply first\n\nBe specific and actionable. 2-3 sentences per recommendation.` }],
+      undefined,
+      1500
     );
 
     res.json({ profile, strategicPlan: claudeEnhancement, source: "gemini+claude" });
@@ -55,19 +48,16 @@ Be specific and actionable. 2-3 sentences per recommendation.`,
   }
 });
 
-router.post("/research/competitor", async (req: Request, res: Response) => {
+router.post("/research/competitor", async (req: Request, res: Response): Promise<void> => {
   try {
     const { domain, niche, market = "es" } = req.body as { domain: string; niche: string; market?: string };
-    if (!domain || !niche) return res.status(400).json({ error: "domain and niche are required" });
+    if (!domain || !niche) { res.status(400).json({ error: "domain and niche are required" }); return; }
 
     const intel = await analyzeCompetitor(domain, niche, market);
 
     const gaps = await askClaudeJson<{ quickWins: string[]; contentGaps: string[]; pricingOpportunity: string; seoGap: string }>(
-      `Based on this competitor intelligence for ${domain}:
-${JSON.stringify(intel, null, 2)}
-
-Identify specific opportunities for a competing Shopify store to win:
-Return JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`
+      0,
+      `Based on this competitor intelligence for ${domain}:\n${JSON.stringify(intel, null, 2)}\n\nIdentify specific opportunities for a competing Shopify store to win:\nReturn JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`
     );
 
     res.json({ competitor: intel, gaps, source: "gemini+claude" });
@@ -77,10 +67,10 @@ Return JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content th
   }
 });
 
-router.post("/research/market", async (req: Request, res: Response) => {
+router.post("/research/market", async (req: Request, res: Response): Promise<void> => {
   try {
     const { niche, market = "es", saveToOmnicore = true } = req.body as { niche: string; market?: string; saveToOmnicore?: boolean };
-    if (!niche) return res.status(400).json({ error: "niche is required" });
+    if (!niche) { res.status(400).json({ error: "niche is required" }); return; }
 
     const intel = await gatherMarketIntelligence(niche, market);
 
@@ -135,10 +125,10 @@ router.post("/research/market", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/research/product-trends", async (req: Request, res: Response) => {
+router.post("/research/product-trends", async (req: Request, res: Response): Promise<void> => {
   try {
     const { productType, market = "es", saveToOmnicore = true } = req.body as { productType: string; market?: string; saveToOmnicore?: boolean };
-    if (!productType) return res.status(400).json({ error: "productType is required" });
+    if (!productType) { res.status(400).json({ error: "productType is required" }); return; }
 
     const trends = await analyzeProductTrends(productType, market);
 
@@ -170,10 +160,10 @@ router.post("/research/product-trends", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/research/person-brand", async (req: Request, res: Response) => {
+router.post("/research/person-brand", async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, context, market = "es" } = req.body as { name: string; context: string; market?: string };
-    if (!name) return res.status(400).json({ error: "name is required" });
+    if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
     const profile = await researchPersonOrBrand(name, context ?? "", market);
 
@@ -184,12 +174,12 @@ router.post("/research/person-brand", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/research/full-audit", async (req: Request, res: Response) => {
+router.post("/research/full-audit", async (req: Request, res: Response): Promise<void> => {
   try {
     const { businessName, domain, niche, market = "es" } = req.body as {
       businessName: string; domain: string; niche: string; market?: string;
     };
-    if (!businessName || !domain || !niche) return res.status(400).json({ error: "businessName, domain and niche are required" });
+    if (!businessName || !domain || !niche) { res.status(400).json({ error: "businessName, domain and niche are required" }); return; }
 
     const [businessProfile, marketIntel] = await Promise.all([
       researchBusiness(businessName, domain, niche, market),
@@ -197,24 +187,13 @@ router.post("/research/full-audit", async (req: Request, res: Response) => {
     ]);
 
     const synthesis = await askClaude(
-      `You are OmniCore, an elite Shopify eCommerce optimization AI. 
-You have performed a full intelligence audit of ${businessName} (${domain}) in the ${niche} niche for the ${market} market.
-
-BUSINESS PROFILE (from Gemini):
-${JSON.stringify(businessProfile, null, 2)}
-
-MARKET INTELLIGENCE (from Gemini):
-${JSON.stringify(marketIntel, null, 2)}
-
-Create an executive intelligence brief with:
-1. SITUATIONAL ANALYSIS — where this business stands vs market
-2. TOP 3 REVENUE OPPORTUNITIES — highest-impact optimizations (with estimated % improvement)
-3. COMPETITIVE POSITIONING — how to differentiate from top competitors: ${marketIntel.topPlayers.slice(0, 3).join(", ")}
-4. PRICING STRATEGY — specific price point recommendations based on market data
-5. 90-DAY ACTION PLAN — prioritized by ROI
-
-Be specific, bold, and actionable. Format clearly with headers.`,
-      undefined, undefined, 2000
+      0,
+      [{
+        role: "user",
+        content: `You are OmniCore, an elite Shopify eCommerce optimization AI.\nYou have performed a full intelligence audit of ${businessName} (${domain}) in the ${niche} niche for the ${market} market.\n\nBUSINESS PROFILE (from Gemini):\n${JSON.stringify(businessProfile, null, 2)}\n\nMARKET INTELLIGENCE (from Gemini):\n${JSON.stringify(marketIntel, null, 2)}\n\nCreate an executive intelligence brief with:\n1. SITUATIONAL ANALYSIS — where this business stands vs market\n2. TOP 3 REVENUE OPPORTUNITIES — highest-impact optimizations (with estimated % improvement)\n3. COMPETITIVE POSITIONING — how to differentiate from top competitors: ${marketIntel.topPlayers.slice(0, 3).join(", ")}\n4. PRICING STRATEGY — specific price point recommendations based on market data\n5. 90-DAY ACTION PLAN — prioritized by ROI\n\nBe specific, bold, and actionable. Format clearly with headers.`,
+      }],
+      undefined,
+      2000
     );
 
     try {

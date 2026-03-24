@@ -34,7 +34,7 @@ async function canAccessProject(
 
 // ─── LISTAR ARCHIVOS DE UN PROYECTO ──────────────────────────────────────────
 router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId);
+  const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
@@ -69,7 +69,7 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
 
 // ─── STATS DEL VAULT ─────────────────────────────────────────────────────────
 router.get("/projects/:projectId/vault/stats", requireAuth, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId);
+  const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
@@ -99,8 +99,8 @@ router.get("/projects/:projectId/vault/stats", requireAuth, async (req, res): Pr
 
 // ─── DESCARGAR UN ARCHIVO ────────────────────────────────────────────────────
 router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId);
-  const fileId = parseInt(req.params.fileId);
+  const projectId = parseInt(String(req.params.projectId));
+  const fileId = parseInt(String(req.params.fileId));
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const session = req.session as any;
@@ -132,8 +132,9 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   if (file.originalUrl) {
     try {
       const response = await fetch(file.originalUrl);
-      if (response.ok && response.body) {
-        response.body.pipe(res as any);
+      if (response.ok) {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
         return;
       }
     } catch {}
@@ -164,7 +165,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
 
 // ─── DESCARGAR TODO EL VAULT COMO ZIP ────────────────────────────────────────
 router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId);
+  const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
@@ -235,7 +236,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
 
 // ─── REGISTRAR ARCHIVO GENERADO (llamado internamente por los motores) ────────
 router.post("/projects/:projectId/vault/register", requireAuth, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId);
+  const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
@@ -262,8 +263,8 @@ router.delete("/projects/:projectId/vault/:fileId", requireAuth, async (req, res
   const session = req.session as any;
   if (session.role !== "admin") { res.status(403).json({ error: "Solo admin puede eliminar archivos" }); return; }
 
-  const projectId = parseInt(req.params.projectId);
-  const fileId = parseInt(req.params.fileId);
+  const projectId = parseInt(String(req.params.projectId));
+  const fileId = parseInt(String(req.params.fileId));
 
   const [file] = await db.select().from(projectFilesTable)
     .where(and(eq(projectFilesTable.id, fileId), eq(projectFilesTable.projectId, projectId))).limit(1);

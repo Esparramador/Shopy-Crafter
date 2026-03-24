@@ -198,7 +198,7 @@ ALL email HTML must:
 - Be professional, brand-consistent, conversion-focused
 - Be written in ${market === "es" ? "Spanish" : "English"}`;
 
-    const plan = await askClaudeJson<WorkflowPlan>(undefined, prompt, undefined, 8000);
+    const plan = await askClaudeJson<WorkflowPlan>(0, prompt, undefined, 8000);
 
     // Step 3: Save to OmniCore memory
     try {
@@ -235,26 +235,8 @@ router.post("/klaviyo-ai/generate-email", requireAdmin, async (req: Request, res
   };
 
   try {
-    const html = await askClaude(undefined, `Create a complete, responsive HTML email for Klaviyo.
-
-Flow: ${flowType}
-Email #${emailPosition} (${delay || "immediate"})
-Store: ${storeName} (${shopDomain})
-Niche: ${niche}
-Tone: ${tone}
-Language: ${market === "es" ? "Spanish" : "English"}
-
-Requirements:
-- Complete HTML with DOCTYPE, head, body, inline CSS
-- Responsive (max-width 600px)
-- Dark background (#0a0a0f) with gold accents (#c8a84b)
-- Use {{ first_name|default:'amig@' }} for personalization
-- CTA button with direct link to {{ shop.url }}
-- Klaviyo unsubscribe footer: {% unsubscribe %}
-- Professional, high-converting copy specific to ${niche}
-- Include product image placeholder: {{ event.ExtraContext.image_url|default:'' }}
-
-Return ONLY the complete HTML, no markdown, no explanation.`, undefined, 4000);
+    const emailPrompt = `Create a complete, responsive HTML email for Klaviyo.\n\nFlow: ${flowType}\nEmail #${emailPosition} (${delay || "immediate"})\nStore: ${storeName} (${shopDomain})\nNiche: ${niche}\nTone: ${tone}\nLanguage: ${market === "es" ? "Spanish" : "English"}\n\nRequirements:\n- Complete HTML with DOCTYPE, head, body, inline CSS\n- Responsive (max-width 600px)\n- Dark background (#0a0a0f) with gold accents (#c8a84b)\n- Use {{ first_name|default:'amig@' }} for personalization\n- CTA button with direct link to {{ shop.url }}\n- Klaviyo unsubscribe footer: {% unsubscribe %}\n- Professional, high-converting copy specific to ${niche}\n- Include product image placeholder: {{ event.ExtraContext.image_url|default:'' }}\n\nReturn ONLY the complete HTML, no markdown, no explanation.`;
+    const html = await askClaude(0, [{ role: "user", content: emailPrompt }], undefined, 4000);
 
     res.json({ html, flowType, emailPosition });
   } catch (err) {

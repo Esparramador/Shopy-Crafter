@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { projectsTable } from "@workspace/db";
+import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 

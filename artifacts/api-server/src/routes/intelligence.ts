@@ -261,7 +261,7 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
       projectId,
       [{ role: "user", content: prompt }],
       `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations.`,
-      "intelligence",
+      "general",
       project.storeNiche ?? undefined,
       4096
     );

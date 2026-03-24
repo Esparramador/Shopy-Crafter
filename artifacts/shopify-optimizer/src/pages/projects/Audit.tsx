@@ -376,7 +376,7 @@ export default function AuditPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <DollarSign className="w-4 h-4 text-green-400" />
-                        <span className="text-sm font-semibold text-green-400">{opp.estimatedPriceRange}</span>
+                        <span className="text-sm font-semibold text-green-400">{opp.estimatedPriceMin}–{opp.estimatedPriceMax}€</span>
                       </div>
                       <button className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />

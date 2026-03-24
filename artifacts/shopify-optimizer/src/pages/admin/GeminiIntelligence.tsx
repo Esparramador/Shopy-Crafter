@@ -472,7 +472,7 @@ export default function GeminiIntelligence() {
             </div>
           )}
 
-          {state.data && !state.loading && (
+          {Boolean(state.data) && !state.loading && (
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <CheckCircle2 size={14} style={{ color: "var(--jade)" }} />

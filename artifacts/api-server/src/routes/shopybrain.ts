@@ -105,7 +105,7 @@ router.post("/shopybrain/memories", requireAdmin, async (req, res): Promise<void
 });
 
 router.delete("/shopybrain/memories/:id", requireAdmin, async (req, res): Promise<void> => {
-  await db.delete(omnicoreMemoriesTable).where(eq(omnicoreMemoriesTable.id, req.params.id));
+  await db.delete(omnicoreMemoriesTable).where(eq(omnicoreMemoriesTable.id, String(req.params.id)));
   res.json({ success: true });
 });
 

@@ -305,7 +305,7 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       competitiveData: JSON.stringify(analysis.competitive_data ?? analysis.competitiveData ?? {}),
       audienceSignals: JSON.stringify(analysis.audience_signals ?? analysis.audienceSignals ?? {}),
       brandElements: JSON.stringify(analysis.brand_elements ?? analysis.brandElements ?? {}),
-      visualComposition: JSON.stringify(analysis.visual_composition ?? analysis.visual_from_page?.visual_composition ?? null),
+      visualComposition: JSON.stringify((analysis as any).visual_composition ?? (analysis as any).visual_from_page?.visual_composition ?? null),
       fullAnalysis: analysis,
       niche: niche ?? null,
       confidence: 0.75,

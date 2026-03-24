@@ -6,7 +6,7 @@ import {
   omnicoreMemoriesTable, omnicoreStudySessionsTable, omnicoreKnowledgeDomainsTable,
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
-import { desc, eq, gte, sql, isNull, or } from "drizzle-orm";
+import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
 import { shopifyRequest } from "./shopify.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";
@@ -96,36 +96,35 @@ export async function runInventorySync() {
         );
         for (const variant of data.variants) {
           const existing = await db.select().from(inventoryTrackingTable)
-            .where(eq(inventoryTrackingTable.shopifyVariantId, String(variant.id))).limit(1);
+            .where(eq(inventoryTrackingTable.variantId, String(variant.id))).limit(1);
           const prev = existing[0];
           const velocity = prev ? ((prev.currentStock ?? 0) - variant.inventory_quantity) : 0;
           const daysRemaining = velocity > 0 ? Math.round(variant.inventory_quantity / velocity) : null;
           if (prev) {
             await db.update(inventoryTrackingTable).set({
               currentStock: variant.inventory_quantity,
-              salesVelocity: String(velocity),
+              avgDailySales: velocity,
               daysRemaining,
               updatedAt: new Date(),
-            }).where(eq(inventoryTrackingTable.shopifyVariantId, String(variant.id)));
+            }).where(eq(inventoryTrackingTable.variantId, String(variant.id)));
           } else {
             await db.insert(inventoryTrackingTable).values({
-              projectId: project.id,
-              shopifyProductId: String(variant.product_id),
-              shopifyVariantId: String(variant.id),
-              sku: variant.sku ?? null,
+              id: randomBytes(8).toString("hex"),
+              projectId: String(project.id),
+              productId: String(variant.product_id),
+              variantId: String(variant.id),
               currentStock: variant.inventory_quantity,
-              salesVelocity: "0",
+              avgDailySales: 0,
               daysRemaining,
             }).onConflictDoNothing();
           }
           if (variant.inventory_quantity > 0 && variant.inventory_quantity <= 5) {
             await db.insert(eventsTable).values({
-              projectId: project.id,
-              motor: "M7",
+              id: randomBytes(8).toString("hex"),
+              projectId: String(project.id),
               eventType: "stock_critical",
-              description: `Stock crítico: SKU ${variant.sku ?? variant.id} — ${variant.inventory_quantity} uds`,
-              impact: "high",
-            }).onConflictDoNothing().catch(() => {});
+              payload: `Stock crítico: SKU ${variant.sku ?? variant.id} — ${variant.inventory_quantity} uds`,
+            }).catch(() => {});
           }
         }
       } catch (err) {
@@ -155,9 +154,12 @@ export async function runCompetitorScans() {
         const price = priceMatch ? parseFloat(priceMatch[1].replace(",", ".")) : null;
 
         await db.insert(competitorSnapshotsTable).values({
+          id: randomBytes(8).toString("hex"),
           competitorId: competitor.id,
-          price: price ? String(price) : null,
-          htmlSnapshot: html.slice(0, 5000),
+          priceMin: price,
+          priceMax: price,
+          priceMedian: price,
+          rawData: html.slice(0, 5000),
           scannedAt: new Date(),
         });
 
@@ -166,17 +168,17 @@ export async function runCompetitorScans() {
           .orderBy(desc(competitorSnapshotsTable.scannedAt)).limit(2);
 
         if (prevSnaps.length >= 2 && price !== null) {
-          const prevPrice = parseFloat(prevSnaps[1]?.price ?? "0");
+          const prevPrice = prevSnaps[1]?.priceMin ?? 0;
           const changePct = prevPrice > 0 ? Math.abs((price - prevPrice) / prevPrice) * 100 : 0;
           if (changePct >= 5) {
             await db.insert(competitorAlertsTable).values({
+              id: randomBytes(8).toString("hex"),
               competitorId: competitor.id,
               projectId: competitor.projectId,
               alertType: price < prevPrice ? "price_drop" : "price_increase",
-              message: `${competitor.name}: precio ${price < prevPrice ? "bajó" : "subió"} de €${prevPrice.toFixed(2)} a €${price.toFixed(2)} (${changePct.toFixed(1)}%)`,
+              title: `${competitor.name}: precio ${price < prevPrice ? "bajó" : "subió"}`,
+              description: `${competitor.name}: precio ${price < prevPrice ? "bajó" : "subió"} de €${prevPrice.toFixed(2)} a €${price.toFixed(2)} (${changePct.toFixed(1)}%)`,
               severity: changePct >= 15 ? "high" : "medium",
-              previousPrice: String(prevPrice),
-              currentPrice: String(price),
             });
           }
         }
@@ -200,15 +202,15 @@ export async function runOmnicoreRealDataIntegration() {
       if (!project.storeNiche) continue;
       try {
         const snaps = await db.select().from(revenueSnapshotsTable)
-          .where(eq(revenueSnapshotsTable.projectId, project.id))
+          .where(eq(revenueSnapshotsTable.projectId, String(project.id)))
           .orderBy(desc(revenueSnapshotsTable.date)).limit(7);
         if (snaps.length < 2) continue;
-        const totalRevenue = snaps.reduce((s, r) => s + parseFloat(r.revenue ?? "0"), 0);
+        const totalRevenue = snaps.reduce((s, r) => s + (r.revenue ?? 0), 0);
         const avgRevenue = totalRevenue / snaps.length;
         const firstSnap = snaps[0];
         const lastSnap = snaps[snaps.length - 1];
         const trend = firstSnap && lastSnap
-          ? ((parseFloat(firstSnap.revenue ?? "0") - parseFloat(lastSnap.revenue ?? "0")) / Math.max(parseFloat(lastSnap.revenue ?? "1"), 1)) * 100
+          ? (((firstSnap.revenue ?? 0) - (lastSnap.revenue ?? 0)) / Math.max(lastSnap.revenue ?? 1, 1)) * 100
           : 0;
         const content = `Tienda ${project.name} (${project.storeNiche}): revenue medio €${avgRevenue.toFixed(0)}/día. Tendencia 7 días: ${trend > 0 ? "+" : ""}${trend.toFixed(1)}%. ${trend > 5 ? "Crecimiento positivo detectado." : trend < -5 ? "Caída detectada — revisar estrategia." : "Revenue estable."}`;
 

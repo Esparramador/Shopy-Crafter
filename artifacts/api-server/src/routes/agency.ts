@@ -72,8 +72,8 @@ router.get("/agency/services", requireAdmin, async (req, res): Promise<void> => 
 router.put("/agency/services/:id", requireAdmin, async (req, res): Promise<void> => {
   const body = { ...req.body };
   delete body.id;
-  await db.update(serviceCatalogTable).set(body).where(eq(serviceCatalogTable.id, req.params.id));
-  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, req.params.id));
+  await db.update(serviceCatalogTable).set(body as any).where(eq(serviceCatalogTable.id, String(req.params.id)));
+  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, String(req.params.id)));
   res.json(updated);
 });
 
@@ -303,8 +303,8 @@ router.put("/agency/services/:id/shopify-variant", requireAdmin, async (req, res
   const { variantId, productId } = req.body;
   await db.update(serviceCatalogTable)
     .set({ shopifyVariantId: variantId ?? null, shopifyProductId: productId ?? null })
-    .where(eq(serviceCatalogTable.id, req.params.id));
-  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, req.params.id));
+    .where(eq(serviceCatalogTable.id, String(req.params.id)));
+  const [updated] = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.id, String(req.params.id)));
   res.json(updated);
 });
 

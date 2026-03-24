@@ -53,6 +53,7 @@ function JobPoller({
 }) {
   const { data } = useGetGenerationJob(projectId, jobId, {
     query: {
+      queryKey: ["generation-job", projectId, jobId],
       refetchInterval: (query: { state: { data: unknown } }) => {
         const status = (query.state.data as { status?: string } | undefined)?.status;
         if (status === "completed" || status === "failed") return false;
@@ -94,7 +95,7 @@ function PromptModal({
 
   useEffect(() => {
     buildPrompt.mutate(
-      { projectId, productId, data: { productId, imageType } },
+      { projectId, data: { productId, imageType } },
       {
         onSuccess: (d) => {
           setPromptData(d as typeof promptData);
@@ -133,7 +134,7 @@ function PromptModal({
             onIntelligenceReady={(intel) => {
               setReferenceIntelligence(intel);
               buildPrompt.mutate(
-                { projectId, productId, data: { productId, imageType } },
+                { projectId, data: { productId, imageType } },
                 { onSuccess: (d) => setPromptData(d as typeof promptData) }
               );
             }}

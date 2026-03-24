@@ -346,7 +346,7 @@ ${research.competitors.slice(0, 1500)}
 ${research.ecommerce.slice(0, 1500)}
 
 === VISUAL IDENTITY & BRAND DESIGN ===
-${(research as Record<string, string>).visual?.slice(0, 1000) ?? ""}
+${(research as any).visual?.slice(0, 1000) ?? ""}
 
 === PRICING STRATEGY & PSYCHOLOGY ===
 ${research.pricing?.slice(0, 1200) ?? ""}
@@ -646,7 +646,7 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
 router.get("/shopybrain/entity-knowledge/:name", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
   try {
-    const knowledge = await loadExistingEntityKnowledge(decodeURIComponent(name));
+    const knowledge = await loadExistingEntityKnowledge(decodeURIComponent(String(name)));
 
     if (!knowledge.hasKnowledge) {
       res.json({
@@ -692,7 +692,7 @@ router.get("/shopybrain/entity-knowledge/:name", requireAdmin, async (req: Reque
 router.get("/shopybrain/research-entity/:name", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
   try {
-    const knowledge = await loadExistingEntityKnowledge(name);
+    const knowledge = await loadExistingEntityKnowledge(String(name));
     if (knowledge.hasKnowledge) {
       res.json({ found: true, cached: true, memoriesFound: knowledge.memories.length, knowledgeAge: knowledge.knowledgeAge });
     } else {

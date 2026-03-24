@@ -350,9 +350,7 @@ export async function askGeminiWithUrls(
         systemInstruction: systemInstruction ?? "You are a deep web intelligence analyst. Read each URL thoroughly and extract all relevant business intelligence, product info, pricing, contact details, social links, and marketing strategies.",
         tools: [
           { urlContext: {} },          // Gemini fetches each URL directly
-          { googleSearch: {            // Also allowed to search for missing context
-            dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.3 },
-          }},
+          { googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.3 } } } as any,
         ],
         maxOutputTokens: 65_536,
         thinkingConfig: { thinkingBudget: 6_000 },

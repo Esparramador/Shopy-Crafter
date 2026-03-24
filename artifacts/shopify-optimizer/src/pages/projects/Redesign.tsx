@@ -51,6 +51,7 @@ function BulkProgressPoller({
 }) {
   const { data } = useGetGenerationJob(projectId, jobId, {
     query: {
+      queryKey: ["generation-job", projectId, jobId],
       refetchInterval: (query: { state: { data: unknown } }) => {
         const status = (query.state.data as { status?: string } | undefined)?.status;
         if (status === "completed" || status === "failed") return false;

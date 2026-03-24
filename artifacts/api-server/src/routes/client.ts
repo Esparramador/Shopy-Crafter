@@ -8,7 +8,7 @@ const router = Router();
 router.use(requireAuth);
 
 function getClientProjectId(req: import("express").Request): string {
-  return req.session.clientId ?? req.params["projectId"] ?? "";
+  return String(req.session.clientId ?? req.params["projectId"] ?? "");
 }
 
 router.get("/dashboard", async (req, res): Promise<void> => {
@@ -123,7 +123,7 @@ router.get("/products", async (req, res): Promise<void> => {
     price: productsTable.price,
     auditScore: productsTable.auditScore,
     auditGrade: productsTable.auditGrade,
-    images: productsTable.images,
+    imagesJson: productsTable.imagesJson,
   }).from(productsTable)
     .where(eq(productsTable.projectId, parseInt(projectId)))
     .orderBy(desc(productsTable.auditScore))
