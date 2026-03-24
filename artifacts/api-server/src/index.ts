@@ -23,6 +23,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function ensureAdminUser() {
   try {
     const ADMIN_EMAIL = "sadiagiljoan@gmail.com";
+    const ADMIN_NAME  = "Joan Sàdia Gil";
     const ADMIN_PASS  = process.env.ADMIN_PASSWORD ?? "ShopyAdmin2026!";
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL));
@@ -31,11 +32,18 @@ async function ensureAdminUser() {
       await db.insert(usersTable).values({
         id: randomBytes(16).toString("hex"),
         email: ADMIN_EMAIL,
+        name: ADMIN_NAME,
         password: hashed,
         role: "admin",
+        isActive: 1,
       });
       logger.info({ email: ADMIN_EMAIL }, "✅ Admin user created on startup");
     } else {
+      // Ensure name is set (fix for deployments where name was missing)
+      if (!existing[0].name) {
+        await db.update(usersTable).set({ name: ADMIN_NAME }).where(eq(usersTable.email, ADMIN_EMAIL));
+        logger.info({ email: ADMIN_EMAIL }, "✅ Admin name patched");
+      }
       logger.info({ email: ADMIN_EMAIL, role: existing[0].role }, "✅ Admin user present");
     }
   } catch (err) {
