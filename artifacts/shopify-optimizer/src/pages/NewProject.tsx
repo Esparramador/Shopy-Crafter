@@ -19,6 +19,7 @@ export default function NewProject() {
     shopDomain: "",
     clientId: "",
     clientSecret: "",
+    accessToken: "",
     storeNiche: "",
     brandTone: "",
     targetAudience: "",
@@ -50,6 +51,7 @@ export default function NewProject() {
           shopDomain: formData.shopDomain,
           clientId: formData.clientId,
           clientSecret: formData.clientSecret,
+          accessToken: formData.accessToken,
           storeNiche: formData.storeNiche || undefined,
           brandTone: formData.brandTone || undefined,
           targetAudience: formData.targetAudience || undefined,
@@ -70,7 +72,7 @@ export default function NewProject() {
     }
   };
 
-  const isValid = formData.shopDomain && formData.clientId && formData.clientSecret;
+  const isValid = formData.shopDomain && formData.clientId && formData.clientSecret && formData.accessToken;
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
@@ -129,8 +131,11 @@ export default function NewProject() {
           <div style={{ borderTop: "1px solid var(--bdr)", margin: "20px 0" }} />
 
           {/* Credenciales de la app personalizada */}
-          <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
-            Credenciales de la app — Shopify Admin → Apps → Desarrollar apps
+          <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+            Credenciales — Shopify Admin → Configuración → Apps → Desarrollar apps → tu app
+          </p>
+          <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 14, lineHeight: 1.5 }}>
+            Los 3 campos los encuentras en la pestaña <strong style={{ color: "var(--t2)" }}>Credenciales de la API</strong> de tu app.
           </p>
 
           <div className="grid-2" style={{ marginBottom: 0 }}>
@@ -145,6 +150,7 @@ export default function NewProject() {
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 autoComplete="off"
               />
+              <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 3 }}>Pestaña "Credenciales de la API"</p>
             </div>
             <div className="form-group">
               <label className="form-label">Clave secreta de la API *</label>
@@ -158,11 +164,36 @@ export default function NewProject() {
                 placeholder="shpss_••••••••••••••••••••••••••••••••"
                 autoComplete="new-password"
               />
+              <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 3 }}>Misma pestaña, junto al API Key</p>
             </div>
           </div>
 
-          <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 8 }}>
-            Todas las credenciales se cifran con AES-256 antes de guardarse.
+          <div className="form-group" style={{ marginTop: 4 }}>
+            <label className="form-label">
+              Admin API Access Token *
+              <span style={{ marginLeft: 8, fontFamily: "var(--fr)", color: "var(--gold)", fontSize: 11, fontWeight: 400 }}>
+                ← Este es el más importante
+              </span>
+            </label>
+            <input
+              required
+              type="password"
+              className="form-input"
+              style={{ fontFamily: "var(--fm)" }}
+              value={formData.accessToken}
+              onChange={handleChange("accessToken")}
+              placeholder="shpat_••••••••••••••••••••••••••••••••"
+              autoComplete="new-password"
+            />
+            <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 3, lineHeight: 1.5 }}>
+              En la misma pestaña "Credenciales de la API", sección <strong>"Tokens de acceso de la API de Admin"</strong>.
+              Empieza por <code style={{ background: "var(--ink2)", padding: "1px 4px", borderRadius: 3 }}>shpat_</code>.
+              Solo se muestra una vez — guárdalo bien.
+            </p>
+          </div>
+
+          <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
+            🔒 Client ID y Secret se cifran con AES-256. El token se valida contra Shopify antes de guardar.
           </p>
         </div>
 
@@ -210,7 +241,7 @@ export default function NewProject() {
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
           {!isValid && (
             <span style={{ fontSize: 12, color: "var(--t3)" }}>
-              {!formData.shopDomain ? "Dominio requerido" : !formData.clientId ? "Client ID requerido" : "Clave secreta requerida"}
+              {!formData.shopDomain ? "Dominio requerido" : !formData.clientId ? "API Key requerida" : !formData.clientSecret ? "Clave secreta requerida" : "Access Token (shpat_...) requerido"}
             </span>
           )}
           <button

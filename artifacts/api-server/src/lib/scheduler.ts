@@ -7,7 +7,7 @@ import {
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
 import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
-import { refreshToken, shopifyRequest } from "./shopify.js";
+import { rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";
@@ -623,40 +623,46 @@ Return ONLY valid JSON:
 // Cada hora revisa todos los proyectos y renueva el token si está caducado
 // o le quedan menos de 2 horas de validez. Garantiza acceso continuo a la API.
 export async function runTokenRefresh() {
-  log("token-refresh", "🔑 Checking tokens for all projects");
+  log("token-refresh", "🔑 Validating Shopify tokens for all projects");
   try {
     const projects = await db.select().from(projectsTable);
-    const soon = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
-
-    let refreshed = 0;
-    let skipped = 0;
+    let valid = 0;
+    let rotated = 0;
+    let failed = 0;
+    let noToken = 0;
 
     for (const project of projects) {
-      // Renew if: no token, no expiry date, or expiry within 2h
-      const needsRefresh =
-        !project.accessToken ||
-        !project.tokenExpiresAt ||
-        new Date(project.tokenExpiresAt) <= soon;
-
-      if (!needsRefresh) { skipped++; continue; }
+      if (!project.accessToken) {
+        noToken++;
+        logger.warn({ projectId: project.id, domain: project.shopDomain }, "Project has no access token — add it in project settings");
+        continue;
+      }
 
       try {
-        const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-        if (!plainSecret || !project.clientId) {
-          logger.warn({ projectId: project.id }, "Token refresh skipped — missing credentials");
+        const isValid = await validateToken(project.shopDomain, project.accessToken);
+        if (isValid) {
+          valid++;
           continue;
         }
-        await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
-        refreshed++;
-        log("token-refresh", `✅ Token renewed: project ${project.id} (${project.shopDomain})`);
+
+        // Token failed — attempt rotation (only works if rotation is enabled in Shopify)
+        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting rotation`);
+        const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+        await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
+        rotated++;
+        log("token-refresh", `✅ Token rotated: project ${project.id} (${project.shopDomain})`);
       } catch (err) {
-        logger.warn({ projectId: project.id, err }, "Token refresh failed for project — will retry next hour");
+        failed++;
+        logger.error(
+          { projectId: project.id, domain: project.shopDomain, err },
+          "Token invalid and rotation failed — manual token update required in project settings"
+        );
       }
     }
 
-    log("token-refresh", `🔑 Done: ${refreshed} renewed, ${skipped} still valid`);
+    log("token-refresh", `🔑 Done: ${valid} valid, ${rotated} rotated, ${failed} failed, ${noToken} missing`);
   } catch (err) {
-    logger.error({ err }, "Token refresh job failed");
+    logger.error({ err }, "Token validation job failed");
   }
 }
 

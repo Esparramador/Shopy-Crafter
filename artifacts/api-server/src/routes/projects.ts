@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { refreshToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
+import { rotateToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
@@ -208,18 +208,37 @@ router.get("/projects", async (req, res): Promise<void> => {
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
-  const { name, shopDomain, clientId, clientSecret, storeNiche, brandTone, targetAudience, storeMarkets, replicateApiToken, anthropicApiKey } = req.body;
+  const {
+    name, shopDomain, clientId, clientSecret, accessToken,
+    storeNiche, brandTone, targetAudience, storeMarkets,
+    replicateApiToken, anthropicApiKey,
+  } = req.body;
 
-  if (!name || !shopDomain || !clientId || !clientSecret) {
-    res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
+  if (!name || !shopDomain || !clientId || !clientSecret || !accessToken) {
+    res.status(400).json({
+      error: "name, shopDomain, clientId, clientSecret y accessToken son obligatorios. El Access Token (shpat_...) se obtiene en Shopify Admin → Apps → tu app → Credenciales.",
+    });
+    return;
+  }
+
+  const normalizedDomain = normalizeShopDomain(shopDomain);
+
+  // Validate token before saving — fail fast if credentials are wrong
+  const isValid = await validateToken(normalizedDomain, accessToken);
+  if (!isValid) {
+    res.status(400).json({
+      error: `El token de acceso no es válido para ${normalizedDomain}. Verifica que el Admin API Access Token sea correcto y que la app tenga los permisos necesarios.`,
+    });
     return;
   }
 
   const [project] = await db.insert(projectsTable).values({
     name,
-    shopDomain: normalizeShopDomain(shopDomain),
+    shopDomain: normalizedDomain,
     clientId,
     clientSecret: encrypt(clientSecret),
+    accessToken,          // stored in plaintext (encrypted column not in schema — token is sensitive but project-scoped)
+    tokenExpiresAt: null, // custom app tokens are permanent
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
     targetAudience: targetAudience ?? null,
@@ -227,13 +246,6 @@ router.post("/projects", async (req, res): Promise<void> => {
     replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
     anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
   }).returning();
-
-  // Auto-generate access token immediately using client credentials
-  try {
-    await refreshToken(project.id, project.shopDomain, project.clientId, clientSecret);
-  } catch (err) {
-    req.log.warn({ projectId: project.id, err }, "Initial token generation failed — will retry on first API call");
-  }
 
   const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
 
@@ -326,25 +338,43 @@ router.get("/projects/:projectId/reveal-token", async (req, res): Promise<void> 
 });
 
 router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void> => {
-  const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const id = parseInt(String(req.params.projectId), 10);
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
 
-  if (!project) {
-    res.status(404).json({ error: "Proyecto no encontrado" });
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+  if (!project.accessToken) {
+    res.status(400).json({ error: "Sin token de acceso. Añade el Admin API Access Token en la configuración del proyecto." });
     return;
   }
 
+  // Allow manual token update via body
+  const { newAccessToken } = req.body as { newAccessToken?: string };
+  if (newAccessToken) {
+    const isValid = await validateToken(project.shopDomain, newAccessToken);
+    if (!isValid) {
+      res.status(400).json({ error: "El nuevo token no es válido para esta tienda." });
+      return;
+    }
+    await db.update(projectsTable).set({ accessToken: newAccessToken }).where(eq(projectsTable.id, id));
+    res.json({ success: true, message: "Token actualizado y validado correctamente." });
+    return;
+  }
+
+  // Otherwise attempt token rotation (requires Shopify token rotation enabled)
   try {
-    await refreshToken(id, project.shopDomain, project.clientId, project.clientSecret);
-    const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+    const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+    const newToken = await rotateToken(id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
     res.json({
       success: true,
-      expiresAt: updated.tokenExpiresAt?.toISOString() ?? null,
-      message: "Token renovado correctamente",
+      message: "Token rotado correctamente. El nuevo token ya está activo.",
+      tokenPreview: newToken.slice(0, 12) + "••••••••",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
-    res.status(400).json({ error: message });
+    res.status(400).json({
+      error: message,
+      hint: "Si la rotación de tokens no está habilitada para tu app, actualiza el token manualmente enviando { newAccessToken: 'shpat_...' } en el cuerpo de esta petición.",
+    });
   }
 });
 
