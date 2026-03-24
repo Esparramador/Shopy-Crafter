@@ -51,7 +51,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="username"
-                placeholder="sadiagiljoan@gmail.com"
+                placeholder="tu@email.com"
               />
             </div>
 
@@ -126,10 +126,7 @@ export default function LoginPage() {
 
           {/* Footer hint */}
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
-            <p style={{ fontSize: 11, color: "var(--t3)" }}>
-              Admin: <span style={{ color: "var(--gold)", fontFamily: "var(--fm)", letterSpacing: 0.3 }}>sadiagiljoan@gmail.com</span>
-            </p>
-            <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 3, opacity: 0.6 }}>
+            <p style={{ fontSize: 10, color: "var(--t3)", opacity: 0.6 }}>
               Plataforma exclusiva · Solo usuarios autorizados
             </p>
           </div>
