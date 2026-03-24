@@ -76,6 +76,15 @@ Admins can generate Shopify checkout links for services, linking directly to Sho
 ### Store Disconnect / Reconnect
 Provides functionality to disconnect a Shopify store without data loss and to reconnect with new credentials, or to fully delete a project and its associated data.
 
+### Shopify Product Creation
+Admin can create new products directly in any connected Shopify store via the Audit page ("Crear Producto" button). Features:
+- Full product form: title, price, compare-at-price, vendor, product type, tags, SKU, weight, inventory, shipping, status (draft/active).
+- AI-powered content generation: When "ShopyBrain genera el contenido" toggle is enabled (default), Claude generates optimized title, HTML description, tags, SEO title, and meta description using the store's niche, brand tone, and accumulated OmniCore knowledge.
+- Variant support: Up to 3 options (e.g., Size, Color) with automatic Cartesian variant generation (100-variant Shopify limit enforced).
+- Auto-audit: Created products are immediately audited and scored (A-F grade) and stored in the local database.
+- Success screen shows audit score, Shopify admin link, and option to create another product.
+- Endpoint: `POST /projects/:projectId/products/create`
+
 ### Shopify Pagination
 Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopify product listings.
 

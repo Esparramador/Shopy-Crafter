@@ -19,10 +19,395 @@ import {
   Tag,
   DollarSign,
   CheckCircle2,
+  Plus,
+  X,
+  Sparkles,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState } from "react";
 import { motion } from "framer-motion";
+
+const API = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface CreateProductForm {
+  title: string;
+  bodyHtml: string;
+  vendor: string;
+  productType: string;
+  tags: string;
+  price: string;
+  compareAtPrice: string;
+  status: "draft" | "active";
+  aiGenerate: boolean;
+  trackInventory: boolean;
+  quantity: string;
+  requiresShipping: boolean;
+  sku: string;
+  weight: string;
+  options: Array<{ name: string; values: string }>;
+}
+
+const INITIAL_FORM: CreateProductForm = {
+  title: "", bodyHtml: "", vendor: "", productType: "", tags: "",
+  price: "0.00", compareAtPrice: "", status: "draft", aiGenerate: true,
+  trackInventory: false, quantity: "", requiresShipping: true, sku: "",
+  weight: "", options: [],
+};
+
+function CreateProductModal({ projectId, onClose, onCreated }: {
+  projectId: number; onClose: () => void;
+  onCreated: (product: Record<string, unknown>) => void;
+}) {
+  const [form, setForm] = useState<CreateProductForm>(INITIAL_FORM);
+  const [creating, setCreating] = useState(false);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState("");
+
+  const set = (k: keyof CreateProductForm, v: unknown) => setForm(p => ({ ...p, [k]: v }));
+
+  const addOption = () => {
+    if (form.options.length >= 3) return;
+    setForm(p => ({ ...p, options: [...p.options, { name: "", values: "" }] }));
+  };
+  const removeOption = (i: number) => {
+    setForm(p => ({ ...p, options: p.options.filter((_, idx) => idx !== i) }));
+  };
+  const updateOption = (i: number, field: "name" | "values", val: string) => {
+    setForm(p => ({
+      ...p,
+      options: p.options.map((o, idx) => idx === i ? { ...o, [field]: val } : o),
+    }));
+  };
+
+  const handleCreate = async () => {
+    if (!form.title.trim()) { setError("El título es obligatorio"); return; }
+    setCreating(true); setError("");
+    try {
+      const body: Record<string, unknown> = {
+        title: form.title,
+        bodyHtml: form.bodyHtml || undefined,
+        vendor: form.vendor || undefined,
+        productType: form.productType || undefined,
+        tags: form.tags || undefined,
+        price: form.price || "0.00",
+        compareAtPrice: form.compareAtPrice || undefined,
+        status: form.status,
+        aiGenerate: form.aiGenerate,
+        trackInventory: form.trackInventory,
+        quantity: form.quantity ? parseInt(form.quantity) : undefined,
+        requiresShipping: form.requiresShipping,
+      };
+
+      if (form.options.length > 0) {
+        const validOpts = form.options.filter(o => o.name && o.values);
+        if (validOpts.length > 0) {
+          body.options = validOpts.map(o => ({
+            name: o.name,
+            values: o.values.split(",").map(v => v.trim()).filter(Boolean),
+          }));
+          const variantCombos: Record<string, unknown>[] = [];
+          const allValues = validOpts.map(o => o.values.split(",").map(v => v.trim()).filter(Boolean));
+          const totalCombos = allValues.reduce((acc, v) => acc * v.length, 1);
+          if (totalCombos > 100) {
+            setError(`Demasiadas combinaciones de variantes (${totalCombos}). Shopify permite máximo 100.`);
+            setCreating(false);
+            return;
+          }
+          const generate = (current: string[], depth: number) => {
+            if (depth === allValues.length) {
+              const variant: Record<string, unknown> = {
+                price: form.price || "0.00",
+                compareAtPrice: form.compareAtPrice || null,
+                sku: form.sku || null,
+                trackInventory: form.trackInventory,
+                quantity: form.quantity ? parseInt(form.quantity) : null,
+                requiresShipping: form.requiresShipping,
+                weight: form.weight ? parseFloat(form.weight) : null,
+              };
+              current.forEach((v, i) => { variant[`option${i + 1}`] = v; });
+              variantCombos.push(variant);
+              return;
+            }
+            for (const val of allValues[depth]) {
+              generate([...current, val], depth + 1);
+            }
+          };
+          generate([], 0);
+          body.variants = variantCombos;
+        }
+      }
+
+      const res = await fetch(`${API}/api/projects/${projectId}/products/create`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error creando producto");
+      setResult(data.product);
+      onCreated(data.product);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    }
+    setCreating(false);
+  };
+
+  const inputStyle = "w-full bg-[var(--ink2)] border border-[var(--bdr)] rounded-lg px-3 py-2.5 text-sm text-[var(--t1)] placeholder:text-[var(--t4)] focus:outline-none focus:border-[var(--gold)] transition-colors";
+  const labelStyle = "block text-xs font-semibold text-[var(--t3)] mb-1.5 uppercase tracking-wider";
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+    }} onClick={onClose}>
+      <div style={{
+        background: "var(--ink)", border: "1px solid rgba(200,168,75,0.25)", borderRadius: 16,
+        width: "min(640px, 94vw)", maxHeight: "88vh", overflow: "auto",
+        boxShadow: "0 16px 64px rgba(0,0,0,0.6)",
+      }} onClick={e => e.stopPropagation()}>
+
+        <div style={{
+          padding: "18px 24px", borderBottom: "1px solid var(--bdr)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "linear-gradient(135deg, rgba(200,168,75,0.06), transparent)",
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--t1)" }}>Crear Producto en Shopify</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>
+              Se crea directamente en la tienda del cliente
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {result ? (
+          <div style={{ padding: 24, textAlign: "center" }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%", margin: "0 auto 16px",
+              background: "rgba(45,212,159,0.15)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <CheckCircle2 size={28} style={{ color: "#2dd49f" }} />
+            </div>
+            <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "var(--t1)" }}>Producto Creado</h3>
+            <p style={{ fontSize: 14, color: "var(--t2)", margin: "0 0 16px" }}>
+              <strong>{result.title as string}</strong>
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", marginBottom: 20 }}>
+              {[
+                ["Estado", result.status as string],
+                ["Variantes", String(result.variants)],
+                ["Score", `${result.auditScore}/100 (${result.auditGrade})`],
+                ["IA", result.aiGenerated ? "Contenido generado por ShopyBrain" : "Contenido manual"],
+              ].map(([l, v]) => (
+                <div key={l} style={{ fontSize: 13, color: "var(--t2)" }}>
+                  <span style={{ color: "var(--t3)" }}>{l}: </span><strong>{v}</strong>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <a href={result.url as string} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px",
+                  background: "linear-gradient(135deg, #c8a84b, #e8c87b)", color: "#000",
+                  borderRadius: 10, fontWeight: 700, fontSize: 13, textDecoration: "none",
+                }}>
+                <ExternalLink size={14} /> Ver en Shopify
+              </a>
+              <button onClick={() => { setResult(null); setForm(INITIAL_FORM); }}
+                style={{
+                  padding: "10px 20px", background: "var(--ink2)", border: "1px solid var(--bdr)",
+                  borderRadius: 10, fontWeight: 600, fontSize: 13, color: "var(--t2)", cursor: "pointer",
+                }}>
+                Crear otro
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              background: form.aiGenerate ? "rgba(200,168,75,0.08)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${form.aiGenerate ? "rgba(200,168,75,0.3)" : "var(--bdr)"}`,
+              borderRadius: 10, cursor: "pointer",
+            }} onClick={() => set("aiGenerate", !form.aiGenerate)}>
+              <Sparkles size={18} style={{ color: form.aiGenerate ? "var(--gold)" : "var(--t4)" }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: form.aiGenerate ? "var(--gold)" : "var(--t2)" }}>
+                  ShopyBrain genera el contenido
+                </div>
+                <div style={{ fontSize: 11, color: "var(--t3)" }}>
+                  Título, descripción, tags y SEO optimizados por IA
+                </div>
+              </div>
+              <div style={{
+                width: 36, height: 20, borderRadius: 10, position: "relative",
+                background: form.aiGenerate ? "var(--gold)" : "rgba(255,255,255,0.1)",
+                transition: "background 0.2s",
+              }}>
+                <div style={{
+                  position: "absolute", top: 2, width: 16, height: 16, borderRadius: "50%",
+                  background: "#fff", transition: "left 0.2s",
+                  left: form.aiGenerate ? 18 : 2,
+                }} />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label className={labelStyle}>Título del producto *</label>
+                <input className={inputStyle} value={form.title} onChange={e => set("title", e.target.value)}
+                  placeholder="Ej: Camiseta Premium Algodón Orgánico" />
+              </div>
+
+              {!form.aiGenerate && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label className={labelStyle}>Descripción (HTML)</label>
+                  <textarea className={inputStyle} value={form.bodyHtml} onChange={e => set("bodyHtml", e.target.value)}
+                    placeholder="Descripción del producto..." rows={4} style={{ resize: "vertical" }} />
+                </div>
+              )}
+
+              <div>
+                <label className={labelStyle}>Precio</label>
+                <input className={inputStyle} type="number" step="0.01" value={form.price}
+                  onChange={e => set("price", e.target.value)} placeholder="29.99" />
+              </div>
+              <div>
+                <label className={labelStyle}>Precio anterior (tachado)</label>
+                <input className={inputStyle} type="number" step="0.01" value={form.compareAtPrice}
+                  onChange={e => set("compareAtPrice", e.target.value)} placeholder="39.99" />
+              </div>
+
+              <div>
+                <label className={labelStyle}>Vendor / Marca</label>
+                <input className={inputStyle} value={form.vendor} onChange={e => set("vendor", e.target.value)}
+                  placeholder="Nombre de la marca" />
+              </div>
+              <div>
+                <label className={labelStyle}>Tipo de producto</label>
+                <input className={inputStyle} value={form.productType} onChange={e => set("productType", e.target.value)}
+                  placeholder="Ej: Camisetas, Electrónica..." />
+              </div>
+
+              {!form.aiGenerate && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label className={labelStyle}>Tags (separados por coma)</label>
+                  <input className={inputStyle} value={form.tags} onChange={e => set("tags", e.target.value)}
+                    placeholder="moda, premium, algodón, verano" />
+                </div>
+              )}
+
+              <div>
+                <label className={labelStyle}>SKU</label>
+                <input className={inputStyle} value={form.sku} onChange={e => set("sku", e.target.value)}
+                  placeholder="SKU-001" />
+              </div>
+              <div>
+                <label className={labelStyle}>Peso (kg)</label>
+                <input className={inputStyle} type="number" step="0.01" value={form.weight}
+                  onChange={e => set("weight", e.target.value)} placeholder="0.5" />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={form.trackInventory}
+                  onChange={e => set("trackInventory", e.target.checked)} id="inv" />
+                <label htmlFor="inv" style={{ fontSize: 13, color: "var(--t2)", cursor: "pointer" }}>
+                  Control de inventario
+                </label>
+              </div>
+              {form.trackInventory && (
+                <div>
+                  <label className={labelStyle}>Cantidad inicial</label>
+                  <input className={inputStyle} type="number" value={form.quantity}
+                    onChange={e => set("quantity", e.target.value)} placeholder="100" />
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={form.requiresShipping}
+                  onChange={e => set("requiresShipping", e.target.checked)} id="ship" />
+                <label htmlFor="ship" style={{ fontSize: 13, color: "var(--t2)", cursor: "pointer" }}>
+                  Requiere envío
+                </label>
+              </div>
+              <div>
+                <label className={labelStyle}>Estado</label>
+                <select className={inputStyle} value={form.status} onChange={e => set("status", e.target.value)}>
+                  <option value="draft">Borrador</option>
+                  <option value="active">Activo (publicado)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <label className={labelStyle} style={{ margin: 0 }}>Opciones / Variantes</label>
+                {form.options.length < 3 && (
+                  <button onClick={addOption} style={{
+                    background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 8,
+                    padding: "4px 10px", fontSize: 11, color: "var(--t2)", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    <Plus size={11} /> Añadir opción
+                  </button>
+                )}
+              </div>
+              {form.options.length === 0 && (
+                <p style={{ fontSize: 11, color: "var(--t4)", margin: 0 }}>
+                  Sin opciones = producto simple. Añade opciones para crear variantes (ej: Talla, Color).
+                </p>
+              )}
+              {form.options.map((opt, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <input className={inputStyle} style={{ width: 120 }} value={opt.name}
+                    onChange={e => updateOption(i, "name", e.target.value)} placeholder="Ej: Talla" />
+                  <input className={inputStyle} style={{ flex: 1 }} value={opt.values}
+                    onChange={e => updateOption(i, "values", e.target.value)} placeholder="S, M, L, XL" />
+                  <button onClick={() => removeOption(i)} style={{
+                    background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 4,
+                  }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {error && (
+              <div style={{
+                padding: "10px 14px", background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8,
+                fontSize: 13, color: "#ef4444",
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button onClick={handleCreate} disabled={creating || !form.title.trim()}
+              style={{
+                width: "100%", padding: "13px", borderRadius: 11, border: "none",
+                background: !form.title.trim() ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #c8a84b, #e8c87b)",
+                color: !form.title.trim() ? "var(--t3)" : "#000",
+                fontWeight: 700, fontSize: 14, cursor: creating || !form.title.trim() ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+                opacity: creating ? 0.75 : 1, transition: "all 0.2s",
+              }}>
+              {creating ? (
+                <><Loader2 size={15} style={{ animation: "spin 0.6s linear infinite" }} />
+                  {form.aiGenerate ? "ShopyBrain generando contenido..." : "Creando en Shopify..."}</>
+              ) : (
+                <><Plus size={15} /> Crear producto en Shopify</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type OppDifficulty = "Fácil" | "Media" | "Difícil";
 
@@ -40,6 +425,7 @@ export default function AuditPage() {
   const [filterGrade, setFilterGrade] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"products" | "opportunities">("products");
   const [scanStatus, setScanStatus] = useState<"idle" | "syncing" | "auditing">("idle");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { data, isLoading } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
   const syncProducts = useSyncProducts();
@@ -86,19 +472,38 @@ export default function AuditPage() {
             {data?.total ? `Analizando ${data.total} productos` : "Escanea tu tienda para comenzar"}
           </p>
         </div>
-        <button
-          onClick={handleScan}
-          disabled={isScanning}
-          className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-70"
-        >
-          <RefreshCw className={`w-5 h-5 ${isScanning ? "animate-spin" : ""}`} />
-          {scanStatus === "syncing"
-            ? "Sincronizando Shopify..."
-            : scanStatus === "auditing"
-            ? "Calculando scores..."
-            : "Escanear Tienda"}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-[var(--gold)] text-black px-5 py-3 rounded-xl font-semibold flex items-center gap-2 hover:brightness-110 transition-all shadow-[0_0_15px_rgba(200,168,75,0.3)]"
+          >
+            <Plus className="w-5 h-5" />
+            Crear Producto
+          </button>
+          <button
+            onClick={handleScan}
+            disabled={isScanning}
+            className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-70"
+          >
+            <RefreshCw className={`w-5 h-5 ${isScanning ? "animate-spin" : ""}`} />
+            {scanStatus === "syncing"
+              ? "Sincronizando Shopify..."
+              : scanStatus === "auditing"
+              ? "Calculando scores..."
+              : "Escanear Tienda"}
+          </button>
+        </div>
       </div>
+
+      {showCreateModal && (
+        <CreateProductModal
+          projectId={projectId}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
+          }}
+        />
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

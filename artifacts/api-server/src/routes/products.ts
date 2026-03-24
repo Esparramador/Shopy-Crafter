@@ -457,4 +457,209 @@ Devuelve SOLO un JSON array con estos campos por objeto. Sin texto adicional.`;
   res.json(opportunities);
 });
 
+router.post("/projects/:projectId/products/create", async (req, res): Promise<void> => {
+  const projectId = parseInt(req.params.projectId, 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const {
+    title, bodyHtml, vendor, productType, tags, status,
+    variants, options, images, aiGenerate,
+  } = req.body;
+
+  if (!title) { res.status(400).json({ error: "El título es obligatorio" }); return; }
+
+  let finalTitle = title;
+  let finalBody = bodyHtml ?? "";
+  let finalTags = tags ?? "";
+  let seoTitle = "";
+  let seoDescription = "";
+
+  if (aiGenerate) {
+    try {
+      const aiResult = await askClaudeJsonWithBrain<{
+        title: string;
+        description: string;
+        tags: string[];
+        seoTitle: string;
+        seoDescription: string;
+      }>(
+        projectId,
+        `Genera contenido optimizado para un producto Shopify.
+Datos del producto:
+- Título original: "${title}"
+- Tipo: ${productType || "no especificado"}
+- Vendor/marca: ${vendor || "no especificado"}
+- Nicho de la tienda: ${project.storeNiche || "general"}
+- Tono de marca: ${project.brandTone || "profesional"}
+- Público objetivo: ${project.targetAudience || "general"}
+
+Genera:
+1. "title": Título optimizado para SEO y conversión (max 70 chars)
+2. "description": Descripción HTML persuasiva y profesional (min 150 palabras, con bullet points, beneficios, CTA). Usa <h3>, <ul>, <li>, <p>, <strong>.
+3. "tags": Array de 5-8 tags relevantes para SEO y categorización
+4. "seoTitle": Meta title optimizado (max 60 chars)
+5. "seoDescription": Meta description persuasiva (max 155 chars)
+
+Responde SOLO JSON válido.`,
+        `${SHOPIFY_EXPERT_SYSTEM} Eres experto en copywriting de eCommerce. Genera contenido que convierta, usando el conocimiento acumulado del nicho.`,
+        "redesign",
+        project.storeNiche ?? undefined
+      );
+
+      if (aiResult) {
+        finalTitle = aiResult.title || title;
+        finalBody = aiResult.description || bodyHtml || "";
+        finalTags = Array.isArray(aiResult.tags) ? aiResult.tags.join(", ") : (tags ?? "");
+        seoTitle = aiResult.seoTitle || "";
+        seoDescription = aiResult.seoDescription || "";
+      }
+    } catch (e) {
+      console.error("AI generation for product failed, using original data:", e);
+    }
+  }
+
+  const shopifyProduct: Record<string, unknown> = {
+    title: finalTitle,
+    body_html: finalBody,
+    vendor: vendor || undefined,
+    product_type: productType || undefined,
+    tags: finalTags,
+    status: status || "draft",
+  };
+
+  if (variants?.length) {
+    shopifyProduct.variants = variants.map((v: Record<string, unknown>) => ({
+      title: v.title || "Default",
+      price: v.price || "0.00",
+      compare_at_price: v.compareAtPrice || null,
+      sku: v.sku || null,
+      inventory_management: v.trackInventory ? "shopify" : null,
+      inventory_quantity: v.quantity ?? null,
+      option1: v.option1 || null,
+      option2: v.option2 || null,
+      option3: v.option3 || null,
+      weight: v.weight || null,
+      weight_unit: v.weightUnit || "kg",
+      requires_shipping: v.requiresShipping !== false,
+      taxable: v.taxable !== false,
+    }));
+  } else {
+    shopifyProduct.variants = [{
+      title: "Default",
+      price: req.body.price || "0.00",
+      compare_at_price: req.body.compareAtPrice || null,
+      sku: req.body.sku || null,
+      inventory_management: req.body.trackInventory ? "shopify" : null,
+      inventory_quantity: req.body.quantity ?? null,
+      weight: req.body.weight ? parseFloat(req.body.weight) : null,
+      weight_unit: "kg",
+      requires_shipping: req.body.requiresShipping !== false,
+      taxable: req.body.taxable !== false,
+    }];
+  }
+
+  if (options?.length) {
+    shopifyProduct.options = options.map((o: Record<string, unknown>, i: number) => ({
+      name: o.name,
+      position: i + 1,
+      values: o.values,
+    }));
+  }
+
+  if (images?.length) {
+    shopifyProduct.images = images.map((img: Record<string, unknown>, i: number) => ({
+      src: img.src,
+      alt: img.alt || finalTitle,
+      position: i + 1,
+    }));
+  }
+
+  if (seoTitle || seoDescription) {
+    shopifyProduct.metafields_global_title_tag = seoTitle;
+    shopifyProduct.metafields_global_description_tag = seoDescription;
+  }
+
+  try {
+    const result = await shopifyRequest<{ product: ShopifyProductRaw }>(
+      projectId,
+      project.shopDomain,
+      "/products.json",
+      {
+        method: "POST",
+        body: JSON.stringify({ product: shopifyProduct }),
+      }
+    );
+
+    const sp = result.product;
+    const audit = auditProduct({
+      title: sp.title,
+      body_html: sp.body_html,
+      price: sp.variants?.[0]?.price,
+      compare_at_price: sp.variants?.[0]?.compare_at_price,
+      images: sp.images,
+      tags: sp.tags,
+    });
+
+    await db.insert(productsTable).values({
+      projectId,
+      shopifyProductId: String(sp.id),
+      title: sp.title,
+      handle: sp.handle,
+      bodyHtml: sp.body_html,
+      vendor: sp.vendor,
+      productType: sp.product_type,
+      status: sp.status,
+      tags: sp.tags,
+      price: sp.variants?.[0]?.price ?? null,
+      compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
+      imageCount: sp.images?.length ?? 0,
+      variantCount: sp.variants?.length ?? 1,
+      imagesJson: sp.images ?? [],
+      auditScore: audit.overallScore,
+      auditGrade: scoreToGrade(audit.overallScore),
+      auditProblems: audit.problems,
+      titleScore: audit.titleScore,
+      descriptionScore: audit.descriptionScore,
+      priceScore: audit.priceScore,
+      imageScore: audit.imageScore,
+      seoScore: audit.seoScore,
+    }).onConflictDoUpdate({
+      target: [productsTable.projectId, productsTable.shopifyProductId],
+      set: {
+        title: sp.title,
+        handle: sp.handle,
+        bodyHtml: sp.body_html,
+        status: sp.status,
+        tags: sp.tags,
+        price: sp.variants?.[0]?.price ?? null,
+        imageCount: sp.images?.length ?? 0,
+        variantCount: sp.variants?.length ?? 1,
+        imagesJson: sp.images ?? [],
+        auditScore: audit.overallScore,
+        auditGrade: scoreToGrade(audit.overallScore),
+      },
+    });
+
+    res.json({
+      success: true,
+      product: {
+        shopifyId: sp.id,
+        title: sp.title,
+        handle: sp.handle,
+        status: sp.status,
+        url: `https://${project.shopDomain}/admin/products/${sp.id}`,
+        variants: sp.variants?.length ?? 1,
+        images: sp.images?.length ?? 0,
+        auditScore: audit.overallScore,
+        auditGrade: scoreToGrade(audit.overallScore),
+        aiGenerated: !!aiGenerate,
+      },
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: `Error creando producto en Shopify: ${msg}` });
+  }
+});
+
 export default router;
