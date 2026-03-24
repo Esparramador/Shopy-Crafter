@@ -43,12 +43,30 @@ Key tables: `users`, `projects`, `products`, `omnicore_memories`, `omnicore_insi
 - Session: `httpOnly`, `sameSite: strict`, `secure: true` in production
 - SVG from AI sanitized (strips `<script>`, `on*`, `javascript:`)
 
-### AI Stack — OmniCore (ShopyBrain)
-- Claude `claude-sonnet-4-5` — text generation with `buildShopyBrainContext()` injection
-- Replicate (Flux, Recraft) — image generation
-- `learnFromOperation()` + `ingestToShopyBrain()` — always fire-and-forget, NEVER awaited
+### AI Stack — OmniCore (ShopyBrain) + Gemini Research
+**Three-model pipeline: Gemini → Claude → OmniCore**
+
+| Model | Role | Use Case |
+|---|---|---|
+| Gemini `gemini-3.1-pro-preview` | Research & Intelligence | Business research, market intel, competitor analysis, product trends |
+| Gemini `gemini-2.5-flash` | Fast research | Competitor gaps, product trends (batch) |
+| Claude `claude-sonnet-4-5` | Analysis & Content | Strategy, content generation, ShopyBrain context injection |
+| Replicate (Flux, Recraft) | Image generation | Product images, lifestyle shots |
+
 - `askClaudeJsonWithBrain()` — main Claude call (injects OmniCore context in system prompt)
 - `askClaudeWithBrain()` — vision variant
+- `researchBusiness()` — Gemini: full business intelligence profile
+- `gatherMarketIntelligence()` — Gemini: market data → auto-saved to OmniCore niche profiles
+- `analyzeCompetitor()` — Gemini: competitor intel + Claude gap analysis
+- `analyzeProductTrends()` — Gemini: product trend analysis → auto-saved to OmniCore
+- `learnFromOperation()` + `ingestToShopyBrain()` — always fire-and-forget, NEVER awaited
+
+**Gemini integration**: Replit AI Integrations proxy — no API key required, billed to Replit credits.
+- `AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY` — auto-provisioned
+- Package: `@workspace/integrations-gemini-ai` + `@google/genai` (direct dep in api-server)
+- Library: `artifacts/api-server/src/lib/gemini.ts`
+- Route: `artifacts/api-server/src/routes/gemini-research.ts` → `/api/gemini/*`
+- Frontend: `/admin/gemini-intel` → `GeminiIntelligence.tsx`
 
 ### OmniCore / ShopyBrain Cron Jobs (9 total)
 | Schedule | Job |

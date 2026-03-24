@@ -11,6 +11,7 @@ import NewProject from "@/pages/NewProject";
 import Landing from "@/pages/Landing";
 import CMSEditor from "@/pages/admin/CMSEditor";
 import Intelligence from "@/pages/admin/Intelligence";
+import GeminiIntelligence from "@/pages/admin/GeminiIntelligence";
 import Inventory from "@/pages/admin/Inventory";
 import Achievements from "@/pages/admin/Achievements";
 import Roadmap from "@/pages/admin/Roadmap";
@@ -199,6 +200,9 @@ function Router() {
               <AppLayout><Intelligence /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
+        </Route>
+        <Route path="/admin/gemini-intel">
+          <RequireAdmin><AppLayout><GeminiIntelligence /></AppLayout></RequireAdmin>
         </Route>
         <Route path="/admin/inventory">
           <RequireAdmin>

@@ -33,6 +33,7 @@ const ADMIN_NAV = [
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
   { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
+  { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
   { label: "M7 Inventario", icon: "📦", href: "/admin/inventory" },
   { label: "Competitor Intel", icon: "🎯", href: "/admin/competitors" },
   { label: "Predicciones ML", icon: "🔮", href: "/admin/forecast" },
