@@ -211,13 +211,16 @@ router.post("/projects", async (req, res): Promise<void> => {
   const {
     name, shopDomain, clientId, clientSecret,
     storeNiche, brandTone, targetAudience, storeMarkets,
-    replicateApiToken, anthropicApiKey,
+    replicateApiToken, anthropicApiKey, plan,
   } = req.body;
 
   if (!name || !shopDomain || !clientId || !clientSecret) {
     res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
     return;
   }
+
+  const validPlans = ["admin", "starter", "agency_pro", "enterprise", "trial"];
+  const finalPlan = validPlans.includes(plan) ? plan : "starter";
 
   const normalizedDomain = normalizeShopDomain(shopDomain);
 
@@ -233,6 +236,8 @@ router.post("/projects", async (req, res): Promise<void> => {
     storeMarkets: storeMarkets ?? null,
     replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
     anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
+    plan: finalPlan as "admin" | "starter" | "agency_pro" | "enterprise" | "trial",
+    planRenewsAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
   }).returning();
 
   // Auto-generate token immediately via client_credentials grant

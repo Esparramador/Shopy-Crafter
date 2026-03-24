@@ -28,8 +28,26 @@ export const projectsTable = pgTable("projects", {
   productCount: integer("product_count"),
   avgAuditScore: real("avg_audit_score"),
   webhookId: text("webhook_id"),
+  // Plan & limits
+  plan: text("plan").notNull().default("starter").$type<"admin" | "starter" | "agency_pro" | "enterprise" | "trial">(),
+  productsUsedThisMonth: integer("products_used_this_month").notNull().default(0),
+  imagesUsedThisMonth: integer("images_used_this_month").notNull().default(0),
+  creditsProducts: integer("credits_products").notNull().default(0),
+  creditsImages: integer("credits_images").notNull().default(0),
+  planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const planCreditPacksTable = pgTable("plan_credit_packs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  packType: text("pack_type").notNull(),
+  productsIncluded: integer("products_included").notNull(),
+  imagesIncluded: integer("images_included").notNull(),
+  shopifyProductId: text("shopify_product_id"),
+  shopifyOrderId: text("shopify_order_id"),
+  purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertProjectSchema = createInsertSchema(projectsTable).omit({
@@ -39,3 +57,4 @@ export const insertProjectSchema = createInsertSchema(projectsTable).omit({
 });
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projectsTable.$inferSelect;
+export type PlanType = "admin" | "starter" | "agency_pro" | "enterprise" | "trial";

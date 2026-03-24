@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 
 const router = Router();
 
@@ -261,6 +262,12 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
     return;
   }
 
+  const limitCheck = await checkProductionLimit(projectId, "image", 1);
+  if (!limitCheck.allowed) {
+    res.status(403).json({ error: limitCheck.reason, planLimit: true, remaining: limitCheck.remaining, planLabel: limitCheck.planLabel });
+    return;
+  }
+
   const model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
   const estimatedCost = COST_MAP[model] ?? 0.04;
 
@@ -442,6 +449,13 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
   }
 
   const totalItems = productIds.length * imageTypes.length;
+
+  const bulkLimitCheck = await checkProductionLimit(projectId, "image", totalItems);
+  if (!bulkLimitCheck.allowed) {
+    res.status(403).json({ error: bulkLimitCheck.reason, planLimit: true, remaining: bulkLimitCheck.remaining, planLabel: bulkLimitCheck.planLabel });
+    return;
+  }
+
   const jobId = await createBulkJob(projectId, "bulk_image_generation", totalItems);
 
   res.json({
@@ -520,6 +534,7 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
 
           if (result.success) {
             completed++;
+            await recordUsage(projectId, "image", 1);
             await updateJobProgress(jobId, completed, failed, `✓ ${product.title} — ${imageType}`);
           } else {
             failed++;

@@ -23,7 +23,16 @@ export default function NewProject() {
     brandTone: "",
     targetAudience: "",
     storeMarkets: "",
+    plan: "starter",
   });
+
+  const PLANS = [
+    { key: "trial", label: "Trial", desc: "3 productos · 2 imgs", color: "#888" },
+    { key: "starter", label: "Starter €49/mes", desc: "15 productos · 3 imgs", color: "#c9a84c" },
+    { key: "agency_pro", label: "Agency Pro €149/mes", desc: "60 productos · 5 imgs", color: "#5b9bd5" },
+    { key: "enterprise", label: "Enterprise €399/mes", desc: "200 productos · 6 imgs", color: "#3db87a" },
+    { key: "admin", label: "Admin (sin límites)", desc: "Tienda propia", color: "#a855f7" },
+  ];
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -54,6 +63,7 @@ export default function NewProject() {
           brandTone: formData.brandTone || undefined,
           targetAudience: formData.targetAudience || undefined,
           storeMarkets: formData.storeMarkets || undefined,
+          plan: formData.plan,
         }),
       });
       const data = await r.json();
@@ -164,6 +174,48 @@ export default function NewProject() {
           <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
             🔒 Credenciales cifradas con AES-256. El token de acceso se genera automáticamente al guardar.
           </p>
+        </div>
+
+        {/* Plan selector */}
+        <div className="card" style={{ padding: "20px 24px", marginBottom: 16 }}>
+          <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+            Plan del cliente
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {PLANS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, plan: p.key }))}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${formData.plan === p.key ? p.color : "var(--bdr)"}`,
+                  background: formData.plan === p.key ? `${p.color}18` : "transparent",
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  minWidth: 120,
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: 12, fontFamily: "var(--fb)", color: formData.plan === p.key ? p.color : "var(--t2)" }}>
+                  {p.label}
+                </span>
+                <span style={{ fontSize: 10, color: "var(--t3)" }}>{p.desc}</span>
+              </button>
+            ))}
+          </div>
+          {formData.plan !== "starter" && (
+            <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
+              {formData.plan === "admin" ? "⚡ Sin límites de productos ni imágenes — solo para tiendas propias" :
+               formData.plan === "trial" ? "⏳ Acceso limitado para pruebas" :
+               formData.plan === "enterprise" ? "🏆 200 productos/mes · 6 imágenes/producto · 1.200 imgs/mes" :
+               "💼 60 productos/mes · 5 imágenes/producto · 300 imgs/mes"}
+            </p>
+          )}
         </div>
 
         {/* Contexto de marca (colapsable) */}

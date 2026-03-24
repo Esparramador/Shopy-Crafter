@@ -32,6 +32,7 @@ import absorberRouter from "./absorber.js";
 import entityResearchRouter from "./entity-research.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
+import plansRouter from "./plans.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -74,5 +75,6 @@ router.use("/gemini", geminiResearchRouter);
 router.use(klaviyoAiRouter);
 router.use(absorberRouter);
 router.use(entityResearchRouter);
+router.use(plansRouter);
 
 export default router;
