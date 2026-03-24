@@ -48,57 +48,141 @@ function formatTime(dateStr: string) {
 }
 
 // ─── Invite Modal ─────────────────────────────────────────────────────────────
-interface InviteModalProps { onClose: () => void; onInvited: (link: string, email: string) => void; }
+interface InviteModalProps { onClose: () => void; onInvited: (link: string, email: string, storeName: string) => void; }
+
+interface ProjectOption { id: number; name: string; shopDomain: string; storeNiche: string | null; }
 
 function InviteModal({ onClose, onInvited }: InviteModalProps) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [inviteResult, setInviteResult] = useState<{ link: string; storeName: string; shopDomain: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/admin/projects-list`, { credentials: "include" })
+      .then(r => r.json())
+      .then((data: ProjectOption[]) => { setProjects(data); setLoadingProjects(false); })
+      .catch(() => setLoadingProjects(false));
+  }, []);
+
+  const copyLink = () => {
+    if (!inviteResult) return;
+    navigator.clipboard.writeText(inviteResult.link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId.trim()) { setError("El ID del proyecto es obligatorio"); return; }
+    if (!projectId) { setError("Selecciona la tienda del cliente"); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/projects/${projectId.trim()}/invite`, {
+      const res = await fetch(`${API_BASE}/api/admin/projects/${projectId}/invite`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify({ email, name }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      onInvited(data.inviteLink, email);
+      setInviteResult({ link: data.inviteLink, storeName: data.storeName ?? name, shopDomain: data.shopDomain ?? "" });
+      onInvited(data.inviteLink, email, data.storeName ?? name);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al invitar");
     } finally { setLoading(false); }
   };
 
+  const selectedProject = projects.find(p => String(p.id) === projectId);
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div className="modal-box">
+      <div className="modal-box" style={{ maxWidth: 480 }}>
         <p className="modal-title">📨 Invitar Cliente</p>
-        <p className="modal-subtitle">El cliente recibirá un enlace de acceso.</p>
-        <form onSubmit={submit}>
-          {[
-            { label: "Nombre del cliente", value: name, onChange: setName, placeholder: "Ej: María García", type: "text" },
-            { label: "Email del cliente", value: email, onChange: setEmail, placeholder: "cliente@tienda.com", type: "email" },
-            { label: "ID del proyecto (numérico)", value: projectId, onChange: setProjectId, placeholder: "Ej: 1", type: "text" },
-          ].map(({ label, value, onChange, placeholder, type }) => (
-            <div className="form-group" key={label}>
-              <label className="form-label">{label}</label>
-              <input type={type} className="form-input" value={value} onChange={(e) => onChange(e.target.value)} required placeholder={placeholder} />
+        <p className="modal-subtitle">El enlace generado es exclusivo e intransferible para esa tienda.</p>
+
+        {inviteResult ? (
+          /* ─── Success: show link to copy ─── */
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ padding: "12px 14px", background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.25)", borderRadius: 10 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: "var(--jade)" }}>✅ Enlace creado para {email}</p>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--t3)" }}>Tienda: {inviteResult.storeName} · {inviteResult.shopDomain}</p>
             </div>
-          ))}
-          {error && <div style={{ background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.2)", borderRadius: 8, padding: "8px 12px", color: "var(--crim)", fontSize: 12.5, marginBottom: 14 }}>{error}</div>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
-            <button type="submit" disabled={loading} className={`btn btn-gold${loading ? " loading" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
-              Enviar invitación
-            </button>
+            <div style={{ padding: "10px 12px", background: "var(--ink2)", borderRadius: 8, border: "1px solid var(--ink3)", wordBreak: "break-all", fontSize: 11, color: "var(--t2)", fontFamily: "monospace" }}>
+              {inviteResult.link}
+            </div>
+            <div style={{ padding: "10px 12px", background: "rgba(255,200,0,0.05)", border: "1px solid rgba(255,200,0,0.15)", borderRadius: 8 }}>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--gold)", lineHeight: 1.6 }}>
+                ⚠️ <b>Importante:</b> Envía este enlace <b>únicamente</b> al cliente <b>{name}</b> ({email}). Es personal e intransferible — expira en 48 horas y solo funciona para esta tienda.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={copyLink} className="btn btn-gold" style={{ flex: 1, justifyContent: "center" }}>
+                {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+                {copied ? "¡Copiado!" : "Copiar enlace"}
+              </button>
+              <button onClick={onClose} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cerrar</button>
+            </div>
           </div>
-        </form>
+        ) : (
+          /* ─── Form ─── */
+          <form onSubmit={submit}>
+            <div className="form-group">
+              <label className="form-label">Nombre del cliente</label>
+              <input type="text" className="form-input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ej: María García" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email del cliente</label>
+              <input type="email" className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="cliente@tienda.com" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tienda (proyecto)</label>
+              {loadingProjects ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "var(--ink2)", borderRadius: 8, border: "1px solid var(--bdr)", fontSize: 13, color: "var(--t3)" }}>
+                  <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} /> Cargando tiendas...
+                </div>
+              ) : projects.length === 0 ? (
+                <div style={{ padding: "10px 14px", background: "rgba(232,69,88,0.06)", borderRadius: 8, border: "1px solid rgba(232,69,88,0.2)", fontSize: 12, color: "var(--crim)" }}>
+                  No hay tiendas creadas aún. Crea un proyecto primero.
+                </div>
+              ) : (
+                <select
+                  className="form-input"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  required
+                  style={{ cursor: "pointer" }}
+                >
+                  <option value="">— Selecciona la tienda —</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name} · {p.shopDomain}{p.storeNiche ? ` · ${p.storeNiche}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Selected project preview */}
+            {selectedProject && (
+              <div style={{ marginBottom: 14, padding: "8px 12px", background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.2)", borderRadius: 8, fontSize: 11, color: "var(--t2)" }}>
+                <ShoppingCart size={11} style={{ marginRight: 6, verticalAlign: "middle", color: "var(--gold)" }} />
+                <b style={{ color: "var(--gold)" }}>{selectedProject.name}</b> · {selectedProject.shopDomain}
+                <span style={{ marginLeft: 8, padding: "1px 6px", background: "rgba(200,168,75,0.1)", borderRadius: 10, fontSize: 9, color: "var(--gold)", fontWeight: 700 }}>EXCLUSIVO</span>
+              </div>
+            )}
+
+            {error && <div style={{ background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.2)", borderRadius: 8, padding: "8px 12px", color: "var(--crim)", fontSize: 12.5, marginBottom: 14 }}>{error}</div>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
+              <button type="submit" disabled={loading || projects.length === 0} className={`btn btn-gold${loading ? " loading" : ""}`} style={{ flex: 1, justifyContent: "center" }}>
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                Generar enlace
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -407,7 +491,7 @@ export default function AdminClients() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteLink, setInviteLink] = useState<{ link: string; email: string } | null>(null);
+  const [inviteLink, setInviteLink] = useState<{ link: string; email: string; storeName?: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [chatClient, setChatClient] = useState<User | null>(null);
@@ -447,7 +531,7 @@ export default function AdminClients() {
       {showInvite && (
         <InviteModal
           onClose={() => setShowInvite(false)}
-          onInvited={(link, email) => { setShowInvite(false); setInviteLink({ link, email }); load(); }}
+          onInvited={(link, email, storeName) => { setShowInvite(false); setInviteLink({ link, email, storeName }); load(); }}
         />
       )}
       {paymentClient && (
@@ -483,8 +567,8 @@ export default function AdminClients() {
           <div style={{ background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: "var(--r3)", padding: 16, display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
             <CheckCircle size={18} style={{ color: "var(--jade)", flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Invitación creada para {inviteLink.email}</p>
-              <p style={{ fontSize: 11.5, color: "var(--jade)", marginBottom: 8 }}>Comparte este enlace (expira en 48h):</p>
+              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Invitación creada para {inviteLink.email}{inviteLink.storeName ? ` — ${inviteLink.storeName}` : ""}</p>
+              <p style={{ fontSize: 11.5, color: "var(--jade)", marginBottom: 8 }}>Enlace exclusivo e intransferible (expira en 48h):</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ink3)", borderRadius: 8, padding: "7px 10px", border: "1px solid var(--bdr)" }}>
                 <code style={{ flex: 1, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "none", border: "none", padding: 0, color: "var(--t2)" }}>
                   {inviteLink.link}

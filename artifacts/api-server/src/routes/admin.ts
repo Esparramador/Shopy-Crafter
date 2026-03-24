@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { db, usersTable, auditLogTable, approvalsTable, messagesTable } from "@workspace/db";
+import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 
@@ -50,6 +50,17 @@ router.post("/users", async (req, res): Promise<void> => {
   res.json({ id, email, name, role: safeRole });
 });
 
+// ─── GET /admin/projects-list — for invite modal dropdown ────────────────────
+router.get("/projects-list", async (_req, res): Promise<void> => {
+  const projects = await db.select({
+    id: projectsTable.id,
+    name: projectsTable.name,
+    shopDomain: projectsTable.shopDomain,
+    storeNiche: projectsTable.storeNiche,
+  }).from(projectsTable).orderBy(desc(projectsTable.createdAt));
+  res.json(projects);
+});
+
 router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
   const { projectId } = req.params;
   const { email, name } = req.body as { email: string; name: string };
@@ -76,6 +87,13 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     });
   }
 
+  // Fetch the project to include shop info in the response
+  const [project] = await db.select({
+    id: projectsTable.id,
+    name: projectsTable.name,
+    shopDomain: projectsTable.shopDomain,
+  }).from(projectsTable).where(eq(projectsTable.id, Number(projectId)));
+
   const replitDomains = process.env.REPLIT_DOMAINS?.split(",")[0];
   const replitDev = process.env.REPLIT_DEV_DOMAIN;
   const baseUrl = process.env.APP_URL
@@ -89,10 +107,16 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     userId: req.session.userId!,
     projectId,
     action: "invite_client",
-    details: `Invited ${email} to project ${projectId}`,
+    details: `Invited ${email} to project ${projectId} (${project?.shopDomain ?? "unknown"})`,
   });
 
-  res.json({ success: true, inviteLink, message: `Invitation created for ${email}` });
+  res.json({
+    success: true,
+    inviteLink,
+    storeName: project?.name ?? null,
+    shopDomain: project?.shopDomain ?? null,
+    message: `Enlace de invitación creado para ${email} — tienda: ${project?.shopDomain ?? projectId}`,
+  });
 });
 
 router.post("/users/:userId/deactivate", async (req, res): Promise<void> => {

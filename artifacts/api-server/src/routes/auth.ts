@@ -99,7 +99,29 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ name: user.name, email: user.email, projectId: user.clientId });
+  // Fetch project info so the setup page can show store name + domain
+  let storeName: string | null = null;
+  let shopDomain: string | null = null;
+  if (user.clientId) {
+    try {
+      const { projectsTable } = await import("@workspace/db");
+      const [project] = await db.select({
+        name: projectsTable.name,
+        shopDomain: projectsTable.shopDomain,
+      }).from(projectsTable).where(eq(projectsTable.id, Number(user.clientId)));
+      storeName = project?.name ?? null;
+      shopDomain = project?.shopDomain ?? null;
+    } catch { /* project may not exist yet */ }
+  }
+
+  res.json({
+    name: user.name,
+    email: user.email,
+    projectId: user.clientId,
+    storeName,
+    shopDomain,
+    expiresAt: user.inviteExpires,
+  });
 });
 
 router.post("/invite/:token/setup", async (req, res): Promise<void> => {
