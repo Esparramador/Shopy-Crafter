@@ -98,6 +98,13 @@ Admin goes to Clients → "Cobrar" button → selects service → `POST /api/age
 7. **Contactar (fp-contact)** — contact form → `POST /api/contact` → audit_log + Klaviyo event
 8. Empezar (fp-cta) + footer
 
+### Admin Navigation — Key Routes
+- `/admin/clients` — **default after login** (client management + billing)
+- `/home` — projects dashboard (also accessible via sidebar logo click)
+- `/admin/shopybrain` — OmniCore brain overview
+- `/admin/my-pricing` — CFO pricing dashboard
+- `/new-project` — add new Shopify store
+
 ### Public Routes (no auth required)
 - `GET /api/cms/content` — landing CMS content
 - `POST /api/contact` — lead form submission (saved to audit_log + Klaviyo events)

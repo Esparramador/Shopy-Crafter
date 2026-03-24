@@ -88,11 +88,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* ── SIDEBAR ── */}
       <nav className={`sidebar${sidebarOpen ? " open" : ""}`} role="navigation" aria-label="Navegación principal">
         {/* Logo */}
-        <div className="sidebar-logo">
-          <div className="logo-gem">⚡</div>
-          <span className="logo-text">Shopify<em>AI</em></span>
-          <span className="logo-badge">PRO</span>
-        </div>
+        <Link href="/home" style={{ textDecoration: "none" }}>
+          <div className="sidebar-logo" style={{ cursor: "pointer" }}>
+            <div className="logo-gem">⚡</div>
+            <span className="logo-text">Shopify<em>AI</em></span>
+            <span className="logo-badge">PRO</span>
+          </div>
+        </Link>
 
         {/* Stores list */}
         <div className="sidebar-clients">

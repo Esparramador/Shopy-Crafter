@@ -86,7 +86,7 @@ function HomeRedirect() {
   if (loading) return <LoadingScreen />;
   if (!user) return <Landing />;
   if (user.role === "client") return <Redirect to="/client" />;
-  return <AppLayout><Home /></AppLayout>;
+  return <Redirect to="/admin/clients" />;
 }
 
 function ImpersonationBanner() {
@@ -158,15 +158,20 @@ function Router() {
           <HomeRedirect />
         </Route>
 
-        {/* Admin base redirects — /admin → home, /admin/projects → home */}
+        {/* Admin home — projects dashboard */}
+        <Route path="/home">
+          <RequireAdmin><AppLayout><Home /></AppLayout></RequireAdmin>
+        </Route>
+
+        {/* Admin base redirects */}
         <Route path="/admin">
-          <RequireAdmin><Redirect to="/admin/shopybrain" /></RequireAdmin>
+          <RequireAdmin><Redirect to="/admin/clients" /></RequireAdmin>
         </Route>
         <Route path="/admin/projects">
-          <RequireAdmin><Redirect to="/" /></RequireAdmin>
+          <RequireAdmin><Redirect to="/home" /></RequireAdmin>
         </Route>
         <Route path="/dashboard">
-          <RequireAdmin><Redirect to="/" /></RequireAdmin>
+          <RequireAdmin><Redirect to="/admin/clients" /></RequireAdmin>
         </Route>
 
         {/* Admin routes */}

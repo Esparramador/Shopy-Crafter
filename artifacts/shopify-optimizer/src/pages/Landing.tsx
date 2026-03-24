@@ -259,8 +259,8 @@ export default function Landing() {
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
-      document.body.style.overflow = prev;
-      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
     };
   }, []);
 
@@ -835,6 +835,18 @@ export default function Landing() {
                         <option>Más de €50.000</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Row 4: Redes sociales */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Redes sociales / Instagram</label>
+                    <input
+                      type="text" value={contactForm.socialMedia} onChange={CF("socialMedia")}
+                      placeholder="@tutienda o https://instagram.com/tutienda"
+                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                    />
                   </div>
 
                   {/* Servicios */}
