@@ -7,7 +7,7 @@ import {
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
 import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
-import { rotateToken, validateToken, shopifyRequest } from "./shopify.js";
+import { refreshToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { buildShopyBrainContext } from "./claude.js";
 import { logger } from "./logger.js";

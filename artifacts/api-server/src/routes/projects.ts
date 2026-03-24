@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { rotateToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
+import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
@@ -209,36 +209,24 @@ router.get("/projects", async (req, res): Promise<void> => {
 
 router.post("/projects", async (req, res): Promise<void> => {
   const {
-    name, shopDomain, clientId, clientSecret, accessToken,
+    name, shopDomain, clientId, clientSecret,
     storeNiche, brandTone, targetAudience, storeMarkets,
     replicateApiToken, anthropicApiKey,
   } = req.body;
 
-  if (!name || !shopDomain || !clientId || !clientSecret || !accessToken) {
-    res.status(400).json({
-      error: "name, shopDomain, clientId, clientSecret y accessToken son obligatorios. El Access Token (shpat_...) se obtiene en Shopify Admin → Apps → tu app → Credenciales.",
-    });
+  if (!name || !shopDomain || !clientId || !clientSecret) {
+    res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
     return;
   }
 
   const normalizedDomain = normalizeShopDomain(shopDomain);
 
-  // Validate token before saving — fail fast if credentials are wrong
-  const isValid = await validateToken(normalizedDomain, accessToken);
-  if (!isValid) {
-    res.status(400).json({
-      error: `El token de acceso no es válido para ${normalizedDomain}. Verifica que el Admin API Access Token sea correcto y que la app tenga los permisos necesarios.`,
-    });
-    return;
-  }
-
+  // Save project first (without token)
   const [project] = await db.insert(projectsTable).values({
     name,
     shopDomain: normalizedDomain,
     clientId,
     clientSecret: encrypt(clientSecret),
-    accessToken,          // stored in plaintext (encrypted column not in schema — token is sensitive but project-scoped)
-    tokenExpiresAt: null, // custom app tokens are permanent
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
     targetAudience: targetAudience ?? null,
@@ -246,6 +234,20 @@ router.post("/projects", async (req, res): Promise<void> => {
     replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
     anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
   }).returning();
+
+  // Auto-generate token immediately via client_credentials grant
+  // clientSecret passed in plaintext (before encryption) so no decrypt needed here
+  try {
+    await refreshToken(project.id, normalizedDomain, clientId, clientSecret);
+  } catch (err) {
+    // Token generation failed — project is saved, user can retry from settings
+    req.log.warn({ projectId: project.id, err }, "Initial token generation failed — credentials may be incorrect");
+    await db.delete(projectsTable).where(eq(projectsTable.id, project.id));
+    res.status(400).json({
+      error: `No se pudo generar el token de acceso. Verifica que el Client ID y el Secret sean correctos para ${normalizedDomain}.`,
+    });
+    return;
+  }
 
   const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
 
@@ -360,21 +362,18 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
     return;
   }
 
-  // Otherwise attempt token rotation (requires Shopify token rotation enabled)
+  // Regenerate token using client_credentials grant
   try {
     const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-    const newToken = await rotateToken(id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
+    const newToken = await refreshToken(id, project.shopDomain, project.clientId, plainSecret);
     res.json({
       success: true,
-      message: "Token rotado correctamente. El nuevo token ya está activo.",
+      message: "Token regenerado correctamente.",
       tokenPreview: newToken.slice(0, 12) + "••••••••",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
-    res.status(400).json({
-      error: message,
-      hint: "Si la rotación de tokens no está habilitada para tu app, actualiza el token manualmente enviando { newAccessToken: 'shpat_...' } en el cuerpo de esta petición.",
-    });
+    res.status(400).json({ error: message });
   }
 });
 

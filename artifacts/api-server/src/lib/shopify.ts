@@ -12,94 +12,10 @@ export function normalizeShopDomain(domain: string): string {
 }
 
 /**
- * Returns the stored Shopify access token headers for a project.
- * Custom app tokens (shpat_...) are PERMANENT — no expiry check needed.
- * Token rotation only happens reactively on 401 in shopifyRequest.
- */
-export async function getShopifyHeaders(projectId: number): Promise<Record<string, string>> {
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  if (!project) throw new Error(`Proyecto ${projectId} no encontrado`);
-  if (!project.accessToken) {
-    throw new Error(
-      `Proyecto ${projectId} no tiene token de acceso. Añádelo en Configuración del proyecto → Admin API Access Token.`
-    );
-  }
-  return {
-    "X-Shopify-Access-Token": project.accessToken,
-    "Content-Type": "application/json",
-  };
-}
-
-/**
- * Token rotation via Shopify's official rotate endpoint.
- * Requires: current valid token + clientId + clientSecret.
- * Note: Token rotation must be enabled for the app in Shopify Partners.
- * For custom apps created in the store admin, the shpat_ token is permanent
- * and doesn't need rotation unless manually rotated.
- */
-export async function rotateToken(
-  projectId: number,
-  shopDomain: string,
-  clientId: string,
-  clientSecret: string,
-  currentToken: string
-): Promise<string> {
-  const domain = normalizeShopDomain(shopDomain);
-  const url = `https://${domain}/admin/oauth/access_token/rotate`;
-
-  logger.info({ projectId, domain }, "Attempting Shopify token rotation");
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": currentToken,
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      access_token: currentToken,
-    }),
-    signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Token rotation failed (${resp.status}): ${text}`);
-  }
-
-  const data = (await resp.json()) as { access_token: string };
-  const newToken = data.access_token;
-
-  await db
-    .update(projectsTable)
-    .set({ accessToken: newToken, updatedAt: new Date() })
-    .where(eq(projectsTable.id, projectId));
-
-  logger.info({ projectId }, "Token rotated successfully");
-  return newToken;
-}
-
-/**
- * Validates a token by making a lightweight call to /shop.json.
- * Returns true if the token is valid, false if Shopify returns 401/403.
- */
-export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
-  const domain = normalizeShopDomain(shopDomain);
-  try {
-    const resp = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
-      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
-    });
-    return resp.status !== 401 && resp.status !== 403;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * @deprecated Use rotateToken instead.
- * Kept for backward compatibility with existing route calls.
+ * Generates or renews a Shopify access token using client_credentials grant.
+ * POST https://{shop}/admin/oauth/access_token
+ *   grant_type=client_credentials&client_id=...&client_secret=...
+ * Tokens expire in 12-24h. clientSecret must be PLAINTEXT (not encrypted).
  */
 export async function refreshToken(
   projectId: number,
@@ -107,22 +23,73 @@ export async function refreshToken(
   clientId: string,
   clientSecret: string
 ): Promise<string> {
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  if (!project?.accessToken) {
-    throw new Error(
-      `No se puede renovar el token: proyecto ${projectId} no tiene token actual. ` +
-      `Añade el Admin API Access Token manualmente en la configuración del proyecto.`
-    );
+  const domain = normalizeShopDomain(shopDomain);
+  const url = `https://${domain}/admin/oauth/access_token`;
+
+  logger.info({ projectId, domain }, "Generating Shopify token via client_credentials");
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+    signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Token generation failed (${resp.status}): ${text}`);
   }
-  const plainSecret = clientSecret.startsWith("$argon") || clientSecret.length > 60
-    ? (safeDecrypt(clientSecret) || clientSecret)
-    : clientSecret;
-  return rotateToken(projectId, shopDomain, clientId, plainSecret, project.accessToken);
+
+  const data = (await resp.json()) as { access_token: string; expires_in?: number };
+  const token = data.access_token;
+  const expiresIn = data.expires_in ?? 86_400; // default 24h if not specified
+  const expiresAtDate = new Date(Date.now() + expiresIn * 1000);
+
+  await db
+    .update(projectsTable)
+    .set({ accessToken: token, tokenExpiresAt: expiresAtDate })
+    .where(eq(projectsTable.id, projectId));
+
+  logger.info({ projectId, expiresAt: expiresAtDate }, "Token generated successfully");
+  return token;
+}
+
+/**
+ * Returns Shopify API headers for a project.
+ * Auto-refreshes the token if it is missing, expired, or expires within 30 minutes.
+ */
+export async function getShopifyHeaders(projectId: number): Promise<Record<string, string>> {
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) throw new Error(`Proyecto ${projectId} no encontrado`);
+
+  let token = project.accessToken;
+  const expiresAt = project.tokenExpiresAt;
+
+  // Refresh if: no token, no expiry date, or expiry within next 30 minutes
+  const needsRefresh =
+    !token ||
+    !expiresAt ||
+    new Date(expiresAt) < new Date(Date.now() + 30 * 60 * 1000);
+
+  if (needsRefresh) {
+    // Always decrypt the stored secret before using it
+    const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+    token = await refreshToken(projectId, project.shopDomain, project.clientId, plainSecret);
+  }
+
+  return {
+    "X-Shopify-Access-Token": token!,
+    "Content-Type": "application/json",
+  };
 }
 
 /**
  * Makes a Shopify Admin API request.
- * On 401: attempts token rotation once, then retries.
+ * On 401 (expired/invalid token), auto-regenerates token and retries once.
  */
 export async function shopifyRequest<T>(
   projectId: number,
@@ -141,29 +108,18 @@ export async function shopifyRequest<T>(
   });
 
   if (resp.status === 401) {
-    logger.warn({ projectId, url }, "Shopify 401 — attempting token rotation");
+    logger.warn({ projectId, url }, "Shopify 401 — force-regenerating token");
     const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!proj?.accessToken) throw new Error(`Project ${projectId}: no access token for rotation`);
-
+    if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
     const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
-
-    try {
-      const newToken = await rotateToken(projectId, proj.shopDomain, proj.clientId, plainSecret, proj.accessToken);
-      const retryResp = await fetch(url, {
-        ...options,
-        headers: { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
-      });
-      if (!retryResp.ok) throw new Error(`Shopify ${retryResp.status} after token rotation at ${path}`);
-      return retryResp.json() as Promise<T>;
-    } catch (rotateErr) {
-      // Rotation failed — token is invalid. Admin must update it manually.
-      logger.error({ projectId, err: rotateErr }, "Token rotation failed. Admin must update the access token.");
-      throw new Error(
-        `Token de Shopify inválido para el proyecto ${projectId}. ` +
-        `Ve a la configuración del proyecto y actualiza el Admin API Access Token.`
-      );
-    }
+    const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
+    const retryResp = await fetch(url, {
+      ...options,
+      headers: { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+    });
+    if (!retryResp.ok) throw new Error(`Shopify ${retryResp.status} after token regeneration at ${path}`);
+    return retryResp.json() as Promise<T>;
   }
 
   if (!resp.ok) {
@@ -172,4 +128,20 @@ export async function shopifyRequest<T>(
   }
 
   return resp.json() as Promise<T>;
+}
+
+/**
+ * Validates a token with a lightweight API call. Returns true if valid.
+ */
+export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
+  const domain = normalizeShopDomain(shopDomain);
+  try {
+    const resp = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
+      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
+    });
+    return resp.status !== 401 && resp.status !== 403;
+  } catch {
+    return false;
+  }
 }
