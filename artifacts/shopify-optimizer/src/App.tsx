@@ -312,6 +312,14 @@ function Router() {
           </RequireAdmin>
         </Route>
 
+        {/* Base project route → audit */}
+        <Route path="/project/:id">
+          {(params) => <Redirect to={`/projects/${params.id}/audit`} />}
+        </Route>
+        <Route path="/projects/:id">
+          {(params) => <Redirect to={`/projects/${params.id}/audit`} />}
+        </Route>
+
         <Route path="/projects/:id/audit">
           <RequireAdmin>
             <AdminWrapper>

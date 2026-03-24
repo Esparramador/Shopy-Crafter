@@ -73,7 +73,7 @@ export default function NewProject() {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-      setLocation(`/project/${data.id}`);
+      setLocation(`/projects/${data.id}/audit`);
     } catch {
       setError("Error de conexión. Comprueba la red e inténtalo de nuevo.");
       setSaving(false);

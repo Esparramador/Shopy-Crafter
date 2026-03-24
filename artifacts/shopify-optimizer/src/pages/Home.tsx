@@ -101,7 +101,16 @@ export default function Home() {
               <Link key={p.id} href={`/projects/${p.id}/audit`}>
                 <div className="glass-card card-hover" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div className="logo-gem" style={{ width: 30, height: 30, fontSize: 13, background: "rgba(200,168,75,0.1)", color: "var(--gold2)", flexShrink: 0 }}>🛍</div>
+                    <div style={{ position: "relative", flexShrink: 0 }}>
+                      <div className="logo-gem" style={{ width: 30, height: 30, fontSize: 13, background: "rgba(200,168,75,0.1)", color: "var(--gold2)" }}>🛍</div>
+                      <span style={{
+                        position: "absolute", top: -6, right: -8,
+                        background: "var(--ink3)", border: "1px solid var(--bdr)",
+                        borderRadius: 6, padding: "1px 5px",
+                        fontSize: 9, fontWeight: 800, color: "var(--t3)", letterSpacing: "0.5px",
+                        lineHeight: "14px",
+                      }}>#{p.id}</span>
+                    </div>
                     <div>
                       <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>{p.name}</p>
                       <p style={{ fontSize: 11, color: "var(--t3)" }}>{p.shopDomain ?? "—"}{p.storeNiche ? ` · ${p.storeNiche}` : ""}</p>

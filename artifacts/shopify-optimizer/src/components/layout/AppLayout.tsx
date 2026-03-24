@@ -118,7 +118,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                       style={{ background: isActive ? "var(--gold)" : "var(--t4)" }}
                     />
                     <div className="client-info">
-                      <p className="client-name">{project.name}</p>
+                      <p className="client-name">
+                        {project.name}
+                        <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 800, color: "var(--t4)", letterSpacing: "0.3px" }}>#{project.id}</span>
+                      </p>
                       <p className="client-domain">{project.shopDomain ?? "—"}</p>
                     </div>
                   </div>
