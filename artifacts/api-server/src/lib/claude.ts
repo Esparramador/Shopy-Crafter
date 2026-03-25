@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable } from "@workspace/db";
+import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable } from "@workspace/db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
@@ -287,8 +287,31 @@ export async function buildShopyBrainContext(
   }
 }
 
+async function buildBrandDnaContext(projectId: number): Promise<string> {
+  try {
+    const [dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
+    if (!dna) return "";
+
+    const lines: string[] = ["\n━━━ BRAND DNA — IDENTIDAD VISUAL DEL PROYECTO ━━━"];
+    if (dna.backgroundStyle) lines.push(`Estilo de fondo: ${dna.backgroundStyle}`);
+    if (dna.lightingStyle) lines.push(`Iluminación: ${dna.lightingStyle}`);
+    if (dna.colorTemp) lines.push(`Temperatura de color: ${dna.colorTemp}`);
+    if (dna.composition) lines.push(`Composición: ${dna.composition}`);
+    if (dna.mood) lines.push(`Mood de marca: ${dna.mood}`);
+    if (dna.humanPresence) lines.push(`Presencia humana: ${dna.humanPresence}`);
+    if (dna.brandColors && dna.brandColors.length > 0) lines.push(`Colores de marca: ${dna.brandColors.join(", ")}`);
+    if (dna.props && dna.props.length > 0) lines.push(`Props/accesorios: ${dna.props.join(", ")}`);
+    if (dna.consistencyScore) lines.push(`Score de consistencia: ${dna.consistencyScore}/100`);
+    lines.push("INSTRUCCIÓN: Usa esta identidad visual en TODAS tus recomendaciones de diseño, imágenes, textos y emails. Mantén coherencia de marca.");
+    lines.push("━━━ FIN BRAND DNA ━━━");
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 /**
- * askClaude enhanced with ShopyBrain context injection (returns raw string).
+ * askClaude enhanced with ShopyBrain + BrandDNA context injection (returns raw string).
  */
 export async function askClaudeWithBrain(
   projectId: number,
@@ -298,14 +321,17 @@ export async function askClaudeWithBrain(
   niche?: string,
   maxTokens = 4096
 ): Promise<string> {
-  const brainContext = await buildShopyBrainContext(niche, useCase);
+  const [brainContext, brandDna] = await Promise.all([
+    buildShopyBrainContext(niche, useCase),
+    buildBrandDnaContext(projectId),
+  ]);
   const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
-  const enrichedSystem = brainContext ? base + brainContext : base;
+  const enrichedSystem = base + (brainContext || "") + (brandDna || "");
   return askClaude(projectId, messages, enrichedSystem, maxTokens);
 }
 
 /**
- * askClaudeJson enhanced with ShopyBrain context injection.
+ * askClaudeJson enhanced with ShopyBrain + BrandDNA context injection.
  */
 export async function askClaudeJsonWithBrain<T>(
   projectId: number,
@@ -315,8 +341,11 @@ export async function askClaudeJsonWithBrain<T>(
   niche?: string,
   maxTokens = 4096
 ): Promise<T> {
-  const brainContext = await buildShopyBrainContext(niche, useCase);
-  const enrichedSystem = brainContext ? systemPrompt + brainContext : systemPrompt;
+  const [brainContext, brandDna] = await Promise.all([
+    buildShopyBrainContext(niche, useCase),
+    buildBrandDnaContext(projectId),
+  ]);
+  const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");
   return askClaudeJson<T>(projectId, prompt, enrichedSystem, maxTokens);
 }
 

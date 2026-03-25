@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, cogsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { projectsTable, productsTable, cogsTable, priceHistoryTable } from "@workspace/db";
+import { eq, and, desc, gte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 
@@ -344,6 +344,7 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
   let grossRevenue = 0;
   let aov = 0;
   let orderCount = 0;
+  const productSales = new Map<string, { units: number; revenue: number }>();
 
   try {
     const ordersData = await shopifyRequest<{ orders: Array<{ total_price: string; line_items: Array<{ product_id: number; quantity: number; price: string }> }> }>(
@@ -354,36 +355,48 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
     orderCount = ordersData.orders.length;
     grossRevenue = ordersData.orders.reduce((sum, o) => sum + parseFloat(o.total_price), 0);
     aov = orderCount > 0 ? grossRevenue / orderCount : 0;
+
+    for (const order of ordersData.orders) {
+      for (const item of order.line_items) {
+        const pid = String(item.product_id);
+        const existing = productSales.get(pid) ?? { units: 0, revenue: 0 };
+        existing.units += item.quantity;
+        existing.revenue += item.quantity * parseFloat(item.price);
+        productSales.set(pid, existing);
+      }
+    }
   } catch {
     grossRevenue = 0;
     aov = 0;
   }
 
   const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
-  const totalCogs = allCogs.reduce((sum, c) => sum + c.totalCogs, 0);
-  const grossProfit = grossRevenue - totalCogs;
-  const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
-
   const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
 
-  const productProfitability = products.slice(0, 20).map((p) => {
+  const productProfitability = products.slice(0, 50).map((p) => {
     const cogs = allCogs.find((c) => c.shopifyProductId === p.shopifyProductId);
-    const revenue = parseFloat(p.price ?? "0") * 10;
+    const sales = productSales.get(p.shopifyProductId);
+    const unitsSold = sales?.units ?? 0;
+    const revenue = sales?.revenue ?? 0;
     const cogsTotal = cogs?.totalCogs ?? 0;
-    const profit = revenue - cogsTotal * 10;
+    const profit = revenue - cogsTotal * unitsSold;
     const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
     const grade = margin >= 40 ? "A" : margin >= 20 ? "B" : margin >= 10 ? "C" : "F";
     return {
       productId: p.shopifyProductId,
       title: p.title,
-      unitsSold: 10,
+      unitsSold,
       revenue: Math.round(revenue * 100) / 100,
-      cogs: Math.round(cogsTotal * 10 * 100) / 100,
+      cogs: Math.round(cogsTotal * unitsSold * 100) / 100,
       grossProfit: Math.round(profit * 100) / 100,
       marginPct: Math.round(margin * 10) / 10,
       grade,
     };
-  });
+  }).sort((a, b) => b.revenue - a.revenue);
+
+  const totalCogsAgg = productProfitability.reduce((sum, p) => sum + p.cogs, 0);
+  const grossProfit = grossRevenue - totalCogsAgg;
+  const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
 
   const alerts: string[] = [];
   if (grossMarginPct < 20) alerts.push("⚠️ Margen bruto global por debajo del 20% — revisar estructura de costes");
@@ -392,7 +405,7 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
 
   res.json({
     grossRevenue: Math.round(grossRevenue * 100) / 100,
-    totalCogs: Math.round(totalCogs * 100) / 100,
+    totalCogs: Math.round(totalCogsAgg * 100) / 100,
     grossProfit: Math.round(grossProfit * 100) / 100,
     grossMarginPct: Math.round(grossMarginPct * 10) / 10,
     netMarginPct: Math.round((grossMarginPct - 10) * 10) / 10,
@@ -401,6 +414,222 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
     ltvCacRatio: null,
     productProfitability,
     alerts,
+  });
+});
+
+// ── T001: SIMULADOR DE PRECIO ─────────────────────────────────────────────────
+router.post("/projects/:projectId/products/:productId/price-simulator", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+  const rawPrice = parseFloat(req.body?.newPrice);
+  const rawUnits = parseInt(req.body?.unitsPerMonth);
+  const safePriceSim = isNaN(rawPrice) || rawPrice <= 0 ? null : rawPrice;
+  const safeUnits = isNaN(rawUnits) || rawUnits <= 0 ? 30 : rawUnits;
+
+  if (!safePriceSim) { res.status(400).json({ error: "newPrice debe ser un número positivo" }); return; }
+
+  const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+  const [cogs] = await db.select().from(cogsTable).where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
+
+  if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+
+  const newPrice = safePriceSim;
+  const currentPrice = parseFloat(product.price ?? "0");
+  const totalCogs = cogs?.totalCogs ?? 0;
+  const units = safeUnits;
+  const pctChange = currentPrice > 0 ? ((newPrice - currentPrice) / currentPrice) * 100 : 0;
+
+  const scenarios = [
+    { label: "Pesimista", priceMultiplier: 1, unitMultiplier: pctChange > 0 ? 0.7 : 1.1 },
+    { label: "Base", priceMultiplier: 1, unitMultiplier: pctChange > 0 ? 0.85 : 1.05 },
+    { label: "Optimista", priceMultiplier: 1, unitMultiplier: pctChange > 0 ? 0.95 : 1.15 },
+  ].map(s => {
+    const adjustedUnits = Math.round(units * s.unitMultiplier);
+    const revenue = newPrice * adjustedUnits;
+    const totalCost = totalCogs * adjustedUnits;
+    const profit = revenue - totalCost;
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    return {
+      scenario: s.label,
+      price: newPrice,
+      estimatedUnits: adjustedUnits,
+      monthlyRevenue: Math.round(revenue * 100) / 100,
+      monthlyCost: Math.round(totalCost * 100) / 100,
+      monthlyProfit: Math.round(profit * 100) / 100,
+      marginPct: Math.round(margin * 10) / 10,
+    };
+  });
+
+  const currentRevenue = currentPrice * units;
+  const currentProfit = (currentPrice - totalCogs) * units;
+  const currentMargin = currentRevenue > 0 ? (currentProfit / currentRevenue) * 100 : 0;
+
+  const breakEvenUnits = totalCogs > 0 && newPrice > totalCogs ? Math.ceil((totalCogs * units) / (newPrice - totalCogs)) : null;
+
+  res.json({
+    currentPrice,
+    newPrice,
+    priceChangePct: Math.round(pctChange * 10) / 10,
+    currentMonthly: {
+      revenue: Math.round(currentRevenue * 100) / 100,
+      profit: Math.round(currentProfit * 100) / 100,
+      marginPct: Math.round(currentMargin * 10) / 10,
+      units,
+    },
+    scenarios,
+    breakEvenUnits,
+    cogsPerUnit: totalCogs,
+  });
+});
+
+// ── T002: ELASTICIDAD DE PRECIO (datos históricos reales) ─────────────────────
+router.get("/projects/:projectId/products/:productId/price-elasticity", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+  const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+
+  if (!product || !project) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+
+  const priceHistory = await db.select().from(priceHistoryTable)
+    .where(and(eq(priceHistoryTable.projectId, projectId), eq(priceHistoryTable.shopifyProductId, shopifyProductId)))
+    .orderBy(desc(priceHistoryTable.recordedAt))
+    .limit(50);
+
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  let salesData: Array<{ date: string; units: number; revenue: number }> = [];
+
+  try {
+    const ordersData = await shopifyRequest<{ orders: Array<{ created_at: string; line_items: Array<{ product_id: number; quantity: number; price: string }> }> }>(
+      projectId, project.shopDomain,
+      `/orders.json?status=any&created_at_min=${ninetyDaysAgo}&limit=250`
+    );
+
+    const dailyMap = new Map<string, { units: number; revenue: number }>();
+    for (const order of ordersData.orders) {
+      const date = order.created_at.split("T")[0];
+      for (const item of order.line_items) {
+        if (String(item.product_id) === shopifyProductId) {
+          const existing = dailyMap.get(date) ?? { units: 0, revenue: 0 };
+          existing.units += item.quantity;
+          existing.revenue += item.quantity * parseFloat(item.price);
+          dailyMap.set(date, existing);
+        }
+      }
+    }
+    salesData = Array.from(dailyMap.entries()).map(([date, d]) => ({ date, ...d })).sort((a, b) => a.date.localeCompare(b.date));
+  } catch {}
+
+  let elasticityCoefficient: number | null = null;
+  let elasticityLabel = "Sin datos suficientes";
+
+  if (priceHistory.length >= 2 && salesData.length >= 7) {
+    const priceChanges = priceHistory.filter(h => h.oldPrice && h.newPrice && h.oldPrice !== h.newPrice);
+    if (priceChanges.length > 0) {
+      const avgPctPriceChange = priceChanges.reduce((sum, h) => {
+        const pct = ((h.newPrice - (h.oldPrice ?? h.newPrice)) / (h.oldPrice ?? h.newPrice)) * 100;
+        return sum + Math.abs(pct);
+      }, 0) / priceChanges.length;
+
+      const totalUnits = salesData.reduce((sum, d) => sum + d.units, 0);
+      const avgDailyUnits = totalUnits / salesData.length;
+
+      if (avgPctPriceChange > 0 && avgDailyUnits > 0) {
+        elasticityCoefficient = Math.round((avgDailyUnits / avgPctPriceChange) * 100) / 100;
+        elasticityLabel = elasticityCoefficient > 1.5 ? "Muy elástico — sensible al precio"
+          : elasticityCoefficient > 0.8 ? "Moderadamente elástico"
+          : "Inelástico — precio poco impacta ventas";
+      }
+    }
+  }
+
+  res.json({
+    productId: shopifyProductId,
+    currentPrice: parseFloat(product.price ?? "0"),
+    priceHistory: priceHistory.map(h => ({
+      oldPrice: h.oldPrice,
+      newPrice: h.newPrice,
+      changeSource: h.changeSource,
+      date: h.recordedAt.toISOString(),
+    })),
+    salesData,
+    elasticity: {
+      coefficient: elasticityCoefficient,
+      label: elasticityLabel,
+      dataPoints: salesData.length,
+      priceChanges: priceHistory.length,
+    },
+  });
+});
+
+// ── T003: P&L FORECAST PREDICTIVO (3/6/12 meses) ─────────────────────────────
+router.post("/projects/:projectId/financial-forecast", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const { months = 12 } = req.body as { months?: number };
+
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  let currentMonthlyRevenue = 0;
+  let currentMonthlyOrders = 0;
+
+  try {
+    const ordersData = await shopifyRequest<{ orders: Array<{ total_price: string }> }>(
+      projectId, project.shopDomain,
+      `/orders.json?status=any&created_at_min=${thirtyDaysAgo}&limit=250`
+    );
+    currentMonthlyOrders = ordersData.orders.length;
+    currentMonthlyRevenue = ordersData.orders.reduce((sum, o) => sum + parseFloat(o.total_price), 0);
+  } catch {}
+
+  const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+  const avgCogsPerOrder = allCogs.length > 0
+    ? allCogs.reduce((sum, c) => sum + c.totalCogs, 0) / allCogs.length
+    : currentMonthlyRevenue * 0.4;
+
+  const growthRates = { pessimistic: -0.02, base: 0.05, optimistic: 0.12 };
+
+  const forecast = Object.entries(growthRates).map(([scenario, rate]) => {
+    const monthlyData = [];
+    let cumRevenue = 0;
+    let cumProfit = 0;
+
+    for (let m = 1; m <= months; m++) {
+      const growthFactor = Math.pow(1 + rate, m);
+      const revenue = Math.round(currentMonthlyRevenue * growthFactor * 100) / 100;
+      const orders = Math.round(currentMonthlyOrders * growthFactor);
+      const costs = Math.round(avgCogsPerOrder * orders * 100) / 100;
+      const profit = Math.round((revenue - costs) * 100) / 100;
+      const margin = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+      cumRevenue += revenue;
+      cumProfit += profit;
+
+      monthlyData.push({ month: m, revenue, orders, costs, profit, margin });
+    }
+
+    return {
+      scenario,
+      monthlyGrowthRate: rate,
+      months: monthlyData,
+      totals: {
+        revenue: Math.round(cumRevenue * 100) / 100,
+        profit: Math.round(cumProfit * 100) / 100,
+        avgMargin: cumRevenue > 0 ? Math.round((cumProfit / cumRevenue) * 1000) / 10 : 0,
+      },
+    };
+  });
+
+  const breakEvenMonth = forecast.find(f => f.scenario === "base")?.months.findIndex(m => m.profit > 0);
+
+  res.json({
+    currentMonthlyRevenue: Math.round(currentMonthlyRevenue * 100) / 100,
+    currentMonthlyOrders,
+    avgCogsPerOrder: Math.round(avgCogsPerOrder * 100) / 100,
+    forecastMonths: months,
+    forecast,
+    breakEvenMonth: breakEvenMonth !== undefined && breakEvenMonth >= 0 ? breakEvenMonth + 1 : null,
   });
 });
 

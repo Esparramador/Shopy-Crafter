@@ -64,8 +64,17 @@ A deep absorption engine for brands, competitors, or influencers triggered via t
 ### OmniCore Chatbot Guide Assistant
 The OmniChatbot has full app-guide knowledge injected (via `app-guide.ts`). It detects the current page route (`useLocation` from wouter) and sends it to the backend. When users ask help questions (detected by `detectGuideRequest`), the full APP_GUIDE_KNOWLEDGE is injected into Claude's system prompt along with PAGE_CONTEXT for the current route. This makes the chatbot a context-aware assistant that guides users step-by-step with exact button names and locations.
 
-### ShopyBrain Cron Jobs (9 total)
-Automated tasks for continuous learning, consolidation, cross-synthesis, revenue snapshots, data integration, competitor scans, and inventory sync.
+### ShopyBrain Cron Jobs (10 total)
+Automated tasks for continuous learning, consolidation, cross-synthesis, revenue snapshots, data integration, competitor scans (6am daily with auto-alerts), inventory sync, and weekly mega-synthesis.
+
+### Price Simulator & P&L Forecast
+- **Price Simulator**: `POST /projects/:id/products/:pid/price-simulator` — simulates 3 scenarios (pessimistic/base/optimistic) with break-even and margin analysis.
+- **Price Elasticity**: `GET /projects/:id/products/:pid/price-elasticity` — uses `price_history` table + Shopify orders (90d) to calculate elasticity coefficient.
+- **P&L Forecast**: `POST /projects/:id/financial-forecast` — 3/6/12-month forecast with 3 scenarios based on current revenue/orders/COGS.
+- **Financial Dashboard Fix**: Uses real Shopify order data to calculate per-product units sold (no more hardcoded values). Total COGS computed from actual units × per-unit COGS.
+
+### BrandDNA Auto-Injection
+The `visualDnaTable` stores extracted visual identity (background style, lighting, colors, mood, composition). `buildBrandDnaContext()` in claude.ts auto-injects this DNA into all `askClaudeWithBrain` and `askClaudeJsonWithBrain` calls, ensuring brand consistency across redesign, images, SEO, and email generation.
 
 ### Pricing Model
 A multi-tiered pricing structure (Starter, Agency Pro, Enterprise, One-Shot Audit) with monthly retainers and one-time setup fees, visible on the landing page and managed through the CMS.

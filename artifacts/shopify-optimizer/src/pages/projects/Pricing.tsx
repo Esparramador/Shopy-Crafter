@@ -22,11 +22,16 @@ import {
   ChevronUp,
   X,
   Package,
+  Calculator,
+  BarChart3,
+  Target,
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line, CartesianGrid } from "recharts";
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Product = { id: string; title: string; price?: number | null; images?: Array<{ src: string }> };
 
@@ -299,6 +304,228 @@ function CogsModal({
   );
 }
 
+function PriceSimulator({ projectId, product, onClose }: { projectId: number; product: Product; onClose: () => void }) {
+  const [newPrice, setNewPrice] = useState(product.price?.toString() ?? "");
+  const [units, setUnits] = useState("30");
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const simulate = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/price-simulator`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newPrice: parseFloat(newPrice), unitsPerMonth: parseInt(units) }),
+      });
+      setResult(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputClass = "bg-background border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm w-full";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-card border border-border rounded-2xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto"
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-primary" />
+            Simulador de Precio
+          </h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{product.title}</p>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Nuevo Precio (€)</label>
+            <input type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Uds/Mes Estimadas</label>
+            <input type="number" value={units} onChange={e => setUnits(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+
+        <button onClick={simulate} disabled={loading || !newPrice} className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 mb-4">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+          Simular Impacto
+        </button>
+
+        {result && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Precio Actual</span>
+                <span className="text-foreground font-bold">{formatCurrency(result.currentPrice)}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Nuevo Precio</span>
+                <span className="text-primary font-bold">{formatCurrency(result.newPrice)}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Cambio</span>
+                <span className={result.priceChangePct > 0 ? "text-green-400" : "text-red-400"}>
+                  {result.priceChangePct > 0 ? "+" : ""}{result.priceChangePct}%
+                </span>
+              </div>
+              {result.breakEvenUnits && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Break-even</span>
+                  <span className="text-yellow-400">{result.breakEvenUnits} uds</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {result.scenarios?.map((s: any) => (
+                <div key={s.scenario} className="bg-black/20 rounded-xl p-3 border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-muted-foreground">{s.scenario}</span>
+                    <span className={`text-xs font-bold ${s.monthlyProfit > 0 ? "text-green-400" : "text-red-400"}`}>
+                      {formatCurrency(s.monthlyProfit)}/mes
+                    </span>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>{s.estimatedUnits} uds</span>
+                    <span>Rev: {formatCurrency(s.monthlyRevenue)}</span>
+                    <span>Margen: {s.marginPct}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {result.scenarios && (
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={result.scenarios}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="scenario" tick={{ fill: "#999", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "#999", fontSize: 11 }} />
+                    <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid #333", borderRadius: 12, color: "#fff" }} />
+                    <Bar dataKey="monthlyRevenue" name="Revenue" fill="var(--gold, #d4a574)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="monthlyProfit" name="Beneficio" fill="var(--jade, #00d68f)" radius={[4, 4, 0, 0]} />
+                    <Legend wrapperStyle={{ color: "#999", fontSize: 11 }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+function ForecastSection({ projectId }: { projectId: number }) {
+  const [forecast, setForecast] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const loadForecast = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/financial-forecast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ months }),
+      });
+      setForecast(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const baseScenario = forecast?.forecast?.find((f: any) => f.scenario === "base");
+
+  return (
+    <GlassCard className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-primary" />
+          Forecast P&L Predictivo
+        </h2>
+        <div className="flex items-center gap-2">
+          <select value={months} onChange={e => setMonths(parseInt(e.target.value))} className="bg-background border border-border rounded-lg px-3 py-1.5 text-foreground text-sm">
+            <option value={3}>3 meses</option>
+            <option value={6}>6 meses</option>
+            <option value={12}>12 meses</option>
+          </select>
+          <button onClick={loadForecast} disabled={loading} className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+            Generar
+          </button>
+        </div>
+      </div>
+
+      {forecast && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+              <p className="text-xs text-muted-foreground">Revenue Actual/Mes</p>
+              <p className="text-lg font-bold text-foreground">{formatCurrency(forecast.currentMonthlyRevenue)}</p>
+            </div>
+            <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+              <p className="text-xs text-muted-foreground">Pedidos/Mes</p>
+              <p className="text-lg font-bold text-foreground">{forecast.currentMonthlyOrders}</p>
+            </div>
+            <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+              <p className="text-xs text-muted-foreground">COGS Medio/Pedido</p>
+              <p className="text-lg font-bold text-red-400">{formatCurrency(forecast.avgCogsPerOrder)}</p>
+            </div>
+            {forecast.breakEvenMonth && (
+              <div className="bg-green-500/5 rounded-xl p-3 border border-green-500/20">
+                <p className="text-xs text-muted-foreground">Break-even</p>
+                <p className="text-lg font-bold text-green-400">Mes {forecast.breakEvenMonth}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {forecast.forecast?.map((f: any) => (
+              <div key={f.scenario} className="bg-black/20 rounded-xl p-3 border border-white/5">
+                <p className="text-xs font-semibold text-muted-foreground mb-1 capitalize">{f.scenario}</p>
+                <p className="text-sm font-bold text-foreground">{formatCurrency(f.totals.revenue)}</p>
+                <p className={`text-xs ${f.totals.profit > 0 ? "text-green-400" : "text-red-400"}`}>
+                  Beneficio: {formatCurrency(f.totals.profit)}
+                </p>
+                <p className="text-xs text-muted-foreground">Margen: {f.totals.avgMargin}%</p>
+              </div>
+            ))}
+          </div>
+
+          {baseScenario && (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={baseScenario.months}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="month" tick={{ fill: "#999", fontSize: 11 }} tickFormatter={(v) => `M${v}`} />
+                  <YAxis tick={{ fill: "#999", fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid #333", borderRadius: 12, color: "#fff" }} formatter={(v: number) => formatCurrency(v)} />
+                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke="var(--gold, #d4a574)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="profit" name="Beneficio" stroke="var(--jade, #00d68f)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="costs" name="Costes" stroke="#ff4757" strokeWidth={2} dot={false} />
+                  <Legend wrapperStyle={{ color: "#999", fontSize: 11 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </GlassCard>
+  );
+}
+
 export default function PricingPage() {
   const [, params] = useRoute("/projects/:id/pricing");
   const projectId = parseInt(params?.id || "0");
@@ -309,6 +536,7 @@ export default function PricingPage() {
   const analyzeCompetitors = useAnalyzeCompetitorPrices();
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [simulatorProduct, setSimulatorProduct] = useState<Product | null>(null);
   const [competitorUrl, setCompetitorUrl] = useState("");
   const [competitorResult, setCompetitorResult] = useState<{
     analysis?: string;
@@ -430,13 +658,22 @@ export default function PricingPage() {
                     </span>
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      onClick={() => setSelectedProduct(p as Product)}
-                      className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1 ml-auto"
-                    >
-                      <Scale className="w-3 h-3" />
-                      Optimizar Precio
-                    </button>
+                    <div className="flex gap-1.5 justify-end">
+                      <button
+                        onClick={() => setSimulatorProduct(p as Product)}
+                        className="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1.5 rounded-lg hover:bg-blue-500/20 transition-colors flex items-center gap-1"
+                      >
+                        <Calculator className="w-3 h-3" />
+                        Simular
+                      </button>
+                      <button
+                        onClick={() => setSelectedProduct(p as Product)}
+                        className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1.5 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1"
+                      >
+                        <Scale className="w-3 h-3" />
+                        Optimizar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -491,6 +728,9 @@ export default function PricingPage() {
         )}
       </GlassCard>
 
+      {/* P&L Forecast */}
+      <ForecastSection projectId={projectId} />
+
       {/* COGS Modal */}
       <AnimatePresence>
         {selectedProduct && (
@@ -498,6 +738,17 @@ export default function PricingPage() {
             product={selectedProduct}
             projectId={projectId}
             onClose={() => setSelectedProduct(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Price Simulator Modal */}
+      <AnimatePresence>
+        {simulatorProduct && (
+          <PriceSimulator
+            projectId={projectId}
+            product={simulatorProduct}
+            onClose={() => setSimulatorProduct(null)}
           />
         )}
       </AnimatePresence>
