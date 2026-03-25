@@ -1,7 +1,7 @@
 {
-  "name": "ShopyBrain",
-  "short_name": "ShopyBrain",
-  "description": "Agencia Shopify AI — optimización inteligente con OmniCore",
+  "name": "Shopy Crafter",
+  "short_name": "ShopyCrafter",
+  "description": "Agencia Shopify AI — optimización inteligente con Shopy Crafter",
   "start_url": "./admin/intelligence",
   "display": "standalone",
   "background_color": "#080810",

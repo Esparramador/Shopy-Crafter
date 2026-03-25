@@ -20,7 +20,7 @@ function ApkDownloadButton() {
         setStatus("downloading");
         const a = document.createElement("a");
         a.href = `${API_BASE_LANDING}/api/apk/download`;
-        a.download = "ShopyBrain.apk";
+        a.download = "ShopyCrafter.apk";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -351,7 +351,7 @@ export default function Landing() {
           ) : (
             <div className="l-nav-gem">{content.site.logo.value}</div>
           )}
-          <div className="l-nav-logo-text">Shopify<em>AI</em></div>
+          <div className="l-nav-logo-text">Shopy<em>Crafter</em></div>
         </a>
         <ul className="l-nav-links">
           {FP_SECTIONS.map((sec, i) => (
@@ -472,7 +472,7 @@ export default function Landing() {
                   </div>
                   <div className="l-preview-body">
                     <div className="l-preview-sb">
-                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopifyAI</div></div>
+                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopyCrafter</div></div>
                       {["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"].map((item, i) => (
                         <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
                       ))}
@@ -975,7 +975,7 @@ export default function Landing() {
                     ) : (
                       <div className="l-nav-gem">{content.site.logo.value}</div>
                     )}
-                    <div className="l-nav-logo-text">Shopify<em>AI</em></div>
+                    <div className="l-nav-logo-text">Shopy<em>Crafter</em></div>
                   </a>
                   <p className="l-footer-desc">{content.footer.tagline}</p>
                 </div>

@@ -32,7 +32,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="login-logo">
           <div className="logo-gem">⚡</div>
-          <h1>Shopify<em>AI</em></h1>
+          <h1>Shopy<em>Crafter</em></h1>
           <p>Plataforma de agencia premium</p>
         </div>
 

@@ -440,7 +440,7 @@ export default function InviteSetupPage() {
             ⚡
           </div>
           <h1 style={{ fontFamily: "var(--fh)", fontSize: 26, fontStyle: "italic", fontWeight: 400, marginBottom: 4 }}>
-            {step === 1 ? "Configura tu acceso" : "¡Bienvenido a ShopyBrain!"}
+            {step === 1 ? "Configura tu acceso" : "¡Bienvenido a Shopy Crafter!"}
           </h1>
           <p style={{ fontSize: 13, color: "var(--t3)" }}>
             {step === 1
@@ -488,7 +488,7 @@ export default function InviteSetupPage() {
         </div>
 
         <p style={{ fontSize: 11, color: "var(--t4)", textAlign: "center", marginTop: 16 }}>
-          Plataforma exclusiva · Acceso unipersonal por tienda · ShopyBrain © 2026
+          Plataforma exclusiva · Acceso unipersonal por tienda · Shopy Crafter © 2026
         </p>
       </div>
     </div>

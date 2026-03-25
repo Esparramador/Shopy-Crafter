@@ -25,7 +25,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         {/* Logo */}
         <div className="sidebar-logo">
           <div className="logo-gem">⚡</div>
-          <span className="logo-text">Shopify<em>AI</em></span>
+          <span className="logo-text">Shopy<em>Crafter</em></span>
           <span className="logo-badge">CLIENT</span>
         </div>
 

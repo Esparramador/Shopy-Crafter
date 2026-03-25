@@ -87,7 +87,7 @@ export default function ApkManager() {
     try {
       const a = document.createElement("a");
       a.href = `${API_BASE}/api/apk/download`;
-      a.download = "ShopyBrain.apk";
+      a.download = "ShopyCrafter.apk";
       a.click();
       setTimeout(() => setDownloading(false), 3000);
     } catch {
@@ -120,7 +120,7 @@ export default function ApkManager() {
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
           }}>📱</div>
           <div>
-            <h1 className="section-title" style={{ marginBottom: 0 }}>ShopyBrain APK</h1>
+            <h1 className="section-title" style={{ marginBottom: 0 }}>Shopy Crafter APK</h1>
             <p className="section-subtitle" style={{ marginBottom: 0 }}>Gestión del build Android + distribución</p>
           </div>
         </div>
@@ -242,8 +242,8 @@ export default function ApkManager() {
           {[
             { n: "1", t: "Descarga el APK", d: 'Pulsa "Descargar APK" o el botón en la Landing page' },
             { n: "2", t: "Activa fuentes desconocidas", d: "Android → Ajustes → Seguridad → Instalar apps desconocidas → activar para el navegador" },
-            { n: "3", t: "Instala el APK", d: "Abre el archivo ShopyBrain.apk desde la carpeta de descargas" },
-            { n: "4", t: "Abre ShopyBrain", d: "La app carga directamente la versión de producción — siempre actualizada sin necesidad de actualizaciones manuales" },
+            { n: "3", t: "Instala el APK", d: "Abre el archivo ShopyCrafter.apk desde la carpeta de descargas" },
+            { n: "4", t: "Abre Shopy Crafter", d: "La app carga directamente la versión de producción — siempre actualizada sin necesidad de actualizaciones manuales" },
           ].map(s => (
             <div key={s.n} style={{ display: "flex", gap: 12 }}>
               <span style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(200,168,75,0.12)", border: "1px solid rgba(200,168,75,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 800, color: "var(--gold)" }}>{s.n}</span>
