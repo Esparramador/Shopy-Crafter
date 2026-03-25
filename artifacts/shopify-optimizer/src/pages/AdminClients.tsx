@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -361,6 +361,120 @@ function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalPro
 }
 
 // ─── Chat Panel ───────────────────────────────────────────────────────────────
+interface SuggestionModalProps { client: User; onClose: () => void; }
+
+function SuggestionModal({ client, onClose }: SuggestionModalProps) {
+  const [form, setForm] = useState({ type: "price_change", title: "", description: "", beforeValue: "", afterValue: "", reasoning: "", estimatedImpact: "" });
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const projectId = client.clientId;
+
+  const types = [
+    { value: "price_change", label: "Cambio de Precio" },
+    { value: "seo_update", label: "Mejora SEO" },
+    { value: "product_update", label: "Actualización Producto" },
+    { value: "image_change", label: "Cambio de Imagen" },
+    { value: "strategy", label: "Estrategia General" },
+    { value: "other", label: "Otro" },
+  ];
+
+  const [error, setError] = useState("");
+
+  const send = async () => {
+    if (!form.title.trim() || !form.description.trim() || !projectId) return;
+    setSending(true);
+    setError("");
+    try {
+      const r = await fetch(`${API_BASE}/api/admin/projects/${projectId}/approvals`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error(`Error ${r.status}`);
+      setSending(false);
+      setSent(true);
+      setTimeout(onClose, 1500);
+    } catch (e: any) {
+      setSending(false);
+      setError(e.message || "Error al enviar propuesta");
+    }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", background: "rgba(255,255,255,0.03)", border: "1px solid var(--bdr)",
+    borderRadius: 8, padding: "8px 11px", fontSize: 13, color: "var(--t1)", outline: "none", fontFamily: "inherit",
+  };
+
+  if (sent) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="card" style={{ maxWidth: 360, padding: "40px 32px", textAlign: "center" }}>
+          <CheckCircle size={40} style={{ color: "var(--jade)", marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Propuesta Enviada</p>
+          <p style={{ fontSize: 12, color: "var(--t3)" }}>El cliente la verá en su panel de Aprobaciones</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 520, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 700 }}>Nueva Propuesta</p>
+            <p style={{ fontSize: 11, color: "var(--t3)" }}>Para {client.name} · Proyecto #{projectId}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex" }}><X size={16} /></button>
+        </div>
+
+        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, maxHeight: "65vh", overflowY: "auto" }}>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Tipo de propuesta</label>
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ ...inputStyle, cursor: "pointer" }}>
+              {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Título *</label>
+            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Subir precio del Pack Premium" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Descripción *</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalle de la propuesta…" style={{ ...inputStyle, resize: "vertical" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Valor Actual</label>
+              <input value={form.beforeValue} onChange={e => setForm(f => ({ ...f, beforeValue: e.target.value }))} placeholder="Ej: $24.99" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Valor Propuesto</label>
+              <input value={form.afterValue} onChange={e => setForm(f => ({ ...f, afterValue: e.target.value }))} placeholder="Ej: $29.99" style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Razonamiento</label>
+            <textarea value={form.reasoning} onChange={e => setForm(f => ({ ...f, reasoning: e.target.value }))} rows={2} placeholder="¿Por qué recomiendas este cambio?" style={{ ...inputStyle, resize: "vertical" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Impacto Estimado</label>
+            <input value={form.estimatedImpact} onChange={e => setForm(f => ({ ...f, estimatedImpact: e.target.value }))} placeholder="Ej: +12% margen, ~$500/mes adicional" style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--bdr)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+          {error && <p style={{ fontSize: 11, color: "var(--crim)", marginRight: "auto" }}>{error}</p>}
+          <button onClick={onClose} className="btn btn-ghost btn-sm">Cancelar</button>
+          <button onClick={send} disabled={sending || !form.title.trim() || !form.description.trim()} className="btn btn-gold btn-sm" style={{ opacity: sending || !form.title.trim() || !form.description.trim() ? 0.5 : 1 }}>
+            {sending ? <Loader2 size={12} style={{ animation: "spin 0.6s linear infinite" }} /> : <ClipboardList size={12} />}
+            Enviar Propuesta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ChatPanelProps { client: User; onClose: () => void; initialMessage?: string; }
 
 function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
@@ -497,6 +611,7 @@ export default function AdminClients() {
   const [chatClient, setChatClient] = useState<User | null>(null);
   const [chatInitialMsg, setChatInitialMsg] = useState<string | undefined>(undefined);
   const [paymentClient, setPaymentClient] = useState<User | null>(null);
+  const [suggestionClient, setSuggestionClient] = useState<User | null>(null);
 
   const load = () => {
     fetch(`${API_BASE}/api/admin/users`, { credentials: "include" })
@@ -546,6 +661,12 @@ export default function AdminClients() {
           client={chatClient}
           onClose={() => { setChatClient(null); setChatInitialMsg(undefined); }}
           initialMessage={chatInitialMsg}
+        />
+      )}
+      {suggestionClient && (
+        <SuggestionModal
+          client={suggestionClient}
+          onClose={() => setSuggestionClient(null)}
         />
       )}
 
@@ -644,10 +765,16 @@ export default function AdminClients() {
                           Cobrar
                         </button>
                         {u.clientId && (
-                          <button onClick={() => { setChatInitialMsg(undefined); setChatClient(u); }} className="btn btn-sm btn-ghost" title="Ver mensajes">
-                            <MessageSquare size={11} />
-                            Chat
-                          </button>
+                          <>
+                            <button onClick={() => { setChatInitialMsg(undefined); setChatClient(u); }} className="btn btn-sm btn-ghost" title="Ver mensajes">
+                              <MessageSquare size={11} />
+                              Chat
+                            </button>
+                            <button onClick={() => setSuggestionClient(u)} className="btn btn-sm btn-ghost" title="Enviar propuesta al cliente" style={{ borderColor: "rgba(45,212,159,0.25)", color: "var(--jade)" }}>
+                              <ClipboardList size={11} />
+                              Propuesta
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => toggleActive(u)}

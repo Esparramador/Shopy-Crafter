@@ -69,12 +69,27 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
   const pageLabel = PAGE_LABELS[currentPage] ?? "Dashboard";
 
   // Close sidebar when route changes (tablet)
   useEffect(() => { setSidebarOpen(false); }, [location]);
+
+  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    const poll = () => {
+      fetch(`${API_BASE}/api/admin/unread-messages`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && typeof d.total === "number") setUnreadCount(d.total); })
+        .catch(() => {});
+    };
+    poll();
+    const t = setInterval(poll, 30000);
+    return () => clearInterval(t);
+  }, [user?.role]);
 
   const toggleDarkMode = () => {
     setDarkMode(d => !d);
@@ -174,9 +189,20 @@ export function AppLayout({ children }: AppLayoutProps) {
                 className={`nav-item${location === item.href ? " active" : ""}`}
                 role="button"
                 aria-current={location === item.href ? "page" : undefined}
+                style={{ position: "relative" }}
               >
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
+                {item.href === "/admin/clients" && unreadCount > 0 && (
+                  <span style={{
+                    marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9,
+                    background: "var(--crim)", color: "#fff", fontSize: 10, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 5px", lineHeight: 1, flexShrink: 0,
+                  }}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

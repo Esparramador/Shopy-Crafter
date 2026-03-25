@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 
@@ -174,11 +174,26 @@ router.post("/projects/:projectId/approvals", async (req, res): Promise<void> =>
   res.json({ id });
 });
 
+router.get("/unread-messages", async (_req, res): Promise<void> => {
+  const rows = await db.select({
+    projectId: messagesTable.projectId,
+    count: sql<number>`count(*)::int`,
+  }).from(messagesTable)
+    .where(and(eq(messagesTable.fromRole, "client"), eq(messagesTable.isRead, 0)))
+    .groupBy(messagesTable.projectId);
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  res.json({ total, byProject: rows });
+});
+
 router.get("/projects/:projectId/messages", async (req, res): Promise<void> => {
   const { projectId } = req.params;
   const msgs = await db.select().from(messagesTable)
     .where(eq(messagesTable.projectId, projectId))
     .orderBy(messagesTable.createdAt);
+
+  await db.update(messagesTable).set({ isRead: 1 })
+    .where(and(eq(messagesTable.projectId, projectId), eq(messagesTable.fromRole, "client")));
+
   res.json(msgs);
 });
 
