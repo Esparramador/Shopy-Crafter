@@ -286,7 +286,7 @@ export default function ApkManager() {
           </div>
           <div style={{ padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Secrets opcionales en GitHub (para APK firmado)</p>
-            {["KEYSTORE_BASE64 — Keystore codificado en base64", "KEYSTORE_PASSWORD — Contraseña del keystore", "KEY_ALIAS — Alias de la clave", "KEY_PASSWORD — Contraseña de la clave", "APP_URL — URL de producción (ej: https://shopybrain.replit.app)"].map(s => (
+            {["KEYSTORE_BASE64 — Keystore codificado en base64", "KEYSTORE_PASSWORD — Contraseña del keystore", "KEY_ALIAS — Alias de la clave", "KEY_PASSWORD — Contraseña de la clave", "APP_URL — URL de producción (ej: https://shopycrafter.com)"].map(s => (
               <p key={s} style={{ margin: "3px 0", fontSize: 11, color: "var(--t3)" }}>· <code style={{ color: "var(--t2)" }}>{s}</code></p>
             ))}
           </div>

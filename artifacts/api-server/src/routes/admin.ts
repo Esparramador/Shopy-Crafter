@@ -96,12 +96,10 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     shopDomain: projectsTable.shopDomain,
   }).from(projectsTable).where(eq(projectsTable.id, Number(projectId)));
 
-  const replitDomains = process.env.REPLIT_DOMAINS?.split(",")[0];
   const replitDev = process.env.REPLIT_DEV_DOMAIN;
   const baseUrl = process.env.APP_URL
-    ?? (replitDomains ? `https://${replitDomains}` : null)
     ?? (replitDev ? `https://${replitDev}` : null)
-    ?? "http://localhost:3000";
+    ?? "https://shopycrafter.com";
   const inviteLink = `${baseUrl}/invite/${token}`;
 
   await db.insert(auditLogTable).values({
@@ -268,8 +266,7 @@ router.get("/shopify-config", async (_req, res): Promise<void> => {
   const clientSecret = dbClientSecret || envClientSecret;
   const configured = !!(clientId && clientSecret);
 
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  const appUrl = domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
+  const appUrl = process.env.APP_URL ?? "https://shopycrafter.com";
   const callbackUrl = `${appUrl}/api/shopify/oauth/callback`;
 
   res.json({

@@ -237,7 +237,7 @@ router.post("/forgot-password", async (req, res): Promise<void> => {
     // Send via Klaviyo if available
     const klaviyoKey = process.env.KLAVIYO_API_KEY;
     if (klaviyoKey) {
-      const appUrl = process.env.APP_URL ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://shopycrafter.replit.app");
+      const appUrl = process.env.APP_URL ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://shopycrafter.com");
       const resetUrl = `${appUrl}/reset-password?token=${token}`;
       try {
         await fetch("https://a.klaviyo.com/api/events/", {

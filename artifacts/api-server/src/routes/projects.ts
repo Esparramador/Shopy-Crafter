@@ -40,8 +40,7 @@ const OAUTH_SCOPES = [
 const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string; clientId: string; clientSecret: string }>();
 
 function getAppUrl() {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  return domain ? `https://${domain}` : (process.env.APP_URL ?? "http://localhost:8080");
+  return process.env.APP_URL ?? "https://shopycrafter.com";
 }
 
 router.post("/shopify/oauth/start", async (req, res): Promise<void> => {

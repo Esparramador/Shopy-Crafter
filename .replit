@@ -32,6 +32,7 @@ COLLECTION_HANDLE = "shopify-automatization"
 SHOP_CURRENCY = "EUR"
 ENCRYPTION_KEY = "6d79f5ceb6b2278e76e9b07d67bfc95bd78dec9b8120587f453ccb0ec8d3e035"
 GOOGLE_PAGESPEED_API_KEY = "AIzaSyA-e_29qy2pUX8jQrq_fhNeL4zKDb9yLI4"
+APP_URL = "https://shopycrafter.com"
 
 [nix]
 channel = "stable-25_05"

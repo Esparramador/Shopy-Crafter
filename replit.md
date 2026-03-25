@@ -33,7 +33,7 @@ PostgreSQL with Drizzle ORM, featuring over 42 tables, including: `users`, `proj
 ### Security
 - AES-256-GCM encryption for all credentials using `ENCRYPTION_KEY`.
 - Admin routes are protected by `requireAdmin` middleware.
-- CORS is restricted to `REPLIT_DOMAINS` in production.
+- CORS allows both `APP_URL` (custom domain `shopycrafter.com`) and `REPLIT_DOMAINS` in production.
 - Session management uses `httpOnly`, `sameSite: strict`, `secure: true` in production.
 - SVG content from AI is sanitized to remove scripts.
 

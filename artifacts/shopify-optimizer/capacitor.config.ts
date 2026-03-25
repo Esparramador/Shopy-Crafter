@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "ShopyBrain",
   webDir: "dist/public",
   server: {
-    url: process.env.APP_URL ?? "https://shopybrain.replit.app",
+    url: process.env.APP_URL ?? "https://shopycrafter.com",
     cleartext: false,
     androidScheme: "https",
   },

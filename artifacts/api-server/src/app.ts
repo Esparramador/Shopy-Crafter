@@ -45,10 +45,14 @@ app.use(
 // sameSite:strict on the session cookie provides a second layer of protection.
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // same-origin or server-to-server
-    if (process.env.NODE_ENV !== "production") return callback(null, true); // dev: allow all
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== "production") return callback(null, true);
+    const allowed = new Set<string>();
+    const appUrl = process.env.APP_URL;
+    if (appUrl) allowed.add(appUrl);
     const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-    if (domain && origin === `https://${domain}`) return callback(null, true);
+    if (domain) allowed.add(`https://${domain}`);
+    if (allowed.has(origin)) return callback(null, true);
     callback(null, false);
   },
   credentials: true,

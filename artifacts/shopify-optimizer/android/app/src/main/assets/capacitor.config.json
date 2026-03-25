@@ -3,7 +3,7 @@
         "appName": "ShopyBrain",
         "webDir": "dist/public",
         "server": {
-                "url": "https://shopycrafter.replit.app",
+                "url": "https://shopycrafter.com",
                 "cleartext": false,
                 "androidScheme": "https"
         },
