@@ -182,13 +182,15 @@ Real-time supplier intelligence integrated into the chatbot and action execution
 - Files: `absorber.ts` (endpoints), `shopybrain.ts` (action), `OmniChatbot.tsx` (UI + download)
 
 ### Universal Export System (Centro de Exportación)
-Complete export hub at `/projects/:id/exports` with 17 export options across 3 categories:
+Complete export hub at `/projects/:id/exports` with 24 export options across 4 categories:
 - **Paquete Completo**: ZIP file containing ALL 13 HTML reports + CSV + JSON data in one download
 - **13 Informes Profesionales (HTML)**: Informe Completo, SEO Técnico, Catálogo Productos, Financiero/COGS, Brand Brief, Competidores, Consistencia/ADN Marca, Inventario, Rediseños IA, Revenue/Forecast, A/B Testing, Galería Imágenes IA, ShopyBrain Intelligence
-- **3 Exportaciones de Datos**: CSV Productos, JSON Productos, JSON Full (todo el proyecto)
+- **5 Exportaciones de Datos**: CSV Productos, JSON Productos, JSON Full, Excel Productos (XLSX), Excel Completo (XLSX multi-hoja)
+- **5 Descarga de Imágenes**: PNG, JPG, WebP, AVIF, TIFF — batch ZIP download with format conversion via sharp (quality 100%)
+- XLSX exports use ExcelJS with conditional colors, auto-filters, multi-sheet workbooks, gold/black header styling
 - All HTML reports use gold/black professional branding with print-ready CSS for PDF conversion
 - ZIP endpoint uses `archiver` to bundle everything server-side
-- Files: `exports.ts` (backend routes), `ExportCenter.tsx` (frontend UI)
+- Files: `exports.ts` (backend routes), `ExportCenter.tsx` (frontend UI), `vault.ts` (image downloads)
 
 ### Shopify Pagination
 Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopify product listings.
@@ -204,5 +206,6 @@ Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopif
 - **Shopify**: Storefront API for checkout links and Admin API for product creation.
 - **Klaviyo**: For email flow integration and lead form notifications.
 - **connect-pg-simple**: PostgreSQL session store.
+- **ExcelJS**: XLSX workbook generation with styling, conditional formatting, and multi-sheet support.
 - **express-session**, **bcryptjs**, **sharp**, **pino**, **zod**, **drizzle-orm**, **orval**: Core libraries and utilities.
 - **@google/genai**: For direct Gemini API integration.

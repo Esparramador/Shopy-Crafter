@@ -13,8 +13,13 @@ import { inventoryTrackingTable, restockOrdersTable } from "@workspace/db/schema
 import { revenueSnapshotsTable, forecastsTable } from "@workspace/db/schema";
 import { visualDnaTable } from "@workspace/db/schema";
 import archiver from "archiver";
+import ExcelJS from "exceljs";
 
 const router = Router();
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "").replace(/\s+/g, "_").slice(0, 100);
+}
 
 const BRAND = {
   gold: "#c8a84b",
@@ -1220,6 +1225,245 @@ ${reportEndpoints.map(r => `- ${r.name}_${dateStr}.html`).join("\n")}
   archive.append(readmeContent, { name: "LEEME.txt" });
 
   await archive.finalize();
+});
+
+router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+  const seoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+  const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
+  const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Shopy Crafter — ShopyBrain AI";
+  workbook.created = new Date();
+
+  const ws = workbook.addWorksheet("Productos", {
+    properties: { tabColor: { argb: "FFC8A84B" } },
+  });
+
+  ws.columns = [
+    { header: "Título", key: "title", width: 40 },
+    { header: "Handle", key: "handle", width: 25 },
+    { header: "Estado", key: "status", width: 12 },
+    { header: "Precio (€)", key: "price", width: 12 },
+    { header: "Compare At (€)", key: "compareAt", width: 14 },
+    { header: "COGS (€)", key: "cogs", width: 12 },
+    { header: "Margen (%)", key: "margin", width: 12 },
+    { header: "Beneficio (€)", key: "profit", width: 13 },
+    { header: "Vendor", key: "vendor", width: 20 },
+    { header: "Tipo", key: "type", width: 18 },
+    { header: "Tags", key: "tags", width: 30 },
+    { header: "SEO Grade", key: "seoGrade", width: 10 },
+    { header: "SEO Score", key: "seoScore", width: 10 },
+    { header: "Audit Score", key: "auditScore", width: 12 },
+    { header: "Imágenes", key: "images", width: 10 },
+    { header: "Variantes", key: "variants", width: 10 },
+  ];
+
+  ws.getRow(1).eachCell(cell => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0A0A0F" } };
+    cell.border = { bottom: { style: "medium", color: { argb: "FFC8A84B" } } };
+    cell.alignment = { vertical: "middle" };
+  });
+
+  for (const p of products) {
+    const cogs = cogsMap.get(p.shopifyProductId);
+    const seo = seoMap.get(p.shopifyProductId);
+    const price = parseFloat(p.price ?? "0");
+    const cogsVal = cogs?.totalCogs ?? 0;
+    const margin = price > 0 && cogs ? ((price - cogsVal) / price) * 100 : null;
+    const profit = price > 0 && cogs ? price - cogsVal : null;
+
+    const row = ws.addRow({
+      title: p.title,
+      handle: p.handle,
+      status: p.status === "active" ? "Activo" : "Borrador",
+      price: price || null,
+      compareAt: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
+      cogs: cogs ? cogsVal : null,
+      margin: margin != null ? Math.round(margin * 10) / 10 : null,
+      profit: profit != null ? Math.round(profit * 100) / 100 : null,
+      vendor: p.vendor,
+      type: p.productType,
+      tags: p.tags,
+      seoGrade: seo?.seoGrade ?? "",
+      seoScore: seo?.seoScore ? Math.round(seo.seoScore) : null,
+      auditScore: p.auditScore ? Math.round(p.auditScore) : null,
+      images: p.imageCount ?? 0,
+      variants: p.variantCount ?? 1,
+    });
+
+    if (margin != null) {
+      const marginCell = row.getCell("margin");
+      marginCell.font = { color: { argb: margin > 30 ? "FF2ECC71" : margin > 15 ? "FFC8A84B" : "FFE84558" } };
+    }
+
+    const statusCell = row.getCell("status");
+    statusCell.font = { color: { argb: p.status === "active" ? "FF2ECC71" : "FF8B8B9E" } };
+  }
+
+  ws.autoFilter = { from: "A1", to: `P${products.length + 1}` };
+
+  const summaryWs = workbook.addWorksheet("Resumen", {
+    properties: { tabColor: { argb: "FF2ECC71" } },
+  });
+
+  const totalRevenue = products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0);
+  const totalCosts = allCogs.reduce((s, c) => s + c.totalCogs, 0);
+  const avgPrice = products.length > 0 ? totalRevenue / products.length : 0;
+  const avgMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+  const avgSeo = seoData.filter(s => s.seoScore != null).length > 0
+    ? seoData.reduce((s, d) => s + (d.seoScore ?? 0), 0) / seoData.filter(s => s.seoScore != null).length : 0;
+
+  summaryWs.columns = [
+    { header: "Métrica", key: "metric", width: 30 },
+    { header: "Valor", key: "value", width: 20 },
+  ];
+
+  summaryWs.getRow(1).eachCell(cell => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0A0A0F" } };
+  });
+
+  const summaryData = [
+    ["Proyecto", project.name],
+    ["Dominio", project.shopDomain || "No configurado"],
+    ["Nicho", project.storeNiche || "No definido"],
+    ["Fecha exportación", new Date().toLocaleDateString("es-ES")],
+    ["", ""],
+    ["Total productos", products.length],
+    ["Productos activos", products.filter(p => p.status === "active").length],
+    ["Precio medio", `${avgPrice.toFixed(2)}€`],
+    ["Revenue potencial", `${totalRevenue.toFixed(2)}€`],
+    ["COGS total", `${totalCosts.toFixed(2)}€`],
+    ["Beneficio bruto", `${(totalRevenue - totalCosts).toFixed(2)}€`],
+    ["Margen medio", `${avgMargin.toFixed(1)}%`],
+    ["SEO Score medio", `${Math.round(avgSeo)}/100`],
+    ["Productos con COGS", allCogs.length],
+    ["Productos auditados", products.filter(p => p.auditScore != null).length],
+  ];
+
+  for (const [metric, value] of summaryData) {
+    summaryWs.addRow({ metric, value });
+  }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="Productos_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+  const seoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+  const tests = await db.select().from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
+  const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
+  const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
+  const snapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId)));
+
+  const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
+  const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Shopy Crafter — ShopyBrain AI";
+  workbook.created = new Date();
+
+  const headerStyle = (cell: ExcelJS.Cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0A0A0F" } };
+    cell.border = { bottom: { style: "medium", color: { argb: "FFC8A84B" } } };
+  };
+
+  const ws1 = workbook.addWorksheet("Productos");
+  ws1.columns = [
+    { header: "Título", key: "title", width: 35 },
+    { header: "Estado", key: "status", width: 10 },
+    { header: "Precio", key: "price", width: 10 },
+    { header: "COGS", key: "cogs", width: 10 },
+    { header: "Margen %", key: "margin", width: 10 },
+    { header: "SEO", key: "seo", width: 8 },
+    { header: "Audit", key: "audit", width: 8 },
+    { header: "Vendor", key: "vendor", width: 18 },
+    { header: "Tipo", key: "type", width: 15 },
+    { header: "Imgs", key: "imgs", width: 6 },
+  ];
+  ws1.getRow(1).eachCell(headerStyle);
+  for (const p of products) {
+    const cogs = cogsMap.get(p.shopifyProductId);
+    const seo = seoMap.get(p.shopifyProductId);
+    const price = parseFloat(p.price ?? "0");
+    const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
+    ws1.addRow({ title: p.title, status: p.status, price, cogs: cogs?.totalCogs ?? null, margin: margin != null ? Math.round(margin * 10) / 10 : null, seo: seo?.seoGrade ?? "", audit: p.auditScore ? Math.round(p.auditScore) : null, vendor: p.vendor, type: p.productType, imgs: p.imageCount ?? 0 });
+  }
+
+  if (tests.length > 0) {
+    const ws2 = workbook.addWorksheet("A/B Tests");
+    ws2.columns = [
+      { header: "Test", key: "name", width: 30 },
+      { header: "Tipo", key: "type", width: 15 },
+      { header: "Estado", key: "status", width: 12 },
+      { header: "Ganador", key: "winner", width: 10 },
+      { header: "Mejora %", key: "improvement", width: 10 },
+    ];
+    ws2.getRow(1).eachCell(headerStyle);
+    for (const t of tests) ws2.addRow({ name: t.testName, type: t.testType, status: t.status, winner: t.winner ?? "", improvement: t.improvementPct ?? null });
+  }
+
+  if (competitors.length > 0) {
+    const ws3 = workbook.addWorksheet("Competidores");
+    ws3.columns = [
+      { header: "Nombre", key: "name", width: 25 },
+      { header: "URL", key: "url", width: 40 },
+      { header: "Tipo", key: "type", width: 12 },
+      { header: "Activo", key: "active", width: 8 },
+    ];
+    ws3.getRow(1).eachCell(headerStyle);
+    for (const c of competitors) ws3.addRow({ name: c.name, url: c.url, type: c.type, active: c.active ? "Sí" : "No" });
+  }
+
+  if (inventory.length > 0) {
+    const ws4 = workbook.addWorksheet("Inventario");
+    ws4.columns = [
+      { header: "Producto", key: "product", width: 30 },
+      { header: "Stock", key: "stock", width: 10 },
+      { header: "Ventas/día", key: "daily", width: 10 },
+      { header: "Días rest.", key: "days", width: 10 },
+      { header: "Estado", key: "status", width: 12 },
+      { header: "Proveedor", key: "supplier", width: 25 },
+    ];
+    ws4.getRow(1).eachCell(headerStyle);
+    for (const i of inventory) ws4.addRow({ product: i.productTitle, stock: i.currentStock, daily: i.avgDailySales, days: i.daysRemaining, status: i.status, supplier: i.supplierEmail });
+  }
+
+  if (snapshots.length > 0) {
+    const ws5 = workbook.addWorksheet("Revenue");
+    ws5.columns = [
+      { header: "Fecha", key: "date", width: 15 },
+      { header: "Revenue", key: "revenue", width: 12 },
+      { header: "Pedidos", key: "orders", width: 10 },
+      { header: "AOV", key: "aov", width: 10 },
+      { header: "Conversión", key: "conversion", width: 12 },
+      { header: "Margen", key: "margin", width: 10 },
+    ];
+    ws5.getRow(1).eachCell(headerStyle);
+    for (const s of snapshots) ws5.addRow({ date: s.date, revenue: s.revenue, orders: s.orders, aov: s.aov, conversion: s.conversionRate, margin: s.grossMargin });
+  }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="Proyecto_Completo_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 export default router;

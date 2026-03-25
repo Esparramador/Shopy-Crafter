@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { createRequire } from "module";
 import { db, projectFilesTable, projectsTable } from "@workspace/db";
+import { generationJobsTable } from "@workspace/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
+import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -277,6 +279,188 @@ router.delete("/projects/:projectId/vault/:fileId", requireAuth, async (req, res
   res.json({ success: true });
 });
 
+// ─── DESCARGAR IMAGEN EN FORMATO ESPECÍFICO (PNG/JPG/WEBP) ──────────────────
+router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId));
+  const fileId = parseInt(String(req.params.fileId));
+  const format = (req.params.format || "png").toLowerCase();
+
+  if (!["png", "jpg", "jpeg", "webp", "tiff", "avif"].includes(format)) {
+    res.status(400).json({ error: "Formato no soportado. Usa: png, jpg, webp, tiff, avif" }); return;
+  }
+
+  if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
+
+  const session = req.session as any;
+  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    res.status(403).json({ error: "Sin acceso" }); return;
+  }
+
+  const [file] = await db.select().from(projectFilesTable)
+    .where(and(eq(projectFilesTable.id, fileId), eq(projectFilesTable.projectId, projectId)))
+    .limit(1);
+
+  if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+  let imageBuffer: Buffer | null = null;
+
+  if (file.objectPath) {
+    try {
+      const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+      const response = await getStorage().downloadObject(gcsFile);
+      imageBuffer = Buffer.from(await response.arrayBuffer());
+    } catch {}
+  }
+
+  if (!imageBuffer && file.originalUrl) {
+    try {
+      const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(30000) });
+      if (response.ok) imageBuffer = Buffer.from(await response.arrayBuffer());
+    } catch {}
+  }
+
+  if (!imageBuffer) { res.status(410).json({ error: "Imagen no disponible" }); return; }
+
+  try {
+    let pipeline = sharp(imageBuffer);
+
+    const targetFormat = format === "jpeg" ? "jpg" : format;
+    const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+
+    if (targetFormat === "png") {
+      pipeline = pipeline.png({ quality: 100, compressionLevel: 0 });
+    } else if (targetFormat === "jpg") {
+      pipeline = pipeline.jpeg({ quality: 100, chromaSubsampling: "4:4:4" });
+    } else if (targetFormat === "webp") {
+      pipeline = pipeline.webp({ quality: 100, lossless: true });
+    } else if (targetFormat === "tiff") {
+      pipeline = pipeline.tiff({ quality: 100 });
+    } else if (targetFormat === "avif") {
+      pipeline = pipeline.avif({ quality: 100, lossless: true });
+    }
+
+    const outputBuffer = await pipeline.toBuffer();
+    const mimeMap: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", webp: "image/webp",
+      tiff: "image/tiff", avif: "image/avif",
+    };
+
+    res.setHeader("Content-Type", mimeMap[targetFormat] || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.${targetFormat}"`);
+    res.setHeader("Content-Length", String(outputBuffer.length));
+    res.send(outputBuffer);
+  } catch (e: any) {
+    res.status(500).json({ error: `Error convirtiendo imagen: ${e.message}` });
+  }
+});
+
+// ─── DESCARGAR TODAS LAS IMÁGENES EN FORMATO ESPECÍFICO (ZIP) ───────────────
+router.get("/projects/:projectId/vault/download-images/:format", requireAuth, async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId));
+  const format = (req.params.format || "png").toLowerCase();
+
+  if (!["png", "jpg", "jpeg", "webp", "tiff", "avif", "original"].includes(format)) {
+    res.status(400).json({ error: "Formato no soportado" }); return;
+  }
+
+  if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
+
+  const session = req.session as any;
+  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    res.status(403).json({ error: "Sin acceso" }); return;
+  }
+
+  const [project] = await db.select({ name: projectsTable.name }).from(projectsTable)
+    .where(eq(projectsTable.id, projectId)).limit(1);
+
+  const imageFiles = await db.select().from(projectFilesTable)
+    .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "image")))
+    .orderBy(projectFilesTable.category, projectFilesTable.createdAt);
+
+  const aiImages = await db.select().from(generationJobsTable)
+    .where(and(eq(generationJobsTable.projectId, projectId), eq(generationJobsTable.status, "succeeded")));
+
+  const safeName = (project?.name ?? "proyecto").replace(/[^a-zA-Z0-9]/g, "_");
+  const targetFmt = format === "jpeg" ? "jpg" : format;
+  const zipName = `${safeName}_imagenes_${targetFmt.toUpperCase()}_${new Date().toISOString().split("T")[0]}.zip`;
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.pipe(res);
+
+  let added = 0;
+
+  async function processImage(buffer: Buffer, name: string, folder: string) {
+    try {
+      let outputBuffer: Buffer;
+      let ext: string;
+
+      if (format === "original") {
+        outputBuffer = buffer;
+        ext = "png";
+      } else {
+        let pipeline = sharp(buffer);
+        if (targetFmt === "png") pipeline = pipeline.png({ quality: 100, compressionLevel: 0 });
+        else if (targetFmt === "jpg") pipeline = pipeline.jpeg({ quality: 100, chromaSubsampling: "4:4:4" });
+        else if (targetFmt === "webp") pipeline = pipeline.webp({ quality: 100, lossless: true });
+        else if (targetFmt === "tiff") pipeline = pipeline.tiff({ quality: 100 });
+        else if (targetFmt === "avif") pipeline = pipeline.avif({ quality: 100, lossless: true });
+        outputBuffer = await pipeline.toBuffer();
+        ext = targetFmt;
+      }
+
+      archive.append(outputBuffer, { name: `${folder}/${name}.${ext}` });
+      added++;
+    } catch {}
+  }
+
+  for (const file of imageFiles) {
+    let buffer: Buffer | null = null;
+    const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
+    const folder = file.category ?? "general";
+
+    if (file.objectPath) {
+      try {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const response = await getStorage().downloadObject(gcsFile);
+        buffer = Buffer.from(await response.arrayBuffer());
+      } catch {}
+    }
+    if (!buffer && file.originalUrl) {
+      try {
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(20000) });
+        if (response.ok) buffer = Buffer.from(await response.arrayBuffer());
+      } catch {}
+    }
+    if (buffer) await processImage(buffer, `${safeTitle}_${file.id}`, folder);
+  }
+
+  for (const job of aiImages) {
+    if (!job.imageUrl) continue;
+    try {
+      const response = await fetch(job.imageUrl, { signal: AbortSignal.timeout(20000) });
+      if (response.ok) {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const safeTitle = (job.altText || job.imageType || `imagen_${job.id}`).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
+        const folder = `ia_generadas/${job.imageType ?? "general"}`;
+        await processImage(buffer, `${safeTitle}_${job.id}`, folder);
+      }
+    } catch {}
+  }
+
+  archive.append(JSON.stringify({
+    project: project?.name,
+    format: format === "original" ? "original (sin conversión)" : targetFmt.toUpperCase(),
+    quality: "Máxima (100%)",
+    totalImages: added,
+    exportDate: new Date().toISOString(),
+  }, null, 2), { name: "info_exportacion.json" });
+
+  await archive.finalize();
+});
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function getExtension(mimeType: string): string {
   const map: Record<string, string> = {
@@ -284,6 +468,7 @@ function getExtension(mimeType: string): string {
     "image/gif": "gif", "application/json": "json", "text/html": "html",
     "text/plain": "txt", "application/pdf": "pdf",
     "application/octet-stream": "bin",
+    "image/tiff": "tiff", "image/avif": "avif",
   };
   return map[mimeType] ?? "bin";
 }

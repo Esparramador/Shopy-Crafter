@@ -3,12 +3,12 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import {
   FileText, Download, BarChart3, ShoppingBag, Palette, TestTubes, Image,
   FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package, Eye,
-  Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search
+  Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search, Camera, Table2
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP";
+type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX";
 
 interface ExportOption {
   id: string;
@@ -18,7 +18,7 @@ interface ExportOption {
   endpoint: string;
   format: ExportFormat;
   color: string;
-  category: "reports" | "data" | "bundle";
+  category: "reports" | "data" | "bundle" | "images";
 }
 
 export default function ExportCenter({ projectId }: { projectId: number }) {
@@ -197,6 +197,76 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       color: "#9b59b6",
       category: "data",
     },
+    {
+      id: "xlsx-products",
+      title: "Productos (Excel)",
+      description: "Hoja de cálculo Excel con todos los productos, COGS, márgenes, SEO scores. Colores condicionales y filtros automáticos.",
+      icon: <Table2 className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/xlsx/products`,
+      format: "XLSX",
+      color: "#217346",
+      category: "data",
+    },
+    {
+      id: "xlsx-full",
+      title: "Proyecto Completo (Excel)",
+      description: "Multi-hoja Excel con productos, A/B tests, competidores, inventario y revenue. Dashboard completo en un archivo.",
+      icon: <Table2 className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/xlsx/full`,
+      format: "XLSX",
+      color: "#1D6F42",
+      category: "data",
+    },
+    {
+      id: "img-png",
+      title: "Imágenes (PNG)",
+      description: "Descarga ZIP de todas las imágenes del proyecto convertidas a PNG. Alta calidad, sin pérdida.",
+      icon: <Camera className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/vault/download-images/png`,
+      format: "ZIP",
+      color: "#e74c3c",
+      category: "images",
+    },
+    {
+      id: "img-jpg",
+      title: "Imágenes (JPG)",
+      description: "Descarga ZIP de todas las imágenes en formato JPG. Ideal para web y redes sociales.",
+      icon: <Camera className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/vault/download-images/jpg`,
+      format: "ZIP",
+      color: "#e67e22",
+      category: "images",
+    },
+    {
+      id: "img-webp",
+      title: "Imágenes (WebP)",
+      description: "Formato WebP optimizado para la web. Mejor compresión y calidad. Recomendado por Google.",
+      icon: <Camera className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/vault/download-images/webp`,
+      format: "ZIP",
+      color: "#3498db",
+      category: "images",
+    },
+    {
+      id: "img-avif",
+      title: "Imágenes (AVIF)",
+      description: "Formato de última generación AVIF. Máxima compresión con calidad premium.",
+      icon: <Camera className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/vault/download-images/avif`,
+      format: "ZIP",
+      color: "#9b59b6",
+      category: "images",
+    },
+    {
+      id: "img-tiff",
+      title: "Imágenes (TIFF)",
+      description: "Formato TIFF profesional sin pérdida. Para impresión y uso editorial de máxima calidad.",
+      icon: <Camera className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/vault/download-images/tiff`,
+      format: "ZIP",
+      color: "#1abc9c",
+      category: "images",
+    },
   ];
 
   const handleDownload = async (exp: ExportOption) => {
@@ -234,7 +304,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   };
 
   const formatBadge = (format: ExportFormat) => {
-    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558" };
+    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346" };
     return (
       <span
         className="text-[10px] font-bold px-1.5 py-0.5 rounded"
@@ -248,6 +318,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   const bundles = exports.filter(e => e.category === "bundle");
   const reports = exports.filter(e => e.category === "reports");
   const data = exports.filter(e => e.category === "data");
+  const images = exports.filter(e => e.category === "images");
 
   const renderCard = (exp: ExportOption) => {
     const isDownloading = downloading === exp.id;
@@ -322,8 +393,8 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.15)" }}>
         <FileText className="w-5 h-5" style={{ color: "#c8a84b" }} />
         <div>
-          <p className="text-sm font-medium text-foreground">Formatos disponibles: HTML, CSV, JSON, ZIP</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Los informes HTML tienen diseño profesional. Para PDF: abre en navegador y usa <strong>Ctrl+P &rarr; Guardar como PDF</strong>. El ZIP contiene TODO en un solo archivo.</p>
+          <p className="text-sm font-medium text-foreground">Formatos: HTML, CSV, JSON, XLSX, ZIP, PNG, JPG, WebP, AVIF, TIFF</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Informes HTML con diseño profesional. Para PDF: <strong>Ctrl+P → Guardar como PDF</strong>. Excel con filtros y colores. Imágenes convertidas a cualquier formato.</p>
         </div>
       </div>
 
@@ -355,6 +426,18 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
           {data.map(renderCard)}
         </div>
       </div>
+
+      {images.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+            <Camera className="w-5 h-5" style={{ color: "#e74c3c" }} /> Descarga de Imágenes ({images.length} formatos)
+          </h2>
+          <p className="text-xs text-muted-foreground mb-3">Descarga todas las imágenes del proyecto (vault + IA generadas) convertidas al formato que necesites. Calidad máxima 100%.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {images.map(renderCard)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
