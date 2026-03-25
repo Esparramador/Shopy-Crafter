@@ -6,7 +6,7 @@ import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
-import { shopifyRequest, refreshToken } from "../lib/shopify.js";
+import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
@@ -752,7 +752,13 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
         if (params?.productType) updates.product_type = params.productType;
 
         if (params?.price) {
-          updates.variants = [{ id: params.variantId, price: params.price }];
+          const current = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
+            parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=variants`
+          );
+          const varId = params.variantId || current.product.variants?.[0]?.id;
+          if (varId) {
+            updates.variants = [{ id: varId, price: params.price }];
+          }
         }
 
         const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
@@ -823,9 +829,11 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         try {
-          const scopesData = await shopifyRequest<{ access_scopes: Array<{ handle: string }> }>(
-            parseInt(projectId), project.shopDomain, "/../oauth/access_scopes.json"
-          );
+          const headers = await getShopifyHeaders(parseInt(projectId));
+          const domain = normalizeShopDomain(project.shopDomain);
+          const scopesRes = await fetch(`https://${domain}/admin/oauth/access_scopes.json`, { headers });
+          if (!scopesRes.ok) throw new Error(`Scopes request failed: ${scopesRes.status}`);
+          const scopesData = await scopesRes.json() as { access_scopes: Array<{ handle: string }> };
           const scopes = scopesData.access_scopes?.map(s => s.handle) ?? [];
           result = {
             scopes,
