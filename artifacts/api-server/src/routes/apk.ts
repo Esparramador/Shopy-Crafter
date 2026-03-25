@@ -92,7 +92,7 @@ router.get("/apk/download", async (req, res): Promise<void> => {
       redirect: "follow",
     });
 
-    res.setHeader("Content-Disposition", "attachment; filename=\"ShopyBrain.apk\"");
+    res.setHeader("Content-Disposition", "attachment; filename=\"ShopyCrafter.apk\"");
     res.setHeader("Content-Type", "application/vnd.android.package-archive");
     if (assetRes.headers.get("content-length")) {
       res.setHeader("Content-Length", assetRes.headers.get("content-length")!);
