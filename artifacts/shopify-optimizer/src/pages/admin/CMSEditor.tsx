@@ -435,7 +435,7 @@ export default function CMSEditor() {
     return n;
   });
 
-  const previewUrl = `${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}/`;
+  const previewUrl = `${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}/landing`;
 
   if (!content) {
     return (

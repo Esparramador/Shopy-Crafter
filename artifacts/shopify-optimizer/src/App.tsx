@@ -156,6 +156,9 @@ function Router() {
         <Route path="/tienda" component={Tienda} />
         <Route path="/oauth-success" component={OAuthSuccess} />
 
+        {/* Landing — always visible (for CMS preview & admin viewing) */}
+        <Route path="/landing" component={Landing} />
+
         {/* Root — redirects by role */}
         <Route path="/">
           <HomeRedirect />

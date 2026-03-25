@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import "./landing.css";
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -124,6 +125,8 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
 }
 
 export default function Landing() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [content, setContent] = useState<CMSContent | null>(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
@@ -342,8 +345,14 @@ export default function Landing() {
           ))}
         </ul>
         <div className="l-nav-ctas">
-          <Link href="/login" className="l-btn-ghost">{content.nav.ctaSecondary.label}</Link>
-          <a href="#fp-pricing" className="l-btn-gold" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.nav.ctaPrimary.label}</a>
+          {isAdmin ? (
+            <Link href="/admin/clients" className="l-btn-gold">← Volver al panel</Link>
+          ) : (
+            <>
+              <Link href="/login" className="l-btn-ghost">{content.nav.ctaSecondary.label}</Link>
+              <a href="#fp-pricing" className="l-btn-gold" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.nav.ctaPrimary.label}</a>
+            </>
+          )}
         </div>
       </nav>
 
