@@ -47,6 +47,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 
 router.get("/approvals", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   const items = await db.select().from(approvalsTable)
     .where(eq(approvalsTable.projectId, projectId))
     .orderBy(desc(approvalsTable.createdAt));
@@ -55,6 +56,7 @@ router.get("/approvals", async (req, res): Promise<void> => {
 
 router.post("/approvals/:id/approve", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   const [item] = await db.select().from(approvalsTable).where(eq(approvalsTable.id, req.params["id"]!));
   if (!item || item.projectId !== projectId) { res.status(403).json({ error: "Access denied" }); return; }
 
@@ -74,6 +76,7 @@ router.post("/approvals/:id/approve", async (req, res): Promise<void> => {
 
 router.post("/approvals/:id/reject", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   const [item] = await db.select().from(approvalsTable).where(eq(approvalsTable.id, req.params["id"]!));
   if (!item || item.projectId !== projectId) { res.status(403).json({ error: "Access denied" }); return; }
 
@@ -95,6 +98,7 @@ router.post("/approvals/:id/reject", async (req, res): Promise<void> => {
 
 router.get("/messages", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   const msgs = await db.select().from(messagesTable)
     .where(eq(messagesTable.projectId, projectId))
     .orderBy(messagesTable.createdAt);
@@ -107,6 +111,7 @@ router.get("/messages", async (req, res): Promise<void> => {
 
 router.post("/messages", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   const { content } = req.body as { content: string };
   const id = randomBytes(16).toString("hex");
   await db.insert(messagesTable).values({
@@ -117,7 +122,8 @@ router.post("/messages", async (req, res): Promise<void> => {
 
 router.get("/products", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
-  const products = await db.select({
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+  const rows = await db.select({
     id: productsTable.id,
     title: productsTable.title,
     price: productsTable.price,
@@ -128,6 +134,11 @@ router.get("/products", async (req, res): Promise<void> => {
     .where(eq(productsTable.projectId, parseInt(projectId)))
     .orderBy(desc(productsTable.auditScore))
     .limit(50);
+  const products = rows.map((r) => {
+    let images: string[] | null = null;
+    try { images = r.imagesJson ? JSON.parse(r.imagesJson) : null; } catch {}
+    return { id: r.id, title: r.title, price: r.price, auditScore: r.auditScore, auditGrade: r.auditGrade, images };
+  });
   res.json(products);
 });
 
