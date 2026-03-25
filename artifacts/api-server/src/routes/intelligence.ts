@@ -18,7 +18,7 @@ async function scrapeUrl(url: string): Promise<{ html: string; title: string; de
         "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
         "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
       },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) return { html: "", title: "", description: "", keywords: "", jsonLd: "" };
     const html = await res.text();
@@ -165,7 +165,7 @@ Sé específico y concreto — nada de respuestas genéricas. Este análisis deb
         system: intelligenceSystem,
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(90_000) }
+      { signal: AbortSignal.timeout(180_000) }
     );
     const text = (response.content[0] as { type: string; text: string }).text;
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);

@@ -53,7 +53,7 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
   try {
     const resp = await fetch(competitor.url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopifyAI-Monitor/1.0)" },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(30_000),
     });
     const raw = await resp.text();
     htmlContent = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 6000);

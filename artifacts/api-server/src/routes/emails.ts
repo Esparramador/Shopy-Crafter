@@ -221,7 +221,7 @@ Devuelve SOLO este JSON (nada más):
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       },
-      { signal: AbortSignal.timeout(90_000) }
+      { signal: AbortSignal.timeout(180_000) }
     );
 
     const content = message.content[0].type === "text" ? message.content[0].text : "";

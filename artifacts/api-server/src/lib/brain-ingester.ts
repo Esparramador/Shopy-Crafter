@@ -108,7 +108,7 @@ Responde exactamente con este JSON:
         system,
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(30_000) }
+      { signal: AbortSignal.timeout(90_000) }
     );
 
     const raw = resp.content[0].type === "text" ? resp.content[0].text : "{}";

@@ -147,7 +147,7 @@ export async function runCompetitorScans() {
       try {
         const response = await fetch(competitor.url, {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopifyAI-Monitor/1.0)" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(30_000),
         });
         const html = await response.text();
         const priceMatch = html.match(/["']price["']:\s*["']?([\d.,]+)["']?/i) ??
@@ -265,7 +265,7 @@ export async function runOmniCoreMicroLearning() {
             system: `You are OmniCore Micro-Learning Engine for ShopifyAI Pro agency platform. You generate precise, actionable Shopify e-commerce knowledge. ${brainCtxMicro}`,
             messages: [{ role: "user", content: prompt }],
           },
-          { signal: AbortSignal.timeout(90_000) }
+          { signal: AbortSignal.timeout(120_000) }
         );
 
         const text = (response.content[0] as { type: string; text: string }).text;
@@ -388,7 +388,7 @@ export async function runOmniCoreCrossConnections() {
         system: `You are OmniCore Cross-Domain Synthesis Engine. You discover hidden connections between Shopify e-commerce knowledge domains that create compounding agency value. ${brainCtx}`,
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(90_000) }
+      { signal: AbortSignal.timeout(120_000) }
     );
 
     const text = (response.content[0] as { type: string; text: string }).text;
@@ -467,7 +467,7 @@ export async function runOmniCoreDailyDeepStudy() {
             system: `You are OmniCore Daily Deep Study Engine for ShopifyAI Pro. You generate elite-level Shopify agency knowledge. ${brainCtxDaily}`,
             messages: [{ role: "user", content: prompt }],
           },
-          { signal: AbortSignal.timeout(90_000) }
+          { signal: AbortSignal.timeout(120_000) }
         );
         consecutiveFails = 0;
 
@@ -569,7 +569,7 @@ Return ONLY valid JSON:
         system: `You are OmniCore Mega-Synthesis Engine — the highest-level reasoning layer of ShopifyAI Pro. You synthesize a week of multi-domain learning into strategic masterclass insights. ${brainCtx}`,
         messages: [{ role: "user", content: prompt }],
       },
-      { signal: AbortSignal.timeout(120_000) }
+      { signal: AbortSignal.timeout(180_000) }
     );
 
     const text = (response.content[0] as { type: string; text: string }).text;

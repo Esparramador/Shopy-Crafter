@@ -154,7 +154,7 @@ async function fetchUrlContent(url: string): Promise<{ text: string; title: stri
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   };
   
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
   const html = await res.text();
   
   // Extract title

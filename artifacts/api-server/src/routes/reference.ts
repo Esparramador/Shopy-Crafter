@@ -198,7 +198,7 @@ Responde en español, con secciones numeradas. Máxima especificidad técnica.`;
             ],
           }],
         },
-        { signal: AbortSignal.timeout(90_000) }
+        { signal: AbortSignal.timeout(180_000) }
       );
       const c = resp.content[0];
       intelligence = c.type === "text" ? c.text : "";
@@ -256,7 +256,7 @@ router.post("/reference/analyze-video", async (req, res): Promise<void> => {
           "User-Agent": "Mozilla/5.0 (compatible; ShopifyAIBot/1.0)",
           "Accept": "text/html,*/*;q=0.9",
         },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(30_000),
       });
       if (pageRes.ok) {
         const html = await pageRes.text();
