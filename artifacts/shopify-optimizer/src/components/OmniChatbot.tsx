@@ -674,6 +674,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `🔐 **${result.total} scopes activos:**\n${scopes.map(s => `· ${s}`).join("\n")}`;
       }
       case "delete_product":
+        if (result.requiresConfirmation || result.success === false) {
+          return `⚠️ ${result.message || "No se pudo eliminar el producto. Confirma la acción e inténtalo de nuevo."}`;
+        }
         return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
       case "search_product": {
         const prods = (result.products as Array<{ title: string; id: number; price: string }>) ?? [];

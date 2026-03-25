@@ -56,10 +56,14 @@ export default function CommandCenter() {
         const data = await res.json();
         let result: ActionResult = { success: true, message: data.answer };
         if (data.detectedAction) {
+          const params = { ...data.detectedAction.params };
+          if (!params.projectId && selectedProject) {
+            params.projectId = selectedProject;
+          }
           const actionRes = await fetch(`${API}/api/shopybrain/execute-action`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: data.detectedAction.action, params: data.detectedAction.params }),
+            body: JSON.stringify({ action: data.detectedAction.action, params }),
           });
           const actionData = await actionRes.json();
           result = { ...result, ...actionData, message: (data.answer || "") + "\n\n" + (actionData.message || "") };
