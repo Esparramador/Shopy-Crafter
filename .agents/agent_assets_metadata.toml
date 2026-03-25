@@ -12,3 +12,9 @@ id = "yfw292hTbdy9RCRREuGH2"
 uri = "file://MANUAL_AUTOMATIZACION_COMPLETO.md"
 type = "text"
 title = "Manual Completo de Automatizacion — ShopyBrain"
+
+[[outputs]]
+id = "1c38DRC9ULgblKY6KtZ9b"
+uri = "file://CMS_DOCUMENTATION.md"
+type = "text"
+title = "CMS ShopyBrain — Documentación Completa"
