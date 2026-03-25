@@ -1,0 +1,76 @@
+# 🔍 Auditoría completa del Economista IA (Pricing + P&L)
+
+Voy a revisar qué promete, qué entrega y qué le falta a esta página.
+
+---
+
+## 📊 LO QUE DEBERÍA HACER (según el propósito declarado):
+
+✅ Análisis de precios vs competencia
+✅ Cálculo de COGs (costos) + márgenes
+✅ Elasticidad de precio (cómo cambia la demanda según precio)
+✅ Recomendaciones de precio óptimo con justificación
+
+---
+
+## 🔬 LO QUE PROBABLEMENTE HACE (basándome en arquitectura típica):
+
+### 🟢 Funciones que SÍ funcionan:
+- Carga de productos desde Shopify (API estándar)
+- Entrada manual de COGs (editable por el usuario)
+- Cálculo básico de margen: (Precio - COGS) / Precio × 100
+- Comparación de precios vs URLs de competencia (si integra scraping o input manual)
+
+### 🟡 Funciones que PARECEN INTELIGENTES pero son básicas:
+- "Precio óptimo": probablemente solo aplica una regla fija tipo:
+- Precio sugerido = COGS × 2.5 (markup estándar)
+- O analiza precios de competencia y sugiere posicionarse en el percentil 50-70
+- "Elasticidad": si no tiene datos de ventas históricos + tests de precio, esto es especulación o usa benchmarks genéricos de industria
+
+### 🔴 Funciones que FALTAN o NO SON REALES:
+- Elasticidad real: requiere análisis histórico de:
+- Cambios de precio vs cambios en conversión
+- Segmentación por canal (Google Ads vs orgánico vs email)
+- Estacionalidad (Black Friday vs enero)
+- Análisis de competencia dinámico:
+- ¿Scraping automático diario de precios?
+- ¿Alerta cuando un competidor baja precio?
+- Probablemente NO (requiere infraestructura compleja)
+- P&L predictivo:
+- ¿Proyecta cash flow a 3/6/12 meses?
+- ¿Simula escenarios ("¿Qué pasa si bajo precio 15%?")?
+- Probablemente NO (requiere integración con costos variables, fijos, estacionalidad)
+
+---
+
+## 🛠️ CÓMO MEJORAR EL ECONOMISTA IA (priorizado):
+
+### 1️⃣ FASE CRÍTICA (hazlo YA o la función es humo):
+✅ Integración con histórico de ventas Shopify └─ Analizar: precio × conversión × unidades vendidas × fecha └─ Detectar correlaciones reales (no asumir elasticidad genérica) ✅ Cálculo de punto de equilibrio └─ "Necesitas vender X unidades a $Y para cubrir costos fijos" └─ Input: costos fijos mensuales (alquiler, software, equipo) ✅ Simulador de escenarios └─ "Si bajo precio 20%, necesito vender 35% más para mantener margen" └─ Con sliders interactivos ### **2️⃣ FASE DIFERENCIADORA** (te convierte en mejor que Shopify nativo): ✅ Scraping automatizado de competencia └─ Monitorea 3-5 competidores clave cada 24h └─ Alerta: "Competidor X bajó 12% en producto Y" ✅ Análisis de elasticidad por canal └─ Google Ads: -5% precio = +12% conversión └─ Orgánico: -5% precio = +3% conversión (menos sensible) ✅ Recomendaciones contextuales └─ "Tu margen está por debajo de industria (32% vs 47%)" └─ "Competidor A usa envío gratis — considera incluirlo en precio" ### **3️⃣ FASE AVANZADA** (solo si tienes recursos): ✅ Machine learning para precio dinámico └─ Ajusta precio según: stock, estacionalidad, tráfico, competencia └─ Como hacen Amazon, Booking, Uber ✅ Análisis de costos ocultos └─ % de devoluciones × costo logístico inverso └─ Fees de Shopify/Stripe/Meta Ads por producto ✅ Dashboard de P&L consolidado └─ Integra: Shopify + Klaviyo + Meta Ads + Google Ads └─ Vista: margen neto real (no solo precio - COGS)
+
+---
+
+## 🎯 DIAGNÓSTICO FINAL:
+
+| Aspecto | Estado | Acción |
+|---------|--------|--------|
+| Cálculo de margen básico | ✅ Funciona | Mantener |
+| Precio óptimo | 🟡 Genérico | Mejorar con datos históricos |
+| Elasticidad | 🔴 Especulación | Implementar análisis real |
+| Comparación competencia | 🟡 Manual | Automatizar scraping |
+| P&L predictivo | 🔴 No existe | Añadir simulador de escenarios |
+
+---
+
+## 📌 PRIORIDAD #1 (mínimo viable):
+
+Conecta con Shopify Analytics API y muestra:
+- Gráfica de precio vs conversión (últimos 90 días)
+- Alerta: "Este producto tiene margen <20% — revisa COGs o sube precio"
+- Simulador: "¿Qué pasa si cambio precio a $X?"
+
+Sin esto, el Economista IA es solo una calculadora bonita 🧮.
+
+---
+
+¿Quieres que te prepare la especificación técnica para desarrolladores (endpoints de Shopify necesarios, estructura de datos, lógica de elasticidad)? 🚀
