@@ -134,9 +134,7 @@ export function VoiceButton() {
       setResponse("Error al procesar el comando. Inténtalo de nuevo.");
     }
 
-    setTimeout(() => {
-      if (!actionResult) setShowBubble(false);
-    }, 6000);
+    setTimeout(() => setShowBubble(false), 8000);
   };
 
   if (!supported) return null;

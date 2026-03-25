@@ -851,6 +851,10 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
         const projectId = params?.projectId;
         const productId = params?.productId;
         if (!projectId || !productId) { res.status(400).json({ error: "projectId y productId requeridos" }); return; }
+        if (!params?.confirmed) {
+          res.json({ success: false, requiresConfirmation: true, action: "delete_product", productId, message: "⚠️ ¿Estás seguro de eliminar este producto? Envía la orden de nuevo para confirmar." });
+          return;
+        }
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
