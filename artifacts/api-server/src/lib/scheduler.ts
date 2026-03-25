@@ -23,20 +23,36 @@ function log(job: string, msg: string) {
 function uid() { return randomBytes(8).toString("hex"); }
 
 const ALL_DOMAINS: Record<string, string> = {
-  ecommerce:            "eCommerce · CRO · UX",
-  shopify_technical:    "Shopify Técnico",
-  financial_analysis:   "Finanzas · P&L",
-  trading_markets:      "Trading · Mercados",
-  investment:           "Inversión · Valoración",
-  marketing:            "Marketing · Ventas",
-  sales:                "Ventas · Psicología",
-  design_ux:            "Diseño · UX",
-  merchandising:        "Merchandising",
-  seo_content:          "SEO · Contenido",
-  logistics:            "Logística · Stock",
-  paid_media:           "Paid Media · ROAS",
-  consumer_psychology:  "Psicología Consumidor",
-  pricing_science:      "Pricing Science",
+  ecommerce:            "eCommerce · CRO · UX · Conversión · Experiencia de compra",
+  shopify_technical:    "Shopify Técnico · Liquid · APIs · Themes · Checkout · Metafields",
+  financial_analysis:   "Finanzas · P&L · Cash Flow · Unit Economics · Break-even · KPIs financieros",
+  trading_markets:      "Trading · Mercados Internacionales · Divisas · Tendencias Globales",
+  investment:           "Inversión · Valoración de Negocios · Due Diligence · ROI · Capital",
+  marketing:            "Marketing Digital · Branding · Storytelling · Funnels · Email · Estrategia de marca",
+  sales:                "Ventas · Negociación · Psicología de ventas · Objeciones · Cierre",
+  design_ux:            "Diseño · UX/UI · Tipografía · Color Theory · Layout · Accesibilidad · Motion Design",
+  merchandising:        "Merchandising Visual · Producto · Packaging · Presentación · Escaparatismo",
+  seo_content:          "SEO · Contenido · Copywriting · Blog · Arquitectura web · Schema · Keywords · Link Building",
+  logistics:            "Logística · Stock · Fulfillment · Envíos · Cadena de suministro · Warehousing",
+  paid_media:           "Paid Media · ROAS · Google Ads · Meta Ads · TikTok Ads · Retargeting · Attribution",
+  consumer_psychology:  "Psicología del Consumidor · Neuromarketing · Behavioral Economics · Persuasión · Sesgos cognitivos",
+  pricing_science:      "Pricing Science · Estrategias de precio · Elasticidad · Bundling · Descuentos · Anchoring",
+  photography:          "Fotografía de Producto · Composición · Iluminación · Estilos · Props · Post-producción · Food Photography · Moda",
+  video_content:        "Vídeo · Reels · TikTok · YouTube · UGC · Producción · Guiones · Storytelling visual",
+  copywriting:          "Copywriting Persuasivo · Titulares · Descripciones · CTAs · Fórmulas (AIDA, PAS, BAB) · Tono de voz",
+  social_media:         "Redes Sociales · Community Management · Calendario editorial · Engagement · Influencers · Virality",
+  ai_technology:        "IA · Machine Learning · Automatización · Prompts · Generación de contenido · Computer Vision · LLMs",
+  legal_compliance:     "Legal · GDPR · Cookies · Términos y condiciones · Propiedad intelectual · Normativa eCommerce",
+  sustainability:       "Sostenibilidad · Packaging eco · Certificaciones · ESG · Comercio justo · Economía circular",
+  customer_service:     "Atención al cliente · Chatbots · Retención · NPS · Fidelización · Post-venta · Reviews",
+  analytics_data:       "Analytics · Google Analytics · Data Science · Dashboards · Métricas · Cohorts · Attribution",
+  international:        "Internacionalización · Multiidioma · Multi-moneda · Localización · Mercados emergentes · Cross-border",
+  trends_innovation:    "Tendencias · Innovación · Web3 · AR/VR · Live Shopping · Voice Commerce · Social Commerce",
+  supply_chain:         "Proveedores · Sourcing · Alibaba · AliExpress · Fabricación · MOQ · Negociación con proveedores · Dropshipping",
+  brand_strategy:       "Estrategia de Marca · Posicionamiento · Diferenciación · Propuesta de valor · Arquitectura de marca · Brand Equity",
+  email_automation:     "Email Marketing · Automatización · Klaviyo · Segmentación · A/B Testing · Flows · Deliverability",
+  marketplace:          "Marketplaces · Amazon · Etsy · eBay · Multi-canal · Omnichannel · Comparadores",
+  taxes_accounting:     "Impuestos · Contabilidad · IVA · Facturación · Autónomos · SII · Modelos fiscales",
 };
 
 // ─── REVENUE SNAPSHOTS ───────────────────────────────────────────────────────
@@ -255,14 +271,14 @@ export async function runOmniCoreMicroLearning() {
     for (const domain of domains) {
       try {
         const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain ?? "ecommerce";
-        const prompt = `You are an expert in ${label} for Shopify e-commerce agencies in 2026. Generate exactly 3 fresh, actionable insights that a Shopify agency owner can apply directly. Each insight must be specific, data-driven, and novel. Return ONLY valid JSON:
+        const prompt = `You are a world-class expert in ${label}. Your knowledge is UNIVERSAL — not limited to any single industry. Generate exactly 3 fresh, deeply researched, actionable insights that combine best practices from multiple industries and disciplines. Each insight must be specific, backed by real-world data or established frameworks, and immediately applicable to improve quality of content, strategy, or execution for an eCommerce agency managing Shopify stores. Think broadly: draw from psychology, neuroscience, art, architecture, fashion, technology, data science, behavioral economics, or ANY discipline that enriches the topic. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.82,"memoryType":"pricing_pattern","tags":["tag1","tag2"]}]}`;
 
         const response = await anthropic.messages.create(
           {
             model: "claude-sonnet-4-5",
             max_tokens: 1200,
-            system: `You are OmniCore Micro-Learning Engine for ShopifyAI Pro agency platform. You generate precise, actionable Shopify e-commerce knowledge. ${brainCtxMicro}`,
+            system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
             messages: [{ role: "user", content: prompt }],
           },
           { signal: AbortSignal.timeout(120_000) }
@@ -288,14 +304,13 @@ export async function runOmniCoreMicroLearning() {
             source: "micro_learning_cron",
           }).onConflictDoNothing();
 
-          // Alta confianza → también a memorias permanentes
           if (conf >= 0.82) {
             await db.insert(omnicoreMemoriesTable).values({
               id: `mem-${insId}`,
               memoryType: ins.memoryType ?? "general",
               niche: "general",
               title: `[${domain.domain}] ${ins.title}`,
-              content: ins.insight.slice(0, 400),
+              content: ins.insight.slice(0, 800),
               confidence: conf,
               sourceType: "micro_learning",
               tags: ins.tags ? JSON.stringify(ins.tags) : null,
@@ -342,7 +357,7 @@ export async function runOmniCoreMemoryConsolidation() {
           memoryType: "general",
           niche: "general",
           title: ins.title ?? "(sin título)",
-          content: (ins.insight ?? "").slice(0, 400),
+          content: (ins.insight ?? "").slice(0, 800),
           confidence: ins.confidence ?? 0.85,
           sourceType: "memory_consolidation",
         }).onConflictDoNothing();
@@ -378,14 +393,14 @@ export async function runOmniCoreCrossConnections() {
     const names = shuffled.map(d => ALL_DOMAINS[d.domain ?? ""] ?? d.domain);
 
     const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
-    const prompt = `Find 3 powerful hidden cross-domain insights connecting these Shopify e-commerce knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy that a Shopify agency can monetize. Return ONLY valid JSON:
+    const prompt = `Find 3 powerful hidden cross-domain insights connecting these knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy — drawing from ANY discipline (neuroscience, art, architecture, behavioral economics, technology, culture, science, nature, music, etc.) that creates compounding value. The BEST cross-domain insights connect fields that nobody would think are related. Return ONLY valid JSON:
 {"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
 
     const response = await anthropic.messages.create(
       {
         model: "claude-sonnet-4-5",
         max_tokens: 1200,
-        system: `You are OmniCore Cross-Domain Synthesis Engine. You discover hidden connections between Shopify e-commerce knowledge domains that create compounding agency value. ${brainCtx}`,
+        system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
         messages: [{ role: "user", content: prompt }],
       },
       { signal: AbortSignal.timeout(120_000) }
@@ -417,7 +432,7 @@ export async function runOmniCoreCrossConnections() {
         memoryType: "general",
         niche: "general",
         title: `Cross-insight: ${conn.fromDomain} × ${conn.toDomain}`,
-        content: `${conn.insight} | Synergy: ${conn.synergy}`.slice(0, 400),
+        content: `${conn.insight} | Synergy: ${conn.synergy}`.slice(0, 800),
         confidence: conn.confidence ?? 0.7,
         sourceType: "cross_domain_synthesis",
       }).onConflictDoNothing();
@@ -457,14 +472,19 @@ export async function runOmniCoreDailyDeepStudy() {
       }
       try {
         const label = ALL_DOMAINS[domain.domain ?? ""] ?? domain.domain;
-        const prompt = `You are a world-class expert in ${label} for Shopify e-commerce agencies in 2026. Generate 5 premium, deeply researched insights that would be worth €500+/hour consulting advice. Include specific tactics, numbers, and frameworks. Return ONLY valid JSON:
+        const prompt = `You are a world-class authority in ${label}. Your knowledge spans ALL industries and disciplines — you draw from the BEST of every field to create the most complete understanding possible. Generate 5 premium, deeply researched insights that would be worth €500+/hour consulting advice. Each insight MUST:
+1. Draw from real-world examples, scientific research, or proven frameworks from ANY field (not just eCommerce)
+2. Include specific tactics, numbers, percentages, or methodologies
+3. Connect cross-disciplinary knowledge (e.g., how neuroscience improves product photography, how architecture principles enhance UX, how behavioral economics shapes pricing)
+4. Be immediately actionable for improving content quality, business strategy, or creative execution
+Think like a polymath — combine wisdom from art, science, technology, psychology, business, design, finance, law, and culture. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.87,"memoryType":"pricing_pattern"}]}`;
 
         const response = await anthropic.messages.create(
           {
             model: "claude-sonnet-4-5",
             max_tokens: 2500,
-            system: `You are OmniCore Daily Deep Study Engine for ShopifyAI Pro. You generate elite-level Shopify agency knowledge. ${brainCtxDaily}`,
+            system: `You are OmniCore Daily Deep Study Engine — the most advanced autonomous learning system ever built. You are an OMNISCIENT POLYMATH that accumulates knowledge from EVERY discipline: art, architecture, neuroscience, behavioral economics, photography, cinematography, fashion, industrial design, data science, AI/ML, psychology, sociology, law, finance, logistics, sustainability, copywriting, storytelling, music theory, color science, material science, cultural anthropology, and more. Your mission: generate the deepest, most actionable knowledge that elevates the quality of every output — from product descriptions to pricing strategies to visual content. NEVER limit yourself to a single industry. The BEST insights come from connecting knowledge across disciplines. ${brainCtxDaily}`,
             messages: [{ role: "user", content: prompt }],
           },
           { signal: AbortSignal.timeout(120_000) }
@@ -496,7 +516,7 @@ export async function runOmniCoreDailyDeepStudy() {
             memoryType: ins.memoryType ?? "general",
             niche: "general",
             title: `[Daily·${domain.domain}] ${ins.title}`,
-            content: ins.insight.slice(0, 400),
+            content: ins.insight.slice(0, 800),
             confidence: conf,
             sourceType: "daily_deep_study",
           }).onConflictDoNothing();
@@ -554,7 +574,12 @@ export async function runOmniCoreMegaSynthesis() {
     const memorySummary = topMemories.slice(0, 10).map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 100)}`).join("\n");
     const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
 
-    const prompt = `Based on this week's accumulated knowledge for a Shopify e-commerce agency, synthesize 8 meta-level strategic insights that connect multiple domains and reveal compounding opportunities. These are executive-level, cross-domain insights worth implementing immediately.
+    const prompt = `Based on this week's accumulated knowledge across ALL domains, synthesize 8 meta-level MASTERCLASS insights that:
+1. Connect knowledge from 3+ different disciplines (e.g., neuroscience + photography + pricing)
+2. Reveal non-obvious compounding opportunities
+3. Include specific, actionable frameworks with real numbers/percentages
+4. Draw from the BEST of every field — art, science, psychology, technology, business, law, design, data
+5. Are executive-level strategic insights worth implementing immediately
 
 Recent top memories:
 ${memorySummary}
@@ -566,7 +591,7 @@ Return ONLY valid JSON:
       {
         model: "claude-sonnet-4-5",
         max_tokens: 4000,
-        system: `You are OmniCore Mega-Synthesis Engine — the highest-level reasoning layer of ShopifyAI Pro. You synthesize a week of multi-domain learning into strategic masterclass insights. ${brainCtx}`,
+        system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
         messages: [{ role: "user", content: prompt }],
       },
       { signal: AbortSignal.timeout(180_000) }
@@ -598,7 +623,7 @@ Return ONLY valid JSON:
           memoryType: "mega_insight",
           niche: "general",
           title: `[MEGA] ${ins.title}`,
-          content: ins.insight.slice(0, 400),
+          content: ins.insight.slice(0, 800),
           confidence: conf,
           sourceType: "mega_synthesis",
           tags: JSON.stringify(["mega", "strategic", ...(ins.domains ?? [])]),

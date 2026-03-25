@@ -16,22 +16,38 @@ const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const DOMAIN_LABELS: Record<string, string> = {
-  ecommerce: "eCommerce · CRO · UX",
-  shopify_technical: "Shopify Técnico",
-  financial_analysis: "Finanzas · P&L",
-  trading_markets: "Trading · Mercados",
-  investment: "Inversión · Valoración",
-  marketing: "Marketing · Ventas",
-  sales: "Ventas · Psicología",
-  design_ux: "Diseño · UX",
-  merchandising: "Merchandising",
-  seo_content: "SEO · Contenido",
-  logistics: "Logística · Stock",
-  paid_media: "Paid Media · ROAS",
-  consumer_psychology: "Psicología Consumidor",
-  pricing_science: "Pricing Science",
-  visual_production: "Producción Visual · Cinematografía",
-  general: "Conocimiento General",
+  ecommerce:            "eCommerce · CRO · UX · Conversión",
+  shopify_technical:    "Shopify Técnico · Liquid · APIs · Themes",
+  financial_analysis:   "Finanzas · P&L · Cash Flow · Unit Economics",
+  trading_markets:      "Trading · Mercados Internacionales · Tendencias",
+  investment:           "Inversión · Valoración · Due Diligence · ROI",
+  marketing:            "Marketing Digital · Branding · Storytelling · Funnels",
+  sales:                "Ventas · Negociación · Psicología de ventas",
+  design_ux:            "Diseño · UX/UI · Tipografía · Color Theory · Motion",
+  merchandising:        "Merchandising Visual · Packaging · Presentación",
+  seo_content:          "SEO · Contenido · Blog · Keywords · Link Building",
+  logistics:            "Logística · Fulfillment · Envíos · Cadena de suministro",
+  paid_media:           "Paid Media · ROAS · Google Ads · Meta Ads · TikTok",
+  consumer_psychology:  "Psicología del Consumidor · Neuromarketing · Persuasión",
+  pricing_science:      "Pricing Science · Elasticidad · Bundling · Anchoring",
+  visual_production:    "Producción Visual · Cinematografía",
+  photography:          "Fotografía de Producto · Composición · Iluminación · Estilos",
+  video_content:        "Vídeo · Reels · TikTok · YouTube · UGC · Producción",
+  copywriting:          "Copywriting Persuasivo · Titulares · CTAs · Fórmulas",
+  social_media:         "Redes Sociales · Community · Engagement · Influencers",
+  ai_technology:        "IA · Machine Learning · Automatización · Prompts · LLMs",
+  legal_compliance:     "Legal · GDPR · Normativa eCommerce · Propiedad intelectual",
+  sustainability:       "Sostenibilidad · Packaging eco · ESG · Economía circular",
+  customer_service:     "Atención al cliente · Retención · NPS · Fidelización",
+  analytics_data:       "Analytics · Data Science · Dashboards · Métricas",
+  international:        "Internacionalización · Multiidioma · Cross-border",
+  trends_innovation:    "Tendencias · Innovación · AR/VR · Live Shopping · Social Commerce",
+  supply_chain:         "Proveedores · Sourcing · Alibaba · Fabricación · Dropshipping",
+  brand_strategy:       "Estrategia de Marca · Posicionamiento · Brand Equity",
+  email_automation:     "Email Marketing · Klaviyo · Segmentación · Flows",
+  marketplace:          "Marketplaces · Amazon · Etsy · Omnichannel",
+  taxes_accounting:     "Impuestos · Contabilidad · IVA · Facturación",
+  general:              "Conocimiento General · Multidisciplinar",
 };
 
 async function ensureDomains() {
@@ -343,8 +359,10 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   const domainsToStudy = requestedDomains ?? Object.keys(DOMAIN_LABELS).slice(0, 4);
   const startTime = Date.now();
 
-  const systemPrompt = `Eres Shopy Brain — el megacerebro de inteligencia especializada en eCommerce Shopify.
+  const systemPrompt = `Eres ShopyBrain — el MEGACEREBRO OMNISCIENTE que aprende de TODAS las disciplinas del conocimiento humano.
 Vas a realizar una sesión de estudio profundo en estos dominios: ${domainsToStudy.join(", ")}.
+
+Tu conocimiento NO tiene límites sectoriales. Absorbes sabiduría de: arte, ciencia, psicología, neurociencia, arquitectura, fotografía, cinematografía, diseño industrial, moda, tecnología, IA, behavioral economics, storytelling, música, antropología cultural, derecho, sostenibilidad, data science, y CUALQUIER disciplina que enriquezca el tema.
 
 Para cada dominio, genera 3-5 insights en formato JSON:
 {
@@ -353,8 +371,8 @@ Para cada dominio, genera 3-5 insights en formato JSON:
       "domain": "nombre_dominio",
       "insightType": "principle|pattern|correlation|prediction|opportunity|warning",
       "title": "título corto",
-      "insight": "el conocimiento específico y accionable",
-      "evidence": "qué datos o lógica lo soporta",
+      "insight": "el conocimiento específico, profundo y accionable — conectando múltiples disciplinas",
+      "evidence": "qué datos, investigaciones, frameworks o ejemplos reales lo soportan",
       "confidence": 0.0-1.0,
       "impactScore": 0.0-1.0,
       "relatedDomains": ["dominio1", "dominio2"]
@@ -365,9 +383,11 @@ Para cada dominio, genera 3-5 insights en formato JSON:
 }
 
 Principios que guían el análisis:
-- Insights concretos y aplicables al eCommerce español/latinoamericano
-- Conexiones cross-domain (cómo el pricing afecta al SEO, cómo la psicología afecta al merchandising, etc.)
-- Datos reales y tendencias actuales del mercado Shopify
+- Insights PROFUNDOS que combinan conocimiento de MÚLTIPLES disciplinas (ej: neurociencia + fotografía de producto, arquitectura + UX, psicología conductual + pricing)
+- Conexiones cross-domain NO OBVIAS que generan ventaja competitiva real
+- Datos reales, investigaciones científicas, frameworks probados de CUALQUIER campo
+- Ejemplos de las MEJORES prácticas mundiales, sin limitarse a un solo sector o mercado
+- Todo orientado a mejorar la calidad del contenido, la estrategia y la ejecución
 Responde SOLO con el JSON, sin texto adicional.`;
 
   const aiRes = await anthropic.messages.create({
