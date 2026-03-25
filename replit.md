@@ -155,6 +155,19 @@ Admin can create new products directly in any connected Shopify store via the Au
 - Success screen shows audit score, Shopify admin link, and option to create another product.
 - Endpoint: `POST /projects/:projectId/products/create`
 
+### Image-to-Product Creation (Chat)
+Users can drag/drop or attach a product photo in the OmniChatbot and say "créame un producto con esta foto" to trigger an automated pipeline:
+1. **Claude Vision** deep-analyzes the image (product identification, materials, quality tier, target market, features, comparable products)
+2. **Gemini + Google Search** researches REAL market prices from actual stores (Amazon, Zalando, etc.) — never invented prices
+3. **Claude Copywriting** generates SEO-optimized title, HTML description, tags using store BrandDNA
+4. **Shopify API** creates the product as draft with the image attached and competitive pricing
+- Intent detection: Recognizes Spanish/English create+product keywords when an image is attached
+- Requires active project in URL (`/projects/:id/...`)
+- Shows pricing sources, market average, justification, and competitive position in chat response
+- Product saved to ShopyBrain memory for future reference
+- Endpoint: `POST /api/shopybrain/create-product-from-image`
+- Files: `absorber.ts` (endpoint), `OmniChatbot.tsx` (intent detection + UI)
+
 ### Shopify Pagination
 Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopify product listings.
 

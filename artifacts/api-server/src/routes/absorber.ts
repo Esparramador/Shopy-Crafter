@@ -11,9 +11,10 @@ import multer from "multer";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
-import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable } from "@workspace/db/schema";
-import { askGeminiJson } from "../lib/gemini.js";
+import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
+import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
 import { getClaudeClient } from "../lib/claude.js";
+import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";
 
@@ -502,6 +503,272 @@ router.post("/shopybrain/absorb-text", requireAdmin, async (req: Request, res: R
     res.status(500).json({ error: String(err) });
   }
 });
+
+// ─── POST /api/shopybrain/create-product-from-image ────────────────────────────
+router.post("/shopybrain/create-product-from-image",
+  requireAdmin,
+  upload.single("file"),
+  async (req: Request, res: Response): Promise<void> => {
+    const file = req.file;
+    const { projectId, userInstruction, imageUrl } = req.body as {
+      projectId: string; userInstruction?: string; imageUrl?: string;
+    };
+
+    if (!file && !imageUrl) { res.status(400).json({ error: "Se requiere una imagen" }); return; }
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    try {
+      logger.info({ projectId, file: file?.originalname, imageUrl }, "Creating product from image");
+
+      const anthropic = await getClaudeClient(0);
+
+      const imageBlock = (imageUrl && !file)
+        ? { type: "image" as const, source: { type: "url" as const, url: imageUrl } }
+        : {
+            type: "image" as const,
+            source: {
+              type: "base64" as const,
+              media_type: (file!.mimetype as "image/jpeg" | "image/png" | "image/gif" | "image/webp"),
+              data: file!.buffer.toString("base64"),
+            },
+          };
+
+      const visionRes = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 3000,
+        messages: [{
+          role: "user",
+          content: [
+            imageBlock,
+            {
+              type: "text",
+              text: `You are ShopyBrain's Product Intelligence Engine. Analyze this product image with MAXIMUM DEPTH.
+
+EXTRACT:
+1. PRODUCT IDENTIFICATION: What EXACTLY is this product? Be specific (brand if visible, exact category, subcategory, material, style)
+2. MATERIALS: What is it made of? (fabric type, metal, plastic, wood, ceramic, etc.)
+3. QUALITY TIER: Is this budget/mid-range/premium/luxury? Based on visible quality signals
+4. TARGET MARKET: Who buys this? Age, gender, lifestyle, income bracket
+5. PRODUCT CATEGORY: Exact Shopify product_type (e.g., "Camiseta", "Zapatillas", "Funda de móvil")
+6. SEARCH KEYWORDS: What would someone Google to find this product? Give 10+ specific search terms
+7. KEY FEATURES: List 5-8 key selling features visible in the image
+8. SIZE/DIMENSIONS: Estimate if possible
+9. COMPARABLE PRODUCTS: Name 3 similar products from known brands with their approximate price ranges
+10. SUGGESTED TITLE: Professional eCommerce product title in Spanish
+11. SUGGESTED TAGS: 10+ relevant Shopify tags
+
+${userInstruction ? `USER CONTEXT: ${userInstruction}` : ""}
+
+Return ONLY valid JSON with these exact fields:
+{
+  "productName": "exact product name",
+  "productCategory": "Shopify product_type",
+  "materials": ["material1", "material2"],
+  "qualityTier": "budget|mid-range|premium|luxury",
+  "targetMarket": "description",
+  "searchKeywords": ["keyword1", "keyword2", ...],
+  "keyFeatures": ["feature1", "feature2", ...],
+  "comparableProducts": [{"name": "...", "brand": "...", "priceRange": "€XX-€XX"}],
+  "suggestedTitle": "...",
+  "suggestedTags": ["tag1", "tag2", ...],
+  "estimatedPriceRange": "€XX-€XX",
+  "detailedDescription": "what this product is in detail"
+}`,
+            },
+          ],
+        }],
+      });
+
+      const visionText = (visionRes.content[0] as { type: string; text: string }).text;
+      const visionMatch = visionText.match(/\{[\s\S]*\}/);
+      const productAnalysis = visionMatch ? JSON.parse(visionMatch[0]) : {};
+
+      logger.info({ product: productAnalysis.productName, category: productAnalysis.productCategory }, "Vision analysis complete");
+
+      const searchKeywords = productAnalysis.searchKeywords?.slice(0, 5)?.join(", ") || productAnalysis.productName;
+      const comparables = productAnalysis.comparableProducts?.map((p: { name: string; brand: string; priceRange: string }) =>
+        `${p.brand} ${p.name}: ${p.priceRange}`).join(", ") || "";
+
+      const pricingPrompt = `MISIÓN CRÍTICA: Investigar precios REALES y ACTUALES del mercado para este producto.
+
+PRODUCTO: ${productAnalysis.productName || "producto de la imagen"}
+CATEGORÍA: ${productAnalysis.productCategory || "general"}
+MATERIALES: ${(productAnalysis.materials || []).join(", ")}
+CALIDAD: ${productAnalysis.qualityTier || "mid-range"}
+MERCADO OBJETIVO: ${productAnalysis.targetMarket || "general"}
+KEYWORDS DE BÚSQUEDA: ${searchKeywords}
+PRODUCTOS COMPARABLES: ${comparables}
+RANGO ESTIMADO POR VISIÓN: ${productAnalysis.estimatedPriceRange || "desconocido"}
+
+INSTRUCCIONES:
+1. Busca precios REALES en tiendas online españolas y europeas (Amazon, El Corte Inglés, Zalando, AliExpress, etc.)
+2. Compara al menos 5-10 productos similares con sus precios REALES
+3. Analiza el margen de beneficio típico para esta categoría (30-60% markup es normal en eCommerce)
+4. Considera los costes de envío y gestión
+5. Calcula un precio COMPETITIVO pero RENTABLE
+
+Responde en este formato JSON exacto:
+{
+  "researchedPrices": [{"source": "tienda", "product": "nombre", "price": 0.00, "url": "..."}],
+  "averageMarketPrice": 0.00,
+  "lowestFound": 0.00,
+  "highestFound": 0.00,
+  "recommendedPrice": 0.00,
+  "compareAtPrice": 0.00,
+  "priceJustification": "explicación detallada de por qué este precio",
+  "marginAnalysis": "análisis del margen esperado",
+  "competitivePosition": "por debajo/igual/por encima del mercado y por qué"
+}`;
+
+      const pricingResult = await askGeminiWithSearch(
+        pricingPrompt,
+        "Eres un analista de precios eCommerce profesional. SIEMPRE usa Google Search para encontrar precios REALES y ACTUALES. No inventes precios. Busca en tiendas reales. Responde SOLO con JSON válido."
+      );
+
+      let pricingData: Record<string, unknown> = {};
+      try {
+        const pricingMatch = pricingResult.text.match(/\{[\s\S]*\}/);
+        if (pricingMatch) pricingData = JSON.parse(pricingMatch[0]);
+      } catch {
+        logger.warn("Could not parse pricing JSON, using vision estimate");
+      }
+
+      const recommendedPrice = (pricingData.recommendedPrice as number) || 0;
+      const compareAtPrice = (pricingData.compareAtPrice as number) || 0;
+      const priceSources = (pricingData.researchedPrices as Array<{ source: string; product: string; price: number }>) || [];
+
+      logger.info({
+        recommendedPrice,
+        compareAtPrice,
+        sourcesFound: priceSources.length,
+        geminiSources: pricingResult.sources?.length
+      }, "Pricing research complete");
+
+      const copyRes = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 2000,
+        system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
+Tienda: ${project.storeName || "Shopify Store"}
+Nicho: ${project.storeNiche || "general"}
+Tono: ${project.brandTone || "profesional"}
+El producto ha sido analizado visualmente y los precios han sido investigados con datos REALES del mercado.`,
+        messages: [{
+          role: "user",
+          content: `Genera contenido Shopify OPTIMIZADO para este producto:
+
+ANÁLISIS VISUAL: ${JSON.stringify(productAnalysis)}
+INVESTIGACIÓN DE PRECIOS: ${JSON.stringify(pricingData)}
+PRECIO RECOMENDADO: €${recommendedPrice}
+
+${userInstruction ? `INSTRUCCIÓN DEL USUARIO: ${userInstruction}` : ""}
+
+Genera JSON con:
+{
+  "title": "título optimizado SEO en español",
+  "bodyHtml": "<div>descripción HTML profesional con bullet points de features, materiales, y por qué comprarlo</div>",
+  "tags": ["tag1", "tag2", ...],
+  "seoTitle": "título SEO max 70 chars",
+  "seoDescription": "meta description max 160 chars",
+  "vendor": "marca si se identifica o nombre genérico"
+}`,
+        }],
+      });
+
+      const copyText = (copyRes.content[0] as { type: string; text: string }).text;
+      const copyMatch = copyText.match(/\{[\s\S]*\}/);
+      const productCopy = copyMatch ? JSON.parse(copyMatch[0]) : {};
+
+      const finalPrice = recommendedPrice > 0 ? recommendedPrice.toFixed(2) : "0.00";
+      const finalCompareAt = compareAtPrice > recommendedPrice ? compareAtPrice.toFixed(2) : null;
+
+      const imageBase64 = file ? file.buffer.toString("base64") : null;
+
+      const shopifyProduct: Record<string, unknown> = {
+        title: productCopy.title || productAnalysis.suggestedTitle || "Nuevo Producto",
+        body_html: productCopy.bodyHtml || `<p>${productAnalysis.detailedDescription || ""}</p>`,
+        tags: Array.isArray(productCopy.tags) ? productCopy.tags.join(", ") : (productAnalysis.suggestedTags || []).join(", "),
+        vendor: productCopy.vendor || undefined,
+        product_type: productAnalysis.productCategory || undefined,
+        status: "draft",
+        variants: [{
+          title: "Default",
+          price: finalPrice,
+          compare_at_price: finalCompareAt,
+          requires_shipping: true,
+          taxable: true,
+        }],
+      };
+
+      if (imageBase64) {
+        shopifyProduct.images = [{ attachment: imageBase64, filename: file!.originalname }];
+      } else if (imageUrl) {
+        shopifyProduct.images = [{ src: imageUrl }];
+      }
+
+      const created = await shopifyRequest<{ product: Record<string, unknown> }>(
+        parseInt(projectId), project.shopDomain, "/products.json",
+        { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
+      );
+
+      const memoryContent = [
+        `PRODUCT CREATED FROM IMAGE`,
+        `Title: ${created.product.title}`,
+        `Price: €${finalPrice} (researched from ${priceSources.length} sources)`,
+        `Category: ${productAnalysis.productCategory}`,
+        `Materials: ${(productAnalysis.materials || []).join(", ")}`,
+        `Quality: ${productAnalysis.qualityTier}`,
+        `Pricing Sources: ${priceSources.map((s: { source: string; price: number }) => `${s.source}: €${s.price}`).join(", ")}`,
+        `Justification: ${pricingData.priceJustification || "N/A"}`,
+      ].join("\n");
+
+      const memoryId = await saveToShopyBrain({
+        title: `[PRODUCT] ${created.product.title}`,
+        content: memoryContent.slice(0, 10000),
+        memoryType: "product_creation",
+        niche: project.storeNiche || undefined,
+        sourceType: "image_to_product",
+        confidence: 0.9,
+        tags: ["product", "created", "image_analysis", "price_research"],
+      });
+
+      res.json({
+        success: true,
+        product: {
+          id: created.product.id,
+          title: created.product.title,
+          status: created.product.status,
+          handle: created.product.handle,
+          price: finalPrice,
+          compareAtPrice: finalCompareAt,
+          images: created.product.images,
+        },
+        analysis: {
+          productName: productAnalysis.productName,
+          category: productAnalysis.productCategory,
+          materials: productAnalysis.materials,
+          qualityTier: productAnalysis.qualityTier,
+          keyFeatures: productAnalysis.keyFeatures,
+        },
+        pricing: {
+          recommendedPrice: finalPrice,
+          compareAtPrice: finalCompareAt,
+          sourcesResearched: priceSources.length,
+          sources: priceSources.slice(0, 5),
+          justification: pricingData.priceJustification,
+          marketAverage: pricingData.averageMarketPrice,
+          competitivePosition: pricingData.competitivePosition,
+        },
+        memoryId,
+      });
+    } catch (err) {
+      logger.error(err, "Create product from image failed");
+      res.status(500).json({ error: String(err) });
+    }
+  }
+);
 
 // ─── GET /api/shopybrain/absorbed-content ─────────────────────────────────────
 router.get("/shopybrain/absorbed-content", requireAdmin, async (_req: Request, res: Response): Promise<void> => {

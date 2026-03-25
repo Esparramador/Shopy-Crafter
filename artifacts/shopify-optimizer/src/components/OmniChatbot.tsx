@@ -794,54 +794,126 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       let assistantContent = "";
       let action: ChatAction | undefined;
 
-      // ── CASE 1: Has file or URL attachment → ABSORB ──
+      // ── Detect product creation intent from text ──
+      const isProductCreationIntent = (text: string) => {
+        const lower = text.toLowerCase();
+        const createWords = ["crea", "crear", "créame", "creame", "publica", "sube", "subir", "añade", "añadir", "pon", "poner", "haz", "hacer", "genera", "generar", "create", "make", "add", "upload"];
+        const productWords = ["producto", "product", "artículo", "articulo", "item", "listing"];
+        const shopifyWords = ["shopify", "tienda", "store", "shop"];
+        const hasCreate = createWords.some(w => lower.includes(w));
+        const hasProduct = productWords.some(w => lower.includes(w)) || shopifyWords.some(w => lower.includes(w));
+        return hasCreate && hasProduct;
+      };
+
+      // ── CASE 1: Has file or URL attachment ──
       if (hasAttach) {
-        const absorbingMsg = attachType === "image"
-          ? `🔬 Absorbiendo imagen **${attachName}** al ShopyBrain...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
-          : attachType === "video"
-          ? `🎬 Absorbiendo vídeo **${attachName}** al ShopyBrain...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
-          : (() => {
-              const urlInfo = classifyUrl(attachUrl);
-              return `${urlInfo.icon} Absorbiendo **${urlInfo.label}**: ${attachUrl}\n\nExtrayendo: contenido, marca, productos, audiencia, estrategia, señales eCommerce...\n\n_Analizando con Gemini + Claude..._`;
-            })();
+        const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
+        const wantsProduct = content && attachType === "image" && isProductCreationIntent(content) && projectIdFromUrl;
 
-        setMessages(m => [...m, { id: uuid(), role: "assistant", content: absorbingMsg, timestamp: new Date(), model: "gemini+claude+brain" }]);
+        if (wantsProduct && attachFile) {
+          setMessages(m => [...m, { id: uuid(), role: "assistant", content: `🚀 **Creando producto desde imagen** — ${attachName}\n\n**Paso 1** — Claude Vision analiza el producto en profundidad\n**Paso 2** — Gemini investiga precios REALES del mercado (búsquedas Google)\n**Paso 3** — Claude genera copywriting profesional optimizado\n**Paso 4** — Se crea el producto en Shopify con la imagen\n\n_⏱️ Esto puede tardar 30-60 segundos. Investigando precios reales..._`, timestamp: new Date(), model: "gemini+claude+brain" }]);
 
-        let result: AbsorbResult;
-        if (attachFile) {
-          result = await absorbFile(attachFile);
-        } else {
-          result = await absorbUrl(attachUrl);
-        }
+          const formData = new FormData();
+          formData.append("file", attachFile);
+          formData.append("projectId", projectIdFromUrl!);
+          if (content) formData.append("userInstruction", content);
 
-        const isImage = attachType === "image";
-        const a = result.analysis as Record<string, Record<string, string[]>>;
-        const angles = a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
-
-        assistantContent = `✅ **Absorbido al ShopyBrain**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
-        if (isImage && a.visual_composition) {
-          assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
-        }
-        if (a.technical_chemical_composition) {
-          assistantContent += `**Material/Técnica:** ${typeof a.technical_chemical_composition === "object" ? (a.technical_chemical_composition.manufacturing_process_indicators ?? JSON.stringify(a.technical_chemical_composition).slice(0, 150)) : a.technical_chemical_composition}\n\n`;
-        }
-        if (angles?.length > 0) {
-          assistantContent += `**Top Marketing Angles:**\n${(Array.isArray(angles) ? angles : []).slice(0, 3).map(a => `· ${a}`).join("\n")}\n\n`;
-        }
-        if (content) {
-          assistantContent += `\n**Tu pregunta:** ${content}\n\n`;
-          const followUp = await fetch(`${API}/api/shopybrain/search`, {
-            method: "POST", credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
+          const prodRes = await fetch(`${API}/api/shopybrain/create-product-from-image`, {
+            method: "POST", credentials: "include", body: formData,
           });
-          if (followUp.ok) {
-            const d = await followUp.json();
-            assistantContent += d.answer ?? "";
+
+          if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            const p = prodData.product;
+            const pr = prodData.pricing;
+            const an = prodData.analysis;
+
+            assistantContent = `✅ **Producto creado en Shopify**\n\n`;
+            assistantContent += `📦 **${p.title}**\n`;
+            assistantContent += `🏷️ ID: \`${p.id}\` | Estado: \`${p.status}\`\n\n`;
+
+            assistantContent += `💰 **Precio: €${pr.recommendedPrice}**`;
+            if (pr.compareAtPrice) assistantContent += ` ~~€${pr.compareAtPrice}~~`;
+            assistantContent += `\n`;
+
+            if (pr.sourcesResearched > 0) {
+              assistantContent += `📊 **Investigación de precios** (${pr.sourcesResearched} fuentes analizadas):\n`;
+              (pr.sources || []).slice(0, 4).forEach((s: { source: string; product: string; price: number }) => {
+                assistantContent += `  · ${s.source}: €${s.price} — ${s.product}\n`;
+              });
+              if (pr.marketAverage) assistantContent += `  📈 Media del mercado: €${pr.marketAverage}\n`;
+              assistantContent += `\n`;
+            }
+
+            if (pr.justification) {
+              assistantContent += `💡 **Por qué este precio:** ${pr.justification}\n\n`;
+            }
+
+            if (an?.materials?.length) {
+              assistantContent += `🔬 **Materiales:** ${an.materials.join(", ")}\n`;
+            }
+            if (an?.qualityTier) {
+              assistantContent += `⭐ **Calidad:** ${an.qualityTier}\n`;
+            }
+            if (an?.keyFeatures?.length) {
+              assistantContent += `✨ **Features:** ${an.keyFeatures.slice(0, 4).join(" · ")}\n`;
+            }
+
+            assistantContent += `\n_El producto está en borrador. Revísalo y publícalo cuando estés listo._`;
+            action = { type: "shopify-action", label: "Ver producto creado", data: prodData };
+          } else {
+            const errText = await prodRes.text();
+            assistantContent = `❌ Error creando el producto: ${errText}`;
           }
+
+        } else {
+          const absorbingMsg = attachType === "image"
+            ? `🔬 Absorbiendo imagen **${attachName}** al ShopyBrain...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
+            : attachType === "video"
+            ? `🎬 Absorbiendo vídeo **${attachName}** al ShopyBrain...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
+            : (() => {
+                const urlInfo = classifyUrl(attachUrl);
+                return `${urlInfo.icon} Absorbiendo **${urlInfo.label}**: ${attachUrl}\n\nExtrayendo: contenido, marca, productos, audiencia, estrategia, señales eCommerce...\n\n_Analizando con Gemini + Claude..._`;
+              })();
+
+          setMessages(m => [...m, { id: uuid(), role: "assistant", content: absorbingMsg, timestamp: new Date(), model: "gemini+claude+brain" }]);
+
+          let result: AbsorbResult;
+          if (attachFile) {
+            result = await absorbFile(attachFile);
+          } else {
+            result = await absorbUrl(attachUrl);
+          }
+
+          const isImage = attachType === "image";
+          const a = result.analysis as Record<string, Record<string, string[]>>;
+          const angles = a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
+
+          assistantContent = `✅ **Absorbido al ShopyBrain**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
+          if (isImage && a.visual_composition) {
+            assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
+          }
+          if (a.technical_chemical_composition) {
+            assistantContent += `**Material/Técnica:** ${typeof a.technical_chemical_composition === "object" ? (a.technical_chemical_composition.manufacturing_process_indicators ?? JSON.stringify(a.technical_chemical_composition).slice(0, 150)) : a.technical_chemical_composition}\n\n`;
+          }
+          if (angles?.length > 0) {
+            assistantContent += `**Top Marketing Angles:**\n${(Array.isArray(angles) ? angles : []).slice(0, 3).map(a => `· ${a}`).join("\n")}\n\n`;
+          }
+          if (content) {
+            assistantContent += `\n**Tu pregunta:** ${content}\n\n`;
+            const followUp = await fetch(`${API}/api/shopybrain/search`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
+            });
+            if (followUp.ok) {
+              const d = await followUp.json();
+              assistantContent += d.answer ?? "";
+            }
+          }
+          assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
+          action = { type: "absorb-result", label: "Ver análisis completo", data: result };
         }
-        assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
-        action = { type: "absorb-result", label: "Ver análisis completo", data: result };
 
       // ── CASE 2: Klaviyo workflow request ──
       } else if (detectKlaviyo(content)) {
