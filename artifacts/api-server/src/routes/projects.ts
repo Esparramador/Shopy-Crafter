@@ -383,8 +383,21 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
 
 router.delete("/projects/:projectId", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  await db.delete(projectsTable).where(eq(projectsTable.id, id));
-  res.json({ success: true, message: "Proyecto eliminado" });
+  const mode = (req.query.mode as string) ?? "full";
+
+  if (mode === "dissociate") {
+    await db.update(projectsTable).set({
+      accessToken: null,
+      tokenExpiresAt: null,
+      clientId: "",
+      clientSecret: "",
+      shopDomain: "",
+    }).where(eq(projectsTable.id, id));
+    res.json({ success: true, message: "Tienda desasociada. Tus productos, COGS, SEO e imágenes se conservan." });
+  } else {
+    await db.delete(projectsTable).where(eq(projectsTable.id, id));
+    res.json({ success: true, message: "Proyecto eliminado completamente" });
+  }
 });
 
 router.get("/projects/:projectId/reveal-token", async (req, res): Promise<void> => {

@@ -117,13 +117,18 @@ export default function SettingsPage() {
     finally { setReconnecting(false); }
   };
 
-  const handleDeleteProject = async () => {
+  const handleDeleteProject = async (mode: "full" | "dissociate") => {
     setDeleting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/${projectId}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}?mode=${mode}`, { method: "DELETE", credentials: "include" });
       const data = await res.json();
       if (data.success) {
-        window.location.href = `${API_BASE}/home`;
+        if (mode === "dissociate") {
+          alert(data.message);
+          window.location.reload();
+        } else {
+          window.location.href = `${API_BASE}/home`;
+        }
       } else {
         alert(data.error || "Error al eliminar");
       }
@@ -454,21 +459,36 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "rgba(232,69,88,.04)", border: "1px solid rgba(232,69,88,.15)" }}>
+          <div className="p-4 rounded-xl space-y-3" style={{ background: "rgba(232,69,88,.04)", border: "1px solid rgba(232,69,88,.15)" }}>
             <div>
-              <p className="font-medium text-foreground text-sm">Eliminar proyecto completo</p>
-              <p className="text-xs text-muted-foreground mt-1">Borra el proyecto y TODO su contenido: productos, imágenes, rediseños, SEO, vault. Esta acción es irreversible.</p>
+              <p className="font-medium text-foreground text-sm">Gestión del proyecto</p>
+              <p className="text-xs text-muted-foreground mt-1">Elige si desasociar la tienda (conservando datos) o eliminar todo permanentemente.</p>
             </div>
             {!showDeleteConfirm ? (
               <button onClick={() => setShowDeleteConfirm(true)} className="px-5 py-2 rounded-xl font-medium text-sm flex items-center gap-2 transition-all" style={{ border: "1px solid rgba(232,69,88,.3)", color: "#e84558" }}>
-                <Trash2 className="w-4 h-4" /> Eliminar
+                <Trash2 className="w-4 h-4" /> Eliminar / Desasociar
               </button>
             ) : (
-              <div className="flex gap-2">
-                <button onClick={handleDeleteProject} disabled={deleting} className="px-4 py-2 rounded-xl font-bold text-sm text-white transition-all" style={{ background: "#e84558" }}>
-                  {deleting ? "..." : "Sí, eliminar todo"}
-                </button>
-                <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-xl font-medium text-sm text-muted-foreground border border-border">
+              <div className="space-y-3 pt-1">
+                <div className="p-3 rounded-lg flex items-center justify-between" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.25)" }}>
+                  <div className="flex-1 mr-3">
+                    <p className="font-semibold text-sm" style={{ color: "#c8a84b" }}>Desasociar tienda</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Desconecta Shopify pero <strong>conserva</strong> todos tus productos, COGS, SEO, imágenes y datos.</p>
+                  </div>
+                  <button onClick={() => handleDeleteProject("dissociate")} disabled={deleting} className="px-4 py-2 rounded-xl font-bold text-sm text-white shrink-0 transition-all" style={{ background: "#c8a84b" }}>
+                    {deleting ? "..." : "Desasociar"}
+                  </button>
+                </div>
+                <div className="p-3 rounded-lg flex items-center justify-between" style={{ background: "rgba(232,69,88,.06)", border: "1px solid rgba(232,69,88,.25)" }}>
+                  <div className="flex-1 mr-3">
+                    <p className="font-semibold text-sm" style={{ color: "#e84558" }}>Eliminar todo</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Borra el proyecto <strong>y TODO</strong> su contenido: productos, imágenes, COGS, SEO, vault. Irreversible.</p>
+                  </div>
+                  <button onClick={() => handleDeleteProject("full")} disabled={deleting} className="px-4 py-2 rounded-xl font-bold text-sm text-white shrink-0 transition-all" style={{ background: "#e84558" }}>
+                    {deleting ? "..." : "Eliminar todo"}
+                  </button>
+                </div>
+                <button onClick={() => setShowDeleteConfirm(false)} className="w-full px-4 py-2 rounded-xl font-medium text-sm text-muted-foreground border border-border text-center">
                   Cancelar
                 </button>
               </div>
