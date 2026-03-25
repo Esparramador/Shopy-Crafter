@@ -74,12 +74,12 @@ function ApkDownloadButton() {
 type CMSContent = {
   site: { name: string; tagline: string; logo: { type: string; value: string; imageUrl: string | null }; primaryColor: string; accentColor: string; font_heading: string; font_body: string };
   nav: { links: { id: string; label: string; href: string }[]; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string } };
-  hero: { pill: { text: string; visible: boolean }; headline: string; headlineHighlight: string; subheadline: string; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string }; trustItems: string[] };
-  features: { pill: string; headline: string; subheadline: string; items: { id: string; num: string; icon: string; iconBg: string; title: string; description: string; tags: string[] }[] };
+  hero: { pill: { text: string; visible: boolean }; headline: string; headlineHighlight: string; subheadline: string; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string }; trustItems: string[]; imageUrl?: string | null };
+  features: { pill: string; headline: string; subheadline: string; items: { id: string; num: string; icon: string; iconBg: string; title: string; description: string; tags: string[]; imageUrl?: string | null }[] };
   stats: { id: string; num: string; label: string }[];
   how: { pill: string; headline: string; headlineHighlight: string; steps: { num: string; title: string; desc: string }[] };
   pricing: { pill: string; headline: string; subheadline: string; plans: { id: string; name: string; price: string; currency: string; period: string; featured: boolean; badge: string | null; features: { text: string; included: boolean }[]; cta: { label: string; style: string } }[] };
-  testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string }[] };
+  testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string; avatarUrl?: string | null }[] };
   cta: { pill: string; headline: string; headlineHighlight: string; subheadline: string; placeholder: string; buttonLabel: string; finePrint: string };
   footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
 };
@@ -126,7 +126,8 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
 
 export default function Landing() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
+  const isAdmin = !isPreview && user?.role === "admin";
   const [content, setContent] = useState<CMSContent | null>(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
@@ -233,7 +234,6 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
-  // Hash-based navigation (e.g. /#fp-pricing loads section 4)
   useEffect(() => {
     if (!content) return;
     const hash = window.location.hash;
@@ -241,6 +241,18 @@ export default function Landing() {
     const idx = FP_SECTIONS.findIndex(s => `#${s.id}` === hash);
     if (idx >= 0) setTimeout(() => goToSection(idx), 350);
   }, [content, goToSection]);
+
+  useEffect(() => {
+    if (!isPreview) return;
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "cms-go-to-section") {
+        const idx = FP_SECTIONS.findIndex(s => s.id === e.data.sectionId);
+        if (idx >= 0) goToSection(idx);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [isPreview, goToSection]);
 
   // Lock body scroll ONLY on desktop — mobile uses native scroll
   useEffect(() => {
@@ -334,7 +346,11 @@ export default function Landing() {
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
-          <div className="l-nav-gem">{content.site.logo.value}</div>
+          {content.site.logo.imageUrl ? (
+            <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt={content.site.name} style={{ height: 32, width: "auto", borderRadius: 6 }} />
+          ) : (
+            <div className="l-nav-gem">{content.site.logo.value}</div>
+          )}
           <div className="l-nav-logo-text">Shopify<em>AI</em></div>
         </a>
         <ul className="l-nav-links">
@@ -439,56 +455,62 @@ export default function Landing() {
 
             <div className={`fp-hero-right ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
               <div className="l-preview-glow"></div>
-              <div className="l-preview-frame">
-                <div className="l-preview-topbar">
-                  <div className="l-preview-dots">
-                    <div className="l-dot" style={{ background: "#ff5f57" }}></div>
-                    <div className="l-dot" style={{ background: "#ffbd2e" }}></div>
-                    <div className="l-dot" style={{ background: "#28ca41" }}></div>
-                  </div>
-                  <div className="l-preview-url">app.shopifyai.pro/admin — Moda Urbana</div>
-                  <div className="l-preview-status"><div className="l-status-dot"></div>6 motores activos</div>
+              {content.hero.imageUrl ? (
+                <div className="l-preview-frame" style={{ padding: 0, overflow: "hidden" }}>
+                  <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} />
                 </div>
-                <div className="l-preview-body">
-                  <div className="l-preview-sb">
-                    <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopifyAI</div></div>
-                    {["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"].map((item, i) => (
-                      <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
-                    ))}
+              ) : (
+                <div className="l-preview-frame">
+                  <div className="l-preview-topbar">
+                    <div className="l-preview-dots">
+                      <div className="l-dot" style={{ background: "#ff5f57" }}></div>
+                      <div className="l-dot" style={{ background: "#ffbd2e" }}></div>
+                      <div className="l-dot" style={{ background: "#28ca41" }}></div>
+                    </div>
+                    <div className="l-preview-url">app.shopifyai.pro/admin — Moda Urbana</div>
+                    <div className="l-preview-status"><div className="l-status-dot"></div>6 motores activos</div>
                   </div>
-                  <div className="l-preview-main">
-                    <div className="l-pm-row">
-                      {[{ lbl: "Revenue", val: "€32.4K", ch: "↑ 22%", color: "#e6c668" }, { lbl: "Conversión", val: "4.2%", ch: "↑ 0.9pp", color: "#2dd49f" }, { lbl: "Margen", val: "61%", ch: "↑ 8pts", color: "#f2f0ff" }, { lbl: "SEO", val: "88", ch: "↑ 23pts", color: "#4a9edd" }].map((c, i) => (
-                        <div key={i} className="l-pm-card">
-                          <div className="l-pm-lbl">{c.lbl}</div>
-                          <div className="l-pm-val" style={{ color: c.color }}>{c.val}</div>
-                          <div className="l-pm-ch" style={{ color: c.color }}>{c.ch}</div>
-                        </div>
+                  <div className="l-preview-body">
+                    <div className="l-preview-sb">
+                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopifyAI</div></div>
+                      {["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"].map((item, i) => (
+                        <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
                       ))}
                     </div>
-                    <div className="l-pm-row2">
-                      <div className="l-pm-card2">
-                        <div className="l-pm-c2-title">Salud de tiendas</div>
-                        {[{ name: "Moda Urbana", v: 88, color: "#2dd49f", w: "88%" }, { name: "TechGadgets", v: 71, color: "#4a9edd", w: "71%" }, { name: "Casa & Arte", v: 42, color: "#e84558", w: "42%" }].map((s, i) => (
-                          <div key={i}>
-                            <div className="l-pm-bar-row"><span>{s.name}</span><span style={{ color: s.color }}>{s.v}</span></div>
-                            <div className="l-pm-bar"><div className="l-pm-bar-f" style={{ width: s.w, background: `linear-gradient(90deg,${s.color},${s.color}88)` }}></div></div>
+                    <div className="l-preview-main">
+                      <div className="l-pm-row">
+                        {[{ lbl: "Revenue", val: "€32.4K", ch: "↑ 22%", color: "#e6c668" }, { lbl: "Conversión", val: "4.2%", ch: "↑ 0.9pp", color: "#2dd49f" }, { lbl: "Margen", val: "61%", ch: "↑ 8pts", color: "#f2f0ff" }, { lbl: "SEO", val: "88", ch: "↑ 23pts", color: "#4a9edd" }].map((c, i) => (
+                          <div key={i} className="l-pm-card">
+                            <div className="l-pm-lbl">{c.lbl}</div>
+                            <div className="l-pm-val" style={{ color: c.color }}>{c.val}</div>
+                            <div className="l-pm-ch" style={{ color: c.color }}>{c.ch}</div>
                           </div>
                         ))}
                       </div>
-                      <div className="l-pm-card2">
-                        <div className="l-pm-c2-title">Actividad reciente</div>
-                        {[{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f", txt: "A/B Test ganador · +28% conv." }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668", txt: "48 imágenes · €13.44" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd", txt: "Schema SEO · 234 productos" }].map((f, i) => (
-                          <div key={i} className="l-feed-row">
-                            <div className="l-feed-ico" style={{ background: f.bg, color: f.color }}>{f.ico}</div>
-                            <div className="l-feed-txt">{f.txt}</div>
-                          </div>
-                        ))}
+                      <div className="l-pm-row2">
+                        <div className="l-pm-card2">
+                          <div className="l-pm-c2-title">Salud de tiendas</div>
+                          {[{ name: "Moda Urbana", v: 88, color: "#2dd49f", w: "88%" }, { name: "TechGadgets", v: 71, color: "#4a9edd", w: "71%" }, { name: "Casa & Arte", v: 42, color: "#e84558", w: "42%" }].map((s, i) => (
+                            <div key={i}>
+                              <div className="l-pm-bar-row"><span>{s.name}</span><span style={{ color: s.color }}>{s.v}</span></div>
+                              <div className="l-pm-bar"><div className="l-pm-bar-f" style={{ width: s.w, background: `linear-gradient(90deg,${s.color},${s.color}88)` }}></div></div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="l-pm-card2">
+                          <div className="l-pm-c2-title">Actividad reciente</div>
+                          {[{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f", txt: "A/B Test ganador · +28% conv." }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668", txt: "48 imágenes · €13.44" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd", txt: "Schema SEO · 234 productos" }].map((f, i) => (
+                            <div key={i} className="l-feed-row">
+                              <div className="l-feed-ico" style={{ background: f.bg, color: f.color }}>{f.ico}</div>
+                              <div className="l-feed-txt">{f.txt}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -948,7 +970,11 @@ export default function Landing() {
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
-                    <div className="l-nav-gem">{content.site.logo.value}</div>
+                    {content.site.logo.imageUrl ? (
+                      <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt={content.site.name} style={{ height: 28, width: "auto", borderRadius: 6 }} />
+                    ) : (
+                      <div className="l-nav-gem">{content.site.logo.value}</div>
+                    )}
                     <div className="l-nav-logo-text">Shopify<em>AI</em></div>
                   </a>
                   <p className="l-footer-desc">{content.footer.tagline}</p>

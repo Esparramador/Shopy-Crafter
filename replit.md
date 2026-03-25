@@ -94,6 +94,15 @@ The `visualDnaTable` stores extracted visual identity (background style, lightin
 ### Pricing Model
 A multi-tiered pricing structure (Starter, Agency Pro, Enterprise, One-Shot Audit) with monthly retainers and one-time setup fees, visible on the landing page and managed through the CMS.
 
+### CMS Editor (`/admin/cms`)
+Full visual content editor for the landing page with live iframe preview.
+- **Field types**: text, textarea, color, boolean, url, image (drag & drop upload)
+- **Image upload**: `/api/cms/media/upload` with Sharp → WebP, 5MB limit, stored in `public/media/`
+- **Sections**: Sitio (logo image + emoji), Hero (image), Motores (per-engine images), Estadísticas, Cómo funciona, Precios, Testimonios (avatar images), CTA Final, Footer
+- **Preview mode**: Iframe loads `/landing?preview=true` — suppresses admin UI, shows public nav; supports `postMessage` for section navigation from editor
+- **AI Copywriting**: Each text field has IA button for Claude-powered copy improvement
+- **Version history**: Up to 30 versions, restore any version, batch save
+
 ### Shopify Billing Flow
 Admins can generate Shopify checkout links for services, linking directly to Shopify product variants configured in the CFO dashboard.
 

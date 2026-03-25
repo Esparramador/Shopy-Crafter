@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import {
   Monitor, Tablet, Smartphone, Save, Loader2, Sparkles,
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
-  PenLine, LayoutTemplate,
+  PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,7 +18,7 @@ const DEVICE_WIDTHS: Record<DeviceMode, string> = {
   mobile:  "390px",
 };
 
-type FieldType = "text" | "textarea" | "color" | "boolean" | "url";
+type FieldType = "text" | "textarea" | "color" | "boolean" | "url" | "image";
 
 interface FieldDef {
   label: string;
@@ -42,6 +42,7 @@ const SECTIONS: SectionDef[] = [
       { label: "Nombre", path: "site.name", type: "text", placeholder: "ShopyBrain" },
       { label: "Tagline", path: "site.tagline", type: "text", placeholder: "La plataforma de agencia Shopify más completa" },
       { label: "Emoji/Logo", path: "site.logo.value", type: "text", placeholder: "⚡" },
+      { label: "Logo imagen", path: "site.logo.imageUrl", type: "image", hint: "Sube una imagen para reemplazar el emoji del logo" },
       { label: "Color primario", path: "site.primaryColor", type: "color" },
       { label: "Color acento", path: "site.accentColor", type: "color" },
     ],
@@ -55,6 +56,7 @@ const SECTIONS: SectionDef[] = [
       { label: "Subtítulo", path: "hero.subheadline", type: "textarea", placeholder: "Descripción..." },
       { label: "CTA primario", path: "hero.ctaPrimary.label", type: "text" },
       { label: "CTA secundario", path: "hero.ctaSecondary.label", type: "text" },
+      { label: "Imagen Hero", path: "hero.imageUrl", type: "image", hint: "Imagen principal del hero (mockup, producto, etc.)" },
     ],
   },
   {
@@ -65,8 +67,10 @@ const SECTIONS: SectionDef[] = [
       { label: "Subtítulo", path: "features.subheadline", type: "textarea" },
       { label: "M01 Título", path: "features.items.0.title", type: "text" },
       { label: "M01 Descripción", path: "features.items.0.description", type: "textarea" },
+      { label: "M01 Imagen", path: "features.items.0.imageUrl", type: "image" },
       { label: "M02 Título", path: "features.items.1.title", type: "text" },
       { label: "M02 Descripción", path: "features.items.1.description", type: "textarea" },
+      { label: "M02 Imagen", path: "features.items.1.imageUrl", type: "image" },
       { label: "M03 Título", path: "features.items.2.title", type: "text" },
       { label: "M04 Título", path: "features.items.3.title", type: "text" },
       { label: "M05 Título", path: "features.items.4.title", type: "text" },
@@ -122,12 +126,15 @@ const SECTIONS: SectionDef[] = [
       { label: "T1 — Métrica", path: "testimonials.items.0.metric", type: "text" },
       { label: "T1 — Autor",   path: "testimonials.items.0.author", type: "text" },
       { label: "T1 — Rol",     path: "testimonials.items.0.role", type: "text" },
+      { label: "T1 — Avatar",  path: "testimonials.items.0.avatarUrl", type: "image" },
       { label: "T2 — Texto",   path: "testimonials.items.1.text", type: "textarea" },
       { label: "T2 — Métrica", path: "testimonials.items.1.metric", type: "text" },
       { label: "T2 — Autor",   path: "testimonials.items.1.author", type: "text" },
+      { label: "T2 — Avatar",  path: "testimonials.items.1.avatarUrl", type: "image" },
       { label: "T3 — Texto",   path: "testimonials.items.2.text", type: "textarea" },
       { label: "T3 — Métrica", path: "testimonials.items.2.metric", type: "text" },
       { label: "T3 — Autor",   path: "testimonials.items.2.author", type: "text" },
+      { label: "T3 — Avatar",  path: "testimonials.items.2.avatarUrl", type: "image" },
     ],
   },
   {
@@ -252,6 +259,90 @@ function AIImprovePopover({ text, onApply, onClose }: { text: string; onApply: (
   );
 }
 
+/* ── IMAGE UPLOADER ─────────────────────────────────────────────────────── */
+function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { toast } = useToast();
+
+  const upload = async (file: File) => {
+    if (!file.type.startsWith("image/")) { toast({ title: "Solo se permiten imágenes", variant: "destructive" }); return; }
+    if (file.size > 5 * 1024 * 1024) { toast({ title: "Máximo 5MB", variant: "destructive" }); return; }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${BASE_URL}/api/cms/media/upload`, { method: "POST", body: form });
+      if (!res.ok) { toast({ title: "Error al subir imagen", variant: "destructive" }); setUploading(false); return; }
+      const data = await res.json() as { url: string };
+      if (data.url) onChange(data.url);
+    } catch { toast({ title: "Error de conexión", variant: "destructive" }); }
+    setUploading(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) upload(file);
+  };
+
+  const remove = async () => {
+    if (value) {
+      const filename = value.split("/").pop();
+      if (filename) await fetch(`${BASE_URL}/api/cms/media/${filename}`, { method: "DELETE" }).catch(() => {});
+    }
+    onChange("");
+  };
+
+  return (
+    <div>
+      {value ? (
+        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--bdr)" }}>
+          <img src={`${BASE_URL}${value}`} alt="" style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
+          <div style={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 4 }}>
+            <button onClick={() => inputRef.current?.click()}
+              style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Upload size={12} style={{ color: "#fff" }} />
+            </button>
+            <button onClick={remove}
+              style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(200,50,50,0.8)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Trash2 size={12} style={{ color: "#fff" }} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          style={{
+            border: `2px dashed ${dragOver ? "var(--gold)" : "var(--bdr)"}`,
+            borderRadius: 12, padding: "20px 12px", textAlign: "center", cursor: "pointer",
+            background: dragOver ? "rgba(200,168,75,0.05)" : "var(--ink2)",
+            transition: "all .2s",
+          }}
+        >
+          {uploading ? (
+            <Loader2 className="w-5 h-5 animate-spin mx-auto" style={{ color: "var(--gold)" }} />
+          ) : (
+            <>
+              <ImageIcon size={20} style={{ color: "var(--t4)", margin: "0 auto 6px" }} />
+              <p style={{ fontSize: 11, color: "var(--t3)" }}>Arrastra una imagen o haz clic</p>
+              <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>WebP · max 5MB</p>
+            </>
+          )}
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
 /* ── FIELD EDITOR ────────────────────────────────────────────────────────── */
 function FieldEditor({ field, value, onChange }: { field: FieldDef; value: string; onChange: (path: string, value: string) => void }) {
   const [aiTarget, setAiTarget] = useState<string | null>(null);
@@ -276,7 +367,9 @@ function FieldEditor({ field, value, onChange }: { field: FieldDef; value: strin
 
       {field.hint && <p style={{ fontSize: 11, color: "var(--t4)", marginBottom: 6 }}>{field.hint}</p>}
 
-      {field.type === "textarea" ? (
+      {field.type === "image" ? (
+        <ImageUploader value={value} onChange={v => onChange(field.path, v)} />
+      ) : field.type === "textarea" ? (
         <textarea
           rows={3}
           value={value}
@@ -435,7 +528,11 @@ export default function CMSEditor() {
     return n;
   });
 
-  const previewUrl = `${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}/landing`;
+  const previewUrl = `${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}/landing?preview=true`;
+
+  const scrollPreviewToSection = (sectionId: string) => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "cms-go-to-section", sectionId }, "*");
+  };
 
   if (!content) {
     return (
@@ -566,22 +663,36 @@ export default function CMSEditor() {
               const isOpen = openSections.has(section.id);
               return (
                 <div key={section.id} style={{ borderBottom: "1px solid var(--bdr)" }}>
-                  <button onClick={() => toggleSection(section.id)}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "11px 16px", cursor: "pointer", border: "none",
-                      background: isOpen ? "var(--ink2)" : "transparent",
-                      transition: "background .15s",
-                    }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 16 }}>{section.icon}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>{section.label}</span>
-                    </span>
-                    {isOpen
-                      ? <ChevronDown size={13} style={{ color: "var(--gold)" }} />
-                      : <ChevronRight size={13} style={{ color: "var(--t4)" }} />}
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <button onClick={() => toggleSection(section.id)}
+                      style={{
+                        flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "11px 16px", cursor: "pointer", border: "none",
+                        background: isOpen ? "var(--ink2)" : "transparent",
+                        transition: "background .15s",
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>{section.icon}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>{section.label}</span>
+                      </span>
+                      {isOpen
+                        ? <ChevronDown size={13} style={{ color: "var(--gold)" }} />
+                        : <ChevronRight size={13} style={{ color: "var(--t4)" }} />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const map: Record<string, string> = { site: "fp-hero", hero: "fp-hero", features: "fp-engines", stats: "fp-results", how: "fp-demo", pricing: "fp-pricing", testimonials: "fp-clients", cta: "fp-cta", footer: "fp-contact" };
+                        scrollPreviewToSection(map[section.id] || "fp-hero");
+                      }}
+                      title="Ver en preview"
+                      style={{ padding: "8px 10px", background: "none", border: "none", cursor: "pointer", color: "var(--t4)", transition: "color .15s" }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "var(--gold)")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "var(--t4)")}
+                    >
+                      <Eye size={13} />
+                    </button>
+                  </div>
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
