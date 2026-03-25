@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BookOpen, Play, Brain, CheckCircle, Zap, RefreshCw, Link, Star, Activity, Search } from "lucide-react";
+import { BookOpen, Play, Brain, CheckCircle, Zap, RefreshCw, Link, Star, Activity } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -205,20 +205,6 @@ export default function ShopyBrainStudy() {
             onChange={e => setExtractInput(e.target.value)}
             placeholder="Ej: nike.com · Apple · tienda.myshopify.com · 'moda sostenible para millennials' · https://competidor.com"
           />
-          {extractInput.trim().length >= 2 && (
-            <button
-              type="button"
-              onClick={() => {}}
-              style={{
-                padding: "0 18px", borderRadius: 8, background: "var(--gold)",
-                border: "none", color: "#000", fontSize: 13, cursor: "pointer",
-                fontFamily: "var(--fb)", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
-              <Search size={14} />
-              Analizar
-            </button>
-          )}
         </div>
 
         {extractInput.trim().length >= 2 && (
