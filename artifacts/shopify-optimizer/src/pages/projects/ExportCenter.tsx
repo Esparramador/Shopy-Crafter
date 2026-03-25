@@ -2,10 +2,13 @@ import { useState } from "react";
 import { GlassCard } from "../../components/ui/GlassCard";
 import {
   FileText, Download, BarChart3, ShoppingBag, Palette, TestTubes, Image,
-  FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package
+  FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package, Eye,
+  Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP";
 
 interface ExportOption {
   id: string;
@@ -13,8 +16,9 @@ interface ExportOption {
   description: string;
   icon: React.ReactNode;
   endpoint: string;
-  format: string;
+  format: ExportFormat;
   color: string;
+  category: "reports" | "data" | "bundle";
 }
 
 export default function ExportCenter({ projectId }: { projectId: number }) {
@@ -24,6 +28,16 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
 
   const exports: ExportOption[] = [
     {
+      id: "zip-all",
+      title: "Exportación Completa (ZIP)",
+      description: "TODO en un solo archivo: 13 informes HTML + CSV + JSON. Listo para entregar al cliente o archivar.",
+      icon: <Archive className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/zip/all`,
+      format: "ZIP",
+      color: "#c8a84b",
+      category: "bundle",
+    },
+    {
       id: "complete",
       title: "Informe Completo del Proyecto",
       description: "Resumen ejecutivo con todos los datos: productos, SEO, financiero, imágenes y A/B tests. Ideal para presentar a clientes.",
@@ -31,42 +45,97 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       endpoint: `/api/projects/${projectId}/exports/complete-report`,
       format: "HTML",
       color: "#c8a84b",
+      category: "reports",
     },
     {
       id: "seo",
       title: "Informe SEO Técnico",
-      description: "Auditoría SEO completa: scores por producto, distribución de grados, Schema JSON-LD, alt texts, meta titles y recomendaciones estratégicas.",
+      description: "Auditoría SEO completa: scores por producto, Schema JSON-LD, alt texts, meta titles y recomendaciones estratégicas.",
       icon: <BarChart3 className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/seo-audit`,
       format: "HTML",
       color: "#2ecc71",
+      category: "reports",
     },
     {
       id: "catalog",
       title: "Catálogo de Productos",
-      description: "Inventario completo con precios, COGS, márgenes, estado de optimización, SEO grade e imágenes de cada producto.",
+      description: "Inventario completo con precios, COGS, márgenes, estado de optimización, SEO grade e imágenes.",
       icon: <ShoppingBag className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/product-catalog`,
       format: "HTML",
       color: "#3498db",
+      category: "reports",
     },
     {
       id: "financial",
       title: "Informe Financiero y COGS",
-      description: "Análisis financiero detallado: COGS por producto, márgenes de beneficio, historial de cambios de precio y revenue potencial.",
+      description: "Análisis financiero: COGS por producto, márgenes, historial de cambios de precio y revenue potencial.",
       icon: <FileText className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/financial`,
       format: "HTML",
       color: "#e67e22",
+      category: "reports",
     },
     {
       id: "brand",
       title: "Brand Brief & Estrategia",
-      description: "Documento de identidad de marca: nicho, tono, audiencia, catálogo, categorías, proveedores y estado de optimización.",
+      description: "Identidad de marca: nicho, tono, audiencia, catálogo, categorías, proveedores y estado de optimización.",
       icon: <Palette className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/brand-brief`,
       format: "HTML",
       color: "#9b59b6",
+      category: "reports",
+    },
+    {
+      id: "competitors",
+      title: "Análisis de Competencia",
+      description: "Competidores monitoreados, rangos de precios, snapshots de escaneos, alertas competitivas y acciones sugeridas.",
+      icon: <Search className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/competitors`,
+      format: "HTML",
+      color: "#e84558",
+      category: "reports",
+    },
+    {
+      id: "consistency",
+      title: "Consistencia y ADN de Marca",
+      description: "ADN visual (iluminación, colores, composición, mood), ADN de marca (tipografía, layout, personalidad) y score de consistencia.",
+      icon: <Eye className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/consistency`,
+      format: "HTML",
+      color: "#8e44ad",
+      category: "reports",
+    },
+    {
+      id: "inventory",
+      title: "Informe de Inventario",
+      description: "Stock por producto, ventas diarias, días restantes, alertas críticas, órdenes de reposición y proveedores.",
+      icon: <Boxes className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/inventory`,
+      format: "HTML",
+      color: "#16a085",
+      category: "reports",
+    },
+    {
+      id: "redesigns",
+      title: "Rediseños IA",
+      description: "Historial de fichas rediseñadas por IA: títulos optimizados, descripciones SEO, precios recomendados y estado.",
+      icon: <Wand2 className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/redesigns`,
+      format: "HTML",
+      color: "#2980b9",
+      category: "reports",
+    },
+    {
+      id: "revenue",
+      title: "Revenue y Forecast",
+      description: "Snapshots de ventas, pedidos, AOV, márgenes brutos, predicciones de forecast con niveles de confianza.",
+      icon: <TrendingUp className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/revenue`,
+      format: "HTML",
+      color: "#27ae60",
+      category: "reports",
     },
     {
       id: "abtests",
@@ -76,24 +145,57 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       endpoint: `/api/projects/${projectId}/exports/ab-tests`,
       format: "HTML",
       color: "#1abc9c",
+      category: "reports",
     },
     {
       id: "images",
       title: "Galería de Imágenes IA",
-      description: "Catálogo visual de todas las imágenes generadas con IA: lifestyle, hero, packaging, con modelo y alt texts.",
+      description: "Catálogo visual de todas las imágenes generadas: lifestyle, hero, packaging, con modelo y alt texts.",
       icon: <Image className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/images-gallery`,
       format: "HTML",
-      color: "#e84558",
+      color: "#e74c3c",
+      category: "reports",
+    },
+    {
+      id: "shopybrain",
+      title: "Inteligencia ShopyBrain",
+      description: "Estado completo del cerebro IA: dominios de conocimiento, memorias, insights, confianza y inteligencia de proveedores.",
+      icon: <Brain className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/shopybrain`,
+      format: "HTML",
+      color: "#f39c12",
+      category: "reports",
     },
     {
       id: "csv",
-      title: "Exportar Productos (CSV)",
-      description: "Hoja de cálculo con todos los productos: títulos, precios, COGS, márgenes, SEO scores, variantes. Compatible con Excel y Google Sheets.",
+      title: "Productos (CSV)",
+      description: "Hoja de cálculo con todos los productos: títulos, precios, COGS, márgenes, SEO. Compatible con Excel y Google Sheets.",
       icon: <FileSpreadsheet className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/csv/products`,
       format: "CSV",
       color: "#27ae60",
+      category: "data",
+    },
+    {
+      id: "json-products",
+      title: "Productos (JSON)",
+      description: "Datos estructurados de todos los productos con COGS, SEO scores y métricas. Para integraciones y análisis técnico.",
+      icon: <FileJson className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/json/products`,
+      format: "JSON",
+      color: "#3498db",
+      category: "data",
+    },
+    {
+      id: "json-full",
+      title: "Exportación Total (JSON)",
+      description: "TODOS los datos del proyecto en un solo JSON: productos, SEO, COGS, tests, rediseños, imágenes, competidores, inventario, revenue.",
+      icon: <FileJson className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/json/full`,
+      format: "JSON",
+      color: "#9b59b6",
+      category: "data",
     },
   ];
 
@@ -124,27 +226,90 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
     }
   };
 
-  const handleDownloadAll = async () => {
-    for (const exp of exports) {
+  const handleDownloadAllReports = async () => {
+    for (const exp of exports.filter(e => e.category === "reports")) {
       await handleDownload(exp);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 400));
     }
+  };
+
+  const formatBadge = (format: ExportFormat) => {
+    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558" };
+    return (
+      <span
+        className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+        style={{ background: `${colors[format]}20`, color: colors[format] }}
+      >
+        {format}
+      </span>
+    );
+  };
+
+  const bundles = exports.filter(e => e.category === "bundle");
+  const reports = exports.filter(e => e.category === "reports");
+  const data = exports.filter(e => e.category === "data");
+
+  const renderCard = (exp: ExportOption) => {
+    const isDownloading = downloading === exp.id;
+    const isCompleted = completed.has(exp.id);
+
+    return (
+      <GlassCard key={exp.id} className="p-0 overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-start gap-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: `${exp.color}15`, color: exp.color }}
+            >
+              {exp.icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground text-sm">{exp.title}</h3>
+                {formatBadge(exp.format)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exp.description}</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 pb-4">
+          <button
+            onClick={() => handleDownload(exp)}
+            disabled={isDownloading}
+            className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+            style={{
+              background: isCompleted ? "rgba(46,204,113,.1)" : `${exp.color}12`,
+              border: `1px solid ${isCompleted ? "rgba(46,204,113,.3)" : exp.color + "30"}`,
+              color: isCompleted ? "#2ecc71" : exp.color,
+            }}
+          >
+            {isDownloading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
+            ) : isCompleted ? (
+              <><CheckCircle className="w-4 h-4" /> Descargado</>
+            ) : (
+              <><Download className="w-4 h-4" /> Descargar {exp.format}</>
+            )}
+          </button>
+        </div>
+      </GlassCard>
+    );
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Centro de Exportación</h1>
-          <p className="text-muted-foreground text-sm mt-1">Descarga informes profesionales, datos y contenidos para tus clientes</p>
+          <h1 className="text-2xl font-bold text-foreground">Centro de Exportación Universal</h1>
+          <p className="text-muted-foreground text-sm mt-1">Descarga informes profesionales, datos y contenidos en cualquier formato</p>
         </div>
         <button
-          onClick={handleDownloadAll}
+          onClick={handleDownloadAllReports}
           disabled={downloading !== null}
           className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all hover:scale-105"
           style={{ background: "linear-gradient(135deg, #c8a84b 0%, #a08630 100%)" }}
         >
-          <Download className="w-4 h-4" /> Descargar Todo
+          <Download className="w-4 h-4" /> Descargar Todos los Informes
         </button>
       </div>
 
@@ -157,63 +322,38 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.15)" }}>
         <FileText className="w-5 h-5" style={{ color: "#c8a84b" }} />
         <div>
-          <p className="text-sm font-medium text-foreground">Informes profesionales en HTML</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Los informes se descargan como HTML con diseño profesional. Para convertirlos a PDF, ábrelos en tu navegador y usa <strong>Ctrl+P → Guardar como PDF</strong>.</p>
+          <p className="text-sm font-medium text-foreground">Formatos disponibles: HTML, CSV, JSON, ZIP</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Los informes HTML tienen diseño profesional. Para PDF: abre en navegador y usa <strong>Ctrl+P &rarr; Guardar como PDF</strong>. El ZIP contiene TODO en un solo archivo.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {exports.map(exp => {
-          const isDownloading = downloading === exp.id;
-          const isCompleted = completed.has(exp.id);
+      {bundles.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+            <Archive className="w-5 h-5" style={{ color: "#c8a84b" }} /> Paquete Completo
+          </h2>
+          <div className="grid grid-cols-1 gap-4">
+            {bundles.map(renderCard)}
+          </div>
+        </div>
+      )}
 
-          return (
-            <GlassCard key={exp.id} className="p-0 overflow-hidden">
-              <div className="p-5">
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: `${exp.color}15`, color: exp.color }}
-                  >
-                    {exp.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-foreground text-sm">{exp.title}</h3>
-                      <span
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: `${exp.color}20`, color: exp.color }}
-                      >
-                        {exp.format}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exp.description}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="px-5 pb-4">
-                <button
-                  onClick={() => handleDownload(exp)}
-                  disabled={isDownloading}
-                  className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-                  style={{
-                    background: isCompleted ? "rgba(46,204,113,.1)" : `${exp.color}12`,
-                    border: `1px solid ${isCompleted ? "rgba(46,204,113,.3)" : exp.color + "30"}`,
-                    color: isCompleted ? "#2ecc71" : exp.color,
-                  }}
-                >
-                  {isDownloading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
-                  ) : isCompleted ? (
-                    <><CheckCircle className="w-4 h-4" /> Descargado</>
-                  ) : (
-                    <><Download className="w-4 h-4" /> Descargar</>
-                  )}
-                </button>
-              </div>
-            </GlassCard>
-          );
-        })}
+      <div>
+        <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+          <FileText className="w-5 h-5" style={{ color: "#c8a84b" }} /> Informes Profesionales ({reports.length})
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {reports.map(renderCard)}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+          <FileSpreadsheet className="w-5 h-5" style={{ color: "#27ae60" }} /> Exportación de Datos ({data.length})
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.map(renderCard)}
+        </div>
       </div>
     </div>
   );

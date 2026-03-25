@@ -2,12 +2,17 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { cogsTable } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { priceHistoryTable } from "@workspace/db/schema";
+import { eq, desc, and, sql } from "drizzle-orm";
+import { priceHistoryTable, brandDnaTable } from "@workspace/db/schema";
 import { abTestsTable } from "@workspace/db/schema";
 import { redesignsTable } from "@workspace/db/schema";
 import { generationJobsTable } from "@workspace/db/schema";
-import { omnicoreMemoriesTable } from "@workspace/db/schema";
+import { omnicoreMemoriesTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable } from "@workspace/db/schema";
+import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable } from "@workspace/db/schema";
+import { inventoryTrackingTable, restockOrdersTable } from "@workspace/db/schema";
+import { revenueSnapshotsTable, forecastsTable } from "@workspace/db/schema";
+import { visualDnaTable } from "@workspace/db/schema";
+import archiver from "archiver";
 
 const router = Router();
 
@@ -651,6 +656,570 @@ router.get("/projects/:projectId/exports/csv/products", async (req, res): Promis
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Products_Export_${new Date().toISOString().split("T")[0]}.csv"`);
   res.send("\uFEFF" + csv);
+});
+
+router.get("/projects/:projectId/exports/competitors", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
+  const alerts = await db.select().from(competitorAlertsTable).where(eq(competitorAlertsTable.projectId, String(projectId)));
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  let compRows = "";
+  for (const c of competitors) {
+    const snapshots = await db.select().from(competitorSnapshotsTable).where(eq(competitorSnapshotsTable.competitorId, c.id)).orderBy(desc(competitorSnapshotsTable.scannedAt)).limit(1);
+    const latest = snapshots[0];
+    compRows += `<tr>
+      <td style="font-weight:500;">${c.name}</td>
+      <td><a href="${c.url}" style="color:${BRAND.gold};" target="_blank">${c.url?.slice(0, 40)}...</a></td>
+      <td><span class="tag">${c.type || "direct"}</span></td>
+      <td>${latest?.productsFound ?? "—"}</td>
+      <td>${latest?.priceMin != null && latest?.priceMax != null ? `${latest.priceMin.toFixed(0)}€ – ${latest.priceMax.toFixed(0)}€` : "—"}</td>
+      <td>${latest?.priceMedian != null ? `${latest.priceMedian.toFixed(2)}€` : "—"}</td>
+      <td class="text-muted">${c.lastScanned ? new Date(c.lastScanned).toLocaleDateString("es-ES") : "Sin escanear"}</td>
+    </tr>`;
+  }
+
+  let alertRows = "";
+  for (const a of alerts.filter(a => !a.dismissed).slice(0, 20)) {
+    const sevColor = a.severity === "high" ? BRAND.red : a.severity === "medium" ? "#ffa500" : BRAND.jade;
+    alertRows += `<tr>
+      <td><span style="color:${sevColor};font-weight:600;text-transform:uppercase;">${a.severity || "info"}</span></td>
+      <td style="font-weight:500;">${a.title || "Alerta"}</td>
+      <td class="text-muted">${a.description?.slice(0, 100) ?? "—"}</td>
+      <td style="font-size:12px;">${a.actionSuggestion?.slice(0, 80) ?? "—"}</td>
+      <td class="text-muted">${a.createdAt ? new Date(a.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+    </tr>`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${competitors.length}</div><div class="label">Competidores</div></div>
+      <div class="metric"><div class="value">${competitors.filter(c => c.active).length}</div><div class="label">Monitoreados</div></div>
+      <div class="metric"><div class="value">${alerts.filter(a => !a.dismissed).length}</div><div class="label">Alertas activas</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Competidores Monitoreados</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Nombre</th><th>URL</th><th>Tipo</th><th>Productos</th><th>Rango precios</th><th>Mediana</th><th>Escaneado</th></tr></thead>
+          <tbody>${compRows || '<tr><td colspan="7" class="text-muted">No hay competidores registrados</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    ${alertRows ? `<div class="section">
+      <div class="section-title">Alertas Competitivas</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Severidad</th><th>Alerta</th><th>Descripción</th><th>Acción sugerida</th><th>Fecha</th></tr></thead>
+          <tbody>${alertRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}`;
+
+  const html = reportShell("Informe de Competencia", `${project.name} — Análisis Competitivo`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Competitor_Analysis_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/consistency", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const visualDna = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
+  const brandDna = await db.select().from(brandDnaTable).where(eq(brandDnaTable.projectId, projectId));
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  const vd = visualDna[0];
+  const bd = brandDna[0];
+  const avgConsistency = vd?.consistencyScore ?? 0;
+
+  let dnaDetails = "";
+  if (vd) {
+    dnaDetails = `
+      <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo de fondo</p><p>${vd.backgroundStyle || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Iluminación</p><p>${vd.lightingStyle || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Temperatura color</p><p>${vd.colorTemp || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Composición</p><p>${vd.composition || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mood</p><p>${vd.mood || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Presencia humana</p><p>${vd.humanPresence || "No analizado"}</p></div>
+      </div>
+      ${vd.brandColors?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Colores de marca</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${vd.brandColors.map(c => `<div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:24px;border-radius:6px;background:${c};border:1px solid ${BRAND.border};"></div><span style="font-size:12px;">${c}</span></div>`).join("")}</div></div>` : ""}
+      ${vd.props?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Props/Accesorios</p><div>${vd.props.map(p => `<span class="tag">${p}</span>`).join(" ")}</div></div>` : ""}`;
+  }
+
+  let brandDetails = "";
+  if (bd) {
+    brandDetails = `
+      <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo tipográfico</p><p>${bd.typographyStyle || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Patrón de layout</p><p>${bd.layoutPattern || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Densidad visual</p><p>${bd.visualDensity || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Personalidad de marca</p><p>${bd.brandPersonality || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Posición competitiva</p><p>${bd.competitivePosition || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo fotográfico</p><p>${bd.photographyStyle || "—"}</p></div>
+      </div>
+      ${bd.valuePropositions?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Propuestas de valor</p><div>${bd.valuePropositions.map(v => `<span class="tag">${v}</span>`).join(" ")}</div></div>` : ""}
+      ${bd.urgencyTactics?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Tácticas de urgencia</p><div>${bd.urgencyTactics.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${(avgConsistency * 100).toFixed(0)}%</div><div class="label">Consistencia visual</div></div>
+      <div class="metric"><div class="value">${products.length}</div><div class="label">Productos analizados</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">ADN Visual</div>
+      ${dnaDetails || '<div class="card text-muted">Sin análisis visual. Ejecuta un análisis de consistencia desde la página Consistencia.</div>'}
+    </div>
+    <div class="section">
+      <div class="section-title">ADN de Marca</div>
+      ${brandDetails || '<div class="card text-muted">Sin ADN de marca extraído. Usa la herramienta de Intelligence para extraer el ADN.</div>'}
+    </div>`;
+
+  const html = reportShell("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Consistency_BrandDNA_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
+  const restocks = await db.select().from(restockOrdersTable).where(eq(restockOrdersTable.projectId, String(projectId))).orderBy(desc(restockOrdersTable.createdAt)).limit(50);
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  const critical = inventory.filter(i => i.status === "critical" || (i.daysRemaining != null && i.daysRemaining <= 7));
+  const lowStock = inventory.filter(i => i.status === "low" || (i.daysRemaining != null && i.daysRemaining > 7 && i.daysRemaining <= 30));
+  const totalStock = inventory.reduce((sum, i) => sum + (i.currentStock ?? 0), 0);
+
+  let invRows = "";
+  for (const i of inventory) {
+    const statusColor = i.status === "critical" ? BRAND.red : i.status === "low" ? "#ffa500" : BRAND.jade;
+    invRows += `<tr>
+      <td style="font-weight:500;">${i.productTitle || i.productId}</td>
+      <td>${i.currentStock ?? "—"}</td>
+      <td>${i.avgDailySales?.toFixed(1) ?? "—"}</td>
+      <td><span style="color:${statusColor};font-weight:600;">${i.daysRemaining != null ? `${i.daysRemaining} días` : "—"}</span></td>
+      <td><span style="color:${statusColor};font-weight:600;text-transform:uppercase;">${i.status || "ok"}</span></td>
+      <td class="text-muted">${i.supplierEmail || "—"}</td>
+      <td>${i.supplierLeadDays ?? "—"} días</td>
+    </tr>`;
+  }
+
+  let restockRows = "";
+  for (const r of restocks.slice(0, 15)) {
+    restockRows += `<tr>
+      <td style="font-weight:500;">${r.productTitle || r.productId || "—"}</td>
+      <td>${r.quantitySuggested ?? "—"}</td>
+      <td><span class="tag">${r.urgency || "normal"}</span></td>
+      <td>${r.adminApproved ? "✅ Aprobado" : "⏳ Pendiente"}</td>
+      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+    </tr>`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${inventory.length}</div><div class="label">Productos rastreados</div></div>
+      <div class="metric"><div class="value">${totalStock}</div><div class="label">Stock total</div></div>
+      <div class="metric"><div class="value" style="color:${BRAND.red}">${critical.length}</div><div class="label">Stock crítico</div></div>
+      <div class="metric"><div class="value" style="color:#ffa500">${lowStock.length}</div><div class="label">Stock bajo</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Estado del Inventario</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Producto</th><th>Stock</th><th>Ventas/día</th><th>Días restantes</th><th>Estado</th><th>Proveedor</th><th>Lead time</th></tr></thead>
+          <tbody>${invRows || '<tr><td colspan="7" class="text-muted">Sin datos de inventario</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    ${restockRows ? `<div class="section">
+      <div class="section-title">Órdenes de Reposición</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Producto</th><th>Cantidad</th><th>Urgencia</th><th>Estado</th><th>Fecha</th></tr></thead>
+          <tbody>${restockRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}`;
+
+  const html = reportShell("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Inventory_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const redesigns = await db.select().from(redesignsTable).where(eq(redesignsTable.projectId, projectId)).orderBy(desc(redesignsTable.createdAt));
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  const productMap = new Map(products.map(p => [p.shopifyProductId, p]));
+  const applied = redesigns.filter(r => r.appliedAt);
+
+  let rows = "";
+  for (const r of redesigns) {
+    const product = productMap.get(r.shopifyProductId ?? "");
+    rows += `<tr>
+      <td style="font-weight:500;">${product?.title || r.shopifyProductId || "Desconocido"}</td>
+      <td>${r.newTitle?.slice(0, 50) ?? "—"}${(r.newTitle?.length ?? 0) > 50 ? "…" : ""}</td>
+      <td>${r.recommendedPrice != null ? `${r.recommendedPrice}€` : "—"}</td>
+      <td>${r.appliedAt ? `<span class="text-jade">Aplicado</span>` : '<span class="text-muted">Pendiente</span>'}</td>
+      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+    </tr>`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Rediseños generados</div></div>
+      <div class="metric"><div class="value">${applied.length}</div><div class="label">Aplicados a Shopify</div></div>
+      <div class="metric"><div class="value">${redesigns.length - applied.length}</div><div class="label">Pendientes</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Historial de Rediseños IA</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Producto original</th><th>Nuevo título propuesto</th><th>Precio recomendado</th><th>Estado</th><th>Fecha</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" class="text-muted">No hay rediseños generados</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    ${redesigns.length > 0 && redesigns[0].newDescription ? `<div class="section">
+      <div class="section-title">Ejemplo de Rediseño Más Reciente</div>
+      <div class="card">
+        <p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Producto: ${productMap.get(redesigns[0].shopifyProductId ?? "")?.title || "—"}</p>
+        <p style="font-size:16px;font-weight:600;color:${BRAND.gold};margin-bottom:12px;">${redesigns[0].newTitle || "—"}</p>
+        <div class="blog-content" style="font-size:13px;">${redesigns[0].newDescription?.slice(0, 500) ?? ""}${(redesigns[0].newDescription?.length ?? 0) > 500 ? "..." : ""}</div>
+        ${redesigns[0].tags ? `<div style="margin-top:12px;">${(redesigns[0].tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}
+      </div>
+    </div>` : ""}`;
+
+  const html = reportShell("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Redesigns_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const snapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.createdAt)).limit(90);
+  const forecasts = await db.select().from(forecastsTable).where(eq(forecastsTable.projectId, String(projectId))).orderBy(desc(forecastsTable.createdAt)).limit(30);
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  const totalRevenue = snapshots.reduce((s, r) => s + (r.revenue ?? 0), 0);
+  const totalOrders = snapshots.reduce((s, r) => s + (r.orders ?? 0), 0);
+  const avgAov = snapshots.filter(s => s.aov != null).length > 0
+    ? snapshots.reduce((s, r) => s + (r.aov ?? 0), 0) / snapshots.filter(s => s.aov != null).length : 0;
+  const avgMargin = snapshots.filter(s => s.grossMargin != null).length > 0
+    ? snapshots.reduce((s, r) => s + (r.grossMargin ?? 0), 0) / snapshots.filter(s => s.grossMargin != null).length : 0;
+
+  let snapRows = "";
+  for (const s of snapshots.slice(0, 30)) {
+    snapRows += `<tr>
+      <td>${s.date}</td>
+      <td style="font-weight:500;">${s.revenue?.toFixed(2) ?? "—"}€</td>
+      <td>${s.orders ?? "—"}</td>
+      <td>${s.aov?.toFixed(2) ?? "—"}€</td>
+      <td>${s.conversionRate != null ? `${(s.conversionRate * 100).toFixed(2)}%` : "—"}</td>
+      <td>${s.grossMargin != null ? `<span class="${s.grossMargin > 30 ? "text-jade" : "text-red"}">${s.grossMargin.toFixed(1)}%</span>` : "—"}</td>
+    </tr>`;
+  }
+
+  let forecastRows = "";
+  for (const f of forecasts) {
+    forecastRows += `<tr>
+      <td>${f.forecastDate || "—"}</td>
+      <td><span class="tag">${f.forecastType || "general"}</span></td>
+      <td style="font-weight:500;">${f.predictedValue?.toFixed(2) ?? "—"}€</td>
+      <td>${f.confidenceLow?.toFixed(0) ?? "—"}€ – ${f.confidenceHigh?.toFixed(0) ?? "—"}€</td>
+      <td>${f.confidencePct ?? "—"}%</td>
+      <td class="text-muted" style="font-size:11px;">${f.reasoning?.slice(0, 60) ?? "—"}</td>
+    </tr>`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${totalRevenue.toFixed(0)}€</div><div class="label">Revenue total</div></div>
+      <div class="metric"><div class="value">${totalOrders}</div><div class="label">Pedidos</div></div>
+      <div class="metric"><div class="value">${avgAov.toFixed(2)}€</div><div class="label">AOV medio</div></div>
+      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen bruto</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Snapshots de Revenue</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Fecha</th><th>Revenue</th><th>Pedidos</th><th>AOV</th><th>Conversión</th><th>Margen</th></tr></thead>
+          <tbody>${snapRows || '<tr><td colspan="6" class="text-muted">Sin datos de revenue aún</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    ${forecastRows ? `<div class="section">
+      <div class="section-title">Predicciones / Forecast</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Predicción</th><th>Rango confianza</th><th>Confianza</th><th>Razonamiento</th></tr></thead>
+          <tbody>${forecastRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}`;
+
+  const html = reportShell("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Revenue_Forecast_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const memories = await db.select().from(omnicoreMemoriesTable).orderBy(desc(omnicoreMemoriesTable.createdAt)).limit(200);
+  const domains = await db.select().from(omnicoreKnowledgeDomainsTable).orderBy(desc(omnicoreKnowledgeDomainsTable.verifiedInsights));
+  const insights = await db.select().from(omnicoreInsightsTable).orderBy(desc(omnicoreInsightsTable.createdAt)).limit(100);
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  const totalMemories = memories.length;
+  const avgConfidence = memories.length > 0 ? memories.reduce((s, m) => s + (m.confidence ?? 0), 0) / memories.length : 0;
+  const verified = memories.filter(m => m.isVerified).length;
+  const supplierMemories = memories.filter(m => m.memoryType === "supplier_intelligence");
+
+  let domainRows = "";
+  for (const d of domains) {
+    const depth = d.knowledgeDepth ?? 0;
+    domainRows += `<tr>
+      <td style="font-weight:600;">${d.domain}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;"><div class="score-bar" style="width:100px;"><div class="score-fill" style="width:${Math.min(depth, 100)}%;background:${scoreColor(depth)};"></div></div><span>${depth}%</span></div></td>
+      <td>${d.verifiedInsights ?? 0}</td>
+      <td>${d.totalInsights ?? 0}</td>
+      <td class="text-muted">${d.lastStudySession ? new Date(d.lastStudySession).toLocaleDateString("es-ES") : "—"}</td>
+    </tr>`;
+  }
+
+  let memoryTypes: Record<string, number> = {};
+  memories.forEach(m => { memoryTypes[m.memoryType] = (memoryTypes[m.memoryType] || 0) + 1; });
+  let typeBreakdown = Object.entries(memoryTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${BRAND.border};"><span>${type}</span><span class="text-gold" style="font-weight:600;">${count}</span></div>`
+  ).join("");
+
+  let topInsights = "";
+  for (const i of insights.slice(0, 10)) {
+    topInsights += `<div class="recommendation">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-weight:600;color:${BRAND.gold};">${i.title}</span>
+        <span class="tag">${i.domain}</span>
+      </div>
+      <p style="font-size:12px;color:${BRAND.muted};">${i.insight?.slice(0, 150) ?? ""}${(i.insight?.length ?? 0) > 150 ? "..." : ""}</p>
+      <div style="margin-top:4px;font-size:11px;"><span class="text-muted">Confianza: </span><span class="${(i.confidence ?? 0) > 0.7 ? "text-jade" : "text-gold"}">${((i.confidence ?? 0) * 100).toFixed(0)}%</span>
+      <span class="text-muted" style="margin-left:12px;">Impacto: </span><span class="text-gold">${((i.impactScore ?? 0) * 100).toFixed(0)}%</span></div>
+    </div>`;
+  }
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${totalMemories}</div><div class="label">Memorias totales</div></div>
+      <div class="metric"><div class="value">${domains.length}</div><div class="label">Dominios</div></div>
+      <div class="metric"><div class="value">${(avgConfidence * 100).toFixed(0)}%</div><div class="label">Confianza media</div></div>
+      <div class="metric"><div class="value">${verified}</div><div class="label">Verificadas</div></div>
+      <div class="metric"><div class="value">${supplierMemories.length}</div><div class="label">Intel proveedores</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Dominios de Conocimiento</div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Dominio</th><th>Profundidad</th><th>Verificados</th><th>Total insights</th><th>Última sesión</th></tr></thead>
+          <tbody>${domainRows || '<tr><td colspan="5" class="text-muted">Sin dominios registrados</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Distribución de Memorias por Tipo</div>
+      <div class="card">${typeBreakdown || '<p class="text-muted">Sin memorias</p>'}</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Top 10 Insights Más Recientes</div>
+      ${topInsights || '<div class="card text-muted">Sin insights generados aún</div>'}
+    </div>`;
+
+  const html = reportShell("Informe ShopyBrain — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="ShopyBrain_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.send(html);
+});
+
+router.get("/projects/:projectId/exports/json/products", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+  const seoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+  const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
+  const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
+
+  const data = products.map(p => ({
+    title: p.title,
+    handle: p.handle,
+    status: p.status,
+    price: p.price,
+    compareAtPrice: p.compareAtPrice,
+    vendor: p.vendor,
+    productType: p.productType,
+    tags: p.tags,
+    imageCount: p.imageCount,
+    variantCount: p.variantCount,
+    auditScore: p.auditScore,
+    cogs: cogsMap.get(p.shopifyProductId)?.totalCogs ?? null,
+    seoGrade: seoMap.get(p.shopifyProductId)?.seoGrade ?? null,
+    seoScore: seoMap.get(p.shopifyProductId)?.seoScore ?? null,
+  }));
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Products_Data_${new Date().toISOString().split("T")[0]}.json"`);
+  res.json({ exportDate: new Date().toISOString(), totalProducts: data.length, products: data });
+});
+
+router.get("/projects/:projectId/exports/json/full", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+  const seoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+  const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+  const tests = await db.select().from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
+  const redesignsData = await db.select().from(redesignsTable).where(eq(redesignsTable.projectId, projectId));
+  const jobs = await db.select().from(generationJobsTable).where(eq(generationJobsTable.projectId, projectId));
+  const memories = await db.select().from(omnicoreMemoriesTable).limit(500);
+  const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
+  const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
+  const snapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId)));
+
+  const fullExport = {
+    exportDate: new Date().toISOString(),
+    project: { name: project.name, domain: project.shopDomain, niche: project.storeNiche, markets: project.storeMarkets, plan: project.plan },
+    products: products.map(p => ({ title: p.title, handle: p.handle, price: p.price, status: p.status, vendor: p.vendor, type: p.productType, tags: p.tags, images: p.imageCount, variants: p.variantCount, audit: p.auditScore })),
+    seo: seoData.map(s => ({ productId: s.shopifyProductId, score: s.seoScore, grade: s.seoGrade, metaTitle: s.metaTitle, metaDescription: s.metaDescription })),
+    cogs: allCogs.map(c => ({ productId: c.shopifyProductId, total: c.totalCogs })),
+    abTests: tests.map(t => ({ name: t.testName, type: t.testType, status: t.status, winner: t.winner, improvement: t.improvementPct })),
+    redesigns: redesignsData.map(r => ({ productId: r.shopifyProductId, newTitle: r.newTitle, price: r.recommendedPrice, applied: !!r.appliedAt })),
+    aiImages: jobs.filter(j => j.status === "succeeded").map(j => ({ type: j.imageType, url: j.imageUrl, alt: j.altText, model: j.model })),
+    competitors: competitors.map(c => ({ name: c.name, url: c.url, type: c.type })),
+    inventory: inventory.map(i => ({ product: i.productTitle, stock: i.currentStock, daysLeft: i.daysRemaining, status: i.status })),
+    revenue: snapshots.map(s => ({ date: s.date, revenue: s.revenue, orders: s.orders, aov: s.aov })),
+    brainMemories: memories.length,
+  };
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Full_Project_Export_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.json"`);
+  res.json(fullExport);
+});
+
+router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const safeName = project.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeName}_Complete_Export_${dateStr}.zip"`);
+
+  const archive = archiver("zip", { zlib: { level: 9 } });
+  archive.on("error", (err: any) => { res.status(500).json({ error: err.message }); });
+  archive.pipe(res);
+
+  const reportEndpoints = [
+    { name: "Informe_Completo", path: "complete-report" },
+    { name: "SEO_Audit", path: "seo-audit" },
+    { name: "Catalogo_Productos", path: "product-catalog" },
+    { name: "Informe_Financiero", path: "financial" },
+    { name: "Brand_Brief", path: "brand-brief" },
+    { name: "AB_Testing", path: "ab-tests" },
+    { name: "Galeria_IA", path: "images-gallery" },
+    { name: "Competidores", path: "competitors" },
+    { name: "Consistencia_BrandDNA", path: "consistency" },
+    { name: "Inventario", path: "inventory" },
+    { name: "Rediseños_IA", path: "redesigns" },
+    { name: "Revenue_Forecast", path: "revenue" },
+    { name: "ShopyBrain_Intel", path: "shopybrain" },
+  ];
+
+  const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
+
+  for (const rpt of reportEndpoints) {
+    try {
+      const response = await fetch(`${baseUrl}/${rpt.path}`);
+      if (response.ok) {
+        const html = await response.text();
+        archive.append(html, { name: `informes/${rpt.name}_${dateStr}.html` });
+      }
+    } catch {}
+  }
+
+  try {
+    const csvRes = await fetch(`${baseUrl}/csv/products`);
+    if (csvRes.ok) {
+      const csv = await csvRes.text();
+      archive.append(csv, { name: `datos/Productos_${dateStr}.csv` });
+    }
+  } catch {}
+
+  try {
+    const jsonRes = await fetch(`${baseUrl}/json/full`);
+    if (jsonRes.ok) {
+      const json = await jsonRes.text();
+      archive.append(json, { name: `datos/Exportacion_Completa_${dateStr}.json` });
+    }
+  } catch {}
+
+  try {
+    const jsonProdRes = await fetch(`${baseUrl}/json/products`);
+    if (jsonProdRes.ok) {
+      const jsonProd = await jsonProdRes.text();
+      archive.append(jsonProd, { name: `datos/Productos_${dateStr}.json` });
+    }
+  } catch {}
+
+  const readmeContent = `# Exportación Completa — ${project.name}
+Fecha: ${dateStr}
+Generado por: Shopy Crafter (ShopyBrain AI)
+
+## Contenido del ZIP
+
+### /informes/ (HTML — abrir en navegador, Ctrl+P para PDF)
+${reportEndpoints.map(r => `- ${r.name}_${dateStr}.html`).join("\n")}
+
+### /datos/ (CSV + JSON — abrir con Excel, Google Sheets o cualquier editor)
+- Productos_${dateStr}.csv
+- Productos_${dateStr}.json
+- Exportacion_Completa_${dateStr}.json
+
+## Cómo convertir a PDF
+1. Abre cualquier archivo .html en tu navegador
+2. Pulsa Ctrl+P (o Cmd+P en Mac)
+3. Selecciona "Guardar como PDF"
+4. El informe ya tiene diseño profesional optimizado para impresión
+`;
+  archive.append(readmeContent, { name: "LEEME.txt" });
+
+  await archive.finalize();
 });
 
 export default router;
