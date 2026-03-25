@@ -17,23 +17,50 @@ SHOPIFY SPECIFICS: Shopify fee structures, payment processor margins, return rat
 
 Always show your reasoning with specific numbers. Never give vague advice. Respond in Spanish.`;
 
-function calculateCogs(data: {
-  unitCost: number; packagingCost: number; labelCost: number;
-  shippingCostDomestic: number; fulfillmentFee: number; returnRate: number;
-  returnProcessingCost: number; shopifyPaymentFee: number; shopifyPlanCostPerOrder: number;
-  cac: number; affiliateFee: number; overheadPerUnit: number; finalPrice?: number;
-}): { totalCogs: number; breakEvenPrice: number; minimumViablePrice: number } {
-  const price = data.finalPrice ?? 0;
-  const totalCogs =
-    data.unitCost + data.packagingCost + data.labelCost +
-    data.shippingCostDomestic + data.fulfillmentFee +
-    (data.returnRate * data.returnProcessingCost) +
-    (price * data.shopifyPaymentFee) +
-    data.shopifyPlanCostPerOrder + data.cac + data.affiliateFee + data.overheadPerUnit;
+function calculateCogs(data: Record<string, any>): {
+  totalCogs: number; totalCogsWithVat: number;
+  breakEvenPrice: number; breakEvenPriceWithVat: number;
+  minimumViablePrice: number;
+} {
+  const n = (k: string) => parseFloat(data[k]) || 0;
+  const price = n("finalPrice");
+
+  const production = n("unitCost") + n("materialCost") + n("fabricCost") + n("printingCost")
+    + n("screenPrintingCost") + n("moldAmortization") + n("assemblyCost")
+    + n("laborCostPerUnit") + n("qualityControlCost");
+
+  const packaging = n("packagingCost") + n("labelCost");
+
+  const logistics = n("shippingCostDomestic") + n("shippingCostInternational")
+    + n("fulfillmentFee") + n("warehouseCostPerUnit") + n("customsDuty") + n("insuranceCost");
+
+  const returns = n("returnRate") * n("returnProcessingCost");
+
+  const platform = (price * n("shopifyPaymentFee")) + n("shopifyPlanCostPerOrder")
+    + n("paymentProcessingFee") + n("platformCommission");
+
+  const marketing = n("cac") + n("affiliateFee") + n("digitalMarketingCost")
+    + n("influencerCostPerUnit") + n("seoCostPerUnit");
+
+  const professional = n("consultingFee") + n("legalCostPerUnit")
+    + n("aiApiCostPerUnit") + n("designCostPerUnit");
+
+  const overhead = n("overheadPerUnit");
+
+  const customItems = Array.isArray(data.customCosts)
+    ? data.customCosts.reduce((sum: number, item: any) => sum + (parseFloat(item?.cost) || 0), 0)
+    : 0;
+
+  const totalCogs = production + packaging + logistics + returns + platform + marketing + professional + overhead + customItems;
+
+  const vatRate = data.vatRate != null ? n("vatRate") : 0.21;
+  const totalCogsWithVat = totalCogs * (1 + vatRate);
 
   return {
     totalCogs: Math.round(totalCogs * 100) / 100,
+    totalCogsWithVat: Math.round(totalCogsWithVat * 100) / 100,
     breakEvenPrice: Math.round(totalCogs * 100) / 100,
+    breakEvenPriceWithVat: Math.round(totalCogsWithVat * 100) / 100,
     minimumViablePrice: Math.round(totalCogs * 1.15 * 100) / 100,
   };
 }
@@ -60,26 +87,12 @@ router.get("/projects/:projectId/products/:productId/cogs", async (req, res): Pr
     .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
 
   if (!cogs) {
-    res.json({
-      productId: shopifyProductId,
-      unitCost: 0, packagingCost: 0, labelCost: 0,
-      shippingCostDomestic: 0, shippingCostInternational: 0, fulfillmentFee: 0,
-      returnRate: 0.08, returnProcessingCost: 0, shopifyPaymentFee: 0.015,
-      shopifyPlanCostPerOrder: 0, cac: 0, affiliateFee: 0, overheadPerUnit: 0,
-      totalCogs: 0, breakEvenPrice: 0, minimumViablePrice: 0,
-    });
+    res.json({ productId: shopifyProductId, totalCogs: 0, totalCogsWithVat: 0, breakEvenPrice: 0, breakEvenPriceWithVat: 0, minimumViablePrice: 0 });
     return;
   }
 
-  res.json({
-    productId: cogs.shopifyProductId,
-    unitCost: cogs.unitCost, packagingCost: cogs.packagingCost, labelCost: cogs.labelCost,
-    shippingCostDomestic: cogs.shippingCostDomestic, shippingCostInternational: cogs.shippingCostInternational,
-    fulfillmentFee: cogs.fulfillmentFee, returnRate: cogs.returnRate, returnProcessingCost: cogs.returnProcessingCost,
-    shopifyPaymentFee: cogs.shopifyPaymentFee, shopifyPlanCostPerOrder: cogs.shopifyPlanCostPerOrder,
-    cac: cogs.cac, affiliateFee: cogs.affiliateFee, overheadPerUnit: cogs.overheadPerUnit,
-    totalCogs: cogs.totalCogs, breakEvenPrice: cogs.breakEvenPrice, minimumViablePrice: cogs.minimumViablePrice,
-  });
+  const { id, createdAt, updatedAt, lastCompetitorAnalysis, lastPricingRecommendation, ...rest } = cogs;
+  res.json({ productId: cogs.shopifyProductId, ...rest });
 });
 
 router.post("/projects/:projectId/products/:productId/cogs", async (req, res): Promise<void> => {
@@ -87,24 +100,45 @@ router.post("/projects/:projectId/products/:productId/cogs", async (req, res): P
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
 
   const input = req.body;
-  const { totalCogs, breakEvenPrice, minimumViablePrice } = calculateCogs(input);
+  const calc = calculateCogs(input);
+  const n = (k: string) => parseFloat(input[k]) || 0;
 
   const values = {
     projectId, shopifyProductId,
-    unitCost: input.unitCost ?? 0, packagingCost: input.packagingCost ?? 0,
-    labelCost: input.labelCost ?? 0, shippingCostDomestic: input.shippingCostDomestic ?? 0,
-    shippingCostInternational: input.shippingCostInternational ?? 0, fulfillmentFee: input.fulfillmentFee ?? 0,
-    returnRate: input.returnRate ?? 0.08, returnProcessingCost: input.returnProcessingCost ?? 0,
-    shopifyPaymentFee: 0.015, shopifyPlanCostPerOrder: input.shopifyPlanCostPerOrder ?? 0,
-    cac: input.cac ?? 0, affiliateFee: input.affiliateFee ?? 0, overheadPerUnit: input.overheadPerUnit ?? 0,
-    totalCogs, breakEvenPrice, minimumViablePrice,
+    unitCost: n("unitCost"), packagingCost: n("packagingCost"), labelCost: n("labelCost"),
+    shippingCostDomestic: n("shippingCostDomestic"), shippingCostInternational: n("shippingCostInternational"),
+    fulfillmentFee: n("fulfillmentFee"), returnRate: input.returnRate != null ? n("returnRate") : 0.08,
+    returnProcessingCost: n("returnProcessingCost"), shopifyPaymentFee: input.shopifyPaymentFee != null ? n("shopifyPaymentFee") : 0.015,
+    shopifyPlanCostPerOrder: n("shopifyPlanCostPerOrder"),
+    cac: n("cac"), affiliateFee: n("affiliateFee"), overheadPerUnit: n("overheadPerUnit"),
+    materialCost: n("materialCost"), fabricCost: n("fabricCost"),
+    printingCost: n("printingCost"), screenPrintingCost: n("screenPrintingCost"),
+    moldAmortization: n("moldAmortization"), assemblyCost: n("assemblyCost"),
+    laborCostPerUnit: n("laborCostPerUnit"), qualityControlCost: n("qualityControlCost"),
+    warehouseCostPerUnit: n("warehouseCostPerUnit"), customsDuty: n("customsDuty"),
+    insuranceCost: n("insuranceCost"), paymentProcessingFee: n("paymentProcessingFee"),
+    platformCommission: n("platformCommission"),
+    digitalMarketingCost: n("digitalMarketingCost"), influencerCostPerUnit: n("influencerCostPerUnit"),
+    seoCostPerUnit: n("seoCostPerUnit"),
+    vatRate: input.vatRate != null ? n("vatRate") : 0.21, corporateTaxRate: n("corporateTaxRate"),
+    consultingFee: n("consultingFee"), legalCostPerUnit: n("legalCostPerUnit"),
+    aiApiCostPerUnit: n("aiApiCostPerUnit"), designCostPerUnit: n("designCostPerUnit"),
+    customCosts: Array.isArray(input.customCosts) ? input.customCosts : [],
+    notes: input.notes ?? null,
+    totalCogs: calc.totalCogs, totalCogsWithVat: calc.totalCogsWithVat,
+    breakEvenPrice: calc.breakEvenPrice, breakEvenPriceWithVat: calc.breakEvenPriceWithVat,
+    minimumViablePrice: calc.minimumViablePrice,
   };
 
-  await db.insert(cogsTable).values(values)
-    .onConflictDoNothing();
-
-  await db.update(cogsTable).set(values)
+  const [existing] = await db.select({ id: cogsTable.id }).from(cogsTable)
     .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
+
+  if (existing) {
+    await db.update(cogsTable).set(values)
+      .where(eq(cogsTable.id, existing.id));
+  } else {
+    await db.insert(cogsTable).values(values);
+  }
 
   res.json({ productId: shopifyProductId, ...values });
 });

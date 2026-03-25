@@ -35,6 +35,96 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Product = { id: string; title: string; price?: number | null; images?: Array<{ src: string }> };
 
+type CostCategory = {
+  id: string;
+  label: string;
+  icon: string;
+  fields: Array<{ key: string; label: string; placeholder?: string; suffix?: string }>;
+};
+
+const COST_CATEGORIES: CostCategory[] = [
+  {
+    id: "production", label: "Producción y Fabricación", icon: "🏭",
+    fields: [
+      { key: "unitCost", label: "Coste unitario producto" },
+      { key: "materialCost", label: "Materiales (marcos, componentes...)" },
+      { key: "fabricCost", label: "Tejidos / Telas" },
+      { key: "printingCost", label: "Impresión digital" },
+      { key: "screenPrintingCost", label: "Serigrafía" },
+      { key: "moldAmortization", label: "Amortización moldes/utillajes" },
+      { key: "assemblyCost", label: "Montaje / Ensamblaje" },
+      { key: "laborCostPerUnit", label: "Mano de obra por unidad" },
+      { key: "qualityControlCost", label: "Control de calidad" },
+    ],
+  },
+  {
+    id: "packaging", label: "Embalaje y Etiquetado", icon: "📦",
+    fields: [
+      { key: "packagingCost", label: "Embalaje / Packaging" },
+      { key: "labelCost", label: "Etiquetas / Pegatinas" },
+    ],
+  },
+  {
+    id: "logistics", label: "Logística y Envío", icon: "🚚",
+    fields: [
+      { key: "shippingCostDomestic", label: "Envío nacional" },
+      { key: "shippingCostInternational", label: "Envío internacional" },
+      { key: "fulfillmentFee", label: "Fulfillment / Preparación pedido" },
+      { key: "warehouseCostPerUnit", label: "Almacén por unidad" },
+      { key: "customsDuty", label: "Aranceles / Aduanas" },
+      { key: "insuranceCost", label: "Seguro de envío" },
+    ],
+  },
+  {
+    id: "returns", label: "Devoluciones", icon: "🔄",
+    fields: [
+      { key: "returnRate", label: "Tasa de devolución", placeholder: "0.08", suffix: "%" },
+      { key: "returnProcessingCost", label: "Coste procesar devolución" },
+    ],
+  },
+  {
+    id: "platform", label: "Plataforma y Pagos", icon: "💳",
+    fields: [
+      { key: "shopifyPaymentFee", label: "Comisión Shopify Payments", placeholder: "0.015", suffix: "%" },
+      { key: "shopifyPlanCostPerOrder", label: "Plan Shopify por pedido" },
+      { key: "paymentProcessingFee", label: "Comisión pasarela pago" },
+      { key: "platformCommission", label: "Comisión marketplace / plataforma" },
+    ],
+  },
+  {
+    id: "marketing", label: "Marketing y Adquisición", icon: "📣",
+    fields: [
+      { key: "cac", label: "CAC (Coste Adquisición Cliente)" },
+      { key: "affiliateFee", label: "Comisión afiliados" },
+      { key: "digitalMarketingCost", label: "Marketing digital por unidad" },
+      { key: "influencerCostPerUnit", label: "Influencers por unidad" },
+      { key: "seoCostPerUnit", label: "SEO por unidad" },
+    ],
+  },
+  {
+    id: "taxes", label: "Impuestos y Legal", icon: "📋",
+    fields: [
+      { key: "vatRate", label: "IVA / Tax Rate", placeholder: "0.21", suffix: "%" },
+      { key: "corporateTaxRate", label: "Impuesto sociedades", suffix: "%" },
+      { key: "consultingFee", label: "Asesoría / Consultoría" },
+      { key: "legalCostPerUnit", label: "Legal por unidad" },
+    ],
+  },
+  {
+    id: "tech", label: "Tecnología e IA", icon: "🤖",
+    fields: [
+      { key: "aiApiCostPerUnit", label: "APIs de IA por unidad (Claude, Replicate...)" },
+      { key: "designCostPerUnit", label: "Diseño gráfico por unidad" },
+    ],
+  },
+  {
+    id: "overhead", label: "Gastos Generales", icon: "🏢",
+    fields: [
+      { key: "overheadPerUnit", label: "Overhead / gastos generales por unidad" },
+    ],
+  },
+];
+
 function CogsModal({
   product,
   projectId,
@@ -50,14 +140,18 @@ function CogsModal({
   const applyPrice = useApplyPriceToShopify();
   const { toast } = useToast();
 
-  const existingCogsData = existingCogs as { unitCost?: number; shippingCostDomestic?: number; packagingCost?: number; cac?: number } | undefined;
-  const [cogs, setCogs] = useState({
-    unitCost: existingCogsData?.unitCost?.toString() ?? "",
-    shippingCostDomestic: existingCogsData?.shippingCostDomestic?.toString() ?? "",
-    packagingCost: existingCogsData?.packagingCost?.toString() ?? "",
-    cac: existingCogsData?.cac?.toString() ?? "",
-    targetMarginPct: "60",
-  });
+  const ex = (existingCogs ?? {}) as Record<string, any>;
+  const allKeys = COST_CATEGORIES.flatMap(c => c.fields.map(f => f.key));
+  const initialState: Record<string, string> = {};
+  for (const k of allKeys) initialState[k] = ex[k]?.toString() ?? "";
+  initialState["targetMarginPct"] = "60";
+
+  const [cogs, setCogs] = useState(initialState);
+  const [customCosts, setCustomCosts] = useState<Array<{ name: string; cost: string }>>(
+    Array.isArray(ex.customCosts) ? ex.customCosts.map((c: any) => ({ name: c.name ?? "", cost: String(c.cost ?? "0") })) : []
+  );
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(["production", "logistics"]));
+  const [notes, setNotes] = useState(ex.notes ?? "");
 
   const [optimalData, setOptimalData] = useState<{
     suggestedPrice?: number;
@@ -66,44 +160,59 @@ function CogsModal({
     reasoning?: string;
   } | null>(null);
 
-  const totalCogs =
-    parseFloat(cogs.unitCost || "0") +
-    parseFloat(cogs.shippingCostDomestic || "0") +
-    parseFloat(cogs.packagingCost || "0") +
-    parseFloat(cogs.cac || "0");
+  const toggleCat = (id: string) => {
+    setExpandedCats(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
-  const currentMargin = product.price && totalCogs > 0
-    ? Math.round(((product.price - totalCogs) / product.price) * 100)
+  const n = (k: string) => parseFloat(cogs[k] || "0") || 0;
+  const price = product.price ?? 0;
+
+  const categoryTotals = COST_CATEGORIES.map(cat => {
+    let total = 0;
+    if (cat.id === "returns") {
+      total = n("returnRate") * n("returnProcessingCost");
+    } else if (cat.id === "platform") {
+      total = (price * n("shopifyPaymentFee")) + n("shopifyPlanCostPerOrder") + n("paymentProcessingFee") + n("platformCommission");
+    } else {
+      total = cat.fields.reduce((sum, f) => {
+        if (f.suffix === "%") return sum;
+        return sum + n(f.key);
+      }, 0);
+    }
+    return { id: cat.id, label: cat.label, total };
+  });
+
+  const customTotal = customCosts.reduce((sum, c) => sum + (parseFloat(c.cost) || 0), 0);
+  const subtotal = categoryTotals.reduce((sum, c) => sum + c.total, 0) + customTotal;
+  const vatRate = cogs.vatRate !== "" ? (parseFloat(cogs.vatRate) ?? 0.21) : 0.21;
+  const totalWithVat = subtotal * (1 + vatRate);
+
+  const currentMargin = product.price && subtotal > 0
+    ? Math.round(((product.price - subtotal) / product.price) * 100)
     : null;
 
   const handleSave = () => {
+    const data: Record<string, any> = {};
+    for (const k of allKeys) data[k] = parseFloat(cogs[k]) || 0;
+    data.customCosts = customCosts.filter(c => c.name).map(c => ({ name: c.name, cost: parseFloat(c.cost) || 0 }));
+    data.notes = notes;
+    data.finalPrice = product.price ?? 0;
     saveCogs.mutate(
+      { projectId, productId: product.id, data },
       {
-        projectId,
-        productId: product.id,
-        data: {
-          unitCost: parseFloat(cogs.unitCost) || 0,
-          shippingCostDomestic: parseFloat(cogs.shippingCostDomestic) || 0,
-          packagingCost: parseFloat(cogs.packagingCost) || 0,
-          cac: parseFloat(cogs.cac) || 0,
-          fulfillmentFee: 0,
-          returnRate: 0.08,
-          overheadPerUnit: 0,
-        },
-      },
-      {
-        onSuccess: () => toast({ title: "COGS guardados" }),
-        onError: () => toast({ title: "Error guardando COGS", variant: "destructive" }),
+        onSuccess: () => toast({ title: "Costes guardados correctamente" }),
+        onError: () => toast({ title: "Error guardando costes", variant: "destructive" }),
       }
     );
   };
 
   const handleCalcOptimal = () => {
     calcOptimal.mutate(
-      {
-        projectId,
-        productId: product.id,
-      },
+      { projectId, productId: product.id },
       {
         onSuccess: (d) => setOptimalData(d as typeof optimalData),
         onError: () => toast({ title: "Error calculando precio", variant: "destructive" }),
@@ -113,157 +222,217 @@ function CogsModal({
 
   const handleApply = (price: number, compareAt: number) => {
     applyPrice.mutate(
+      { projectId, productId: product.id, data: { price: String(price), compareAtPrice: String(compareAt) } },
       {
-        projectId,
-        productId: product.id,
-        data: { price: String(price), compareAtPrice: String(compareAt) },
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "✓ Precio aplicado en Shopify" });
-          onClose();
-        },
+        onSuccess: () => { toast({ title: "Precio aplicado en Shopify" }); onClose(); },
         onError: () => toast({ title: "Error aplicando precio", variant: "destructive" }),
       }
     );
   };
 
-  const inputClass = "w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm transition-all";
+  const inputClass = "w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm transition-all";
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-[#0f0f1a] border border-white/10 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+        className="bg-[#0f0f1a] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/5">
+        <div className="flex items-center justify-between p-5 border-b border-white/5 sticky top-0 bg-[#0f0f1a] z-10">
           <div>
-            <h3 className="font-bold text-foreground">{product.title}</h3>
-            <p className="text-sm text-muted-foreground">Calculadora COGS & Precio Óptimo</p>
+            <h3 className="font-bold text-foreground text-lg">Estructura de Costes Real</h3>
+            <p className="text-xs text-muted-foreground line-clamp-1">{product.title}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-2">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* COGS Form */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Costo del Producto (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={cogs.unitCost}
-                onChange={(e) => setCogs({ ...cogs, unitCost: e.target.value })}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Costo Envío (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={cogs.shippingCostDomestic}
-                onChange={(e) => setCogs({ ...cogs, shippingCostDomestic: e.target.value })}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Packaging (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={cogs.packagingCost}
-                onChange={(e) => setCogs({ ...cogs, packagingCost: e.target.value })}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Ad Spend por Venta (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={cogs.cac}
-                onChange={(e) => setCogs({ ...cogs, cac: e.target.value })}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
+        <div className="p-5 space-y-3">
+          {COST_CATEGORIES.map(cat => {
+            const catTotal = categoryTotals.find(c => c.id === cat.id)?.total ?? 0;
+            const isExpanded = expandedCats.has(cat.id);
+            const hasValues = cat.fields.some(f => parseFloat(cogs[f.key] || "0") > 0);
+
+            return (
+              <div key={cat.id} className={`border rounded-xl overflow-hidden transition-colors ${hasValues ? "border-primary/30 bg-primary/[0.02]" : "border-white/5"}`}>
+                <button
+                  onClick={() => toggleCat(cat.id)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{cat.icon}</span>
+                    <span className="text-sm font-medium text-foreground">{cat.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {catTotal > 0 && <span className="text-xs font-bold text-primary">{formatCurrency(catTotal)}</span>}
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="px-3 pb-3 grid grid-cols-2 gap-2">
+                    {cat.fields.map(field => (
+                      <div key={field.key} className="space-y-1">
+                        <label className="text-[11px] text-muted-foreground">{field.label}</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={cogs[field.key]}
+                            onChange={(e) => setCogs({ ...cogs, [field.key]: e.target.value })}
+                            className={inputClass}
+                            placeholder={field.placeholder ?? "0.00"}
+                          />
+                          {field.suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{field.suffix}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="border border-white/5 rounded-xl overflow-hidden">
+            <button onClick={() => toggleCat("custom")} className="w-full flex items-center justify-between p-3 hover:bg-white/[0.02]">
+              <div className="flex items-center gap-2">
+                <span className="text-base">➕</span>
+                <span className="text-sm font-medium text-foreground">Costes Personalizados</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {customTotal > 0 && <span className="text-xs font-bold text-primary">{formatCurrency(customTotal)}</span>}
+                {expandedCats.has("custom") ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </div>
+            </button>
+            {expandedCats.has("custom") && (
+              <div className="px-3 pb-3 space-y-2">
+                {customCosts.map((cc, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      value={cc.name}
+                      onChange={e => { const arr = [...customCosts]; arr[i] = { ...arr[i], name: e.target.value }; setCustomCosts(arr); }}
+                      className={`${inputClass} flex-1`}
+                      placeholder="Nombre del coste..."
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={cc.cost}
+                      onChange={e => { const arr = [...customCosts]; arr[i] = { ...arr[i], cost: e.target.value }; setCustomCosts(arr); }}
+                      className={`${inputClass} w-28`}
+                      placeholder="0.00"
+                    />
+                    <button onClick={() => setCustomCosts(customCosts.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300 p-1"><X className="w-4 h-4" /></button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setCustomCosts([...customCosts, { name: "", cost: "" }])}
+                  className="text-xs text-primary hover:text-primary/80 font-medium"
+                >
+                  + Agregar coste personalizado
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Margen Objetivo (%)</label>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              max="95"
-              value={cogs.targetMarginPct}
-              onChange={(e) => setCogs({ ...cogs, targetMarginPct: e.target.value })}
-              className={inputClass}
-              placeholder="60"
+          <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="w-full bg-transparent border-none text-sm text-muted-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none"
+              rows={2}
+              placeholder="Notas sobre la estructura de costes (proveedores, APIs utilizadas, materiales...)"
             />
           </div>
 
-          {/* COGS Summary */}
-          <div className="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">COGS Total</p>
-              <p className="text-xl font-bold text-red-400">{formatCurrency(totalCogs)}</p>
+          <div className="bg-black/40 rounded-xl p-4 border border-primary/20 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal COGS (sin IVA)</span>
+              <span className="font-bold text-foreground">{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">IVA ({(vatRate * 100).toFixed(0)}%)</span>
+              <span className="text-muted-foreground">{formatCurrency(subtotal * vatRate)}</span>
+            </div>
+            <div className="flex justify-between text-base border-t border-white/10 pt-2">
+              <span className="font-bold text-foreground">TOTAL con IVA</span>
+              <span className="font-bold text-primary">{formatCurrency(totalWithVat)}</span>
             </div>
             {product.price && (
-              <div>
-                <p className="text-xs text-muted-foreground">Precio Actual</p>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(product.price)}</p>
+              <div className="flex justify-between text-sm pt-1 border-t border-white/5">
+                <span className="text-muted-foreground">Precio venta actual</span>
+                <span className="text-foreground">{formatCurrency(product.price)}</span>
               </div>
             )}
             {currentMargin !== null && (
-              <div>
-                <p className="text-xs text-muted-foreground">Margen Actual</p>
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: currentMargin >= 50 ? "#00d68f" : currentMargin >= 30 ? "#ffd32a" : "#ff4757" }}
-                >
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Margen actual</span>
+                <span className="font-bold" style={{ color: currentMargin >= 40 ? "#00d68f" : currentMargin >= 20 ? "#ffd32a" : "#ff4757" }}>
                   {currentMargin}%
-                </p>
+                </span>
               </div>
             )}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Precio mínimo viable (+15%)</span>
+              <span className="text-yellow-400">{formatCurrency(subtotal * 1.15)}</span>
+            </div>
+          </div>
+
+          {categoryTotals.filter(c => c.total > 0).length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground font-medium">Desglose por categoría</p>
+              {categoryTotals.filter(c => c.total > 0).map(c => {
+                const pct = subtotal > 0 ? (c.total / subtotal) * 100 : 0;
+                return (
+                  <div key={c.id} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-40 truncate">{c.label}</span>
+                    <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
+                      <div className="bg-primary/60 h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                    <span className="text-xs text-foreground w-16 text-right">{formatCurrency(c.total)}</span>
+                    <span className="text-xs text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
+                  </div>
+                );
+              })}
+              {customTotal > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-40 truncate">Personalizados</span>
+                  <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
+                    <div className="bg-primary/60 h-full rounded-full" style={{ width: `${Math.min((customTotal / subtotal) * 100, 100)}%` }} />
+                  </div>
+                  <span className="text-xs text-foreground w-16 text-right">{formatCurrency(customTotal)}</span>
+                  <span className="text-xs text-muted-foreground w-10 text-right">{subtotal > 0 ? ((customTotal / subtotal) * 100).toFixed(0) : 0}%</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">Margen objetivo (%)</label>
+              <input type="number" min="5" max="95" value={cogs.targetMarginPct} onChange={e => setCogs({ ...cogs, targetMarginPct: e.target.value })} className={inputClass} />
+            </div>
           </div>
 
           <div className="flex gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saveCogs.isPending}
-              className="flex-1 bg-white/5 border border-white/10 text-foreground py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
-            >
+            <button onClick={handleSave} disabled={saveCogs.isPending}
+              className="flex-1 bg-white/5 border border-white/10 text-foreground py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
               {saveCogs.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Guardar COGS
+              Guardar Costes
             </button>
-            <button
-              onClick={handleCalcOptimal}
-              disabled={calcOptimal.isPending || totalCogs === 0}
-              className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-            >
+            <button onClick={handleCalcOptimal} disabled={calcOptimal.isPending || subtotal === 0}
+              className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               {calcOptimal.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4" />}
               Calcular Precio Óptimo
             </button>
           </div>
 
-          {/* Optimal Price Result */}
           {optimalData && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-green-500/5 border border-green-500/20 rounded-xl p-5"
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
               <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
-                Recomendación de Claude
+                Recomendación IA (basada en costes reales)
               </h4>
               <div className="flex gap-6 mb-3">
                 <div>
@@ -273,9 +442,7 @@ function CogsModal({
                 {optimalData.compareAtPrice && (
                   <div>
                     <p className="text-xs text-muted-foreground">Compare At</p>
-                    <p className="text-2xl font-bold text-muted-foreground line-through">
-                      {formatCurrency(optimalData.compareAtPrice)}
-                    </p>
+                    <p className="text-2xl font-bold text-muted-foreground line-through">{formatCurrency(optimalData.compareAtPrice)}</p>
                   </div>
                 )}
                 {optimalData.margin && (
@@ -285,14 +452,9 @@ function CogsModal({
                   </div>
                 )}
               </div>
-              {optimalData.reasoning && (
-                <p className="text-xs text-muted-foreground mb-4">{optimalData.reasoning}</p>
-              )}
-              <button
-                onClick={() => handleApply(optimalData.suggestedPrice!, optimalData.compareAtPrice!)}
-                disabled={applyPrice.isPending}
-                className="w-full bg-green-500 text-black py-2.5 rounded-xl text-sm font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2"
-              >
+              {optimalData.reasoning && <p className="text-xs text-muted-foreground mb-4">{optimalData.reasoning}</p>}
+              <button onClick={() => handleApply(optimalData.suggestedPrice!, optimalData.compareAtPrice!)} disabled={applyPrice.isPending}
+                className="w-full bg-green-500 text-black py-2.5 rounded-xl text-sm font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2">
                 {applyPrice.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 Aplicar Precio en Shopify
               </button>
@@ -303,6 +465,7 @@ function CogsModal({
     </div>
   );
 }
+
 
 function PriceSimulator({ projectId, product, onClose }: { projectId: number; product: Product; onClose: () => void }) {
   const [newPrice, setNewPrice] = useState(product.price?.toString() ?? "");

@@ -28,8 +28,42 @@ export const cogsTable = pgTable("cogs", {
   cac: real("cac").notNull().default(0),
   affiliateFee: real("affiliate_fee").notNull().default(0),
   overheadPerUnit: real("overhead_per_unit").notNull().default(0),
+
+  materialCost: real("material_cost").notNull().default(0),
+  fabricCost: real("fabric_cost").notNull().default(0),
+  printingCost: real("printing_cost").notNull().default(0),
+  screenPrintingCost: real("screen_printing_cost").notNull().default(0),
+  moldAmortization: real("mold_amortization").notNull().default(0),
+  assemblyCost: real("assembly_cost").notNull().default(0),
+  laborCostPerUnit: real("labor_cost_per_unit").notNull().default(0),
+  qualityControlCost: real("quality_control_cost").notNull().default(0),
+
+  warehouseCostPerUnit: real("warehouse_cost_per_unit").notNull().default(0),
+  customsDuty: real("customs_duty").notNull().default(0),
+  insuranceCost: real("insurance_cost").notNull().default(0),
+
+  paymentProcessingFee: real("payment_processing_fee").notNull().default(0),
+  platformCommission: real("platform_commission").notNull().default(0),
+
+  digitalMarketingCost: real("digital_marketing_cost").notNull().default(0),
+  influencerCostPerUnit: real("influencer_cost_per_unit").notNull().default(0),
+  seoCostPerUnit: real("seo_cost_per_unit").notNull().default(0),
+
+  vatRate: real("vat_rate").notNull().default(0.21),
+  corporateTaxRate: real("corporate_tax_rate").notNull().default(0),
+  consultingFee: real("consulting_fee").notNull().default(0),
+  legalCostPerUnit: real("legal_cost_per_unit").notNull().default(0),
+
+  aiApiCostPerUnit: real("ai_api_cost_per_unit").notNull().default(0),
+  designCostPerUnit: real("design_cost_per_unit").notNull().default(0),
+
+  customCosts: jsonb("custom_costs").$type<Array<{ name: string; cost: number; category?: string }>>().default([]),
+  notes: text("notes"),
+
   totalCogs: real("total_cogs").notNull().default(0),
+  totalCogsWithVat: real("total_cogs_with_vat").notNull().default(0),
   breakEvenPrice: real("break_even_price").notNull().default(0),
+  breakEvenPriceWithVat: real("break_even_price_with_vat").notNull().default(0),
   minimumViablePrice: real("minimum_viable_price").notNull().default(0),
   lastCompetitorAnalysis: jsonb("last_competitor_analysis"),
   lastPricingRecommendation: jsonb("last_pricing_recommendation"),

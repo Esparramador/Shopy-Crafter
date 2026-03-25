@@ -73,6 +73,21 @@ Automated tasks for continuous learning, consolidation, cross-synthesis, revenue
 - **P&L Forecast**: `POST /projects/:id/financial-forecast` — 3/6/12-month forecast with 3 scenarios based on current revenue/orders/COGS.
 - **Financial Dashboard Fix**: Uses real Shopify order data to calculate per-product units sold (no more hardcoded values). Total COGS computed from actual units × per-unit COGS.
 
+### Comprehensive COGS System (30+ fields)
+The `cogs` table supports real-world cost structures for any business type with 9 categories:
+1. **Producción**: unitCost, materialCost, fabricCost, printingCost, screenPrintingCost, moldAmortization, assemblyCost, laborCostPerUnit, qualityControlCost
+2. **Embalaje**: packagingCost, labelCost
+3. **Logística**: shippingCostDomestic, shippingCostInternational, fulfillmentFee, warehouseCostPerUnit, customsDuty, insuranceCost
+4. **Devoluciones**: returnRate, returnProcessingCost (computed as rate × cost)
+5. **Plataforma**: shopifyPaymentFee (% of price), shopifyPlanCostPerOrder, paymentProcessingFee, platformCommission
+6. **Marketing**: cac, affiliateFee, digitalMarketingCost, influencerCostPerUnit, seoCostPerUnit
+7. **Impuestos/Legal**: vatRate (default 21% IVA España), corporateTaxRate, consultingFee, legalCostPerUnit
+8. **Tech/IA**: aiApiCostPerUnit, designCostPerUnit
+9. **Overhead**: overheadPerUnit
+- **customCosts**: JSONB array for unlimited custom cost lines (name + cost)
+- **Computed**: totalCogs, totalCogsWithVat, breakEvenPrice, breakEvenPriceWithVat, minimumViablePrice (+15%)
+- Frontend: Accordion-based CogsModal with collapsible categories, live subtotal, IVA calculation, margin display, and category breakdown bars.
+
 ### BrandDNA Auto-Injection
 The `visualDnaTable` stores extracted visual identity (background style, lighting, colors, mood, composition). `buildBrandDnaContext()` in claude.ts auto-injects this DNA into all `askClaudeWithBrain` and `askClaudeJsonWithBrain` calls, ensuring brand consistency across redesign, images, SEO, and email generation.
 
