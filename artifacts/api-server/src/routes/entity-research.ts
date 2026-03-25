@@ -276,20 +276,34 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
     logger.info({ entityDisplay }, "Phase 0: Consulting existing ShopyBrain knowledge");
     const existingKnowledge = await loadExistingEntityKnowledge(entityDisplay);
 
+    const allPossibleDimensions = [
+      "brand_intelligence", "brand_overview", "products_catalog", "social_presence",
+      "press_mentions", "customer_sentiment", "competitive_intel", "ecommerce_strategy",
+      "visual_identity", "pricing_strategy", "paid_advertising", "founders_team",
+      "international_presence", "web_content",
+    ];
+
     if (existingKnowledge.hasKnowledge) {
+      const coveredDimensions = existingKnowledge.dimensions;
+      const missingDimensions = allPossibleDimensions.filter(d => !coveredDimensions.includes(d));
+      const weakDimensions = existingKnowledge.memories
+        .filter(m => (m.content ?? "").length < 300 || (m.confidence ?? 0) < 0.7)
+        .map(m => m.memoryType)
+        .filter(Boolean);
+
       logger.info({
         memoriesFound: existingKnowledge.memories.length,
         absorbedFound: existingKnowledge.absorbed.length,
-        dimensions: existingKnowledge.dimensions,
+        coveredDimensions,
+        missingDimensions,
+        weakDimensions,
         age: existingKnowledge.knowledgeAge,
-      }, "✅ Existing knowledge found — enriching instead of starting from scratch");
+      }, "✅ Existing knowledge found — enriching gaps + weak dimensions");
     } else {
       logger.info("📭 No existing knowledge — full virgin research");
     }
 
-    // PHASE 2: 8 parallel Google searches (real web search grounding)
-    // Gemini knows about existing knowledge and focuses on GAPS + NEW info
-    logger.info("Phase 2: 8 parallel Google searches (context-aware)");
+    logger.info("Phase 2: 12 parallel Google searches (context-aware, gap-hunting)");
     const research = await deepEntityResearch(
       entityDisplay,
       entity.url,
@@ -476,11 +490,14 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
     const memoryIds: string[] = [];
     const upsertActions: Array<"created" | "updated"> = [];
 
-    // Main comprehensive profile
+    const researchIteration = existingKnowledge.hasKnowledge
+      ? `ITERACIÓN ACUMULATIVA #${existingKnowledge.memories.length + 1} — ${existingKnowledge.memories.length} memorias previas enriquecidas con ${research.allSources.length} fuentes nuevas`
+      : "PRIMERA INVESTIGACIÓN — 12 dimensiones + URL deep-dive completo";
+
     const mainResult = await upsertEntityMemory({
       entityName: entityDisplay,
       title: `[DEEP RESEARCH] ${entityDisplay}`,
-      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\nREPEAT RESEARCH: ${existingKnowledge.hasKnowledge ? `${existingKnowledge.memories.length} memorias previas enriquecidas` : "primera investigación — 12 dimensiones + URL deep-dive"}\n\nPROFILE:\n${JSON.stringify(profile, null, 2).slice(0, 8000)}\n\nEXTRA (Instagram):\n${extraInsights.slice(0, 2000)}`,
+      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\n${researchIteration}\nFUENTES TOTALES: ${research.allSources.length}\nQUERIES: ${research.allQueries.length}\n\nPROFILE:\n${JSON.stringify(profile, null, 2).slice(0, 10000)}\n\nEXTRA (Instagram):\n${extraInsights.slice(0, 2000)}`,
       memoryType: "brand_intelligence",
       niche,
       sourceType: "deep_entity_research",
@@ -508,15 +525,15 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
 
     for (const dim of dimensions) {
       const content = (research as Record<string, unknown>)[dim.key];
-      if (typeof content === "string" && content.length > 100) {
+      if (typeof content === "string" && content.length > 50) {
         const result = await upsertEntityMemory({
           entityName: entityDisplay,
           title: `[${dim.label.toUpperCase()}] ${entityDisplay}`,
-          content: `Entity: ${entityDisplay}\nDimension: ${dim.label}\n\n${content}`,
+          content: `Entity: ${entityDisplay}\nDimension: ${dim.label}\nSources: ${research.allSources.length} | Queries: ${research.allQueries.length}\nIteration: ${researchIteration}\n\n${content}`,
           memoryType: dim.label,
           niche,
           sourceType: "google_search_grounding",
-          confidence: dim.confidence,
+          confidence: existingKnowledge.hasKnowledge ? Math.min(dim.confidence + 0.05, 0.98) : dim.confidence,
           tags: [dim.label, entityDisplay.toLowerCase(), niche ?? "general"],
         });
         memoryIds.push(result.id);
@@ -598,19 +615,19 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       profile,
       // All 12 research dimensions + URL deep-dive
       research: {
-        overview:      research.overview.slice(0, 1200),
-        products:      research.products.slice(0, 1000),
-        social:        research.social.slice(0, 1000),
-        news:          research.news.slice(0, 800),
-        reviews:       research.reviews.slice(0, 800),
-        competitors:   research.competitors.slice(0, 800),
-        ecommerce:     research.ecommerce.slice(0, 800),
-        pricing:       research.pricing?.slice(0, 800) ?? "",
-        paidAds:       research.paidAds?.slice(0, 800) ?? "",
-        founders:      research.founders?.slice(0, 600) ?? "",
-        international: research.international?.slice(0, 600) ?? "",
-        urlDeepDive:   research.urlDeepDive?.slice(0, 1000) ?? "",
-        extraInsights: extraInsights.slice(0, 600),
+        overview:      research.overview.slice(0, 3000),
+        products:      research.products.slice(0, 3000),
+        social:        research.social.slice(0, 2500),
+        news:          research.news.slice(0, 2000),
+        reviews:       research.reviews.slice(0, 2000),
+        competitors:   research.competitors.slice(0, 2500),
+        ecommerce:     research.ecommerce.slice(0, 2000),
+        pricing:       research.pricing?.slice(0, 2000) ?? "",
+        paidAds:       research.paidAds?.slice(0, 2000) ?? "",
+        founders:      research.founders?.slice(0, 1500) ?? "",
+        international: research.international?.slice(0, 1500) ?? "",
+        urlDeepDive:   research.urlDeepDive?.slice(0, 3000) ?? "",
+        extraInsights: extraInsights.slice(0, 1500),
       },
       sourcesFound:    research.allSources.length,
       queriesExecuted: research.allQueries.length,
@@ -619,7 +636,7 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       memoriesUpdated,
       dimensionsResearched: 12,
       urlDeepDiveChars: research.urlDeepDive?.length ?? 0,
-      allSources:  research.allSources.slice(0, 40),
+      allSources:  research.allSources.slice(0, 60),
       allQueries:  research.allQueries,
       elapsed: `${elapsed}s`,
       pipeline: "gemini-2.5-flash (12×search+urlContext+thinking) → claude-sonnet-4-5 (pro synthesis)",

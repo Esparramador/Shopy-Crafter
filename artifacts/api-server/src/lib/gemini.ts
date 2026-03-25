@@ -43,11 +43,14 @@ const GEMINI_MODEL     = "gemini-2.5-flash";
 const GEMINI_PRO_MODEL = "gemini-2.5-pro";
 
 // ─── Timeout & retry config ───────────────────────────────────────────────────
-const GEMINI_CALL_TIMEOUT_MS  = 120_000;  // 120s per individual Gemini call
-const GEMINI_SEARCH_TIMEOUT   = 100_000;  // 100s per search-grounding call (slightly longer)
-const OVERALL_RESEARCH_TIMEOUT = 270_000; // 270s total for full entity research (safe under 5-min proxy limit)
-const URL_FETCH_TIMEOUT_MS    = 25_000;   // 25s per URL fetch
-const GEMINI_URL_CTX_TIMEOUT  = 90_000;   // 90s for URL context deep-dive
+// Replit proxy cuts at 300s. Server socket at 600s. We use 270s for user-facing
+// requests (safe margin) and generous per-call limits so each search dimension
+// has room to finish. Background/cron jobs have no proxy limit.
+const GEMINI_CALL_TIMEOUT_MS   = 150_000;  // 150s per individual Gemini call (generous for complex prompts)
+const GEMINI_SEARCH_TIMEOUT    = 150_000;  // 150s per search-grounding call (same — searches can be slow)
+const OVERALL_RESEARCH_TIMEOUT = 270_000;  // 270s total for full entity research (safe under 5-min proxy)
+const URL_FETCH_TIMEOUT_MS     = 30_000;   // 30s per URL fetch
+const GEMINI_URL_CTX_TIMEOUT   = 150_000;  // 150s for URL context deep-dive (reads many pages)
 
 // ─── Utility: race a promise against a timeout ────────────────────────────────
 function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
@@ -389,10 +392,19 @@ export async function deepEntityResearch(
     "🔍 Deep entity research: 12 parallel searches + URL deep-dive"
   );
 
-  // Inject existing knowledge so Gemini hunts for GAPS only
-  const knowledgeCtx = existingKnowledge
-    ? `\n\n[CONOCIMIENTO PREVIO EN SHOPYBRAIN — busca ÚNICAMENTE información NUEVA, ACTUALIZADA o DIFERENTE a esto]:\n${existingKnowledge.slice(0, 2000)}\n\nFOCUS: Find what's MISSING, UPDATED, or CHANGED since last research. Do NOT repeat already-known info.`
-    : "";
+  // Inject existing knowledge so Gemini hunts for GAPS only — with SPECIFIC instructions
+  // on what dimensions are already covered vs what's weak/missing
+  let knowledgeCtx = "";
+  if (existingKnowledge) {
+    knowledgeCtx = `\n\n[⚠️ CONOCIMIENTO PREVIO EN SHOPYBRAIN — LEE CON ATENCIÓN]:\n${existingKnowledge.slice(0, 3000)}\n\n🎯 INSTRUCCIONES CRÍTICAS:
+- NO repitas información que ya aparece arriba — ShopyBrain ya lo sabe.
+- Busca ÚNICAMENTE datos NUEVOS, MÁS RECIENTES, o desde FUENTES DIFERENTES.
+- Si ya tenemos precios de una fuente, busca precios en OTRA fuente o tienda para comparar.
+- Si ya tenemos redes sociales, busca métricas ACTUALIZADAS o perfiles que falten.
+- Si ya tenemos competidores, busca competidores DIFERENTES o información nueva sobre los ya conocidos.
+- Prioriza: datos numéricos concretos, URLs verificables, fechas recientes, citas textuales.
+- NUNCA digas "según investigación anterior" — aporta solo VALOR NUEVO.`;
+  }
 
   // ── Phase 1: 12 PARALLEL Google Search Grounding calls ────────────────────
   // Each targets a completely different intelligence dimension
@@ -518,30 +530,48 @@ export async function deepEntityResearch(
   const uniqueSources = [...new Set(allSources)];
   const urlsForDeepDive = uniqueSources
     .filter(u => !u.includes("instagram.com") && !u.includes("facebook.com") && !u.includes("twitter.com") && !u.includes("tiktok.com"))
-    .slice(0, 12); // Top 12 URLs for Gemini to read directly
+    .slice(0, 15);
 
   let urlDeepDive = "";
   if (urlsForDeepDive.length > 0) {
     try {
-      logger.info({ urlCount: urlsForDeepDive.length }, "Phase 2: Gemini URL context deep-dive");
-      const deepDiveResult = await withTimeout(
+      logger.info({ urlCount: urlsForDeepDive.length }, "Phase 2: Gemini URL context deep-dive (batch 1)");
+      const batch1 = urlsForDeepDive.slice(0, 8);
+      const batch2 = urlsForDeepDive.slice(8);
+
+      const deepDivePromise1 = withRetry(() => withTimeout(
         askGeminiWithUrls(
           `You have found these URLs about "${entityName}". Read each one carefully and extract:
-          - Product details, prices, and availability
-          - About/team/mission information
-          - Contact information, physical locations
-          - Blog posts and content strategy
-          - Any unique facts, stats, or testimonials
-          - Technical implementation details (Shopify apps visible, chat widgets, payment methods)
-          Synthesize all findings into a comprehensive profile addition.`,
-          urlsForDeepDive,
-          "Web content extraction specialist. Read each URL and extract maximum intelligence."
+          - Product details, exact prices, availability, variants
+          - About/team/mission/founding story
+          - Contact information, physical locations, opening hours
+          - Blog posts, content strategy, publication frequency
+          - Unique facts, stats, testimonials, case studies
+          - Technical details (Shopify apps, chat widgets, payment methods, shipping info)
+          - Legal info (terms, privacy policy, business registration)
+          Synthesize all findings. Be EXHAUSTIVE — every data point matters.`,
+          batch1,
+          "Web content extraction specialist. Read each URL thoroughly and extract EVERY piece of business intelligence."
         ),
         GEMINI_URL_CTX_TIMEOUT,
-        "url-deep-dive"
-      );
-      urlDeepDive = deepDiveResult.text;
-      allSources.push(...deepDiveResult.sources);
+        "url-deep-dive-batch1"
+      ), 1, 3000, "url-deep-dive-1");
+
+      const deepDivePromise2 = batch2.length > 0
+        ? withRetry(() => withTimeout(
+            askGeminiWithUrls(
+              `Read these additional URLs about "${entityName}" and extract ALL new information not covered in previous analysis. Focus on: secondary pages, blog content, FAQ, shipping details, return policy, press mentions, partner pages, career pages.`,
+              batch2,
+              "Secondary content analyst. Find details others miss."
+            ),
+            GEMINI_URL_CTX_TIMEOUT,
+            "url-deep-dive-batch2"
+          ), 1, 3000, "url-deep-dive-2")
+        : Promise.resolve({ text: "", sources: [] as string[] });
+
+      const [dd1, dd2] = await Promise.allSettled([deepDivePromise1, deepDivePromise2]);
+      if (dd1.status === "fulfilled") { urlDeepDive += dd1.value.text; allSources.push(...dd1.value.sources); }
+      if (dd2.status === "fulfilled" && dd2.value.text) { urlDeepDive += "\n\n--- ADDITIONAL URL FINDINGS ---\n" + dd2.value.text; allSources.push(...dd2.value.sources); }
     } catch (err) {
       logger.warn({ err: String(err) }, "URL deep-dive failed — continuing without it");
       urlDeepDive = "";
