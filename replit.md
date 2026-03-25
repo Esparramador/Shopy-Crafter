@@ -78,6 +78,9 @@ A professional AI-powered email template editor with 26 template types across 4 
 ### Client Invite Flow
 A unique, single-use invite link system for clients. Each token-based invite expires in 48 hours and establishes a client session with restricted access to their project's data.
 
+### Professional Budget/Invoice Generator
+Integrated as "Presupuesto / Factura" tab in `/admin/my-pricing`. Features: full client data form (name, NIF, email, phone, address), project details (store name, niche, products, collections), editable service line-items table, IVA toggle with configurable rate, Claude-powered ultra-detailed budget generation with sections, conditions, and internal profitability analysis. Exports to printable HTML (PDF via print) and downloadable HTML. Backend: `POST /api/agency/budget` in `agency.ts`.
+
 ### Shopify Billing Flow
 Admins can generate Shopify checkout links for services, directly linked to product variants configured in the CFO dashboard.
 

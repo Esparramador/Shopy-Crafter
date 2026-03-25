@@ -191,6 +191,110 @@ Catálogo servicios: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceNa
   res.json(quote);
 });
 
+router.post("/agency/budget", requireAdmin, async (req, res): Promise<void> => {
+  const {
+    clientName, clientNIF, clientEmail, clientPhone, clientAddress,
+    storeName, storeNiche, numProducts, numCollections,
+    selectedServices: budgetItems,
+    includeIVA = true, ivaRate = 21,
+    notes, paymentTerms, validDays = 30,
+  } = req.body;
+
+  const servicesList = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
+  const [costs] = await db.select().from(agencyCostStructureTable);
+
+  const systemPrompt = `Eres ShopyBrain como Director Financiero (CFO) experto en presupuestos para agencias Shopify.
+Genera un presupuesto/factura proforma ULTRA-DETALLADO y profesional para el cliente.
+
+REGLAS ABSOLUTAS:
+1. Cada servicio DEBE tener: nombre, descripción detallada, unidades, precio unitario, subtotal
+2. Los precios deben ser REALISTAS y competitivos para el mercado español/europeo
+3. DESGLOSA cada servicio al máximo detalle (no agrupar, detallar cada línea)
+4. Incluye SIEMPRE: horas de consultoría, coste por imagen generada, coste de auditorías, coste de SEO, etc.
+5. ${includeIVA ? `Base imponible, IVA (${ivaRate}%) y total final DEBEN estar calculados EXACTAMENTE` : "Este presupuesto está EXENTO DE IVA. ivaRate=0, ivaAmount=0, total = baseImponible. NO incluyas línea de IVA."}
+6. Si el cliente pide productos, desglosa: creación de fichas, fotografía IA, copywriting, SEO por producto
+7. Incluye una sección de condiciones: plazo de entrega, forma de pago, validez del presupuesto
+
+Catálogo de servicios actual: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceName, type: s.serviceType, price: s.priceCurrent, cost: s.totalCost })))}
+Costes internos: ${JSON.stringify(costs)}
+
+Responde en JSON con esta estructura EXACTA:
+{
+  "budgetNumber": "PRES-2026-XXXX",
+  "date": "DD/MM/YYYY",
+  "validUntil": "DD/MM/YYYY",
+  "client": { "name": "...", "nif": "...", "email": "...", "phone": "...", "address": "..." },
+  "agency": { "name": "Shopy Crafter", "nif": "...", "email": "info@shopycrafter.com", "web": "shopycrafter.com" },
+  "sections": [
+    {
+      "sectionName": "Nombre de la sección (ej: Diseño Web, Creación de Productos, SEO...)",
+      "items": [
+        { "concept": "Descripción detallada del servicio", "units": 1, "unitPrice": 000.00, "subtotal": 000.00 }
+      ],
+      "sectionSubtotal": 000.00
+    }
+  ],
+  "summary": {
+    "baseImponible": 0000.00,
+    "ivaRate": ${ivaRate},
+    "ivaAmount": 000.00,
+    "total": 0000.00,
+    "totalInWords": "Mil doscientos euros con cero céntimos"
+  },
+  "conditions": {
+    "paymentTerms": "...",
+    "deliveryTime": "...",
+    "validity": "...",
+    "includesRevisions": "...",
+    "additionalNotes": "..."
+  },
+  "internalAnalysis": {
+    "totalCostForUs": 000.00,
+    "totalMargin": 000.00,
+    "marginPercentage": 00,
+    "hoursEstimated": 00,
+    "profitabilityRating": "alta|media|baja",
+    "recommendation": "..."
+  }
+}`;
+
+  const userMsg = `CLIENTE: ${clientName || "Sin nombre"}
+NIF/CIF: ${clientNIF || "No proporcionado"}
+Email: ${clientEmail || ""}, Teléfono: ${clientPhone || ""}
+Dirección: ${clientAddress || ""}
+TIENDA: ${storeName || "Nueva tienda Shopify"}
+NICHO: ${storeNiche || "general"}
+PRODUCTOS A CREAR: ${numProducts || 0}
+COLECCIONES: ${numCollections || 0}
+IVA: ${includeIVA ? `Sí (${ivaRate}%)` : "No (exento)"}
+CONDICIONES DE PAGO: ${paymentTerms || "50% inicio, 50% entrega"}
+VALIDEZ: ${validDays} días
+NOTAS: ${notes || "Sin notas adicionales"}
+
+SERVICIOS SOLICITADOS:
+${(budgetItems ?? []).map((s: any) => `- ${s.name}: ${s.description || ""} (qty: ${s.qty || 1})`).join("\n") || "Paquete completo: diseño web + productos + SEO + auditoría + imágenes IA"}`;
+
+  try {
+    const aiRes = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 6000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMsg }],
+    });
+
+    const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
+    let budget: any = {};
+    try {
+      const m = raw.match(/\{[\s\S]*\}/);
+      budget = m ? JSON.parse(m[0]) : {};
+    } catch { budget = { error: "Error parsing AI response", raw }; }
+
+    res.json(budget);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/agency/proposal", requireAdmin, async (req, res): Promise<void> => {
   const { clientName, storeName, services: selectedServices, quote, auditResults } = req.body;
 

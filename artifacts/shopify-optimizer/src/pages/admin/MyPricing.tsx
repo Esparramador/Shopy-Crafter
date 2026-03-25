@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink, Link, ShoppingBag } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink, Link, ShoppingBag, Download, Printer, Plus, Trash2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -33,7 +33,7 @@ export default function MyPricing() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [savingCosts, setSavingCosts] = useState(false);
-  const [tab, setTab] = useState<"services" | "costs" | "quote" | "proposal" | "shopify">("services");
+  const [tab, setTab] = useState<"services" | "costs" | "budget" | "quote" | "proposal" | "shopify">("services");
   const [editCosts, setEditCosts] = useState<Partial<CostStructure>>({});
   const [showCostsForm, setShowCostsForm] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
@@ -46,6 +46,25 @@ export default function MyPricing() {
   const [proposalLoading, setProposalLoading] = useState(false);
   const [clientName, setClientName] = useState("");
   const [storeName, setStoreName] = useState("");
+  const [budgetForm, setBudgetForm] = useState({
+    clientName: "", clientNIF: "", clientEmail: "", clientPhone: "", clientAddress: "",
+    storeName: "", storeNiche: "", numProducts: 40, numCollections: 5,
+    includeIVA: true, ivaRate: 21, notes: "", paymentTerms: "50% al inicio, 50% a la entrega",
+    validDays: 30,
+  });
+  const [budgetItems, setBudgetItems] = useState<Array<{ name: string; description: string; qty: number }>>([
+    { name: "Diseño web Shopify completo", description: "Diseño y desarrollo de tema personalizado", qty: 1 },
+    { name: "Creación de productos con IA", description: "Ficha completa: título, descripción, SEO, tags", qty: 40 },
+    { name: "Fotografía IA por producto", description: "3 imágenes profesionales por producto (Hero, Lifestyle, Detalle)", qty: 120 },
+    { name: "Auditoría completa del catálogo", description: "Análisis de calidad A-F de todos los productos", qty: 1 },
+    { name: "SEO técnico completo", description: "Meta tags, schemas, alt texts, sitemap, PageSpeed", qty: 1 },
+    { name: "Organización en colecciones", description: "Creación y diseño de colecciones por tipo", qty: 5 },
+    { name: "Consultoría estratégica", description: "Horas de asesoría personalizada", qty: 4 },
+    { name: "Búsqueda de proveedores", description: "Investigación de proveedores reales con precios y MOQ", qty: 1 },
+  ]);
+  const [budget, setBudget] = useState<any>(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
+  const budgetRef = useRef<HTMLDivElement>(null);
   const [pushing, setPushing] = useState(false);
   const [pushResult, setPushResult] = useState<{ success: boolean; message: string; requiresManualImport?: boolean; created?: number; failed?: number; instructions?: string[]; storeUrl?: string } | null>(null);
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string | null }>>([]);
@@ -173,11 +192,114 @@ export default function MyPricing() {
     setSavingVariant(null);
   };
 
+  const generateBudget = async () => {
+    setBudgetLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/agency/budget`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...budgetForm, selectedServices: budgetItems }),
+      });
+      setBudget(await r.json());
+    } catch { setBudget({ error: "Error de conexión" }); }
+    setBudgetLoading(false);
+  };
+
+  const buildBudgetHTML = () => {
+    if (!budget?.sections) return "";
+    const s = budget.summary ?? {};
+    const c = budget.conditions ?? {};
+    const cl = budget.client ?? {};
+    const ag = budget.agency ?? {};
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${budget.budgetNumber ?? ""}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;padding:40px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #c8a84b}
+.logo{font-size:28px;font-weight:900;color:#c8a84b;letter-spacing:-0.5px}
+.logo span{color:#1a1a1a}
+.budget-num{font-size:22px;font-weight:800;color:#c8a84b;text-align:right}
+.budget-date{font-size:12px;color:#666;text-align:right;margin-top:4px}
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
+.party{padding:16px;border-radius:8px}
+.party.from{background:#f8f6f0;border-left:4px solid #c8a84b}
+.party.to{background:#f0f4f8;border-left:4px solid #2d8cf0}
+.party h4{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#999;margin-bottom:8px;font-weight:700}
+.party p{font-size:13px;line-height:1.7;color:#333}
+.party .name{font-size:15px;font-weight:700;color:#1a1a1a}
+.section{margin-bottom:24px}
+.section-title{font-size:14px;font-weight:800;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;padding:8px 0;border-bottom:2px solid #e8e0cc;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:#f8f6f0;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#666;font-weight:700;border-bottom:1px solid #ddd}
+td{padding:8px 12px;font-size:12px;border-bottom:1px solid #eee;color:#333}
+td:nth-child(2),td:nth-child(3),td:nth-child(4),th:nth-child(2),th:nth-child(3),th:nth-child(4){text-align:right;white-space:nowrap}
+.section-sub{text-align:right;font-weight:700;font-size:13px;padding:6px 12px;color:#c8a84b}
+.totals{margin-top:20px;margin-left:auto;width:320px;border:2px solid #c8a84b;border-radius:8px;overflow:hidden}
+.totals tr td{padding:10px 16px;font-size:13px}
+.totals .total-row{background:#c8a84b;color:#fff;font-size:16px;font-weight:900}
+.totals .total-row td{color:#fff;font-weight:900}
+.words{font-size:11px;color:#666;text-align:right;margin-top:8px;font-style:italic}
+.conditions{margin-top:30px;padding:20px;background:#f8f6f0;border-radius:8px}
+.conditions h3{font-size:13px;font-weight:800;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.conditions p{font-size:12px;line-height:1.8;color:#444}
+.conditions strong{color:#1a1a1a}
+.footer{margin-top:40px;text-align:center;padding-top:20px;border-top:1px solid #ddd}
+.footer p{font-size:11px;color:#999}
+.stamp{display:inline-block;padding:8px 24px;border:2px solid #c8a84b;border-radius:4px;color:#c8a84b;font-weight:800;font-size:11px;letter-spacing:2px;transform:rotate(-3deg);margin-top:10px}
+@media print{body{padding:20px}@page{margin:15mm}}
+</style></head><body>
+<div class="header">
+  <div><div class="logo">Shopy<span>Crafter</span></div><p style="font-size:12px;color:#666;margin-top:4px">${ag.email ?? "info@shopycrafter.com"} · ${ag.web ?? "shopycrafter.com"}</p></div>
+  <div><div class="budget-num">${budget.budgetNumber ?? "PRESUPUESTO"}</div><div class="budget-date">Fecha: ${budget.date ?? new Date().toLocaleDateString("es-ES")}<br/>Válido hasta: ${budget.validUntil ?? ""}</div></div>
+</div>
+<div class="parties">
+  <div class="party from"><h4>De</h4><p class="name">${ag.name ?? "Shopy Crafter"}</p><p>${ag.nif ? `NIF: ${ag.nif}<br/>` : ""}${ag.email ?? ""}<br/>${ag.web ?? ""}</p></div>
+  <div class="party to"><h4>Para</h4><p class="name">${cl.name ?? budgetForm.clientName}</p><p>${cl.nif ? `NIF/CIF: ${cl.nif}<br/>` : ""}${cl.email ? `${cl.email}<br/>` : ""}${cl.phone ? `Tel: ${cl.phone}<br/>` : ""}${cl.address ?? ""}</p></div>
+</div>
+${(budget.sections ?? []).map((sec: any) => `<div class="section"><div class="section-title">${sec.sectionName}</div><table><thead><tr><th style="width:55%">Concepto</th><th>Uds.</th><th>P/U</th><th>Subtotal</th></tr></thead><tbody>${(sec.items ?? []).map((it: any) => `<tr><td>${it.concept}</td><td>${it.units}</td><td>${Number(it.unitPrice).toFixed(2)} €</td><td><strong>${Number(it.subtotal).toFixed(2)} €</strong></td></tr>`).join("")}</tbody></table><div class="section-sub">Subtotal sección: ${Number(sec.sectionSubtotal).toFixed(2)} €</div></div>`).join("")}
+<table class="totals"><tbody>
+  <tr><td>Base imponible</td><td style="text-align:right;font-weight:700">${Number(s.baseImponible ?? 0).toFixed(2)} €</td></tr>
+  ${Number(s.ivaAmount ?? 0) > 0 ? `<tr><td>IVA (${s.ivaRate ?? 21}%)</td><td style="text-align:right">${Number(s.ivaAmount ?? 0).toFixed(2)} €</td></tr>` : ""}
+  <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${Number(s.total ?? 0).toFixed(2)} €</td></tr>
+</tbody></table>
+${s.totalInWords ? `<p class="words">${s.totalInWords}</p>` : ""}
+<div class="conditions"><h3>Condiciones</h3>
+${c.paymentTerms ? `<p><strong>Forma de pago:</strong> ${c.paymentTerms}</p>` : ""}
+${c.deliveryTime ? `<p><strong>Plazo de entrega:</strong> ${c.deliveryTime}</p>` : ""}
+${c.validity ? `<p><strong>Validez:</strong> ${c.validity}</p>` : ""}
+${c.includesRevisions ? `<p><strong>Revisiones:</strong> ${c.includesRevisions}</p>` : ""}
+${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""}
+</div>
+<div class="footer"><div class="stamp">PRESUPUESTO</div><p style="margin-top:12px">Shopy Crafter · Agencia de Optimización Shopify con IA</p></div>
+</body></html>`;
+  };
+
+  const downloadBudgetHTML = () => {
+    const html = buildBudgetHTML();
+    if (!html) return;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `presupuesto-${budget?.budgetNumber ?? "draft"}.html`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const printBudget = () => {
+    const html = buildBudgetHTML();
+    if (!html) return;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+  };
+
   const TABS = [
     { id: "services", label: "Tabla de precios" },
     { id: "costs", label: "Estructura de costes" },
-    { id: "quote", label: "Generar propuesta" },
-    { id: "shopify", label: "🛍 Shopify Sync" },
+    { id: "budget", label: "Presupuesto / Factura" },
+    { id: "quote", label: "Propuesta rápida" },
+    { id: "shopify", label: "Shopify Sync" },
   ];
 
   return (
@@ -375,7 +497,253 @@ export default function MyPricing() {
             </button>
           )}
         </div>
-      ) : (
+      ) : tab === "budget" ? (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+            <div className="glass-card">
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <FileText size={16} color="var(--gold)" /> Datos del cliente
+              </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Nombre / Razón social", key: "clientName", placeholder: "Ej: María García López" },
+                  { label: "NIF / CIF", key: "clientNIF", placeholder: "Ej: 12345678A" },
+                  { label: "Email", key: "clientEmail", placeholder: "cliente@email.com" },
+                  { label: "Teléfono", key: "clientPhone", placeholder: "+34 600 123 456" },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</label>
+                    <input className="input-field" placeholder={f.placeholder} value={(budgetForm as any)[f.key]} onChange={e => setBudgetForm(prev => ({ ...prev, [f.key]: e.target.value }))} />
+                  </div>
+                ))}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Dirección</label>
+                  <input className="input-field" placeholder="Calle, Ciudad, CP" value={budgetForm.clientAddress} onChange={e => setBudgetForm(prev => ({ ...prev, clientAddress: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="glass-card">
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <ShoppingBag size={16} color="var(--gold)" /> Datos del proyecto
+              </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Nombre de la tienda", key: "storeName", placeholder: "Ej: Modas El Sol", type: "text" },
+                  { label: "Nicho / Sector", key: "storeNiche", placeholder: "Ej: moda, tecnología", type: "text" },
+                  { label: "Nº de productos", key: "numProducts", placeholder: "40", type: "number" },
+                  { label: "Nº de colecciones", key: "numCollections", placeholder: "5", type: "number" },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</label>
+                    <input className="input-field" type={f.type} placeholder={f.placeholder} value={(budgetForm as any)[f.key]} onChange={e => setBudgetForm(prev => ({ ...prev, [f.key]: f.type === "number" ? parseInt(e.target.value) || 0 : e.target.value }))} />
+                  </div>
+                ))}
+                <div>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>IVA</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--t2)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={budgetForm.includeIVA} onChange={e => setBudgetForm(prev => ({ ...prev, includeIVA: e.target.checked }))} />
+                      Incluir IVA
+                    </label>
+                    {budgetForm.includeIVA && (
+                      <input className="input-field" type="number" style={{ width: 60 }} value={budgetForm.ivaRate} onChange={e => setBudgetForm(prev => ({ ...prev, ivaRate: parseInt(e.target.value) || 21 }))} />
+                    )}
+                    {budgetForm.includeIVA && <span style={{ fontSize: 11, color: "var(--t3)" }}>%</span>}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Validez (días)</label>
+                  <input className="input-field" type="number" value={budgetForm.validDays} onChange={e => setBudgetForm(prev => ({ ...prev, validDays: parseInt(e.target.value) || 30 }))} />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Condiciones de pago</label>
+                  <input className="input-field" value={budgetForm.paymentTerms} onChange={e => setBudgetForm(prev => ({ ...prev, paymentTerms: e.target.value }))} />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Notas adicionales</label>
+                  <textarea className="input-field" rows={2} value={budgetForm.notes} onChange={e => setBudgetForm(prev => ({ ...prev, notes: e.target.value }))} placeholder="Requisitos especiales, observaciones..." />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="glass-card" style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                <Calculator size={16} color="var(--gold)" /> Servicios a presupuestar
+              </h3>
+              <button onClick={() => setBudgetItems(prev => [...prev, { name: "", description: "", qty: 1 }])} className="btn-secondary" style={{ fontSize: 11 }}>
+                <Plus size={12} /> Añadir línea
+              </button>
+            </div>
+            <div style={{ background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--ink3)", borderBottom: "1px solid var(--bdr)" }}>
+                    {["Servicio", "Descripción", "Uds.", ""].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {budgetItems.map((item, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid var(--bdr)" }}>
+                      <td style={{ padding: "6px 10px" }}>
+                        <input className="input-field" style={{ fontSize: 12 }} value={item.name} onChange={e => { const n = [...budgetItems]; n[i] = { ...n[i], name: e.target.value }; setBudgetItems(n); }} placeholder="Nombre del servicio" />
+                      </td>
+                      <td style={{ padding: "6px 10px" }}>
+                        <input className="input-field" style={{ fontSize: 12 }} value={item.description} onChange={e => { const n = [...budgetItems]; n[i] = { ...n[i], description: e.target.value }; setBudgetItems(n); }} placeholder="Descripción" />
+                      </td>
+                      <td style={{ padding: "6px 10px", width: 70 }}>
+                        <input className="input-field" type="number" style={{ fontSize: 12, width: 60, textAlign: "center" }} value={item.qty} min={1} onChange={e => { const n = [...budgetItems]; n[i] = { ...n[i], qty: parseInt(e.target.value) || 1 }; setBudgetItems(n); }} />
+                      </td>
+                      <td style={{ padding: "6px 10px", width: 40, textAlign: "center" }}>
+                        <button onClick={() => setBudgetItems(prev => prev.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 4 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <button onClick={generateBudget} disabled={budgetLoading} className="btn-primary" style={{ padding: "12px 40px", fontSize: 14 }}>
+              {budgetLoading ? <><Calculator size={16} style={{ animation: "spin 1s linear infinite" }} /> Generando presupuesto detallado...</> : <><FileText size={16} /> Generar presupuesto profesional</>}
+            </button>
+          </div>
+          {budget && !budget.error && budget.sections && (
+            <div ref={budgetRef}>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginBottom: 12 }}>
+                <button onClick={printBudget} className="btn-secondary" style={{ fontSize: 12 }}>
+                  <Printer size={14} /> Imprimir / PDF
+                </button>
+                <button onClick={downloadBudgetHTML} className="btn-secondary" style={{ fontSize: 12 }}>
+                  <Download size={14} /> Descargar HTML
+                </button>
+              </div>
+              <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
+                <div style={{ padding: "20px 24px", borderBottom: "3px solid var(--gold)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "var(--gold)" }}>Shopy<span style={{ color: "var(--t)" }}>Crafter</span></div>
+                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>{budget.agency?.email} · {budget.agency?.web}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "var(--gold)" }}>{budget.budgetNumber}</div>
+                    <div style={{ fontSize: 11, color: "var(--t3)" }}>Fecha: {budget.date} · Válido: {budget.validUntil}</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--bdr)" }}>
+                  <div style={{ padding: "14px 20px", borderLeft: "3px solid var(--gold)", background: "rgba(200,168,75,0.04)" }}>
+                    <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>DE</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>{budget.agency?.name}</div>
+                    {budget.agency?.nif && <div style={{ fontSize: 11, color: "var(--t2)" }}>NIF: {budget.agency.nif}</div>}
+                  </div>
+                  <div style={{ padding: "14px 20px", borderLeft: "3px solid #2d8cf0", background: "rgba(45,140,240,0.04)" }}>
+                    <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>PARA</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>{budget.client?.name}</div>
+                    {budget.client?.nif && <div style={{ fontSize: 11, color: "var(--t2)" }}>NIF: {budget.client.nif}</div>}
+                    {budget.client?.email && <div style={{ fontSize: 11, color: "var(--t2)" }}>{budget.client.email}</div>}
+                  </div>
+                </div>
+                <div style={{ padding: "16px 20px" }}>
+                  {(budget.sections ?? []).map((sec: any, si: number) => (
+                    <div key={si} style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, padding: "6px 0", borderBottom: "2px solid rgba(200,168,75,0.3)", marginBottom: 8 }}>{sec.sectionName}</div>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", textAlign: "left", borderBottom: "1px solid var(--bdr)" }}>Concepto</th>
+                            <th style={{ padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>Uds.</th>
+                            <th style={{ padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>P/U</th>
+                            <th style={{ padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(sec.items ?? []).map((item: any, ii: number) => (
+                            <tr key={ii}>
+                              <td style={{ padding: "7px 10px", fontSize: 12, color: "var(--t)", borderBottom: "1px solid var(--bdr)" }}>{item.concept}</td>
+                              <td style={{ padding: "7px 10px", fontSize: 12, color: "var(--t2)", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>{item.units}</td>
+                              <td style={{ padding: "7px 10px", fontSize: 12, color: "var(--t2)", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>{Number(item.unitPrice).toFixed(2)} €</td>
+                              <td style={{ padding: "7px 10px", fontSize: 12, fontWeight: 700, color: "var(--t)", textAlign: "right", borderBottom: "1px solid var(--bdr)" }}>{Number(item.subtotal).toFixed(2)} €</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div style={{ textAlign: "right", fontSize: 12, fontWeight: 700, color: "var(--gold)", padding: "4px 10px" }}>Subtotal: {Number(sec.sectionSubtotal).toFixed(2)} €</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: "0 20px 20px", display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ width: 280, border: "2px solid var(--gold)", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 14px", borderBottom: "1px solid var(--bdr)" }}>
+                      <span style={{ fontSize: 12, color: "var(--t2)" }}>Base imponible</span>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>{Number(budget.summary?.baseImponible ?? 0).toFixed(2)} €</span>
+                    </div>
+                    {Number(budget.summary?.ivaAmount ?? 0) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 14px", borderBottom: "1px solid var(--bdr)" }}>
+                      <span style={{ fontSize: 12, color: "var(--t2)" }}>IVA ({budget.summary?.ivaRate ?? 21}%)</span>
+                      <span style={{ fontSize: 12 }}>{Number(budget.summary?.ivaAmount ?? 0).toFixed(2)} €</span>
+                    </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "var(--gold)", color: "#fff" }}>
+                      <span style={{ fontSize: 14, fontWeight: 900 }}>TOTAL</span>
+                      <span style={{ fontSize: 14, fontWeight: 900 }}>{Number(budget.summary?.total ?? 0).toFixed(2)} €</span>
+                    </div>
+                  </div>
+                </div>
+                {budget.summary?.totalInWords && (
+                  <div style={{ padding: "0 20px 12px", textAlign: "right" }}>
+                    <span style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic" }}>{budget.summary.totalInWords}</span>
+                  </div>
+                )}
+                {budget.conditions && (
+                  <div style={{ margin: "0 20px 20px", padding: 16, background: "rgba(200,168,75,0.05)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Condiciones</div>
+                    {budget.conditions.paymentTerms && <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.7 }}><strong>Forma de pago:</strong> {budget.conditions.paymentTerms}</p>}
+                    {budget.conditions.deliveryTime && <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.7 }}><strong>Plazo de entrega:</strong> {budget.conditions.deliveryTime}</p>}
+                    {budget.conditions.validity && <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.7 }}><strong>Validez:</strong> {budget.conditions.validity}</p>}
+                    {budget.conditions.includesRevisions && <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.7 }}><strong>Revisiones:</strong> {budget.conditions.includesRevisions}</p>}
+                    {budget.conditions.additionalNotes && <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.7 }}><strong>Notas:</strong> {budget.conditions.additionalNotes}</p>}
+                  </div>
+                )}
+              </div>
+              {budget.internalAnalysis && (
+                <div className="glass-card" style={{ marginTop: 16, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.2)" }}>
+                  <h4 style={{ fontSize: 12, fontWeight: 800, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TrendingUp size={14} /> Análisis interno (solo tú lo ves)
+                  </h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                    {[
+                      { label: "Coste para nosotros", value: `${Number(budget.internalAnalysis.totalCostForUs ?? 0).toFixed(0)} €` },
+                      { label: "Margen bruto", value: `${Number(budget.internalAnalysis.totalMargin ?? 0).toFixed(0)} €` },
+                      { label: "% Margen", value: `${budget.internalAnalysis.marginPercentage ?? 0}%` },
+                      { label: "Horas estimadas", value: `${budget.internalAnalysis.hoursEstimated ?? 0}h` },
+                      { label: "Rentabilidad", value: budget.internalAnalysis.profitabilityRating ?? "-" },
+                    ].map((m, i) => (
+                      <div key={i} style={{ padding: "10px 12px", background: "var(--ink2)", borderRadius: 8, textAlign: "center" }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)" }}>{m.value}</div>
+                        <div style={{ fontSize: 10, color: "var(--t3)" }}>{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {budget.internalAnalysis.recommendation && (
+                    <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--ink3)", borderRadius: 6 }}>
+                      <p style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.6 }}><strong style={{ color: "var(--gold)" }}>Recomendación:</strong> {budget.internalAnalysis.recommendation}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {budget?.error && (
+            <div className="glass-card" style={{ textAlign: "center", color: "#ff6b6b", padding: 20 }}>
+              <AlertTriangle size={24} style={{ marginBottom: 8 }} />
+              <p style={{ fontSize: 13 }}>{budget.error}</p>
+            </div>
+          )}
+        </div>
+      ) : tab === "quote" ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           <div className="glass-card">
             <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Datos del cliente</h3>
@@ -493,7 +861,7 @@ export default function MyPricing() {
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ── Shopify Sync tab ──────────────────────────────────────────────────── */}
       {tab === "shopify" && (
