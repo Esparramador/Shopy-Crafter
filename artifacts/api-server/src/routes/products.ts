@@ -4,7 +4,7 @@ import { projectsTable, productsTable, bulkJobsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
-import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
+import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 
 const router = Router();
@@ -467,6 +467,15 @@ Devuelve SOLO un JSON array con estos campos por objeto. Sin texto adicional.`;
     project.storeNiche ?? undefined
   );
 
+  learnFromOperation({
+    operationType: "catalog_analysis",
+    niche: project.storeNiche,
+    title: `Catalog opportunities — ${project.storeName ?? project.shopDomain}`,
+    content: JSON.stringify(opportunities).slice(0, 1500),
+    confidence: 0.7,
+    tags: ["catalog", "opportunities", "trends"],
+  });
+
   res.json(opportunities);
 });
 
@@ -652,6 +661,16 @@ Responde SOLO JSON válido.`,
         auditScore: audit.overallScore,
         auditGrade: scoreToGrade(audit.overallScore),
       },
+    });
+
+    learnFromOperation({
+      operationType: "product_creation",
+      niche: project.storeNiche,
+      productType: sp.product_type ?? null,
+      title: `Product created: ${sp.title}`,
+      content: `Producto "${sp.title}" creado en ${project.shopDomain}. Tipo: ${sp.product_type ?? "N/A"}. Tags: ${sp.tags ?? "N/A"}. Variantes: ${sp.variants?.length ?? 1}. Score: ${audit.overallScore}/100 (${scoreToGrade(audit.overallScore)}). ${aiGenerate ? "Contenido generado con IA." : "Contenido manual."}`,
+      confidence: 0.75,
+      tags: ["product_creation", sp.product_type ?? "general"].filter(Boolean),
     });
 
     res.json({

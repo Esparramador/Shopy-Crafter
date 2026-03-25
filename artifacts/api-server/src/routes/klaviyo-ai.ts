@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { askGeminiJson, askGemini } from "../lib/gemini.js";
-import { askClaude, askClaudeJson } from "../lib/claude.js";
+import { askClaude, askClaudeJson, learnFromOperation } from "../lib/claude.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable } from "@workspace/db/schema";
 import { v4 as uuid } from "uuid";
@@ -237,6 +237,15 @@ router.post("/klaviyo-ai/generate-email", requireAdmin, async (req: Request, res
   try {
     const emailPrompt = `Create a complete, responsive HTML email for Klaviyo.\n\nFlow: ${flowType}\nEmail #${emailPosition} (${delay || "immediate"})\nStore: ${storeName} (${shopDomain})\nNiche: ${niche}\nTone: ${tone}\nLanguage: ${market === "es" ? "Spanish" : "English"}\n\nRequirements:\n- Complete HTML with DOCTYPE, head, body, inline CSS\n- Responsive (max-width 600px)\n- Dark background (#0a0a0f) with gold accents (#c8a84b)\n- Use {{ first_name|default:'amig@' }} for personalization\n- CTA button with direct link to {{ shop.url }}\n- Klaviyo unsubscribe footer: {% unsubscribe %}\n- Professional, high-converting copy specific to ${niche}\n- Include product image placeholder: {{ event.ExtraContext.image_url|default:'' }}\n\nReturn ONLY the complete HTML, no markdown, no explanation.`;
     const html = await askClaude(0, [{ role: "user", content: emailPrompt }], undefined, 4000);
+
+    learnFromOperation({
+      operationType: "email_content",
+      niche: niche ?? null,
+      title: `Email ${flowType} #${emailPosition} — ${storeName}`,
+      content: `Flow: ${flowType}, Email #${emailPosition}, Tienda: ${storeName} (${shopDomain}), Nicho: ${niche}, Tono: ${tone}, Delay: ${delay ?? "immediate"}. Template HTML generado con éxito.`,
+      confidence: 0.7,
+      tags: ["email", "klaviyo", flowType, niche].filter(Boolean),
+    });
 
     res.json({ html, flowType, emailPosition });
   } catch (err) {

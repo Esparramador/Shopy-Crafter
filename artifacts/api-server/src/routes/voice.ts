@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
+import { learnFromOperation } from "../lib/claude";
 
 const router = Router();
 
@@ -59,6 +60,16 @@ If confidence < 0.6, response should ask for clarification. Never make up data �
     const text = (message.content[0] as any).text;
     const match = text.match(/\{[\s\S]*\}/);
     const parsed = match ? JSON.parse(match[0]) : { response: text, action: null, confidence: 0.8 };
+
+    if (parsed.confidence >= 0.6 && parsed.action) {
+      learnFromOperation({
+        operationType: "voice_command",
+        title: `Voice: ${transcript.slice(0, 80)}`,
+        content: `Comando: "${transcript}". Acción: ${JSON.stringify(parsed.action)}. Respuesta: ${parsed.response?.slice(0, 200)}. Página: ${currentPage ?? "unknown"}.`,
+        confidence: parsed.confidence ?? 0.7,
+        tags: ["voice", "command", parsed.action?.type ?? "general"].filter(Boolean),
+      });
+    }
 
     res.json({
       response: parsed.response || "Entendido. ¿Puedes repetirlo?",

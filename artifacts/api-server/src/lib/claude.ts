@@ -355,7 +355,7 @@ export async function askClaudeJsonWithBrain<T>(
  * Never throws — completely non-blocking.
  */
 export function learnFromOperation(params: {
-  operationType: "redesign" | "seo" | "pricing" | "images" | "ab_winner" | "consistency";
+  operationType: string;
   niche?: string | null;
   productType?: string | null;
   title: string;
@@ -366,10 +366,30 @@ export function learnFromOperation(params: {
   const memTypeMap: Record<string, string> = {
     redesign: "prompt_template",
     seo: "niche_keyword",
+    seo_meta: "niche_keyword",
+    seo_keywords: "niche_keyword",
+    seo_blog: "niche_keyword",
+    seo_audit: "niche_keyword",
     pricing: "pricing_pattern",
+    price_simulation: "pricing_pattern",
+    price_elasticity: "pricing_pattern",
+    financial_forecast: "pricing_pattern",
     images: "image_pattern",
+    image_generation: "image_pattern",
+    alt_text: "image_pattern",
     ab_winner: "ab_insight",
+    ab_test: "ab_insight",
     consistency: "image_pattern",
+    product_copy: "prompt_template",
+    product_creation: "prompt_template",
+    catalog_analysis: "general",
+    email_flow: "prompt_template",
+    email_content: "prompt_template",
+    competitor_analysis: "competitor_intel",
+    inventory_analysis: "general",
+    voice_command: "general",
+    brand_analysis: "general",
+    revenue_analysis: "pricing_pattern",
   };
 
   const memoryType = memTypeMap[params.operationType] ?? "general";

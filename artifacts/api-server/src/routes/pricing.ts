@@ -500,6 +500,15 @@ router.post("/projects/:projectId/products/:productId/price-simulator", async (r
 
   const breakEvenUnits = totalCogs > 0 && newPrice > totalCogs ? Math.ceil((totalCogs * units) / (newPrice - totalCogs)) : null;
 
+  learnFromOperation({
+    operationType: "price_simulation",
+    niche: product.productType ?? null,
+    title: `Price simulation: ${product.title} (${currentPrice}→${newPrice})`,
+    content: `Simulación "${product.title}": precio ${currentPrice}→${newPrice} (${pctChange > 0 ? "+" : ""}${Math.round(pctChange)}%). COGS: ${totalCogs}. Base: ${scenarios[1]?.monthlyRevenue}€ rev, ${scenarios[1]?.marginPct}% margen. Break-even: ${breakEvenUnits ?? "N/A"} unidades.`,
+    confidence: 0.7,
+    tags: ["pricing", "simulation"],
+  });
+
   res.json({
     currentPrice,
     newPrice,
@@ -577,6 +586,15 @@ router.get("/projects/:projectId/products/:productId/price-elasticity", async (r
       }
     }
   }
+
+  learnFromOperation({
+    operationType: "price_elasticity",
+    niche: product.productType ?? null,
+    title: `Elasticity: ${product.title}`,
+    content: `Elasticidad "${product.title}": coeficiente ${elasticityCoefficient ?? "N/A"} (${elasticityLabel}). ${salesData.length} días de ventas, ${priceHistory.length} cambios de precio. Precio actual: ${parseFloat(product.price ?? "0")}.`,
+    confidence: elasticityCoefficient != null ? 0.8 : 0.5,
+    tags: ["pricing", "elasticity"],
+  });
 
   res.json({
     productId: shopifyProductId,
@@ -656,6 +674,15 @@ router.post("/projects/:projectId/financial-forecast", async (req, res): Promise
   });
 
   const breakEvenMonth = forecast.find(f => f.scenario === "base")?.months.findIndex(m => m.profit > 0);
+
+  const baseTotals = forecast.find(f => f.scenario === "base")?.totals;
+  learnFromOperation({
+    operationType: "financial_forecast",
+    title: `P&L Forecast ${months}m — ${project.shopDomain}`,
+    content: `Forecast ${months} meses para ${project.shopDomain}. Rev mensual actual: ${Math.round(currentMonthlyRevenue)}€, ${currentMonthlyOrders} pedidos. COGS medio/pedido: ${Math.round(avgCogsPerOrder)}€. Escenario base: ${baseTotals?.revenue ?? 0}€ rev total, ${baseTotals?.avgMargin ?? 0}% margen medio. Break-even mes: ${breakEvenMonth !== undefined && breakEvenMonth >= 0 ? breakEvenMonth + 1 : "N/A"}.`,
+    confidence: 0.7,
+    tags: ["pricing", "forecast", "financial"],
+  });
 
   res.json({
     currentMonthlyRevenue: Math.round(currentMonthlyRevenue * 100) / 100,

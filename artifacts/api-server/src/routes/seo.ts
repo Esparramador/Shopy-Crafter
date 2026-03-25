@@ -108,6 +108,16 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
     impact: "medium",
   }] : [];
 
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  learnFromOperation({
+    operationType: "seo_audit",
+    niche: project?.storeNiche ?? null,
+    title: `SEO Audit — ${project?.storeName ?? project?.shopDomain ?? "store"}: ${storeGrade} (${Math.round(avgScore)}/100)`,
+    content: `Auditoría SEO: ${products.length} productos. Score medio: ${Math.round(avgScore)}. Grade: ${storeGrade}. Críticos: ${criticalIssues.length} (${noMetaDesc} sin meta desc). Altos: ${highIssues.length} (${noSchema} sin schema). Medios: ${mediumIssues.length} (${noAltTexts} sin alt texts).`,
+    confidence: 0.8,
+    tags: ["seo", "audit", "store_health"],
+  });
+
   res.json({
     storeScore: Math.round(avgScore),
     storeGrade,
@@ -422,6 +432,16 @@ Devuelve JSON con:
 }`;
 
   const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined);
+
+  learnFromOperation({
+    operationType: "seo_keywords",
+    niche: project?.storeNiche ?? null,
+    title: `Keywords: ${productName} — ${result?.primaryKeyword ?? ""}`,
+    content: `Keyword strategy para "${productName}". Primary: ${result?.primaryKeyword ?? ""}. Secondary: ${JSON.stringify(result?.secondaryKeywords ?? []).slice(0, 300)}. Semantic: ${JSON.stringify(result?.semanticKeywords ?? []).slice(0, 300)}. Difficulty: ${result?.difficulty ?? "N/A"}.`,
+    confidence: 0.72,
+    tags: ["seo", "keywords", project?.storeNiche ?? "ecommerce"].filter(Boolean),
+  });
+
   res.json(result);
 });
 
@@ -442,6 +462,16 @@ Devuelve JSON con:
 }`;
 
   const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined, 6000);
+
+  learnFromOperation({
+    operationType: "seo_blog",
+    niche: project?.storeNiche ?? null,
+    title: `Blog strategy — ${project?.name ?? project?.shopDomain ?? "store"}`,
+    content: `Estrategia blog para ${project?.name}. Pilar: ${result?.pillarPage?.title ?? "N/A"}. Clusters: ${result?.clusterPosts?.length ?? 0}. Product posts: ${result?.productPosts?.length ?? 0}. Nicho: ${project?.storeNiche ?? "general"}.`,
+    confidence: 0.72,
+    tags: ["seo", "blog", "content_strategy"],
+  });
+
   res.json(result);
 });
 
@@ -466,6 +496,15 @@ El artículo debe tener:
 Devuelve JSON con: title, metaTitle (60 chars), metaDescription (155 chars), bodyHtml (HTML completo), wordCount (number), readyForShopify (true).`;
 
   const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", undefined, 8000);
+
+  learnFromOperation({
+    operationType: "seo_blog",
+    title: `Blog post: ${title}`,
+    content: `Artículo generado: "${title}". Keyword: ${primaryKeyword}. ${result?.wordCount ?? 0} palabras. Meta: ${result?.metaTitle ?? ""}.`,
+    confidence: 0.7,
+    tags: ["seo", "blog", "content"],
+  });
+
   res.json(result);
 });
 
