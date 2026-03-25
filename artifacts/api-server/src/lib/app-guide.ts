@@ -32,6 +32,7 @@ Cuando el usuario pregunte cómo hacer algo, debes guiarle paso a paso con instr
   6. Revisa el antes/después
   7. Botón "Aplicar a Shopify" → publica los cambios directamente en tu tienda
 - También genera Photo Briefs (guías para fotógrafo): Hero, Lifestyle, Detail
+- Botón "Guardar en Repositorio" → guarda informe de rediseño con todos los briefs en carpeta Rediseños del Vault
 
 📌 PÁGINA: /projects/:id/images (IMÁGENES IA)
 - Genera fotos profesionales con IA (Replicate + FLUX) sin fotógrafo
@@ -52,12 +53,14 @@ Cuando el usuario pregunte cómo hacer algo, debes guiarle paso a paso con instr
   3. Informe con puntuación y acciones recomendadas
   4. Botones para aplicar correcciones automáticamente
 - FLUJO BLOG: genera plan de contenido + artículos completos optimizados para SEO
+- Botón "Guardar en Repositorio" → guarda informe SEO completo en carpeta Informes SEO del Vault
 
 📌 PÁGINA: /projects/:id/pricing (PRICING + P&L)
 - Análisis inteligente de precios vs competencia
 - La IA analiza: costes (COGs), precios competidores, elasticidad, márgenes
 - Genera recomendaciones de precio óptimo por producto
 - Botón para aplicar nuevos precios a Shopify
+- Botón "Guardar en Repositorio" → guarda informe financiero en carpeta Financiero del Vault
 
 📌 PÁGINA: /projects/:id/ab-testing (TESTS A/B)
 - Compara versiones de productos para medir conversión
@@ -68,6 +71,7 @@ Cuando el usuario pregunte cómo hacer algo, debes guiarle paso a paso con instr
   4. La app rastrea conversiones en tiempo real
   5. Cuando hay datos: clic "Gana A" o "Gana B" para declarar ganador
   6. Opción de aplicar ganador automáticamente a Shopify
+- Botón "Guardar en Repositorio" → guarda informe de tests A/B en carpeta Tests A/B del Vault
 
 📌 PÁGINA: /projects/:id/settings (CONFIGURACIÓN DEL PROYECTO)
 - Gestión de credenciales Shopify (Client ID, Secret, dominio)
@@ -178,16 +182,43 @@ Cuando el usuario pregunte cómo hacer algo, debes guiarle paso a paso con instr
 📌 PÁGINA: /admin/system (SISTEMA)
 - Estado del servidor, logs y diagnósticos
 
-📌 PÁGINA: /projects/:id/audit (AUDITORÍA)
-- Análisis de calidad de productos con grados A-F
-- Botón "Auditar todo" para análisis masivo
+📌 PÁGINA: /projects/:id/audit (AUDITORÍA DEL CATÁLOGO)
+- Análisis de calidad de productos con grados A-F y score numérico
+- Botones principales:
+  • "Guardar en Repositorio" → guarda informe completo en carpeta Auditorías del Vault
+  • "Crear Producto" → abre formulario con campos manuales + opción de generación IA por ShopyBrain
+  • "Escanear Tienda" → sincroniza productos de Shopify y calcula scores
+- Pestañas: Productos (con filtro por grado) y Oportunidades de Catálogo
+- También detecta oportunidades de cross-sell, upsell y categorías vacías
 
 📌 PÁGINA: /projects/:id/consistency (CONSISTENCIA DE MARCA)
 - Análisis de coherencia en tono, estilo y formato entre todos los productos
+- Botón "Guardar en Repositorio" → guarda informe de consistencia visual en carpeta Consistencia Visual del Vault
 
-📌 PÁGINA: /projects/:id/vault (VAULT — GALERÍA IA)
-- Todas las imágenes generadas por IA para el proyecto
-- Historial con prompts y alt texts
+📌 PÁGINA: /projects/:id/vault (REPOSITORIO / VAULT)
+- CENTRO DOCUMENTAL de todo el contenido generado para el proyecto
+- Vistas: "Carpetas" (organización por tipo) / "Lista" (vista plana)
+- CARPETAS AUTOMÁTICAS:
+  • 🖼 Imágenes — fotos generadas con IA (Hero, Lifestyle, Detalle, etc.)
+  • 📋 Auditorías — informes de auditoría del catálogo
+  • 🔍 Informes SEO — auditorías SEO, keywords, PageSpeed
+  • ✨ Rediseños — informes de rediseño IA de productos
+  • 🎨 Consistencia Visual — informes de Visual DNA y coherencia
+  • 🧪 Tests A/B — resultados de tests de conversión
+  • 💰 Financiero — informes P&L, márgenes, pricing
+  • 📦 Productos — fichas de productos creados
+  • 📊 Exportaciones — archivos exportados
+  • ✉️ Emails — templates de email generados
+- CÓMO GUARDAR UN INFORME:
+  1. Entra a cualquier página de análisis (Auditoría, SEO, Consistencia, A/B Testing, Rediseño, Pricing)
+  2. Haz clic en "Guardar en Repositorio" (botón dorado en la cabecera)
+  3. El sistema recoge TODOS los datos actuales de la pantalla
+  4. Genera un informe HTML profesional con branding Shopy Crafter
+  5. Lo clasifica automáticamente en la carpeta correcta
+  6. Lo guarda aislado por proyecto
+- Botón "Descargar todo (N)" → ZIP con TODOS los archivos del repositorio
+- Cada archivo tiene: botón Descargar, botón Eliminar
+- Las imágenes se muestran como galería con preview
 
 ═══ PORTAL CLIENTE ═══
 
@@ -283,14 +314,14 @@ export const PAGE_CONTEXT: Record<string, string> = {
   "/admin/command-center": "CENTRO DE COMANDO — Ejecuta acciones directas en Shopify: ver estado de tienda, listar/crear/buscar/eliminar productos, cambiar precios, regenerar tokens OAuth, ver pedidos, ver scopes. También acepta comandos de texto libre que ShopyBrain interpreta y ejecuta automáticamente. NUEVO: Búsqueda de proveedores — pide 'busca proveedores de X' y ShopyBrain investigará proveedores reales en Alibaba, AliExpress, fabricantes directos, con precios, MOQ, envío, certificaciones. Se genera informe HTML descargable.",
   "/admin/apk": "APK — Descarga de la aplicación Android. Información y link de descarga de la app móvil.",
   "/new-project": "NUEVO PROYECTO — Formulario para crear un nuevo proyecto/tienda. Campos: nombre, dominio Shopify, Client ID, Client Secret.",
-  "/audit": "AUDITORÍA — Análisis completo de calidad de productos. Grados A-F para cada producto. 'Auditar todo' para análisis masivo.",
-  "/redesign": "REDESIGN — IA reescribe títulos/descripciones/meta tags. Grados A-F. 'Rediseñar Débiles' o 'Rediseñar Todo'. 'Aplicar a Shopify' para publicar.",
+  "/audit": "AUDITORÍA — Análisis de calidad de productos con grados A-F. 'Escanear Tienda' sincroniza y audita. 'Crear Producto' abre formulario con IA. 'Guardar en Repositorio' guarda informe completo en la carpeta Auditorías del Vault.",
+  "/redesign": "REDESIGN — IA reescribe títulos/descripciones/meta tags. Grados A-F. 'Rediseñar Débiles' o 'Rediseñar Todo'. 'Aplicar a Shopify' para publicar. 'Guardar en Repositorio' guarda informe de rediseño en el Vault.",
   "/images": "IMÁGENES IA — Genera fotos profesionales sin fotógrafo. Tipos: Hero, Lifestyle, Macro, Unboxing, Social. 'Generar' por imagen, 'Boost Masivo' para todos.",
-  "/consistency": "CONSISTENCIA — Análisis de coherencia de marca en todos los productos. Detecta inconsistencias en tono, estilo y formato.",
-  "/seo": "SEO TÉCNICO — Auditoría completa, schemas, meta tags masivo, alt texts, sitemap, PageSpeed, keywords, blog strategy. 'Auditar SEO Completo' para empezar.",
-  "/pricing": "PRICING + P&L — Análisis inteligente de precios vs competencia. COGs, márgenes, elasticidad. Recomendaciones de precio óptimo.",
-  "/ab-testing": "A/B TESTING — Compara versiones de productos. 'Nuevo Test', selecciona producto, define hipótesis. 'Gana A/B' para declarar ganador.",
-  "/vault": "VAULT — Galería de todas las imágenes generadas por IA para este proyecto. Historial completo de generaciones con prompts y alt texts.",
+  "/consistency": "CONSISTENCIA — Análisis de coherencia de marca en todos los productos. Detecta inconsistencias en tono, estilo y formato. 'Guardar en Repositorio' guarda informe de consistencia visual en el Vault.",
+  "/seo": "SEO TÉCNICO — Auditoría completa, schemas, meta tags masivo, alt texts, sitemap, PageSpeed, keywords, blog strategy. 'Auditar SEO Completo' para empezar. 'Guardar en Repositorio' guarda informe SEO en el Vault.",
+  "/pricing": "PRICING + P&L — Análisis inteligente de precios vs competencia. COGs, márgenes, elasticidad. Recomendaciones de precio óptimo. 'Guardar en Repositorio' guarda informe financiero en el Vault.",
+  "/ab-testing": "A/B TESTING — Compara versiones de productos. 'Nuevo Test', selecciona producto, define hipótesis. 'Gana A/B' para declarar ganador. 'Guardar en Repositorio' guarda informe de tests A/B en el Vault.",
+  "/vault": "REPOSITORIO / VAULT — Centro documental del proyecto. Vista por carpetas (Imágenes, Auditorías, SEO, Rediseños, Consistencia, Tests A/B, Financiero, Productos, Exportaciones, Emails) o lista. Botón 'Descargar todo' para ZIP completo. Cada carpeta agrupa archivos por tipo automáticamente.",
   "/settings": "CONFIGURACIÓN — Credenciales Shopify, regenerar token. Zona de gestión: Desconectar/Reconectar tienda, Eliminar proyecto.",
   "/client": "PORTAL CLIENTE — Vista del cliente. Resumen de su proyecto, productos y estado de los trabajos.",
   "/client/products": "PRODUCTOS CLIENTE — Vista del cliente de sus productos con el estado de optimización.",
