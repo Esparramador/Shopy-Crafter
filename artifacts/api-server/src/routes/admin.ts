@@ -5,6 +5,7 @@ import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsT
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -111,12 +112,53 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     details: `Invited ${email} to project ${projectId} (${project?.shopDomain ?? "unknown"})`,
   });
 
+  let emailSent = false;
+  const klaviyoKey = process.env.KLAVIYO_API_KEY;
+  if (klaviyoKey) {
+    try {
+      const klaviyoRes = await fetch("https://a.klaviyo.com/api/events/", {
+        method: "POST",
+        headers: {
+          "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
+          "Content-Type": "application/json",
+          "revision": "2024-02-15",
+        },
+        body: JSON.stringify({
+          data: {
+            type: "event",
+            attributes: {
+              properties: {
+                clientName: name,
+                shopDomain: project?.shopDomain ?? "",
+                storeName: project?.name ?? "",
+                inviteUrl: inviteLink,
+                agencyName: "ShopyBrain",
+                expiresIn: "48 horas",
+              },
+              metric: { data: { type: "metric", attributes: { name: "Client Invite" } } },
+              profile: { data: { type: "profile", attributes: { email: email.toLowerCase(), first_name: name } } },
+            },
+          },
+        }),
+      });
+      emailSent = klaviyoRes.ok;
+      if (!klaviyoRes.ok) {
+        logger.warn({ status: klaviyoRes.status }, "Klaviyo invite email failed — link still generated");
+      }
+    } catch (err) {
+      logger.warn({ err }, "Klaviyo invite email error — link still generated");
+    }
+  }
+
   res.json({
     success: true,
     inviteLink,
     storeName: project?.name ?? null,
     shopDomain: project?.shopDomain ?? null,
-    message: `Enlace de invitación creado para ${email} — tienda: ${project?.shopDomain ?? projectId}`,
+    emailSent,
+    message: emailSent
+      ? `Invitación enviada por email a ${email} — tienda: ${project?.shopDomain ?? projectId}`
+      : `Enlace de invitación creado para ${email} — tienda: ${project?.shopDomain ?? projectId}. Envía el enlace manualmente.`,
   });
 });
 

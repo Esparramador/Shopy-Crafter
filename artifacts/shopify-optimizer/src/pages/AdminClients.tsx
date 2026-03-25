@@ -60,7 +60,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [inviteResult, setInviteResult] = useState<{ link: string; storeName: string; shopDomain: string } | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ link: string; storeName: string; shopDomain: string; emailSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setInviteResult({ link: data.inviteLink, storeName: data.storeName ?? name, shopDomain: data.shopDomain ?? "" });
+      setInviteResult({ link: data.inviteLink, storeName: data.storeName ?? name, shopDomain: data.shopDomain ?? "", emailSent: !!data.emailSent });
       onInvited(data.inviteLink, email, data.storeName ?? name);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al invitar");
@@ -105,8 +105,13 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
           /* ─── Success: show link to copy ─── */
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ padding: "12px 14px", background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.25)", borderRadius: 10 }}>
-              <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: "var(--jade)" }}>✅ Enlace creado para {email}</p>
+              <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: "var(--jade)" }}>
+                {inviteResult.emailSent ? "📧 Invitación enviada por email a" : "✅ Enlace creado para"} {email}
+              </p>
               <p style={{ margin: 0, fontSize: 11, color: "var(--t3)" }}>Tienda: {inviteResult.storeName} · {inviteResult.shopDomain}</p>
+              {inviteResult.emailSent && (
+                <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--jade)" }}>El cliente recibirá un email con su enlace de acceso exclusivo.</p>
+              )}
             </div>
             <div style={{ padding: "10px 12px", background: "var(--ink2)", borderRadius: 8, border: "1px solid var(--ink3)", wordBreak: "break-all", fontSize: 11, color: "var(--t2)", fontFamily: "monospace" }}>
               {inviteResult.link}

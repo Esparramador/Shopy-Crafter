@@ -103,6 +103,15 @@ Full visual content editor for the landing page with live iframe preview.
 - **AI Copywriting**: Each text field has IA button for Claude-powered copy improvement
 - **Version history**: Up to 30 versions, restore any version, batch save
 
+### Client Invite Flow
+Unique, single-use invite links per store:
+- **Token**: 64-char `randomBytes(32)`, always unique per invite
+- **Expiry**: 48 hours from creation
+- **Email**: Auto-sent via Klaviyo (`Client Invite` metric) with invite URL, store name, and client name; falls back to manual copy if Klaviyo fails
+- **Setup**: `/invite/:token` → validates token → shows store banner → client sets password → token consumed (`inviteToken: null`) → session established as `role: client` with `clientId` → redirects to `/client` (NOT /admin)
+- **Client access**: Only their project's data (dashboard, products, approvals, messages). Admin endpoints return `Forbidden`.
+- **Admin view**: `AdminClients.tsx` — invite modal, client table, Chat, Propuesta, Cobrar, Activar/Revocar
+
 ### Shopify Billing Flow
 Admins can generate Shopify checkout links for services, linking directly to Shopify product variants configured in the CFO dashboard.
 
