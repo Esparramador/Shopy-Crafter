@@ -150,37 +150,48 @@ router.post("/email-templates/generate", async (req, res): Promise<void> => {
   } = req.body;
 
   if (!templateType) { res.status(400).json({ error: "templateType requerido" }); return; }
+  if (!projectId) { res.status(400).json({ error: "projectId requerido — selecciona un proyecto" }); return; }
 
   try {
-    let projectInfo = { name: brandName || "Tu Marca", niche: "ecommerce", brandTone: "", shopDomain: "" };
+    const { rows } = await pool.query(
+      "SELECT name, shop_domain, store_niche, brand_tone FROM projects WHERE id = $1",
+      [projectId]
+    );
+    if (!rows.length) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const project = rows[0];
+    const realStoreName = project.name;
+    const realDomain = project.shop_domain || "";
+    const realNiche = project.store_niche || "ecommerce";
+    const realBrandTone = project.brand_tone || "";
+
+    const effectiveBrandName = brandName || realStoreName;
+
     let visualDna = "";
-    if (projectId) {
-      const { rows } = await pool.query(
-        "SELECT name, shop_domain, store_niche, brand_tone FROM projects WHERE id = $1",
-        [projectId]
-      );
-      if (rows.length) {
-        projectInfo = {
-          name: brandName || rows[0].name,
-          niche: rows[0].store_niche || "ecommerce",
-          brandTone: rows[0].brand_tone || "",
-          shopDomain: rows[0].shop_domain || "",
-        };
-      }
-      const { rows: dnaRows } = await pool.query(
-        "SELECT background_style, lighting_style, mood, brand_colors, color_temp FROM visual_dna WHERE project_id = $1 LIMIT 1",
-        [projectId]
-      );
-      if (dnaRows.length) {
-        const d = dnaRows[0];
-        const parts: string[] = [];
-        if (d.mood) parts.push(`Mood: ${d.mood}`);
-        if (d.brand_colors?.length) parts.push(`Colores: ${d.brand_colors.join(", ")}`);
-        if (d.color_temp) parts.push(`Temperatura: ${d.color_temp}`);
-        if (d.lighting_style) parts.push(`Iluminación: ${d.lighting_style}`);
-        visualDna = parts.join(" · ");
-      }
+    const { rows: dnaRows } = await pool.query(
+      "SELECT background_style, lighting_style, mood, brand_colors, color_temp FROM visual_dna WHERE project_id = $1 LIMIT 1",
+      [projectId]
+    );
+    if (dnaRows.length) {
+      const d = dnaRows[0];
+      const parts: string[] = [];
+      if (d.mood) parts.push(`Mood: ${d.mood}`);
+      if (d.brand_colors?.length) parts.push(`Colores: ${d.brand_colors.join(", ")}`);
+      if (d.color_temp) parts.push(`Temperatura: ${d.color_temp}`);
+      if (d.lighting_style) parts.push(`Iluminación: ${d.lighting_style}`);
+      visualDna = parts.join(" · ");
     }
+
+    let topProducts = "";
+    try {
+      const { rows: prodRows } = await pool.query(
+        `SELECT title, product_type, vendor FROM products WHERE project_id = $1 ORDER BY id LIMIT 5`,
+        [projectId]
+      );
+      if (prodRows.length) {
+        topProducts = prodRows.map((p: any) => `${p.title}${p.product_type ? ` (${p.product_type})` : ""}`).join(", ");
+      }
+    } catch {}
 
     const typeMeta = TEMPLATE_TYPES[templateType];
     const typeName = typeMeta?.label || templateType;
@@ -192,24 +203,36 @@ REGLAS INQUEBRANTABLES:
 1. SIEMPRE escribes copy que suena humano, nunca robótico ni genérico
 2. Cada frase tiene un propósito: informar, emocionar o convertir
 3. El diseño visual es tan importante como el copy — eres diseñador + redactor
-4. Usas datos reales de la marca, NUNCA inventes información
+4. NUNCA inventes datos, nombres de marca, URLs, productos, o información que no se te haya proporcionado
 5. El email DEBE funcionar perfectamente en todos los clientes de email (Gmail, Outlook, Apple Mail)
 6. El HTML usa SOLO tablas para layout — NUNCA flexbox ni grid
 7. TODOS los estilos son inline — los email clients ignoran <style> tags
-8. Máximo 600px de ancho para el contenido principal`;
+8. Máximo 600px de ancho para el contenido principal
+
+⚠️ REGLA CRÍTICA DE IDENTIDAD DE MARCA ⚠️
+Este email es EXCLUSIVAMENTE para la marca "${effectiveBrandName}".
+- El nombre de la empresa que aparece en TODOS los textos, header, footer, alt-texts y subjects DEBE ser "${effectiveBrandName}" — NUNCA otro nombre.
+- Si el negocio es "${realNiche}", el copy debe reflejar ESE nicho exacto, no otro genérico.
+- ${realDomain ? `El dominio real es "${realDomain}" — NUNCA uses otro dominio ni URLs inventadas.` : "No uses dominios inventados."}
+- ${realBrandTone ? `El tono de voz de esta marca es: "${realBrandTone}" — respeta este tono en TODO el copy.` : ""}
+- NUNCA uses nombres como "Tu Tienda", "Mi Marca", "Acme", "Store Name", "Your Brand" ni NINGÚN placeholder genérico. Siempre "${effectiveBrandName}".
+- Cuando uses {{ store_name }}, su valor real será "${effectiveBrandName}".`;
 
     const brandBlock = [
-      `MARCA: ${projectInfo.name}`,
-      projectInfo.niche !== "ecommerce" ? `NICHO: ${projectInfo.niche}` : null,
-      projectInfo.brandTone ? `TONO DE MARCA: ${projectInfo.brandTone}` : null,
-      projectInfo.shopDomain ? `DOMINIO: ${projectInfo.shopDomain}` : null,
+      `EMPRESA/MARCA: ${effectiveBrandName}`,
+      `NOMBRE REAL DE LA TIENDA: ${realStoreName}`,
+      `NICHO: ${realNiche}`,
+      realBrandTone ? `TONO DE MARCA: ${realBrandTone}` : null,
+      realDomain ? `DOMINIO SHOPIFY: ${realDomain}` : null,
       brandTagline ? `TAGLINE: ${brandTagline}` : null,
       brandLogoUrl ? `LOGO URL: ${brandLogoUrl}` : null,
-      brandColors ? `COLORES MARCA: ${JSON.stringify(brandColors)}` : null,
+      brandColors ? `COLORES MARCA: principal=${brandColors.primary || "#c8a84b"}, acento=${brandColors.accent || "#2dd49f"}, oscuro=${brandColors.dark || "#0a0a0f"}, claro=${brandColors.light || "#f0eefc"}` : null,
       visualDna ? `DNA VISUAL: ${visualDna}` : null,
+      topProducts ? `PRODUCTOS DE LA TIENDA (reales): ${topProducts}` : null,
     ].filter(Boolean).join("\n");
 
-    const userPrompt = `Genera un email HTML COMPLETO y PROFESIONAL de nivel agencia premium.
+    const userPrompt = `Genera un email HTML COMPLETO y PROFESIONAL para "${effectiveBrandName}" (${realNiche}).
+Todo el contenido DEBE ser específico para esta marca. No uses nombres genéricos.
 
 TIPO DE PLANTILLA: ${typeName}
 DESCRIPCIÓN: ${typeDesc}
@@ -221,10 +244,10 @@ ${brandBlock}
 ${customInstructions ? `INSTRUCCIONES ADICIONALES DEL USUARIO:\n${customInstructions}\n` : ""}
 
 DISEÑO VISUAL OBLIGATORIO:
-- Fondo exterior: #0a0a0f (dark)
+- Fondo exterior: ${brandColors?.dark || "#0a0a0f"}
 - Fondo email: #13131f
 - Header: gradiente o sólido usando colores de marca (${brandColors?.primary || "#c8a84b"} como acento principal)
-- Texto principal: #f0eefc
+- Texto principal: ${brandColors?.light || "#f0eefc"}
 - Texto secundario: #9d9db8
 - Links: ${brandColors?.accent || "#c8a84b"}
 - Botón CTA principal: fondo ${brandColors?.primary || "#c8a84b"}, texto #060400, padding 16px 36px, border-radius 8px, font-weight bold, font-size 16px
@@ -232,20 +255,20 @@ DISEÑO VISUAL OBLIGATORIO:
 - Font: Arial, Helvetica, sans-serif (seguro para email)
 - Separadores: líneas sutiles #1e1e2e
 - Iconos: usa emojis Unicode para iconos (✓ ✉ ⭐ 🎁 etc.)
-${brandLogoUrl ? `- INCLUIR LOGO: <img src="${brandLogoUrl}" alt="${projectInfo.name}" style="max-height:48px;"> en el header` : "- Header: usar el nombre de la marca en texto con estilo premium"}
+${brandLogoUrl ? `- INCLUIR LOGO: <img src="${brandLogoUrl}" alt="${effectiveBrandName}" style="max-height:48px;"> en el header` : `- Header: mostrar "${effectiveBrandName}" como texto grande con estilo premium`}
 
 ESTRUCTURA DEL EMAIL:
-1. PREHEADER invisible (texto preview para inbox)
-2. HEADER con ${brandLogoUrl ? "logo" : "nombre de marca"} y navegación sutil
-3. HERO — titular impactante con copy persuasivo
-4. CUERPO — contenido principal con secciones bien definidas, espaciado generoso
+1. PREHEADER invisible (texto preview para inbox) — mencionando "${effectiveBrandName}"
+2. HEADER con ${brandLogoUrl ? "logo" : `"${effectiveBrandName}" en texto estilizado`}
+3. HERO — titular impactante relevante al nicho ${realNiche} y tono ${tone}
+4. CUERPO — contenido principal adaptado al tipo ${typeName}, con referencias reales al negocio
 5. CTA PRINCIPAL — botón grande, centrado, con microcopy debajo
-6. SOCIAL PROOF / TRUST — si aplica al tipo de email
-7. FOOTER — links legales, redes sociales, dirección, unsubscribe
+6. SOCIAL PROOF / TRUST — si aplica, adaptado al nicho ${realNiche}
+7. FOOTER — con "${effectiveBrandName}", links legales, redes sociales, dirección, unsubscribe
 
 VARIABLES DISPONIBLES (usa las que apliquen al tipo):
 - {{ first_name }} — nombre del destinatario
-- {{ store_name }} — nombre de la tienda (= ${projectInfo.name})
+- {{ store_name }} — nombre de la tienda (valor real = "${effectiveBrandName}")
 - {{ product_title }} — nombre del producto
 - {{ product_image_url }} — imagen del producto  
 - {{ product_url }} — link al producto
@@ -259,13 +282,13 @@ VARIABLES DISPONIBLES (usa las que apliquen al tipo):
 
 Devuelve SOLO este JSON (nada más):
 {
-  "subject_a": "asunto variante A — máx 55 chars, persuasivo, con emoji si aplica",
-  "subject_b": "asunto variante B con {{ first_name }} — personalizado",
-  "preview_text": "texto preview para inbox — máx 100 chars — genera curiosidad",
-  "html": "HTML COMPLETO del email (DOCTYPE html, head con meta charset+viewport, body con tablas, inline CSS, RESPONSIVE)",
-  "text": "versión texto plano profesional con separadores y estructura clara",
+  "subject_a": "asunto variante A — máx 55 chars, con marca ${effectiveBrandName}",
+  "subject_b": "asunto variante B con {{ first_name }} — personalizado para ${effectiveBrandName}",
+  "preview_text": "texto preview para inbox — máx 100 chars — específico de ${effectiveBrandName}",
+  "html": "HTML COMPLETO del email con TODA referencia a ${effectiveBrandName} (DOCTYPE html, head, body con tablas, inline CSS, RESPONSIVE)",
+  "text": "versión texto plano profesional mencionando ${effectiveBrandName}",
   "variables_used": ["lista", "de", "variables", "klaviyo", "usadas"],
-  "copywriting_notes": "breve explicación de la estrategia de copy usada y por qué funciona"
+  "copywriting_notes": "estrategia de copy específica para ${effectiveBrandName} y su nicho ${realNiche}"
 }`;
 
     const result = await askClaudeJsonWithBrain<{

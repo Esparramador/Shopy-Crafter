@@ -118,6 +118,14 @@ export default function EmailTemplates() {
 
   useEffect(() => { if (selectedProjectId) fetchTemplates(); }, [selectedProjectId, filterCategory]);
 
+  function applyProjectBrand(project: Project) {
+    setForm(p => ({
+      ...p,
+      brand_name: project.name,
+      from_name: project.name,
+    }));
+  }
+
   async function fetchProjects() {
     try {
       const res = await fetch(`${API}/api/projects`, { credentials: "include" });
@@ -126,11 +134,7 @@ export default function EmailTemplates() {
       setProjects(list);
       if (list.length) {
         setSelectedProjectId(list[0].id);
-        setForm(p => ({
-          ...p,
-          brand_name: list[0].name,
-          from_name: list[0].name,
-        }));
+        applyProjectBrand(list[0]);
       }
     } catch {}
     setLoading(false);
@@ -154,6 +158,7 @@ export default function EmailTemplates() {
 
   function openNewTemplate(typeKey?: string) {
     const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return;
     setSelectedTemplate(null);
     const tmplType = typeKey || "welcome-client";
     const meta = templateTypes[tmplType];
@@ -165,11 +170,11 @@ export default function EmailTemplates() {
       language: "es",
       subject_a: "", subject_b: "", preview_text: "",
       html_content: "", text_content: "", variables_used: "",
-      brand_name: project?.name || "",
+      brand_name: project.name,
       brand_logo_url: "",
       brand_tagline: "",
       brand_colors: { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" },
-      from_email: "", from_name: project?.name || "", reply_email: "",
+      from_email: "", from_name: project.name, reply_email: "",
       customInstructions: "",
     });
     setCopywritingNotes("");
@@ -353,7 +358,12 @@ export default function EmailTemplates() {
             </p>
           </div>
           {projects.length > 1 && (
-            <select value={selectedProjectId || ""} onChange={e => setSelectedProjectId(Number(e.target.value))}
+            <select value={selectedProjectId || ""} onChange={e => {
+              const pid = Number(e.target.value);
+              setSelectedProjectId(pid);
+              const proj = projects.find(p => p.id === pid);
+              if (proj) applyProjectBrand(proj);
+            }}
               style={{ ...inputStyle, width: "auto", minWidth: 180 }}>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -484,6 +494,15 @@ export default function EmailTemplates() {
           <ArrowLeft size={14} /> Plantillas
         </button>
         <div style={{ width: 1, height: 20, background: "var(--bdr)", margin: "0 8px" }} />
+        {(() => {
+          const project = projects.find(p => p.id === selectedProjectId);
+          return project ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(200,168,75,0.08)", border: "1px solid rgba(200,168,75,0.2)", borderRadius: 8, marginRight: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd49f" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#c8a84b" }}>{project.name}</span>
+            </div>
+          ) : null;
+        })()}
 
         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
           {editorTabs.map(t => (
@@ -518,10 +537,20 @@ export default function EmailTemplates() {
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #c8a84b, #e8c87b)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Palette size={22} color="#000" />
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t1)" }}>Identidad de Marca</h2>
                   <p style={{ margin: 0, fontSize: 12, color: "var(--t2)" }}>ShopyBrain usará esta información para crear emails 100% on-brand</p>
                 </div>
+                {(() => {
+                  const project = projects.find(p => p.id === selectedProjectId);
+                  return project ? (
+                    <div style={{ padding: "8px 14px", background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: 10, textAlign: "right" }}>
+                      <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", fontWeight: 700 }}>Proyecto activo</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#2dd49f" }}>{project.name}</div>
+                      {project.store_niche && <div style={{ fontSize: 10, color: "var(--t3)" }}>{project.store_niche}</div>}
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

@@ -143,32 +143,44 @@ router.delete("/emails/flows/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/emails/generate", async (req, res): Promise<void> => {
-  const { flowType, tone = "urgente", projectId, includeOptions = [], language = "es" } = req.body;
+  const { flowType, tone = "urgente", projectId, includeOptions = [], language = "es", referenceContext } = req.body;
+
+  if (!projectId) { res.status(400).json({ error: "projectId requerido — selecciona un proyecto" }); return; }
 
   try {
-    let projectInfo = { name: "Tu Tienda", niche: "ecommerce" };
-    if (projectId) {
-      const { rows } = await pool.query("SELECT name, store_niche, anthropic_api_key FROM projects WHERE id = $1", [projectId]);
-      if (rows.length) {
-        projectInfo = { name: rows[0].name, niche: rows[0].store_niche || "ecommerce" };
-      }
-    }
+    const { rows: projRows } = await pool.query("SELECT name, store_niche, brand_tone, shop_domain FROM projects WHERE id = $1", [projectId]);
+    if (!projRows.length) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const project = projRows[0];
+    const storeName = project.name;
+    const niche = project.store_niche || "ecommerce";
+    const brandTone = project.brand_tone || "";
+    const shopDomain = project.shop_domain || "";
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const client = new Anthropic({ apiKey: anthropicKey });
 
-    const brainContext = await buildShopyBrainContext(projectInfo.niche, "general");
+    const brainContext = await buildShopyBrainContext(niche, "general");
 
     const systemPrompt = `Eres un experto en email marketing de eCommerce con años de experiencia creando emails de alta conversión.
 Generas emails HTML completos, profesionales y que realmente convierten para tiendas Shopify.
-SIEMPRE devuelves JSON válido y nada más.${brainContext}`;
+SIEMPRE devuelves JSON válido y nada más.
 
-    const userPrompt = `Genera un email HTML completo y profesional para la tienda "${projectInfo.name}" (nicho: ${projectInfo.niche}).
+⚠️ REGLA CRÍTICA: Este email es EXCLUSIVAMENTE para "${storeName}".
+- TODOS los textos, headers, footers y subjects DEBEN usar "${storeName}" — NUNCA otro nombre.
+- NUNCA uses nombres genéricos como "Tu Tienda", "Mi Marca", "Acme", "Store Name".
+- El nicho es "${niche}" — todo el copy debe ser relevante a este nicho.
+${brandTone ? `- El tono de voz de la marca es: "${brandTone}".` : ""}
+${shopDomain ? `- El dominio real es "${shopDomain}".` : ""}
+${brainContext}`;
+
+    const userPrompt = `Genera un email HTML completo y profesional para "${storeName}" (nicho: ${niche}).
 
 TIPO DE FLOW: ${flowType}
 TONO: ${tone}
 IDIOMA: ${language}
 INCLUIR: ${includeOptions.join(", ") || "imagen producto, urgencia, CTA"}
+${referenceContext ? `\nCONTEXTO DE REFERENCIA:\n${referenceContext}\n` : ""}
 
 VARIABLES KLAVIYO A USAR:
 - {{ first_name }} — nombre del cliente
@@ -177,7 +189,7 @@ VARIABLES KLAVIYO A USAR:
 - {{ product_url }} — link al producto
 - {{ checkout_url }} — link al carrito abandonado
 - {{ discount_code }} — código de descuento
-- {{ store_name }} — nombre de la tienda = ${projectInfo.name}
+- {{ store_name }} — nombre de la tienda (= "${storeName}")
 
 REGLAS HTML CRÍTICAS (email clients):
 - Ancho máximo: 600px, centrado con margin: 0 auto
@@ -190,14 +202,15 @@ REGLAS HTML CRÍTICAS (email clients):
 - SIEMPRE inline CSS — los email clients ignoran <style>
 - NUNCA uses flexbox ni grid — usa tablas para layout
 - El HTML debe ser completamente auto-contenido
+- TODOS los textos visibles deben hacer referencia a "${storeName}", NO a nombres genéricos
 
 Devuelve SOLO este JSON (nada más):
 {
-  "subject_a": "asunto variante A (máx 55 chars)",
-  "subject_b": "asunto variante B con {{ first_name }} (máx 55 chars)",
-  "preview_text": "texto preview (máx 90 chars)",
-  "html": "HTML completo del email (tabla-based, inline CSS)",
-  "text": "versión texto plano del email",
+  "subject_a": "asunto variante A para ${storeName} (máx 55 chars)",
+  "subject_b": "asunto variante B con {{ first_name }} para ${storeName} (máx 55 chars)",
+  "preview_text": "texto preview de ${storeName} (máx 90 chars)",
+  "html": "HTML completo del email con TODO referenciando a ${storeName} (tabla-based, inline CSS)",
+  "text": "versión texto plano del email mencionando ${storeName}",
   "variables_used": ["lista de variables Klaviyo usadas"]
 }`;
 
@@ -220,11 +233,11 @@ Devuelve SOLO este JSON (nada más):
     // ShopyBrain learns from every email generated
     learnFromOperation({
       operationType: "redesign",
-      niche: projectInfo.niche,
-      title: `Email ${flowType} generado para ${projectInfo.name}`,
-      content: `Flow: ${flowType} | Tone: ${tone} | Subjects: ${result.subject_a ?? ""} / ${result.subject_b ?? ""}`,
+      niche,
+      title: `Email ${flowType} generado para ${storeName}`,
+      content: `Flow: ${flowType} | Tone: ${tone} | Tienda: ${storeName} | Subjects: ${result.subject_a ?? ""} / ${result.subject_b ?? ""}`,
       confidence: 0.68,
-      tags: ["email", flowType, tone, projectInfo.niche],
+      tags: ["email", flowType, tone, niche],
     });
 
     res.json(result);
