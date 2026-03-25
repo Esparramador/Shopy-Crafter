@@ -27,6 +27,7 @@ import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
 import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
 import MyPricing from "@/pages/admin/MyPricing";
 import Emails from "@/pages/admin/Emails";
+import EmailTemplates from "@/pages/admin/EmailTemplates";
 import ProjectVault from "@/pages/admin/ProjectVault";
 import ExportCenter from "@/pages/projects/ExportCenter";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -302,6 +303,13 @@ function Router() {
           </RequireAdmin>
         </Route>
         <Route path="/admin/emails">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><EmailTemplates /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/email-flows">
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><Emails /></AppLayout>

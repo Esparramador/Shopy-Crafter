@@ -103,6 +103,19 @@ Full visual content editor for the landing page with live iframe preview.
 - **AI Copywriting**: Each text field has IA button for Claude-powered copy improvement
 - **Version history**: Up to 30 versions, restore any version, batch save
 
+### Email Template Studio (`/admin/emails`)
+Professional AI-powered email template editor with 26 template types across 4 categories:
+- **Categories**: Agencia (welcome-client, invite, onboarding, reports, proposals), eCommerce (abandoned cart, order confirmation, post-purchase, reviews, win-back, VIP, product launch, flash sale, back-in-stock, price drop), Transaccional (shipping, password reset, account created, subscription), Campaña (seasonal, newsletter, referral, loyalty)
+- **Brand-aware AI generation**: Uses `askClaudeJsonWithBrain` — injects BrandDNA + OmniCore knowledge + ShopyBrain context for professional copy
+- **Brand identity panel**: Logo URL, brand name, tagline, 4-color picker (primary/accent/dark/light)
+- **Professional HTML output**: Table-based responsive layout, inline CSS, 600px max, dark theme with brand colors
+- **Preview system**: Desktop/mobile toggle, inbox simulation (sender, subject, preview text), live iframe
+- **Subject A/B testing**: Two subject line variants generated with copywriting strategy notes
+- **Klaviyo push**: Creates templates directly in Klaviyo via API
+- **CRUD**: Gallery view with favorites, duplicates, categories, version tracking
+- **DB**: `email_templates` table. Backend: `email-templates.ts`. Frontend: `EmailTemplates.tsx`
+- **Legacy flows**: Old flow editor still accessible at `/admin/email-flows` via `Emails.tsx`
+
 ### Client Invite Flow
 Unique, single-use invite links per store:
 - **Token**: 64-char `randomBytes(32)`, always unique per invite
