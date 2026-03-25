@@ -33,6 +33,7 @@ import entityResearchRouter from "./entity-research.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
 import plansRouter from "./plans.js";
+import exportsRouter from "./exports.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -76,5 +77,6 @@ router.use(klaviyoAiRouter);
 router.use(absorberRouter);
 router.use(entityResearchRouter);
 router.use(plansRouter);
+router.use(exportsRouter);
 
 export default router;

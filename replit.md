@@ -98,7 +98,19 @@ A multi-tiered pricing structure (Starter, Agency Pro, Enterprise, One-Shot Audi
 Admins can generate Shopify checkout links for services, linking directly to Shopify product variants configured in the CFO dashboard.
 
 ### Store Disconnect / Reconnect
-Provides functionality to disconnect a Shopify store without data loss and to reconnect with new credentials, or to fully delete a project and its associated data.
+Provides functionality to disconnect a Shopify store without data loss (`?mode=dissociate` clears credentials, keeps products/COGS/SEO/images) and to reconnect with new credentials, or to fully delete a project and its associated data (`?mode=full` CASCADE deletes everything).
+
+### Professional Export Center
+Full export system at `/projects/:id/exports` with 8 report types:
+- **Informe Completo**: Executive summary with all project data
+- **SEO Técnico**: Grade distribution, Schema/alt-text coverage, per-product scores, strategic recommendations
+- **Catálogo de Productos**: Full inventory with prices, COGS, margins, SEO grades, image counts
+- **Financiero y COGS**: Per-product COGS breakdown, margin analysis, price change history
+- **Brand Brief & Estrategia**: Identity document with niche, tone, audience, catalog overview
+- **A/B Testing**: Test history with types, winners, improvement percentages
+- **Galería de Imágenes IA**: Visual catalog of AI-generated images with models and alt texts
+- **CSV Products**: Excel-compatible spreadsheet with all product data
+Reports are professional HTML with gold/black branding, print-ready CSS for PDF conversion. Backend: `exports.ts`. Frontend: `ExportCenter.tsx`.
 
 ### Shopify Product Creation
 Admin can create new products directly in any connected Shopify store via the Audit page ("Crear Producto" button). Features:

@@ -17,6 +17,7 @@ const MODULE_NAV = [
   { id: "pricing",     label: "Pricing",      icon: "💰" },
   { id: "seo",         label: "SEO Engine",   icon: "🔍" },
   { id: "vault",       label: "Repositorio",  icon: "🗄️" },
+  { id: "exports",     label: "Exportar",     icon: "📥" },
 ];
 
 const SHOPYBRAIN_NAV = [
@@ -55,6 +56,7 @@ const PAGE_LABELS: Record<string, string> = {
   seo: "SEO Engine",
   settings: "Configuración",
   vault: "Repositorio",
+  exports: "Exportar",
 };
 
 export function AppLayout({ children }: AppLayoutProps) {

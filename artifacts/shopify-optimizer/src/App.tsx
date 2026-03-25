@@ -28,6 +28,7 @@ import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
 import MyPricing from "@/pages/admin/MyPricing";
 import Emails from "@/pages/admin/Emails";
 import ProjectVault from "@/pages/admin/ProjectVault";
+import ExportCenter from "@/pages/projects/ExportCenter";
 import ForgotPassword from "@/pages/ForgotPassword";
 import OAuthSuccess from "@/pages/OAuthSuccess";
 import AuditPage from "@/pages/projects/Audit";
@@ -386,6 +387,16 @@ function Router() {
               <AppLayout><ProjectVault /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
+        </Route>
+
+        <Route path="/projects/:id/exports">
+          {(params: { id: string }) => (
+            <RequireAdmin>
+              <AdminWrapper>
+                <AppLayout><ExportCenter projectId={parseInt(params.id)} /></AppLayout>
+              </AdminWrapper>
+            </RequireAdmin>
+          )}
         </Route>
 
         {/* Client routes */}
