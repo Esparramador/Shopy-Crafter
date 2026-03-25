@@ -743,13 +743,18 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-        const updates: Record<string, unknown> = {};
+        const updates: Record<string, unknown> = { id: parseInt(productId) };
         if (params?.title) updates.title = params.title;
         if (params?.bodyHtml) updates.body_html = params.bodyHtml;
         if (params?.tags) updates.tags = params.tags;
         if (params?.status) updates.status = params.status;
         if (params?.vendor) updates.vendor = params.vendor;
         if (params?.productType) updates.product_type = params.productType;
+
+        if (Object.keys(updates).length <= 1) {
+          res.status(400).json({ error: "Se requiere al menos un campo a actualizar (title, bodyHtml, tags, status, price, vendor, productType)" });
+          return;
+        }
 
         if (params?.price) {
           const current = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
