@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "es.shopybrain.app",
-  appName: "ShopyBrain",
+  appName: "Shopy Crafter",
   webDir: "dist/public",
   server: {
     url: process.env.APP_URL ?? "https://shopycrafter.com",

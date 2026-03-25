@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">ShopyBrain</string>
-    <string name="title_activity_main">ShopyBrain</string>
+    <string name="app_name">Shopy Crafter</string>
+    <string name="title_activity_main">Shopy Crafter</string>
     <string name="package_name">es.shopybrain.app</string>
     <string name="custom_url_scheme">es.shopybrain.app</string>
 </resources>

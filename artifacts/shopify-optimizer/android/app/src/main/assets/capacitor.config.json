@@ -1,6 +1,6 @@
 {
         "appId": "es.shopybrain.app",
-        "appName": "ShopyBrain",
+        "appName": "Shopy Crafter",
         "webDir": "dist/public",
         "server": {
                 "url": "https://shopycrafter.com",
