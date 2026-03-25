@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, Zap, RefreshCw, Trash2, Eye, Send, Star, Copy, Loader2, CheckCircle,
   AlertCircle, Clock, ChevronDown, Sparkles, Palette, Type, Mail, Monitor, Smartphone,
-  ArrowLeft, X, EyeOff,
+  ArrowLeft, X, EyeOff, WifiOff,
 } from "lucide-react";
 import GenerationProgress from "@/components/GenerationProgress";
+import { useDraftPersistence, useBeforeUnload, useOnlineStatus } from "@/hooks/use-draft-persistence";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -110,6 +111,27 @@ export default function EmailTemplates() {
     reply_email: "",
     customInstructions: "",
   });
+
+  const hasEditorChanges = view === "editor" && (form.html_content.length > 0 || form.subject_a.length > 0);
+  useBeforeUnload(hasEditorChanges);
+
+  const draftData = useMemo(() => view === "editor" ? form : null, [view, form]);
+  const { clear: clearEmailDraft } = useDraftPersistence(
+    "email-template-draft",
+    draftData,
+    (restored) => {
+      if (restored && typeof restored === "object" && (restored as typeof form).html_content) {
+        setForm(restored as typeof form);
+        setView("editor");
+        setEditorTab((restored as typeof form).html_content ? "preview" : "brand");
+      }
+    },
+    { enabled: view === "editor" }
+  );
+
+  const { isOnline } = useOnlineStatus(useCallback(() => {
+    if (selectedProjectId) fetchTemplates();
+  }, [selectedProjectId]));
 
   useEffect(() => {
     fetchProjects();
@@ -238,6 +260,7 @@ export default function EmailTemplates() {
         setSelectedTemplate(saved);
       }
       await fetchTemplates();
+      clearEmailDraft();
       return saved;
     } catch { return null; }
     finally { setSaving(false); }

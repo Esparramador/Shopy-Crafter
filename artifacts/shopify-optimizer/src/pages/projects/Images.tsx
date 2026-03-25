@@ -24,10 +24,11 @@ import {
   CheckCircle,
   ImageOff,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineStatus } from "@/hooks/use-draft-persistence";
 
 const IMAGE_TYPES = [
   { id: "hero", label: "Hero (Studio)", icon: "📸", model: "Flux 1.1 Pro", color: "blue" },
@@ -233,14 +234,73 @@ export default function ImagesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [jobs, setJobs] = useState<Record<string, JobEntry>>({});
+  const [jobs, setJobs] = useState<Record<string, JobEntry>>(() => {
+    try {
+      const saved = localStorage.getItem(`img-jobs-${projectId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { data: Record<string, JobEntry>; at: number };
+        if (Date.now() - parsed.at < 10 * 60 * 1000) return parsed.data;
+        localStorage.removeItem(`img-jobs-${projectId}`);
+      }
+    } catch {}
+    return {};
+  });
   const [completedImages, setCompletedImages] = useState<Record<string, string>>({});
   const [completedSvgs, setCompletedSvgs] = useState<Record<string, string>>({});
   const [previewModal, setPreviewModal] = useState<{
     productId: string;
     imageType: string;
   } | null>(null);
-  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
+  const [bulkJobId, setBulkJobId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(`img-bulk-${projectId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { id: string; at: number };
+        if (Date.now() - parsed.at < 10 * 60 * 1000) return parsed.id;
+        localStorage.removeItem(`img-bulk-${projectId}`);
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    const active = Object.keys(jobs).length > 0;
+    if (active) {
+      try { localStorage.setItem(`img-jobs-${projectId}`, JSON.stringify({ data: jobs, at: Date.now() })); } catch {}
+    } else {
+      localStorage.removeItem(`img-jobs-${projectId}`);
+    }
+  }, [jobs, projectId]);
+
+  useEffect(() => {
+    if (bulkJobId) {
+      try { localStorage.setItem(`img-bulk-${projectId}`, JSON.stringify({ id: bulkJobId, at: Date.now() })); } catch {}
+    } else {
+      localStorage.removeItem(`img-bulk-${projectId}`);
+    }
+  }, [bulkJobId, projectId]);
+
+  useEffect(() => {
+    try {
+      const savedJobs = localStorage.getItem(`img-jobs-${projectId}`);
+      if (savedJobs) {
+        const parsed = JSON.parse(savedJobs) as { data: Record<string, JobEntry>; at: number };
+        if (Date.now() - parsed.at < 10 * 60 * 1000) { setJobs(parsed.data); } else { setJobs({}); localStorage.removeItem(`img-jobs-${projectId}`); }
+      } else { setJobs({}); }
+      const savedBulk = localStorage.getItem(`img-bulk-${projectId}`);
+      if (savedBulk) {
+        const parsed = JSON.parse(savedBulk) as { id: string; at: number };
+        if (Date.now() - parsed.at < 10 * 60 * 1000) { setBulkJobId(parsed.id); } else { setBulkJobId(null); localStorage.removeItem(`img-bulk-${projectId}`); }
+      } else { setBulkJobId(null); }
+    } catch { setJobs({}); setBulkJobId(null); }
+    setCompletedImages({});
+    setCompletedSvgs({});
+  }, [projectId]);
+
+  useOnlineStatus(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
+    toast({ title: "Conexión restaurada", description: "Datos actualizados" });
+  }, [projectId, queryClient, toast]));
 
   const jobKey = (productId: string, type: string) => `${productId}::${type}`;
 

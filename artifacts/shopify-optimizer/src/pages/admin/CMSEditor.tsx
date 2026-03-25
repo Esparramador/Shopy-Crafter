@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "wouter";
 import {
   Monitor, Tablet, Smartphone, Save, Loader2, Sparkles,
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
-  PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon,
+  PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon, WifiOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -443,28 +444,77 @@ export default function CMSEditor() {
   const [mobileTab, setMobileTab]       = useState<MobileTab>("edit");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { toast } = useToast();
+  const retryFetch = useRetryFetch();
 
   const changeCount = pending.size;
+
+  const pendingObj = useMemo(() => Object.fromEntries(pending), [pending]);
+  const { clear: clearDraft } = useDraftPersistence(
+    "cms-editor-draft",
+    pendingObj,
+    (restored: Record<string, unknown>) => {
+      const m = new Map(Object.entries(restored));
+      if (m.size > 0) {
+        setPending(m);
+        toast({ title: "Borrador recuperado", description: `${m.size} cambios pendientes restaurados` });
+      }
+    },
+    { enabled: true }
+  );
+
+  useBeforeUnload(changeCount > 0);
+
+  const loadContent = useCallback(async () => {
+    try {
+      const res = await retryFetch(`${BASE_URL}/api/cms/content`);
+      const data = await res.json() as Record<string, unknown>;
+      setContent(data);
+    } catch {
+      toast({ title: "Error de conexión", description: "No se pudo cargar el contenido. Reintentando...", variant: "destructive" });
+    }
+  }, [retryFetch, toast]);
+
+  const loadVersions = useCallback(async () => {
+    try {
+      const res = await retryFetch(`${BASE_URL}/api/cms/versions`, { credentials: "include" });
+      const data = await res.json() as VersionEntry[];
+      setVersions(data);
+    } catch {}
+  }, [retryFetch]);
+
+  const { isOnline } = useOnlineStatus(useCallback(() => {
+    loadContent();
+    loadVersions();
+    setIframeKey(k => k + 1);
+    toast({ title: "Conexión restaurada", description: "Datos actualizados" });
+  }, [loadContent, loadVersions, toast]));
 
   useEffect(() => {
     loadContent();
     loadVersions();
-    const es = new EventSource(`${BASE_URL}/api/cms/events`);
-    es.addEventListener("content_updated", () => { loadContent(); setIframeKey(k => k + 1); });
-    return () => es.close();
-  }, []);
 
-  const loadContent = async () => {
-    const res  = await fetch(`${BASE_URL}/api/cms/content`);
-    const data = await res.json() as Record<string, unknown>;
-    setContent(data);
-  };
+    let es: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retries = 0;
 
-  const loadVersions = async () => {
-    const res  = await fetch(`${BASE_URL}/api/cms/versions`, { credentials: "include" });
-    const data = await res.json() as VersionEntry[];
-    setVersions(data);
-  };
+    function connectSSE() {
+      es = new EventSource(`${BASE_URL}/api/cms/events`);
+      es.addEventListener("connected", () => { retries = 0; });
+      es.addEventListener("content_updated", () => { loadContent(); setIframeKey(k => k + 1); });
+      es.onerror = () => {
+        es?.close();
+        const delay = Math.min(1000 * Math.pow(2, retries), 30000);
+        retries++;
+        retryTimer = setTimeout(connectSSE, delay);
+      };
+    }
+    connectSSE();
+
+    return () => {
+      es?.close();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [loadContent]);
 
   const handleFieldChange = useCallback((path: string, value: string) => {
     setPending(prev => { const n = new Map(prev); n.set(path, value); return n; });
@@ -490,17 +540,20 @@ export default function CMSEditor() {
     setSaving(true);
     try {
       const changes = Array.from(pending.entries()).map(([path, value]) => ({ path, value }));
-      const res = await fetch(`${BASE_URL}/api/cms/content/batch`, {
+      const res = await retryFetch(`${BASE_URL}/api/cms/content/batch`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ changes }),
       });
       if (res.ok) {
         setPending(new Map());
+        clearDraft();
         setIframeKey(k => k + 1);
         await loadVersions();
         toast({ title: "✅ Guardado", description: `${changes.length} cambios aplicados a la landing` });
       }
+    } catch {
+      toast({ title: "Error al guardar", description: "Los cambios están guardados localmente. Reintenta cuando tengas conexión.", variant: "destructive" });
     } finally { setSaving(false); }
   };
 
@@ -564,6 +617,13 @@ export default function CMSEditor() {
             }}>✏️</div>
             <span style={{ fontWeight: 700, fontSize: 15, color: "var(--t)" }}>Editor Landing</span>
           </div>
+          {!isOnline && (
+            <span style={{
+              fontSize: 11, background: "rgba(232,69,88,.15)", color: "#e84558",
+              padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(232,69,88,.3)", whiteSpace: "nowrap",
+              display: "flex", alignItems: "center", gap: 4,
+            }}><WifiOff size={11} />Sin conexión</span>
+          )}
           {changeCount > 0 ? (
             <span style={{
               fontSize: 11, background: "rgba(200,168,75,.15)", color: "var(--gold)",
