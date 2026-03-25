@@ -28,6 +28,7 @@ import {
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import SaveReportButton from "@/components/SaveReportButton";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -472,7 +473,39 @@ export default function AuditPage() {
             {data?.total ? `Analizando ${data.total} productos` : "Escanea tu tienda para comenzar"}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap items-center">
+          <SaveReportButton
+            projectId={projectId}
+            title="Auditoría del Catálogo"
+            fileType="audit"
+            category="catalog_audit"
+            compact
+            buildContent={() => {
+              const products = data?.products || [];
+              const grades: Record<string, number> = {};
+              products.forEach((p: any) => { grades[p.grade || "?"] = (grades[p.grade || "?"] || 0) + 1; });
+              const avgScore = products.length > 0 ? (products.reduce((s: number, p: any) => s + (p.auditScore || 0), 0) / products.length).toFixed(1) : "0";
+              return `
+<h2>Resumen de la Auditoría</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Total Productos</div><div class="value">${products.length}</div></div>
+  <div class="metric-card"><div class="label">Score Medio</div><div class="value">${avgScore}</div><div class="sub">de 100</div></div>
+  <div class="metric-card"><div class="label">Grado A</div><div class="value status-ok">${grades["A"] || 0}</div></div>
+  <div class="metric-card"><div class="label">Grado B</div><div class="value">${grades["B"] || 0}</div></div>
+  <div class="metric-card"><div class="label">Grado C</div><div class="value status-warn">${grades["C"] || 0}</div></div>
+  <div class="metric-card"><div class="label">Grado D-F</div><div class="value status-bad">${(grades["D"] || 0) + (grades["F"] || 0)}</div></div>
+</div>
+<h2>Distribución por Grado</h2>
+<table><tr><th>Grado</th><th>Cantidad</th><th>% del Total</th></tr>
+${["A", "B", "C", "D", "F"].map(g => `<tr><td><strong>${g}</strong></td><td>${grades[g] || 0}</td><td>${products.length ? ((grades[g] || 0) / products.length * 100).toFixed(1) : 0}%</td></tr>`).join("")}
+</table>
+<h2>Detalle por Producto</h2>
+<table><tr><th>Producto</th><th>Grado</th><th>Score</th><th>Precio</th><th>Estado</th></tr>
+${products.slice(0, 100).map((p: any) => `<tr><td>${p.title}</td><td><strong>${p.grade || "?"}</strong></td><td>${Math.round(p.auditScore || 0)}/100</td><td>${p.price ? p.price + "€" : "—"}</td><td>${p.status === "active" ? '<span class="status-ok">Activo</span>' : '<span class="status-warn">Borrador</span>'}</td></tr>`).join("")}
+</table>
+${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0, 20).map((o: any) => `<li><strong>${o.type}:</strong> ${o.title} — ${o.description || ""}</li>`).join("")}</ul>` : ""}`;
+            }}
+          />
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-[var(--gold)] text-black px-5 py-3 rounded-xl font-semibold flex items-center gap-2 hover:brightness-110 transition-all shadow-[0_0_15px_rgba(200,168,75,0.3)]"

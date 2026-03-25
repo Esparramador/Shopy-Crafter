@@ -10,6 +10,7 @@ import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } 
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -727,6 +728,23 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           parseInt(projectId), project.shopDomain, "/products.json",
           { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
         );
+
+        saveToVault({
+          projectId: parseInt(projectId),
+          fileType: "product_card",
+          category: "product_creation",
+          title: `Producto: ${created.product.title}`,
+          description: finalBody ? String(finalBody).replace(/<[^>]*>/g, "").slice(0, 200) : undefined,
+          productId: String(created.product.id),
+          productTitle: String(created.product.title),
+          generatedBy: "shopybrain_voice",
+          metadata: {
+            price: params?.price || "0.00",
+            status: created.product.status,
+            tags: finalTags,
+            shopifyId: created.product.id,
+          },
+        }).catch(() => {});
 
         result = {
           productId: created.product.id,

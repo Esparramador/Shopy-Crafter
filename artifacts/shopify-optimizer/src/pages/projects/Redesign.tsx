@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import SaveReportButton from "@/components/SaveReportButton";
 
 type RedesignResult = {
   title?: string;
@@ -244,7 +245,35 @@ export default function RedesignPage() {
             Reescritura completa con Claude: título SEO, descripción HTML, precio, tags y photo briefs.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap items-center">
+          <SaveReportButton
+            projectId={projectId}
+            title="Informe Rediseño IA"
+            fileType="redesign"
+            category="redesign"
+            compact
+            buildContent={() => {
+              const results = redesignResults;
+              const redesignedProducts = products.filter(p => results[(p as any).shopifyGid || (p as any).id]);
+              return `
+<h2>Resumen de Rediseño IA</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Total Productos</div><div class="value">${products.length}</div></div>
+  <div class="metric-card"><div class="label">Rediseñados</div><div class="value status-ok">${redesignedProducts.length}</div></div>
+  <div class="metric-card"><div class="label">Pendientes</div><div class="value">${products.length - redesignedProducts.length}</div></div>
+</div>
+${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedProducts.map(p => {
+  const r = results[(p as any).shopifyGid || (p as any).id];
+  return `<div style="margin:16px 0;padding:16px;border:1px solid rgba(200,168,75,0.2);border-radius:12px">
+  <h3>${r?.title || (p as any).title}</h3>
+  ${r?.shortDescription ? `<p style="color:#aaa">${r.shortDescription}</p>` : ""}
+  ${r?.price ? `<p><strong>Precio sugerido:</strong> ${r.price}€</p>` : ""}
+  ${r?.tags?.length ? `<p><strong>Tags:</strong> ${r.tags.join(", ")}</p>` : ""}
+  ${r?.photoBriefs?.length ? `<h4>Photo Briefs</h4><ol>${r.photoBriefs.map(b => `<li>${b}</li>`).join("")}</ol>` : ""}
+</div>`;
+}).join("")}` : "<p>Aún no se han generado rediseños en esta sesión.</p>"}`;
+            }}
+          />
           <button
             onClick={() => handleBulk("weak")}
             disabled={bulkRedesign.isPending || !!bulkJobId}

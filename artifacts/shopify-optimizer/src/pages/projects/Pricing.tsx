@@ -30,6 +30,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import SaveReportButton from "@/components/SaveReportButton";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -734,9 +735,33 @@ export default function PricingPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">Economista IA</h1>
-        <p className="text-muted-foreground mt-1">P&L, márgenes, COGS y optimización de precios con IA.</p>
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground">Economista IA</h1>
+          <p className="text-muted-foreground mt-1">P&L, márgenes, COGS y optimización de precios con IA.</p>
+        </div>
+        <SaveReportButton
+          projectId={projectId}
+          title="Informe Financiero"
+          fileType="financial"
+          category="financial"
+          compact
+          buildContent={() => {
+            return `
+<h2>Dashboard Financiero</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Revenue Bruto (30d)</div><div class="value">${formatCurrency(dash.grossRevenue)}</div></div>
+  <div class="metric-card"><div class="label">Gross Profit</div><div class="value status-ok">${formatCurrency(dash.grossProfit)}</div></div>
+  <div class="metric-card"><div class="label">Margen Neto</div><div class="value">${dash.netMarginPct}%</div></div>
+  <div class="metric-card"><div class="label">AOV</div><div class="value">${formatCurrency(dash.aov)}</div></div>
+</div>
+${dash.alerts?.length ? `<h2>Alertas Financieras</h2><ul>${dash.alerts.map((a: any) => `<li><strong>${a.severity || "info"}:</strong> ${a.message || a}</li>`).join("")}</ul>` : ""}
+<h2>Productos y Márgenes</h2>
+<table><tr><th>Producto</th><th>Precio</th></tr>
+${products.slice(0, 50).map((p: any) => `<tr><td>${p.title}</td><td>${p.price ? formatCurrency(Number(p.price)) : "—"}</td></tr>`).join("")}
+</table>`;
+          }}
+        />
       </div>
 
       {/* KPI Cards */}

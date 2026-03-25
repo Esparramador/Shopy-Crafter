@@ -33,6 +33,7 @@ import {
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import SaveReportButton from "@/components/SaveReportButton";
 
 export default function SEOPage() {
   const [, params] = useRoute("/projects/:id/seo");
@@ -221,18 +222,45 @@ export default function SEOPage() {
           <h1 className="text-3xl font-display font-bold text-foreground">SEO Técnico & Contenido</h1>
           <p className="text-muted-foreground mt-1">Schemas, metas, alt texts, keywords y estrategia de blog.</p>
         </div>
-        <button
-          onClick={handleAudit}
-          disabled={runSeoAudit.isPending}
-          className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-60"
-        >
-          {runSeoAudit.isPending ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Search className="w-5 h-5" />
-          )}
-          {runSeoAudit.isPending ? "Auditando..." : "Auditoría SEO"}
-        </button>
+        <div className="flex gap-3 items-center flex-wrap">
+          <SaveReportButton
+            projectId={projectId}
+            title="Informe SEO"
+            fileType="seo_audit"
+            category="seo"
+            compact
+            buildContent={() => {
+              const score = seoData?.globalScore ?? 0;
+              const issues = seoData?.issues || [];
+              const kws = keywords;
+              const ps = psResult;
+              return `
+<h2>Score SEO Global</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Score Global</div><div class="value">${score}/100</div></div>
+  <div class="metric-card"><div class="label">Metas Faltantes</div><div class="value status-warn">${seoData?.missingMetas || 0}</div></div>
+  <div class="metric-card"><div class="label">Alt Texts Faltantes</div><div class="value status-warn">${seoData?.missingAlts || 0}</div></div>
+  ${schemas ? `<div class="metric-card"><div class="label">Schemas Generados</div><div class="value status-ok">${schemas.generated || 0}</div></div>` : ""}
+</div>
+${issues.length > 0 ? `<h2>Issues Detectados</h2><ul>${issues.map(i => `<li>${i}</li>`).join("")}</ul>` : ""}
+${kws ? `<h2>Keywords</h2><h3>Primarias</h3><ul>${(kws.primary || []).map(k => `<li>${k}</li>`).join("")}</ul><h3>Long-Tail</h3><ul>${(kws.longTail || []).map(k => `<li>${k}</li>`).join("")}</ul>` : ""}
+${ps ? `<h2>PageSpeed</h2><div class="metric-grid"><div class="metric-card"><div class="label">Performance</div><div class="value">${ps.performanceScore || 0}</div></div><div class="metric-card"><div class="label">SEO</div><div class="value">${ps.seoScore || 0}</div></div><div class="metric-card"><div class="label">Accessibility</div><div class="value">${ps.accessibilityScore || 0}</div></div></div>` : ""}
+${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><th>Palabras</th><th>Dificultad</th></tr>${blogStrategy.pillars.map(p => `<tr><td>${p.title}</td><td>${p.words}</td><td>${p.difficulty}</td></tr>`).join("")}</table>` : ""}`;
+            }}
+          />
+          <button
+            onClick={handleAudit}
+            disabled={runSeoAudit.isPending}
+            className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-60"
+          >
+            {runSeoAudit.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Search className="w-5 h-5" />
+            )}
+            {runSeoAudit.isPending ? "Auditando..." : "Auditoría SEO"}
+          </button>
+        </div>
       </div>
 
       {/* Score + Issues */}

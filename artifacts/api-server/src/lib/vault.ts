@@ -3,7 +3,7 @@ import { logger } from "./logger.js";
 
 interface VaultFileParams {
   projectId: number;
-  fileType: "image" | "seo_report" | "redesign" | "ab_test" | "email" | "pricing_report" | "audit" | "bulk_export";
+  fileType: string;
   category?: string;
   title: string;
   description?: string;

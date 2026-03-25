@@ -17,6 +17,7 @@ import { getClaudeClient } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -733,6 +734,26 @@ Genera JSON con:
         confidence: 0.9,
         tags: ["product", "created", "image_analysis", "price_research"],
       });
+
+      saveToVault({
+        projectId,
+        fileType: "product_card",
+        category: "product_creation",
+        title: `Producto: ${created.product.title}`,
+        description: productAnalysis.productName || created.product.title,
+        productId: String(created.product.id),
+        productTitle: created.product.title,
+        generatedBy: "image_to_product",
+        metadata: {
+          price: finalPrice,
+          compareAtPrice: finalCompareAt,
+          category: productAnalysis.productCategory,
+          materials: productAnalysis.materials,
+          qualityTier: productAnalysis.qualityTier,
+          sourcesResearched: priceSources.length,
+          shopifyId: created.product.id,
+        },
+      }).catch(() => {});
 
       res.json({
         success: true,

@@ -24,6 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import SaveReportButton from "@/components/SaveReportButton";
 
 function NewTestModal({
   projectId,
@@ -374,13 +375,34 @@ export default function ABTestingPage() {
           <h1 className="text-3xl font-display font-bold text-foreground">A/B Testing Automático</h1>
           <p className="text-muted-foreground mt-1">Pruebas estadísticas de imágenes con datos reales de Shopify.</p>
         </div>
-        <button
-          onClick={() => setShowNewTestModal(true)}
-          className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)]"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Test
-        </button>
+        <div className="flex gap-3 items-center flex-wrap">
+          <SaveReportButton
+            projectId={projectId}
+            title="Informe A/B Testing"
+            fileType="ab_testing"
+            category="ab_testing"
+            compact
+            buildContent={() => {
+              return `
+<h2>Resumen A/B Testing</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Tests Activos</div><div class="value">${activeTests.length || dash.activeTests || 0}</div></div>
+  <div class="metric-card"><div class="label">Tests Completados</div><div class="value">${completedTests.length || dash.completedTests || 0}</div></div>
+  <div class="metric-card"><div class="label">Win Rate</div><div class="value">${dash.winRate ?? 0}%</div></div>
+  <div class="metric-card"><div class="label">Impacto Revenue</div><div class="value">${formatCurrency(dash.totalRevenueImpact || 0)}</div></div>
+</div>
+${dash.insight ? `<blockquote style="border-left:3px solid #c8a84b;padding:12px 16px;margin:16px 0;font-style:italic;color:#c8a84b">${dash.insight}</blockquote>` : ""}
+${tests.length > 0 ? `<h2>Historial de Tests</h2><table><tr><th>Producto</th><th>Tipo</th><th>Estado</th><th>Variante A (CTR)</th><th>Variante B (CTR)</th><th>Ganador</th></tr>${tests.map(t => `<tr><td>${t.productTitle || t.productId}</td><td>${t.testType}</td><td>${t.status}</td><td>${((t.variantAClicks || 0) / Math.max(t.variantAImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${((t.variantBClicks || 0) / Math.max(t.variantBImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${t.winner || "—"}</td></tr>`).join("")}</table>` : "<p>No hay tests registrados aún.</p>"}`;
+            }}
+          />
+          <button
+            onClick={() => setShowNewTestModal(true)}
+            className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)]"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Test
+          </button>
+        </div>
       </div>
 
       {/* Overview Cards */}

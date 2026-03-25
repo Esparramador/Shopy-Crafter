@@ -5,6 +5,7 @@ import { generationJobsTable } from "@workspace/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
+import { logger } from "../lib/logger.js";
 import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
@@ -97,6 +98,127 @@ router.get("/projects/:projectId/vault/stats", requireAuth, async (req, res): Pr
     totalSizeBytes: Number(totals?.totalSize ?? 0),
     byType: byType.map(r => ({ fileType: r.fileType, count: Number(r.count), sizeBytes: Number(r.totalSize ?? 0) })),
   });
+});
+
+// ─── GUARDAR INFORME PROFESIONAL EN EL VAULT ────────────────────────────────
+router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId));
+  if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
+
+  const session = req.session as any;
+  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    res.status(403).json({ error: "Sin acceso" }); return;
+  }
+
+  const { title, content, fileType, category, productId, productTitle, metadata } = req.body;
+  if (!title || !content || !fileType) {
+    res.status(400).json({ error: "title, content y fileType son requeridos" }); return;
+  }
+
+  const [project] = await db.select({ name: projectsTable.name }).from(projectsTable)
+    .where(eq(projectsTable.id, projectId)).limit(1);
+
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+  const htmlReport = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title} — ${project?.name || "Proyecto"}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #0a0a0f; color: #f5f5f7; line-height: 1.7; }
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 48px; }
+  .header { border-bottom: 2px solid #c8a84b; padding-bottom: 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .header-left h1 { font-size: 24px; font-weight: 800; color: #c8a84b; }
+  .header-left p { font-size: 13px; color: #8b8b9e; margin-top: 4px; }
+  .header-right { text-align: right; font-size: 12px; color: #8b8b9e; }
+  .header-right .brand { font-size: 11px; color: #c8a84b; font-weight: 700; margin-bottom: 2px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .content { font-size: 14px; color: #d0d0d8; }
+  .content h2 { font-size: 18px; font-weight: 700; color: #c8a84b; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #1e1e2e; }
+  .content h3 { font-size: 15px; font-weight: 700; color: #f5f5f7; margin: 20px 0 8px; }
+  .content p { margin: 8px 0; }
+  .content ul, .content ol { margin: 8px 0 8px 20px; }
+  .content li { margin: 4px 0; }
+  .content table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  .content th { background: #111118; color: #c8a84b; padding: 10px 12px; text-align: left; font-weight: 700; border-bottom: 2px solid #c8a84b; }
+  .content td { padding: 8px 12px; border-bottom: 1px solid #1e1e2e; }
+  .content tr:hover td { background: rgba(200,168,75,0.04); }
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+  .metric-card { background: #111118; border: 1px solid #1e1e2e; border-radius: 10px; padding: 16px; }
+  .metric-card .label { font-size: 11px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .metric-card .value { font-size: 22px; font-weight: 800; color: #f5f5f7; margin-top: 4px; }
+  .metric-card .sub { font-size: 11px; color: #2ecc71; margin-top: 2px; }
+  .section { background: #111118; border: 1px solid #1e1e2e; border-radius: 12px; padding: 20px; margin: 16px 0; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #1e1e2e; font-size: 11px; color: #8b8b9e; text-align: center; }
+  .status-ok { color: #2ecc71; } .status-warn { color: #f39c12; } .status-bad { color: #e84558; }
+  .highlight { background: rgba(200,168,75,0.08); border-left: 3px solid #c8a84b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  @media print { body { background: white; color: #111; } .page { padding: 20px; } .header { border-color: #c8a84b; } .content th { background: #f5f5f5; color: #111; } .content td { border-color: #ddd; } .section { background: #f9f9f9; border-color: #ddd; } .metric-card { background: #f5f5f5; border-color: #ddd; } .footer { color: #999; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-left">
+      <h1>${title}</h1>
+      <p>${project?.name || "Proyecto"} — Generado por ShopyBrain AI</p>
+    </div>
+    <div class="header-right">
+      <div class="brand">SHOPY CRAFTER</div>
+      <div>${date}</div>
+      <div>${time}</div>
+    </div>
+  </div>
+  <div class="content">
+    ${content}
+  </div>
+  <div class="footer">
+    Shopy Crafter — ShopyBrain AI Intelligence · ${date} · Informe confidencial
+  </div>
+</div>
+</body>
+</html>`;
+
+  const htmlBuffer = Buffer.from(htmlReport, "utf-8");
+
+  try {
+    const safeName = title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
+    const objectPath = `projects/${projectId}/${fileType}/${safeName}_${Date.now()}.html`;
+
+    let savedPath: string | null = null;
+    try {
+      const gcsFile = await getStorage().getObjectEntityFile(objectPath);
+      await getStorage().uploadObject(gcsFile, htmlBuffer, "text/html");
+      savedPath = objectPath;
+    } catch (uploadErr: any) {
+      logger.warn({ err: uploadErr, projectId, fileType }, "Object storage upload failed for report, saving DB record only");
+    }
+
+    const [saved] = await db.insert(projectFilesTable).values({
+      projectId,
+      fileType,
+      category: category || null,
+      title,
+      description: `Informe profesional generado el ${date} a las ${time}`,
+      objectPath: savedPath,
+      originalUrl: null,
+      mimeType: "text/html",
+      fileSizeBytes: htmlBuffer.length,
+      productId: productId || null,
+      productTitle: productTitle || null,
+      generatedBy: "report_engine",
+      metadata: metadata ? JSON.stringify(metadata) : null,
+      isPublic: 0,
+    }).returning();
+
+    res.json({ success: true, fileId: saved.id, title, fileType, sizeBytes: htmlBuffer.length });
+  } catch (e: any) {
+    res.status(500).json({ error: `Error guardando informe: ${e.message}` });
+  }
 });
 
 // ─── DESCARGAR UN ARCHIVO ────────────────────────────────────────────────────

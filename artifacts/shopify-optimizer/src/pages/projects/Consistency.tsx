@@ -22,6 +22,7 @@ import {
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import SaveReportButton from "@/components/SaveReportButton";
 
 function RepairPoller({
   projectId,
@@ -184,18 +185,51 @@ export default function ConsistencyPage() {
             Extrae el ADN visual de tu marca y garantiza coherencia en todo el catálogo.
           </p>
         </div>
-        <button
-          onClick={handleExtractDna}
-          disabled={extractDna.isPending}
-          className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-60"
-        >
-          {extractDna.isPending ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Fingerprint className="w-5 h-5" />
-          )}
-          {extractDna.isPending ? "Analizando..." : hasDna ? "Re-extraer DNA" : "Extraer DNA Visual"}
-        </button>
+        <div className="flex gap-3 items-center flex-wrap">
+          <SaveReportButton
+            projectId={projectId}
+            title="Consistencia Visual"
+            fileType="consistency"
+            category="visual_consistency"
+            compact
+            buildContent={() => {
+              const d = dna;
+              const s = scores;
+              return `
+<h2>Visual DNA de Marca</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Background</div><div class="value">${d?.backgroundStyle || "—"}</div></div>
+  <div class="metric-card"><div class="label">Iluminación</div><div class="value">${d?.lightingStyle || "—"}</div></div>
+  <div class="metric-card"><div class="label">Temperatura</div><div class="value">${d?.colorTemp || "—"}</div></div>
+  <div class="metric-card"><div class="label">Composición</div><div class="value">${d?.composition || "—"}</div></div>
+  <div class="metric-card"><div class="label">Mood</div><div class="value">${d?.mood || "—"}</div></div>
+  <div class="metric-card"><div class="label">Presencia Humana</div><div class="value">${d?.humanPresence || "—"}</div></div>
+</div>
+${d?.brandColors ? `<h3>Colores de Marca</h3><div style="display:flex;gap:8px;margin:12px 0">${d.brandColors.map(c => `<div style="width:40px;height:40px;border-radius:8px;background:${c};border:1px solid rgba(255,255,255,0.2)"></div>`).join("")}</div>` : ""}
+<h2>Score de Consistencia</h2>
+<div class="metric-grid">
+  <div class="metric-card"><div class="label">Score Global</div><div class="value">${s?.globalConsistencyScore ?? "—"}/100</div></div>
+  <div class="metric-card"><div class="label">Total Productos</div><div class="value">${s?.totalProducts || 0}</div></div>
+  <div class="metric-card"><div class="label">Consistentes</div><div class="value status-ok">${s?.consistent || 0}</div></div>
+  <div class="metric-card"><div class="label">Off-Brand</div><div class="value status-warn">${s?.offBrand || 0}</div></div>
+  <div class="metric-card"><div class="label">Inconsistentes</div><div class="value status-bad">${s?.inconsistent || 0}</div></div>
+</div>
+${s?.products?.length ? `<h2>Detalle por Producto</h2><table><tr><th>Producto</th><th>Score</th><th>Nivel</th><th>Issues</th></tr>${s.products.map(p => `<tr><td>${p.title}</td><td>${Math.round(p.score)}</td><td>${p.consistencyLevel}</td><td>${p.issues?.join(", ") || "—"}</td></tr>`).join("")}</table>` : ""}`;
+            }}
+          />
+          <button
+            onClick={handleExtractDna}
+            disabled={extractDna.isPending}
+            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-60"
+          >
+            {extractDna.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Fingerprint className="w-5 h-5" />
+            )}
+            {extractDna.isPending ? "Analizando..." : hasDna ? "Re-extraer DNA" : "Extraer DNA Visual"}
+          </button>
+        </div>
       </div>
 
       {/* DNA + Score */}
