@@ -15,6 +15,7 @@ export function VoiceButton() {
   const [showBubble, setShowBubble] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
+  const [actionResult, setActionResult] = useState("");
   const [supported, setSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [location, navigate] = useLocation();
@@ -54,6 +55,7 @@ export function VoiceButton() {
     setShowBubble(true);
     setTranscript("Escuchando...");
     setResponse("");
+    setActionResult("");
     recognitionRef.current?.start();
   };
 
@@ -67,17 +69,39 @@ export function VoiceButton() {
     else startListening();
   };
 
+  const executeAction = async (actionType: string, params: Record<string, unknown>): Promise<string> => {
+    try {
+      const res = await fetch(`${API_BASE}/api/shopybrain/execute-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: actionType, params }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error" }));
+        return `Error: ${err.error || res.statusText}`;
+      }
+      const data = await res.json();
+      return data.message || "Acción completada.";
+    } catch {
+      return "Error ejecutando la acción.";
+    }
+  };
+
   const processVoiceCommand = async (text: string) => {
     stopListening();
     setTranscript(`"${text}"`);
     setResponse("Procesando...");
+    setActionResult("");
+
+    const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
 
     try {
       const res = await fetch(`${API_BASE}/api/voice/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ transcript: text, currentPage: location }),
+        body: JSON.stringify({ transcript: text, currentPage: location, projectId: projectIdFromUrl }),
       });
       const data = await res.json();
       setResponse(data.response);
@@ -89,14 +113,30 @@ export function VoiceButton() {
         window.speechSynthesis.speak(utterance);
       }
 
+      const EXECUTABLE_ACTIONS = ["store_status", "list_products", "create_product", "edit_product", "change_price", "regenerate_token", "get_scopes", "delete_product", "search_product", "publish_product", "get_orders"];
+
       if (data.action?.type === "navigate" && data.action.params?.path) {
         navigate(data.action.params.path);
+      } else if (data.action?.type && data.confidence >= 0.6 && EXECUTABLE_ACTIONS.includes(data.action.type)) {
+        setActionResult("Ejecutando...");
+        const result = await executeAction(data.action.type, data.action.params || {});
+        setActionResult(result);
+
+        if ("speechSynthesis" in window) {
+          const shortResult = result.length > 120 ? result.slice(0, 120) + "..." : result;
+          const utterance2 = new SpeechSynthesisUtterance(shortResult);
+          utterance2.lang = "es-ES";
+          utterance2.rate = 1.0;
+          window.speechSynthesis.speak(utterance2);
+        }
       }
     } catch {
       setResponse("Error al procesar el comando. Inténtalo de nuevo.");
     }
 
-    setTimeout(() => setShowBubble(false), 5000);
+    setTimeout(() => {
+      if (!actionResult) setShowBubble(false);
+    }, 6000);
   };
 
   if (!supported) return null;
@@ -131,12 +171,12 @@ export function VoiceButton() {
           position: "fixed", bottom: 152, right: 24, zIndex: 901,
           background: "var(--ink2)", border: "1px solid var(--ink3)",
           borderRadius: 14, padding: "14px 18px",
-          maxWidth: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          maxWidth: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           animation: "fadeIn 0.2s ease",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 0.5 }}>
-              {listening ? "🔴 Escuchando" : "🎙 Voz"}
+              {listening ? "🔴 Escuchando" : "🎙 Voz ShopyBrain"}
             </span>
             <button
               onClick={() => setShowBubble(false)}
@@ -149,6 +189,15 @@ export function VoiceButton() {
           {response && (
             <p style={{ fontSize: 12, color: "var(--t3)", borderTop: "1px solid var(--ink3)", paddingTop: 8, marginTop: 6, lineHeight: 1.5 }}>
               {response}
+            </p>
+          )}
+          {actionResult && (
+            <p style={{
+              fontSize: 11, color: actionResult.startsWith("Error") ? "var(--crim)" : "var(--jade)",
+              borderTop: "1px solid var(--ink3)", paddingTop: 6, marginTop: 6, lineHeight: 1.4,
+              fontWeight: 600,
+            }}>
+              {actionResult}
             </p>
           )}
         </div>

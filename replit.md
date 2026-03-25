@@ -44,8 +44,11 @@ A three-model pipeline: Gemini → Claude → OmniCore, with integrations for im
 - **Replicate (Flux, Recraft)**: For generating product and lifestyle images.
 - **OmniCore**: The central "brain" for permanent memory, absorbing all AI outputs and analysis into `omnicore_memories` or `omnicore_absorbed_content`.
 
-### OmniCore Floating AI Chatbot
-A universal, multi-model chatbot accessible from all admin pages, capable of absorbing and analyzing various content types:
+### OmniCore Floating AI Chatbot (with Shopify Action Execution)
+A universal, multi-model chatbot accessible from all admin pages, capable of absorbing/analyzing content AND executing Shopify operations:
+- **Shopify Actions via Chat**: Create/edit/delete/publish products, change prices, regenerate tokens, list products/orders, view scopes — all through natural language commands. Claude detects action intents and returns `:::ACTION:::` blocks that the frontend auto-executes via `/api/shopybrain/execute-action`.
+- **Voice Commands**: VoiceButton uses SpeechRecognition → backend intent parsing → action execution → speech synthesis response.
+- **Command Center**: Dedicated page at `/admin/command-center` with buttons for all Shopify operations + free-text command input.
 - **Images/Videos**: Analyzed by Claude Opus Vision and Gemini for composition, style, brand, and eCommerce signals.
 - **URLs (Websites, Social Media)**: Fetched and analyzed by Gemini for content, brand identity, marketing strategy, and audience engagement.
 - **Text**: Analyzed by Gemini for themes and insights.

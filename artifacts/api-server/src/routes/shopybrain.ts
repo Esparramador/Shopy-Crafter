@@ -1,11 +1,15 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable } from "@workspace/db";
+import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
+import { shopifyRequest, refreshToken } from "../lib/shopify.js";
+import { safeDecrypt } from "../lib/crypto.js";
+import { learnFromOperation } from "../lib/claude.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -183,15 +187,53 @@ INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es inf
     const guideBlock = isGuideRequest ? `\n\n${APP_GUIDE_KNOWLEDGE}` : "";
     const pageBlock = pageContext ? `\n\nPÁGINA ACTUAL DEL USUARIO: ${pageContext}\nRuta: ${currentRoute}\nINSTRUCCIÓN: Si el usuario pregunta algo, ten en cuenta que está en esta página. Si pide ayuda, guíale con los botones y opciones EXACTOS de esta página. Sé muy específico con nombres de botones, ubicaciones y orden de pasos.` : "";
 
+    const actionDetectionBlock = `
+
+CAPACIDADES DE ACCIÓN DIRECTA — SHOPIFY:
+Cuando el usuario pida EJECUTAR una acción (crear producto, cambiar precio, ver productos, regenerar token, etc.), debes responder con un bloque JSON de acción AL FINAL de tu respuesta, después de tu texto explicativo.
+
+Formato del bloque de acción (pon esto al final de tu respuesta cuando detectes una acción):
+:::ACTION:::{"action":"nombre_accion","params":{...}}:::END_ACTION:::
+
+Acciones disponibles:
+- store_status: Ver estado de la tienda. Params: {projectId}
+- list_products: Listar productos. Params: {projectId, limit?}
+- create_product: Crear producto. Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?}
+- edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
+- change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
+- regenerate_token: Regenerar token Shopify. Params: {projectId}
+- get_scopes: Ver permisos/scopes. Params: {projectId}
+- delete_product: Eliminar producto. Params: {projectId, productId}
+- search_product: Buscar producto por nombre. Params: {projectId, query}
+- publish_product: Publicar producto (draft→active). Params: {projectId, productId}
+- get_orders: Ver pedidos recientes. Params: {projectId, limit?}
+
+REGLAS:
+- Si el usuario dice "crea un producto llamado X", EJECUTA la acción create_product
+- Si dice "muéstrame los productos", EJECUTA list_products
+- Si dice "regenera el token", EJECUTA regenerate_token
+- Si dice "cuántos productos tiene la tienda", EJECUTA store_status
+- Si dice "cambia el precio de X a Y", necesitas primero buscar el producto, o si dan el ID, usa change_price
+- Si dice "publica el producto X", usa publish_product
+- Si dice "borra el producto X", usa delete_product
+- Si dice "busca productos de X", usa search_product
+- Si dice "ver pedidos", usa get_orders
+- USA projectId del contexto si el usuario tiene un proyecto activo
+- Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
+- Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
+`;
+
     const sysPrompt = (customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
 Eres experto en Shopify, Klaviyo, email marketing, SEO, pricing y estrategia eCommerce.
 Tienes acceso al conocimiento acumulado de ShopyBrain — memorias de investigaciones anteriores sobre marcas, nichos y estrategias.
 Responde siempre en español, de forma directa, clara y accionable.
 Cuando el usuario pida ayuda o pregunte cómo hacer algo, actúa como GUÍA INTERACTIVA: da instrucciones paso a paso con los nombres EXACTOS de botones, páginas y secciones de la app.
 Si conoces la página actual del usuario, contextualiza tu respuesta a esa página.
-Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.`) + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext;
+Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.
+PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, etc., EJECUTA la acción correspondiente.`) + actionDetectionBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext;
 
-    const userContent = conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query;
+    const projectContext = req.body.activeProjectId ? `\n[CONTEXTO: El usuario tiene el proyecto activo con ID ${req.body.activeProjectId}. Úsalo como projectId en las acciones.]` : "";
+    const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
 
     const aiRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
@@ -201,11 +243,23 @@ Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu re
     });
 
     const answer = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+
+    let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
+    const actionMatch = answer.match(/:::ACTION:::([\s\S]*?):::END_ACTION:::/);
+    if (actionMatch) {
+      try {
+        detectedAction = JSON.parse(actionMatch[1]);
+      } catch { /* invalid JSON, ignore */ }
+    }
+
+    const cleanAnswer = answer.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
+
     res.json({
-      answer,
+      answer: cleanAnswer,
       source: "claude+omnicore",
       entityKnowledgeUsed: !!entityKnowledgeContext,
       potentialEntity: potentialEntity ?? null,
+      detectedAction,
     });
     return;
   }
@@ -545,5 +599,352 @@ export async function getShopyBrainContext(niche: string | null, useCase: string
     return "";
   }
 }
+
+router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
+  const { action, params } = req.body;
+  if (!action) { res.status(400).json({ error: "action requerida" }); return; }
+
+  try {
+    let result: Record<string, unknown> = {};
+
+    switch (action) {
+      case "store_status": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const shop = await shopifyRequest<{ shop: Record<string, unknown> }>(parseInt(projectId), project.shopDomain, "/shop.json");
+        const productsCount = await shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json");
+        const ordersCount = await shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/orders/count.json?status=any");
+
+        const tokenExpiry = project.tokenExpiresAt;
+        const tokenValid = tokenExpiry ? new Date(tokenExpiry) > new Date() : false;
+        const tokenHoursLeft = tokenExpiry ? Math.max(0, Math.round((new Date(tokenExpiry).getTime() - Date.now()) / 3600000 * 10) / 10) : 0;
+
+        result = {
+          storeName: shop.shop?.name ?? project.name,
+          domain: project.shopDomain,
+          plan: (shop.shop as Record<string, unknown>)?.plan_name,
+          currency: (shop.shop as Record<string, unknown>)?.currency,
+          productsCount: productsCount.count,
+          ordersCount: ordersCount.count,
+          tokenStatus: tokenValid ? "valid" : "expired",
+          tokenHoursLeft,
+          tokenExpiresAt: tokenExpiry,
+          message: `Tienda: ${shop.shop?.name ?? project.name} | ${productsCount.count} productos | ${ordersCount.count} pedidos | Token: ${tokenValid ? `válido (${tokenHoursLeft}h restantes)` : "EXPIRADO"}`,
+        };
+        break;
+      }
+
+      case "list_products": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const limit = Math.min(params?.limit ?? 10, 50);
+        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+          parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&fields=id,title,status,variants,images,tags`
+        );
+
+        result = {
+          products: data.products.map((p: Record<string, unknown>) => ({
+            id: p.id,
+            title: p.title,
+            status: p.status,
+            price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
+            imageCount: (p.images as unknown[])?.length ?? 0,
+            tags: p.tags,
+          })),
+          total: data.products.length,
+          message: `${data.products.length} productos encontrados`,
+        };
+        break;
+      }
+
+      case "create_product": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const title = params?.title;
+        if (!title) { res.status(400).json({ error: "title requerido" }); return; }
+
+        let finalTitle = title;
+        let finalBody = params?.bodyHtml ?? "";
+        let finalTags = params?.tags ?? "";
+
+        if (params?.aiGenerate !== false) {
+          try {
+            const aiRes = await anthropic.messages.create({
+              model: "claude-sonnet-4-5",
+              max_tokens: 1500,
+              system: "Eres un experto en copywriting eCommerce Shopify. Genera contenido que convierta. Responde SOLO JSON válido.",
+              messages: [{
+                role: "user",
+                content: `Genera contenido optimizado para un producto Shopify.
+Título: "${title}"
+Tipo: ${params?.productType || "no especificado"}
+Nicho: ${project.storeNiche || "general"}
+Tono: ${project.brandTone || "profesional"}
+
+Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","tags":["tag1","tag2"],"seoTitle":"...","seoDescription":"..."}`
+              }],
+            });
+            const text = (aiRes.content[0] as { type: string; text: string }).text;
+            const match = text.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              finalTitle = parsed.title || title;
+              finalBody = parsed.description || finalBody;
+              finalTags = Array.isArray(parsed.tags) ? parsed.tags.join(", ") : finalTags;
+            }
+          } catch { /* use original data */ }
+        }
+
+        const shopifyProduct = {
+          title: finalTitle,
+          body_html: finalBody,
+          tags: finalTags,
+          vendor: params?.vendor || undefined,
+          product_type: params?.productType || undefined,
+          status: params?.status || "draft",
+          variants: [{
+            title: "Default",
+            price: params?.price || "0.00",
+            compare_at_price: params?.compareAtPrice || null,
+            sku: params?.sku || null,
+            requires_shipping: true,
+            taxable: true,
+          }],
+        };
+
+        const created = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, "/products.json",
+          { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
+        );
+
+        result = {
+          productId: created.product.id,
+          title: created.product.title,
+          status: created.product.status,
+          handle: created.product.handle,
+          message: `Producto "${created.product.title}" creado exitosamente en Shopify (ID: ${created.product.id}, estado: ${created.product.status})`,
+        };
+        break;
+      }
+
+      case "edit_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { res.status(400).json({ error: "projectId y productId requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const updates: Record<string, unknown> = {};
+        if (params?.title) updates.title = params.title;
+        if (params?.bodyHtml) updates.body_html = params.bodyHtml;
+        if (params?.tags) updates.tags = params.tags;
+        if (params?.status) updates.status = params.status;
+        if (params?.vendor) updates.vendor = params.vendor;
+        if (params?.productType) updates.product_type = params.productType;
+
+        if (params?.price) {
+          updates.variants = [{ id: params.variantId, price: params.price }];
+        }
+
+        const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
+          { method: "PUT", body: JSON.stringify({ product: updates }) }
+        );
+
+        result = {
+          productId: updated.product.id,
+          title: updated.product.title,
+          message: `Producto "${updated.product.title}" actualizado en Shopify`,
+        };
+        break;
+      }
+
+      case "change_price": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const newPrice = params?.price;
+        if (!projectId || !productId || !newPrice) { res.status(400).json({ error: "projectId, productId y price requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const current = await shopifyRequest<{ product: { variants: Array<{ id: number; price: string }> } }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=id,title,variants`
+        );
+        const variantId = current.product.variants?.[0]?.id;
+        if (!variantId) { res.status(404).json({ error: "No se encontró variante" }); return; }
+
+        await shopifyRequest(
+          parseInt(projectId), project.shopDomain, `/variants/${variantId}.json`,
+          { method: "PUT", body: JSON.stringify({ variant: { id: variantId, price: String(newPrice), compare_at_price: params?.compareAtPrice || null } }) }
+        );
+
+        result = {
+          productId,
+          oldPrice: current.product.variants[0].price,
+          newPrice: String(newPrice),
+          message: `Precio actualizado: ${current.product.variants[0].price}€ → ${newPrice}€`,
+        };
+        break;
+      }
+
+      case "regenerate_token": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+        const newToken = await refreshToken(parseInt(projectId), project.shopDomain, project.clientId, plainSecret);
+        const [updated] = await db.select({ tokenExpiresAt: projectsTable.tokenExpiresAt }).from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+
+        result = {
+          success: true,
+          tokenValid: !!newToken,
+          expiresAt: updated?.tokenExpiresAt,
+          hoursRemaining: updated?.tokenExpiresAt ? Math.round((new Date(updated.tokenExpiresAt).getTime() - Date.now()) / 3600000 * 10) / 10 : 0,
+          message: `Token regenerado exitosamente. Válido por ${updated?.tokenExpiresAt ? Math.round((new Date(updated.tokenExpiresAt).getTime() - Date.now()) / 3600000) : 24} horas.`,
+        };
+        break;
+      }
+
+      case "get_scopes": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        try {
+          const scopesData = await shopifyRequest<{ access_scopes: Array<{ handle: string }> }>(
+            parseInt(projectId), project.shopDomain, "/../oauth/access_scopes.json"
+          );
+          const scopes = scopesData.access_scopes?.map(s => s.handle) ?? [];
+          result = {
+            scopes,
+            total: scopes.length,
+            hasWriteProducts: scopes.includes("write_products"),
+            hasWriteInventory: scopes.includes("write_inventory"),
+            hasWriteContent: scopes.includes("write_content"),
+            hasReadOrders: scopes.includes("read_orders"),
+            message: `${scopes.length} scopes activos: ${scopes.join(", ")}`,
+          };
+        } catch (e) {
+          result = {
+            scopes: ["read_products", "write_products", "read_orders", "read_customers", "read_analytics", "read_inventory", "write_inventory", "read_price_rules", "write_price_rules", "read_content", "write_content", "read_themes"],
+            total: 12,
+            message: "Scopes configurados en OAuth (no se pudo verificar en vivo): read/write_products, orders, customers, analytics, inventory, price_rules, content, themes",
+            note: "Error consultando scopes en vivo, mostrando scopes configurados",
+          };
+        }
+        break;
+      }
+
+      case "delete_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { res.status(400).json({ error: "projectId y productId requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        await shopifyRequest(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
+          { method: "DELETE" }
+        );
+
+        result = { productId, message: `Producto ${productId} eliminado de Shopify` };
+        break;
+      }
+
+      case "search_product": {
+        const projectId = params?.projectId;
+        const query = params?.query;
+        if (!projectId || !query) { res.status(400).json({ error: "projectId y query requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+          parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&fields=id,title,status,variants,images`
+        );
+
+        result = {
+          products: data.products.map((p: Record<string, unknown>) => ({
+            id: p.id, title: p.title, status: p.status,
+            price: (p.variants as Array<Record<string, string>>)?.[0]?.price,
+            imageCount: (p.images as unknown[])?.length ?? 0,
+          })),
+          total: data.products.length,
+          message: `${data.products.length} productos encontrados para "${query}"`,
+        };
+        break;
+      }
+
+      case "publish_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { res.status(400).json({ error: "projectId y productId requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
+          { method: "PUT", body: JSON.stringify({ product: { id: productId, status: "active" } }) }
+        );
+
+        result = { productId, title: updated.product.title, status: "active", message: `Producto "${updated.product.title}" publicado (active)` };
+        break;
+      }
+
+      case "get_orders": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const limit = Math.min(params?.limit ?? 10, 50);
+        const data = await shopifyRequest<{ orders: Array<Record<string, unknown>> }>(
+          parseInt(projectId), project.shopDomain, `/orders.json?limit=${limit}&status=any&fields=id,name,total_price,financial_status,fulfillment_status,created_at,customer`
+        );
+
+        result = {
+          orders: data.orders.map((o: Record<string, unknown>) => ({
+            id: o.id, name: o.name, total: o.total_price,
+            financial: o.financial_status, fulfillment: o.fulfillment_status,
+            date: o.created_at,
+            customer: (o.customer as Record<string, string>)?.first_name ? `${(o.customer as Record<string, string>).first_name} ${(o.customer as Record<string, string>).last_name}` : "Anónimo",
+          })),
+          total: data.orders.length,
+          message: `${data.orders.length} pedidos recientes`,
+        };
+        break;
+      }
+
+      default:
+        res.status(400).json({ error: `Acción desconocida: ${action}` });
+        return;
+    }
+
+    learnFromOperation({
+      operationType: `chatbot_action_${action}`,
+      title: `Chatbot ejecutó: ${action}`,
+      content: `Acción: ${action}. Params: ${JSON.stringify(params).slice(0, 300)}. Resultado: ${(result as Record<string, unknown>).message ?? "OK"}`,
+      confidence: 0.8,
+      tags: ["chatbot", "action", action],
+    });
+
+    res.json({ success: true, action, ...result });
+  } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    logger.error({ action, params, error: errMsg }, "Chatbot action failed");
+    res.status(500).json({ error: `Error ejecutando ${action}: ${errMsg}` });
+  }
+});
 
 export default router;

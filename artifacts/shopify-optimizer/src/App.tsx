@@ -26,6 +26,7 @@ import ShopyBrainMemories from "@/pages/admin/ShopyBrainMemories";
 import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
 import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
 import MyPricing from "@/pages/admin/MyPricing";
+import CommandCenter from "@/pages/admin/CommandCenter";
 import Emails from "@/pages/admin/Emails";
 import EmailTemplates from "@/pages/admin/EmailTemplates";
 import ProjectVault from "@/pages/admin/ProjectVault";
@@ -229,6 +230,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><Roadmap /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/command-center">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><CommandCenter /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

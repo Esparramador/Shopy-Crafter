@@ -27,7 +27,7 @@ interface Message {
 }
 
 interface ChatAction {
-  type: "klaviyo-workflow" | "absorb-result" | "entity-research";
+  type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action";
   label: string;
   data: unknown;
 }
@@ -554,10 +554,14 @@ function AttachmentPreview({ file, url, onRemove }: {
 // ─── QUICK ACTIONS ─────────────────────────────────────────────────────────────
 const QUICK_ACTIONS = [
   { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
-  { icon: "🔬", label: "Investigar marca completa", prompt: "__RESEARCH__", isResearch: true },
+  { icon: "🏪", label: "Estado de la tienda", prompt: "Muéstrame el estado de la tienda: productos, pedidos y estado del token." },
+  { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda Shopify." },
+  { icon: "➕", label: "Crear producto", prompt: "Crea un producto nuevo en Shopify con IA. Título: " },
+  { icon: "🔑", label: "Regenerar token", prompt: "Regenera el token de acceso de Shopify ahora." },
+  { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
+  { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
   { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
   { icon: "🧠", label: "Estado del Brain", prompt: "¿Qué conocimiento ha absorbido el ShopyBrain? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
-  { icon: "📘", label: "Cómo configurar Klaviyo", prompt: "Explícame paso a paso cómo configurar Klaviyo desde cero para enviar emails automatizados desde esta app." },
 ];
 
 const SYSTEM_PROMPT = `Eres OmniCore AI — la inteligencia central de ShopyBrain para agencias Shopify.
@@ -577,19 +581,20 @@ export default function OmniChatbot() {
     id: "welcome", role: "assistant", timestamp: new Date(), model: "omnicore",
     content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy **OmniCore AI** — el cerebro central ShopyBrain.
 
-Puedo absorber y analizar **cualquier cosa**:
-· 📸 Fotos/imágenes — composición, texturas, topología, química, colores
-· 🎬 Vídeos — técnica, estilo, señales de conversión
-· 🌐 URLs — cualquier web, tienda, artículo
-· 📱 Instagram, Facebook, X, YouTube — inteligencia de marca y contenido
+🚀 **Ahora puedo EJECUTAR acciones en Shopify directamente:**
+· ➕ "Crea un producto llamado X" — lo creo en tu tienda
+· 📦 "Lista mis productos" — te los muestro todos
+· 💰 "Cambia el precio de X a Y" — actualizo en Shopify
+· 🔑 "Regenera el token" — renuevo acceso automáticamente
+· 🛒 "Ver pedidos" — últimos pedidos de la tienda
+· 🗑️ "Elimina el producto X" — lo borro de Shopify
+· 🔐 "Ver scopes" — permisos activos de la app
 
-**Soy tu guía de la app** — pregúntame:
-· ❓ "¿Qué puedo hacer aquí?" — te explico la página actual
-· 📘 "¿Cómo creo un email en Klaviyo?" — paso a paso exacto
-· 🛠️ "¿Cómo configuro X?" — cualquier función de la app
+**También absorbo y analizo:**
+· 📸 Imágenes · 🎬 Vídeos · 🌐 URLs · 📱 Redes sociales
 
-Usa el 📎 **botón de adjuntar** para subir archivos o pegar URLs.
-Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
+**Soy tu guía** — pregúntame cualquier cosa sobre la app.
+Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -625,6 +630,66 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
 
   const handleUrlAdd = () => {
     if (urlInput.trim()) { setAttachUrl(urlInput.trim()); setAttachFile(null); setUrlInput(""); }
+  };
+
+  // ─── Execute Shopify action via backend ────────────────────────────────────
+  const executeShopifyAction = async (action: string, params: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
+    try {
+      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, params }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Error desconocido" }));
+        return { error: true, message: `Error: ${errData.error || res.statusText}` };
+      }
+      return res.json();
+    } catch (e) {
+      return { error: true, message: `Error de conexión: ${e instanceof Error ? e.message : "desconocido"}` };
+    }
+  };
+
+  const formatActionResult = (action: string, result: Record<string, unknown>): string => {
+    if (result.error) return `❌ ${result.message}`;
+
+    switch (action) {
+      case "store_status":
+        return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos | 🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
+      case "list_products": {
+        const prods = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
+        if (!prods.length) return "📦 No se encontraron productos.";
+        return `📦 **${result.total} productos:**\n${prods.map((p, i) => `${i + 1}. **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
+      }
+      case "create_product":
+        return `✅ **Producto creado en Shopify:**\n🆔 ID: ${result.productId}\n📝 "${result.title}"\n📊 Estado: ${result.status}`;
+      case "edit_product":
+        return `✅ **Producto actualizado:** "${result.title}"`;
+      case "change_price":
+        return `✅ **Precio actualizado:** ${result.oldPrice}€ → ${result.newPrice}€`;
+      case "regenerate_token":
+        return `✅ **Token regenerado exitosamente.** Válido por ${result.hoursRemaining}h.`;
+      case "get_scopes": {
+        const scopes = (result.scopes as string[]) ?? [];
+        return `🔐 **${result.total} scopes activos:**\n${scopes.map(s => `· ${s}`).join("\n")}`;
+      }
+      case "delete_product":
+        return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
+      case "search_product": {
+        const prods = (result.products as Array<{ title: string; id: number; price: string }>) ?? [];
+        if (!prods.length) return "🔍 No se encontraron productos.";
+        return `🔍 **${result.total} resultados:**\n${prods.map((p, i) => `${i + 1}. **${p.title}** (ID: ${p.id}) — ${p.price}€`).join("\n")}`;
+      }
+      case "publish_product":
+        return `✅ Producto "${result.title}" publicado (active).`;
+      case "get_orders": {
+        const orders = (result.orders as Array<{ name: string; total: string; customer: string; financial: string }>) ?? [];
+        if (!orders.length) return "🛒 No hay pedidos.";
+        return `🛒 **${result.total} pedidos:**\n${orders.map((o, i) => `${i + 1}. ${o.name} — ${o.total}€ (${o.financial}) — ${o.customer}`).join("\n")}`;
+      }
+      default:
+        return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
+    }
   };
 
   // ─── Absorb image/video file ───────────────────────────────────────────────
@@ -841,17 +906,26 @@ Todo queda absorbido en el **ShopyBrain** para potenciar futuras creaciones.`,
         assistantContent += `\n_Explora las pestañas del panel para ver social, productos, competidores y más._`;
         action = { type: "entity-research", label: "Ver perfil completo", data: researchResult };
 
-      // ── CASE 4: Regular chat ──
+      // ── CASE 4: Regular chat (with Shopify action detection) ──
       } else {
         const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "OmniCore"}: ${m.content}`).join("\n\n");
+        const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
         const res = await fetch(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl }),
         });
         if (res.ok) {
           const d = await res.json();
           assistantContent = d.answer ?? d.result ?? "No pude procesar la respuesta.";
+
+          if (d.detectedAction) {
+            const actionResult = await executeShopifyAction(d.detectedAction.action, d.detectedAction.params);
+            if (actionResult) {
+              assistantContent += "\n\n" + formatActionResult(d.detectedAction.action, actionResult);
+              action = { type: "shopify-action", label: "Ver resultado", data: actionResult };
+            }
+          }
         } else {
           assistantContent = "Error de conexión con el servidor. Intenta de nuevo.";
         }

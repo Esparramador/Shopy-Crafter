@@ -17,37 +17,42 @@ router.post("/voice/command", async (req, res): Promise<void> => {
   }
 
   let storeName = "tu tienda";
+  let activeProjectId: number | null = null;
   if (projectId) {
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+    activeProjectId = parseInt(projectId);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, activeProjectId));
     if (project) storeName = project.name;
   }
 
-  const systemPrompt = `You are a voice assistant for ShopifyAI Pro, a Shopify optimization platform. The user manages store: ${storeName}. Current page: ${currentPage || "/admin"}.
+  const systemPrompt = `Eres el asistente de voz de Shopy Crafter (ShopyBrain). La tienda activa es: ${storeName}. Página actual: ${currentPage || "/admin"}.${activeProjectId ? ` ProjectId: ${activeProjectId}` : ""}
 
-Interpret this voice command in natural Spanish and return:
-1. A natural Spanish spoken response (max 2 sentences, no markdown, conversational tone)
-2. An action to execute (if applicable)
+Interpreta este comando de voz en español y devuelve:
+1. Una respuesta hablada natural en español (max 2 frases, sin markdown, tono conversacional)
+2. Una acción a ejecutar (si aplica)
 
-Available actions:
-- get_revenue: { period: 'today|week|month' }
-- get_top_products: { limit: N }
-- run_audit: { projectId }
-- run_boost: { projectId }
-- generate_images: { productId, types: [] }
-- change_price: { productId, newPrice }
-- get_ab_status: {}
-- get_inventory_alerts: {}
-- navigate: { path: '/admin/products' }
-- search_product: { query: 'string' }
+Acciones disponibles:
+- store_status: Ver estado de la tienda. Params: {projectId}
+- list_products: Listar productos. Params: {projectId, limit?}
+- create_product: Crear producto en Shopify. Params: {projectId, title, price?, productType?, aiGenerate?}
+- edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?}
+- change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
+- regenerate_token: Regenerar token de Shopify. Params: {projectId}
+- get_scopes: Ver permisos OAuth. Params: {projectId}
+- search_product: Buscar producto. Params: {projectId, query}
+- publish_product: Publicar producto. Params: {projectId, productId}
+- delete_product: Eliminar producto. Params: {projectId, productId}
+- get_orders: Ver pedidos. Params: {projectId, limit?}
+- navigate: Navegar a página. Params: {path}
+- navigate: Ir a /projects/{projectId}/audit para ejecutar auditoría
 
-Return JSON ONLY:
+Devuelve SOLO JSON válido:
 {
   "response": "Respuesta hablada natural en español",
-  "action": null,
+  "action": {"type": "nombre_accion", "params": {...}} o null,
   "confidence": 0.85
 }
 
-If confidence < 0.6, response should ask for clarification. Never make up data — if you don't have it, say so.`;
+Si confidence < 0.6, pide aclaración. Nunca inventes datos.`;
 
   try {
     const message = await anthropic.messages.create({

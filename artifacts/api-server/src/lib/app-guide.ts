@@ -266,6 +266,7 @@ export const PAGE_CONTEXT: Record<string, string> = {
   "/admin/system": "SISTEMA — Configuración del sistema, estado del servidor, logs y diagnósticos.",
   "/admin/settings": "CONFIGURACIÓN ADMIN — Ajustes generales de la plataforma, preferencias de administrador.",
   "/admin/gemini-intel": "GEMINI INTELLIGENCE — Motor de investigación con Gemini. Análisis de mercado e investigación profunda.",
+  "/admin/command-center": "CENTRO DE COMANDO — Ejecuta acciones directas en Shopify: ver estado de tienda, listar/crear/buscar/eliminar productos, cambiar precios, regenerar tokens OAuth, ver pedidos, ver scopes. También acepta comandos de texto libre que ShopyBrain interpreta y ejecuta automáticamente.",
   "/admin/apk": "APK — Descarga de la aplicación Android. Información y link de descarga de la app móvil.",
   "/new-project": "NUEVO PROYECTO — Formulario para crear un nuevo proyecto/tienda. Campos: nombre, dominio Shopify, Client ID, Client Secret.",
   "/audit": "AUDITORÍA — Análisis completo de calidad de productos. Grados A-F para cada producto. 'Auditar todo' para análisis masivo.",
