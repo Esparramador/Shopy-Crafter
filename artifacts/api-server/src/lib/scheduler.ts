@@ -701,14 +701,14 @@ export function registerCronJobs() {
   cron.schedule("0 0 * * 0", () => { runOmniCoreMegaSynthesis().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
   // ── TOKENS SHOPIFY ────────────────────────────────────────────────────────
-  // Cada hora — Renovar tokens Shopify próximos a caducar (o ya caducados)
-  cron.schedule("5 * * * *", () => { runTokenRefresh().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+  // Cada 20h — Renovar tokens Shopify (duran 24h, renovamos con 4h de margen)
+  cron.schedule("5 */20 * * *", () => { runTokenRefresh().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
   // También ejecutar al arrancar para renovar tokens caducados tras reinicio
   setTimeout(() => { runTokenRefresh().catch(e => logger.error(e)); }, 10_000);
 
   log("scheduler", [
     "✅ 10 jobs registrados:",
-    "  🔑 Tokens Shopify    → cada 1h  (renovación automática)",
+    "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
     "  🔗 Cross-synthesis   → cada 12h (conexiones cruzadas)",
