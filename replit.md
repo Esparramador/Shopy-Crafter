@@ -168,6 +168,19 @@ Users can drag/drop or attach a product photo in the OmniChatbot and say "créam
 - Endpoint: `POST /api/shopybrain/create-product-from-image`
 - Files: `absorber.ts` (endpoint), `OmniChatbot.tsx` (intent detection + UI)
 
+### Supplier Research System
+Real-time supplier intelligence integrated into the chatbot and action execution system:
+- **Endpoint**: `POST /api/shopybrain/supplier-research` — 3 parallel Gemini+Search queries:
+  1. Supplier search (Alibaba, AliExpress, DHgate, Made-in-China, European suppliers)
+  2. Production/logistics costs (manufacturing, packaging, shipping, customs, warehousing)
+  3. Deals/promotions (volume discounts, free samples, trade fairs)
+- **Claude synthesis**: Analyzes all data to produce top recommendation, cost breakdown, strategy, risks, next steps
+- **Report download**: `POST /api/shopybrain/supplier-report` — generates professional HTML report with gold/black branding, print-ready CSS
+- **Chat integration**: Say "busca proveedores de X" in the OmniChatbot → automatic execution + download button for report
+- **Action**: `search_suppliers` in execute-action endpoint with params: productName, productCategory, materials, targetMarket, qualityTier, budget, country
+- All results saved permanently in ShopyBrain memory (type: `supplier_intelligence`)
+- Files: `absorber.ts` (endpoints), `shopybrain.ts` (action), `OmniChatbot.tsx` (UI + download)
+
 ### Shopify Pagination
 Utilizes cursor-based pagination (`page_info` from `Link` header) for all Shopify product listings.
 

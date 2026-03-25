@@ -770,6 +770,455 @@ Genera JSON con:
   }
 );
 
+// ─── POST /api/shopybrain/supplier-research ─────────────────────────────────────
+router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { productName, productCategory, materials, targetMarket, qualityTier, budget, country } = req.body as {
+    productName: string; productCategory?: string; materials?: string[];
+    targetMarket?: string; qualityTier?: string; budget?: string; country?: string;
+  };
+
+  if (!productName) { res.status(400).json({ error: "productName requerido" }); return; }
+
+  try {
+    logger.info({ productName, productCategory }, "Starting supplier research");
+
+    const materialsStr = materials?.join(", ") || "no especificado";
+    const region = country || "España/Europa";
+
+    const supplierSearches = await Promise.all([
+      askGeminiWithSearch(
+        `Busca proveedores REALES y ACTUALES de "${productName}" (categoría: ${productCategory || "general"}, materiales: ${materialsStr}).
+
+BUSCA EN:
+- Alibaba.com, AliExpress, DHgate, Made-in-China.com
+- Proveedores europeos y españoles
+- Fabricantes directos
+- Distribuidores mayoristas
+
+Para CADA proveedor encontrado, extrae:
+1. Nombre de la empresa/tienda
+2. País/ubicación
+3. Precio unitario o rango de precios
+4. Cantidad mínima de pedido (MOQ)
+5. Tiempo de envío estimado
+6. Puntuación/valoración si existe
+7. URL del proveedor
+8. Capacidad de personalización
+9. Certificaciones (CE, ISO, etc.)
+
+Busca al menos 8-15 proveedores REALES con datos REALES.
+
+Responde en JSON:
+{
+  "suppliers": [
+    {
+      "name": "nombre empresa",
+      "country": "país",
+      "platform": "alibaba/aliexpress/directo/etc",
+      "priceRange": "€X-€Y por unidad",
+      "priceMin": 0.00,
+      "priceMax": 0.00,
+      "moq": "cantidad mínima",
+      "shippingTime": "X-Y días",
+      "rating": 4.5,
+      "url": "https://...",
+      "customization": "sí/no/parcial",
+      "certifications": ["CE", "ISO"],
+      "specialties": ["descripción de especialidad"],
+      "paymentTerms": "métodos de pago aceptados"
+    }
+  ]
+}`,
+        "Eres un agente de sourcing profesional. SIEMPRE busca datos REALES de proveedores actuales. Usa Google Search para encontrar proveedores verificados. NUNCA inventes empresas o precios."
+      ),
+
+      askGeminiWithSearch(
+        `Investiga los costes REALES de fabricación, distribución y empaquetado para "${productName}" (${productCategory || "producto genérico"}).
+
+INVESTIGA:
+1. COSTE DE PRODUCCIÓN: Coste unitario de fabricación en diferentes países (China, España, Portugal, Turquía, India)
+2. EMBALAJE: Tipos de packaging disponibles y sus costes (básico, premium, eco-friendly, personalizado)
+3. ENVÍO: Costes de envío internacional por unidad/kg/contenedor desde principales orígenes
+4. ARANCELES: Tasas aduaneras e impuestos de importación a ${region}
+5. CERTIFICACIONES: Qué certificaciones necesita este producto en ${region} y su coste
+6. SEGUROS: Coste de seguro de transporte
+7. ALMACENAMIENTO: Costes de almacén/fulfillment por unidad
+8. MARGEN RECOMENDADO: Markup típico en la industria
+
+Responde en JSON:
+{
+  "productionCosts": {
+    "china": {"unitCost": "€X-€Y", "details": "..."},
+    "europe": {"unitCost": "€X-€Y", "details": "..."},
+    "other": [{"country": "...", "unitCost": "€X-€Y"}]
+  },
+  "packaging": [
+    {"type": "básico", "costPerUnit": "€X", "description": "..."},
+    {"type": "premium", "costPerUnit": "€X", "description": "..."},
+    {"type": "eco-friendly", "costPerUnit": "€X", "description": "..."}
+  ],
+  "shipping": {
+    "airFreight": {"costPerKg": "€X", "timedays": "X-Y"},
+    "seaFreight": {"costPerKg": "€X", "timedays": "X-Y"},
+    "express": {"costPerKg": "€X", "timedays": "X-Y"},
+    "dropshipping": {"costPerUnit": "€X", "timedays": "X-Y"}
+  },
+  "customs": {"dutyRate": "X%", "vatRate": "21%", "otherFees": "..."},
+  "certifications": [{"name": "CE", "cost": "€X", "timeToGet": "X semanas"}],
+  "warehousing": {"costPerUnit": "€X/mes", "fulfillmentFee": "€X/pedido"},
+  "recommendedMarkup": "X-Y%",
+  "totalLandedCostEstimate": "€X-€Y por unidad puesto en ${region}"
+}`,
+        "Eres un experto en logística internacional y sourcing de productos. Busca datos REALES de costes actualizados. Usa Google Search. NUNCA inventes cifras."
+      ),
+
+      askGeminiWithSearch(
+        `Busca las MEJORES OFERTAS y PROMOCIONES ACTUALES de proveedores para "${productName}".
+
+BUSCA:
+1. Descuentos por volumen activos en Alibaba/AliExpress
+2. Promociones de temporada vigentes
+3. Proveedores con muestras gratis
+4. Ofertas de envío gratuito
+5. Programas de fidelización de proveedores
+6. Ferias comerciales próximas relevantes (Canton Fair, etc.)
+7. Directorios de proveedores verificados
+8. Comparativas de precios entre plataformas
+
+Responde en JSON:
+{
+  "deals": [
+    {"supplier": "nombre", "deal": "descripción oferta", "discount": "X%", "validUntil": "fecha", "url": "..."}
+  ],
+  "tradeFairs": [
+    {"name": "...", "date": "...", "location": "...", "relevance": "..."}
+  ],
+  "freeSamples": [
+    {"supplier": "nombre", "conditions": "...", "url": "..."}
+  ],
+  "volumeDiscounts": [
+    {"supplier": "nombre", "tiers": [{"qty": 100, "discount": "10%"}, {"qty": 500, "discount": "20%"}]}
+  ],
+  "recommendations": "resumen de mejores oportunidades actuales"
+}`,
+        "Eres un cazador de ofertas B2B profesional. Busca promociones REALES y ACTUALES de proveedores. Usa Google Search. NUNCA inventes ofertas."
+      ),
+    ]);
+
+    let suppliersData: Record<string, unknown> = {};
+    let costsData: Record<string, unknown> = {};
+    let dealsData: Record<string, unknown> = {};
+
+    try {
+      const m1 = supplierSearches[0].text.match(/\{[\s\S]*\}/);
+      if (m1) suppliersData = JSON.parse(m1[0]);
+    } catch { logger.warn("Could not parse suppliers JSON"); }
+
+    try {
+      const m2 = supplierSearches[1].text.match(/\{[\s\S]*\}/);
+      if (m2) costsData = JSON.parse(m2[0]);
+    } catch { logger.warn("Could not parse costs JSON"); }
+
+    try {
+      const m3 = supplierSearches[2].text.match(/\{[\s\S]*\}/);
+      if (m3) dealsData = JSON.parse(m3[0]);
+    } catch { logger.warn("Could not parse deals JSON"); }
+
+    const allSources = [
+      ...supplierSearches[0].sources,
+      ...supplierSearches[1].sources,
+      ...supplierSearches[2].sources,
+    ];
+
+    const anthropic = await getClaudeClient(0);
+    const synthesisRes = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 2000,
+      system: "Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.",
+      messages: [{
+        role: "user",
+        content: `Analiza estos datos de proveedores para "${productName}" y genera una recomendación estratégica.
+
+PROVEEDORES ENCONTRADOS: ${JSON.stringify(suppliersData)}
+COSTES DE PRODUCCIÓN/LOGÍSTICA: ${JSON.stringify(costsData)}
+OFERTAS/PROMOCIONES: ${JSON.stringify(dealsData)}
+PRESUPUESTO DEL CLIENTE: ${budget || "no especificado"}
+MERCADO OBJETIVO: ${targetMarket || "España"}
+CALIDAD BUSCADA: ${qualityTier || "mid-range"}
+
+Genera JSON:
+{
+  "topRecommendation": {
+    "supplier": "nombre del mejor proveedor",
+    "reason": "por qué es la mejor opción",
+    "estimatedCostPerUnit": 0.00,
+    "estimatedProfitMargin": "X%",
+    "riskLevel": "bajo/medio/alto"
+  },
+  "top3Suppliers": [
+    {"name": "...", "pros": ["..."], "cons": ["..."], "bestFor": "..."}
+  ],
+  "costBreakdown": {
+    "production": 0.00,
+    "packaging": 0.00,
+    "shipping": 0.00,
+    "customs": 0.00,
+    "total": 0.00,
+    "recommendedRetailPrice": 0.00,
+    "estimatedMargin": "X%"
+  },
+  "strategy": "estrategia recomendada de sourcing",
+  "risks": ["riesgo1", "riesgo2"],
+  "nextSteps": ["paso1", "paso2", "paso3"]
+}`,
+      }],
+    });
+
+    let synthesis: Record<string, unknown> = {};
+    try {
+      const synthText = (synthesisRes.content[0] as { type: string; text: string }).text;
+      const synthMatch = synthText.match(/\{[\s\S]*\}/);
+      if (synthMatch) synthesis = JSON.parse(synthMatch[0]);
+    } catch { logger.warn("Could not parse synthesis JSON"); }
+
+    const memoryContent = [
+      `SUPPLIER RESEARCH: ${productName}`,
+      `Category: ${productCategory || "general"}`,
+      `Materials: ${materialsStr}`,
+      `Quality: ${qualityTier || "mid-range"}`,
+      `Region: ${region}`,
+      `Suppliers Found: ${(suppliersData as { suppliers?: unknown[] }).suppliers?.length || 0}`,
+      `Top Recommendation: ${JSON.stringify((synthesis as Record<string, unknown>).topRecommendation || {})}`,
+      `Cost Breakdown: ${JSON.stringify((synthesis as Record<string, unknown>).costBreakdown || {})}`,
+      `Strategy: ${(synthesis as Record<string, unknown>).strategy || "N/A"}`,
+      `Sources Analyzed: ${allSources.length}`,
+      `Full Suppliers: ${JSON.stringify(suppliersData).slice(0, 3000)}`,
+      `Costs: ${JSON.stringify(costsData).slice(0, 2000)}`,
+      `Deals: ${JSON.stringify(dealsData).slice(0, 1500)}`,
+    ].join("\n\n");
+
+    const memoryId = await saveToShopyBrain({
+      title: `[SUPPLIERS] ${productName}`,
+      content: memoryContent.slice(0, 10000),
+      memoryType: "supplier_intelligence",
+      sourceType: "supplier_research",
+      confidence: 0.85,
+      tags: ["suppliers", "sourcing", "pricing", "logistics", productCategory || "general"],
+    });
+
+    res.json({
+      success: true,
+      productName,
+      suppliers: suppliersData,
+      costs: costsData,
+      deals: dealsData,
+      synthesis,
+      sourcesAnalyzed: allSources.length,
+      memoryId,
+    });
+  } catch (err) {
+    logger.error(err, "Supplier research failed");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/shopybrain/supplier-report ──────────────────────────────────────
+router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { productName, suppliers, costs, deals, synthesis, sourcesAnalyzed } = req.body;
+
+  if (!productName) { res.status(400).json({ error: "productName requerido" }); return; }
+
+  try {
+    const suppliersList = (suppliers?.suppliers || []) as Array<{
+      name: string; country: string; platform: string; priceRange: string;
+      moq: string; shippingTime: string; rating: number; url: string;
+      customization: string; certifications: string[]; specialties: string[];
+    }>;
+    const costData = costs || {};
+    const dealsInfo = deals || {};
+    const synth = synthesis || {};
+
+    const suppliersRows = suppliersList.map((s, i) => `
+      <tr style="border-bottom:1px solid #1a1a2e;">
+        <td style="padding:12px;color:#c8a84b;font-weight:600;">${i + 1}. ${s.name}</td>
+        <td style="padding:12px;">${s.country || "N/A"}</td>
+        <td style="padding:12px;">${s.platform || "N/A"}</td>
+        <td style="padding:12px;color:#2dd49f;font-weight:600;">${s.priceRange || "N/A"}</td>
+        <td style="padding:12px;">${s.moq || "N/A"}</td>
+        <td style="padding:12px;">${s.shippingTime || "N/A"}</td>
+        <td style="padding:12px;">${s.rating ? "⭐".repeat(Math.min(5, Math.round(s.rating))) + ` (${s.rating})` : "N/A"}</td>
+        <td style="padding:12px;">${s.customization || "N/A"}</td>
+        <td style="padding:12px;">${(s.certifications || []).join(", ") || "N/A"}</td>
+        <td style="padding:12px;">${s.url ? `<a href="${s.url}" style="color:#c8a84b;">Ver</a>` : "N/A"}</td>
+      </tr>`).join("");
+
+    const packagingRows = ((costData as Record<string, unknown>).packaging as Array<{ type: string; costPerUnit: string; description: string }> || []).map(p => `
+      <tr style="border-bottom:1px solid #1a1a2e;">
+        <td style="padding:10px;color:#c8a84b;">${p.type}</td>
+        <td style="padding:10px;color:#2dd49f;">${p.costPerUnit}</td>
+        <td style="padding:10px;">${p.description || ""}</td>
+      </tr>`).join("");
+
+    const top3 = ((synth as Record<string, unknown>).top3Suppliers as Array<{ name: string; pros: string[]; cons: string[]; bestFor: string }> || []).map(s => `
+      <div style="background:#0d0d1a;border:1px solid rgba(200,168,75,0.2);border-radius:12px;padding:20px;margin-bottom:16px;">
+        <h4 style="color:#c8a84b;margin:0 0 10px;">${s.name}</h4>
+        <p style="color:#2dd49f;margin:4px 0;">✅ Ventajas: ${(s.pros || []).join(" · ")}</p>
+        <p style="color:#e84558;margin:4px 0;">⚠️ Desventajas: ${(s.cons || []).join(" · ")}</p>
+        <p style="color:#aaa;margin:4px 0;">🎯 Mejor para: ${s.bestFor || "N/A"}</p>
+      </div>`).join("");
+
+    const costBreakdown = (synth as Record<string, unknown>).costBreakdown as Record<string, unknown> || {};
+    const topRec = (synth as Record<string, unknown>).topRecommendation as Record<string, unknown> || {};
+    const risks = ((synth as Record<string, unknown>).risks as string[] || []).map(r => `<li style="margin:4px 0;">${r}</li>`).join("");
+    const nextSteps = ((synth as Record<string, unknown>).nextSteps as string[] || []).map(s => `<li style="margin:6px 0;color:#2dd49f;">${s}</li>`).join("");
+
+    const shippingData = (costData as Record<string, unknown>).shipping as Record<string, Record<string, string>> || {};
+
+    const now = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe de Proveedores — ${productName} | ShopyBrain</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:#080810; color:#e0e0e0; line-height:1.6; }
+    .container { max-width:1200px; margin:0 auto; padding:40px 24px; }
+    h1 { font-size:28px; color:#c8a84b; border-bottom:2px solid #c8a84b; padding-bottom:12px; margin-bottom:24px; }
+    h2 { font-size:22px; color:#c8a84b; margin:32px 0 16px; padding:8px 0; border-left:4px solid #c8a84b; padding-left:16px; }
+    h3 { font-size:18px; color:#e6c668; margin:20px 0 12px; }
+    .header { text-align:center; padding:40px 0; border-bottom:2px solid rgba(200,168,75,0.3); margin-bottom:32px; }
+    .header h1 { border:none; font-size:36px; margin-bottom:8px; }
+    .header .subtitle { color:#aaa; font-size:16px; }
+    .badge { display:inline-block; background:rgba(200,168,75,0.15); color:#c8a84b; border:1px solid rgba(200,168,75,0.3); padding:4px 12px; border-radius:20px; font-size:13px; margin:4px; }
+    .card { background:#0d0d1a; border:1px solid rgba(200,168,75,0.15); border-radius:12px; padding:24px; margin-bottom:20px; }
+    .highlight { background:linear-gradient(135deg,rgba(200,168,75,0.1),rgba(45,212,159,0.05)); border:1px solid rgba(200,168,75,0.3); border-radius:12px; padding:24px; margin:20px 0; }
+    table { width:100%; border-collapse:collapse; margin:16px 0; }
+    th { background:#0d0d1a; color:#c8a84b; padding:12px; text-align:left; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid #c8a84b; }
+    td { padding:12px; font-size:14px; vertical-align:top; }
+    tr:nth-child(even) { background:rgba(200,168,75,0.03); }
+    .metric { display:inline-block; text-align:center; padding:16px 24px; margin:8px; background:#0d0d1a; border:1px solid rgba(200,168,75,0.2); border-radius:12px; min-width:140px; }
+    .metric .value { font-size:24px; color:#2dd49f; font-weight:700; }
+    .metric .label { font-size:12px; color:#999; text-transform:uppercase; margin-top:4px; }
+    .footer { text-align:center; padding:32px 0; margin-top:40px; border-top:1px solid rgba(200,168,75,0.2); color:#666; font-size:13px; }
+    a { color:#c8a84b; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    @media print { body { background:white; color:black; } h1,h2,h3,.badge { color:#333; } .card,.highlight { border-color:#ddd; background:#f9f9f9; } th { background:#eee; color:#333; } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔍 Informe de Proveedores</h1>
+    <div style="font-size:24px;color:#e6c668;margin:8px 0;">${productName}</div>
+    <div class="subtitle">Generado por ShopyBrain Intelligence Engine — ${now}</div>
+    <div style="margin-top:12px;">
+      <span class="badge">📊 ${suppliersList.length} proveedores analizados</span>
+      <span class="badge">🌐 ${sourcesAnalyzed || 0} fuentes investigadas</span>
+      <span class="badge">🤖 3 búsquedas IA paralelas</span>
+    </div>
+  </div>
+
+  ${topRec.supplier ? `
+  <div class="highlight">
+    <h2 style="border:none;padding:0;margin:0 0 12px;">🏆 RECOMENDACIÓN PRINCIPAL</h2>
+    <h3 style="color:#2dd49f;font-size:22px;">${topRec.supplier}</h3>
+    <p style="margin:8px 0;">${topRec.reason || ""}</p>
+    <div style="margin-top:16px;">
+      <div class="metric"><div class="value">${topRec.estimatedCostPerUnit ? `€${topRec.estimatedCostPerUnit}` : "N/A"}</div><div class="label">Coste/unidad</div></div>
+      <div class="metric"><div class="value">${topRec.estimatedProfitMargin || "N/A"}</div><div class="label">Margen estimado</div></div>
+      <div class="metric"><div class="value">${topRec.riskLevel || "N/A"}</div><div class="label">Nivel de riesgo</div></div>
+    </div>
+  </div>` : ""}
+
+  ${top3 ? `<h2>🥇 Top 3 Proveedores Recomendados</h2>${top3}` : ""}
+
+  <h2>📦 Tabla Completa de Proveedores</h2>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>Proveedor</th><th>País</th><th>Plataforma</th><th>Precio</th><th>MOQ</th><th>Envío</th><th>Rating</th><th>Custom</th><th>Certificaciones</th><th>Link</th>
+      </tr></thead>
+      <tbody>${suppliersRows || '<tr><td colspan="10" style="text-align:center;color:#999;">No se encontraron proveedores</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  ${costBreakdown.total ? `
+  <h2>💰 Desglose de Costes</h2>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+      <div class="metric"><div class="value">${costBreakdown.production ? `€${costBreakdown.production}` : "N/A"}</div><div class="label">Producción</div></div>
+      <div class="metric"><div class="value">${costBreakdown.packaging ? `€${costBreakdown.packaging}` : "N/A"}</div><div class="label">Embalaje</div></div>
+      <div class="metric"><div class="value">${costBreakdown.shipping ? `€${costBreakdown.shipping}` : "N/A"}</div><div class="label">Envío</div></div>
+      <div class="metric"><div class="value">${costBreakdown.customs ? `€${costBreakdown.customs}` : "N/A"}</div><div class="label">Aduanas</div></div>
+      <div class="metric" style="border-color:#2dd49f;"><div class="value" style="font-size:28px;">${costBreakdown.total ? `€${costBreakdown.total}` : "N/A"}</div><div class="label">COSTE TOTAL</div></div>
+      <div class="metric" style="border-color:#c8a84b;"><div class="value" style="color:#c8a84b;font-size:28px;">${costBreakdown.recommendedRetailPrice ? `€${costBreakdown.recommendedRetailPrice}` : "N/A"}</div><div class="label">PVP Recomendado</div></div>
+      <div class="metric"><div class="value">${costBreakdown.estimatedMargin || "N/A"}</div><div class="label">Margen</div></div>
+    </div>
+  </div>` : ""}
+
+  ${packagingRows ? `
+  <h2>📦 Opciones de Embalaje</h2>
+  <table>
+    <thead><tr><th>Tipo</th><th>Coste/unidad</th><th>Descripción</th></tr></thead>
+    <tbody>${packagingRows}</tbody>
+  </table>` : ""}
+
+  ${shippingData ? `
+  <h2>🚚 Costes de Envío</h2>
+  <div class="card">
+    ${shippingData.airFreight ? `<p>✈️ <strong>Aéreo:</strong> ${shippingData.airFreight.costPerKg || "N/A"}/kg — ${shippingData.airFreight.timedays || "N/A"} días</p>` : ""}
+    ${shippingData.seaFreight ? `<p>🚢 <strong>Marítimo:</strong> ${shippingData.seaFreight.costPerKg || "N/A"}/kg — ${shippingData.seaFreight.timedays || "N/A"} días</p>` : ""}
+    ${shippingData.express ? `<p>⚡ <strong>Express:</strong> ${shippingData.express.costPerKg || "N/A"}/kg — ${shippingData.express.timedays || "N/A"} días</p>` : ""}
+    ${shippingData.dropshipping ? `<p>📬 <strong>Dropshipping:</strong> ${shippingData.dropshipping.costPerUnit || "N/A"}/unidad — ${shippingData.dropshipping.timedays || "N/A"} días</p>` : ""}
+  </div>` : ""}
+
+  ${(dealsInfo as Record<string, unknown>).deals ? `
+  <h2>🏷️ Ofertas y Promociones Activas</h2>
+  <div class="card">
+    ${((dealsInfo as Record<string, unknown>).deals as Array<{ supplier: string; deal: string; discount: string; validUntil: string; url: string }>).map(d => `
+      <div style="padding:12px 0;border-bottom:1px solid #1a1a2e;">
+        <strong style="color:#c8a84b;">${d.supplier}</strong> — <span style="color:#2dd49f;">${d.discount || ""}</span>
+        <p style="margin:4px 0;">${d.deal}</p>
+        ${d.validUntil ? `<span style="color:#999;font-size:12px;">Válido hasta: ${d.validUntil}</span>` : ""}
+        ${d.url ? ` <a href="${d.url}" style="font-size:12px;">Ver oferta</a>` : ""}
+      </div>
+    `).join("")}
+  </div>` : ""}
+
+  ${synth.strategy ? `
+  <h2>🧠 Estrategia de Sourcing Recomendada</h2>
+  <div class="highlight">
+    <p style="font-size:16px;">${synth.strategy}</p>
+  </div>` : ""}
+
+  ${risks ? `
+  <h2>⚠️ Riesgos Identificados</h2>
+  <div class="card"><ul style="padding-left:20px;">${risks}</ul></div>` : ""}
+
+  ${nextSteps ? `
+  <h2>📋 Próximos Pasos</h2>
+  <div class="card"><ol style="padding-left:20px;">${nextSteps}</ol></div>` : ""}
+
+  <div class="footer">
+    <p><strong>ShopyBrain</strong> — Inteligencia de Sourcing Profesional</p>
+    <p>Informe generado automáticamente con 3 modelos IA (Claude Vision + Gemini Search + Claude Strategy)</p>
+    <p style="margin-top:8px;">© ${new Date().getFullYear()} Shopy Crafter · shopycrafter.com</p>
+  </div>
+</div>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="informe-proveedores-${productName.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}-${Date.now()}.html"`);
+    res.send(html);
+  } catch (err) {
+    logger.error(err, "Supplier report generation failed");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // ─── GET /api/shopybrain/absorbed-content ─────────────────────────────────────
 router.get("/shopybrain/absorbed-content", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {

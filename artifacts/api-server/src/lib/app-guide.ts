@@ -207,10 +207,24 @@ Cuando el usuario pregunte cómo hacer algo, debes guiarle paso a paso con instr
 - Botón dorado del cerebro (esquina inferior derecha)
 - Capacidades:
   • Subir imágenes → Claude Vision analiza composición, colores, texturas, marca
+  • 📸 CREAR PRODUCTO DESDE FOTO: Sube una foto + escribe "créame un producto con esta foto":
+    1. Claude Vision identifica el producto, materiales, calidad, mercado
+    2. Gemini busca precios REALES en Google (Amazon, Zalando, AliExpress, etc.)
+    3. Claude genera copywriting SEO profesional
+    4. Se crea el producto en Shopify con la foto y precio competitivo investigado
+    ¡Todo automático! Necesitas estar en un proyecto (/projects/X/...)
+  • 🔍 BUSCAR PROVEEDORES: Escribe "busca proveedores de [producto]":
+    1. Gemini busca proveedores REALES en Alibaba, AliExpress, fabricantes directos
+    2. Analiza costes de producción, embalaje, envío, aduanas
+    3. Busca ofertas y descuentos activos
+    4. Claude genera recomendación estratégica
+    5. Informe HTML descargable con tabla completa de proveedores
+    Todo guardado permanentemente en ShopyBrain
   • Pegar URLs → analiza contenido web completo
   • Redes sociales → analiza marca, estrategia, engagement
   • "@NombreDeMarca" o "investiga X" → investigación exhaustiva (8 búsquedas paralelas)
   • "Genera workflow Klaviyo" → crea 6 flows estratégicos con HTML completo
+  • Ejecutar acciones Shopify: "crea producto X", "lista productos", "cambia precio", "regenera token"
   • Preguntas generales → responde con conocimiento acumulado
   • Pedir ayuda → GUÍA PASO A PASO de cualquier función de la app
 
@@ -266,7 +280,7 @@ export const PAGE_CONTEXT: Record<string, string> = {
   "/admin/system": "SISTEMA — Configuración del sistema, estado del servidor, logs y diagnósticos.",
   "/admin/settings": "CONFIGURACIÓN ADMIN — Ajustes generales de la plataforma, preferencias de administrador.",
   "/admin/gemini-intel": "GEMINI INTELLIGENCE — Motor de investigación con Gemini. Análisis de mercado e investigación profunda.",
-  "/admin/command-center": "CENTRO DE COMANDO — Ejecuta acciones directas en Shopify: ver estado de tienda, listar/crear/buscar/eliminar productos, cambiar precios, regenerar tokens OAuth, ver pedidos, ver scopes. También acepta comandos de texto libre que ShopyBrain interpreta y ejecuta automáticamente.",
+  "/admin/command-center": "CENTRO DE COMANDO — Ejecuta acciones directas en Shopify: ver estado de tienda, listar/crear/buscar/eliminar productos, cambiar precios, regenerar tokens OAuth, ver pedidos, ver scopes. También acepta comandos de texto libre que ShopyBrain interpreta y ejecuta automáticamente. NUEVO: Búsqueda de proveedores — pide 'busca proveedores de X' y ShopyBrain investigará proveedores reales en Alibaba, AliExpress, fabricantes directos, con precios, MOQ, envío, certificaciones. Se genera informe HTML descargable.",
   "/admin/apk": "APK — Descarga de la aplicación Android. Información y link de descarga de la app móvil.",
   "/new-project": "NUEVO PROYECTO — Formulario para crear un nuevo proyecto/tienda. Campos: nombre, dominio Shopify, Client ID, Client Secret.",
   "/audit": "AUDITORÍA — Análisis completo de calidad de productos. Grados A-F para cada producto. 'Auditar todo' para análisis masivo.",

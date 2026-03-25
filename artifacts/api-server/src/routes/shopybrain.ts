@@ -207,8 +207,10 @@ Acciones disponibles:
 - search_product: Buscar producto por nombre. Params: {projectId, query}
 - publish_product: Publicar producto (draft→active). Params: {projectId, productId}
 - get_orders: Ver pedidos recientes. Params: {projectId, limit?}
+- search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
 
 REGLAS:
+- Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
 - Si el usuario dice "crea un producto llamado X", EJECUTA la acción create_product
 - Si dice "muéstrame los productos", EJECUTA list_products
 - Si dice "regenera el token", EJECUTA regenerate_token
@@ -939,6 +941,52 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           })),
           total: data.orders.length,
           message: `${data.orders.length} pedidos recientes`,
+        };
+        break;
+      }
+
+      case "search_suppliers": {
+        const pName = params?.productName;
+        if (!pName) { res.status(400).json({ error: "productName requerido" }); return; }
+
+        const supRes = await fetch(`http://localhost:${process.env.PORT || 8080}/api/shopybrain/supplier-research`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+          body: JSON.stringify({
+            productName: pName,
+            productCategory: params?.productCategory,
+            materials: params?.materials,
+            targetMarket: params?.targetMarket,
+            qualityTier: params?.qualityTier,
+            budget: params?.budget,
+            country: params?.country,
+          }),
+        });
+
+        if (!supRes.ok) {
+          const errText = await supRes.text();
+          res.status(500).json({ error: `Error buscando proveedores: ${errText}` });
+          return;
+        }
+
+        const supData = await supRes.json() as Record<string, unknown>;
+        const suppliersList = ((supData.suppliers as Record<string, unknown>)?.suppliers as Array<{ name: string; priceRange: string; country: string; platform: string }>) || [];
+        const synth = supData.synthesis as Record<string, unknown> || {};
+        const topRec = synth.topRecommendation as Record<string, string> || {};
+
+        result = {
+          productName: pName,
+          suppliersFound: suppliersList.length,
+          topRecommendation: topRec.supplier ? `${topRec.supplier} — ${topRec.reason || ""}` : "Sin recomendación",
+          topSuppliers: suppliersList.slice(0, 5).map(s => `${s.name} (${s.country}) — ${s.priceRange} [${s.platform}]`),
+          strategy: synth.strategy || "N/A",
+          risks: synth.risks || [],
+          nextSteps: synth.nextSteps || [],
+          costBreakdown: synth.costBreakdown || {},
+          sourcesAnalyzed: supData.sourcesAnalyzed,
+          memoryId: supData.memoryId,
+          fullData: supData,
+          message: `Investigación de proveedores completada: ${suppliersList.length} proveedores encontrados para "${pName}"`,
         };
         break;
       }

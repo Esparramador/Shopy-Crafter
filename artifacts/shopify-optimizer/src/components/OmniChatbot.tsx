@@ -27,7 +27,7 @@ interface Message {
 }
 
 interface ChatAction {
-  type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action";
+  type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action" | "supplier-research";
   label: string;
   data: unknown;
 }
@@ -687,6 +687,28 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (!orders.length) return "🛒 No hay pedidos.";
         return `🛒 **${result.total} pedidos:**\n${orders.map((o, i) => `${i + 1}. ${o.name} — ${o.total}€ (${o.financial}) — ${o.customer}`).join("\n")}`;
       }
+      case "search_suppliers": {
+        const topSups = (result.topSuppliers as string[]) ?? [];
+        let msg = `🔍 **Investigación de proveedores: ${result.productName}**\n\n`;
+        msg += `📊 **${result.suppliersFound} proveedores encontrados** (${result.sourcesAnalyzed} fuentes analizadas)\n\n`;
+        if (result.topRecommendation) msg += `🏆 **Recomendación:** ${result.topRecommendation}\n\n`;
+        if (topSups.length > 0) {
+          msg += `**Top proveedores:**\n${topSups.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n`;
+        }
+        const cb = result.costBreakdown as Record<string, unknown>;
+        if (cb?.total) {
+          msg += `💰 **Costes:** Producción €${cb.production || "?"} + Embalaje €${cb.packaging || "?"} + Envío €${cb.shipping || "?"} = **Total €${cb.total}**\n`;
+          if (cb.recommendedRetailPrice) msg += `🏷️ PVP recomendado: **€${cb.recommendedRetailPrice}** (margen ${cb.estimatedMargin || "N/A"})\n`;
+        }
+        if (result.strategy) msg += `\n🧠 **Estrategia:** ${result.strategy}\n`;
+        const risks = result.risks as string[];
+        if (risks?.length) msg += `\n⚠️ **Riesgos:** ${risks.join(" · ")}\n`;
+        const steps = result.nextSteps as string[];
+        if (steps?.length) msg += `\n📋 **Próximos pasos:**\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`;
+        msg += `\n💾 Guardado en ShopyBrain (ID: ${(result.memoryId as string)?.slice(0, 8) || "N/A"})`;
+        msg += `\n\n📥 _Puedes descargar el informe completo con el botón de abajo._`;
+        return msg;
+      }
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }
@@ -995,7 +1017,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             const actionResult = await executeShopifyAction(d.detectedAction.action, d.detectedAction.params);
             if (actionResult) {
               assistantContent += "\n\n" + formatActionResult(d.detectedAction.action, actionResult);
-              action = { type: "shopify-action", label: "Ver resultado", data: actionResult };
+              const actionType = d.detectedAction.action === "search_suppliers" ? "supplier-research" : "shopify-action";
+              action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult };
             }
           }
         } else {
@@ -1120,6 +1143,44 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       )}
                       {msg.action?.type === "entity-research" && (
                         <EntityResearchCard data={msg.action.data as EntityResearchResult} />
+                      )}
+                      {msg.action?.type === "supplier-research" && (
+                        <button
+                          onClick={async () => {
+                            const d = msg.action!.data as Record<string, unknown>;
+                            const fd = d.fullData as Record<string, unknown>;
+                            try {
+                              const res = await fetch(`${API}/api/shopybrain/supplier-report`, {
+                                method: "POST", credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  productName: d.productName,
+                                  suppliers: fd?.suppliers,
+                                  costs: fd?.costs,
+                                  deals: fd?.deals,
+                                  synthesis: fd?.synthesis || d.synthesis,
+                                  sourcesAnalyzed: d.sourcesAnalyzed,
+                                }),
+                              });
+                              if (res.ok) {
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `informe-proveedores-${(d.productName as string || "producto").replace(/\s+/g, "-").toLowerCase()}.html`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }
+                            } catch { /* ignore */ }
+                          }}
+                          style={{
+                            marginTop: 8, padding: "8px 16px", background: "linear-gradient(135deg, rgba(200,168,75,0.15), rgba(45,212,159,0.1))",
+                            border: "1px solid rgba(200,168,75,0.3)", borderRadius: 8, color: "#c8a84b",
+                            fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 600,
+                          }}
+                        >
+                          📥 Descargar Informe Completo de Proveedores
+                        </button>
                       )}
                     </div>
                     <span style={{ fontSize: 9, color: "var(--t4)", marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
