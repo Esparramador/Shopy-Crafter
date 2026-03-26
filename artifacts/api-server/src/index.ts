@@ -1,8 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { registerCronJobs } from "./lib/scheduler.js";
-import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { ensureAllKnowledgeDomains } from "./routes/shopybrain.js";
+import { db, usersTable, projectsTable } from "@workspace/db";
+import { eq, sql, isNull, or } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
@@ -39,6 +40,33 @@ async function deduplicateProducts() {
     `);
   } catch (err) {
     logger.error({ err }, "⚠️  deduplicateProducts failed — continuing startup");
+  }
+}
+
+async function ensureProjectConfig() {
+  try {
+    const projects = await db.select().from(projectsTable)
+      .where(or(isNull(projectsTable.storeNiche), eq(projectsTable.storeNiche, "")));
+
+    for (const project of projects) {
+      const domain = project.shopDomain ?? "";
+      let niche = "";
+      let tone = "";
+
+      if (domain.includes("comic")) {
+        niche = "comics y arte digital";
+        tone = "Creativo, apasionado y cercano";
+      }
+
+      if (niche) {
+        await db.update(projectsTable)
+          .set({ storeNiche: niche, brandTone: tone })
+          .where(eq(projectsTable.id, project.id));
+        logger.info({ projectId: project.id, niche, tone }, "✅ Project config synced (store_niche + brand_tone)");
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "⚠️  ensureProjectConfig failed — continuing startup");
   }
 }
 
@@ -79,7 +107,15 @@ const server = app.listen(port, (err?: Error) => {
   }
 
   logger.info({ port }, "Server listening");
-  deduplicateProducts().then(() => ensureAdminUser());
+  deduplicateProducts()
+    .then(() => ensureAdminUser())
+    .then(() => ensureProjectConfig())
+    .then(() => ensureAllKnowledgeDomains())
+    .then((created) => {
+      if (created > 0) logger.info({ created }, "🧠 Knowledge domains seeded on startup");
+      else logger.info("🧠 All knowledge domains already present");
+    })
+    .catch((err) => logger.error({ err }, "⚠️  Knowledge domain seeding failed — continuing startup"));
   registerCronJobs();
 });
 

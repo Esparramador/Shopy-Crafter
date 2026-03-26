@@ -10,11 +10,44 @@ import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { buildShopyBrainContext } from "./claude.js";
+import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let anthropicCreditsExhausted = false;
+
+async function aiGenerate(opts: { system: string; prompt: string; maxTokens: number; timeoutMs?: number }): Promise<string> {
+  const timeout = opts.timeoutMs ?? 120_000;
+
+  if (!anthropicCreditsExhausted) {
+    try {
+      const response = await anthropic.messages.create(
+        {
+          model: "claude-sonnet-4-5",
+          max_tokens: opts.maxTokens,
+          system: opts.system,
+          messages: [{ role: "user", content: opts.prompt }],
+        },
+        { signal: AbortSignal.timeout(timeout) }
+      );
+      return (response.content[0] as { type: string; text: string }).text;
+    } catch (err: any) {
+      const msg = String(err?.message ?? err ?? "");
+      if (msg.includes("credit balance") || msg.includes("billing") || msg.includes("overloaded") || err?.status === 429) {
+        anthropicCreditsExhausted = true;
+        log("ai-fallback", "⚠️ Anthropic credits exhausted — switching to Gemini for all scheduler AI jobs");
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const result = await askGeminiWithSearch(opts.prompt, opts.system);
+  log("ai-fallback", "📊 Gemini fallback used");
+  return result?.text ?? "";
+}
 
 function log(job: string, msg: string) {
   logger.info({ job }, msg);
@@ -53,6 +86,15 @@ const ALL_DOMAINS: Record<string, string> = {
   email_automation:     "Email Marketing · Automatización · Klaviyo · Segmentación · A/B Testing · Flows · Deliverability",
   marketplace:          "Marketplaces · Amazon · Etsy · eBay · Multi-canal · Omnichannel · Comparadores",
   taxes_accounting:     "Impuestos · Contabilidad · IVA · Facturación · Autónomos · SII · Modelos fiscales",
+  "Conversion Rate Optimization":     "CRO · Tests A/B · Funnels · Optimización de conversión",
+  "Copywriting & Product Descriptions": "Copywriting · Fichas de producto · SEO Copy · Storytelling comercial",
+  "Email Marketing & Retention":       "Email Marketing · Retención · Flows · Klaviyo · Newsletters · Segmentación",
+  "Mobile UX & Checkout":              "UX Móvil · Checkout · Responsive · App Commerce · PWA",
+  "Pricing Psychology & Strategy":     "Psicología de Precios · Estrategia · Anchoring · Bundling · Descuentos",
+  "Product Photography & Images":      "Fotografía · Imágenes de Producto · IA Visual · Composición · Lighting",
+  "SEO & Product Discovery":           "SEO · Descubrimiento de Producto · Keywords · Schema · SERP · Google Shopping",
+  "Social Proof & Reviews":            "Social Proof · Reviews · Testimonios · UGC · Trust · Ratings",
+  "Upsell & Cross-sell Strategies":    "Upsell · Cross-sell · Bundles · AOV · Estrategias de Ticket Medio",
 };
 
 // ─── REVENUE SNAPSHOTS ───────────────────────────────────────────────────────
@@ -274,17 +316,11 @@ export async function runOmniCoreMicroLearning() {
         const prompt = `You are a world-class expert in ${label}. Your knowledge is UNIVERSAL — not limited to any single industry. Generate exactly 3 fresh, deeply researched, actionable insights that combine best practices from multiple industries and disciplines. Each insight must be specific, backed by real-world data or established frameworks, and immediately applicable to improve quality of content, strategy, or execution for an eCommerce agency managing Shopify stores. Think broadly: draw from psychology, neuroscience, art, architecture, fashion, technology, data science, behavioral economics, or ANY discipline that enriches the topic. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.82,"memoryType":"pricing_pattern","tags":["tag1","tag2"]}]}`;
 
-        const response = await anthropic.messages.create(
-          {
-            model: "claude-sonnet-4-5",
-            max_tokens: 1200,
-            system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
-            messages: [{ role: "user", content: prompt }],
-          },
-          { signal: AbortSignal.timeout(120_000) }
-        );
-
-        const text = (response.content[0] as { type: string; text: string }).text;
+        const text = await aiGenerate({
+          system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
+          prompt,
+          maxTokens: 1200,
+        });
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
 
@@ -396,17 +432,11 @@ export async function runOmniCoreCrossConnections() {
     const prompt = `Find 3 powerful hidden cross-domain insights connecting these knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy — drawing from ANY discipline (neuroscience, art, architecture, behavioral economics, technology, culture, science, nature, music, etc.) that creates compounding value. The BEST cross-domain insights connect fields that nobody would think are related. Return ONLY valid JSON:
 {"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
 
-    const response = await anthropic.messages.create(
-      {
-        model: "claude-sonnet-4-5",
-        max_tokens: 1200,
-        system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: AbortSignal.timeout(120_000) }
-    );
-
-    const text = (response.content[0] as { type: string; text: string }).text;
+    const text = await aiGenerate({
+      system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
+      prompt,
+      maxTokens: 1200,
+    });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
 
@@ -480,18 +510,12 @@ export async function runOmniCoreDailyDeepStudy() {
 Think like a polymath — combine wisdom from art, science, technology, psychology, business, design, finance, law, and culture. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.87,"memoryType":"pricing_pattern"}]}`;
 
-        const response = await anthropic.messages.create(
-          {
-            model: "claude-sonnet-4-5",
-            max_tokens: 2500,
-            system: `You are OmniCore Daily Deep Study Engine — the most advanced autonomous learning system ever built. You are an OMNISCIENT POLYMATH that accumulates knowledge from EVERY discipline: art, architecture, neuroscience, behavioral economics, photography, cinematography, fashion, industrial design, data science, AI/ML, psychology, sociology, law, finance, logistics, sustainability, copywriting, storytelling, music theory, color science, material science, cultural anthropology, and more. Your mission: generate the deepest, most actionable knowledge that elevates the quality of every output — from product descriptions to pricing strategies to visual content. NEVER limit yourself to a single industry. The BEST insights come from connecting knowledge across disciplines. ${brainCtxDaily}`,
-            messages: [{ role: "user", content: prompt }],
-          },
-          { signal: AbortSignal.timeout(120_000) }
-        );
+        const text = await aiGenerate({
+          system: `You are OmniCore Daily Deep Study Engine — the most advanced autonomous learning system ever built. You are an OMNISCIENT POLYMATH that accumulates knowledge from EVERY discipline: art, architecture, neuroscience, behavioral economics, photography, cinematography, fashion, industrial design, data science, AI/ML, psychology, sociology, law, finance, logistics, sustainability, copywriting, storytelling, music theory, color science, material science, cultural anthropology, and more. Your mission: generate the deepest, most actionable knowledge that elevates the quality of every output — from product descriptions to pricing strategies to visual content. NEVER limit yourself to a single industry. The BEST insights come from connecting knowledge across disciplines. ${brainCtxDaily}`,
+          prompt,
+          maxTokens: 2500,
+        });
         consecutiveFails = 0;
-
-        const text = (response.content[0] as { type: string; text: string }).text;
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) continue;
 
@@ -587,17 +611,12 @@ ${memorySummary}
 Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.92,"domains":["domain1","domain2"],"priority":"high"}]}`;
 
-    const response = await anthropic.messages.create(
-      {
-        model: "claude-sonnet-4-5",
-        max_tokens: 4000,
-        system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: AbortSignal.timeout(180_000) }
-    );
-
-    const text = (response.content[0] as { type: string; text: string }).text;
+    const text = await aiGenerate({
+      system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
+      prompt,
+      maxTokens: 4000,
+      timeoutMs: 180_000,
+    });
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       const parsed = JSON.parse(match[0]) as {

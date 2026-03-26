@@ -116,10 +116,20 @@ const DOMAIN_LABELS: Record<string, string> = {
   marketplace:          "Marketplaces · Amazon · Etsy · Omnichannel",
   taxes_accounting:     "Impuestos · Contabilidad · IVA · Facturación",
   general:              "Conocimiento General · Multidisciplinar",
+  "Conversion Rate Optimization":     "CRO · Tests A/B · Funnels · Optimización de conversión",
+  "Copywriting & Product Descriptions": "Copywriting · Fichas de producto · SEO Copy · Storytelling",
+  "Email Marketing & Retention":       "Email Marketing · Retención · Flows · Klaviyo · Newsletters",
+  "Mobile UX & Checkout":              "UX Móvil · Checkout · Responsive · App Commerce",
+  "Pricing Psychology & Strategy":     "Psicología de Precios · Estrategia · Anchoring · Bundling",
+  "Product Photography & Images":      "Fotografía · Imágenes de Producto · IA Visual · Composición",
+  "SEO & Product Discovery":           "SEO · Descubrimiento de Producto · Keywords · Schema · SERP",
+  "Social Proof & Reviews":            "Social Proof · Reviews · Testimonios · UGC · Trust",
+  "Upsell & Cross-sell Strategies":    "Upsell · Cross-sell · Bundles · Estrategias de Ticket Medio",
 };
 
-async function ensureDomains() {
+export async function ensureAllKnowledgeDomains() {
   const domains = Object.keys(DOMAIN_LABELS);
+  let created = 0;
   for (const domain of domains) {
     const existing = await db.select().from(omnicoreKnowledgeDomainsTable).where(eq(omnicoreKnowledgeDomainsTable.domain, domain));
     if (!existing.length) {
@@ -130,8 +140,14 @@ async function ensureDomains() {
         verifiedInsights: 0,
         totalInsights: 0,
       });
+      created++;
     }
   }
+  return created;
+}
+
+async function ensureDomains() {
+  return ensureAllKnowledgeDomains();
 }
 
 router.get("/shopybrain/status", requireAdmin, async (req, res): Promise<void> => {
