@@ -4,6 +4,7 @@ import {
   Monitor, Tablet, Smartphone, Save, Loader2, Sparkles,
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
   PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon, WifiOff,
+  GripVertical, ArrowUp, ArrowDown, Film, Images, Atom,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
@@ -344,6 +345,72 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
   );
 }
 
+/* ── BACKGROUND TYPE SELECTOR ─────────────────────────────────────────────── */
+function BackgroundTypeSelector({ sectionId, content, onChange }: { sectionId: string; content: Record<string, unknown>; onChange: (path: string, value: string) => void }) {
+  const bgKey = `backgrounds.${sectionId}`;
+  const backgrounds = (content as any)?.backgrounds ?? {};
+  const sectionBg = backgrounds[sectionId] ?? { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" };
+  const bgType = sectionBg.type ?? "none";
+
+  const types = [
+    { value: "none", label: "Ninguno", icon: <X size={12} /> },
+    { value: "video", label: "Video", icon: <Film size={12} /> },
+    { value: "gallery", label: "Galería", icon: <Images size={12} /> },
+    { value: "particles", label: "Partículas", icon: <Atom size={12} /> },
+  ];
+
+  return (
+    <div style={{ marginBottom: 16, padding: 12, background: "var(--ink2)", borderRadius: 10, border: "1px solid var(--bdr)" }}>
+      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, color: "var(--t3)", marginBottom: 8 }}>
+        Fondo de sección
+      </div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        {types.map(t => (
+          <button key={t.value} onClick={() => onChange(`${bgKey}.type`, t.value)}
+            style={{
+              flex: 1, padding: "6px 4px", fontSize: 10, fontWeight: 600,
+              background: bgType === t.value ? "rgba(200,168,75,0.15)" : "var(--ink3)",
+              border: `1px solid ${bgType === t.value ? "var(--gold)" : "var(--bdr)"}`,
+              borderRadius: 6, cursor: "pointer", color: bgType === t.value ? "var(--gold)" : "var(--t3)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
+              transition: "all 0.15s",
+            }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {bgType === "video" && (
+        <input
+          value={sectionBg.videoUrl ?? ""}
+          placeholder="URL de video (YouTube o MP4)"
+          onChange={e => onChange(`${bgKey}.videoUrl`, e.target.value)}
+          style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, color: "var(--t)", outline: "none", boxSizing: "border-box" }}
+        />
+      )}
+      {bgType === "particles" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: "var(--t3)" }}>Color:</span>
+          <input type="color" value={sectionBg.particleColor ?? "#c8a84b"} onChange={e => onChange(`${bgKey}.particleColor`, e.target.value)}
+            style={{ width: 28, height: 28, borderRadius: 6, cursor: "pointer", border: "none" }} />
+        </div>
+      )}
+      {bgType === "gallery" && (
+        <div>
+          <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>Imágenes del carrusel (URLs separadas por coma)</p>
+          <textarea
+            value={Array.isArray(sectionBg.galleryImages) ? sectionBg.galleryImages.join(", ") : ""}
+            onChange={e => onChange(`${bgKey}.galleryImages`, e.target.value)}
+            placeholder="/media/img1.webp, /media/img2.webp"
+            rows={2}
+            style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, color: "var(--t)", outline: "none", resize: "none", boxSizing: "border-box" }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── FIELD EDITOR ────────────────────────────────────────────────────────── */
 function FieldEditor({ field, value, onChange }: { field: FieldDef; value: string; onChange: (path: string, value: string) => void }) {
   const [aiTarget, setAiTarget] = useState<string | null>(null);
@@ -442,7 +509,10 @@ export default function CMSEditor() {
   const [showVersions, setShowVersions] = useState(false);
   const [iframeKey, setIframeKey]       = useState(0);
   const [mobileTab, setMobileTab]       = useState<MobileTab>("edit");
+  const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(s => s.id));
+  const [dragIdx, setDragIdx]           = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { toast } = useToast();
   const retryFetch = useRetryFetch();
 
@@ -469,10 +539,23 @@ export default function CMSEditor() {
       const res = await retryFetch(`${BASE_URL}/api/cms/content`);
       const data = await res.json() as Record<string, unknown>;
       setContent(data);
+      if (Array.isArray(data.sectionOrder) && data.sectionOrder.length > 0) {
+        setSectionOrder(data.sectionOrder as string[]);
+      }
     } catch {
       toast({ title: "Error de conexión", description: "No se pudo cargar el contenido. Reintentando...", variant: "destructive" });
     }
   }, [retryFetch, toast]);
+
+  const moveSection = useCallback((fromIdx: number, toIdx: number) => {
+    setSectionOrder(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setPending(p => { const n = new Map(p); n.set("sectionOrder", next); return n; });
+      return next;
+    });
+  }, []);
 
   const loadVersions = useCallback(async () => {
     try {
@@ -488,6 +571,32 @@ export default function CMSEditor() {
     setIframeKey(k => k + 1);
     toast({ title: "Conexión restaurada", description: "Datos actualizados" });
   }, [loadContent, loadVersions, toast]));
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (iframeRef.current && e.source !== iframeRef.current.contentWindow) return;
+      if (e.data?.type === "cms-click-to-edit" && typeof e.data.path === "string") {
+        const path = e.data.path as string;
+        if (!/^[a-zA-Z0-9._]+$/.test(path)) return;
+        const sectionId = path.split(".")[0];
+        setOpenSections(prev => new Set([...prev, sectionId]));
+        setTimeout(() => {
+          const el = fieldRefs.current[path] ?? fieldRefs.current[`section-${sectionId}`];
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.style.outline = "2px solid var(--gold)";
+            el.style.outlineOffset = "2px";
+            el.style.borderRadius = "8px";
+            setTimeout(() => { el.style.outline = "none"; }, 2000);
+            const input = el.querySelector("input, textarea") as HTMLElement | null;
+            if (input) input.focus();
+          }
+        }, 150);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   useEffect(() => {
     loadContent();
@@ -719,15 +828,42 @@ export default function CMSEditor() {
 
           {/* sections list */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {SECTIONS.map(section => {
+            {sectionOrder.map((sectionId, orderIdx) => {
+              const section = SECTIONS.find(s => s.id === sectionId);
+              if (!section) return null;
               const isOpen = openSections.has(section.id);
+              const canMoveUp = orderIdx > 0;
+              const canMoveDown = orderIdx < sectionOrder.length - 1;
+              const isDragging = dragIdx === orderIdx;
               return (
-                <div key={section.id} style={{ borderBottom: "1px solid var(--bdr)" }}>
+                <div key={section.id}
+                  ref={el => { fieldRefs.current[`section-${section.id}`] = el; }}
+                  draggable
+                  onDragStart={() => setDragIdx(orderIdx)}
+                  onDragOver={e => { e.preventDefault(); }}
+                  onDrop={() => { if (dragIdx !== null && dragIdx !== orderIdx) moveSection(dragIdx, orderIdx); setDragIdx(null); }}
+                  onDragEnd={() => setDragIdx(null)}
+                  style={{
+                    borderBottom: "1px solid var(--bdr)",
+                    opacity: isDragging ? 0.5 : 1,
+                    transition: "opacity 0.15s",
+                  }}>
                   <div style={{ display: "flex", alignItems: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", padding: "0 2px 0 6px", cursor: "grab" }} title="Arrastrar para reordenar">
+                      <button onClick={() => canMoveUp && moveSection(orderIdx, orderIdx - 1)} disabled={!canMoveUp}
+                        style={{ background: "none", border: "none", cursor: canMoveUp ? "pointer" : "default", color: canMoveUp ? "var(--t3)" : "var(--ink3)", padding: 1, lineHeight: 1 }}>
+                        <ArrowUp size={10} />
+                      </button>
+                      <GripVertical size={11} style={{ color: "var(--t4)", margin: "1px 0" }} />
+                      <button onClick={() => canMoveDown && moveSection(orderIdx, orderIdx + 1)} disabled={!canMoveDown}
+                        style={{ background: "none", border: "none", cursor: canMoveDown ? "pointer" : "default", color: canMoveDown ? "var(--t3)" : "var(--ink3)", padding: 1, lineHeight: 1 }}>
+                        <ArrowDown size={10} />
+                      </button>
+                    </div>
                     <button onClick={() => toggleSection(section.id)}
                       style={{
                         flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "11px 16px", cursor: "pointer", border: "none",
+                        padding: "11px 10px 11px 6px", cursor: "pointer", border: "none",
                         background: isOpen ? "var(--ink2)" : "transparent",
                         transition: "background .15s",
                       }}
@@ -756,13 +892,18 @@ export default function CMSEditor() {
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
+                      {["hero", "features", "pricing", "testimonials", "cta"].includes(section.id) && (
+                        <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
+                      )}
                       {section.fields.map(field => {
                         const raw   = getNestedValue(content, field.path);
                         const value = typeof raw === "string" ? raw
                           : typeof raw === "number" ? String(raw)
                           : typeof raw === "boolean" ? String(raw) : "";
                         return (
-                          <FieldEditor key={field.path} field={field} value={value} onChange={handleFieldChange} />
+                          <div key={field.path} ref={el => { fieldRefs.current[field.path] = el; }}>
+                            <FieldEditor field={field} value={value} onChange={handleFieldChange} />
+                          </div>
                         );
                       })}
                     </div>

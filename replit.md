@@ -51,6 +51,17 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 ### Database
 PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.
 
+### Global Admin Pages
+- `/admin/products` — Cross-project products table with grade filter, pagination, project filter
+- `/admin/abtests` — Cross-project A/B tests dashboard with stats, confidence bars, status filter
+- `/admin/automations` — Cron jobs dashboard showing 10 scheduled jobs with manual "Run Now" triggers
+
+### CMS Features
+- **Section Reorder**: CMS editor sections can be reordered via drag-and-drop or arrow buttons; order persists in `sectionOrder` field
+- **Background Types**: Sections can have background types (none/video/gallery/particles) configured via `backgrounds` field
+- **Click-to-Edit**: In preview mode, clicking CMS-editable elements in the landing iframe sends postMessage to CMS editor, which opens the section and focuses the field
+- **Automations API**: `/api/automations/jobs` (GET) and `/api/automations/jobs/:id/run` (POST) endpoints for cron job management
+
 ### Security
 - AES-256-GCM encryption for all credentials with startup validation (temporary key auto-generated with warning if missing).
 - Comprehensive audit logging via `recordAudit()` helper — covers login, logout, password change/reset, user create/activate/deactivate, impersonation, project create/delete, plan upgrades, Shopify token refresh, settings changes, client invites, approval actions.
@@ -63,6 +74,7 @@ PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalitie
 - CORS configured for `APP_URL` and `REPLIT_DOMAINS`.
 - Secure session management (`httpOnly`, `sameSite: strict`, `secure: true` in production).
 - SVG content from AI is sanitized.
+- PostMessage origin validation on CMS click-to-edit channel.
 
 ### AI Stack — OmniCore (ShopyBrain) + Gemini Research
 A three-model pipeline: Gemini → Claude → OmniCore, with image generation integrations.

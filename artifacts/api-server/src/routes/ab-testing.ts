@@ -33,6 +33,71 @@ function normalCDF(z: number): number {
   return z > 0 ? 1 - p : p;
 }
 
+router.get("/admin/all-ab-tests", async (req, res): Promise<void> => {
+  try {
+    const projectFilter = req.query.projectId ? parseInt(req.query.projectId as string, 10) : null;
+    const statusFilter = req.query.status as string | undefined;
+
+    if (projectFilter !== null && isNaN(projectFilter)) {
+      res.status(400).json({ error: "projectId inválido" });
+      return;
+    }
+    if (statusFilter && !["running", "completed", "paused", "cancelled"].includes(statusFilter)) {
+      res.status(400).json({ error: "status inválido" });
+      return;
+    }
+
+    let tests;
+    if (projectFilter) {
+      tests = await db.select().from(abTestsTable).where(eq(abTestsTable.projectId, projectFilter));
+    } else {
+      tests = await db.select().from(abTestsTable);
+    }
+
+    if (statusFilter) {
+      tests = tests.filter(t => t.status === statusFilter);
+    }
+
+    const projects = await db.select({ id: projectsTable.id, name: projectsTable.name }).from(projectsTable);
+    const projectMap = new Map(projects.map(p => [p.id, p.name]));
+
+    const mapped = tests.map(t => {
+      const { confidence, winner: calcWinner } = calculateSignificance(
+        t.variantAConversions, t.variantAVisitors,
+        t.variantBConversions, t.variantBVisitors
+      );
+      return {
+        id: String(t.id),
+        projectId: t.projectId,
+        projectName: projectMap.get(t.projectId) ?? "Unknown",
+        productId: t.shopifyProductId,
+        productTitle: t.productTitle,
+        imageType: t.imageType,
+        hypothesis: t.hypothesis,
+        variantAVisitors: t.variantAVisitors,
+        variantBVisitors: t.variantBVisitors,
+        variantAConversions: t.variantAConversions,
+        variantBConversions: t.variantBConversions,
+        variantARevenue: t.variantARevenue,
+        variantBRevenue: t.variantBRevenue,
+        confidence,
+        winner: t.winner ?? (confidence >= 95 ? calcWinner : null),
+        status: t.status,
+        targetMetric: t.targetMetric,
+        startDate: t.startDate.toISOString(),
+        endDate: t.endDate?.toISOString() ?? null,
+      };
+    });
+
+    res.json({
+      tests: mapped,
+      projects: projects.map(p => ({ id: p.id, name: p.name })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Error al cargar tests A/B" });
+  }
+});
+
 router.get("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const statusFilter = req.query.status as string | undefined;

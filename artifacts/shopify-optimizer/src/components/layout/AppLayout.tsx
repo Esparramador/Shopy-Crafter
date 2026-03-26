@@ -36,10 +36,13 @@ const SHOPYBRAIN_NAV = [
 
 const ADMIN_NAV = [
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
+  { label: "Productos Global", icon: "📦", href: "/admin/products" },
+  { label: "A/B Tests Global", icon: "📈", href: "/admin/abtests" },
+  { label: "Automaciones", icon: "⚡", href: "/admin/automations" },
   { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
   { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
-  { label: "M7 Inventario", icon: "📦", href: "/admin/inventory" },
+  { label: "M7 Inventario", icon: "🗄", href: "/admin/inventory" },
   { label: "Competitor Intel", icon: "🎯", href: "/admin/competitors" },
   { label: "Predicciones ML", icon: "🔮", href: "/admin/forecast" },
   { label: "Logros", icon: "🏆", href: "/admin/achievements" },

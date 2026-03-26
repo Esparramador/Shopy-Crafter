@@ -37,6 +37,77 @@ interface ShopifyProductRaw {
   images: Array<{ id: number; src: string; alt: string | null; position: number }>;
 }
 
+router.get("/admin/all-products", async (req, res): Promise<void> => {
+  try {
+    const projectFilter = req.query.projectId ? parseInt(req.query.projectId as string, 10) : null;
+    const gradeFilter = req.query.grade as string | undefined;
+    const page = Math.max(1, parseInt(req.query.page as string ?? "1", 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string ?? "50", 10) || 50));
+
+    if (projectFilter !== null && isNaN(projectFilter)) {
+      res.status(400).json({ error: "projectId inválido" });
+      return;
+    }
+    if (gradeFilter && !["A", "B", "C", "D", "F"].includes(gradeFilter)) {
+      res.status(400).json({ error: "grade inválido" });
+      return;
+    }
+
+    let allProducts;
+    if (projectFilter) {
+      allProducts = await db.select().from(productsTable)
+        .where(eq(productsTable.projectId, projectFilter))
+        .orderBy(desc(productsTable.auditScore));
+    } else {
+      allProducts = await db.select().from(productsTable)
+        .orderBy(desc(productsTable.auditScore));
+    }
+
+    const projects = await db.select({ id: projectsTable.id, name: projectsTable.name }).from(projectsTable);
+    const projectMap = new Map(projects.map(p => [p.id, p.name]));
+
+    const filtered = gradeFilter
+      ? allProducts.filter(p => p.auditGrade === gradeFilter)
+      : allProducts;
+
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
+
+    const gradeCounts = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+    allProducts.forEach(p => {
+      const g = (p.auditGrade ?? "F") as keyof typeof gradeCounts;
+      if (g in gradeCounts) gradeCounts[g]++;
+    });
+
+    const mapped = paginated.map(p => ({
+      id: p.shopifyProductId,
+      projectId: p.projectId,
+      projectName: projectMap.get(p.projectId) ?? "Unknown",
+      title: p.title,
+      handle: p.handle,
+      vendor: p.vendor,
+      productType: p.productType,
+      status: p.status,
+      price: p.price,
+      imageCount: p.imageCount,
+      variantCount: p.variantCount,
+      auditScore: p.auditScore,
+      auditGrade: p.auditGrade,
+    }));
+
+    res.json({
+      products: mapped,
+      total: filtered.length,
+      page,
+      totalPages: Math.ceil(filtered.length / limit),
+      gradeCounts,
+      projects: projects.map(p => ({ id: p.id, name: p.name })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Error al cargar productos" });
+  }
+});
+
 router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const gradeFilter = req.query.grade as string | undefined;

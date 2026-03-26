@@ -992,3 +992,23 @@
   /* Cursor: ocultar en mobile (no tiene sentido) */
   .l-cursor, .l-cursor-ring { display: none; }
 }
+
+/* ── CMS Preview Mode: click-to-edit hover indicators ── */
+.cms-preview-mode [data-cms-path] {
+  transition: outline 0.15s, outline-offset 0.15s;
+  cursor: pointer !important;
+}
+.cms-preview-mode [data-cms-path]:hover {
+  outline: 2px dashed rgba(200,168,75,0.6);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.cms-preview-mode h1[onclick],
+.cms-preview-mode h2[onclick],
+.cms-preview-mode p[onclick] {
+  cursor: pointer !important;
+}
+.cms-preview-mode h1:hover,
+.cms-preview-mode h2:hover {
+  text-decoration-color: rgba(200,168,75,0.4);
+}

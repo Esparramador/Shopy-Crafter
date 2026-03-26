@@ -4,6 +4,12 @@ export const DEFAULT_CMS_CONTENT = {
     updatedBy: "system",
     version: 1,
   },
+  sectionOrder: ["site", "hero", "features", "stats", "how", "pricing", "testimonials", "cta", "footer"],
+  backgrounds: {
+    hero: { type: "particles", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
+    features: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#2dd49f" },
+    pricing: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
+  },
   site: {
     name: "ShopyBrain",
     tagline: "La plataforma de agencia Shopify más completa",

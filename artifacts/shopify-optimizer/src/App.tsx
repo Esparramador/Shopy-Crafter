@@ -46,6 +46,9 @@ import LoginPage from "@/pages/Login";
 import InviteSetupPage from "@/pages/InviteSetup";
 import AdminClients from "@/pages/AdminClients";
 import AdminSettings from "@/pages/admin/AdminSettings";
+import AdminProducts from "@/pages/admin/AdminProducts";
+import AdminABTests from "@/pages/admin/AdminABTests";
+import AdminAutomations from "@/pages/admin/AdminAutomations";
 
 import ClientDashboard from "@/pages/client/ClientDashboard";
 import ClientApprovals from "@/pages/client/ClientApprovals";
@@ -335,6 +338,27 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><AdminSettings /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/products">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><AdminProducts /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/abtests">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><AdminABTests /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/automations">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><AdminAutomations /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>
