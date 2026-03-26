@@ -71,8 +71,10 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
   const initPrice = norm(product.price) || "0.00";
   const initCompare = norm(product.compareAtPrice);
   const initHandle = norm(product.handle);
+  const initBodyHtml = norm(product.bodyHtml);
 
   const [title, setTitle] = useState(initTitle);
+  const [bodyHtml, setBodyHtml] = useState(initBodyHtml);
   const [vendor, setVendor] = useState(initVendor);
   const [productType, setProductType] = useState(initProductType);
   const [tags, setTags] = useState(initTags);
@@ -88,6 +90,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
 
   const hasChanges = useCallback(() => {
     return title !== initTitle ||
+      bodyHtml !== initBodyHtml ||
       vendor !== initVendor ||
       productType !== initProductType ||
       tags !== initTags ||
@@ -96,8 +99,8 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
       price !== initPrice ||
       compareAtPrice !== initCompare ||
       handle !== initHandle;
-  }, [title, vendor, productType, tags, status, published, price, compareAtPrice, handle,
-      initTitle, initVendor, initProductType, initTags, initStatus, initPublished, initPrice, initCompare, initHandle]);
+  }, [title, bodyHtml, vendor, productType, tags, status, published, price, compareAtPrice, handle,
+      initTitle, initBodyHtml, initVendor, initProductType, initTags, initStatus, initPublished, initPrice, initCompare, initHandle]);
 
   const isValidPrice = (v: string) => v === "" || /^\d+(\.\d{0,2})?$/.test(v);
 
@@ -121,6 +124,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
 
     const updates: Record<string, unknown> = {};
     if (title !== initTitle) updates.title = title;
+    if (bodyHtml !== initBodyHtml) updates.bodyHtml = bodyHtml;
     if (vendor !== initVendor) updates.vendor = vendor;
     if (productType !== initProductType) updates.productType = productType;
     if (tags !== initTags) updates.tags = tags;
@@ -211,6 +215,17 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Descripción (HTML)</label>
+              <textarea
+                value={bodyHtml}
+                onChange={(e) => setBodyHtml(e.target.value)}
+                rows={5}
+                placeholder="Descripción del producto en HTML..."
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors resize-y min-h-[80px]"
               />
             </div>
 
