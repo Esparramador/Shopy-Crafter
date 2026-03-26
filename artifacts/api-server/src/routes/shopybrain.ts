@@ -11,6 +11,8 @@ import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
+import * as fs from "fs";
+import * as path from "path";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -230,6 +232,10 @@ Acciones disponibles:
 - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
 - modify_audit_filter: Cambiar el filtro de auditoría para incluir/excluir productos por estado. Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean, default true)}
 - diagnose_app: Auditar el funcionamiento interno de la app, detectar errores y repararlos. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
+- inspect_code: Leer y analizar un archivo de código fuente de la app. Params: {filePath (ej: "src/pages/projects/Audit.tsx"), analyze? (boolean, default true)}
+- fix_code: Aplicar una corrección a un archivo de código fuente. Params: {filePath, oldCode (texto exacto a reemplazar), newCode (código corregido), description (descripción del fix)}
+- list_source_files: Listar archivos del código fuente de la app. Params: {directory? (ej: "src/pages", "src/components"), pattern? (ej: ".tsx", ".ts")}
+- analyze_component: Analizar un componente/página en profundidad buscando bugs, problemas de UX, errores lógicos. Params: {filePath, focusOn? ("bugs","ux","performance","logic","all")}
 
 REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
@@ -244,7 +250,13 @@ REGLAS:
 - Si dice "archiva el producto X", usa set_product_status con status="archived"
 - Si dice "escanea la tienda", "audita todos los productos", "escanear tienda", "hacer auditoría", EJECUTA scan_store con statusFilter="any" para incluir TODOS los productos
 - Si dice "modifica el filtro de auditoría", "cambia el filtro", "incluye productos draft en la auditoría", "filtra por draft", "filtra por archivados", EJECUTA modify_audit_filter con statusFilter apropiado
-- Si dice "diagnostica la app", "audita el funcionamiento", "revisa errores de la app", "hay algún problema", "la app no funciona bien", "repara errores", "arregla la app", "self-check", "autodiagnóstico", EJECUTA diagnose_app
+- Si dice "diagnostica la app", "audita el funcionamiento", "revisa errores de la app", "hay algún problema", "la app no funciona bien", "self-check", "autodiagnóstico", EJECUTA diagnose_app
+- Si dice "muéstrame el código de X", "lee el archivo X", "inspecciona X", "revisa el código de X", "qué hace el archivo X", EJECUTA inspect_code con el filePath correspondiente
+- Si dice "arregla X", "repara X", "fix X", "corrige el bug de X", "modifica la función X", "cambia el código de X", PRIMERO usa inspect_code para leer el código, LUEGO analízalo y usa fix_code para aplicar el fix
+- Si dice "qué archivos tiene la app", "lista los componentes", "qué páginas hay", "muéstrame la estructura", EJECUTA list_source_files
+- Si dice "analiza la página X", "busca bugs en X", "hay errores en X", "revisa X en profundidad", "analiza el componente X", EJECUTA analyze_component con el filePath
+- Si dice "arregla la app", "repara errores de la app", necesitas PRIMERO ejecutar analyze_component en los archivos relevantes, y LUEGO fix_code para cada error encontrado
+- Para filePath: los archivos frontend están en "src/pages/..." y "src/components/...", los backend en rutas del api-server. Siempre usa rutas relativas desde la raíz del proyecto correspondiente
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
 - Si dice "ver pedidos", usa get_orders
@@ -1307,6 +1319,257 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           summary: { errors, warnings, ok: oks, fixesApplied },
           message: `${statusEmoji} Diagnóstico: ${overallStatus}. ${errors} errores, ${warnings} advertencias, ${oks} ok. ${fixesApplied > 0 ? `Se aplicaron ${fixesApplied} reparaciones automáticas.` : ""}
 ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠️" : "❌"} ${i.component}: ${i.detail}${i.autoFixed ? " [AUTO-REPARADO]" : ""}`).join("\n")}`,
+        };
+        break;
+      }
+
+      case "list_source_files": {
+        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
+        const FRONTEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer");
+        const BACKEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/api-server");
+
+        const directory = params?.directory || "";
+        const pattern = params?.pattern || "";
+
+        const listDir = (root: string, dir: string, prefix: string): string[] => {
+          const results: string[] = [];
+          const fullPath = path.join(root, dir);
+          if (!fs.existsSync(fullPath)) return results;
+          try {
+            const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
+              const relPath = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                results.push(`📁 ${prefix}${relPath}/`);
+                if (relPath.split("/").length < 4) {
+                  results.push(...listDir(root, relPath, prefix));
+                }
+              } else if (!pattern || entry.name.endsWith(pattern)) {
+                const stat = fs.statSync(path.join(root, relPath));
+                const sizeKb = Math.round(stat.size / 1024);
+                results.push(`📄 ${prefix}${relPath} (${sizeKb}KB)`);
+              }
+            }
+          } catch { /* ignore */ }
+          return results;
+        };
+
+        const frontendDir = directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "");
+        const frontendFiles = listDir(FRONTEND_ROOT, frontendDir, "[frontend] ");
+        const backendDir = directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "");
+        const backendFiles = listDir(BACKEND_ROOT, backendDir, "[backend] ");
+
+        result = {
+          frontend: frontendFiles.slice(0, 60),
+          backend: backendFiles.slice(0, 60),
+          totalFrontend: frontendFiles.length,
+          totalBackend: backendFiles.length,
+          message: `📂 Estructura del código:\n\n**Frontend (${frontendFiles.length} items):**\n${frontendFiles.slice(0, 30).join("\n")}\n\n**Backend (${backendFiles.length} items):**\n${backendFiles.slice(0, 30).join("\n")}`,
+        };
+        break;
+      }
+
+      case "inspect_code": {
+        const filePath = params?.filePath;
+        if (!filePath) { res.status(400).json({ error: "filePath requerido (ej: src/pages/projects/Audit.tsx)" }); return; }
+
+        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
+        const candidates = [
+          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
+          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
+          path.resolve(WORKSPACE_ROOT, filePath),
+        ];
+
+        let resolvedPath = "";
+        let fileContent = "";
+        for (const c of candidates) {
+          if (fs.existsSync(c)) {
+            resolvedPath = c;
+            fileContent = fs.readFileSync(c, "utf-8");
+            break;
+          }
+        }
+
+        if (!fileContent) {
+          res.status(404).json({ error: `Archivo no encontrado: ${filePath}. Prueba con list_source_files para ver los archivos disponibles.` });
+          return;
+        }
+
+        const lines = fileContent.split("\n").length;
+        const truncated = fileContent.length > 15000 ? fileContent.slice(0, 15000) + "\n\n// ... [truncado, archivo demasiado largo]" : fileContent;
+        let analysis = "";
+
+        if (params?.analyze !== false) {
+          try {
+            const analyzeMsg = await anthropic.messages.create({
+              model: "claude-sonnet-4-5",
+              max_tokens: 2000,
+              messages: [{
+                role: "user",
+                content: `Analiza este archivo de código fuente de una app Shopify (React+TypeScript frontend, Express+Node backend).
+Identifica: bugs, errores lógicos, problemas de UX, funciones rotas, imports faltantes, handlers sin error handling, y cualquier otro problema.
+Responde en español, sé concreto y directo. Para cada problema indica la línea aproximada y el fix sugerido.
+
+Archivo: ${filePath}
+\`\`\`
+${truncated}
+\`\`\``,
+              }],
+            });
+            analysis = (analyzeMsg.content[0] as { text: string }).text;
+          } catch {
+            analysis = "No se pudo ejecutar el análisis con IA.";
+          }
+        }
+
+        result = {
+          filePath,
+          resolvedPath: resolvedPath.replace(WORKSPACE_ROOT, ""),
+          lines,
+          sizeBytes: fileContent.length,
+          content: truncated,
+          analysis: analysis || undefined,
+          message: `📄 **${filePath}** (${lines} líneas, ${Math.round(fileContent.length / 1024)}KB)\n\n${analysis ? `🔍 **Análisis:**\n${analysis}` : "Contenido leído correctamente."}`,
+        };
+        break;
+      }
+
+      case "analyze_component": {
+        const filePath = params?.filePath;
+        if (!filePath) { res.status(400).json({ error: "filePath requerido" }); return; }
+        const focusOn = params?.focusOn || "all";
+
+        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
+        const candidates = [
+          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
+          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
+          path.resolve(WORKSPACE_ROOT, filePath),
+        ];
+
+        let fileContent = "";
+        for (const c of candidates) {
+          if (fs.existsSync(c)) { fileContent = fs.readFileSync(c, "utf-8"); break; }
+        }
+
+        if (!fileContent) {
+          res.status(404).json({ error: `Archivo no encontrado: ${filePath}` });
+          return;
+        }
+
+        const truncated = fileContent.length > 18000 ? fileContent.slice(0, 18000) + "\n// ... [truncado]" : fileContent;
+
+        const focusPrompts: Record<string, string> = {
+          bugs: "Busca SOLO bugs, errores de runtime, null pointer exceptions, funciones que fallan, imports rotos, variables undefined.",
+          ux: "Busca SOLO problemas de UX: botones que no funcionan, feedback faltante al usuario, estados de loading no manejados, errores silenciosos sin mensaje.",
+          performance: "Busca SOLO problemas de rendimiento: re-renders innecesarios, llamadas API sin cache, loops ineficientes, memory leaks.",
+          logic: "Busca SOLO errores de lógica de negocio: cálculos incorrectos, condiciones mal escritas, estados inconsistentes, race conditions.",
+          all: "Haz un análisis COMPLETO: bugs, errores lógicos, UX, rendimiento, seguridad. Prioriza por severidad (crítico > alto > medio > bajo).",
+        };
+
+        try {
+          const analyzeMsg = await anthropic.messages.create({
+            model: "claude-sonnet-4-5",
+            max_tokens: 4000,
+            messages: [{
+              role: "user",
+              content: `Eres un senior developer auditando código de producción de una app Shopify (React+Vite frontend, Express+Node backend, PostgreSQL, Drizzle ORM).
+
+ENFOQUE: ${focusPrompts[focusOn] || focusPrompts.all}
+
+Para CADA problema encontrado, responde con este formato exacto:
+🔴 CRÍTICO / 🟡 ALTO / 🟢 MEDIO / ⚪ BAJO
+**Línea ~N**: Descripción del problema
+**Fix**: Código exacto para corregirlo (old → new)
+
+Si no encuentras problemas, di "✅ Sin problemas detectados".
+Responde en español.
+
+Archivo: ${filePath}
+\`\`\`typescript
+${truncated}
+\`\`\``,
+            }],
+          });
+
+          const analysisText = (analyzeMsg.content[0] as { text: string }).text;
+
+          const criticalCount = (analysisText.match(/🔴/g) || []).length;
+          const highCount = (analysisText.match(/🟡/g) || []).length;
+          const mediumCount = (analysisText.match(/🟢/g) || []).length;
+          const lowCount = (analysisText.match(/⚪/g) || []).length;
+          const totalIssues = criticalCount + highCount + mediumCount + lowCount;
+
+          result = {
+            filePath,
+            focusOn,
+            analysis: analysisText,
+            issueCount: { critical: criticalCount, high: highCount, medium: mediumCount, low: lowCount, total: totalIssues },
+            message: `🔍 **Análisis de ${filePath}** (enfoque: ${focusOn})\n📊 ${totalIssues} problemas: ${criticalCount} críticos, ${highCount} altos, ${mediumCount} medios, ${lowCount} bajos\n\n${analysisText}`,
+          };
+        } catch (e) {
+          result = { error: true, message: `Error analizando: ${e instanceof Error ? e.message : String(e)}` };
+        }
+        break;
+      }
+
+      case "fix_code": {
+        const filePath = params?.filePath;
+        const oldCode = params?.oldCode;
+        const newCode = params?.newCode;
+        const description = params?.description || "Fix aplicado por ShopyBrain";
+
+        if (!filePath || !oldCode || newCode === undefined) {
+          res.status(400).json({ error: "filePath, oldCode y newCode son requeridos" });
+          return;
+        }
+
+        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
+        const candidates = [
+          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
+          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
+          path.resolve(WORKSPACE_ROOT, filePath),
+        ];
+
+        let resolvedPath = "";
+        let fileContent = "";
+        for (const c of candidates) {
+          if (fs.existsSync(c)) {
+            resolvedPath = c;
+            fileContent = fs.readFileSync(c, "utf-8");
+            break;
+          }
+        }
+
+        if (!resolvedPath) {
+          res.status(404).json({ error: `Archivo no encontrado: ${filePath}` });
+          return;
+        }
+
+        if (!fileContent.includes(oldCode)) {
+          result = {
+            success: false,
+            message: `❌ No se encontró el código a reemplazar en ${filePath}. Verifica que el texto es exacto. Usa inspect_code para ver el contenido actual del archivo.`,
+          };
+          break;
+        }
+
+        const backupPath = `${resolvedPath}.bak.${Date.now()}`;
+        fs.writeFileSync(backupPath, fileContent, "utf-8");
+
+        const newContent = fileContent.replace(oldCode, newCode);
+        fs.writeFileSync(resolvedPath, newContent, "utf-8");
+
+        const changedLines = newCode.split("\n").length;
+
+        result = {
+          success: true,
+          filePath,
+          resolvedPath: resolvedPath.replace(WORKSPACE_ROOT, ""),
+          description,
+          linesChanged: changedLines,
+          backupCreated: backupPath.replace(WORKSPACE_ROOT, ""),
+          message: `✅ **Fix aplicado en ${filePath}**\n📝 ${description}\n📊 ${changedLines} líneas modificadas\n💾 Backup creado automáticamente\n\n⚠️ **Nota:** Los cambios se aplican al código fuente. Reinicia el servidor para que tengan efecto.`,
         };
         break;
       }

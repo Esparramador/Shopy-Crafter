@@ -48,6 +48,10 @@ Acciones disponibles:
 - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
 - modify_audit_filter: Cambiar filtro de auditoría (qué productos incluir). Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean)}
 - diagnose_app: Diagnosticar el funcionamiento de la app, detectar y reparar errores. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
+- inspect_code: Leer y analizar código fuente de la app. Params: {filePath, analyze? (boolean)}
+- fix_code: Aplicar corrección a un archivo de código. Params: {filePath, oldCode, newCode, description}
+- list_source_files: Listar archivos del código fuente. Params: {directory?, pattern?}
+- analyze_component: Analizar componente buscando bugs. Params: {filePath, focusOn? ("bugs","ux","performance","logic","all")}
 - navigate: Navegar a página. Params: {path}
 - navigate: Ir a /projects/{projectId}/audit para ver auditoría visual
 

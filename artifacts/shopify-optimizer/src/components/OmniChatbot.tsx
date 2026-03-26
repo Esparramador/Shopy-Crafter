@@ -702,6 +702,18 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         msg += issues.map(i => `${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠️" : "❌"} **${i.component}**: ${i.detail}${i.autoFixed ? " 🔧" : ""}`).join("\n");
         return msg;
       }
+      case "list_source_files":
+        return result.message ?? `📂 ${result.totalFrontend ?? 0} archivos frontend, ${result.totalBackend ?? 0} archivos backend`;
+      case "inspect_code":
+        return result.message ?? `📄 Archivo: ${result.filePath}\n${result.analysis ?? "Código leído."}`;
+      case "analyze_component": {
+        const counts = result.issueCount as { critical?: number; high?: number; medium?: number; low?: number; total?: number } ?? {};
+        return `🔍 **Análisis: ${result.filePath}** (${result.focusOn})\n📊 ${counts.total ?? 0} problemas: ${counts.critical ?? 0} críticos, ${counts.high ?? 0} altos, ${counts.medium ?? 0} medios, ${counts.low ?? 0} bajos\n\n${result.analysis ?? ""}`;
+      }
+      case "fix_code":
+        return result.success
+          ? `✅ **Fix aplicado en ${result.filePath}**\n📝 ${result.description}\n📊 ${result.linesChanged ?? 0} líneas modificadas\n💾 Backup creado\n⚠️ Reinicia el servidor para aplicar los cambios.`
+          : `❌ ${result.message ?? "No se pudo aplicar el fix."}`;
       case "list_all_products": {
         const allProds = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
         const stats = result.byStatus as Record<string, number> ?? {};
