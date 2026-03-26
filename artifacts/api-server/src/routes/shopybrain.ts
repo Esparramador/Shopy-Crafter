@@ -296,7 +296,7 @@ Acciones disponibles:
 - store_status: Ver estado de la tienda. Params: {projectId}
 - list_products: Listar productos activos. Params: {projectId, limit?}
 - list_all_products: Listar TODOS los productos (active+draft+archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
-- create_product: Crear producto. Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?}
+- create_product: Crear producto COMPLETO con IA (título SEO, descripción 400+ palabras, tags, precio real del mercado, meta tags SEO, e imágenes generadas con IA según plan). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
 - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
@@ -326,7 +326,7 @@ Acciones disponibles:
 
 REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
-- Si el usuario dice "crea un producto llamado X", EJECUTA la acción create_product
+- Si el usuario dice "crea un producto llamado X", "créame un producto de X", "hazme una taza de X", "necesito una camiseta", "crea un producto sobre X", EJECUTA la acción create_product — el sistema genera automáticamente TODO: título SEO, descripción profesional, precio real investigado, meta tags, e imágenes con IA según el plan del proyecto
 - Si dice "muéstrame los productos", EJECUTA list_products
 - Si dice "muéstrame TODOS los productos" o "productos draft" o "productos ocultos" o "productos archivados", EJECUTA list_all_products con statusFilter="any" o el filtro específico
 - Si dice "regenera el token", EJECUTA regenerate_token
@@ -836,8 +836,19 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         let finalPrice = params?.price || "0.00";
         let finalCompareAt = params?.compareAtPrice || null;
         let pricingInfo = "";
+        let seoTitle = "";
+        let seoDescription = "";
 
         const storeNiche = project.storeNiche || "general";
+        const plan = (project.plan ?? "starter") as string;
+
+        const IMAGE_TYPES_BY_PLAN: Record<string, string[]> = {
+          trial: ["hero"],
+          starter: ["hero", "lifestyle"],
+          agency_pro: ["hero", "lifestyle", "detail", "packaging"],
+          enterprise: ["hero", "lifestyle", "detail", "packaging", "ugc"],
+          admin: ["hero", "lifestyle", "detail", "packaging", "ugc", "bundle"],
+        };
 
         if (params?.aiGenerate !== false) {
           try {
@@ -853,38 +864,52 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 seoDescription?: string;
                 suggestedPrice?: number;
                 suggestedCompareAtPrice?: number;
+                productType?: string;
               }>(
                 parseInt(projectId),
-                `Genera contenido PROFESIONAL optimizado para un nuevo producto Shopify.
+                `Genera contenido PROFESIONAL COMPLETO optimizado para un nuevo producto Shopify.
 Título base: "${title}"
-Tipo de producto: ${params?.productType || "no especificado"}
+Tipo de producto: ${params?.productType || "DETECTA el tipo de producto a partir del título (ej: 'taza', 'camiseta', 'poster', 'accesorio', etc.)"}
 Nicho: ${storeNiche}
 Tono de marca: ${project.brandTone || "profesional"}
-Precio proporcionado: ${params?.price || "NO proporcionado — sugiere un precio competitivo basado en el nicho y tipo de producto"}
+Plan de suscripción: ${plan} (adapta la profundidad del contenido)
+Precio proporcionado: ${params?.price || "NO proporcionado — investiga y sugiere un precio competitivo REAL del mercado"}
 
-INSTRUCCIONES:
-1. Mejora el título para SEO (mantén la esencia pero hazlo irresistible)
-2. Genera una descripción HTML profesional de AL MENOS 300 palabras con:
-   - Párrafo de apertura con storytelling emocional
-   - Lista de beneficios con bullet points (✅)
-   - Especificaciones técnicas si aplica
-   - Párrafo de cierre con CTA persuasivo
-3. Genera 15+ tags SEO relevantes para el nicho
-4. Meta title SEO (max 60 chars) y meta description (max 155 chars)
-5. Si NO hay precio proporcionado, sugiere un precio competitivo basado en tu conocimiento del nicho
+INSTRUCCIONES (contenido PREMIUM de agencia profesional):
+1. Mejora el título para SEO (mantén la esencia pero hazlo irresistible, incluye keywords del nicho)
+2. Genera una descripción HTML profesional de AL MENOS 400 palabras con:
+   - Headline emotivo con H2
+   - Párrafo de apertura con storytelling emocional que conecte con el buyer persona
+   - Sección de características con bullet points (✅) — mínimo 6 beneficios
+   - Especificaciones técnicas en tabla HTML si aplica (materiales, dimensiones, peso, etc.)
+   - Sección "¿Para quién es?" con casos de uso
+   - Sección de garantía/confianza
+   - Párrafo de cierre con CTA persuasivo y urgencia sutil
+   - Usa clases CSS inline para darle estilo profesional
+3. Genera 20+ tags SEO relevantes (incluye long-tail keywords, variaciones, sinónimos)
+4. Meta title SEO (max 60 chars, incluye keyword principal + beneficio)
+5. Meta description SEO (max 155 chars, incluye CTA y keywords)
+6. Si NO hay precio, sugiere precio competitivo basado en el mercado real
+7. Detecta automáticamente el tipo de producto si no se proporcionó
 
 Responde SOLO JSON válido:
-{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.XX,"suggestedCompareAtPrice":XX.XX}`,
-                `Eres un experto ELITE en copywriting eCommerce Shopify con 15 años de experiencia. Generas contenido que convierte visitantes en compradores. Conoces las mejores prácticas de SEO, persuasión y storytelling de marca. Responde SOLO JSON válido.`,
+{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.XX,"suggestedCompareAtPrice":XX.XX,"productType":"tipo_detectado"}`,
+                `Eres un equipo ELITE de copywriting eCommerce Shopify con 15 años de experiencia trabajando para marcas premium. Generas fichas de producto que CONVIERTEN al nivel de agencias que cobran €5.000+/mes. Tu contenido es indistinguible del de una agencia top. Conoces las mejores prácticas de SEO, persuasión, storytelling y CRO (Conversion Rate Optimization). Responde SOLO JSON válido.`,
                 "seo",
                 storeNiche || undefined,
-                2500
+                4000
               ),
             ]);
 
             finalTitle = aiContent.title || title;
             finalBody = aiContent.description || finalBody;
             finalTags = Array.isArray(aiContent.tags) ? aiContent.tags.join(", ") : finalTags;
+            seoTitle = aiContent.seoTitle || "";
+            seoDescription = aiContent.seoDescription || "";
+
+            if (aiContent.productType && !params?.productType) {
+              params.productType = aiContent.productType;
+            }
 
             if (!params?.price || params?.price === "0.00") {
               if (priceResearch && priceResearch.suggestedPrice > 0) {
@@ -904,7 +929,14 @@ Responde SOLO JSON válido:
           } catch { /* use original data */ }
         }
 
-        const shopifyProduct = {
+        const { checkProductionLimit: checkProdLimit, recordUsage: recProdUsage } = await import("../lib/plan-limits.js");
+        const prodLimitCheck = await checkProdLimit(parseInt(projectId), "product", 1);
+        if (!prodLimitCheck.allowed) {
+          result = { error: true, message: `❌ Límite de productos alcanzado para tu plan (${prodLimitCheck.planLabel}). Quedan ${prodLimitCheck.remaining.products} productos este mes.` };
+          break;
+        }
+
+        const shopifyProduct: Record<string, unknown> = {
           title: finalTitle,
           body_html: finalBody,
           tags: finalTags,
@@ -921,25 +953,36 @@ Responde SOLO JSON válido:
           }],
         };
 
+        if (seoTitle) shopifyProduct.metafields_global_title_tag = seoTitle;
+        if (seoDescription) shopifyProduct.metafields_global_description_tag = seoDescription;
+
         const created = await shopifyRequest<{ product: Record<string, unknown> }>(
           parseInt(projectId), project.shopDomain, "/products.json",
           { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
         );
 
+        await recProdUsage(parseInt(projectId), "product", 1);
+
+        const createdProductId = String(created.product.id);
+        const createdTitle = String(created.product.title);
+        const createdHandle = String(created.product.handle || "");
+
         saveToVault({
           projectId: parseInt(projectId),
           fileType: "product_card",
           category: "product_creation",
-          title: `Producto: ${created.product.title}`,
+          title: `Producto: ${createdTitle}`,
           description: finalBody ? String(finalBody).replace(/<[^>]*>/g, "").slice(0, 200) : undefined,
-          productId: String(created.product.id),
-          productTitle: String(created.product.title),
+          productId: createdProductId,
+          productTitle: createdTitle,
           generatedBy: "shopybrain_voice",
           metadata: {
             price: finalPrice,
             status: created.product.status,
             tags: finalTags,
             shopifyId: created.product.id,
+            seoTitle,
+            seoDescription,
           },
         }).catch(() => {});
 
@@ -947,25 +990,172 @@ Responde SOLO JSON válido:
           operationType: "product_creation",
           niche: project.storeNiche,
           productType: params?.productType || null,
-          title: `Producto creado: ${created.product.title}`,
+          title: `Producto creado: ${createdTitle}`,
           content: JSON.stringify({
-            title: created.product.title,
+            title: createdTitle,
             description: finalBody ? String(finalBody).slice(0, 500) : "",
             tags: finalTags,
             price: finalPrice,
-            handle: created.product.handle,
+            handle: createdHandle,
+            seoTitle,
+            seoDescription,
           }),
-          confidence: 0.8,
+          confidence: 0.9,
         });
+
+        const imageTypes = IMAGE_TYPES_BY_PLAN[plan] || IMAGE_TYPES_BY_PLAN.starter;
+        let imagesGenerated = 0;
+        let imagesUploaded = 0;
+        const imageErrors: string[] = [];
+
+        if (params?.aiGenerate !== false && params?.skipImages !== true) {
+          try {
+            const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
+            const { buildImagePrompt: buildPrompt, runImageGeneration: runGeneration, MODEL_MAP: modelMap, COST_MAP: costMap, NEGATIVE_PROMPT: negPrompt, uploadGeneratedImageToShopify: uploadImg } = await import("./images.js");
+            
+
+            await db.insert(pTable).values({
+              projectId: parseInt(projectId),
+              shopifyProductId: createdProductId,
+              title: createdTitle,
+              handle: createdHandle,
+              bodyHtml: finalBody || null,
+              vendor: params?.vendor || null,
+              productType: params?.productType || null,
+              status: (params?.status || "draft") as "active" | "draft" | "archived",
+              tags: finalTags || null,
+              price: finalPrice,
+              compareAtPrice: finalCompareAt,
+              imageCount: 0,
+              variantCount: 1,
+            }).onConflictDoNothing().catch(() => {});
+
+            const limitCheck = await checkProdLimit(parseInt(projectId), "image", imageTypes.length);
+            const allowedCount = limitCheck.allowed ? imageTypes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+
+            if (allowedCount > 0) {
+              const typesToGenerate = imageTypes.slice(0, allowedCount);
+
+              let imagePosition = 0;
+              const generateAndUpload = async (imageType: string): Promise<void> => {
+                const position = ++imagePosition;
+                try {
+                  const model = modelMap[imageType] ?? modelMap.hero;
+                  const estimatedCost = costMap[model] ?? 0.04;
+                  const prompt = await buildPrompt(
+                    parseInt(projectId), createdTitle, params?.productType || null,
+                    imageType, storeNiche, project.brandTone
+                  );
+
+                  const [job] = await db.insert(gjTable).values({
+                    projectId: parseInt(projectId),
+                    shopifyProductId: createdProductId,
+                    imageType,
+                    status: "pending",
+                    prompt,
+                    negativePrompt: negPrompt,
+                    model,
+                    estimatedCost,
+                  }).returning();
+
+                  const genResult = await runGeneration({
+                    job: { id: job.id },
+                    projectId: parseInt(projectId),
+                    shopifyProductId: createdProductId,
+                    imageType,
+                    finalPrompt: prompt,
+                    model,
+                    estimatedCost,
+                    product: { title: createdTitle, productType: params?.productType || null },
+                    project: { storeNiche: project.storeNiche, brandTone: project.brandTone, replicateApiToken: project.replicateApiToken },
+                  });
+
+                  if (genResult.success && genResult.imageUrl) {
+                    imagesGenerated++;
+                    await recProdUsage(parseInt(projectId), "image", 1);
+
+                    const [updatedJob] = await db.select().from(gjTable).where(eq(gjTable.id, job.id));
+                    const uploadResult = await uploadImg({
+                      projectId: parseInt(projectId),
+                      shopDomain: project.shopDomain,
+                      shopifyProductId: createdProductId,
+                      jobId: job.id,
+                      imageUrl: genResult.imageUrl,
+                      altText: updatedJob?.altText || `${createdTitle} - ${imageType}`,
+                      imageType,
+                      position,
+                    });
+                    if (uploadResult.success) imagesUploaded++;
+                    else imageErrors.push(`${imageType}: upload failed`);
+                  } else {
+                    imageErrors.push(`${imageType}: ${genResult.error || "generation failed"}`);
+                  }
+                } catch (e: unknown) {
+                  imageErrors.push(`${imageType}: ${e instanceof Error ? e.message : "error"}`);
+                }
+              };
+
+              const heroType = typesToGenerate.find(t => t === "hero");
+              const otherTypes = typesToGenerate.filter(t => t !== "hero");
+
+              if (heroType) {
+                await generateAndUpload(heroType);
+              }
+
+              if (otherTypes.length > 0) {
+                const batchSize = 2;
+                for (let i = 0; i < otherTypes.length; i += batchSize) {
+                  const batch = otherTypes.slice(i, i + batchSize);
+                  await Promise.allSettled(batch.map(t => generateAndUpload(t)));
+                }
+              }
+            }
+          } catch (imgErr: unknown) {
+            logger.error({ err: imgErr }, "Error en generación de imágenes para producto nuevo");
+          }
+        }
+
+        let imagesSummary = "";
+        if (imagesGenerated > 0) {
+          imagesSummary = `\n📸 ${imagesGenerated} imagen(es) generada(s) con IA`;
+          if (imagesUploaded > 0) imagesSummary += `, ${imagesUploaded} subida(s) a Shopify`;
+          if (imageErrors.length > 0) imagesSummary += ` (⚠️ ${imageErrors.length} con error: ${imageErrors.join(", ")})`;
+        } else if (imageErrors.length > 0) {
+          imagesSummary = `\n⚠️ Imágenes: ${imageErrors.length} error(es) — ${imageErrors.join(", ")}`;
+        } else if (params?.skipImages === true) {
+          imagesSummary = `\n📸 Imágenes omitidas (skipImages=true)`;
+        } else if (params?.aiGenerate === false) {
+          imagesSummary = "";
+        } else {
+          imagesSummary = `\n📸 Generación de imágenes no disponible (verifica Replicate API token)`;
+        }
+
+        let seoSummary = "";
+        if (seoTitle || seoDescription) {
+          seoSummary = `\n🔍 SEO: meta title y description configurados`;
+        }
 
         result = {
           productId: created.product.id,
-          title: created.product.title,
+          title: createdTitle,
           status: created.product.status,
-          handle: created.product.handle,
+          handle: createdHandle,
           price: finalPrice,
           compareAtPrice: finalCompareAt,
-          message: `Producto "${created.product.title}" creado exitosamente en Shopify (ID: ${created.product.id}, estado: ${created.product.status}, precio: ${finalPrice}€)${pricingInfo}`,
+          seoTitle,
+          seoDescription,
+          imagesGenerated,
+          imagesUploaded,
+          imageTypes: (IMAGE_TYPES_BY_PLAN[plan] || []).slice(0, imagesGenerated),
+          message: `✅ Producto "${createdTitle}" creado COMPLETO en Shopify (ID: ${created.product.id})
+
+📝 Contenido: Título SEO optimizado + descripción profesional (400+ palabras)
+🏷️ Tags: ${finalTags ? finalTags.split(",").length : 0} tags SEO generados
+${pricingInfo || `💰 Precio: ${finalPrice}€`}${finalCompareAt ? ` (antes: ${finalCompareAt}€)` : ""}${seoSummary}${imagesSummary}
+📦 Estado: ${created.product.status}
+🔗 Handle: ${createdHandle}
+
+Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de imagen disponibles`,
         };
         break;
       }

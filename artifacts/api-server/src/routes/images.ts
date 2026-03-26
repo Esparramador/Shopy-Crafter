@@ -12,7 +12,7 @@ const router = Router();
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const MODEL_MAP: Record<string, string> = {
+export const MODEL_MAP: Record<string, string> = {
   hero: "black-forest-labs/flux-1.1-pro",
   lifestyle: "black-forest-labs/flux-1.1-pro",
   bundle: "black-forest-labs/flux-1.1-pro",
@@ -23,14 +23,14 @@ const MODEL_MAP: Record<string, string> = {
   infographic: "svg_only",
 };
 
-const COST_MAP: Record<string, number> = {
+export const COST_MAP: Record<string, number> = {
   "black-forest-labs/flux-1.1-pro": 0.04,
   "black-forest-labs/flux-dev": 0.025,
   "recraft-ai/recraft-v3": 0.022,
   svg_only: 0,
 };
 
-const NEGATIVE_PROMPT =
+export const NEGATIVE_PROMPT =
   "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs, wrong product, unrelated object, flowers on non-flower product, animals on non-animal product, food on non-food product, random decorations unrelated to subject";
 
 // Replicate can take up to 3 minutes for complex models — allow 5 min max
@@ -51,7 +51,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([promise, timeout]);
 }
 
-async function buildImagePrompt(
+export async function buildImagePrompt(
   projectId: number,
   productTitle: string,
   productType: string | null,
@@ -108,7 +108,7 @@ async function buildImagePrompt(
  * Core image generation logic — shared by single and bulk generators.
  * Handles Replicate call with proper timeout, DB updates, vault save, and learning.
  */
-async function runImageGeneration(params: {
+export async function runImageGeneration(params: {
   job: { id: number };
   projectId: number;
   shopifyProductId: string;
@@ -357,6 +357,40 @@ router.get("/projects/:projectId/generation-jobs/:jobId", async (req, res): Prom
 
 // ── Upload generated image to Shopify ────────────────────────────────────────
 
+export async function uploadGeneratedImageToShopify(opts: {
+  projectId: number;
+  shopDomain: string;
+  shopifyProductId: string;
+  jobId: number;
+  imageUrl: string;
+  altText: string | null;
+  imageType: string;
+  position?: number;
+}): Promise<{ success: boolean; shopifyImageId?: number; error?: string }> {
+  try {
+    if (!/^https?:\/\//.test(opts.imageUrl)) {
+      return { success: false, error: "URL de imagen inválida" };
+    }
+
+    const imgResp = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS) });
+    if (!imgResp.ok) return { success: false, error: `No se pudo descargar la imagen (${imgResp.status})` };
+
+    const buffer = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+
+    const uploadData = await shopifyRequest<{ image: { id: number } }>(
+      opts.projectId, opts.shopDomain,
+      `/products/${opts.shopifyProductId}/images.json`,
+      { method: "POST", body: JSON.stringify({ image: { attachment: base64, alt: opts.altText ?? opts.imageType, position: opts.position ?? 1 } }) }
+    );
+
+    await db.update(generationJobsTable).set({ shopifyImageId: uploadData.image.id }).where(eq(generationJobsTable.id, opts.jobId));
+    return { success: true, shopifyImageId: uploadData.image.id };
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Error subiendo imagen" };
+  }
+}
+
 router.post("/projects/:projectId/products/:productId/images/:imageId/upload-to-shopify", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
@@ -370,34 +404,15 @@ router.post("/projects/:projectId/products/:productId/images/:imageId/upload-to-
     return;
   }
 
-  // ── Fetch generated image with timeout ──────────────────────────────────
-  const imgResp = await fetch(job.imageUrl, {
-    signal: AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS),
+  const uploadResult = await uploadGeneratedImageToShopify({
+    projectId, shopDomain: project.shopDomain, shopifyProductId,
+    jobId: imageJobId, imageUrl: job.imageUrl, altText: job.altText, imageType: job.imageType,
   });
 
-  if (!imgResp.ok) {
-    res.status(502).json({ error: `No se pudo descargar la imagen generada (${imgResp.status})` });
+  if (!uploadResult.success) {
+    res.status(502).json({ error: uploadResult.error });
     return;
   }
-
-  const buffer = await imgResp.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
-
-  const uploadData = await shopifyRequest<{ image: { id: number } }>(
-    projectId,
-    project.shopDomain,
-    `/products/${shopifyProductId}/images.json`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        image: { attachment: base64, alt: job.altText ?? job.imageType, position: 1 },
-      }),
-    }
-  );
-
-  await db.update(generationJobsTable)
-    .set({ shopifyImageId: uploadData.image.id })
-    .where(eq(generationJobsTable.id, imageJobId));
 
   res.json({ success: true, message: "Imagen subida a Shopify correctamente" });
 });

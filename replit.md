@@ -109,8 +109,20 @@ Functionality to dissociate a Shopify store (clears credentials, retains data) o
 ### Professional Export Center
 A comprehensive export system at `/projects/:id/exports` offering 8 report types, including executive summaries, SEO reports, product catalogs, financial reports, and brand briefs. Reports are professional HTML with gold/black branding, print-ready for PDF conversion.
 
-### Shopify Product Creation
-Admins can create new products directly in connected Shopify stores via the Audit page. Features include a full product form, AI-powered content generation (title, description, tags, SEO), variant support, and immediate product auditing.
+### Shopify Product Creation (Full AI Pipeline)
+Products can be created via the Audit page form OR via the OmniChatbot ("créame un producto de X"). Both paths use the same `create_product` action which generates a COMPLETE product:
+1. **AI Content (Claude + OmniCore)**: SEO-optimized title, 400+ word HTML description with storytelling, 20+ SEO tags, meta title & description
+2. **Real Price Research (Gemini Search)**: Investigates actual market prices from competitors, suggests competitive pricing with compare-at price
+3. **SEO Metafields**: Sets `metafields_global_title_tag` and `metafields_global_description_tag` on Shopify
+4. **AI Image Generation (Replicate)**: Auto-generates images based on subscription plan:
+   - Trial: 1 image (hero)
+   - Starter: 2 images (hero + lifestyle)
+   - Agency Pro: 4 images (hero + lifestyle + detail + packaging)
+   - Enterprise: 5 images (+ ugc)
+   - Admin: 6 images (+ bundle)
+5. **Auto-upload to Shopify**: Generated images are automatically uploaded to the product
+6. **Vault & Learning**: Saved to project vault and OmniCore learns from each creation
+The `skipImages` param can bypass image generation if needed.
 
 ### Image-to-Product Creation (Chat)
 Users can drag/drop a product photo into the OmniChatbot and command it to create a product. This triggers a pipeline using Claude Vision for image analysis, Gemini for market pricing research, and Claude for SEO-optimized copywriting, ultimately creating a draft product in Shopify.
