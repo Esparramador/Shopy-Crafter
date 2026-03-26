@@ -767,6 +767,9 @@ export default function AuditPage() {
   const [scanResult, setScanResult] = useState<string>("");
   const [tokenLoading, setTokenLoading] = useState(false);
   const [editProduct, setEditProduct] = useState<EditableProduct | null>(null);
+  const [optimizingId, setOptimizingId] = useState<string | null>(null);
+  const [bulkOptimizing, setBulkOptimizing] = useState(false);
+  const [optimizeMsg, setOptimizeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const { data, isLoading, refetch } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
@@ -823,6 +826,48 @@ export default function AuditPage() {
       setTokenMsg({ text: e instanceof Error ? e.message : "Error regenerando token", ok: false });
     } finally {
       setTokenLoading(false);
+    }
+  };
+
+  const optimizeProduct = async (shopifyProductId: string) => {
+    setOptimizingId(shopifyProductId);
+    setOptimizeMsg(null);
+    try {
+      const res = await fetch(`${API}/api/shopybrain/action`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "optimize_product", params: { projectId, productId: shopifyProductId } }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error optimizando");
+      setOptimizeMsg({ text: `"${data.title}" optimizado con IA`, ok: true });
+      refetch();
+    } catch (e: unknown) {
+      setOptimizeMsg({ text: e instanceof Error ? e.message : "Error", ok: false });
+    } finally {
+      setOptimizingId(null);
+    }
+  };
+
+  const optimizeAll = async () => {
+    setBulkOptimizing(true);
+    setOptimizeMsg(null);
+    try {
+      const res = await fetch(`${API}/api/shopybrain/action`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "optimize_all_products", params: { projectId, limit: 25 } }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error en optimización masiva");
+      setOptimizeMsg({ text: `${data.optimized}/${data.total} productos optimizados con IA`, ok: true });
+      refetch();
+    } catch (e: unknown) {
+      setOptimizeMsg({ text: e instanceof Error ? e.message : "Error", ok: false });
+    } finally {
+      setBulkOptimizing(false);
     }
   };
 
@@ -1094,8 +1139,26 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
       {/* Products Tab */}
       {activeTab === "products" && (
         <>
+          {optimizeMsg && (
+            <div className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm ${optimizeMsg.ok ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+              {optimizeMsg.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              {optimizeMsg.text}
+              <button onClick={() => setOptimizeMsg(null)} className="ml-2 hover:opacity-70"><X className="w-3 h-3" /></button>
+            </div>
+          )}
+
           <div className="flex flex-wrap justify-between items-center gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Resultados</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-foreground">Resultados</h2>
+              <button
+                onClick={optimizeAll}
+                disabled={bulkOptimizing || isScanning || !!optimizingId}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 text-yellow-400 rounded-lg text-xs font-medium hover:from-yellow-600/30 hover:to-amber-600/30 transition-all disabled:opacity-50"
+              >
+                {bulkOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {bulkOptimizing ? "Optimizando..." : "Optimizar Todo con IA"}
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <select
                 value={filterStatus}
@@ -1151,13 +1214,24 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-0.5">
                       <h3 className="text-base font-bold text-foreground line-clamp-2">{product.title}</h3>
-                      <button
-                        onClick={() => setEditProduct(product as unknown as EditableProduct)}
-                        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                        title="Editar producto"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => optimizeProduct(String(product.shopifyProductId || product.id))}
+                          disabled={optimizingId === String(product.shopifyProductId || product.id) || bulkOptimizing}
+                          className="p-1.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50"
+                          title="Optimizar con ShopyBrain IA"
+                        >
+                          {optimizingId === String(product.shopifyProductId || product.id) ? <Loader2 className="w-4 h-4 animate-spin text-yellow-400" /> : <Sparkles className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => setEditProduct(product as unknown as EditableProduct)}
+                          className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                          title="Editar producto"
+                          aria-label="Editar producto"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${

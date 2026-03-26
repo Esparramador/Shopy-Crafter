@@ -750,6 +750,39 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         msg += `\n\n📥 _Puedes descargar el informe completo con el botón de abajo._`;
         return msg;
       }
+      case "optimize_product":
+        return `🧠 **Producto optimizado con IA:**\n📝 "${result.title}"${result.previousTitle !== result.title ? ` (antes: "${result.previousTitle}")` : ""}\n🏷 ${result.tagsCount} tags SEO\n📄 Descripción: ${result.descriptionLength} caracteres\n🔍 SEO: ${result.seoTitle}\n🖼 ${result.altTextsGenerated} alt texts generados`;
+      case "optimize_all_products": {
+        const prods = (result.products as Array<{ title: string }>) ?? [];
+        let msg = `🧠 **Optimización masiva IA:** ${result.optimized}/${result.total} productos\n`;
+        if (prods.length > 0) msg += prods.map((p, i) => `${i + 1}. ✅ ${p.title}`).join("\n");
+        if (result.failed) msg += `\n⚠️ ${result.failed} errores`;
+        return msg;
+      }
+      case "create_collection":
+        return `📂 **Colección "${result.title}" creada**\n🆔 ID: ${result.collectionId}\n📋 Tipo: ${result.type}${result.productsAdded ? `\n📦 ${result.productsAdded} productos añadidos` : ""}`;
+      case "list_collections": {
+        const cols = (result.collections as Array<{ title: string; type: string; productsCount: number }>) ?? [];
+        if (!cols.length) return "📂 No hay colecciones.";
+        return `📂 **${result.total} colecciones:**\n${cols.map((c, i) => `${i + 1}. **${c.title}** (${c.type}) — ${c.productsCount} productos`).join("\n")}`;
+      }
+      case "auto_collections": {
+        const cols = (result.collections as Array<{ title: string; type: string }>) ?? [];
+        return `📂 **${result.collectionsCreated} colecciones creadas automáticamente:**\n${cols.map((c, i) => `${i + 1}. **${c.title}** (${c.type})`).join("\n")}`;
+      }
+      case "create_page":
+        return `📄 **Página "${result.title}" creada**\n🆔 ID: ${result.pageId}\n📝 ${result.contentLength} caracteres de contenido IA\n🔗 /pages/${result.handle}`;
+      case "list_pages": {
+        const pages = (result.pages as Array<{ title: string; handle: string; published: boolean }>) ?? [];
+        if (!pages.length) return "📄 No hay páginas.";
+        return `📄 **${result.total} páginas:**\n${pages.map((p, i) => `${i + 1}. **${p.title}** — /pages/${p.handle} ${p.published ? "✅" : "⏸️"}`).join("\n")}`;
+      }
+      case "design_all_pages": {
+        const pages = (result.pages as Array<{ title: string; handle: string }>) ?? [];
+        return `📄 **${result.pagesCreated} páginas diseñadas por IA:**\n${pages.map((p, i) => `${i + 1}. **${p.title}** → /pages/${p.handle}`).join("\n")}`;
+      }
+      case "optimize_images":
+        return `🖼 **Optimización de imágenes completada:**\n📊 ${result.productsProcessed} productos procesados\n🖼 ${result.optimizedImages}/${result.totalImages} imágenes con alt text SEO`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }

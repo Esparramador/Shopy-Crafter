@@ -43,7 +43,22 @@ A three-model pipeline: Gemini → Claude → OmniCore, with image generation in
 - **OmniCore**: The central "brain" for permanent memory, storing all AI outputs and analysis.
 
 ### OmniCore Floating AI Chatbot (with Shopify Action Execution)
-A universal, multi-model chatbot accessible from all admin pages, capable of absorbing/analyzing content and executing Shopify operations through natural language commands or voice commands. It can create, edit, delete, publish products, change prices, and regenerate tokens. All findings are permanently stored in `omnicore_absorbed_content`.
+A universal, multi-model chatbot accessible from all admin pages, capable of absorbing/analyzing content and executing Shopify operations through natural language commands or voice commands. All findings are permanently stored in `omnicore_absorbed_content`.
+
+**Product Management Actions**: create, edit, delete, publish, change price, set status, search, scan/audit
+**AI Content Generation Actions**:
+- `optimize_product`: AI generates professional title, description (400+ words HTML), 15+ SEO tags, meta title/description, alt texts for all images, SEO handle — directly updates Shopify
+- `optimize_all_products`: Batch optimize up to 25 products at once with full AI content
+- `optimize_images`: Generate SEO alt texts for all product images using AI analysis
+**Collections Management Actions**:
+- `create_collection`: Create custom or smart collections with AI-generated descriptions and SEO
+- `list_collections`: List all custom + smart collections
+- `auto_collections`: AI analyzes all products and automatically creates optimal collections
+**Pages Design Actions**:
+- `create_page`: Create Shopify pages (About, FAQ, Shipping, Returns, Privacy, Terms, Contact) with full AI-generated professional content
+- `list_pages`: List all store pages
+- `design_all_pages`: Create all essential store pages in one command
+**DevOps Actions**: diagnose_app, inspect_code, fix_code, list_source_files, analyze_component
 
 ### Entity Research Engine
 A deep absorption engine for brands, competitors, or influencers, triggered via the chatbot. It performs parallel Google Search Grounding, identifies knowledge gaps with Gemini, synthesizes structured JSON profiles with Claude, and upserts entity memories.

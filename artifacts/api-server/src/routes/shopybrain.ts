@@ -8,7 +8,7 @@ import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation } from "../lib/claude.js";
+import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
 import * as fs from "fs";
@@ -232,6 +232,15 @@ Acciones disponibles:
 - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
 - modify_audit_filter: Cambiar el filtro de auditoría para incluir/excluir productos por estado. Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean, default true)}
 - diagnose_app: Auditar el funcionamiento interno de la app, detectar errores y repararlos. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
+- optimize_product: Optimizar un producto con IA (título, descripción, tags, SEO, alt texts). Params: {projectId, productId}
+- optimize_all_products: Optimizar TODOS los productos con IA profesional. Params: {projectId, limit? (default 10, max 25)}
+- create_collection: Crear colección Shopify. Params: {projectId, title, type? ("custom"|"smart"), bodyHtml?, rules? (para smart), productIds? (para custom), sortOrder?, aiGenerate? (default true)}
+- list_collections: Listar colecciones. Params: {projectId, limit?}
+- auto_collections: Analizar productos y crear colecciones inteligentes automáticamente. Params: {projectId}
+- create_page: Crear página Shopify con contenido IA. Params: {projectId, title?, pageType? ("about"|"contact"|"faq"|"shipping"|"returns"|"privacy"|"terms"|"size_guide")}
+- list_pages: Listar páginas de la tienda. Params: {projectId}
+- design_all_pages: Diseñar TODAS las páginas esenciales de la tienda. Params: {projectId, pageTypes? (default ["about","faq","shipping","returns","contact"])}
+- optimize_images: Generar alt texts SEO para imágenes. Params: {projectId, productId? (si no se da, optimiza todos)}
 - inspect_code: Leer y analizar un archivo de código fuente de la app. Params: {filePath (ej: "src/pages/projects/Audit.tsx"), analyze? (boolean, default true)}
 - fix_code: Aplicar una corrección a un archivo de código fuente. Params: {filePath, oldCode (texto exacto a reemplazar), newCode (código corregido), description (descripción del fix)}
 - list_source_files: Listar archivos del código fuente de la app. Params: {directory? (ej: "src/pages", "src/components"), pattern? (ej: ".tsx", ".ts")}
@@ -256,6 +265,16 @@ REGLAS:
 - Si dice "qué archivos tiene la app", "lista los componentes", "qué páginas hay", "muéstrame la estructura", EJECUTA list_source_files
 - Si dice "analiza la página X", "busca bugs en X", "hay errores en X", "revisa X en profundidad", "analiza el componente X", EJECUTA analyze_component con el filePath
 - Si dice "arregla la app", "repara errores de la app", necesitas PRIMERO ejecutar analyze_component en los archivos relevantes, y LUEGO fix_code para cada error encontrado
+- Si dice "optimiza este producto", "mejora el producto X", "genera contenido para el producto X", "rellena el producto X", EJECUTA optimize_product con productId
+- Si dice "optimiza todos los productos", "mejora todos", "rellena todo el catálogo", "genera contenido para todos", EJECUTA optimize_all_products
+- Si dice "crea una colección", "nueva colección de X", "agrupa los productos por X", EJECUTA create_collection
+- Si dice "crea las colecciones automáticamente", "organiza los productos en colecciones", "genera colecciones", EJECUTA auto_collections
+- Si dice "lista las colecciones", "qué colecciones hay", "ver colecciones", EJECUTA list_collections
+- Si dice "crea la página de X", "haz la página About", "diseña la página FAQ", "crea página de envíos", EJECUTA create_page con el pageType adecuado
+- Si dice "diseña todas las páginas", "crea todas las páginas de la tienda", "páginas esenciales", EJECUTA design_all_pages
+- Si dice "lista las páginas", "qué páginas tiene la tienda", EJECUTA list_pages
+- Si dice "optimiza las imágenes", "genera alt text", "SEO de imágenes", "alt texts", EJECUTA optimize_images
+- Si dice "prepara la tienda completa", "configura toda la tienda", "setup completo", ejecuta en secuencia: optimize_all_products, auto_collections, design_all_pages, optimize_images
 - Para filePath: los archivos frontend están en "src/pages/..." y "src/components/...", los backend en rutas del api-server. Siempre usa rutas relativas desde la raíz del proyecto correspondiente
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
@@ -1585,6 +1604,644 @@ ${truncated}
           linesChanged: changedLines,
           backupCreated: backupPath.replace(WORKSPACE_ROOT, ""),
           message: `✅ **Fix aplicado en ${filePath}**\n📝 ${description}\n📊 ${changedLines} líneas modificadas\n💾 Backup creado automáticamente\n\n⚠️ **Nota:** Los cambios se aplican al código fuente. Reinicia el servidor para que tengan efecto.`,
+        };
+        break;
+      }
+
+      case "optimize_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { res.status(400).json({ error: "projectId y productId requeridos" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const prodData = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`
+        );
+        const prod = prodData.product;
+        const images = (prod.images as Array<Record<string, unknown>>) || [];
+        const variants = (prod.variants as Array<Record<string, unknown>>) || [];
+        const currentTags = String(prod.tags || "");
+        const currentTitle = String(prod.title || "");
+        const currentDesc = String(prod.body_html || "");
+        const vendor = String(prod.vendor || "");
+        const productType = String(prod.product_type || "");
+
+        const optimizePrompt = `Eres el mejor copywriter y experto SEO de Shopify del mundo. Optimiza este producto de manera PROFESIONAL y COMPLETA.
+
+PRODUCTO ACTUAL:
+- Título: "${currentTitle}"
+- Descripción HTML actual: "${currentDesc.slice(0, 500)}"
+- Vendor: "${vendor}"
+- Tipo: "${productType}"
+- Tags actuales: "${currentTags}"
+- Precio: ${variants[0]?.price || "N/A"}€
+- Imágenes: ${images.length} fotos
+- Nicho de la tienda: ${project.storeNiche || "comics y cultura pop"}
+- Tono de marca: ${project.brandTone || "profesional y apasionado"}
+
+GENERA UN JSON COMPLETO con TODOS estos campos:
+{
+  "title": "Título optimizado SEO (40-70 chars, incluye keywords relevantes)",
+  "bodyHtml": "Descripción HTML COMPLETA y profesional. Mínimo 400 palabras. Incluye: <h2> subtítulos, <ul><li> bullet points con beneficios, especificaciones técnicas, storytelling emocional sobre el producto, llamada a la acción. Usa <strong> para enfatizar. NO uses placeholder ni lorem ipsum. Contenido REAL basado en el producto.",
+  "tags": ["tag1", "tag2", "..."], // Mínimo 15 tags SEO relevantes, incluye long-tail keywords, sinónimos, categorías, materiales, estilos, público objetivo
+  "seoTitle": "Meta title SEO optimizado (50-60 chars con keyword principal)",
+  "seoDescription": "Meta description persuasiva (140-160 chars con CTA)",
+  "altTexts": ["alt text para imagen 1", "alt text para imagen 2", "..."], // Un alt text descriptivo y SEO para cada imagen (${images.length} imágenes)
+  "handle": "url-handle-optimizado-seo"
+}
+
+REGLAS CRÍTICAS:
+- TODO el contenido debe ser REAL, específico para este producto exacto
+- La descripción debe contar una historia, no solo listar características
+- Tags deben cubrir: categoría, material, estilo, público, uso, colección, tendencia
+- Alt texts deben describir lo que se VE en cada imagen, no genéricos
+- Responde SOLO el JSON, sin texto adicional`;
+
+        const optimized = await askClaudeJsonWithBrain<{
+          title: string;
+          bodyHtml: string;
+          tags: string[];
+          seoTitle: string;
+          seoDescription: string;
+          altTexts?: string[];
+          handle?: string;
+        }>(parseInt(projectId), optimizePrompt, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 8192);
+
+        const shopifyUpdate: Record<string, unknown> = { id: parseInt(productId) };
+        if (optimized.title) shopifyUpdate.title = optimized.title;
+        if (optimized.bodyHtml) shopifyUpdate.body_html = optimized.bodyHtml;
+        if (optimized.tags && Array.isArray(optimized.tags)) shopifyUpdate.tags = optimized.tags.join(", ");
+        if (optimized.handle) shopifyUpdate.handle = optimized.handle;
+
+        if (optimized.seoTitle) shopifyUpdate.metafields_global_title_tag = optimized.seoTitle;
+        if (optimized.seoDescription) shopifyUpdate.metafields_global_description_tag = optimized.seoDescription;
+
+        if (optimized.altTexts && images.length > 0) {
+          shopifyUpdate.images = images.map((img, i) => ({
+            id: img.id,
+            alt: optimized.altTexts?.[i] || String(img.alt || ""),
+          }));
+        }
+
+        const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
+          { method: "PUT", body: JSON.stringify({ product: shopifyUpdate }) }
+        );
+
+        learnFromOperation({
+          operationType: "product_optimization",
+          title: `Optimización IA: ${updated.product.title}`,
+          content: `Producto "${currentTitle}" optimizado → "${updated.product.title}". Tags: ${optimized.tags?.length || 0}. SEO: ${optimized.seoTitle}. Desc: ${String(optimized.bodyHtml || "").length} chars.`,
+          confidence: 0.9,
+          tags: ["optimization", "seo", "ai_content"],
+        });
+
+        result = {
+          productId: updated.product.id,
+          title: updated.product.title,
+          previousTitle: currentTitle,
+          tagsCount: optimized.tags?.length || 0,
+          descriptionLength: String(optimized.bodyHtml || "").length,
+          seoTitle: optimized.seoTitle,
+          altTextsGenerated: optimized.altTexts?.length || 0,
+          message: `✅ Producto "${updated.product.title}" optimizado profesionalmente.\n📝 Descripción: ${String(optimized.bodyHtml || "").length} chars\n🏷 ${optimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${optimized.altTexts?.length || 0} alt texts de imágenes`,
+        };
+        break;
+      }
+
+      case "optimize_all_products": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        let allProds: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&published_status=any&fields=id,title,body_html,vendor,product_type,tags,status,variants,images,handle`
+          );
+          allProds = allProds.concat(d.products || []);
+        }
+
+        const optimizeLimit = Math.min(params?.limit ?? 10, 25);
+        const toOptimize = allProds.slice(0, optimizeLimit);
+        const results: Array<{ id: unknown; title: string; status: string }> = [];
+        const errors: string[] = [];
+
+        for (const prod of toOptimize) {
+          try {
+            const images = (prod.images as Array<Record<string, unknown>>) || [];
+            const variants = (prod.variants as Array<Record<string, unknown>>) || [];
+
+            const optimizePrompt = `Optimiza este producto Shopify como experto profesional. Genera contenido REAL y COMPLETO.
+
+PRODUCTO:
+- Título: "${prod.title}"
+- Descripción: "${String(prod.body_html || "").slice(0, 300)}"
+- Vendor: "${prod.vendor || ""}"
+- Tipo: "${prod.product_type || ""}"
+- Tags: "${prod.tags || ""}"
+- Precio: ${variants[0]?.price || "N/A"}€
+- Imágenes: ${images.length}
+- Nicho: ${project.storeNiche || "general"}
+
+JSON RESPUESTA:
+{"title":"título SEO 40-70 chars","bodyHtml":"HTML completa mín 300 palabras con <h2>, <ul><li>, <strong>, storytelling, beneficios, especificaciones, CTA","tags":["15+ tags SEO"],"seoTitle":"meta title 50-60 chars","seoDescription":"meta desc 140-160 chars","altTexts":["alt para cada imagen"],"handle":"url-seo-handle"}
+
+SOLO JSON, contenido REAL para ESTE producto exacto.`;
+
+            const optimized = await askClaudeJsonWithBrain<{
+              title: string; bodyHtml: string; tags: string[];
+              seoTitle: string; seoDescription: string; altTexts?: string[]; handle?: string;
+            }>(parseInt(projectId), optimizePrompt, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 6144);
+
+            const shopifyUpdate: Record<string, unknown> = { id: prod.id };
+            if (optimized.title) shopifyUpdate.title = optimized.title;
+            if (optimized.bodyHtml) shopifyUpdate.body_html = optimized.bodyHtml;
+            if (optimized.tags) shopifyUpdate.tags = optimized.tags.join(", ");
+            if (optimized.handle) shopifyUpdate.handle = optimized.handle;
+            if (optimized.seoTitle) shopifyUpdate.metafields_global_title_tag = optimized.seoTitle;
+            if (optimized.seoDescription) shopifyUpdate.metafields_global_description_tag = optimized.seoDescription;
+            if (optimized.altTexts && images.length > 0) {
+              shopifyUpdate.images = images.map((img, i) => ({
+                id: img.id, alt: optimized.altTexts?.[i] || String(img.alt || ""),
+              }));
+            }
+
+            await shopifyRequest(
+              parseInt(projectId), project.shopDomain, `/products/${prod.id}.json`,
+              { method: "PUT", body: JSON.stringify({ product: shopifyUpdate }) }
+            );
+
+            results.push({ id: prod.id, title: optimized.title || String(prod.title), status: "optimized" });
+            logger.info({ productId: prod.id, title: optimized.title }, "Product optimized by AI");
+          } catch (e) {
+            errors.push(`${prod.title}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        result = {
+          optimized: results.length,
+          failed: errors.length,
+          total: toOptimize.length,
+          products: results,
+          errors: errors.length > 0 ? errors : undefined,
+          message: `✅ Optimización masiva completada: ${results.length}/${toOptimize.length} productos optimizados profesionalmente con IA.\n${errors.length > 0 ? `⚠️ ${errors.length} errores: ${errors[0]}` : ""}`,
+        };
+        break;
+      }
+
+      case "create_collection": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const title = params?.title;
+        if (!title) { res.status(400).json({ error: "title requerido para la colección" }); return; }
+
+        const collectionType = params?.type || "custom";
+        let bodyHtml = params?.bodyHtml || "";
+        let seoTitle = params?.seoTitle || "";
+        let seoDescription = params?.seoDescription || "";
+
+        if (params?.aiGenerate !== false) {
+          try {
+            const aiContent = await askClaudeJsonWithBrain<{
+              bodyHtml: string; seoTitle: string; seoDescription: string; sortOrder: string;
+            }>(parseInt(projectId), `Genera contenido profesional para una colección Shopify.
+Nombre: "${title}"
+Nicho: ${project.storeNiche || "general"}
+Tono: ${project.brandTone || "profesional"}
+
+JSON: {"bodyHtml":"HTML descriptiva profesional de la colección, mín 150 palabras, con <h2>, <p>, <ul><li> explicando qué encontrará el cliente, storytelling de marca, por qué esta colección es especial","seoTitle":"meta title 50-60 chars","seoDescription":"meta description 140-160 chars con CTA","sortOrder":"best-selling"}
+
+SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 4096);
+
+            bodyHtml = aiContent.bodyHtml || bodyHtml;
+            seoTitle = aiContent.seoTitle || seoTitle;
+            seoDescription = aiContent.seoDescription || seoDescription;
+          } catch { /* use provided content */ }
+        }
+
+        if (collectionType === "smart") {
+          const rules = params?.rules || [{ column: "tag", relation: "equals", condition: title.toLowerCase() }];
+          const smartCollection = {
+            title,
+            body_html: bodyHtml,
+            published: params?.published !== false,
+            rules,
+            disjunctive: params?.disjunctive || false,
+            sort_order: params?.sortOrder || "best-selling",
+          };
+
+          const created = await shopifyRequest<{ smart_collection: Record<string, unknown> }>(
+            parseInt(projectId), project.shopDomain, "/smart_collections.json",
+            { method: "POST", body: JSON.stringify({ smart_collection: smartCollection }) }
+          );
+
+          result = {
+            collectionId: created.smart_collection.id,
+            title: created.smart_collection.title,
+            type: "smart",
+            rules,
+            message: `✅ Colección inteligente "${title}" creada. Los productos se añaden automáticamente según las reglas.`,
+          };
+        } else {
+          const customCollection: Record<string, unknown> = {
+            title,
+            body_html: bodyHtml,
+            published: params?.published !== false,
+            sort_order: params?.sortOrder || "best-selling",
+          };
+
+          const created = await shopifyRequest<{ custom_collection: Record<string, unknown> }>(
+            parseInt(projectId), project.shopDomain, "/custom_collections.json",
+            { method: "POST", body: JSON.stringify({ custom_collection: customCollection }) }
+          );
+
+          const collectionId = created.custom_collection.id;
+
+          if (params?.productIds && Array.isArray(params.productIds)) {
+            for (const pid of params.productIds) {
+              try {
+                await shopifyRequest(
+                  parseInt(projectId), project.shopDomain, "/collects.json",
+                  { method: "POST", body: JSON.stringify({ collect: { collection_id: collectionId, product_id: parseInt(pid) } }) }
+                );
+              } catch { /* skip failed product assignment */ }
+            }
+          }
+
+          result = {
+            collectionId,
+            title: created.custom_collection.title,
+            type: "custom",
+            productsAdded: params?.productIds?.length || 0,
+            message: `✅ Colección "${title}" creada${params?.productIds?.length ? ` con ${params.productIds.length} productos asignados` : ""}. Descripción y SEO generados por IA.`,
+          };
+        }
+        break;
+      }
+
+      case "list_collections": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const limit = Math.min(params?.limit ?? 20, 50);
+
+        const [customData, smartData] = await Promise.all([
+          shopifyRequest<{ custom_collections: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/custom_collections.json?limit=${limit}`
+          ),
+          shopifyRequest<{ smart_collections: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/smart_collections.json?limit=${limit}`
+          ),
+        ]);
+
+        const allCollections = [
+          ...(customData.custom_collections || []).map(c => ({ ...c, type: "custom" })),
+          ...(smartData.smart_collections || []).map(c => ({ ...c, type: "smart" })),
+        ];
+
+        result = {
+          collections: allCollections.map(c => ({
+            id: c.id, title: c.title, type: c.type,
+            handle: c.handle, published: c.published_at != null,
+            productsCount: c.products_count || 0,
+            bodyLength: String(c.body_html || "").length,
+          })),
+          total: allCollections.length,
+          message: `${allCollections.length} colecciones encontradas (${customData.custom_collections?.length || 0} manuales + ${smartData.smart_collections?.length || 0} inteligentes)`,
+        };
+        break;
+      }
+
+      case "auto_collections": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        let allProds: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&published_status=any&fields=id,title,product_type,vendor,tags`
+          );
+          allProds = allProds.concat(d.products || []);
+        }
+
+        const productSummary = allProds.map(p => ({
+          id: p.id, title: p.title, type: p.product_type, vendor: p.vendor, tags: p.tags,
+        }));
+
+        const collectionsAi = await askClaudeJsonWithBrain<{
+          collections: Array<{
+            title: string; type: "smart" | "custom"; description: string;
+            rules?: Array<{ column: string; relation: string; condition: string }>;
+            productIds?: number[];
+            sortOrder: string;
+          }>;
+        }>(parseInt(projectId), `Analiza estos ${allProds.length} productos y diseña las colecciones PERFECTAS para la tienda.
+
+PRODUCTOS:
+${JSON.stringify(productSummary, null, 1)}
+
+Nicho: ${project.storeNiche || "general"}
+
+Crea colecciones que:
+1. Agrupen productos por categoría/tipo de forma lógica
+2. Incluyan colecciones temáticas atractivas para el comprador
+3. Tengan títulos SEO atractivos
+4. Usen smart collections cuando sea posible (basadas en tags o product_type)
+
+JSON: {"collections":[{"title":"Nombre","type":"smart o custom","description":"descripción HTML profesional","rules":[{"column":"tag","relation":"equals","condition":"valor"}],"productIds":[ids si es custom],"sortOrder":"best-selling"}]}`, CLAUDE_EXPERT_SYSTEM, "ecommerce", project.storeNiche || undefined, 6144);
+
+        const created: Array<{ id: unknown; title: string; type: string }> = [];
+        for (const col of collectionsAi.collections || []) {
+          try {
+            if (col.type === "smart" && col.rules) {
+              const sc = await shopifyRequest<{ smart_collection: Record<string, unknown> }>(
+                parseInt(projectId), project.shopDomain, "/smart_collections.json",
+                { method: "POST", body: JSON.stringify({ smart_collection: { title: col.title, body_html: col.description, rules: col.rules, sort_order: col.sortOrder || "best-selling", published: true } }) }
+              );
+              created.push({ id: sc.smart_collection.id, title: String(sc.smart_collection.title), type: "smart" });
+            } else {
+              const cc = await shopifyRequest<{ custom_collection: Record<string, unknown> }>(
+                parseInt(projectId), project.shopDomain, "/custom_collections.json",
+                { method: "POST", body: JSON.stringify({ custom_collection: { title: col.title, body_html: col.description, sort_order: col.sortOrder || "best-selling", published: true } }) }
+              );
+              const ccId = cc.custom_collection.id;
+              if (col.productIds) {
+                for (const pid of col.productIds) {
+                  try {
+                    await shopifyRequest(parseInt(projectId), project.shopDomain, "/collects.json",
+                      { method: "POST", body: JSON.stringify({ collect: { collection_id: ccId, product_id: pid } }) });
+                  } catch { /* skip */ }
+                }
+              }
+              created.push({ id: ccId, title: String(cc.custom_collection.title), type: "custom" });
+            }
+          } catch (e) {
+            logger.warn({ collection: col.title, error: e instanceof Error ? e.message : String(e) }, "Failed to create collection");
+          }
+        }
+
+        result = {
+          collectionsCreated: created.length,
+          collections: created,
+          message: `✅ ${created.length} colecciones creadas automáticamente por IA basándose en tus ${allProds.length} productos.\n${created.map(c => `• ${c.title} (${c.type})`).join("\n")}`,
+        };
+        break;
+      }
+
+      case "create_page": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const title = params?.title;
+        const pageType = params?.pageType || "custom";
+        if (!title && !pageType) { res.status(400).json({ error: "title o pageType requerido" }); return; }
+
+        const pageTemplates: Record<string, string> = {
+          about: "Sobre Nosotros / Quiénes Somos",
+          contact: "Contacto",
+          faq: "Preguntas Frecuentes (FAQ)",
+          shipping: "Política de Envíos",
+          returns: "Política de Devoluciones",
+          privacy: "Política de Privacidad",
+          terms: "Términos y Condiciones",
+          size_guide: "Guía de Tallas",
+        };
+
+        const pageTitle = title || pageTemplates[pageType] || pageType;
+
+        const pageContent = await askClaudeWithBrain(
+          parseInt(projectId),
+          [{ role: "user", content: `Diseña la página "${pageTitle}" para una tienda Shopify PROFESIONAL.
+
+Tienda: ${project.name || "Tienda Online"}
+Nicho: ${project.storeNiche || "general"}
+Tono: ${project.brandTone || "profesional"}
+Dominio: ${project.shopDomain}
+Tipo de página: ${pageType}
+
+GENERA HTML COMPLETO y PROFESIONAL para esta página. Incluye:
+- Estructura con <h1>, <h2>, <h3> jerárquicos
+- Párrafos <p> con contenido REAL y específico para esta tienda
+- Listas <ul><li> donde corresponda
+- Formato con <strong>, <em> para énfasis
+- Si es FAQ, usa formato pregunta-respuesta claro
+- Si es Sobre Nosotros, cuenta la historia de la marca
+- Si es Envíos/Devoluciones/Privacidad, incluye políticas completas y profesionales
+- Contenido mínimo 500 palabras
+- TODO en español, profesional, listo para publicar
+- NO uses placeholders, lorem ipsum ni [insertar aquí]
+- Incluye CTAs relevantes
+
+Responde SOLO el HTML, sin envolver en \`\`\`html.` }],
+          CLAUDE_EXPERT_SYSTEM,
+          "general",
+          project.storeNiche || undefined,
+          8192
+        );
+
+        const handle = params?.handle || pageTitle.toLowerCase().replace(/[^a-z0-9áéíóúñü]+/gi, "-").replace(/^-|-$/g, "");
+
+        const page = {
+          title: pageTitle,
+          body_html: pageContent,
+          handle,
+          published: params?.published !== false,
+        };
+
+        const created = await shopifyRequest<{ page: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, "/pages.json",
+          { method: "POST", body: JSON.stringify({ page }) }
+        );
+
+        result = {
+          pageId: created.page.id,
+          title: created.page.title,
+          handle: created.page.handle,
+          contentLength: String(pageContent).length,
+          message: `✅ Página "${created.page.title}" creada y publicada en Shopify.\n📝 ${String(pageContent).length} caracteres de contenido profesional generado por IA.\n🔗 URL: /pages/${created.page.handle}`,
+        };
+        break;
+      }
+
+      case "list_pages": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const data = await shopifyRequest<{ pages: Array<Record<string, unknown>> }>(
+          parseInt(projectId), project.shopDomain, "/pages.json?limit=50"
+        );
+
+        result = {
+          pages: (data.pages || []).map(p => ({
+            id: p.id, title: p.title, handle: p.handle,
+            published: p.published_at != null,
+            contentLength: String(p.body_html || "").length,
+            createdAt: p.created_at,
+          })),
+          total: data.pages?.length || 0,
+          message: `${data.pages?.length || 0} páginas en la tienda`,
+        };
+        break;
+      }
+
+      case "design_all_pages": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const pageTypes = params?.pageTypes || ["about", "faq", "shipping", "returns", "contact"];
+        const createdPages: Array<{ id: unknown; title: string; handle: string }> = [];
+        const pageErrors: string[] = [];
+
+        const pageTitles: Record<string, string> = {
+          about: "Sobre Nosotros",
+          contact: "Contacto",
+          faq: "Preguntas Frecuentes",
+          shipping: "Política de Envíos",
+          returns: "Devoluciones y Reembolsos",
+          privacy: "Política de Privacidad",
+          terms: "Términos y Condiciones",
+          size_guide: "Guía de Tallas",
+        };
+
+        for (const pageType of pageTypes) {
+          try {
+            const pageTitle = pageTitles[pageType] || pageType;
+            const pageContent = await askClaudeWithBrain(
+              parseInt(projectId),
+              [{ role: "user", content: `Diseña la página "${pageTitle}" para la tienda Shopify "${project.name || "Tienda"}".
+Nicho: ${project.storeNiche || "general"}. Tono: ${project.brandTone || "profesional"}.
+Tipo: ${pageType}. Dominio: ${project.shopDomain}.
+
+HTML COMPLETO profesional, mín 400 palabras, con <h1>,<h2>,<h3>,<p>,<ul>,<li>,<strong>. Contenido REAL, NO placeholders. En español.
+${pageType === "faq" ? "Incluye mínimo 10 preguntas frecuentes reales para este tipo de tienda." : ""}
+${pageType === "about" ? "Cuenta una historia de marca inspiradora y profesional." : ""}
+${pageType === "shipping" ? "Incluye zonas de envío, tiempos, costes y seguimiento." : ""}
+${pageType === "returns" ? "Incluye plazos, condiciones, proceso paso a paso." : ""}
+${pageType === "contact" ? "Incluye formulario HTML, email, horarios de atención." : ""}
+SOLO HTML.` }],
+              CLAUDE_EXPERT_SYSTEM, "general", project.storeNiche || undefined, 6144
+            );
+
+            const handle = pageType.replace(/_/g, "-");
+            const created = await shopifyRequest<{ page: Record<string, unknown> }>(
+              parseInt(projectId), project.shopDomain, "/pages.json",
+              { method: "POST", body: JSON.stringify({ page: { title: pageTitle, body_html: pageContent, handle, published: true } }) }
+            );
+            createdPages.push({ id: created.page.id, title: String(created.page.title), handle: String(created.page.handle) });
+          } catch (e) {
+            pageErrors.push(`${pageType}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        result = {
+          pagesCreated: createdPages.length,
+          pages: createdPages,
+          errors: pageErrors.length > 0 ? pageErrors : undefined,
+          message: `✅ ${createdPages.length} páginas diseñadas y publicadas por IA:\n${createdPages.map(p => `• ${p.title} → /pages/${p.handle}`).join("\n")}${pageErrors.length > 0 ? `\n⚠️ ${pageErrors.length} errores` : ""}`,
+        };
+        break;
+      }
+
+      case "optimize_images": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const productId = params?.productId;
+        let productsToOptimize: Array<Record<string, unknown>> = [];
+
+        if (productId) {
+          const d = await shopifyRequest<{ product: Record<string, unknown> }>(
+            parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=id,title,images,product_type,vendor`
+          );
+          productsToOptimize = [d.product];
+        } else {
+          for (const st of ["active", "draft"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&fields=id,title,images,product_type,vendor`
+            );
+            productsToOptimize = productsToOptimize.concat(d.products || []);
+          }
+        }
+
+        let totalImages = 0;
+        let optimizedImages = 0;
+        const prodResults: Array<{ id: unknown; title: string; imagesOptimized: number }> = [];
+
+        for (const prod of productsToOptimize) {
+          const images = (prod.images as Array<Record<string, unknown>>) || [];
+          if (images.length === 0) continue;
+
+          const missingAlt = images.filter(img => !img.alt || String(img.alt).trim() === "");
+          if (missingAlt.length === 0) {
+            totalImages += images.length;
+            continue;
+          }
+
+          try {
+            const altTexts = await askClaudeJsonWithBrain<{ alts: string[] }>(
+              parseInt(projectId),
+              `Genera alt texts SEO profesionales para las ${images.length} imágenes de este producto Shopify.
+
+Producto: "${prod.title}"
+Tipo: "${prod.product_type || "general"}"
+Marca: "${prod.vendor || ""}"
+
+Genera un alt text descriptivo y SEO para cada imagen. Los alt texts deben:
+- Describir lo que probablemente muestra la imagen del producto
+- Incluir el nombre del producto y keywords relevantes
+- Ser específicos (no genéricos como "imagen del producto")
+- Tener 80-125 caracteres cada uno
+- Estar en español
+
+JSON: {"alts":["alt text imagen 1","alt text imagen 2",...]}
+Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images", project.storeNiche || undefined, 2048
+            );
+
+            if (altTexts.alts && altTexts.alts.length > 0) {
+              const imageUpdates = images.map((img, i) => ({
+                id: img.id,
+                alt: altTexts.alts[i] || String(img.alt || `${prod.title} - imagen ${i + 1}`),
+              }));
+
+              await shopifyRequest(
+                parseInt(projectId), project.shopDomain, `/products/${prod.id}.json`,
+                { method: "PUT", body: JSON.stringify({ product: { id: prod.id, images: imageUpdates } }) }
+              );
+
+              optimizedImages += altTexts.alts.length;
+              prodResults.push({ id: prod.id, title: String(prod.title), imagesOptimized: altTexts.alts.length });
+            }
+          } catch (e) {
+            logger.warn({ productId: prod.id, error: e instanceof Error ? e.message : String(e) }, "Image alt optimization failed");
+          }
+
+          totalImages += images.length;
+        }
+
+        result = {
+          productsProcessed: productsToOptimize.length,
+          totalImages,
+          optimizedImages,
+          products: prodResults,
+          message: `✅ Optimización de imágenes completada.\n🖼 ${optimizedImages} alt texts generados para ${prodResults.length} productos.\n📊 Total imágenes procesadas: ${totalImages}`,
         };
         break;
       }
