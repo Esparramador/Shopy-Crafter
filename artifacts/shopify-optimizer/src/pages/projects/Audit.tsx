@@ -25,13 +25,347 @@ import {
   Loader2,
   ExternalLink,
   Key,
+  Edit3,
+  Save,
+  Eye,
+  EyeOff,
+  Archive,
+  FileText,
 } from "lucide-react";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface EditableProduct {
+  id: string;
+  title: string;
+  handle: string;
+  bodyHtml: string;
+  vendor: string;
+  productType: string;
+  status: string;
+  publishedAt: string | null;
+  tags: string;
+  price: string;
+  compareAtPrice: string;
+  images: Array<{ id: number; src: string; alt: string | null }>;
+  [key: string]: unknown;
+}
+
+function ProductEditModal({ projectId, product, onClose, onUpdated }: {
+  projectId: number;
+  product: EditableProduct;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const norm = (v: unknown) => (v == null ? "" : String(v));
+  const initTitle = norm(product.title);
+  const initVendor = norm(product.vendor);
+  const initProductType = norm(product.productType);
+  const initTags = norm(product.tags);
+  const initStatus = norm(product.status) || "active";
+  const initPublished = !!product.publishedAt;
+  const initPrice = norm(product.price) || "0.00";
+  const initCompare = norm(product.compareAtPrice);
+  const initHandle = norm(product.handle);
+
+  const [title, setTitle] = useState(initTitle);
+  const [vendor, setVendor] = useState(initVendor);
+  const [productType, setProductType] = useState(initProductType);
+  const [tags, setTags] = useState(initTags);
+  const [status, setStatus] = useState(initStatus);
+  const [published, setPublished] = useState(initPublished);
+  const [price, setPrice] = useState(initPrice);
+  const [compareAtPrice, setCompareAtPrice] = useState(initCompare);
+  const [handle, setHandle] = useState(initHandle);
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const hasChanges = useCallback(() => {
+    return title !== initTitle ||
+      vendor !== initVendor ||
+      productType !== initProductType ||
+      tags !== initTags ||
+      status !== initStatus ||
+      published !== initPublished ||
+      price !== initPrice ||
+      compareAtPrice !== initCompare ||
+      handle !== initHandle;
+  }, [title, vendor, productType, tags, status, published, price, compareAtPrice, handle,
+      initTitle, initVendor, initProductType, initTags, initStatus, initPublished, initPrice, initCompare, initHandle]);
+
+  const isValidPrice = (v: string) => v === "" || /^\d+(\.\d{0,2})?$/.test(v);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      setError("El título no puede estar vacío");
+      return;
+    }
+    if (price && !isValidPrice(price)) {
+      setError("El precio debe ser un número válido (ej: 12.99)");
+      return;
+    }
+    if (compareAtPrice && !isValidPrice(compareAtPrice)) {
+      setError("El precio de comparación debe ser un número válido");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setSuccessMsg("");
+
+    const updates: Record<string, unknown> = {};
+    if (title !== initTitle) updates.title = title;
+    if (vendor !== initVendor) updates.vendor = vendor;
+    if (productType !== initProductType) updates.productType = productType;
+    if (tags !== initTags) updates.tags = tags;
+    if (status !== initStatus) updates.status = status;
+    if (published !== initPublished) updates.published = published;
+    if (handle !== initHandle) updates.handle = handle;
+
+    const priceChanged = price !== initPrice;
+    const compareChanged = compareAtPrice !== initCompare;
+    if (priceChanged || compareChanged) {
+      const variantUpdate: Record<string, unknown> = {};
+      if (priceChanged) variantUpdate.price = price;
+      if (compareChanged) variantUpdate.compareAtPrice = compareAtPrice || null;
+      updates.variants = [variantUpdate];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setError("No hay cambios para guardar");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/api/projects/${projectId}/products/${product.id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      setSuccessMsg("Producto actualizado en Shopify y re-auditado");
+      setTimeout(() => {
+        onUpdated();
+        onClose();
+      }, 1000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const statusOptions = [
+    { value: "active", label: "Activo", desc: "Visible en la tienda", color: "text-green-400" },
+    { value: "draft", label: "Borrador", desc: "No visible, en edición", color: "text-yellow-400" },
+    { value: "archived", label: "Archivado", desc: "Oculto, almacenado", color: "text-gray-400" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-card border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-card/95 backdrop-blur-md border-b border-white/10 p-5 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Edit3 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Editar Producto</h2>
+              <p className="text-xs text-muted-foreground">Los cambios se aplican directamente en Shopify</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {product.images?.[0]?.src && (
+            <div className="flex items-center gap-4">
+              <img src={product.images[0].src} alt={product.title} className="w-16 h-16 rounded-lg object-cover border border-white/10" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">{product.title}</p>
+                <p className="text-xs text-muted-foreground">ID: {product.id}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Título</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Precio (€)</label>
+              <input
+                type="text"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Precio comparación (€)</label>
+              <input
+                type="text"
+                value={compareAtPrice}
+                onChange={(e) => setCompareAtPrice(e.target.value)}
+                placeholder="Precio tachado"
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Proveedor / Marca</label>
+              <input
+                value={vendor}
+                onChange={(e) => setVendor(e.target.value)}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Tipo de Producto</label>
+              <input
+                value={productType}
+                onChange={(e) => setProductType(e.target.value)}
+                placeholder="Ej: Camiseta, Poster, Figura..."
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">URL Handle</label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">/products/</span>
+                <input
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Etiquetas (separadas por coma)</label>
+              <input
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="comic, manga, coleccionable, ..."
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-2">Estado del Producto</label>
+            <div className="grid grid-cols-3 gap-2">
+              {statusOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatus(opt.value)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    status === opt.value
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                      : "border-white/10 bg-black/20 hover:border-white/20"
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${opt.color}`}>{opt.label}</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-2">Visibilidad</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setPublished(true)}
+                className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                  published
+                    ? "border-blue-500/50 bg-blue-500/10 ring-1 ring-blue-500/30"
+                    : "border-white/10 bg-black/20 hover:border-white/20"
+                }`}
+              >
+                <Eye className={`w-5 h-5 ${published ? "text-blue-400" : "text-muted-foreground"}`} />
+                <div className="text-left">
+                  <span className="text-sm font-semibold text-blue-400">Publicado</span>
+                  <p className="text-[10px] text-muted-foreground">Visible en canales de venta</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setPublished(false)}
+                className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                  !published
+                    ? "border-orange-500/50 bg-orange-500/10 ring-1 ring-orange-500/30"
+                    : "border-white/10 bg-black/20 hover:border-white/20"
+                }`}
+              >
+                <EyeOff className={`w-5 h-5 ${!published ? "text-orange-400" : "text-muted-foreground"}`} />
+                <div className="text-left">
+                  <span className="text-sm font-semibold text-orange-400">No publicado</span>
+                  <p className="text-[10px] text-muted-foreground">Oculto en todos los canales</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span className="text-sm">{successMsg}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-card/95 backdrop-blur-md border-t border-white/10 p-4 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges()}
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? "Guardando en Shopify..." : "Guardar Cambios"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 interface CreateProductForm {
   title: string;
@@ -425,12 +759,14 @@ export default function AuditPage() {
   const queryClient = useQueryClient();
 
   const [filterGrade, setFilterGrade] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"products" | "opportunities">("products");
   const [scanStatus, setScanStatus] = useState<"idle" | "syncing" | "auditing">("idle");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [scanError, setScanError] = useState<string>("");
   const [scanResult, setScanResult] = useState<string>("");
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [editProduct, setEditProduct] = useState<EditableProduct | null>(null);
   const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const { data, isLoading, refetch } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
@@ -491,7 +827,10 @@ export default function AuditPage() {
   };
 
   const isScanning = scanStatus !== "idle";
-  const products = data?.products || [];
+  const allProducts = data?.products || [];
+  const products = filterStatus
+    ? allProducts.filter((p: Record<string, unknown>) => p.status === filterStatus)
+    : allProducts;
 
   const needImprovement =
     (data?.gradeCounts?.C || 0) + (data?.gradeCounts?.D || 0) + (data?.gradeCounts?.F || 0);
@@ -621,6 +960,18 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         />
       )}
 
+      {editProduct && (
+        <ProductEditModal
+          projectId={projectId}
+          product={editProduct}
+          onClose={() => setEditProduct(null)}
+          onUpdated={() => {
+            queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
+            refetch();
+          }}
+        />
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <GlassCard delay={0.1} className="p-5">
@@ -743,20 +1094,32 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
       {/* Products Tab */}
       {activeTab === "products" && (
         <>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <h2 className="text-lg font-semibold text-foreground">Resultados</h2>
-            <select
-              value={filterGrade}
-              onChange={(e) => setFilterGrade(e.target.value)}
-              className="bg-card border border-white/10 rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="">Todos los grados</option>
-              {(["A", "B", "C", "D", "F"] as const).map((g) => (
-                <option key={g} value={g}>
-                  Grado {g} ({data?.gradeCounts?.[g] || 0})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-card border border-white/10 rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="">Todos los estados</option>
+                <option value="active">Activos ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.active || 0})</option>
+                <option value="draft">Borradores ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.draft || 0})</option>
+                <option value="archived">Archivados ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.archived || 0})</option>
+              </select>
+              <select
+                value={filterGrade}
+                onChange={(e) => setFilterGrade(e.target.value)}
+                className="bg-card border border-white/10 rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="">Todos los grados</option>
+                {(["A", "B", "C", "D", "F"] as const).map((g) => (
+                  <option key={g} value={g}>
+                    Grado {g} ({data?.gradeCounts?.[g] || 0})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -788,6 +1151,13 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-0.5">
                       <h3 className="text-base font-bold text-foreground line-clamp-2">{product.title}</h3>
+                      <button
+                        onClick={() => setEditProduct(product as unknown as EditableProduct)}
+                        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                        title="Editar producto"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                     </div>
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${

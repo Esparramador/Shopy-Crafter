@@ -382,6 +382,151 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
   });
 });
 
+router.put("/projects/:projectId/products/:productId", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const updates = req.body;
+  if (!updates || Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No hay campos para actualizar" });
+    return;
+  }
+
+  const shopifyPayload: Record<string, unknown> = { id: parseInt(shopifyProductId) };
+
+  if (updates.title !== undefined) shopifyPayload.title = updates.title;
+  if (updates.bodyHtml !== undefined) shopifyPayload.body_html = updates.bodyHtml;
+  if (updates.vendor !== undefined) shopifyPayload.vendor = updates.vendor;
+  if (updates.productType !== undefined) shopifyPayload.product_type = updates.productType;
+  if (updates.tags !== undefined) shopifyPayload.tags = updates.tags;
+  if (updates.status !== undefined) {
+    if (!["active", "draft", "archived"].includes(updates.status)) {
+      res.status(400).json({ error: "status debe ser: active, draft o archived" });
+      return;
+    }
+    shopifyPayload.status = updates.status;
+  }
+  if (updates.handle !== undefined) shopifyPayload.handle = updates.handle;
+  if (updates.templateSuffix !== undefined) shopifyPayload.template_suffix = updates.templateSuffix;
+  if (updates.seoTitle !== undefined) {
+    shopifyPayload.metafields_global_title_tag = updates.seoTitle;
+  }
+  if (updates.seoDescription !== undefined) {
+    shopifyPayload.metafields_global_description_tag = updates.seoDescription;
+  }
+
+  if (updates.published !== undefined) {
+    if (updates.published === true) {
+      shopifyPayload.published = true;
+    } else {
+      shopifyPayload.published = false;
+    }
+  }
+
+  if (updates.variants && Array.isArray(updates.variants)) {
+    shopifyPayload.variants = updates.variants.map((v: Record<string, unknown>) => {
+      const variant: Record<string, unknown> = {};
+      if (v.id) variant.id = v.id;
+      if (v.price !== undefined) variant.price = v.price;
+      if (v.compareAtPrice !== undefined) variant.compare_at_price = v.compareAtPrice;
+      if (v.sku !== undefined) variant.sku = v.sku;
+      if (v.weight !== undefined) variant.weight = v.weight;
+      if (v.weightUnit !== undefined) variant.weight_unit = v.weightUnit;
+      if (v.inventoryManagement !== undefined) variant.inventory_management = v.inventoryManagement;
+      if (v.option1 !== undefined) variant.option1 = v.option1;
+      if (v.option2 !== undefined) variant.option2 = v.option2;
+      if (v.option3 !== undefined) variant.option3 = v.option3;
+      if (v.taxable !== undefined) variant.taxable = v.taxable;
+      if (v.barcode !== undefined) variant.barcode = v.barcode;
+      return variant;
+    });
+  }
+
+  try {
+    logger.info({ projectId, shopifyProductId, fields: Object.keys(shopifyPayload) }, "Updating product in Shopify");
+
+    const result = await shopifyRequest<{ product: ShopifyProductRaw }>(
+      projectId,
+      project.shopDomain,
+      `/products/${shopifyProductId}.json`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ product: shopifyPayload }),
+      }
+    );
+
+    const sp = result.product;
+    const audit = auditProduct({
+      title: sp.title,
+      body_html: sp.body_html,
+      price: sp.variants?.[0]?.price,
+      compare_at_price: sp.variants?.[0]?.compare_at_price,
+      images: sp.images,
+      tags: sp.tags,
+    });
+
+    await db
+      .update(productsTable)
+      .set({
+        title: sp.title,
+        handle: sp.handle,
+        bodyHtml: sp.body_html,
+        vendor: sp.vendor,
+        productType: sp.product_type,
+        status: sp.status,
+        publishedAt: sp.published_at ?? null,
+        tags: sp.tags,
+        price: sp.variants?.[0]?.price ?? null,
+        compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
+        imageCount: sp.images?.length ?? 0,
+        variantCount: sp.variants?.length ?? 1,
+        imagesJson: sp.images ?? [],
+        auditScore: audit.overallScore,
+        auditGrade: audit.grade,
+        titleScore: audit.titleScore,
+        descriptionScore: audit.descriptionScore,
+        priceScore: audit.priceScore,
+        imageScore: audit.imageScore,
+        seoScore: audit.seoScore,
+        auditProblems: audit.problems,
+        lastAuditedAt: new Date(),
+      })
+      .where(and(
+        eq(productsTable.projectId, projectId),
+        eq(productsTable.shopifyProductId, shopifyProductId)
+      ));
+
+    logger.info({ projectId, shopifyProductId, newStatus: sp.status, published: !!sp.published_at }, "Product updated successfully");
+
+    res.json({
+      product: {
+        id: String(sp.id),
+        title: sp.title,
+        handle: sp.handle,
+        vendor: sp.vendor,
+        productType: sp.product_type,
+        status: sp.status,
+        publishedAt: sp.published_at ?? null,
+        tags: sp.tags,
+        price: sp.variants?.[0]?.price ?? null,
+        compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
+        imageCount: sp.images?.length ?? 0,
+        variantCount: sp.variants?.length ?? 1,
+        auditScore: audit.overallScore,
+        auditGrade: audit.grade,
+      },
+      message: "Producto actualizado en Shopify y re-auditado",
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ projectId, shopifyProductId, error: msg }, "Failed to update product");
+    res.status(502).json({ error: `Error al actualizar en Shopify: ${msg}` });
+  }
+});
+
 router.post("/projects/:projectId/audit", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
 
