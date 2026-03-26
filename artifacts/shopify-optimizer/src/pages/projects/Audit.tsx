@@ -810,7 +810,11 @@ export default function AuditPage() {
         throw new Error(result.error || `Error ${res.status}`);
       }
       setScanStatus("auditing");
-      setScanResult(`${result.synced} productos sincronizados${result.removed > 0 ? `, ${result.removed} eliminados` : ""}. Score medio: ${result.avgScore ? Math.round(result.avgScore) : "—"}/100`);
+      const breakdown = result.statusBreakdown;
+      const breakdownStr = breakdown
+        ? ` (${Object.entries(breakdown as Record<string, number>).filter(([, c]) => c > 0).map(([s, c]) => `${c} ${s === "active" ? "activos" : s === "unlisted" ? "no listados" : s === "draft" ? "borradores" : s === "archived" ? "archivados" : s}`).join(", ")})`
+        : "";
+      setScanResult(`${result.synced} productos sincronizados${breakdownStr}${result.removed > 0 ? `, ${result.removed} eliminados` : ""}. Score medio: ${result.avgScore ? Math.round(result.avgScore) : "—"}/100`);
       await new Promise((r) => setTimeout(r, 400));
       await queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
       await refetch();
@@ -1182,6 +1186,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               >
                 <option value="">Todos los estados</option>
                 <option value="active">Activos ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.active || 0})</option>
+                <option value="unlisted">No listados ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.unlisted || 0})</option>
                 <option value="draft">Borradores ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.draft || 0})</option>
                 <option value="archived">Archivados ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.archived || 0})</option>
               </select>
@@ -1252,10 +1257,11 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
                         product.status === "active" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                        product.status === "unlisted" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
                         product.status === "draft" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
                         "bg-gray-500/10 text-gray-400 border-gray-500/20"
                       }`}>
-                        {product.status === "active" ? "Activo" : product.status === "draft" ? "Borrador" : "Archivado"}
+                        {product.status === "active" ? "Activo" : product.status === "unlisted" ? "No listado" : product.status === "draft" ? "Borrador" : "Archivado"}
                       </span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
                         product.publishedAt ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"

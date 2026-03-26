@@ -92,11 +92,11 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
     seoScore: p.seoScore,
   }));
 
-  const statusCounts = { active: 0, draft: 0, archived: 0 };
+  const statusCounts: Record<string, number> = { active: 0, draft: 0, archived: 0, unlisted: 0 };
   let publishedCount = 0;
   allProducts.forEach((p) => {
-    const s = (p.status ?? "active") as keyof typeof statusCounts;
-    if (s in statusCounts) statusCounts[s]++;
+    const s = p.status ?? "active";
+    statusCounts[s] = (statusCounts[s] ?? 0) + 1;
     if (p.publishedAt) publishedCount++;
   });
 
@@ -133,21 +133,21 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   const requestedFilter = req.body?.statusFilter || req.query?.statusFilter || "any";
 
   const statusesToFetch = requestedFilter === "any"
-    ? ["active", "draft", "archived"]
+    ? ["active", "draft", "archived", "unlisted"]
     : [requestedFilter];
 
   logger.info({ projectId: id, domain: project.shopDomain, statusesToFetch }, "Shopify sync: starting");
 
-  for (const status of statusesToFetch) {
+  if (requestedFilter === "any") {
     let nextPageInfo: string | null = null;
     let isFirst = true;
 
     while (true) {
       const path = isFirst
-        ? `/products.json?limit=${limit}&status=${status}&published_status=any`
+        ? `/products.json?limit=${limit}&published_status=any`
         : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
 
-      logger.info({ projectId: id, path, status, isFirst }, "Shopify sync: fetching page");
+      logger.info({ projectId: id, path, isFirst }, "Shopify sync: fetching page (all statuses)");
 
       let pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null };
       try {
@@ -158,7 +158,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
+        logger.error({ projectId: id, error: msg }, "Shopify sync: API request failed");
         res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
         return;
       }
@@ -167,7 +167,6 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
 
       logger.info({
         projectId: id,
-        status,
         productsInPage: data.products?.length ?? 0,
         hasNext: !!next,
       }, "Shopify sync: page received");
@@ -179,9 +178,58 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
       if (!nextPageInfo) break;
       await new Promise((r) => setTimeout(r, 300));
     }
+  } else {
+    for (const status of statusesToFetch) {
+      let nextPageInfo: string | null = null;
+      let isFirst = true;
+
+      while (true) {
+        const path = isFirst
+          ? `/products.json?limit=${limit}&status=${status}&published_status=any`
+          : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
+
+        logger.info({ projectId: id, path, status, isFirst }, "Shopify sync: fetching page");
+
+        let pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null };
+        try {
+          pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+            id,
+            project.shopDomain,
+            path
+          );
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
+          res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
+          return;
+        }
+
+        const { data, nextPageInfo: next } = pageResult;
+
+        logger.info({
+          projectId: id,
+          status,
+          productsInPage: data.products?.length ?? 0,
+          hasNext: !!next,
+        }, "Shopify sync: page received");
+
+        isFirst = false;
+        if (!data.products?.length) break;
+        allProducts = allProducts.concat(data.products);
+        nextPageInfo = next;
+        if (!nextPageInfo) break;
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
   }
 
-  logger.info({ projectId: id, totalProducts: allProducts.length }, "Shopify sync: all pages fetched");
+  const statusBreakdown: Record<string, number> = {};
+  for (const sp of allProducts) {
+    const s = sp.status ?? "unknown";
+    statusBreakdown[s] = (statusBreakdown[s] ?? 0) + 1;
+  }
+
+  logger.info({ projectId: id, totalProducts: allProducts.length, statusBreakdown }, "Shopify sync: all pages fetched");
 
   let auditedCount = 0;
   let totalScore = 0;
@@ -276,12 +324,15 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   const avgScore = auditedCount > 0 ? totalScore / auditedCount : null;
   await db.update(projectsTable).set({ productCount: allProducts.length, avgAuditScore: avgScore }).where(eq(projectsTable.id, id));
 
+  const breakdownParts = Object.entries(statusBreakdown).map(([s, c]) => `${c} ${s}`);
+
   res.json({
     synced: allProducts.length,
     auditedCount,
     removed: removedCount,
     avgScore,
-    message: `${allProducts.length} productos sincronizados, ${removedCount > 0 ? `${removedCount} eliminados de BD` : "0 eliminados"}`,
+    statusBreakdown,
+    message: `${allProducts.length} productos sincronizados (${breakdownParts.join(", ")}), ${removedCount > 0 ? `${removedCount} eliminados de BD` : "0 eliminados"}`,
   });
 });
 
