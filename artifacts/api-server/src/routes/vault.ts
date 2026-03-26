@@ -50,7 +50,25 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
   if (fileType) conditions.push(eq(projectFilesTable.fileType, fileType));
   if (category) conditions.push(eq(projectFilesTable.category, category));
 
-  const files = await db.select().from(projectFilesTable)
+  const files = await db.select({
+    id: projectFilesTable.id,
+    projectId: projectFilesTable.projectId,
+    fileType: projectFilesTable.fileType,
+    category: projectFilesTable.category,
+    title: projectFilesTable.title,
+    description: projectFilesTable.description,
+    objectPath: projectFilesTable.objectPath,
+    originalUrl: projectFilesTable.originalUrl,
+    mimeType: projectFilesTable.mimeType,
+    fileSizeBytes: projectFilesTable.fileSizeBytes,
+    productId: projectFilesTable.productId,
+    productTitle: projectFilesTable.productTitle,
+    generatedBy: projectFilesTable.generatedBy,
+    metadata: projectFilesTable.metadata,
+    hasContent: sql<boolean>`content IS NOT NULL`.as("has_content"),
+    isPublic: projectFilesTable.isPublic,
+    createdAt: projectFilesTable.createdAt,
+  }).from(projectFilesTable)
     .where(and(...conditions))
     .orderBy(desc(projectFilesTable.createdAt))
     .limit(parseInt(limit))
@@ -59,10 +77,10 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
   const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(projectFilesTable)
     .where(eq(projectFilesTable.projectId, projectId));
 
-  // Añadir URL de acceso a cada archivo
   const filesWithUrls = files.map(f => ({
     ...f,
-    downloadUrl: f.objectPath
+    hasContent: undefined,
+    downloadUrl: (f.objectPath || f.hasContent)
       ? `/api/projects/${projectId}/vault/${f.id}/download`
       : f.originalUrl ?? null,
   }));
@@ -212,6 +230,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
       productTitle: productTitle || null,
       generatedBy: "report_engine",
       metadata: metadata ? JSON.stringify(metadata) : null,
+      content: savedPath ? null : htmlReport,
       isPublic: 0,
     }).returning();
 
@@ -262,6 +281,13 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
         return;
       }
     } catch {}
+  }
+
+  if (file.content) {
+    const buf = Buffer.from(file.content, "utf-8");
+    res.setHeader("Content-Type", file.mimeType ?? "text/html");
+    res.send(buf);
+    return;
   }
 
   // Para archivos solo-metadata (rediseños, reportes SEO, etc.) — servir metadata como JSON
@@ -331,6 +357,10 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
           archive.append(buffer, { name: entryName });
           added++;
         }
+      } else if (file.content) {
+        const htmlName = `${folder}/${safeTitle}_${file.id}.html`;
+        archive.append(file.content, { name: htmlName });
+        added++;
       } else if (file.metadata) {
         // Archivos solo-metadata (rediseños, reportes SEO): serializar como JSON
         const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
@@ -351,7 +381,8 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
   }
 
   // Añadir índice JSON con todos los metadatos
-  archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files }, null, 2), {
+  const indexFiles = files.map(({ content, ...rest }) => rest);
+  archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files: indexFiles }, null, 2), {
     name: "vault_index.json",
   });
 

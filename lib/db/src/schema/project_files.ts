@@ -15,6 +15,7 @@ export const projectFilesTable = pgTable("project_files", {
   productTitle: text("product_title"),
   generatedBy: text("generated_by"),   // "images_motor", "seo_motor", "redesign_motor", etc.
   metadata: text("metadata"),           // JSON con datos adicionales (prompt, score, etc.)
+  content: text("content"),              // HTML/text content fallback when Object Storage unavailable
   isPublic: integer("is_public").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
