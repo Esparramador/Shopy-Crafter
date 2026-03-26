@@ -685,6 +685,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
       case "publish_product":
         return `✅ Producto "${result.title}" publicado (active).`;
+      case "set_product_status":
+        return `✅ Producto "${result.title}" → estado: **${result.status}**`;
+      case "scan_store":
+        return `📊 **Escaneo completado** (filtro: ${result.statusFilter ?? "any"})\n📦 ${result.total ?? 0} productos analizados\n📈 Nota media: ${typeof result.avgScore === "number" ? (result.avgScore as number).toFixed(0) : "N/A"}/100`;
+      case "list_all_products": {
+        const allProds = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
+        const stats = result.byStatus as Record<string, number> ?? {};
+        if (!allProds.length) return "📦 No se encontraron productos.";
+        let msg = `📦 **${result.total} productos** (filtro: ${result.statusFilter ?? "any"})`;
+        if (Object.keys(stats).length) msg += `\n📊 ${Object.entries(stats).map(([s, c]) => `${s}: ${c}`).join(" | ")}`;
+        msg += `\n${allProds.map((p, i) => `${i + 1}. **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
+        return msg;
+      }
       case "get_orders": {
         const orders = (result.orders as Array<{ name: string; total: string; customer: string; financial: string }>) ?? [];
         if (!orders.length) return "🛒 No hay pedidos.";

@@ -32,18 +32,22 @@ Interpreta este comando de voz en español y devuelve:
 
 Acciones disponibles:
 - store_status: Ver estado de la tienda. Params: {projectId}
-- list_products: Listar productos. Params: {projectId, limit?}
+- list_products: Listar productos activos. Params: {projectId, limit?}
+- list_all_products: Listar TODOS los productos (active, draft, archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
 - create_product: Crear producto en Shopify. Params: {projectId, title, price?, productType?, aiGenerate?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?}
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
+- set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
+- scan_store: Escanear/auditar TODOS los productos de la tienda (incluye draft y archived). Params: {projectId, statusFilter? ("any","active","draft","archived")}
 - regenerate_token: Regenerar token de Shopify. Params: {projectId}
 - get_scopes: Ver permisos OAuth. Params: {projectId}
 - search_product: Buscar producto. Params: {projectId, query}
 - publish_product: Publicar producto. Params: {projectId, productId}
 - delete_product: Eliminar producto. Params: {projectId, productId}
 - get_orders: Ver pedidos. Params: {projectId, limit?}
+- search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
 - navigate: Navegar a página. Params: {path}
-- navigate: Ir a /projects/{projectId}/audit para ejecutar auditoría
+- navigate: Ir a /projects/{projectId}/audit para ver auditoría visual
 
 Devuelve SOLO JSON válido:
 {

@@ -214,10 +214,13 @@ Formato del bloque de acción (pon esto al final de tu respuesta cuando detectes
 
 Acciones disponibles:
 - store_status: Ver estado de la tienda. Params: {projectId}
-- list_products: Listar productos. Params: {projectId, limit?}
+- list_products: Listar productos activos. Params: {projectId, limit?}
+- list_all_products: Listar TODOS los productos (active+draft+archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
 - create_product: Crear producto. Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
+- set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
+- scan_store: Escanear/auditar TODOS los productos de la tienda (incluye draft, archived). Params: {projectId, statusFilter? ("any","active","draft","archived")}
 - regenerate_token: Regenerar token Shopify. Params: {projectId}
 - get_scopes: Ver permisos/scopes. Params: {projectId}
 - delete_product: Eliminar producto. Params: {projectId, productId}
@@ -230,10 +233,15 @@ REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
 - Si el usuario dice "crea un producto llamado X", EJECUTA la acción create_product
 - Si dice "muéstrame los productos", EJECUTA list_products
+- Si dice "muéstrame TODOS los productos" o "productos draft" o "productos ocultos" o "productos archivados", EJECUTA list_all_products con statusFilter="any" o el filtro específico
 - Si dice "regenera el token", EJECUTA regenerate_token
 - Si dice "cuántos productos tiene la tienda", EJECUTA store_status
 - Si dice "cambia el precio de X a Y", necesitas primero buscar el producto, o si dan el ID, usa change_price
-- Si dice "publica el producto X", usa publish_product
+- Si dice "publica el producto X", usa publish_product o set_product_status con status="active"
+- Si dice "despublica", "pon en borrador", "oculta el producto X", usa set_product_status con status="draft"
+- Si dice "archiva el producto X", usa set_product_status con status="archived"
+- Si dice "escanea la tienda", "audita todos los productos", "escanear tienda", "hacer auditoría", EJECUTA scan_store con statusFilter="any" para incluir TODOS los productos
+- Si dice "modifica el filtro de auditoría", "cambia el filtro", "incluye productos draft en la auditoría", EJECUTA scan_store con el statusFilter apropiado
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
 - Si dice "ver pedidos", usa get_orders
@@ -979,6 +987,88 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           })),
           total: data.orders.length,
           message: `${data.orders.length} pedidos recientes`,
+        };
+        break;
+      }
+
+      case "scan_store": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const statusFilter = params?.statusFilter || "any";
+        const syncRes = await fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync?statusFilter=${statusFilter}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+          body: JSON.stringify({ statusFilter }),
+        });
+
+        if (!syncRes.ok) {
+          const errText = await syncRes.text();
+          res.status(500).json({ error: `Error escaneando: ${errText}` });
+          return;
+        }
+
+        const syncData = await syncRes.json() as Record<string, unknown>;
+        result = {
+          ...syncData,
+          statusFilter,
+          message: `Escaneo completado (filtro: ${statusFilter}). ${syncData.total ?? 0} productos analizados. Nota media: ${typeof syncData.avgScore === "number" ? syncData.avgScore.toFixed(0) : "N/A"}/100`,
+        };
+        break;
+      }
+
+      case "set_product_status": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const newStatus = params?.status;
+        if (!projectId || !productId || !newStatus) { res.status(400).json({ error: "projectId, productId y status (active/draft/archived) requeridos" }); return; }
+        if (!["active", "draft", "archived"].includes(newStatus)) { res.status(400).json({ error: "status debe ser: active, draft o archived" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
+          { method: "PUT", body: JSON.stringify({ product: { id: parseInt(productId), status: newStatus } }) }
+        );
+
+        result = {
+          productId, title: updated.product.title, status: newStatus,
+          message: `Producto "${updated.product.title}" cambiado a estado: ${newStatus}`,
+        };
+        break;
+      }
+
+      case "list_all_products": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const limit = Math.min(params?.limit ?? 20, 50);
+        const statusFilter = params?.statusFilter || "any";
+        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+          parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${statusFilter}&fields=id,title,status,variants,images,tags`
+        );
+
+        const byStatus: Record<string, number> = {};
+        data.products.forEach((p: Record<string, unknown>) => {
+          const s = String(p.status || "unknown");
+          byStatus[s] = (byStatus[s] || 0) + 1;
+        });
+
+        result = {
+          products: data.products.map((p: Record<string, unknown>) => ({
+            id: p.id, title: p.title, status: p.status,
+            price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
+            imageCount: (p.images as unknown[])?.length ?? 0,
+            tags: p.tags,
+          })),
+          total: data.products.length,
+          byStatus,
+          statusFilter,
+          message: `${data.products.length} productos (filtro: ${statusFilter}). Desglose: ${Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")}`,
         };
         break;
       }

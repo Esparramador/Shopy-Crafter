@@ -115,9 +115,9 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   let isFirst = true;
 
   while (true) {
-    // First page: filter by status. Subsequent pages: ONLY page_info (no other params allowed)
+    const statusFilter = req.body?.statusFilter || req.query?.statusFilter || "any";
     const path = isFirst
-      ? `/products.json?limit=${limit}&status=active`
+      ? `/products.json?limit=${limit}&status=${statusFilter}`
       : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
 
     const { data, nextPageInfo: next } = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
