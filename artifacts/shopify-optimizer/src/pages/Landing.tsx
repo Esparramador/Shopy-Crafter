@@ -246,6 +246,7 @@ export default function Landing() {
   useEffect(() => {
     if (!isPreview) return;
     const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data?.type === "cms-go-to-section") {
         const idx = FP_SECTIONS.findIndex(s => s.id === e.data.sectionId);
         if (idx >= 0) goToSection(idx);

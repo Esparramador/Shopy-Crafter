@@ -693,7 +693,7 @@ export default function CMSEditor() {
   const previewUrl = `${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}/landing?preview=true`;
 
   const scrollPreviewToSection = (sectionId: string) => {
-    iframeRef.current?.contentWindow?.postMessage({ type: "cms-go-to-section", sectionId }, "*");
+    iframeRef.current?.contentWindow?.postMessage({ type: "cms-go-to-section", sectionId }, window.location.origin);
   };
 
   if (!content) {

@@ -37,6 +37,8 @@ async function getOrInitContent() {
 
 function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
   const keys = path.split(".");
+  const BLOCKED = new Set(["__proto__", "constructor", "prototype"]);
+  if (keys.some(k => BLOCKED.has(k))) throw new Error("Invalid path");
   const result = JSON.parse(JSON.stringify(obj));
   let current: Record<string, unknown> = result;
   for (let i = 0; i < keys.length - 1; i++) {
