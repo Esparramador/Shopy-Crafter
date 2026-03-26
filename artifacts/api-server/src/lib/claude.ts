@@ -37,21 +37,24 @@ export async function askClaude(
   systemPrompt?: string,
   maxTokens = 4096
 ): Promise<string> {
-  const client = await getClaudeClient(projectId);
+  const { withClaudeQueue } = await import("./claude-queue.js");
+  return withClaudeQueue(async () => {
+    const client = await getClaudeClient(projectId);
 
-  const response = await client.messages.create(
-    {
-      model: "claude-sonnet-4-5",
-      max_tokens: maxTokens,
-      system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
-      messages,
-    },
-    { signal: AbortSignal.timeout(120_000) }
-  );
+    const response = await client.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: maxTokens,
+        system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
+        messages,
+      },
+      { signal: AbortSignal.timeout(120_000) }
+    );
 
-  const content = response.content[0];
-  if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
-  return content.text;
+    const content = response.content[0];
+    if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
+    return content.text;
+  });
 }
 
 export async function askClaudeJson<T>(
@@ -85,53 +88,59 @@ export async function askClaudeWithVision(
   systemPrompt?: string,
   maxTokens = 2048
 ): Promise<string> {
-  const client = await getClaudeClient(projectId);
+  const { withClaudeQueue } = await import("./claude-queue.js");
+  return withClaudeQueue(async () => {
+    const client = await getClaudeClient(projectId);
 
-  const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
-    type: "image",
-    source: {
-      type: "base64",
-      media_type: img.mediaType,
-      data: img.base64,
-    },
-  }));
+    const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: img.mediaType,
+        data: img.base64,
+      },
+    }));
 
-  const response = await client.messages.create(
-    {
-      model: "claude-sonnet-4-5",
-      max_tokens: maxTokens,
-      system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: [
-            ...imageBlocks,
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
-    },
-    { signal: AbortSignal.timeout(120_000) }
-  );
+    const response = await client.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: maxTokens,
+        system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
+        messages: [
+          {
+            role: "user",
+            content: [
+              ...imageBlocks,
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      },
+      { signal: AbortSignal.timeout(120_000) }
+    );
 
-  const content = response.content[0];
-  if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
-  return content.text;
+    const content = response.content[0];
+    if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
+    return content.text;
+  });
 }
 
 export async function claude(prompt: string, maxTokens = 2048): Promise<string> {
-  const client = getDefaultClient();
-  const response = await client.messages.create(
-    {
-      model: "claude-sonnet-4-5",
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    },
-    { signal: AbortSignal.timeout(120_000) }
-  );
-  const content = response.content[0];
-  if (content.type !== "text") throw new Error("Unexpected non-text response");
-  return content.text;
+  const { withClaudeQueue } = await import("./claude-queue.js");
+  return withClaudeQueue(async () => {
+    const client = getDefaultClient();
+    const response = await client.messages.create(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: AbortSignal.timeout(120_000) }
+    );
+    const content = response.content[0];
+    if (content.type !== "text") throw new Error("Unexpected non-text response");
+    return content.text;
+  });
 }
 
 /**

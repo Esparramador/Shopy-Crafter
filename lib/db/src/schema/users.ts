@@ -43,6 +43,13 @@ export const approvalsTable = pgTable("approvals", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const rateLimitsTable = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  blockedUntil: timestamp("blocked_until"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const messagesTable = pgTable("messages", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),

@@ -1,3 +1,6 @@
+import { validateEncryptionKey } from "./lib/crypto.js";
+validateEncryptionKey();
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import {
@@ -264,6 +267,16 @@ const server = app.listen(port, (err?: Error) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  db.execute(sql`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      blocked_until TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `).catch((err) => logger.error({ err }, "Failed to create rate_limits table"));
+
   deduplicateProducts()
     .then(() => ensureAdminUser())
     .then(() => ensureProjectConfig())

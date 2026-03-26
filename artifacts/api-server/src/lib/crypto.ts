@@ -2,9 +2,32 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const ALGO = "aes-256-gcm";
 
+let tempKeyGenerated = false;
+
+export function validateEncryptionKey(): void {
+  const keyHex = process.env.ENCRYPTION_KEY;
+  if (!keyHex) {
+    const generated = randomBytes(32).toString("hex");
+    process.env.ENCRYPTION_KEY = generated;
+    tempKeyGenerated = true;
+    console.warn("╔══════════════════════════════════════════════════════════════╗");
+    console.warn("║  ⚠️  WARNING: ENCRYPTION_KEY not set!                       ║");
+    console.warn("║  A temporary key has been generated for this session.       ║");
+    console.warn("║  Data encrypted now will NOT be decryptable after restart.  ║");
+    console.warn("║  Set ENCRYPTION_KEY env var with a 64-char hex string.      ║");
+    console.warn("╚══════════════════════════════════════════════════════════════╝");
+  } else if (keyHex.length !== 64 || !/^[0-9a-fA-F]+$/.test(keyHex)) {
+    throw new Error("ENCRYPTION_KEY must be a 64-character hex string (32 bytes)");
+  }
+}
+
+export function isUsingTemporaryKey(): boolean {
+  return tempKeyGenerated;
+}
+
 function getKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
-  if (!keyHex) throw new Error("ENCRYPTION_KEY not set");
+  if (!keyHex) throw new Error("ENCRYPTION_KEY not set — call validateEncryptionKey() at startup");
   return Buffer.from(keyHex, "hex");
 }
 

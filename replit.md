@@ -52,7 +52,13 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.
 
 ### Security
-- AES-256-GCM encryption for all credentials.
+- AES-256-GCM encryption for all credentials with startup validation (temporary key auto-generated with warning if missing).
+- Comprehensive audit logging via `recordAudit()` helper — covers login, logout, password change/reset, user create/activate/deactivate, impersonation, project create/delete, plan upgrades, Shopify token refresh, settings changes, client invites, approval actions.
+- Database-backed rate limiting for auth endpoints (`rate_limits` table) — persists across server restarts.
+- Claude API concurrency queue (max 4 parallel requests) with exponential backoff retry on 429/5xx errors (`lib/claude-queue.ts`).
+- Shopify API calls use exponential backoff retry (3 attempts with 1s/2s/4s delays) for transient errors (429/5xx).
+- Frontend ErrorBoundary component catches unhandled React errors with recovery UI.
+- Global `window.onerror` and `unhandledrejection` handlers show toast notifications for uncaught errors.
 - Admin routes are protected.
 - CORS configured for `APP_URL` and `REPLIT_DOMAINS`.
 - Secure session management (`httpOnly`, `sameSite: strict`, `secure: true` in production).

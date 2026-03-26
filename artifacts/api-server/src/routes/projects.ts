@@ -5,6 +5,7 @@ import { projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
+import { recordAudit } from "../lib/audit.helper.js";
 
 const router = Router();
 
@@ -255,6 +256,14 @@ router.post("/projects", async (req, res): Promise<void> => {
 
   const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
 
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "project_create",
+    projectId: String(refreshed.id),
+    details: `Created project "${name}" (${normalizedDomain})`,
+    ipAddress: req.ip ?? "unknown",
+  });
+
   res.status(201).json({
     ...refreshed,
     clientSecret: "••••••••",
@@ -392,9 +401,23 @@ router.delete("/projects/:projectId", async (req, res): Promise<void> => {
       clientSecret: "",
       shopDomain: "",
     }).where(eq(projectsTable.id, id));
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "project_dissociate",
+      projectId: String(id),
+      details: `Dissociated store from project ${id}`,
+      ipAddress: req.ip ?? "unknown",
+    });
     res.json({ success: true, message: "Tienda desasociada. Tus productos, COGS, SEO e imágenes se conservan." });
   } else {
     await db.delete(projectsTable).where(eq(projectsTable.id, id));
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "project_delete",
+      projectId: String(id),
+      details: `Deleted project ${id}`,
+      ipAddress: req.ip ?? "unknown",
+    });
     res.json({ success: true, message: "Proyecto eliminado completamente" });
   }
 });
@@ -426,6 +449,13 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
       return;
     }
     await db.update(projectsTable).set({ accessToken: newAccessToken }).where(eq(projectsTable.id, id));
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "shopify_token_manual_update",
+      projectId: String(id),
+      details: `Manual token update for project ${id}`,
+      ipAddress: req.ip ?? "unknown",
+    });
     res.json({ success: true, message: "Token actualizado y validado correctamente." });
     return;
   }
@@ -434,6 +464,13 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
   try {
     const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
     const newToken = await refreshToken(id, project.shopDomain, project.clientId, plainSecret);
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "shopify_token_refresh",
+      projectId: String(id),
+      details: `Token refreshed for project ${id} (${project.shopDomain})`,
+      ipAddress: req.ip ?? "unknown",
+    });
     res.json({
       success: true,
       message: "Token regenerado correctamente.",

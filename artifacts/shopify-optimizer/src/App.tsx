@@ -59,6 +59,8 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { OnboardingWidget } from "@/components/OnboardingWidget";
 import { CoachMarks } from "@/components/CoachMarks";
 import OmniChatbot from "@/components/OmniChatbot";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { initGlobalErrorHandlers } from "@/lib/global-error-handler";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -443,19 +445,23 @@ function Router() {
   );
 }
 
+initGlobalErrorHandlers();
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-            <OmniChatbot />
-          </WouterRouter>
-        </AuthProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+              <OmniChatbot />
+            </WouterRouter>
+          </AuthProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,21 +1,67 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { db, usersTable, auditLogTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, auditLogTable, rateLimitsTable } from "@workspace/db";
+import { eq, lt, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { recordAudit } from "../lib/audit.helper.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-const loginAttempts = new Map<string, { count: number; until: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+async function getRateLimit(key: string): Promise<{ count: number; blockedUntil: Date | null }> {
+  try {
+    const [row] = await db.select().from(rateLimitsTable).where(eq(rateLimitsTable.key, key));
+    if (!row) return { count: 0, blockedUntil: null };
+    return { count: row.count, blockedUntil: row.blockedUntil };
+  } catch {
+    return { count: 0, blockedUntil: null };
+  }
+}
+
+async function incrementRateLimit(key: string): Promise<void> {
+  try {
+    const blockedUntil = new Date(Date.now() + RATE_LIMIT_WINDOW_MS);
+    await db.insert(rateLimitsTable)
+      .values({ key, count: 1, blockedUntil, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: rateLimitsTable.key,
+        set: {
+          count: sql`${rateLimitsTable.count} + 1`,
+          blockedUntil,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (err) {
+    logger.error({ err, key }, "Failed to increment rate limit");
+  }
+}
+
+async function clearRateLimit(key: string): Promise<void> {
+  try {
+    await db.delete(rateLimitsTable).where(eq(rateLimitsTable.key, key));
+  } catch {}
+}
+
+async function cleanupExpiredRateLimits(): Promise<void> {
+  try {
+    await db.delete(rateLimitsTable).where(lt(rateLimitsTable.blockedUntil, new Date()));
+  } catch {}
+}
+
+setInterval(() => { cleanupExpiredRateLimits().catch(() => {}); }, 5 * 60 * 1000);
 
 router.post("/login", async (req, res): Promise<void> => {
   const { email, password } = req.body as { email: string; password: string };
   const ip = req.ip ?? "unknown";
+  const rateLimitKey = `login:${ip}`;
 
-  const attempts = loginAttempts.get(ip);
-  if (attempts && attempts.count >= 5 && Date.now() < attempts.until) {
-    const mins = Math.ceil((attempts.until - Date.now()) / 60000);
+  const limits = await getRateLimit(rateLimitKey);
+  if (limits.count >= RATE_LIMIT_MAX && limits.blockedUntil && limits.blockedUntil > new Date()) {
+    const mins = Math.ceil((limits.blockedUntil.getTime() - Date.now()) / 60000);
     res.status(429).json({ error: `Demasiados intentos. Espera ${mins} minuto(s).` });
     return;
   }
@@ -25,25 +71,19 @@ router.post("/login", async (req, res): Promise<void> => {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase().trim()));
 
   if (!user || !user.isActive) {
-    const cur = loginAttempts.get(ip) ?? { count: 0, until: 0 };
-    cur.count += 1;
-    cur.until = Date.now() + 15 * 60 * 1000;
-    loginAttempts.set(ip, cur);
+    await incrementRateLimit(rateLimitKey);
     res.status(401).json({ error: "Credenciales incorrectas" });
     return;
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    const cur = loginAttempts.get(ip) ?? { count: 0, until: 0 };
-    cur.count += 1;
-    cur.until = Date.now() + 15 * 60 * 1000;
-    loginAttempts.set(ip, cur);
+    await incrementRateLimit(rateLimitKey);
     res.status(401).json({ error: "Credenciales incorrectas" });
     return;
   }
 
-  loginAttempts.delete(ip);
+  await clearRateLimit(rateLimitKey);
 
   req.session.userId = user.id;
   req.session.role = user.role;
@@ -53,8 +93,7 @@ router.post("/login", async (req, res): Promise<void> => {
 
   await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
 
-  await db.insert(auditLogTable).values({
-    id: randomBytes(16).toString("hex"),
+  await recordAudit({
     userId: user.id,
     action: "login",
     details: `Login desde ${ip}`,
@@ -65,6 +104,11 @@ router.post("/login", async (req, res): Promise<void> => {
 });
 
 router.post("/logout", (req, res): void => {
+  const userId = req.session.userId;
+  const ip = req.ip ?? "unknown";
+  if (userId) {
+    recordAudit({ userId, action: "logout", details: `Logout desde ${ip}`, ipAddress: ip }).catch(() => {});
+  }
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
     res.json({ success: true });
@@ -99,7 +143,6 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
     return;
   }
 
-  // Fetch project info so the setup page can show store name + domain
   let storeName: string | null = null;
   let shopDomain: string | null = null;
   if (user.clientId) {
@@ -111,7 +154,7 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
       }).from(projectsTable).where(eq(projectsTable.id, Number(user.clientId)));
       storeName = project?.name ?? null;
       shopDomain = project?.shopDomain ?? null;
-    } catch { /* project may not exist yet */ }
+    } catch {}
   }
 
   res.json({
@@ -155,10 +198,16 @@ router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   req.session.name = user.name;
   req.session.email = user.email;
 
+  await recordAudit({
+    userId: user.id,
+    action: "invite_setup",
+    details: "Cliente configuró su cuenta via invitación",
+    ipAddress: req.ip ?? "unknown",
+  });
+
   res.json({ success: true, role: user.role, clientId: user.clientId });
 });
 
-// ─── STOP IMPERSONATION ──────────────────────────────────────────────────────
 router.post("/stop-impersonate", requireAuth, async (req, res): Promise<void> => {
   const adminId = req.session.userId!;
   const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminId));
@@ -168,15 +217,22 @@ router.post("/stop-impersonate", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
+  const impersonatedId = req.session.impersonating;
   req.session.role = "admin";
   req.session.clientId = null;
   req.session.name = admin.name;
   delete req.session.impersonating;
 
+  await recordAudit({
+    userId: adminId,
+    action: "stop_impersonation",
+    details: `Dejó de impersonar usuario ${impersonatedId}`,
+    ipAddress: req.ip ?? "unknown",
+  });
+
   res.json({ success: true });
 });
 
-// ─── CHANGE PASSWORD (autenticado) ───────────────────────────────────────────
 router.post("/change-password", requireAuth, async (req, res): Promise<void> => {
   const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
 
@@ -206,8 +262,7 @@ router.post("/change-password", requireAuth, async (req, res): Promise<void> => 
   const hashed = await bcrypt.hash(newPassword, 12);
   await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, user.id));
 
-  await db.insert(auditLogTable).values({
-    id: randomBytes(16).toString("hex"),
+  await recordAudit({
     userId: user.id,
     action: "password_changed",
     details: "Contraseña cambiada por el usuario",
@@ -217,24 +272,21 @@ router.post("/change-password", requireAuth, async (req, res): Promise<void> => 
   res.json({ success: true, message: "Contraseña actualizada correctamente" });
 });
 
-// ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
 router.post("/forgot-password", async (req, res): Promise<void> => {
   const { email } = req.body as { email: string };
   if (!email) { res.status(400).json({ error: "Email requerido" }); return; }
 
-  // Always respond OK to prevent email enumeration
   const [user] = await db.select().from(usersTable)
     .where(eq(usersTable.email, email.toLowerCase().trim()));
 
   if (user && user.isActive) {
     const token = randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expires = new Date(Date.now() + 60 * 60 * 1000);
     await db.update(usersTable).set({
       resetToken: token,
       resetExpires: expires,
     }).where(eq(usersTable.id, user.id));
 
-    // Send via Klaviyo if available
     const klaviyoKey = process.env.KLAVIYO_API_KEY;
     if (klaviyoKey) {
       const appUrl = process.env.APP_URL ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://shopycrafter.com");
@@ -263,13 +315,17 @@ router.post("/forgot-password", async (req, res): Promise<void> => {
       }
     }
 
-    req.log?.info({ userId: user.id }, "Password reset token generated");
+    await recordAudit({
+      userId: user.id,
+      action: "forgot_password",
+      details: `Solicitud de reset de contraseña para ${email}`,
+      ipAddress: req.ip ?? "unknown",
+    });
   }
 
   res.json({ success: true, message: "Si el email existe, recibirás un enlace de recuperación." });
 });
 
-// ─── RESET PASSWORD ──────────────────────────────────────────────────────────
 router.post("/reset-password", async (req, res): Promise<void> => {
   const { token, password } = req.body as { token: string; password: string };
 
@@ -298,8 +354,7 @@ router.post("/reset-password", async (req, res): Promise<void> => {
     resetExpires: null,
   }).where(eq(usersTable.id, user.id));
 
-  await db.insert(auditLogTable).values({
-    id: randomBytes(16).toString("hex"),
+  await recordAudit({
     userId: user.id,
     action: "password_reset",
     details: "Contraseña restablecida via token",

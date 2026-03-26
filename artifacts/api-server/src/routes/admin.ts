@@ -6,6 +6,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
+import { recordAudit } from "../lib/audit.helper.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -161,19 +162,40 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
 });
 
 router.post("/users/:userId/deactivate", async (req, res): Promise<void> => {
-  await db.update(usersTable).set({ isActive: 0 }).where(eq(usersTable.id, req.params["userId"]!));
+  const targetId = req.params["userId"]!;
+  await db.update(usersTable).set({ isActive: 0 }).where(eq(usersTable.id, targetId));
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "deactivate_user",
+    details: `Deactivated user ${targetId}`,
+    ipAddress: req.ip ?? "unknown",
+  });
   res.json({ success: true });
 });
 
 router.post("/users/:userId/activate", async (req, res): Promise<void> => {
-  await db.update(usersTable).set({ isActive: 1 }).where(eq(usersTable.id, req.params["userId"]!));
+  const targetId = req.params["userId"]!;
+  await db.update(usersTable).set({ isActive: 1 }).where(eq(usersTable.id, targetId));
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "activate_user",
+    details: `Activated user ${targetId}`,
+    ipAddress: req.ip ?? "unknown",
+  });
   res.json({ success: true });
 });
 
 router.post("/users/:userId/reset-password", async (req, res): Promise<void> => {
+  const targetId = req.params["userId"]!;
   const { password } = req.body as { password: string };
   const hashed = await bcrypt.hash(password, 12);
-  await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, req.params["userId"]!));
+  await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, targetId));
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "admin_reset_password",
+    details: `Admin reset password for user ${targetId}`,
+    ipAddress: req.ip ?? "unknown",
+  });
   res.json({ success: true });
 });
 
@@ -184,6 +206,12 @@ router.post("/impersonate/:userId", async (req, res): Promise<void> => {
   req.session.role = "client";
   req.session.clientId = user.clientId;
   req.session.name = user.name;
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "impersonate",
+    details: `Started impersonating user ${user.id} (${user.email})`,
+    ipAddress: req.ip ?? "unknown",
+  });
   res.json({ success: true, clientId: user.clientId });
 });
 
@@ -291,6 +319,13 @@ router.put("/shopify-config", async (req, res): Promise<void> => {
   await db.insert(platformSettingsTable)
     .values({ key: "shopify_client_secret", value: encrypt(clientSecret.trim()) })
     .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value: encrypt(clientSecret.trim()), updatedAt: new Date() } });
+
+  await recordAudit({
+    userId: req.session.userId!,
+    action: "shopify_config_update",
+    details: "Updated Shopify OAuth credentials",
+    ipAddress: req.ip ?? "unknown",
+  });
 
   res.json({ success: true, message: "Credenciales de Shopify OAuth guardadas correctamente" });
 });

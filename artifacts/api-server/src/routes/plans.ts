@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { PLAN_LIMITS, PACK_DEFINITIONS, getPlanStatus, addPackCredits, checkProductionLimit } from "../lib/plan-limits.js";
 import { logger } from "../lib/logger.js";
+import { recordAudit } from "../lib/audit.helper.js";
 
 const router = Router();
 
@@ -68,6 +69,14 @@ router.put("/projects/:projectId/plan", requireAdmin, async (req, res): Promise<
         ...(planRenewsAt ? { planRenewsAt: new Date(planRenewsAt) } : {}),
       })
       .where(eq(projectsTable.id, projectId));
+
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "plan_upgrade",
+      projectId: String(projectId),
+      details: `Plan updated to "${plan}" for project ${projectId}`,
+      ipAddress: req.ip ?? "unknown",
+    });
 
     const status = await getPlanStatus(projectId);
     res.json({ success: true, plan, status });

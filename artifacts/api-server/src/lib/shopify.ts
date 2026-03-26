@@ -87,9 +87,35 @@ export async function getShopifyHeaders(projectId: number): Promise<Record<strin
   };
 }
 
+const RETRY_DELAYS = [1000, 2000, 4000];
+
+async function shopifyRetry<T>(fn: () => Promise<Response>, path: string, projectId: number): Promise<T> {
+  let lastResp: Response | null = null;
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    const resp = await fn();
+    if (resp.status === 429 || (resp.status >= 500 && resp.status !== 501)) {
+      lastResp = resp;
+      if (attempt < RETRY_DELAYS.length) {
+        const delay = RETRY_DELAYS[attempt];
+        logger.warn({ projectId, path, status: resp.status, attempt: attempt + 1, delay }, "Shopify transient error — retrying");
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+    }
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+    }
+    return resp.json() as Promise<T>;
+  }
+  const text = lastResp ? await lastResp.text() : "Max retries exceeded";
+  throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+}
+
 /**
  * Makes a Shopify Admin API request.
  * On 401 (expired/invalid token), auto-regenerates token and retries once.
+ * On 429/5xx, retries up to 3 times with exponential backoff (1s/2s/4s).
  */
 export async function shopifyRequest<T>(
   projectId: number,
@@ -101,33 +127,30 @@ export async function shopifyRequest<T>(
   const headers = await getShopifyHeaders(projectId);
   const url = `https://${domain}/admin/api/2025-01${path}`;
 
-  const resp = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string> || {}) },
-    signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
-  });
-
-  if (resp.status === 401) {
-    logger.warn({ projectId, url }, "Shopify 401 — force-regenerating token");
-    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
-    const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
-    const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
-    const retryResp = await fetch(url, {
+  const doFetch = (hdrs: Record<string, string>) => () =>
+    fetch(url, {
       ...options,
-      headers: { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" },
+      headers: { ...hdrs, ...(options.headers as Record<string, string> || {}) },
       signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
     });
-    if (!retryResp.ok) throw new Error(`Shopify ${retryResp.status} after token regeneration at ${path}`);
-    return retryResp.json() as Promise<T>;
-  }
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+  try {
+    return await shopifyRetry<T>(doFetch(headers), path, projectId);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("401")) {
+      logger.warn({ projectId, url }, "Shopify 401 — force-regenerating token");
+      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
+      const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
+      const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
+      return shopifyRetry<T>(
+        doFetch({ "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" }),
+        path,
+        projectId
+      );
+    }
+    throw err;
   }
-
-  return resp.json() as Promise<T>;
 }
 
 /**
@@ -142,40 +165,57 @@ export async function shopifyRequestPaged<T>(
   path: string,
 ): Promise<{ data: T; nextPageInfo: string | null }> {
   const domain = normalizeShopDomain(shopDomain);
-  const headers = await getShopifyHeaders(projectId);
+  const hdrs = await getShopifyHeaders(projectId);
   const url = `https://${domain}/admin/api/2025-01${path}`;
 
-  let resp = await fetch(url, {
-    headers,
-    signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
-  });
+  const doPagedFetch = async (fetchHeaders: Record<string, string>): Promise<{ data: T; nextPageInfo: string | null }> => {
+    let lastResp: Response | null = null;
+    for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+      const resp = await fetch(url, {
+        headers: fetchHeaders,
+        signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+      });
 
-  if (resp.status === 401) {
-    logger.warn({ projectId, url }, "Shopify 401 (paged) — force-regenerating token");
-    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
-    const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
-    const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
-    resp = await fetch(url, {
-      headers: { "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
-    });
-  }
+      if (resp.status === 429 || (resp.status >= 500 && resp.status !== 501)) {
+        lastResp = resp;
+        if (attempt < RETRY_DELAYS.length) {
+          const delay = RETRY_DELAYS[attempt];
+          logger.warn({ projectId, path, status: resp.status, attempt: attempt + 1, delay }, "Shopify paged transient error — retrying");
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
-  }
+      if (resp.status === 401) {
+        if (fetchHeaders["X-Shopify-Access-Token"] !== hdrs["X-Shopify-Access-Token"]) {
+          throw new Error(`Shopify 401 after token refresh at ${path}`);
+        }
+        logger.warn({ projectId, url }, "Shopify 401 (paged) — force-regenerating token");
+        const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+        if (!proj) throw new Error(`Project ${projectId} not found on 401 retry`);
+        const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
+        const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
+        return doPagedFetch({ "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" });
+      }
 
-  // Parse Link header for cursor-based next page
-  // Format: <https://shop.myshopify.com/admin/api/.../products.json?limit=250&page_info=TOKEN>; rel="next"
-  const linkHeader = resp.headers.get("Link") ?? "";
-  let nextPageInfo: string | null = null;
-  const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-  if (nextMatch) nextPageInfo = nextMatch[1];
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+      }
 
-  const data = await resp.json() as T;
-  return { data, nextPageInfo };
+      const linkHeader = resp.headers.get("Link") ?? "";
+      let nextPageInfo: string | null = null;
+      const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      if (nextMatch) nextPageInfo = nextMatch[1];
+
+      const data = await resp.json() as T;
+      return { data, nextPageInfo };
+    }
+    const text = lastResp ? await lastResp.text() : "Max retries exceeded";
+    throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+  };
+
+  return doPagedFetch(hdrs);
 }
 
 /**
