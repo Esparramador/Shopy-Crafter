@@ -21,6 +21,7 @@ export const productsTable = pgTable("products", {
   vendor: text("vendor"),
   productType: text("product_type"),
   status: text("status").notNull().default("active"),
+  publishedAt: text("published_at"),
   tags: text("tags"),
   price: text("price"),
   compareAtPrice: text("compare_at_price"),

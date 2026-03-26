@@ -1070,7 +1070,7 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
         let allProds: Array<Record<string, unknown>> = [];
         for (const st of statusesToQuery) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&fields=id,title,status,variants,images,tags`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags`
           );
           allProds = allProds.concat(d.products || []);
         }
@@ -1082,17 +1082,23 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           byStatus[s] = (byStatus[s] || 0) + 1;
         });
 
+        const published = allProds.filter(p => !!p.published_at).length;
+        const unpublished = allProds.length - published;
+
         result = {
           products: allProds.map((p: Record<string, unknown>) => ({
             id: p.id, title: p.title, status: p.status,
+            published: !!p.published_at,
             price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
             imageCount: (p.images as unknown[])?.length ?? 0,
             tags: p.tags,
           })),
           total: allProds.length,
           byStatus,
+          published,
+          unpublished,
           statusFilter,
-          message: `${allProds.length} productos (filtro: ${statusFilter}). Desglose: ${Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")}`,
+          message: `${allProds.length} productos (filtro: ${statusFilter}). Desglose: ${Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")}. Publicados: ${published}, No publicados: ${unpublished}`,
         };
         break;
       }

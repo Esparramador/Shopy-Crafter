@@ -513,7 +513,20 @@ export default function AuditPage() {
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Auditoría del Catálogo</h1>
           <p className="text-muted-foreground mt-1">
-            {data?.total ? `Analizando ${data.total} productos` : "Escanea tu tienda para comenzar"}
+            {data?.total ? (
+              <>
+                {data.total} productos
+                {(data as any).statusCounts && (
+                  <span className="ml-2 text-xs">
+                    ({(data as any).statusCounts.active > 0 ? `${(data as any).statusCounts.active} activos` : ""}
+                    {(data as any).statusCounts.draft > 0 ? `, ${(data as any).statusCounts.draft} borradores` : ""}
+                    {(data as any).statusCounts.archived > 0 ? `, ${(data as any).statusCounts.archived} archivados` : ""}
+                    {" · "}
+                    {(data as any).publishedCount ?? 0} publicados, {(data as any).unpublishedCount ?? 0} sin publicar)
+                  </span>
+                )}
+              </>
+            ) : "Escanea tu tienda para comenzar"}
           </p>
         </div>
         <div className="flex gap-3 flex-wrap items-center">
@@ -773,7 +786,23 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
 
                 <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
                   <div>
-                    <h3 className="text-base font-bold text-foreground mb-0.5 line-clamp-2">{product.title}</h3>
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <h3 className="text-base font-bold text-foreground line-clamp-2">{product.title}</h3>
+                    </div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
+                        product.status === "active" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                        product.status === "draft" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                        "bg-gray-500/10 text-gray-400 border-gray-500/20"
+                      }`}>
+                        {product.status === "active" ? "Activo" : product.status === "draft" ? "Borrador" : "Archivado"}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
+                        product.publishedAt ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                      }`}>
+                        {product.publishedAt ? "Publicado" : "No publicado"}
+                      </span>
+                    </div>
                     <p className="text-primary font-medium text-sm">
                       {product.price ? formatCurrency(product.price) : "Sin precio"}
                     </p>

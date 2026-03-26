@@ -18,6 +18,7 @@ interface ShopifyProductRaw {
   product_type: string | null;
   handle: string;
   status: string;
+  published_at: string | null;
   tags: string;
   variants: Array<{
     id: number;
@@ -74,6 +75,7 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
     vendor: p.vendor,
     productType: p.productType,
     status: p.status,
+    publishedAt: p.publishedAt ?? null,
     tags: p.tags ?? "",
     price: p.price,
     compareAtPrice: p.compareAtPrice,
@@ -90,6 +92,14 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
     seoScore: p.seoScore,
   }));
 
+  const statusCounts = { active: 0, draft: 0, archived: 0 };
+  let publishedCount = 0;
+  allProducts.forEach((p) => {
+    const s = (p.status ?? "active") as keyof typeof statusCounts;
+    if (s in statusCounts) statusCounts[s]++;
+    if (p.publishedAt) publishedCount++;
+  });
+
   res.json({
     products: mapped,
     total: filtered.length,
@@ -97,6 +107,9 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
     totalPages: Math.ceil(filtered.length / limit),
     avgScore,
     gradeCounts,
+    statusCounts,
+    publishedCount,
+    unpublishedCount: allProducts.length - publishedCount,
   });
 });
 
@@ -131,7 +144,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
 
     while (true) {
       const path = isFirst
-        ? `/products.json?limit=${limit}&status=${status}`
+        ? `/products.json?limit=${limit}&status=${status}&published_status=any`
         : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
 
       logger.info({ projectId: id, path, status, isFirst }, "Shopify sync: fetching page");
@@ -194,6 +207,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
         vendor: sp.vendor,
         productType: sp.product_type,
         status: sp.status,
+        publishedAt: sp.published_at ?? null,
         tags: sp.tags,
         price: sp.variants?.[0]?.price ?? null,
         compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
@@ -219,6 +233,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
           vendor: sp.vendor,
           productType: sp.product_type,
           status: sp.status,
+          publishedAt: sp.published_at ?? null,
           tags: sp.tags,
           price: sp.variants?.[0]?.price ?? null,
           compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
