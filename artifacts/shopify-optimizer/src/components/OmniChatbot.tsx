@@ -689,6 +689,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `✅ Producto "${result.title}" → estado: **${result.status}**`;
       case "scan_store":
         return `📊 **Escaneo completado** (filtro: ${result.statusFilter ?? "any"})\n📦 ${result.total ?? 0} productos analizados\n📈 Nota media: ${typeof result.avgScore === "number" ? (result.avgScore as number).toFixed(0) : "N/A"}/100`;
+      case "modify_audit_filter":
+        return `🔧 **Filtro de auditoría modificado**\n📋 Filtro: ${result.filterDescription ?? result.filterApplied ?? "any"}\n${result.autoScanExecuted ? `📊 Re-escaneo: ${result.synced ?? 0} productos analizados\n📈 Score medio: ${typeof result.avgScore === "number" ? Math.round(result.avgScore as number) : "N/A"}/100` : "⏸️ Sin re-escaneo automático"}`;
+      case "diagnose_app": {
+        const issues = (result.issues as Array<{ component: string; status: string; detail: string; autoFixed?: boolean }>) ?? [];
+        const summary = result.summary as { errors?: number; warnings?: number; ok?: number; fixesApplied?: number } ?? {};
+        const emoji = (summary.errors ?? 0) > 0 ? "🔴" : (summary.warnings ?? 0) > 0 ? "🟡" : "🟢";
+        let msg = `${emoji} **Diagnóstico: ${result.overallStatus}**\n`;
+        msg += `📊 ${summary.errors ?? 0} errores | ${summary.warnings ?? 0} advertencias | ${summary.ok ?? 0} ok`;
+        if ((summary.fixesApplied ?? 0) > 0) msg += ` | 🔧 ${summary.fixesApplied} reparaciones automáticas`;
+        msg += "\n\n";
+        msg += issues.map(i => `${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠️" : "❌"} **${i.component}**: ${i.detail}${i.autoFixed ? " 🔧" : ""}`).join("\n");
+        return msg;
+      }
       case "list_all_products": {
         const allProds = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
         const stats = result.byStatus as Record<string, number> ?? {};

@@ -228,6 +228,8 @@ Acciones disponibles:
 - publish_product: Publicar producto (draft→active). Params: {projectId, productId}
 - get_orders: Ver pedidos recientes. Params: {projectId, limit?}
 - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
+- modify_audit_filter: Cambiar el filtro de auditoría para incluir/excluir productos por estado. Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean, default true)}
+- diagnose_app: Auditar el funcionamiento interno de la app, detectar errores y repararlos. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
 
 REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
@@ -241,7 +243,8 @@ REGLAS:
 - Si dice "despublica", "pon en borrador", "oculta el producto X", usa set_product_status con status="draft"
 - Si dice "archiva el producto X", usa set_product_status con status="archived"
 - Si dice "escanea la tienda", "audita todos los productos", "escanear tienda", "hacer auditoría", EJECUTA scan_store con statusFilter="any" para incluir TODOS los productos
-- Si dice "modifica el filtro de auditoría", "cambia el filtro", "incluye productos draft en la auditoría", EJECUTA scan_store con el statusFilter apropiado
+- Si dice "modifica el filtro de auditoría", "cambia el filtro", "incluye productos draft en la auditoría", "filtra por draft", "filtra por archivados", EJECUTA modify_audit_filter con statusFilter apropiado
+- Si dice "diagnostica la app", "audita el funcionamiento", "revisa errores de la app", "hay algún problema", "la app no funciona bien", "repara errores", "arregla la app", "self-check", "autodiagnóstico", EJECUTA diagnose_app
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
 - Si dice "ver pedidos", usa get_orders
@@ -1115,6 +1118,195 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           memoryId: supData.memoryId,
           fullData: supData,
           message: `Investigación de proveedores completada: ${suppliersList.length} proveedores encontrados para "${pName}"`,
+        };
+        break;
+      }
+
+      case "modify_audit_filter": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const statusFilter = params?.statusFilter || "any";
+        const validFilters = ["any", "active", "draft", "archived"];
+        if (!validFilters.includes(statusFilter)) {
+          res.status(400).json({ error: `statusFilter debe ser: ${validFilters.join(", ")}` });
+          return;
+        }
+
+        const autoScan = params?.autoScan !== false;
+        let scanResult: Record<string, unknown> = {};
+
+        if (autoScan) {
+          const syncRes = await fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+            body: JSON.stringify({ statusFilter }),
+          });
+          if (syncRes.ok) {
+            scanResult = await syncRes.json() as Record<string, unknown>;
+          }
+        }
+
+        const filterLabels: Record<string, string> = {
+          any: "TODOS (activos + borradores + archivados)",
+          active: "Solo productos ACTIVOS (publicados)",
+          draft: "Solo productos en BORRADOR",
+          archived: "Solo productos ARCHIVADOS",
+        };
+
+        result = {
+          filterApplied: statusFilter,
+          filterDescription: filterLabels[statusFilter] || statusFilter,
+          autoScanExecuted: autoScan,
+          ...(autoScan ? scanResult : {}),
+          message: `Filtro de auditoría cambiado a: ${filterLabels[statusFilter]}. ${autoScan ? `Se re-escanearon ${scanResult.synced ?? 0} productos con el nuevo filtro. Score medio: ${typeof scanResult.avgScore === "number" ? Math.round(scanResult.avgScore) : "N/A"}/100.` : "No se ejecutó escaneo automático."}`,
+        };
+        break;
+      }
+
+      case "diagnose_app": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const checksParam = params?.checks || "all";
+        const issues: Array<{ component: string; status: "ok" | "warning" | "error"; detail: string; autoFixed?: boolean }> = [];
+        let fixesApplied = 0;
+
+        const runCheck = (name: string) => checksParam === "all" || checksParam === name;
+
+        if (runCheck("token")) {
+          try {
+            const { validateToken: vt } = await import("../lib/shopify.js");
+            const tokenValid = project.accessToken ? await vt(project.shopDomain, project.accessToken) : false;
+
+            if (!project.accessToken) {
+              issues.push({ component: "Token Shopify", status: "error", detail: "No hay token de acceso configurado. Necesitas reconectar la tienda." });
+            } else if (!tokenValid) {
+              const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+              try {
+                await refreshToken(parseInt(projectId), project.shopDomain, project.clientId, plainSecret);
+                issues.push({ component: "Token Shopify", status: "warning", detail: "Token estaba expirado — se ha regenerado automáticamente.", autoFixed: true });
+                fixesApplied++;
+              } catch {
+                issues.push({ component: "Token Shopify", status: "error", detail: "Token expirado y no se pudo regenerar. Verifica clientId/clientSecret." });
+              }
+            } else {
+              const hoursLeft = project.tokenExpiresAt ? Math.round((new Date(project.tokenExpiresAt).getTime() - Date.now()) / 3600000 * 10) / 10 : "desconocido";
+              issues.push({ component: "Token Shopify", status: "ok", detail: `Token válido. Expira en ${hoursLeft} horas.` });
+            }
+          } catch (e) {
+            issues.push({ component: "Token Shopify", status: "error", detail: `Error verificando token: ${e instanceof Error ? e.message : String(e)}` });
+          }
+        }
+
+        if (runCheck("connectivity")) {
+          try {
+            const headers = await getShopifyHeaders(parseInt(projectId));
+            const domain = normalizeShopDomain(project.shopDomain);
+            const shopRes = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
+              headers,
+              signal: AbortSignal.timeout(10000),
+            });
+            if (shopRes.ok) {
+              const shopData = await shopRes.json() as { shop: { name: string; plan_name: string; domain: string } };
+              issues.push({ component: "Conexión Shopify", status: "ok", detail: `Conectado a "${shopData.shop?.name}" (plan: ${shopData.shop?.plan_name}, dominio: ${shopData.shop?.domain})` });
+            } else {
+              issues.push({ component: "Conexión Shopify", status: "error", detail: `Shopify devolvió error ${shopRes.status}. Posible problema de permisos o token.` });
+            }
+          } catch (e) {
+            issues.push({ component: "Conexión Shopify", status: "error", detail: `No se pudo conectar con Shopify: ${e instanceof Error ? e.message : "timeout"}` });
+          }
+        }
+
+        if (runCheck("products")) {
+          try {
+            const { productsTable } = await import("@workspace/db");
+            const productRows = await db.select({
+              total: sql<number>`count(*)`,
+              avgScore: sql<number>`avg(${productsTable.auditScore})`,
+              withoutScore: sql<number>`count(*) filter (where ${productsTable.auditScore} is null)`,
+              active: sql<number>`count(*) filter (where ${productsTable.status} = 'active')`,
+              draft: sql<number>`count(*) filter (where ${productsTable.status} = 'draft')`,
+              archived: sql<number>`count(*) filter (where ${productsTable.status} = 'archived')`,
+            }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+
+            const stats = productRows[0];
+            if (!stats || Number(stats.total) === 0) {
+              issues.push({ component: "Productos en BD", status: "warning", detail: "No hay productos sincronizados. Ejecuta un escaneo de tienda para importarlos." });
+            } else {
+              issues.push({
+                component: "Productos en BD",
+                status: "ok",
+                detail: `${stats.total} productos en BD (activos: ${stats.active}, borradores: ${stats.draft}, archivados: ${stats.archived}). Score medio: ${stats.avgScore ? Math.round(Number(stats.avgScore)) : "N/A"}/100. Sin score: ${stats.withoutScore}.`,
+              });
+            }
+
+            if (stats && Number(stats.withoutScore) > 0) {
+              issues.push({ component: "Auditoría pendiente", status: "warning", detail: `${stats.withoutScore} productos sin auditar. Re-escanea la tienda para calcular sus scores.` });
+            }
+          } catch (e) {
+            issues.push({ component: "Productos en BD", status: "error", detail: `Error consultando productos: ${e instanceof Error ? e.message : String(e)}` });
+          }
+        }
+
+        if (runCheck("sync")) {
+          try {
+            const headers = await getShopifyHeaders(parseInt(projectId));
+            const domain = normalizeShopDomain(project.shopDomain);
+            const countRes = await fetch(`https://${domain}/admin/api/2024-01/products/count.json?status=any`, {
+              headers,
+              signal: AbortSignal.timeout(10000),
+            });
+            if (countRes.ok) {
+              const countData = await countRes.json() as { count: number };
+              const shopifyCount = countData.count;
+              const localCount = project.productCount || 0;
+              const diff = Math.abs(shopifyCount - localCount);
+
+              if (diff > 0) {
+                const syncRes = await fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+                  body: JSON.stringify({ statusFilter: "any" }),
+                });
+                if (syncRes.ok) {
+                  const syncData = await syncRes.json() as Record<string, unknown>;
+                  issues.push({
+                    component: "Sincronización",
+                    status: "warning",
+                    detail: `Había ${diff} productos desincronizados (Shopify: ${shopifyCount}, BD local: ${localCount}). Se re-sincronizaron ${syncData.synced} productos automáticamente.`,
+                    autoFixed: true,
+                  });
+                  fixesApplied++;
+                } else {
+                  issues.push({ component: "Sincronización", status: "error", detail: `${diff} productos desincronizados. El re-escaneo automático falló.` });
+                }
+              } else {
+                issues.push({ component: "Sincronización", status: "ok", detail: `BD sincronizada con Shopify (${shopifyCount} productos en ambos).` });
+              }
+            }
+          } catch (e) {
+            issues.push({ component: "Sincronización", status: "warning", detail: `No se pudo verificar sincronización: ${e instanceof Error ? e.message : String(e)}` });
+          }
+        }
+
+        const errors = issues.filter(i => i.status === "error").length;
+        const warnings = issues.filter(i => i.status === "warning").length;
+        const oks = issues.filter(i => i.status === "ok").length;
+
+        const statusEmoji = errors > 0 ? "🔴" : warnings > 0 ? "🟡" : "🟢";
+        const overallStatus = errors > 0 ? "PROBLEMAS DETECTADOS" : warnings > 0 ? "ADVERTENCIAS" : "TODO OK";
+
+        result = {
+          overallStatus,
+          issues,
+          summary: { errors, warnings, ok: oks, fixesApplied },
+          message: `${statusEmoji} Diagnóstico: ${overallStatus}. ${errors} errores, ${warnings} advertencias, ${oks} ok. ${fixesApplied > 0 ? `Se aplicaron ${fixesApplied} reparaciones automáticas.` : ""}
+${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠️" : "❌"} ${i.component}: ${i.detail}${i.autoFixed ? " [AUTO-REPARADO]" : ""}`).join("\n")}`,
         };
         break;
       }

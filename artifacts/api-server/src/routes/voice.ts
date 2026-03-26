@@ -46,6 +46,8 @@ Acciones disponibles:
 - delete_product: Eliminar producto. Params: {projectId, productId}
 - get_orders: Ver pedidos. Params: {projectId, limit?}
 - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
+- modify_audit_filter: Cambiar filtro de auditoría (qué productos incluir). Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean)}
+- diagnose_app: Diagnosticar el funcionamiento de la app, detectar y reparar errores. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
 - navigate: Navegar a página. Params: {path}
 - navigate: Ir a /projects/{projectId}/audit para ver auditoría visual
 
