@@ -2705,4 +2705,83 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
   }
 });
 
+router.get("/shopybrain/knowledge-graph", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const domains = await db.select().from(omnicoreKnowledgeDomainsTable)
+      .orderBy(desc(omnicoreKnowledgeDomainsTable.knowledgeDepth));
+
+    const insights = await db.select({
+      id: omnicoreInsightsTable.id,
+      domain: omnicoreInsightsTable.domain,
+      title: omnicoreInsightsTable.title,
+      confidence: omnicoreInsightsTable.confidence,
+      insightType: omnicoreInsightsTable.insightType,
+    }).from(omnicoreInsightsTable)
+      .orderBy(desc(omnicoreInsightsTable.confidence))
+      .limit(200);
+
+    const connections = await db.select().from(omnicoreCrossConnectionsTable)
+      .orderBy(desc(omnicoreCrossConnectionsTable.connectionStrength))
+      .limit(100);
+
+    const domainNodes = domains.map(d => ({
+      id: `domain-${d.domain}`,
+      type: "domain" as const,
+      label: DOMAIN_LABELS[d.domain ?? ""] ?? d.domain,
+      domain: d.domain,
+      depth: d.knowledgeDepth ?? 0,
+      totalInsights: d.totalInsights ?? 0,
+    }));
+
+    const insightNodes = insights.map(i => ({
+      id: `insight-${i.id}`,
+      type: "insight" as const,
+      label: i.title ?? "",
+      domain: i.domain,
+      confidence: i.confidence ?? 0.5,
+      insightType: i.insightType,
+    }));
+
+    const domainInsightEdges = insights.map(i => ({
+      source: `domain-${i.domain}`,
+      target: `insight-${i.id}`,
+      strength: i.confidence ?? 0.5,
+      type: "domain-insight" as const,
+    }));
+
+    const crossEdges = connections
+      .filter(c => c.insightA && c.insightB)
+      .map(c => ({
+        source: `insight-${c.insightA}`,
+        target: `insight-${c.insightB}`,
+        strength: c.connectionStrength ?? 0.5,
+        type: "cross-connection" as const,
+      }));
+
+    const allNodeIds = new Set([...domainNodes.map(n => n.id), ...insightNodes.map(n => n.id)]);
+    const validCrossEdges = crossEdges.filter(e => allNodeIds.has(e.source) && allNodeIds.has(e.target));
+    const validDomainEdges = domainInsightEdges.filter(e => allNodeIds.has(e.source) && allNodeIds.has(e.target));
+
+    res.json({
+      nodes: [...domainNodes, ...insightNodes],
+      edges: [...validDomainEdges, ...validCrossEdges],
+    });
+  } catch (err) {
+    logger.error({ err }, "Knowledge graph fetch failed");
+    res.status(500).json({ error: "Failed to fetch knowledge graph" });
+  }
+});
+
+router.post("/shopybrain/run/retroanalysis", requireAdmin, async (_req, res): Promise<void> => {
+  const { runRetroactiveReanalysis } = await import("../lib/scheduler.js");
+  runRetroactiveReanalysis().catch(e => logger.error(e));
+  res.json({ message: "Retroactive reanalysis started in background" });
+});
+
+router.post("/shopybrain/run/self-evaluation", requireAdmin, async (_req, res): Promise<void> => {
+  const { runMonthlySelfEvaluation } = await import("../lib/scheduler.js");
+  runMonthlySelfEvaluation().catch(e => logger.error(e));
+  res.json({ message: "Monthly self-evaluation started in background" });
+});
+
 export default router;

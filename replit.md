@@ -109,10 +109,16 @@ A deep absorption engine for brands, competitors, or influencers, triggered via 
 The OmniChatbot acts as a context-aware assistant, providing step-by-step guidance based on injected app-guide knowledge and the current page context.
 
 ### Server Startup Chain
-On boot, the server runs: `deduplicateProducts` → `ensureAdminUser` → `ensureProjectConfig` → `ensureAllKnowledgeDomains` → `registerCronJobs` → `warmupProdKnowledge`. The warmup function detects if production has insufficient knowledge (<250 memories) or missing products (0 synced) and automatically: (1) syncs all Shopify products, (2) runs Daily Deep Study across all 41 domains, (3) runs Cross-Synthesis, Memory Consolidation, Revenue Snapshots, Inventory Sync, and Mega-Synthesis. AI uses Gemini fallback when Anthropic credits are exhausted.
+On boot, the server runs: `deduplicateProducts` → `ensureAdminUser` → `ensureProjectConfig` → `ensureAllKnowledgeDomains` → `loadSeedInsights` → `registerCronJobs` → `warmupProdKnowledge`. The `loadSeedInsights` function loads 100 curated seed insights across 21 domains on first run (skipped if table already has data). The warmup function detects if production has insufficient knowledge (<250 memories) or missing products (0 synced) and automatically: (1) syncs all Shopify products, (2) runs Daily Deep Study across all 41 domains, (3) runs Cross-Synthesis, Memory Consolidation, Revenue Snapshots, Inventory Sync, and Mega-Synthesis. AI uses Gemini fallback when Anthropic credits are exhausted.
+
+### Knowledge Graph Visualization
+Interactive D3.js force-directed graph on the ShopyBrain dashboard (`/admin/shopybrain`). API endpoint `/api/shopybrain/knowledge-graph` returns domain nodes, insight nodes, and cross-connection edges. Frontend component (`KnowledgeGraph.tsx`) supports zoom/pan, domain filtering, confidence filtering, and lazy-loads via React Suspense.
+
+### Achievement Confetti
+`canvas-confetti` fires when newly-unlocked achievements are detected on the Achievements page (`/admin/achievements`). Triggers when `unlockedAt` is within 60 seconds of page load.
 
 ### ShopyBrain Cron Jobs
-Ten automated tasks for continuous learning, data consolidation, cross-synthesis, revenue snapshots, data integration, daily competitor scans with alerts, inventory sync, and weekly mega-synthesis. All jobs use `aiGenerate()` helper which tries Anthropic first, then falls back to Gemini automatically.
+Twelve automated tasks for continuous learning, data consolidation, cross-synthesis, revenue snapshots, data integration, daily competitor scans with alerts, inventory sync, weekly mega-synthesis, weekly retroactive reanalysis (Sun 3am — re-evaluates insights >7 days old, updates confidence/version), and monthly self-evaluation (1st of month 4am — aggregates stats, generates AI performance report). All jobs use `aiGenerate()` helper which tries Anthropic first, then falls back to Gemini automatically.
 
 ### Price Simulator & P&L Forecast
 - **Price Simulator**: Simulates 3 scenarios (pessimistic/base/optimistic) with break-even and margin analysis.

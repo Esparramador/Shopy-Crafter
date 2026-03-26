@@ -716,6 +716,207 @@ export async function runTokenRefresh() {
   }
 }
 
+// ─── RETROACTIVE REANALYSIS (Domingo 3am) ────────────────────────────────────
+// Re-evaluates insights older than 7 days using current knowledge context,
+// updates confidence scores, and tracks retroactive versions.
+export async function runRetroactiveReanalysis() {
+  log("omnicore-retro", "🔄 Retroactive reanalysis starting");
+  const sessionId = `retro-${new Date().toISOString().split("T")[0]}`;
+  let updated = 0;
+
+  try {
+    const oldInsights = await db.select().from(omnicoreInsightsTable)
+      .where(sql`created_at < NOW() - INTERVAL '7 days'`)
+      .orderBy(sql`COALESCE(last_retroactive_update, '1970-01-01'::timestamptz) ASC`)
+      .limit(30);
+
+    if (!oldInsights.length) {
+      log("omnicore-retro", "No insights older than 7 days — skipping");
+      return;
+    }
+
+    await db.insert(omnicoreStudySessionsTable).values({
+      id: sessionId,
+      sessionType: "retroactive_reanalysis",
+      trigger: "cron_weekly_sunday_3am",
+    }).onConflictDoNothing();
+
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+
+    const batchSize = 10;
+    for (let i = 0; i < oldInsights.length; i += batchSize) {
+      const batch = oldInsights.slice(i, i + batchSize);
+      const insightsSummary = batch.map((ins, idx) =>
+        `${idx + 1}. [${ins.domain}] "${ins.title}" (confidence: ${ins.confidence}) — ${(ins.insight ?? "").slice(0, 200)}`
+      ).join("\n");
+
+      try {
+        const text = await aiGenerate({
+          system: `You are OmniCore Retroactive Analyst. You re-evaluate existing insights using the latest knowledge, data, and trends. Your job: assess if each insight is still valid, update confidence scores, and add notes on what has changed. Be rigorous and honest — lower confidence if evidence has weakened, raise it if new evidence supports it. ${brainCtx}`,
+          prompt: `Re-evaluate these existing insights with your current knowledge. For each insight, determine:
+1. Is it still accurate and relevant?
+2. Has new evidence emerged that strengthens or weakens it?
+3. What is the updated confidence score (0.0 to 1.0)?
+
+Insights to re-evaluate:
+${insightsSummary}
+
+Return ONLY valid JSON:
+{"evaluations":[{"index":1,"newConfidence":0.85,"stillValid":true,"notes":"Brief explanation of changes"}]}`,
+          maxTokens: 1500,
+        });
+
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) continue;
+
+        const parsed = JSON.parse(match[0]) as {
+          evaluations: Array<{ index: number; newConfidence: number; stillValid: boolean; notes: string }>
+        };
+
+        for (const ev of parsed.evaluations ?? []) {
+          const ins = batch[ev.index - 1];
+          if (!ins) continue;
+
+          const newConf = Math.max(0.1, Math.min(1.0, ev.newConfidence));
+          await db.update(omnicoreInsightsTable).set({
+            confidence: newConf,
+            retroactiveVersion: sql`COALESCE(retroactive_version, 0) + 1`,
+            lastRetroactiveUpdate: new Date(),
+            evidence: ev.notes ? `[Retro] ${ev.notes}` : ins.evidence,
+            updatedAt: new Date(),
+          }).where(eq(omnicoreInsightsTable.id, ins.id));
+
+          updated++;
+        }
+      } catch (err) {
+        logger.warn({ err }, "Retroactive reanalysis batch failed");
+      }
+    }
+
+    await db.update(omnicoreStudySessionsTable).set({
+      insightsUpdated: updated,
+      retroactiveUpdates: updated,
+      summary: `Retroactive reanalysis: ${updated} insights re-evaluated from ${oldInsights.length} candidates`,
+    }).where(eq(omnicoreStudySessionsTable.id, sessionId));
+
+    log("omnicore-retro", `🔄 Retroactive reanalysis complete: ${updated} insights updated`);
+  } catch (err) {
+    logger.error({ err }, "Retroactive reanalysis failed");
+  }
+}
+
+// ─── MONTHLY SELF-EVALUATION (1st of each month) ────────────────────────────
+// Aggregates learning stats, assesses prediction accuracy, identifies weak
+// domains, and generates a performance report stored as a special insight.
+export async function runMonthlySelfEvaluation() {
+  log("omnicore-eval", "📊 Monthly self-evaluation starting");
+  const sessionId = `eval-${new Date().toISOString().slice(0, 7)}`;
+
+  try {
+    const totalInsights = await db.select({ count: sql<number>`count(*)` }).from(omnicoreInsightsTable);
+    const totalMemories = await db.select({ count: sql<number>`count(*)` }).from(omnicoreMemoriesTable);
+    const domains = await db.select().from(omnicoreKnowledgeDomainsTable).orderBy(desc(omnicoreKnowledgeDomainsTable.knowledgeDepth));
+
+    const recentInsights = await db.select().from(omnicoreInsightsTable)
+      .where(sql`created_at > NOW() - INTERVAL '30 days'`)
+      .orderBy(desc(omnicoreInsightsTable.createdAt));
+
+    const avgConfidence = recentInsights.length > 0
+      ? recentInsights.reduce((sum, i) => sum + (i.confidence ?? 0.5), 0) / recentInsights.length
+      : 0;
+
+    const retroUpdated = await db.select({ count: sql<number>`count(*)` }).from(omnicoreInsightsTable)
+      .where(sql`last_retroactive_update > NOW() - INTERVAL '30 days'`);
+
+    const sessions = await db.select().from(omnicoreStudySessionsTable)
+      .where(sql`created_at > NOW() - INTERVAL '30 days'`);
+
+    const totalSessionInsights = sessions.reduce((s, sess) => s + (sess.insightsCreated ?? 0), 0);
+
+    const weakDomains = domains.filter(d => (d.knowledgeDepth ?? 0) < 30).slice(0, 5);
+    const strongDomains = domains.filter(d => (d.knowledgeDepth ?? 0) >= 60).slice(0, 5);
+
+    const crossConnections = await db.select({ count: sql<number>`count(*)` }).from(omnicoreCrossConnectionsTable);
+
+    const stats = {
+      totalInsights: Number(totalInsights[0]?.count ?? 0),
+      totalMemories: Number(totalMemories[0]?.count ?? 0),
+      insightsThisMonth: recentInsights.length,
+      avgConfidence: Math.round(avgConfidence * 100) / 100,
+      retroactiveUpdates: Number(retroUpdated[0]?.count ?? 0),
+      studySessions: sessions.length,
+      totalSessionInsights,
+      crossConnections: Number(crossConnections[0]?.count ?? 0),
+      weakDomains: weakDomains.map(d => d.domain),
+      strongDomains: strongDomains.map(d => d.domain),
+      domainCount: domains.length,
+    };
+
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+
+    const text = await aiGenerate({
+      system: `You are OmniCore Self-Evaluation Engine. You produce honest, data-driven monthly performance reports about the brain's learning progress. Be specific, use the numbers provided, and give actionable recommendations. Respond in Spanish. ${brainCtx}`,
+      prompt: `Generate a monthly self-evaluation report for OmniCore Brain based on these stats:
+
+${JSON.stringify(stats, null, 2)}
+
+The report should include:
+1. Resumen ejecutivo (2-3 frases)
+2. Métricas clave del mes
+3. Dominios fuertes y débiles
+4. Precisión y confianza de insights
+5. Áreas de mejora identificadas
+6. Recomendaciones para el próximo mes
+
+Return ONLY valid JSON:
+{"report":{"summary":"...","keyMetrics":["metric1","metric2"],"strengths":["..."],"weaknesses":["..."],"recommendations":["..."],"overallScore":85,"knowledgeGaps":["..."]}}`,
+      maxTokens: 2000,
+    });
+
+    const match = text.match(/\{[\s\S]*\}/);
+    let reportData: any = { summary: `Monthly stats: ${stats.insightsThisMonth} insights, ${stats.studySessions} sessions, avg confidence ${stats.avgConfidence}` };
+    if (match) {
+      try { reportData = JSON.parse(match[0]).report ?? reportData; } catch {}
+    }
+
+    const reportInsightId = `eval-report-${sessionId}`;
+    await db.insert(omnicoreInsightsTable).values({
+      id: reportInsightId,
+      domain: "general",
+      insightType: "self_evaluation",
+      title: `Auto-evaluación mensual — ${new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`,
+      insight: JSON.stringify(reportData),
+      confidence: 0.95,
+      source: "monthly_self_evaluation",
+    }).onConflictDoNothing();
+
+    await db.insert(omnicoreMemoriesTable).values({
+      id: `mem-${reportInsightId}`,
+      memoryType: "self_evaluation",
+      niche: "general",
+      title: `[Eval] Auto-evaluación ${new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`,
+      content: typeof reportData.summary === "string" ? reportData.summary.slice(0, 800) : JSON.stringify(reportData).slice(0, 800),
+      confidence: 0.95,
+      sourceType: "monthly_self_evaluation",
+      tags: JSON.stringify(["self_evaluation", "monthly", ...(reportData.knowledgeGaps ?? []).slice(0, 3)]),
+    }).onConflictDoNothing();
+
+    await db.insert(omnicoreStudySessionsTable).values({
+      id: sessionId,
+      sessionType: "monthly_self_evaluation",
+      domainsStudied: JSON.stringify(domains.map(d => d.domain)),
+      trigger: "cron_monthly_1st",
+      insightsCreated: 1,
+      summary: reportData.summary ?? `Monthly evaluation completed. Score: ${reportData.overallScore ?? "N/A"}`,
+      keyDiscoveries: JSON.stringify(reportData.recommendations ?? []),
+    }).onConflictDoNothing();
+
+    log("omnicore-eval", `📊 Monthly self-evaluation complete. Score: ${reportData.overallScore ?? "N/A"}`);
+  } catch (err) {
+    logger.error({ err }, "Monthly self-evaluation failed");
+  }
+}
+
 // ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
 export function registerCronJobs() {
   log("scheduler", "🕐 Registering 24/7 continuous learning jobs (timezone: Europe/Madrid)");
@@ -750,6 +951,13 @@ export function registerCronJobs() {
   // Domingo 00:00 — Mega-synthesis: síntesis estratégica semanal de todos los dominios
   cron.schedule("0 0 * * 0", () => { runOmniCoreMegaSynthesis().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
+  // Domingo 3am — Retroactive reanalysis: re-evaluate old insights
+  cron.schedule("0 3 * * 0", () => { runRetroactiveReanalysis().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // ── EVALUACIÓN MENSUAL ────────────────────────────────────────────────────
+  // 1st of each month 4am — Monthly self-evaluation report
+  cron.schedule("0 4 1 * *", () => { runMonthlySelfEvaluation().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
   // ── TOKENS SHOPIFY ────────────────────────────────────────────────────────
   // Cada 20h — Renovar tokens Shopify (duran 24h, renovamos con 4h de margen)
   cron.schedule("5 */20 * * *", () => { runTokenRefresh().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
@@ -757,7 +965,7 @@ export function registerCronJobs() {
   setTimeout(() => { runTokenRefresh().catch(e => logger.error(e)); }, 10_000);
 
   log("scheduler", [
-    "✅ 10 jobs registrados:",
+    "✅ 12 jobs registrados:",
     "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
@@ -768,5 +976,7 @@ export function registerCronJobs() {
     "  🔍 Competidores      → 6am     (price scans)",
     "  📦 Inventario        → 7am     (sync + alertas stock)",
     "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",
+    "  🔄 Retroanálisis     → Dom 3am (re-evaluar insights antiguos)",
+    "  📊 Auto-evaluación   → 1º/mes  (informe mensual de rendimiento)",
   ].join("\n"));
 }

@@ -72,6 +72,26 @@ const CYCLE_JOBS = [
     color: "#e040fb",
     endpoint: "/api/shopybrain/run/mega-synthesis",
   },
+  {
+    key: "retroanalysis",
+    icon: "🔄",
+    name: "Retroactive Reanalysis",
+    freq: "Domingo 3am",
+    desc: "Re-evalúa insights >7 días con conocimiento actual, actualiza confianza",
+    detail: "1 vez/semana · re-evaluación",
+    color: "#06b6d4",
+    endpoint: "/api/shopybrain/run/retroanalysis",
+  },
+  {
+    key: "self-evaluation",
+    icon: "📊",
+    name: "Auto-Evaluación Mensual",
+    freq: "1º de cada mes",
+    desc: "Informe de rendimiento: aprendizajes, precisión, gaps identificados",
+    detail: "1 vez/mes · análisis completo",
+    color: "#f97316",
+    endpoint: "/api/shopybrain/run/self-evaluation",
+  },
 ];
 
 interface Session {

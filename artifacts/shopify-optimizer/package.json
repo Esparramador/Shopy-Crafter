@@ -44,6 +44,8 @@
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/d3": "^7.4.3",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -77,6 +79,8 @@
   "dependencies": {
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
-    "@capacitor/core": "^8.2.0"
+    "@capacitor/core": "^8.2.0",
+    "canvas-confetti": "^1.9.4",
+    "d3": "^7.9.0"
   }
 }

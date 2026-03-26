@@ -1,16 +1,33 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trophy, Star, Zap } from "lucide-react";
+import { fireAchievementConfetti } from "../../lib/confetti";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Achievements() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const prevUnlockedRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/achievements`, { credentials: "include" })
       .then(r => r.json())
-      .then(setData)
+      .then((d) => {
+        const newUnlocked = d?.unlocked ?? 0;
+        if (prevUnlockedRef.current !== null && newUnlocked > prevUnlockedRef.current) {
+          fireAchievementConfetti();
+        }
+        const recentlyUnlocked = (d?.achievements ?? []).some((a: any) => {
+          if (!a.unlocked || !a.unlockedAt) return false;
+          const diff = Date.now() - new Date(a.unlockedAt).getTime();
+          return diff < 60_000;
+        });
+        if (recentlyUnlocked && prevUnlockedRef.current === null) {
+          fireAchievementConfetti();
+        }
+        prevUnlockedRef.current = newUnlocked;
+        setData(d);
+      })
       .finally(() => setLoading(false));
   }, []);
 

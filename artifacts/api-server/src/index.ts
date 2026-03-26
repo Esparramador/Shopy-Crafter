@@ -285,7 +285,14 @@ const server = app.listen(port, (err?: Error) => {
       if (created > 0) logger.info({ created }, "🧠 Knowledge domains seeded on startup");
       else logger.info("🧠 All knowledge domains already present");
     })
-    .catch((err) => logger.error({ err }, "⚠️  Knowledge domain seeding failed — continuing startup"))
+    .then(async () => {
+      const { loadSeedInsights } = await import("./lib/seed-insights.js");
+      return loadSeedInsights();
+    })
+    .then((seeded) => {
+      if (seeded && seeded > 0) logger.info({ seeded }, "🌱 Seed insights loaded on first run");
+    })
+    .catch((err) => logger.error({ err }, "⚠️  Startup seeding failed — continuing startup"))
     .finally(() => {
       registerCronJobs();
       setTimeout(() => warmupProdKnowledge(), 5000);

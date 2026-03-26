@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Brain, Zap, TrendingUp, BookOpen, Clock, Star, Play, Database, Layers, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
+
+const KnowledgeGraph = lazy(() => import("../../components/KnowledgeGraph"));
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -227,6 +229,12 @@ export default function ShopyBrain() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div style={{ marginTop: 20, marginBottom: 20 }}>
+            <Suspense fallback={<div className="glass-card" style={{ height: 550, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}>Loading graph...</div>}>
+              <KnowledgeGraph />
+            </Suspense>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14, marginTop: 20 }}>
