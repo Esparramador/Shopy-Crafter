@@ -46,9 +46,10 @@ A three-model pipeline: Gemini → Claude → OmniCore, with image generation in
 A universal, multi-model chatbot accessible from all admin pages, capable of absorbing/analyzing content and executing Shopify operations through natural language commands or voice commands. All findings are permanently stored in `omnicore_absorbed_content`.
 
 **Product Management Actions**: create, edit, delete, publish, change price, set status, search, scan/audit
-**AI Content Generation Actions**:
-- `optimize_product`: AI generates professional title, description (400+ words HTML), 15+ SEO tags, meta title/description, alt texts for all images, SEO handle — directly updates Shopify
-- `optimize_all_products`: Batch optimize up to 25 products at once with full AI content
+**AI Content Generation + Pricing Actions**:
+- `optimize_product`: AI generates professional title, description (400+ words HTML), 15+ SEO tags, meta title/description, alt texts for all images, SEO handle + **real market price research via Gemini Google Search** — compares with competitor prices and suggests competitive pricing with compare_at_price — directly updates Shopify
+- `create_product`: AI generates content + **researches real market prices** when no price provided — uses Gemini Search to find competitor prices and set competitive pricing automatically
+- `optimize_all_products`: Batch optimize up to 25 products at once with full AI content + pricing
 - `optimize_images`: Generate SEO alt texts for all product images using AI analysis
 **Collections Management Actions**:
 - `create_collection`: Create custom or smart collections with AI-generated descriptions and SEO
@@ -78,8 +79,11 @@ Ten automated tasks for continuous learning, data consolidation, cross-synthesis
 ### Comprehensive COGS System
 A `cogs` table supports real-world cost structures with over 30 fields across 9 categories (Production, Packaging, Logistics, Returns, Platform, Marketing, Taxes/Legal, Tech/AI, Overhead), plus `customCosts` for unlimited custom cost lines. It computes `totalCogs`, `breakEvenPrice`, and `minimumViablePrice`.
 
-### BrandDNA Auto-Injection
-The `visualDnaTable` stores extracted visual identity, which is automatically injected into all Claude calls to ensure brand consistency across various AI-generated content.
+### BrandDNA + OmniCore Full Knowledge Injection
+The `visualDnaTable` stores extracted visual identity, which is automatically injected into ALL Claude calls (via `askClaudeWithBrain` / `askClaudeJsonWithBrain`) to ensure brand consistency. OmniCore memories (strategic insights, niche patterns, pricing data, competitor intel) are also injected into every AI call. The main OmniCore chatbot, product creation, product optimization, email generation, research, and study sessions all receive the full accumulated knowledge of ShopyBrain.
+
+### Real Market Pricing Research
+`researchRealPricing()` function in shopybrain.ts uses Gemini with Google Search grounding (threshold 0.0 = always search) to find real competitor prices for any product. This data feeds into `optimize_product` (suggests competitive pricing) and `create_product` (auto-prices new products when no price provided). The `pricing.ts` module also scrapes competitor URLs directly for real-time price extraction.
 
 ### Pricing Model
 A multi-tiered pricing structure (Starter, Agency Pro, Enterprise, One-Shot Audit) with monthly retainers and one-time setup fees, managed through the CMS.

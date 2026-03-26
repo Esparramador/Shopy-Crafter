@@ -9,6 +9,7 @@ import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from 
 import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
 import * as fs from "fs";
@@ -16,6 +17,71 @@ import * as path from "path";
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+async function researchRealPricing(productTitle: string, productType: string, niche: string, currentPrice?: string): Promise<{
+  marketPriceRange: { min: number; max: number; median: number };
+  competitorPrices: Array<{ source: string; price: string; url?: string }>;
+  suggestedPrice: number;
+  suggestedCompareAtPrice: number;
+  pricingStrategy: string;
+  sources: string[];
+}> {
+  const defaultResult = {
+    marketPriceRange: { min: 0, max: 0, median: 0 },
+    competitorPrices: [],
+    suggestedPrice: currentPrice ? parseFloat(currentPrice) : 0,
+    suggestedCompareAtPrice: 0,
+    pricingStrategy: "No se pudo investigar precios del mercado",
+    sources: [],
+  };
+
+  try {
+    const searchPrompt = `BUSCA PRECIOS REALES en tiendas online para este tipo de producto:
+
+Producto: "${productTitle}"
+Tipo: ${productType || "no especificado"}
+Nicho/industria: ${niche}
+${currentPrice ? `Precio actual: ${currentPrice}€` : ""}
+
+INSTRUCCIONES:
+1. Busca en Google Shopping, Amazon, tiendas especializadas del nicho "${niche}"
+2. Encuentra AL MENOS 5-10 precios REALES de productos similares o competidores directos
+3. Extrae precios concretos con decimales y la URL/fuente de cada uno
+4. Calcula el rango de mercado real (mínimo, máximo, mediana)
+
+RESPONDE con este formato JSON exacto (sin texto adicional):
+{
+  "competitorPrices": [
+    {"source": "nombre tienda/marca", "price": "XX.XX", "url": "URL si disponible", "productName": "nombre del producto encontrado"}
+  ],
+  "marketPriceRange": {"min": XX.XX, "max": XX.XX, "median": XX.XX},
+  "suggestedPrice": XX.XX,
+  "suggestedCompareAtPrice": XX.XX,
+  "pricingStrategy": "Explicación de la estrategia de pricing recomendada basada en los datos reales encontrados",
+  "marketPosition": "budget|mid-range|premium|luxury"
+}`;
+
+    const geminiResult = await askGeminiWithSearch(searchPrompt,
+      `You are a pricing analyst. Search for REAL current prices of similar products online. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
+    );
+
+    const jsonMatch = geminiResult.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return defaultResult;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      marketPriceRange: parsed.marketPriceRange ?? defaultResult.marketPriceRange,
+      competitorPrices: parsed.competitorPrices ?? [],
+      suggestedPrice: parsed.suggestedPrice ?? (currentPrice ? parseFloat(currentPrice) : 0),
+      suggestedCompareAtPrice: parsed.suggestedCompareAtPrice ?? 0,
+      pricingStrategy: parsed.pricingStrategy ?? "",
+      sources: geminiResult.sources || [],
+    };
+  } catch (err) {
+    logger.warn(err, "Price research failed, using defaults");
+    return defaultResult;
+  }
+}
 
 const DOMAIN_LABELS: Record<string, string> = {
   ecommerce:            "eCommerce · CRO · UX · Conversión",
@@ -767,23 +833,34 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         let finalTitle = title;
         let finalBody = params?.bodyHtml ?? "";
         let finalTags = params?.tags ?? "";
+        let finalPrice = params?.price || "0.00";
+        let finalCompareAt = params?.compareAtPrice || null;
+        let pricingInfo = "";
+
+        const storeNiche = project.storeNiche || "general";
 
         if (params?.aiGenerate !== false) {
           try {
-            const parsed = await askClaudeJsonWithBrain<{
-              title?: string;
-              description?: string;
-              tags?: string[];
-              seoTitle?: string;
-              seoDescription?: string;
-            }>(
-              parseInt(projectId),
-              `Genera contenido PROFESIONAL optimizado para un nuevo producto Shopify.
+            const [priceResearch, aiContent] = await Promise.all([
+              (!params?.price || params?.price === "0.00")
+                ? researchRealPricing(title, params?.productType || "", storeNiche)
+                : Promise.resolve(null),
+              askClaudeJsonWithBrain<{
+                title?: string;
+                description?: string;
+                tags?: string[];
+                seoTitle?: string;
+                seoDescription?: string;
+                suggestedPrice?: number;
+                suggestedCompareAtPrice?: number;
+              }>(
+                parseInt(projectId),
+                `Genera contenido PROFESIONAL optimizado para un nuevo producto Shopify.
 Título base: "${title}"
 Tipo de producto: ${params?.productType || "no especificado"}
-Nicho: ${project.storeNiche || "general"}
+Nicho: ${storeNiche}
 Tono de marca: ${project.brandTone || "profesional"}
-Precio: ${params?.price || "no especificado"}
+Precio proporcionado: ${params?.price || "NO proporcionado — sugiere un precio competitivo basado en el nicho y tipo de producto"}
 
 INSTRUCCIONES:
 1. Mejora el título para SEO (mantén la esencia pero hazlo irresistible)
@@ -794,17 +871,36 @@ INSTRUCCIONES:
    - Párrafo de cierre con CTA persuasivo
 3. Genera 15+ tags SEO relevantes para el nicho
 4. Meta title SEO (max 60 chars) y meta description (max 155 chars)
+5. Si NO hay precio proporcionado, sugiere un precio competitivo basado en tu conocimiento del nicho
 
 Responde SOLO JSON válido:
-{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"..."}`,
-              `Eres un experto ELITE en copywriting eCommerce Shopify con 15 años de experiencia. Generas contenido que convierte visitantes en compradores. Conoces las mejores prácticas de SEO, persuasión y storytelling de marca. Responde SOLO JSON válido.`,
-              "seo",
-              project.storeNiche || undefined,
-              2500
-            );
-            finalTitle = parsed.title || title;
-            finalBody = parsed.description || finalBody;
-            finalTags = Array.isArray(parsed.tags) ? parsed.tags.join(", ") : finalTags;
+{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.XX,"suggestedCompareAtPrice":XX.XX}`,
+                `Eres un experto ELITE en copywriting eCommerce Shopify con 15 años de experiencia. Generas contenido que convierte visitantes en compradores. Conoces las mejores prácticas de SEO, persuasión y storytelling de marca. Responde SOLO JSON válido.`,
+                "seo",
+                storeNiche || undefined,
+                2500
+              ),
+            ]);
+
+            finalTitle = aiContent.title || title;
+            finalBody = aiContent.description || finalBody;
+            finalTags = Array.isArray(aiContent.tags) ? aiContent.tags.join(", ") : finalTags;
+
+            if (!params?.price || params?.price === "0.00") {
+              if (priceResearch && priceResearch.suggestedPrice > 0) {
+                finalPrice = priceResearch.suggestedPrice.toFixed(2);
+                finalCompareAt = priceResearch.suggestedCompareAtPrice > 0
+                  ? priceResearch.suggestedCompareAtPrice.toFixed(2)
+                  : null;
+                pricingInfo = `\n💰 Precio investigado: ${finalPrice}€ (rango mercado: ${priceResearch.marketPriceRange.min}€-${priceResearch.marketPriceRange.max}€, ${priceResearch.competitorPrices.length} competidores analizados)`;
+              } else if (aiContent.suggestedPrice && aiContent.suggestedPrice > 0) {
+                finalPrice = aiContent.suggestedPrice.toFixed(2);
+                if (aiContent.suggestedCompareAtPrice) {
+                  finalCompareAt = aiContent.suggestedCompareAtPrice.toFixed(2);
+                }
+                pricingInfo = `\n💰 Precio sugerido por IA: ${finalPrice}€`;
+              }
+            }
           } catch { /* use original data */ }
         }
 
@@ -817,8 +913,8 @@ Responde SOLO JSON válido:
           status: params?.status || "draft",
           variants: [{
             title: "Default",
-            price: params?.price || "0.00",
-            compare_at_price: params?.compareAtPrice || null,
+            price: finalPrice,
+            compare_at_price: finalCompareAt,
             sku: params?.sku || null,
             requires_shipping: true,
             taxable: true,
@@ -840,7 +936,7 @@ Responde SOLO JSON válido:
           productTitle: String(created.product.title),
           generatedBy: "shopybrain_voice",
           metadata: {
-            price: params?.price || "0.00",
+            price: finalPrice,
             status: created.product.status,
             tags: finalTags,
             shopifyId: created.product.id,
@@ -856,7 +952,7 @@ Responde SOLO JSON válido:
             title: created.product.title,
             description: finalBody ? String(finalBody).slice(0, 500) : "",
             tags: finalTags,
-            price: params?.price,
+            price: finalPrice,
             handle: created.product.handle,
           }),
           confidence: 0.8,
@@ -867,7 +963,9 @@ Responde SOLO JSON válido:
           title: created.product.title,
           status: created.product.status,
           handle: created.product.handle,
-          message: `Producto "${created.product.title}" creado exitosamente en Shopify (ID: ${created.product.id}, estado: ${created.product.status})`,
+          price: finalPrice,
+          compareAtPrice: finalCompareAt,
+          message: `Producto "${created.product.title}" creado exitosamente en Shopify (ID: ${created.product.id}, estado: ${created.product.status}, precio: ${finalPrice}€)${pricingInfo}`,
         };
         break;
       }
@@ -1680,8 +1778,27 @@ ${truncated}
         const currentDesc = String(prod.body_html || "");
         const vendor = String(prod.vendor || "");
         const productType = String(prod.product_type || "");
+        const currentPrice = String(variants[0]?.price || "0");
+        const currentCompareAt = String(variants[0]?.compare_at_price || "");
+        const storeNiche = project.storeNiche || "comics y cultura pop";
 
-        const optimizePrompt = `Eres el mejor copywriter y experto SEO de Shopify del mundo. Optimiza este producto de manera PROFESIONAL y COMPLETA.
+        const [priceResearch, _] = await Promise.all([
+          researchRealPricing(currentTitle, productType, storeNiche, currentPrice),
+          Promise.resolve(null),
+        ]);
+
+        const priceContextBlock = priceResearch.competitorPrices.length > 0
+          ? `\n\nDATOS REALES DE MERCADO (investigados via Google Search):
+Rango de mercado: ${priceResearch.marketPriceRange.min}€ - ${priceResearch.marketPriceRange.max}€ (mediana: ${priceResearch.marketPriceRange.median}€)
+Precio actual del producto: ${currentPrice}€
+${currentCompareAt ? `Precio de comparación actual: ${currentCompareAt}€` : ""}
+Competidores encontrados:
+${priceResearch.competitorPrices.slice(0, 8).map(c => `• ${c.source}: ${c.price}€${c.url ? ` (${c.url})` : ""}`).join("\n")}
+Fuentes: ${priceResearch.sources.slice(0, 5).join(", ")}
+Estrategia sugerida: ${priceResearch.pricingStrategy}`
+          : "";
+
+        const optimizePrompt = `Eres el mejor copywriter, experto SEO y estratega de pricing de Shopify del mundo. Optimiza este producto de manera PROFESIONAL y COMPLETA.
 
 PRODUCTO ACTUAL:
 - Título: "${currentTitle}"
@@ -1689,27 +1806,40 @@ PRODUCTO ACTUAL:
 - Vendor: "${vendor}"
 - Tipo: "${productType}"
 - Tags actuales: "${currentTags}"
-- Precio: ${variants[0]?.price || "N/A"}€
+- Precio actual: ${currentPrice}€
+${currentCompareAt ? `- Precio de comparación: ${currentCompareAt}€` : ""}
 - Imágenes: ${images.length} fotos
-- Nicho de la tienda: ${project.storeNiche || "comics y cultura pop"}
+- Nicho de la tienda: ${storeNiche}
 - Tono de marca: ${project.brandTone || "profesional y apasionado"}
+${priceContextBlock}
 
 GENERA UN JSON COMPLETO con TODOS estos campos:
 {
   "title": "Título optimizado SEO (40-70 chars, incluye keywords relevantes)",
   "bodyHtml": "Descripción HTML COMPLETA y profesional. Mínimo 400 palabras. Incluye: <h2> subtítulos, <ul><li> bullet points con beneficios, especificaciones técnicas, storytelling emocional sobre el producto, llamada a la acción. Usa <strong> para enfatizar. NO uses placeholder ni lorem ipsum. Contenido REAL basado en el producto.",
-  "tags": ["tag1", "tag2", "..."], // Mínimo 15 tags SEO relevantes, incluye long-tail keywords, sinónimos, categorías, materiales, estilos, público objetivo
+  "tags": ["tag1", "tag2", "..."],
   "seoTitle": "Meta title SEO optimizado (50-60 chars con keyword principal)",
   "seoDescription": "Meta description persuasiva (140-160 chars con CTA)",
-  "altTexts": ["alt text para imagen 1", "alt text para imagen 2", "..."], // Un alt text descriptivo y SEO para cada imagen (${images.length} imágenes)
-  "handle": "url-handle-optimizado-seo"
+  "altTexts": ["alt text para imagen 1", "alt text para imagen 2", "..."],
+  "handle": "url-handle-optimizado-seo",
+  "pricingSuggestion": {
+    "suggestedPrice": XX.XX,
+    "suggestedCompareAtPrice": XX.XX,
+    "reasoning": "Por qué este precio basado en datos reales del mercado",
+    "marketPosition": "budget|mid-range|premium|luxury",
+    "competitorsAnalyzed": N
+  }
 }
 
 REGLAS CRÍTICAS:
 - TODO el contenido debe ser REAL, específico para este producto exacto
 - La descripción debe contar una historia, no solo listar características
-- Tags deben cubrir: categoría, material, estilo, público, uso, colección, tendencia
+- Tags: mínimo 15, cubrir categoría, material, estilo, público, uso, colección, tendencia
 - Alt texts deben describir lo que se VE en cada imagen, no genéricos
+- PRICING: Usa los datos REALES del mercado para sugerir un precio COMPETITIVO y RENTABLE.
+  Si hay datos de competencia, el precio sugerido debe ser estratégicamente posicionado.
+  Usa precios psicológicos (.99, .95). Sugiere compare_at_price para percepción de valor.
+  Si NO hay datos de mercado, mantén el precio actual o sugiere ajuste basado en el nicho.
 - Responde SOLO el JSON, sin texto adicional`;
 
         const optimized = await askClaudeJsonWithBrain<{
@@ -1720,6 +1850,13 @@ REGLAS CRÍTICAS:
           seoDescription: string;
           altTexts?: string[];
           handle?: string;
+          pricingSuggestion?: {
+            suggestedPrice?: number;
+            suggestedCompareAtPrice?: number;
+            reasoning?: string;
+            marketPosition?: string;
+            competitorsAnalyzed?: number;
+          };
         }>(parseInt(projectId), optimizePrompt, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 8192);
 
         const shopifyUpdate: Record<string, unknown> = { id: parseInt(productId) };
@@ -1738,6 +1875,29 @@ REGLAS CRÍTICAS:
           }));
         }
 
+        const priceSuggestion = optimized.pricingSuggestion;
+        let priceUpdateMsg = "";
+        if (priceSuggestion?.suggestedPrice && priceSuggestion.suggestedPrice > 0) {
+          const newPrice = priceSuggestion.suggestedPrice.toFixed(2);
+          const newCompareAt = priceSuggestion.suggestedCompareAtPrice
+            ? priceSuggestion.suggestedCompareAtPrice.toFixed(2)
+            : null;
+
+          if (variants.length > 0 && variants[0]?.id) {
+            shopifyUpdate.variants = [{
+              id: variants[0].id,
+              price: newPrice,
+              ...(newCompareAt ? { compare_at_price: newCompareAt } : {}),
+            }];
+            priceUpdateMsg = `\n💰 Precio: ${currentPrice}€ → ${newPrice}€${newCompareAt ? ` (antes ${newCompareAt}€)` : ""}`;
+            priceUpdateMsg += `\n📊 ${priceSuggestion.reasoning || "Basado en análisis de mercado"}`;
+            priceUpdateMsg += `\n🏪 Posición: ${priceSuggestion.marketPosition || "competitivo"}`;
+            if (priceResearch.competitorPrices.length > 0) {
+              priceUpdateMsg += ` (${priceResearch.competitorPrices.length} competidores analizados)`;
+            }
+          }
+        }
+
         const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
           parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
           { method: "PUT", body: JSON.stringify({ product: shopifyUpdate }) }
@@ -1745,10 +1905,22 @@ REGLAS CRÍTICAS:
 
         learnFromOperation({
           operationType: "product_optimization",
+          niche: storeNiche,
+          productType: productType || null,
           title: `Optimización IA: ${updated.product.title}`,
-          content: `Producto "${currentTitle}" optimizado → "${updated.product.title}". Tags: ${optimized.tags?.length || 0}. SEO: ${optimized.seoTitle}. Desc: ${String(optimized.bodyHtml || "").length} chars.`,
+          content: JSON.stringify({
+            previousTitle: currentTitle,
+            newTitle: updated.product.title,
+            tagsCount: optimized.tags?.length || 0,
+            seoTitle: optimized.seoTitle,
+            descLength: String(optimized.bodyHtml || "").length,
+            priceBefore: currentPrice,
+            priceAfter: priceSuggestion?.suggestedPrice || currentPrice,
+            marketRange: priceResearch.marketPriceRange,
+            competitorsFound: priceResearch.competitorPrices.length,
+          }),
           confidence: 0.9,
-          tags: ["optimization", "seo", "ai_content"],
+          tags: ["optimization", "seo", "ai_content", "pricing"],
         });
 
         result = {
@@ -1759,7 +1931,13 @@ REGLAS CRÍTICAS:
           descriptionLength: String(optimized.bodyHtml || "").length,
           seoTitle: optimized.seoTitle,
           altTextsGenerated: optimized.altTexts?.length || 0,
-          message: `✅ Producto "${updated.product.title}" optimizado profesionalmente.\n📝 Descripción: ${String(optimized.bodyHtml || "").length} chars\n🏷 ${optimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${optimized.altTexts?.length || 0} alt texts de imágenes`,
+          pricingSuggestion: priceSuggestion,
+          marketData: {
+            priceRange: priceResearch.marketPriceRange,
+            competitorsFound: priceResearch.competitorPrices.length,
+            sources: priceResearch.sources.slice(0, 5),
+          },
+          message: `✅ Producto "${updated.product.title}" optimizado profesionalmente.\n📝 Descripción: ${String(optimized.bodyHtml || "").length} chars\n🏷 ${optimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${optimized.altTexts?.length || 0} alt texts de imágenes${priceUpdateMsg}`,
         };
         break;
       }
