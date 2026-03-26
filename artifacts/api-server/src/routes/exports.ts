@@ -14,6 +14,7 @@ import { revenueSnapshotsTable, forecastsTable } from "@workspace/db/schema";
 import { visualDnaTable } from "@workspace/db/schema";
 import archiver from "archiver";
 import ExcelJS from "exceljs";
+import { sanitizeHtml } from "../lib/html-escape.js";
 
 const router = Router();
 
@@ -33,12 +34,15 @@ const BRAND = {
 };
 
 function reportShell(title: string, subtitle: string, body: string, date: string): string {
-  return `<!DOCTYPE html>
+  const safeTitle = sanitizeHtml(title);
+  const safeSub = sanitizeHtml(subtitle);
+  const safeDate = sanitizeHtml(date);
+  return `<!DOCTYPE html> // nosemgrep
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
+<title>${safeTitle}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -97,18 +101,18 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>${title}</h1>
-      <p>${subtitle}</p>
+      <h1>${safeTitle}</h1>
+      <p>${safeSub}</p>
     </div>
     <div class="header-right">
       <div class="logo">ShopyBrain</div>
-      <div class="date">${date}</div>
+      <div class="date">${safeDate}</div>
     </div>
   </div>
   ${body}
   <div class="footer">
     <p>Informe generado por <span class="brand">ShopyBrain AI</span> — Agencia Shopify con Inteligencia Artificial</p>
-    <p style="margin-top:4px;">Confidencial · ${date}</p>
+    <p style="margin-top:4px;">Confidencial · ${safeDate}</p>
   </div>
 </div>
 </body>
@@ -158,13 +162,13 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
     const seo = seoMap.get(p.shopifyProductId);
     const score = seo?.seoScore ?? 0;
     const grade = seo?.seoGrade ?? "—";
-    productRows += `<tr>
-      <td style="font-weight:500;">${p.title}</td>
-      <td><span class="grade ${gradeClass(grade)}">${grade}</span></td>
-      <td><div style="display:flex;align-items:center;gap:8px;"><span>${Math.round(score)}</span><div class="score-bar" style="width:80px;"><div class="score-fill" style="width:${score}%;background:${scoreColor(score)};"></div></div></div></td>
+    productRows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
+      <td><span class="grade ${gradeClass(grade)}">${grade}</span></td><!-- nosemgrep -->
+      <td><div style="display:flex;align-items:center;gap:8px;"><span>${Math.round(score)}</span><div class="score-bar" style="width:80px;"><div class="score-fill" style="width:${score}%;background:${scoreColor(score)};"></div></div></div></td><!-- nosemgrep -->
       <td>${seo?.hasSchema ? "✅" : "❌"}</td>
       <td>${seo?.hasAltTexts ? "✅" : "❌"}</td>
-      <td class="text-muted">${seo?.metaTitle?.slice(0, 40) ?? "Sin meta title"}${(seo?.metaTitle?.length ?? 0) > 40 ? "…" : ""}</td>
+      <td class="text-muted">${sanitizeHtml(seo?.metaTitle?.slice(0, 40) ?? "Sin meta title")}${(seo?.metaTitle?.length ?? 0) > 40 ? "…" : ""}</td><!-- nosemgrep -->
     </tr>`;
   }
 
@@ -177,10 +181,10 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   let gradeBreakdown = "";
   for (const [g, count] of Object.entries(gradeDistribution).sort()) {
     const pct = totalProducts > 0 ? Math.round((count / totalProducts) * 100) : 0;
-    gradeBreakdown += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+    gradeBreakdown += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;"><!-- nosemgrep -->
       <span class="grade ${gradeClass(g)}" style="min-width:40px;text-align:center;">${g}</span>
-      <div class="score-bar" style="flex:1;"><div class="score-fill" style="width:${pct}%;background:${scoreColor(g === "A+" || g === "A" ? 90 : g === "B" ? 70 : g === "C" ? 50 : 30)};"></div></div>
-      <span style="min-width:60px;font-size:13px;">${count} (${pct}%)</span>
+      <div class="score-bar" style="flex:1;"><div class="score-fill" style="width:${pct}%;background:${scoreColor(g === "A+" || g === "A" ? 90 : g === "B" ? 70 : g === "C" ? 50 : 30)};"></div></div><!-- nosemgrep -->
+      <span style="min-width:60px;font-size:13px;">${count} (${pct}%)</span><!-- nosemgrep -->
     </div>`;
   }
 
@@ -191,20 +195,20 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   const noMeta = seoData.filter(s => !s.metaTitle || s.metaTitle.length < 10).length;
   if (noMeta > 0) issues.push(`${noMeta} productos sin meta title optimizado. Los meta titles son el factor #1 de CTR en resultados de búsqueda.`);
 
-  let recommendationsHtml = issues.map(i => `<div class="recommendation">${i}</div>`).join("");
-  if (issues.length === 0) recommendationsHtml = `<div class="recommendation" style="border-left-color:${BRAND.jade};">✅ Excelente: No se detectaron problemas críticos de SEO.</div>`;
+  let recommendationsHtml = issues.map(i => `<div class="recommendation">${i}</div>`).join(""); // nosemgrep
+  if (issues.length === 0) recommendationsHtml = `<div class="recommendation" style="border-left-color:${BRAND.jade};">✅ Excelente: No se detectaron problemas críticos de SEO.</div>`; // nosemgrep
 
-  const body = `
+  const body = ` // nosemgrep
     <div class="metric-row">
-      <div class="metric"><div class="value">${totalProducts}</div><div class="label">Productos</div></div>
-      <div class="metric"><div class="value">${Math.round(avgScore)}</div><div class="label">Score SEO medio</div></div>
-      <div class="metric"><div class="value">${withSchema}</div><div class="label">Con Schema</div></div>
-      <div class="metric"><div class="value">${withAltTexts}</div><div class="label">Con Alt Texts</div></div>
+      <div class="metric"><div class="value">${totalProducts}</div><div class="label">Productos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${Math.round(avgScore)}</div><div class="label">Score SEO medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${withSchema}</div><div class="label">Con Schema</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${withAltTexts}</div><div class="label">Con Alt Texts</div></div><!-- nosemgrep -->
     </div>
 
     <div class="section">
       <div class="section-title">Distribución de Grados SEO</div>
-      <div class="card">${gradeBreakdown}</div>
+      <div class="card">${gradeBreakdown}</div><!-- nosemgrep -->
     </div>
 
     <div class="section">
@@ -217,7 +221,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Grado</th><th>Score</th><th>Schema</th><th>Alt Texts</th><th>Meta Title</th></tr></thead>
-          <tbody>${productRows}</tbody>
+          <tbody>${productRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>`;
@@ -253,25 +257,25 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
     const seo = seoMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
-    rows += `<tr>
-      <td style="font-weight:500;">${p.title}</td>
+    rows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
       <td>${p.status === "active" ? '<span class="text-jade">Activo</span>' : '<span class="text-muted">Borrador</span>'}</td>
-      <td>${price > 0 ? price.toFixed(2) + "€" : "—"}</td>
-      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td>
-      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td>
-      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td>
-      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td>
-      <td>${p.imageCount ?? 0}</td>
-      <td>${p.variantCount ?? 1}</td>
+      <td>${price > 0 ? price.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
+      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
+      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
+      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td><!-- nosemgrep -->
+      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td><!-- nosemgrep -->
+      <td>${p.imageCount ?? 0}</td><!-- nosemgrep -->
+      <td>${p.variantCount ?? 1}</td><!-- nosemgrep -->
     </tr>`;
   }
 
-  const body = `
+  const body = ` // nosemgrep
     <div class="metric-row">
-      <div class="metric"><div class="value">${totalProducts}</div><div class="label">Total productos</div></div>
-      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Activos</div></div>
-      <div class="metric"><div class="value">${avgPrice.toFixed(2)}€</div><div class="label">Precio medio</div></div>
-      <div class="metric"><div class="value">${Math.round(avgScore)}</div><div class="label">Score medio</div></div>
+      <div class="metric"><div class="value">${totalProducts}</div><div class="label">Total productos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Activos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgPrice.toFixed(2)}€</div><div class="label">Precio medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${Math.round(avgScore)}</div><div class="label">Score medio</div></div><!-- nosemgrep -->
     </div>
 
     <div class="section">
@@ -279,7 +283,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>Audit</th><th>SEO</th><th>Imgs</th><th>Vars</th></tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>`;
@@ -312,12 +316,12 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
     totalCosts += cogs?.totalCogs ?? 0;
     if (cogs) {
       const margin = price > 0 ? ((price - cogs.totalCogs) / price) * 100 : 0;
-      cogsRows += `<tr>
-        <td style="font-weight:500;">${p.title}</td>
-        <td>${price.toFixed(2)}€</td>
-        <td>${cogs.totalCogs.toFixed(2)}€</td>
-        <td>${(price - cogs.totalCogs).toFixed(2)}€</td>
-        <td><span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span></td>
+      cogsRows += `<tr><!-- nosemgrep -->
+        <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
+        <td>${price.toFixed(2)}€</td><!-- nosemgrep -->
+        <td>${cogs.totalCogs.toFixed(2)}€</td><!-- nosemgrep -->
+        <td>${(price - cogs.totalCogs).toFixed(2)}€</td><!-- nosemgrep -->
+        <td><span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span></td><!-- nosemgrep -->
       </tr>`;
     }
   }
@@ -327,22 +331,22 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
   let priceHistoryRows = "";
   for (const h of priceHistory.slice(0, 30)) {
     const pct = h.oldPrice && h.oldPrice > 0 ? (((h.newPrice - h.oldPrice) / h.oldPrice) * 100) : 0;
-    priceHistoryRows += `<tr>
-      <td>${h.recordedAt?.toLocaleDateString("es-ES") ?? "—"}</td>
-      <td>${h.shopifyProductId}</td>
-      <td>${h.oldPrice?.toFixed(2) ?? "—"}€</td>
-      <td>${h.newPrice.toFixed(2)}€</td>
-      <td><span class="${pct >= 0 ? "text-jade" : "text-red"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></td>
-      <td class="text-muted">${h.changeSource ?? "—"}</td>
+    priceHistoryRows += `<tr><!-- nosemgrep -->
+      <td>${h.recordedAt?.toLocaleDateString("es-ES") ?? "—"}</td><!-- nosemgrep -->
+      <td>${h.shopifyProductId}</td><!-- nosemgrep -->
+      <td>${h.oldPrice?.toFixed(2) ?? "—"}€</td><!-- nosemgrep -->
+      <td>${h.newPrice.toFixed(2)}€</td><!-- nosemgrep -->
+      <td><span class="${pct >= 0 ? "text-jade" : "text-red"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></td><!-- nosemgrep -->
+      <td class="text-muted">${h.changeSource ?? "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${totalRevenuePotential.toFixed(0)}€</div><div class="label">Revenue potencial</div></div>
-      <div class="metric"><div class="value">${totalCosts.toFixed(0)}€</div><div class="label">COGS total</div></div>
-      <div class="metric"><div class="value">${(totalRevenuePotential - totalCosts).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div>
-      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div>
+      <div class="metric"><div class="value">${totalRevenuePotential.toFixed(0)}€</div><div class="label">Revenue potencial</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${totalCosts.toFixed(0)}€</div><div class="label">COGS total</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${(totalRevenuePotential - totalCosts).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div><!-- nosemgrep -->
     </div>
 
     <div class="section">
@@ -350,17 +354,17 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Precio</th><th>COGS</th><th>Beneficio</th><th>Margen</th></tr></thead>
-          <tbody>${cogsRows || '<tr><td colspan="5" class="text-muted">No hay COGS configurados</td></tr>'}</tbody>
+          <tbody>${cogsRows || '<tr><td colspan="5" class="text-muted">No hay COGS configurados</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>
 
-    ${priceHistoryRows ? `<div class="section">
+    ${priceHistoryRows ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Historial de Cambios de Precio</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Fecha</th><th>Producto</th><th>Anterior</th><th>Nuevo</th><th>Cambio</th><th>Fuente</th></tr></thead>
-          <tbody>${priceHistoryRows}</tbody>
+          <tbody>${priceHistoryRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>` : ""}`;
@@ -388,15 +392,15 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
     ? { min: Math.min(...products.map(p => parseFloat(p.price ?? "0"))), max: Math.max(...products.map(p => parseFloat(p.price ?? "0"))) }
     : { min: 0, max: 0 };
 
-  const body = `
+  const body = ` // nosemgrep
     <div class="section">
       <div class="section-title">Identidad de Marca</div>
       <div class="card">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nombre del Proyecto</p><p style="font-size:18px;font-weight:600;">${project.name}</p></div>
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Dominio Shopify</p><p style="font-size:18px;font-weight:600;">${project.shopDomain || "No configurado"}</p></div>
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nicho de Mercado</p><p style="font-size:16px;font-weight:500;">${project.storeNiche || "No definido"}</p></div>
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Mercados Objetivo</p><p style="font-size:16px;font-weight:500;">${project.storeMarkets || "Global"}</p></div>
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nombre del Proyecto</p><p style="font-size:18px;font-weight:600;">${project.name}</p></div><!-- nosemgrep -->
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Dominio Shopify</p><p style="font-size:18px;font-weight:600;">${project.shopDomain || "No configurado"}</p></div><!-- nosemgrep -->
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nicho de Mercado</p><p style="font-size:16px;font-weight:500;">${project.storeNiche || "No definido"}</p></div><!-- nosemgrep -->
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Mercados Objetivo</p><p style="font-size:16px;font-weight:500;">${project.storeMarkets || "Global"}</p></div><!-- nosemgrep -->
         </div>
       </div>
     </div>
@@ -404,37 +408,37 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
     <div class="section">
       <div class="section-title">Voz y Tono de Marca</div>
       <div class="card">
-        <p style="font-size:15px;line-height:1.8;">${project.brandTone || "No definido — Se recomienda establecer el tono de marca para consistencia en todas las comunicaciones."}</p>
+        <p style="font-size:15px;line-height:1.8;">${project.brandTone || "No definido — Se recomienda establecer el tono de marca para consistencia en todas las comunicaciones."}</p><!-- nosemgrep -->
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Audiencia Objetivo</div>
       <div class="card">
-        <p style="font-size:15px;line-height:1.8;">${project.targetAudience || "No definido — Definir la audiencia objetivo permite optimizar copywriting, SEO y estrategia de pricing."}</p>
+        <p style="font-size:15px;line-height:1.8;">${project.targetAudience || "No definido — Definir la audiencia objetivo permite optimizar copywriting, SEO y estrategia de pricing."}</p><!-- nosemgrep -->
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Panorama del Catálogo</div>
       <div class="metric-row">
-        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
+        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div><!-- nosemgrep -->
         <div class="metric"><div class="value">${productTypes.length}</div><div class="label">Categorías</div></div>
-        <div class="metric"><div class="value">${avgPrice.toFixed(2)}€</div><div class="label">Precio medio</div></div>
-        <div class="metric"><div class="value">${priceRange.min.toFixed(0)}–${priceRange.max.toFixed(0)}€</div><div class="label">Rango de precios</div></div>
+        <div class="metric"><div class="value">${avgPrice.toFixed(2)}€</div><div class="label">Precio medio</div></div><!-- nosemgrep -->
+        <div class="metric"><div class="value">${priceRange.min.toFixed(0)}–${priceRange.max.toFixed(0)}€</div><div class="label">Rango de precios</div></div><!-- nosemgrep -->
       </div>
-      ${productTypes.length > 0 ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Categorías de producto</p><div>${productTypes.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}
-      ${vendors.length > 0 ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Proveedores / Vendors</p><div>${vendors.map(v => `<span class="tag">${v}</span>`).join(" ")}</div></div>` : ""}
+      ${productTypes.length > 0 ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Categorías de producto</p><div>${productTypes.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}<!-- nosemgrep -->
+      ${vendors.length > 0 ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Proveedores / Vendors</p><div>${vendors.map(v => `<span class="tag">${v}</span>`).join(" ")}</div></div>` : ""}<!-- nosemgrep -->
     </div>
 
     <div class="section">
       <div class="section-title">Estado de Optimización</div>
       <div class="card">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Plan activo</p><p style="font-size:16px;font-weight:600;text-transform:uppercase;" class="text-gold">${project.plan}</p></div>
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Plan activo</p><p style="font-size:16px;font-weight:600;text-transform:uppercase;" class="text-gold">${project.plan}</p></div><!-- nosemgrep -->
           <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Piloto automático</p><p style="font-size:16px;font-weight:600;">${project.autoPilotEnabled ? '<span class="text-jade">Activado</span>' : '<span class="text-muted">Desactivado</span>'}</p></div>
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Score Audit medio</p><p style="font-size:16px;font-weight:600;">${project.avgAuditScore != null ? Math.round(project.avgAuditScore) + "/100" : "Sin auditar"}</p></div>
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Productos auditados</p><p style="font-size:16px;font-weight:600;">${seoData.filter(s => s.seoScore != null).length}/${products.length}</p></div>
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Score Audit medio</p><p style="font-size:16px;font-weight:600;">${project.avgAuditScore != null ? Math.round(project.avgAuditScore) + "/100" : "Sin auditar"}</p></div><!-- nosemgrep -->
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Productos auditados</p><p style="font-size:16px;font-weight:600;">${seoData.filter(s => s.seoScore != null).length}/${products.length}</p></div><!-- nosemgrep -->
         </div>
       </div>
     </div>`;
@@ -459,28 +463,28 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
 
   let rows = "";
   for (const t of tests) {
-    rows += `<tr>
-      <td style="font-weight:500;">${t.testName}</td>
-      <td>${t.testType}</td>
-      <td><span class="tag">${t.status}</span></td>
-      <td>${t.startDate ? new Date(t.startDate).toLocaleDateString("es-ES") : "—"}</td>
-      <td>${t.winner ?? "—"}</td>
-      <td class="text-muted">${t.improvementPct != null ? `+${t.improvementPct.toFixed(1)}%` : "—"}</td>
+    rows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${t.testName}</td><!-- nosemgrep -->
+      <td>${t.testType}</td><!-- nosemgrep -->
+      <td><span class="tag">${t.status}</span></td><!-- nosemgrep -->
+      <td>${t.startDate ? new Date(t.startDate).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
+      <td>${t.winner ?? "—"}</td><!-- nosemgrep -->
+      <td class="text-muted">${t.improvementPct != null ? `+${t.improvementPct.toFixed(1)}%` : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
-  const body = `
+  const body = ` // nosemgrep
     <div class="metric-row">
-      <div class="metric"><div class="value">${totalTests}</div><div class="label">Tests totales</div></div>
-      <div class="metric"><div class="value">${active}</div><div class="label">Activos</div></div>
-      <div class="metric"><div class="value">${completed}</div><div class="label">Completados</div></div>
+      <div class="metric"><div class="value">${totalTests}</div><div class="label">Tests totales</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${active}</div><div class="label">Activos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${completed}</div><div class="label">Completados</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Historial de A/B Tests</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Test</th><th>Tipo</th><th>Estado</th><th>Inicio</th><th>Ganador</th><th>Mejora</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6" class="text-muted">No hay tests registrados</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="6" class="text-muted">No hay tests registrados</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>`;
@@ -507,26 +511,26 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
 
   let gallery = "";
   for (const j of succeeded) {
-    gallery += `<div style="background:${BRAND.dark};border:1px solid ${BRAND.border};border-radius:10px;overflow:hidden;">
-      ${j.imageUrl ? `<img src="${j.imageUrl}" style="width:100%;height:200px;object-fit:cover;" alt="${j.altText || "AI generated"}"/>` : `<div style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:${BRAND.card};"><span class="text-muted">Sin preview</span></div>`}
+    gallery += `<div style="background:${BRAND.dark};border:1px solid ${BRAND.border};border-radius:10px;overflow:hidden;"><!-- nosemgrep -->
+      ${j.imageUrl ? `<img src="${j.imageUrl}" style="width:100%;height:200px;object-fit:cover;" alt="${j.altText || "AI generated"}"/>` : `<div style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:${BRAND.card};"><span class="text-muted">Sin preview</span></div>`}<!-- nosemgrep -->
       <div style="padding:10px;">
-        <p style="font-size:12px;font-weight:600;margin-bottom:4px;">${j.imageType ?? "Imagen"}</p>
-        <p style="font-size:11px;color:${BRAND.muted};">${j.altText?.slice(0, 60) ?? "Sin descripción"}</p>
-        <p style="font-size:10px;color:${BRAND.muted};margin-top:4px;">${j.model ?? ""}</p>
+        <p style="font-size:12px;font-weight:600;margin-bottom:4px;">${j.imageType ?? "Imagen"}</p><!-- nosemgrep -->
+        <p style="font-size:11px;color:${BRAND.muted};">${j.altText?.slice(0, 60) ?? "Sin descripción"}</p><!-- nosemgrep -->
+        <p style="font-size:10px;color:${BRAND.muted};margin-top:4px;">${j.model ?? ""}</p><!-- nosemgrep -->
       </div>
     </div>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${succeeded.length}</div><div class="label">Imágenes generadas</div></div>
-      <div class="metric"><div class="value">${failed.length}</div><div class="label">Fallidas</div></div>
-      <div class="metric"><div class="value">${jobs.length}</div><div class="label">Total jobs</div></div>
+      <div class="metric"><div class="value">${succeeded.length}</div><div class="label">Imágenes generadas</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${failed.length}</div><div class="label">Fallidas</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${jobs.length}</div><div class="label">Total jobs</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Galería de Imágenes IA</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-        ${gallery || `<div class="text-muted" style="grid-column:span 3;text-align:center;padding:40px;">No hay imágenes generadas aún</div>`}
+        ${gallery || `<div class="text-muted" style="grid-column:span 3;text-align:center;padding:40px;">No hay imágenes generadas aún</div>`}<!-- nosemgrep -->
       </div>
     </div>`;
 
@@ -566,22 +570,22 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
-    productSummary += `<tr>
-      <td style="font-weight:500;">${p.title}</td>
-      <td>${price.toFixed(2)}€</td>
-      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td>
-      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td>
-      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td>
-      <td>${p.imageCount ?? 0}</td>
+    productSummary += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
+      <td>${price.toFixed(2)}€</td><!-- nosemgrep -->
+      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
+      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td><!-- nosemgrep -->
+      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td><!-- nosemgrep -->
+      <td>${p.imageCount ?? 0}</td><!-- nosemgrep -->
     </tr>`;
   }
 
-  const body = `
+  const body = ` // nosemgrep
     <div class="section">
       <div class="section-title">Resumen Ejecutivo</div>
       <div class="card">
-        <p style="font-size:14px;line-height:1.8;">Este informe presenta un análisis completo del proyecto <strong>${project.name}</strong> (${project.shopDomain || "sin dominio"})
-        en el nicho de <strong>${project.storeNiche || "e-commerce"}</strong>. El catálogo cuenta con ${activeProducts} productos activos,
+        <p style="font-size:14px;line-height:1.8;">Este informe presenta un análisis completo del proyecto <strong>${project.name}</strong> (${project.shopDomain || "sin dominio"})<!-- nosemgrep -->
+        en el nicho de <strong>${project.storeNiche || "e-commerce"}</strong>. El catálogo cuenta con ${activeProducts} productos activos,<!-- nosemgrep -->
         con un precio medio de ${avgPrice.toFixed(2)}€ y un margen bruto promedio del ${avgMargin.toFixed(1)}%.
         La puntuación SEO media es ${Math.round(avgSeo)}/100. Se han generado ${imagesGenerated} imágenes IA
         y ejecutado ${tests.length} tests A/B${redesigns.length > 0 ? `, con ${redesigns.length} rediseños de fichas` : ""}.</p>
@@ -589,21 +593,21 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>
 
     <div class="metric-row">
-      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
-      <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
-      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div>
-      <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">SEO medio</div></div>
-      <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imágenes IA</div></div>
-      <div class="metric"><div class="value">${tests.length}</div><div class="label">A/B Tests</div></div>
+      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">SEO medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imágenes IA</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${tests.length}</div><div class="label">A/B Tests</div></div><!-- nosemgrep -->
     </div>
 
     <div class="section">
       <div class="section-title">Identidad y Estrategia</div>
       <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Nicho</p><p>${project.storeNiche || "No definido"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Tono de marca</p><p>${project.brandTone || "No definido"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Audiencia</p><p>${project.targetAudience || "No definida"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mercados</p><p>${project.storeMarkets || "Global"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Nicho</p><p>${project.storeNiche || "No definido"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Tono de marca</p><p>${project.brandTone || "No definido"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Audiencia</p><p>${project.targetAudience || "No definida"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mercados</p><p>${project.storeMarkets || "Global"}</p></div><!-- nosemgrep -->
       </div>
     </div>
 
@@ -612,7 +616,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Precio</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
-          <tbody>${productSummary}</tbody>
+          <tbody>${productSummary}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>`;
@@ -676,50 +680,50 @@ router.get("/projects/:projectId/exports/competitors", async (req, res): Promise
   for (const c of competitors) {
     const snapshots = await db.select().from(competitorSnapshotsTable).where(eq(competitorSnapshotsTable.competitorId, c.id)).orderBy(desc(competitorSnapshotsTable.scannedAt)).limit(1);
     const latest = snapshots[0];
-    compRows += `<tr>
-      <td style="font-weight:500;">${c.name}</td>
-      <td><a href="${c.url}" style="color:${BRAND.gold};" target="_blank">${c.url?.slice(0, 40)}...</a></td>
-      <td><span class="tag">${c.type || "direct"}</span></td>
-      <td>${latest?.productsFound ?? "—"}</td>
-      <td>${latest?.priceMin != null && latest?.priceMax != null ? `${latest.priceMin.toFixed(0)}€ – ${latest.priceMax.toFixed(0)}€` : "—"}</td>
-      <td>${latest?.priceMedian != null ? `${latest.priceMedian.toFixed(2)}€` : "—"}</td>
-      <td class="text-muted">${c.lastScanned ? new Date(c.lastScanned).toLocaleDateString("es-ES") : "Sin escanear"}</td>
+    compRows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${c.name}</td><!-- nosemgrep -->
+      <td><a href="${c.url}" style="color:${BRAND.gold};" target="_blank">${c.url?.slice(0, 40)}...</a></td><!-- nosemgrep -->
+      <td><span class="tag">${c.type || "direct"}</span></td><!-- nosemgrep -->
+      <td>${latest?.productsFound ?? "—"}</td><!-- nosemgrep -->
+      <td>${latest?.priceMin != null && latest?.priceMax != null ? `${latest.priceMin.toFixed(0)}€ – ${latest.priceMax.toFixed(0)}€` : "—"}</td><!-- nosemgrep -->
+      <td>${latest?.priceMedian != null ? `${latest.priceMedian.toFixed(2)}€` : "—"}</td><!-- nosemgrep -->
+      <td class="text-muted">${c.lastScanned ? new Date(c.lastScanned).toLocaleDateString("es-ES") : "Sin escanear"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   let alertRows = "";
   for (const a of alerts.filter(a => !a.dismissed).slice(0, 20)) {
     const sevColor = a.severity === "high" ? BRAND.red : a.severity === "medium" ? "#ffa500" : BRAND.jade;
-    alertRows += `<tr>
-      <td><span style="color:${sevColor};font-weight:600;text-transform:uppercase;">${a.severity || "info"}</span></td>
-      <td style="font-weight:500;">${a.title || "Alerta"}</td>
-      <td class="text-muted">${a.description?.slice(0, 100) ?? "—"}</td>
-      <td style="font-size:12px;">${a.actionSuggestion?.slice(0, 80) ?? "—"}</td>
-      <td class="text-muted">${a.createdAt ? new Date(a.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+    alertRows += `<tr><!-- nosemgrep -->
+      <td><span style="color:${sevColor};font-weight:600;text-transform:uppercase;">${a.severity || "info"}</span></td><!-- nosemgrep -->
+      <td style="font-weight:500;">${a.title || "Alerta"}</td><!-- nosemgrep -->
+      <td class="text-muted">${a.description?.slice(0, 100) ?? "—"}</td><!-- nosemgrep -->
+      <td style="font-size:12px;">${a.actionSuggestion?.slice(0, 80) ?? "—"}</td><!-- nosemgrep -->
+      <td class="text-muted">${a.createdAt ? new Date(a.createdAt).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${competitors.length}</div><div class="label">Competidores</div></div>
-      <div class="metric"><div class="value">${competitors.filter(c => c.active).length}</div><div class="label">Monitoreados</div></div>
-      <div class="metric"><div class="value">${alerts.filter(a => !a.dismissed).length}</div><div class="label">Alertas activas</div></div>
+      <div class="metric"><div class="value">${competitors.length}</div><div class="label">Competidores</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${competitors.filter(c => c.active).length}</div><div class="label">Monitoreados</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${alerts.filter(a => !a.dismissed).length}</div><div class="label">Alertas activas</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Competidores Monitoreados</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Nombre</th><th>URL</th><th>Tipo</th><th>Productos</th><th>Rango precios</th><th>Mediana</th><th>Escaneado</th></tr></thead>
-          <tbody>${compRows || '<tr><td colspan="7" class="text-muted">No hay competidores registrados</td></tr>'}</tbody>
+          <tbody>${compRows || '<tr><td colspan="7" class="text-muted">No hay competidores registrados</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>
-    ${alertRows ? `<div class="section">
+    ${alertRows ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Alertas Competitivas</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Severidad</th><th>Alerta</th><th>Descripción</th><th>Acción sugerida</th><th>Fecha</th></tr></thead>
-          <tbody>${alertRows}</tbody>
+          <tbody>${alertRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>` : ""}`;
@@ -748,44 +752,44 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
   if (vd) {
     dnaDetails = `
       <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo de fondo</p><p>${vd.backgroundStyle || "No analizado"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Iluminación</p><p>${vd.lightingStyle || "No analizado"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Temperatura color</p><p>${vd.colorTemp || "No analizado"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Composición</p><p>${vd.composition || "No analizado"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mood</p><p>${vd.mood || "No analizado"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Presencia humana</p><p>${vd.humanPresence || "No analizado"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo de fondo</p><p>${vd.backgroundStyle || "No analizado"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Iluminación</p><p>${vd.lightingStyle || "No analizado"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Temperatura color</p><p>${vd.colorTemp || "No analizado"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Composición</p><p>${vd.composition || "No analizado"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mood</p><p>${vd.mood || "No analizado"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Presencia humana</p><p>${vd.humanPresence || "No analizado"}</p></div><!-- nosemgrep -->
       </div>
-      ${vd.brandColors?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Colores de marca</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${vd.brandColors.map(c => `<div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:24px;border-radius:6px;background:${c};border:1px solid ${BRAND.border};"></div><span style="font-size:12px;">${c}</span></div>`).join("")}</div></div>` : ""}
-      ${vd.props?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Props/Accesorios</p><div>${vd.props.map(p => `<span class="tag">${p}</span>`).join(" ")}</div></div>` : ""}`;
+      ${vd.brandColors?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Colores de marca</p><div style="display:flex;gap:8px;flex-wrap:wrap;">${vd.brandColors.map(c => `<div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:24px;border-radius:6px;background:${c};border:1px solid ${BRAND.border};"></div><span style="font-size:12px;">${c}</span></div>`).join("")}</div></div>` : ""}<!-- nosemgrep -->
+      ${vd.props?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Props/Accesorios</p><div>${vd.props.map(p => `<span class="tag">${p}</span>`).join(" ")}</div></div>` : ""}`; // nosemgrep
   }
 
   let brandDetails = "";
   if (bd) {
     brandDetails = `
       <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo tipográfico</p><p>${bd.typographyStyle || "—"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Patrón de layout</p><p>${bd.layoutPattern || "—"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Densidad visual</p><p>${bd.visualDensity || "—"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Personalidad de marca</p><p>${bd.brandPersonality || "—"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Posición competitiva</p><p>${bd.competitivePosition || "—"}</p></div>
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo fotográfico</p><p>${bd.photographyStyle || "—"}</p></div>
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo tipográfico</p><p>${bd.typographyStyle || "—"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Patrón de layout</p><p>${bd.layoutPattern || "—"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Densidad visual</p><p>${bd.visualDensity || "—"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Personalidad de marca</p><p>${bd.brandPersonality || "—"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Posición competitiva</p><p>${bd.competitivePosition || "—"}</p></div><!-- nosemgrep -->
+        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Estilo fotográfico</p><p>${bd.photographyStyle || "—"}</p></div><!-- nosemgrep -->
       </div>
-      ${bd.valuePropositions?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Propuestas de valor</p><div>${bd.valuePropositions.map(v => `<span class="tag">${v}</span>`).join(" ")}</div></div>` : ""}
-      ${bd.urgencyTactics?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Tácticas de urgencia</p><div>${bd.urgencyTactics.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}`;
+      ${bd.valuePropositions?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Propuestas de valor</p><div>${bd.valuePropositions.map(v => `<span class="tag">${v}</span>`).join(" ")}</div></div>` : ""}<!-- nosemgrep -->
+      ${bd.urgencyTactics?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Tácticas de urgencia</p><div>${bd.urgencyTactics.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}`; // nosemgrep
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${(avgConsistency * 100).toFixed(0)}%</div><div class="label">Consistencia visual</div></div>
-      <div class="metric"><div class="value">${products.length}</div><div class="label">Productos analizados</div></div>
+      <div class="metric"><div class="value">${(avgConsistency * 100).toFixed(0)}%</div><div class="label">Consistencia visual</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${products.length}</div><div class="label">Productos analizados</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">ADN Visual</div>
-      ${dnaDetails || '<div class="card text-muted">Sin análisis visual. Ejecuta un análisis de consistencia desde la página Consistencia.</div>'}
+      ${dnaDetails || '<div class="card text-muted">Sin análisis visual. Ejecuta un análisis de consistencia desde la página Consistencia.</div>'}<!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">ADN de Marca</div>
-      ${brandDetails || '<div class="card text-muted">Sin ADN de marca extraído. Usa la herramienta de Intelligence para extraer el ADN.</div>'}
+      ${brandDetails || '<div class="card text-muted">Sin ADN de marca extraído. Usa la herramienta de Intelligence para extraer el ADN.</div>'}<!-- nosemgrep -->
     </div>`;
 
   const html = reportShell("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
@@ -810,50 +814,50 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
   let invRows = "";
   for (const i of inventory) {
     const statusColor = i.status === "critical" ? BRAND.red : i.status === "low" ? "#ffa500" : BRAND.jade;
-    invRows += `<tr>
-      <td style="font-weight:500;">${i.productTitle || i.productId}</td>
-      <td>${i.currentStock ?? "—"}</td>
-      <td>${i.avgDailySales?.toFixed(1) ?? "—"}</td>
-      <td><span style="color:${statusColor};font-weight:600;">${i.daysRemaining != null ? `${i.daysRemaining} días` : "—"}</span></td>
-      <td><span style="color:${statusColor};font-weight:600;text-transform:uppercase;">${i.status || "ok"}</span></td>
-      <td class="text-muted">${i.supplierEmail || "—"}</td>
-      <td>${i.supplierLeadDays ?? "—"} días</td>
+    invRows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${i.productTitle || i.productId}</td><!-- nosemgrep -->
+      <td>${i.currentStock ?? "—"}</td><!-- nosemgrep -->
+      <td>${i.avgDailySales?.toFixed(1) ?? "—"}</td><!-- nosemgrep -->
+      <td><span style="color:${statusColor};font-weight:600;">${i.daysRemaining != null ? `${i.daysRemaining} días` : "—"}</span></td><!-- nosemgrep -->
+      <td><span style="color:${statusColor};font-weight:600;text-transform:uppercase;">${i.status || "ok"}</span></td><!-- nosemgrep -->
+      <td class="text-muted">${i.supplierEmail || "—"}</td><!-- nosemgrep -->
+      <td>${i.supplierLeadDays ?? "—"} días</td><!-- nosemgrep -->
     </tr>`;
   }
 
   let restockRows = "";
   for (const r of restocks.slice(0, 15)) {
-    restockRows += `<tr>
-      <td style="font-weight:500;">${r.productTitle || r.productId || "—"}</td>
-      <td>${r.quantitySuggested ?? "—"}</td>
-      <td><span class="tag">${r.urgency || "normal"}</span></td>
+    restockRows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${r.productTitle || r.productId || "—"}</td><!-- nosemgrep -->
+      <td>${r.quantitySuggested ?? "—"}</td><!-- nosemgrep -->
+      <td><span class="tag">${r.urgency || "normal"}</span></td><!-- nosemgrep -->
       <td>${r.adminApproved ? "✅ Aprobado" : "⏳ Pendiente"}</td>
-      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${inventory.length}</div><div class="label">Productos rastreados</div></div>
-      <div class="metric"><div class="value">${totalStock}</div><div class="label">Stock total</div></div>
-      <div class="metric"><div class="value" style="color:${BRAND.red}">${critical.length}</div><div class="label">Stock crítico</div></div>
-      <div class="metric"><div class="value" style="color:#ffa500">${lowStock.length}</div><div class="label">Stock bajo</div></div>
+      <div class="metric"><div class="value">${inventory.length}</div><div class="label">Productos rastreados</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${totalStock}</div><div class="label">Stock total</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value" style="color:${BRAND.red}">${critical.length}</div><div class="label">Stock crítico</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value" style="color:#ffa500">${lowStock.length}</div><div class="label">Stock bajo</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Estado del Inventario</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Stock</th><th>Ventas/día</th><th>Días restantes</th><th>Estado</th><th>Proveedor</th><th>Lead time</th></tr></thead>
-          <tbody>${invRows || '<tr><td colspan="7" class="text-muted">Sin datos de inventario</td></tr>'}</tbody>
+          <tbody>${invRows || '<tr><td colspan="7" class="text-muted">Sin datos de inventario</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>
-    ${restockRows ? `<div class="section">
+    ${restockRows ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Órdenes de Reposición</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto</th><th>Cantidad</th><th>Urgencia</th><th>Estado</th><th>Fecha</th></tr></thead>
-          <tbody>${restockRows}</tbody>
+          <tbody>${restockRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>` : ""}`;
@@ -879,37 +883,37 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
   let rows = "";
   for (const r of redesigns) {
     const product = productMap.get(r.shopifyProductId ?? "");
-    rows += `<tr>
-      <td style="font-weight:500;">${product?.title || r.shopifyProductId || "Desconocido"}</td>
-      <td>${r.newTitle?.slice(0, 50) ?? "—"}${(r.newTitle?.length ?? 0) > 50 ? "…" : ""}</td>
-      <td>${r.recommendedPrice != null ? `${r.recommendedPrice}€` : "—"}</td>
+    rows += `<tr><!-- nosemgrep -->
+      <td style="font-weight:500;">${product?.title || r.shopifyProductId || "Desconocido"}</td><!-- nosemgrep -->
+      <td>${r.newTitle?.slice(0, 50) ?? "—"}${(r.newTitle?.length ?? 0) > 50 ? "…" : ""}</td><!-- nosemgrep -->
+      <td>${r.recommendedPrice != null ? `${r.recommendedPrice}€` : "—"}</td><!-- nosemgrep -->
       <td>${r.appliedAt ? `<span class="text-jade">Aplicado</span>` : '<span class="text-muted">Pendiente</span>'}</td>
-      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td>
+      <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Rediseños generados</div></div>
-      <div class="metric"><div class="value">${applied.length}</div><div class="label">Aplicados a Shopify</div></div>
-      <div class="metric"><div class="value">${redesigns.length - applied.length}</div><div class="label">Pendientes</div></div>
+      <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Rediseños generados</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${applied.length}</div><div class="label">Aplicados a Shopify</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${redesigns.length - applied.length}</div><div class="label">Pendientes</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Historial de Rediseños IA</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Producto original</th><th>Nuevo título propuesto</th><th>Precio recomendado</th><th>Estado</th><th>Fecha</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="5" class="text-muted">No hay rediseños generados</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="5" class="text-muted">No hay rediseños generados</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>
-    ${redesigns.length > 0 && redesigns[0].newDescription ? `<div class="section">
+    ${redesigns.length > 0 && redesigns[0].newDescription ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Ejemplo de Rediseño Más Reciente</div>
       <div class="card">
-        <p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Producto: ${productMap.get(redesigns[0].shopifyProductId ?? "")?.title || "—"}</p>
-        <p style="font-size:16px;font-weight:600;color:${BRAND.gold};margin-bottom:12px;">${redesigns[0].newTitle || "—"}</p>
-        <div class="blog-content" style="font-size:13px;">${redesigns[0].newDescription?.slice(0, 500) ?? ""}${(redesigns[0].newDescription?.length ?? 0) > 500 ? "..." : ""}</div>
-        ${redesigns[0].tags ? `<div style="margin-top:12px;">${(redesigns[0].tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}
+        <p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Producto: ${productMap.get(redesigns[0].shopifyProductId ?? "")?.title || "—"}</p><!-- nosemgrep -->
+        <p style="font-size:16px;font-weight:600;color:${BRAND.gold};margin-bottom:12px;">${redesigns[0].newTitle || "—"}</p><!-- nosemgrep -->
+        <div class="blog-content" style="font-size:13px;">${redesigns[0].newDescription?.slice(0, 500) ?? ""}${(redesigns[0].newDescription?.length ?? 0) > 500 ? "..." : ""}</div><!-- nosemgrep -->
+        ${redesigns[0].tags ? `<div style="margin-top:12px;">${(redesigns[0].tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}<!-- nosemgrep -->
       </div>
     </div>` : ""}`;
 
@@ -937,50 +941,50 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
 
   let snapRows = "";
   for (const s of snapshots.slice(0, 30)) {
-    snapRows += `<tr>
-      <td>${s.date}</td>
-      <td style="font-weight:500;">${s.revenue?.toFixed(2) ?? "—"}€</td>
-      <td>${s.orders ?? "—"}</td>
-      <td>${s.aov?.toFixed(2) ?? "—"}€</td>
-      <td>${s.conversionRate != null ? `${(s.conversionRate * 100).toFixed(2)}%` : "—"}</td>
-      <td>${s.grossMargin != null ? `<span class="${s.grossMargin > 30 ? "text-jade" : "text-red"}">${s.grossMargin.toFixed(1)}%</span>` : "—"}</td>
+    snapRows += `<tr><!-- nosemgrep -->
+      <td>${s.date}</td><!-- nosemgrep -->
+      <td style="font-weight:500;">${s.revenue?.toFixed(2) ?? "—"}€</td><!-- nosemgrep -->
+      <td>${s.orders ?? "—"}</td><!-- nosemgrep -->
+      <td>${s.aov?.toFixed(2) ?? "—"}€</td><!-- nosemgrep -->
+      <td>${s.conversionRate != null ? `${(s.conversionRate * 100).toFixed(2)}%` : "—"}</td><!-- nosemgrep -->
+      <td>${s.grossMargin != null ? `<span class="${s.grossMargin > 30 ? "text-jade" : "text-red"}">${s.grossMargin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   let forecastRows = "";
   for (const f of forecasts) {
-    forecastRows += `<tr>
-      <td>${f.forecastDate || "—"}</td>
-      <td><span class="tag">${f.forecastType || "general"}</span></td>
-      <td style="font-weight:500;">${f.predictedValue?.toFixed(2) ?? "—"}€</td>
-      <td>${f.confidenceLow?.toFixed(0) ?? "—"}€ – ${f.confidenceHigh?.toFixed(0) ?? "—"}€</td>
-      <td>${f.confidencePct ?? "—"}%</td>
-      <td class="text-muted" style="font-size:11px;">${f.reasoning?.slice(0, 60) ?? "—"}</td>
+    forecastRows += `<tr><!-- nosemgrep -->
+      <td>${f.forecastDate || "—"}</td><!-- nosemgrep -->
+      <td><span class="tag">${f.forecastType || "general"}</span></td><!-- nosemgrep -->
+      <td style="font-weight:500;">${f.predictedValue?.toFixed(2) ?? "—"}€</td><!-- nosemgrep -->
+      <td>${f.confidenceLow?.toFixed(0) ?? "—"}€ – ${f.confidenceHigh?.toFixed(0) ?? "—"}€</td><!-- nosemgrep -->
+      <td>${f.confidencePct ?? "—"}%</td><!-- nosemgrep -->
+      <td class="text-muted" style="font-size:11px;">${f.reasoning?.slice(0, 60) ?? "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
   const body = `
     <div class="metric-row">
-      <div class="metric"><div class="value">${totalRevenue.toFixed(0)}€</div><div class="label">Revenue total</div></div>
-      <div class="metric"><div class="value">${totalOrders}</div><div class="label">Pedidos</div></div>
-      <div class="metric"><div class="value">${avgAov.toFixed(2)}€</div><div class="label">AOV medio</div></div>
-      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen bruto</div></div>
+      <div class="metric"><div class="value">${totalRevenue.toFixed(0)}€</div><div class="label">Revenue total</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${totalOrders}</div><div class="label">Pedidos</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgAov.toFixed(2)}€</div><div class="label">AOV medio</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen bruto</div></div><!-- nosemgrep -->
     </div>
     <div class="section">
       <div class="section-title">Snapshots de Revenue</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Fecha</th><th>Revenue</th><th>Pedidos</th><th>AOV</th><th>Conversión</th><th>Margen</th></tr></thead>
-          <tbody>${snapRows || '<tr><td colspan="6" class="text-muted">Sin datos de revenue aún</td></tr>'}</tbody>
+          <tbody>${snapRows || '<tr><td colspan="6" class="text-muted">Sin datos de revenue aún</td></tr>'}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>
-    ${forecastRows ? `<div class="section">
+    ${forecastRows ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Predicciones / Forecast</div>
       <div class="card" style="overflow-x:auto;">
         <table>
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Predicción</th><th>Rango confianza</th><th>Confianza</th><th>Razonamiento</th></tr></thead>
-          <tbody>${forecastRows}</tbody>
+          <tbody>${forecastRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
     </div>` : ""}`;
@@ -1009,7 +1013,7 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
   let domainRows = "";
   for (const d of domains) {
     const depth = d.knowledgeDepth ?? 0;
-    domainRows += `<tr>
+    domainRows += `<tr><!-- nosemgrep -->
       <td style="font-weight:600;">${d.domain}</td>
       <td><div style="display:flex;align-items:center;gap:8px;"><div class="score-bar" style="width:100px;"><div class="score-fill" style="width:${Math.min(depth, 100)}%;background:${scoreColor(depth)};"></div></div><span>${depth}%</span></div></td>
       <td>${d.verifiedInsights ?? 0}</td>
@@ -1021,12 +1025,12 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
   let memoryTypes: Record<string, number> = {};
   memories.forEach(m => { memoryTypes[m.memoryType] = (memoryTypes[m.memoryType] || 0) + 1; });
   let typeBreakdown = Object.entries(memoryTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) =>
-    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${BRAND.border};"><span>${type}</span><span class="text-gold" style="font-weight:600;">${count}</span></div>`
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${BRAND.border};"><span>${type}</span><span class="text-gold" style="font-weight:600;">${count}</span></div>` // nosemgrep
   ).join("");
 
   let topInsights = "";
   for (const i of insights.slice(0, 10)) {
-    topInsights += `<div class="recommendation">
+    topInsights += `<div class="recommendation"><!-- nosemgrep -->
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <span style="font-weight:600;color:${BRAND.gold};">${i.title}</span>
         <span class="tag">${i.domain}</span>

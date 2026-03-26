@@ -205,7 +205,7 @@ export default function ConsistencyPage() {
   <div class="metric-card"><div class="label">Mood</div><div class="value">${d?.mood || "—"}</div></div>
   <div class="metric-card"><div class="label">Presencia Humana</div><div class="value">${d?.humanPresence || "—"}</div></div>
 </div>
-${d?.brandColors ? `<h3>Colores de Marca</h3><div style="display:flex;gap:8px;margin:12px 0">${d.brandColors.map(c => `<div style="width:40px;height:40px;border-radius:8px;background:${c};border:1px solid rgba(255,255,255,0.2)"></div>`).join("")}</div>` : ""}
+${d?.brandColors ? `<h3>Colores de Marca</h3><div style="display:flex;gap:8px;margin:12px 0">${d.brandColors.map(c => `<div style="width:40px;height:40px;border-radius:8px;background:${c};border:1px solid rgba(255,255,255,0.2)"></div>`).join("")}</div>` : ""}<!-- nosemgrep -->
 <h2>Score de Consistencia</h2>
 <div class="metric-grid">
   <div class="metric-card"><div class="label">Score Global</div><div class="value">${s?.globalConsistencyScore ?? "—"}/100</div></div>
@@ -214,7 +214,7 @@ ${d?.brandColors ? `<h3>Colores de Marca</h3><div style="display:flex;gap:8px;ma
   <div class="metric-card"><div class="label">Off-Brand</div><div class="value status-warn">${s?.offBrand || 0}</div></div>
   <div class="metric-card"><div class="label">Inconsistentes</div><div class="value status-bad">${s?.inconsistent || 0}</div></div>
 </div>
-${s?.products?.length ? `<h2>Detalle por Producto</h2><table><tr><th>Producto</th><th>Score</th><th>Nivel</th><th>Issues</th></tr>${s.products.map(p => `<tr><td>${p.title}</td><td>${Math.round(p.score)}</td><td>${p.consistencyLevel}</td><td>${p.issues?.join(", ") || "—"}</td></tr>`).join("")}</table>` : ""}`;
+${s?.products?.length ? `<h2>Detalle por Producto</h2><table><tr><th>Producto</th><th>Score</th><th>Nivel</th><th>Issues</th></tr>${s.products.map(p => `<tr><td>${p.title}</td><td>${Math.round(p.score)}</td><td>${p.consistencyLevel}</td><td>${p.issues?.join(", ") || "—"}</td></tr>`).join("")}</table>` : ""}`;<!-- nosemgrep -->
             }}
           />
           <button

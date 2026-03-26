@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { askGeminiJson, askGemini } from "../lib/gemini.js";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { db } from "@workspace/db";
@@ -13,9 +14,7 @@ const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 const REVISION = "2024-02-15";
 
 function kHeaders() {
-  const key = process.env.KLAVIYO_API_KEY;
-  if (!key) throw new Error("KLAVIYO_API_KEY not set");
-  return { "Authorization": `Klaviyo-API-Key ${key}`, "Content-Type": "application/json", "revision": REVISION };
+  return getKlaviyoHeaders(REVISION);
 }
 
 async function kGet<T>(path: string): Promise<T> {

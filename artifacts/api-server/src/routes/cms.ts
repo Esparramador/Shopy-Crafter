@@ -43,10 +43,13 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   let current: Record<string, unknown> = result;
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i];
+    if (BLOCKED.has(k)) throw new Error("Invalid path");
     if (!(k in current) || typeof current[k] !== "object") current[k] = {};
-    current = current[k] as Record<string, unknown>;
+    current = current[k] as Record<string, unknown>; // nosemgrep: prototype-pollution-loop
   }
-  current[keys[keys.length - 1]] = value;
+  const lastKey = keys[keys.length - 1];
+  if (BLOCKED.has(lastKey)) throw new Error("Invalid path");
+  current[lastKey] = value;
   return result;
 }
 
@@ -131,9 +134,18 @@ router.post("/media/upload", upload.single("file"), async (req: Request, res: Re
 
 router.delete("/media/:filename", async (req: Request, res: Response) => {
   try {
-    const filename = path.basename(String(req.params.filename));
-    const filepath = path.join(MEDIA_DIR, filename);
-    if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+    const rawName = String(req.params.filename);
+    const filename = path.basename(rawName);
+    if (filename !== rawName || filename.includes("..")) {
+      res.status(400).json({ error: "Invalid filename" });
+      return;
+    }
+    const filepath = path.resolve(MEDIA_DIR, filename); // nosemgrep: path-join-resolve-traversal, express-path-join-resolve-traversal
+    if (!filepath.startsWith(path.resolve(MEDIA_DIR))) {
+      res.status(400).json({ error: "Path traversal detected" });
+      return;
+    }
+    if (fs.existsSync(filepath)) fs.unlinkSync(filepath); // nosemgrep: detect-non-literal-fs-filename
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Delete failed" });

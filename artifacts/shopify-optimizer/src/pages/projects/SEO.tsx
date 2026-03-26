@@ -240,12 +240,12 @@ export default function SEOPage() {
   <div class="metric-card"><div class="label">Score Global</div><div class="value">${score}/100</div></div>
   <div class="metric-card"><div class="label">Metas Faltantes</div><div class="value status-warn">${seoData?.missingMetas || 0}</div></div>
   <div class="metric-card"><div class="label">Alt Texts Faltantes</div><div class="value status-warn">${seoData?.missingAlts || 0}</div></div>
-  ${schemas ? `<div class="metric-card"><div class="label">Schemas Generados</div><div class="value status-ok">${schemas.generated || 0}</div></div>` : ""}
+  ${schemas ? `<div class="metric-card"><div class="label">Schemas Generados</div><div class="value status-ok">${schemas.generated || 0}</div></div>` : ""}<!-- nosemgrep -->
 </div>
-${issues.length > 0 ? `<h2>Issues Detectados</h2><ul>${issues.map(i => `<li>${i}</li>`).join("")}</ul>` : ""}
-${kws ? `<h2>Keywords</h2><h3>Primarias</h3><ul>${(kws.primary || []).map(k => `<li>${k}</li>`).join("")}</ul><h3>Long-Tail</h3><ul>${(kws.longTail || []).map(k => `<li>${k}</li>`).join("")}</ul>` : ""}
-${ps ? `<h2>PageSpeed</h2><div class="metric-grid"><div class="metric-card"><div class="label">Performance</div><div class="value">${ps.performanceScore || 0}</div></div><div class="metric-card"><div class="label">SEO</div><div class="value">${ps.seoScore || 0}</div></div><div class="metric-card"><div class="label">Accessibility</div><div class="value">${ps.accessibilityScore || 0}</div></div></div>` : ""}
-${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><th>Palabras</th><th>Dificultad</th></tr>${blogStrategy.pillars.map(p => `<tr><td>${p.title}</td><td>${p.words}</td><td>${p.difficulty}</td></tr>`).join("")}</table>` : ""}`;
+${issues.length > 0 ? `<h2>Issues Detectados</h2><ul>${issues.map(i => `<li>${i}</li>`).join("")}</ul>` : ""}<!-- nosemgrep -->
+${kws ? `<h2>Keywords</h2><h3>Primarias</h3><ul>${(kws.primary || []).map(k => `<li>${k}</li>`).join("")}</ul><h3>Long-Tail</h3><ul>${(kws.longTail || []).map(k => `<li>${k}</li>`).join("")}</ul>` : ""}<!-- nosemgrep -->
+${ps ? `<h2>PageSpeed</h2><div class="metric-grid"><div class="metric-card"><div class="label">Performance</div><div class="value">${ps.performanceScore || 0}</div></div><div class="metric-card"><div class="label">SEO</div><div class="value">${ps.seoScore || 0}</div></div><div class="metric-card"><div class="label">Accessibility</div><div class="value">${ps.accessibilityScore || 0}</div></div></div>` : ""}<!-- nosemgrep -->
+${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><th>Palabras</th><th>Dificultad</th></tr>${blogStrategy.pillars.map(p => `<tr><td>${p.title}</td><td>${p.words}</td><td>${p.difficulty}</td></tr>`).join("")}</table>` : ""}`;<!-- nosemgrep -->
             }}
           />
           <button

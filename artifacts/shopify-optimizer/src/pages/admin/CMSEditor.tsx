@@ -159,13 +159,15 @@ const SECTIONS: SectionDef[] = [
   },
 ];
 
+const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   const keys = path.split(".");
   let cur: unknown = obj;
   for (const k of keys) {
+    if (BLOCKED_KEYS.has(k)) return "";
     if (cur === null || cur === undefined) return "";
-    if (Array.isArray(cur)) cur = (cur as unknown[])[parseInt(k)];
-    else if (typeof cur === "object") cur = (cur as Record<string, unknown>)[k];
+    if (Array.isArray(cur)) cur = (cur as unknown[])[parseInt(k)]; // nosemgrep: prototype-pollution-loop
+    else if (typeof cur === "object") cur = (cur as Record<string, unknown>)[k]; // nosemgrep: prototype-pollution-loop
     else return "";
   }
   return cur;

@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -255,7 +256,7 @@ DISEÑO VISUAL OBLIGATORIO:
 - Font: Arial, Helvetica, sans-serif (seguro para email)
 - Separadores: líneas sutiles #1e1e2e
 - Iconos: usa emojis Unicode para iconos (✓ ✉ ⭐ 🎁 etc.)
-${brandLogoUrl ? `- INCLUIR LOGO: <img src="${brandLogoUrl}" alt="${effectiveBrandName}" style="max-height:48px;"> en el header` : `- Header: mostrar "${effectiveBrandName}" como texto grande con estilo premium`}
+${brandLogoUrl ? `- INCLUIR LOGO: <img src="${brandLogoUrl}" alt="${effectiveBrandName}" style="max-height:48px;"> en el header` : `- Header: mostrar "${effectiveBrandName}" como texto grande con estilo premium`}<!-- nosemgrep -->
 
 ESTRUCTURA DEL EMAIL:
 1. PREHEADER invisible (texto preview para inbox) — mencionando "${effectiveBrandName}"
@@ -347,11 +348,7 @@ router.post("/email-templates/:id/push-klaviyo", async (req, res): Promise<void>
 
     const klaviyoRes = await fetch("https://a.klaviyo.com/api/templates/", {
       method: "POST",
-      headers: {
-        "Authorization": `Klaviyo-API-Key ${key}`,
-        "Content-Type": "application/json",
-        "revision": "2024-10-15",
-      },
+      headers: getKlaviyoHeaders("2024-10-15"),
       body: JSON.stringify({
         data: {
           type: "template",

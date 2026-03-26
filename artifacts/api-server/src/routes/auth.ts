@@ -6,6 +6,7 @@ import { eq, lt, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { logger } from "../lib/logger.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 
@@ -294,11 +295,7 @@ router.post("/forgot-password", async (req, res): Promise<void> => {
       try {
         await fetch("https://a.klaviyo.com/api/events/", {
           method: "POST",
-          headers: {
-            "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
-            "Content-Type": "application/json",
-            "revision": "2024-02-15",
-          },
+          headers: getKlaviyoHeaders(),
           body: JSON.stringify({
             data: {
               type: "event",

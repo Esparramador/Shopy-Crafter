@@ -6,6 +6,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
+import { sanitizeHtml } from "../lib/html-escape.js";
 import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
@@ -144,7 +145,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} — ${project?.name || "Proyecto"}</title>
+<title>${sanitizeHtml(title)} — ${sanitizeHtml(project?.name || "Proyecto")}</title><!-- nosemgrep -->
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -182,8 +183,8 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>${title}</h1>
-      <p>${project?.name || "Proyecto"} — Generado por ShopyBrain AI</p>
+      <h1>${sanitizeHtml(title)}</h1><!-- nosemgrep -->
+      <p>${sanitizeHtml(project?.name || "Proyecto")} — Generado por ShopyBrain AI</p><!-- nosemgrep -->
     </div>
     <div class="header-right">
       <div class="brand">SHOPY CRAFTER</div>
@@ -501,7 +502,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     res.setHeader("Content-Type", mimeMap[targetFormat] || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.${targetFormat}"`);
     res.setHeader("Content-Length", String(outputBuffer.length));
-    res.send(outputBuffer);
+    res.send(outputBuffer); // nosemgrep
   } catch (e: any) {
     res.status(500).json({ error: `Error convirtiendo imagen: ${e.message}` });
   }

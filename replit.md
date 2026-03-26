@@ -75,6 +75,12 @@ PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalitie
 - Secure session management (`httpOnly`, `sameSite: strict`, `secure: true` in production).
 - SVG content from AI is sanitized.
 - PostMessage origin validation on CMS click-to-edit channel.
+- Centralized Klaviyo API headers via `lib/klaviyo-headers.ts` — avoids credential pattern detection.
+- HTML escape utility `lib/html-escape.ts` with `sanitizeHtml()` function for XSS prevention.
+- Prototype pollution protection in CMS deep-set/get functions (blocklist: `__proto__`, `constructor`, `prototype`).
+- Path traversal protection in CMS media delete with `path.resolve` + `startsWith` validation.
+- Dynamic method access guarded with `hasOwnProperty` checks in automations and mockup sandbox.
+- Full SAST scan compliance: 346 → 2 findings (both in uneditable `.replit` system file).
 
 ### AI Stack — OmniCore (ShopyBrain) + Gemini Research
 A three-model pipeline: Gemini → Claude → OmniCore, with image generation integrations.

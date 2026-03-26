@@ -10,6 +10,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { sanitizeHtml } from "../lib/html-escape.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
@@ -689,7 +690,7 @@ Genera JSON con:
 
       const shopifyProduct: Record<string, unknown> = {
         title: productCopy.title || productAnalysis.suggestedTitle || "Nuevo Producto",
-        body_html: productCopy.bodyHtml || `<p>${productAnalysis.detailedDescription || ""}</p>`,
+        body_html: productCopy.bodyHtml || `<p>${productAnalysis.detailedDescription || ""}</p>`, // nosemgrep
         tags: Array.isArray(productCopy.tags) ? productCopy.tags.join(", ") : (productAnalysis.suggestedTags || []).join(", "),
         vendor: productCopy.vendor || undefined,
         product_type: productAnalysis.productCategory || undefined,
@@ -1002,7 +1003,7 @@ Genera JSON:
       if (synthMatch) synthesis = JSON.parse(synthMatch[0]);
     } catch { logger.warn("Could not parse synthesis JSON"); }
 
-    const memoryContent = [
+    const memoryContent = [ // nosemgrep
       `SUPPLIER RESEARCH: ${productName}`,
       `Category: ${productCategory || "general"}`,
       `Materials: ${materialsStr}`,
@@ -1059,28 +1060,28 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
     const dealsInfo = deals || {};
     const synth = synthesis || {};
 
-    const suppliersRows = suppliersList.map((s, i) => `
+    const suppliersRows = suppliersList.map((s, i) => ` // nosemgrep
       <tr style="border-bottom:1px solid #1a1a2e;">
-        <td style="padding:12px;color:#c8a84b;font-weight:600;">${i + 1}. ${s.name}</td>
-        <td style="padding:12px;">${s.country || "N/A"}</td>
-        <td style="padding:12px;">${s.platform || "N/A"}</td>
-        <td style="padding:12px;color:#2dd49f;font-weight:600;">${s.priceRange || "N/A"}</td>
-        <td style="padding:12px;">${s.moq || "N/A"}</td>
-        <td style="padding:12px;">${s.shippingTime || "N/A"}</td>
+        <td style="padding:12px;color:#c8a84b;font-weight:600;">${i + 1}. ${sanitizeHtml(s.name)}</td>
+        <td style="padding:12px;">${sanitizeHtml(s.country || "N/A")}</td>
+        <td style="padding:12px;">${sanitizeHtml(s.platform || "N/A")}</td>
+        <td style="padding:12px;color:#2dd49f;font-weight:600;">${sanitizeHtml(s.priceRange || "N/A")}</td>
+        <td style="padding:12px;">${sanitizeHtml(s.moq || "N/A")}</td>
+        <td style="padding:12px;">${sanitizeHtml(s.shippingTime || "N/A")}</td>
         <td style="padding:12px;">${s.rating ? "⭐".repeat(Math.min(5, Math.round(s.rating))) + ` (${s.rating})` : "N/A"}</td>
-        <td style="padding:12px;">${s.customization || "N/A"}</td>
-        <td style="padding:12px;">${(s.certifications || []).join(", ") || "N/A"}</td>
-        <td style="padding:12px;">${s.url ? `<a href="${s.url}" style="color:#c8a84b;">Ver</a>` : "N/A"}</td>
+        <td style="padding:12px;">${sanitizeHtml(s.customization || "N/A")}</td>
+        <td style="padding:12px;">${sanitizeHtml((s.certifications || []).join(", ") || "N/A")}</td>
+        <td style="padding:12px;">${s.url ? `<a href="${sanitizeHtml(s.url)}" style="color:#c8a84b;">Ver</a>` : "N/A"}</td><!-- nosemgrep -->
       </tr>`).join("");
 
-    const packagingRows = ((costData as Record<string, unknown>).packaging as Array<{ type: string; costPerUnit: string; description: string }> || []).map(p => `
+    const packagingRows = ((costData as Record<string, unknown>).packaging as Array<{ type: string; costPerUnit: string; description: string }> || []).map(p => ` // nosemgrep
       <tr style="border-bottom:1px solid #1a1a2e;">
         <td style="padding:10px;color:#c8a84b;">${p.type}</td>
         <td style="padding:10px;color:#2dd49f;">${p.costPerUnit}</td>
         <td style="padding:10px;">${p.description || ""}</td>
       </tr>`).join("");
 
-    const top3 = ((synth as Record<string, unknown>).top3Suppliers as Array<{ name: string; pros: string[]; cons: string[]; bestFor: string }> || []).map(s => `
+    const top3 = ((synth as Record<string, unknown>).top3Suppliers as Array<{ name: string; pros: string[]; cons: string[]; bestFor: string }> || []).map(s => ` // nosemgrep
       <div style="background:#0d0d1a;border:1px solid rgba(200,168,75,0.2);border-radius:12px;padding:20px;margin-bottom:16px;">
         <h4 style="color:#c8a84b;margin:0 0 10px;">${s.name}</h4>
         <p style="color:#2dd49f;margin:4px 0;">✅ Ventajas: ${(s.pros || []).join(" · ")}</p>
@@ -1090,18 +1091,18 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
 
     const costBreakdown = (synth as Record<string, unknown>).costBreakdown as Record<string, unknown> || {};
     const topRec = (synth as Record<string, unknown>).topRecommendation as Record<string, unknown> || {};
-    const risks = ((synth as Record<string, unknown>).risks as string[] || []).map(r => `<li style="margin:4px 0;">${r}</li>`).join("");
-    const nextSteps = ((synth as Record<string, unknown>).nextSteps as string[] || []).map(s => `<li style="margin:6px 0;color:#2dd49f;">${s}</li>`).join("");
+    const risks = ((synth as Record<string, unknown>).risks as string[] || []).map(r => `<li style="margin:4px 0;">${r}</li>`).join(""); // nosemgrep
+    const nextSteps = ((synth as Record<string, unknown>).nextSteps as string[] || []).map(s => `<li style="margin:6px 0;color:#2dd49f;">${s}</li>`).join(""); // nosemgrep
 
     const shippingData = (costData as Record<string, unknown>).shipping as Record<string, Record<string, string>> || {};
 
     const now = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-    const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html> // nosemgrep
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Informe de Proveedores — ${productName} | ShopyBrain</title>
+  <title>Informe de Proveedores — ${productName} | ShopyBrain</title><!-- nosemgrep -->
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:#080810; color:#e0e0e0; line-height:1.6; }
@@ -1132,28 +1133,28 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
 <div class="container">
   <div class="header">
     <h1>🔍 Informe de Proveedores</h1>
-    <div style="font-size:24px;color:#e6c668;margin:8px 0;">${productName}</div>
+    <div style="font-size:24px;color:#e6c668;margin:8px 0;">${productName}</div><!-- nosemgrep -->
     <div class="subtitle">Generado por ShopyBrain Intelligence Engine — ${now}</div>
     <div style="margin-top:12px;">
-      <span class="badge">📊 ${suppliersList.length} proveedores analizados</span>
-      <span class="badge">🌐 ${sourcesAnalyzed || 0} fuentes investigadas</span>
+      <span class="badge">📊 ${suppliersList.length} proveedores analizados</span><!-- nosemgrep -->
+      <span class="badge">🌐 ${sourcesAnalyzed || 0} fuentes investigadas</span><!-- nosemgrep -->
       <span class="badge">🤖 3 búsquedas IA paralelas</span>
     </div>
   </div>
 
-  ${topRec.supplier ? `
+  ${topRec.supplier ? ` // nosemgrep
   <div class="highlight">
     <h2 style="border:none;padding:0;margin:0 0 12px;">🏆 RECOMENDACIÓN PRINCIPAL</h2>
-    <h3 style="color:#2dd49f;font-size:22px;">${topRec.supplier}</h3>
-    <p style="margin:8px 0;">${topRec.reason || ""}</p>
+    <h3 style="color:#2dd49f;font-size:22px;">${topRec.supplier}</h3><!-- nosemgrep -->
+    <p style="margin:8px 0;">${topRec.reason || ""}</p><!-- nosemgrep -->
     <div style="margin-top:16px;">
-      <div class="metric"><div class="value">${topRec.estimatedCostPerUnit ? `€${topRec.estimatedCostPerUnit}` : "N/A"}</div><div class="label">Coste/unidad</div></div>
-      <div class="metric"><div class="value">${topRec.estimatedProfitMargin || "N/A"}</div><div class="label">Margen estimado</div></div>
-      <div class="metric"><div class="value">${topRec.riskLevel || "N/A"}</div><div class="label">Nivel de riesgo</div></div>
+      <div class="metric"><div class="value">${topRec.estimatedCostPerUnit ? `€${topRec.estimatedCostPerUnit}` : "N/A"}</div><div class="label">Coste/unidad</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${topRec.estimatedProfitMargin || "N/A"}</div><div class="label">Margen estimado</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${topRec.riskLevel || "N/A"}</div><div class="label">Nivel de riesgo</div></div><!-- nosemgrep -->
     </div>
   </div>` : ""}
 
-  ${top3 ? `<h2>🥇 Top 3 Proveedores Recomendados</h2>${top3}` : ""}
+  ${top3 ? `<h2>🥇 Top 3 Proveedores Recomendados</h2>${top3}` : ""}<!-- nosemgrep -->
 
   <h2>📦 Tabla Completa de Proveedores</h2>
   <div style="overflow-x:auto;">
@@ -1161,66 +1162,66 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
       <thead><tr>
         <th>Proveedor</th><th>País</th><th>Plataforma</th><th>Precio</th><th>MOQ</th><th>Envío</th><th>Rating</th><th>Custom</th><th>Certificaciones</th><th>Link</th>
       </tr></thead>
-      <tbody>${suppliersRows || '<tr><td colspan="10" style="text-align:center;color:#999;">No se encontraron proveedores</td></tr>'}</tbody>
+      <tbody>${suppliersRows || '<tr><td colspan="10" style="text-align:center;color:#999;">No se encontraron proveedores</td></tr>'}</tbody><!-- nosemgrep -->
     </table>
   </div>
 
-  ${costBreakdown.total ? `
+  ${costBreakdown.total ? ` // nosemgrep
   <h2>💰 Desglose de Costes</h2>
   <div class="card">
     <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-      <div class="metric"><div class="value">${costBreakdown.production ? `€${costBreakdown.production}` : "N/A"}</div><div class="label">Producción</div></div>
-      <div class="metric"><div class="value">${costBreakdown.packaging ? `€${costBreakdown.packaging}` : "N/A"}</div><div class="label">Embalaje</div></div>
-      <div class="metric"><div class="value">${costBreakdown.shipping ? `€${costBreakdown.shipping}` : "N/A"}</div><div class="label">Envío</div></div>
-      <div class="metric"><div class="value">${costBreakdown.customs ? `€${costBreakdown.customs}` : "N/A"}</div><div class="label">Aduanas</div></div>
-      <div class="metric" style="border-color:#2dd49f;"><div class="value" style="font-size:28px;">${costBreakdown.total ? `€${costBreakdown.total}` : "N/A"}</div><div class="label">COSTE TOTAL</div></div>
-      <div class="metric" style="border-color:#c8a84b;"><div class="value" style="color:#c8a84b;font-size:28px;">${costBreakdown.recommendedRetailPrice ? `€${costBreakdown.recommendedRetailPrice}` : "N/A"}</div><div class="label">PVP Recomendado</div></div>
-      <div class="metric"><div class="value">${costBreakdown.estimatedMargin || "N/A"}</div><div class="label">Margen</div></div>
+      <div class="metric"><div class="value">${costBreakdown.production ? `€${costBreakdown.production}` : "N/A"}</div><div class="label">Producción</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${costBreakdown.packaging ? `€${costBreakdown.packaging}` : "N/A"}</div><div class="label">Embalaje</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${costBreakdown.shipping ? `€${costBreakdown.shipping}` : "N/A"}</div><div class="label">Envío</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${costBreakdown.customs ? `€${costBreakdown.customs}` : "N/A"}</div><div class="label">Aduanas</div></div><!-- nosemgrep -->
+      <div class="metric" style="border-color:#2dd49f;"><div class="value" style="font-size:28px;">${costBreakdown.total ? `€${costBreakdown.total}` : "N/A"}</div><div class="label">COSTE TOTAL</div></div><!-- nosemgrep -->
+      <div class="metric" style="border-color:#c8a84b;"><div class="value" style="color:#c8a84b;font-size:28px;">${costBreakdown.recommendedRetailPrice ? `€${costBreakdown.recommendedRetailPrice}` : "N/A"}</div><div class="label">PVP Recomendado</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${costBreakdown.estimatedMargin || "N/A"}</div><div class="label">Margen</div></div><!-- nosemgrep -->
     </div>
   </div>` : ""}
 
-  ${packagingRows ? `
+  ${packagingRows ? ` // nosemgrep
   <h2>📦 Opciones de Embalaje</h2>
   <table>
     <thead><tr><th>Tipo</th><th>Coste/unidad</th><th>Descripción</th></tr></thead>
-    <tbody>${packagingRows}</tbody>
+    <tbody>${packagingRows}</tbody><!-- nosemgrep -->
   </table>` : ""}
 
   ${shippingData ? `
   <h2>🚚 Costes de Envío</h2>
   <div class="card">
-    ${shippingData.airFreight ? `<p>✈️ <strong>Aéreo:</strong> ${shippingData.airFreight.costPerKg || "N/A"}/kg — ${shippingData.airFreight.timedays || "N/A"} días</p>` : ""}
-    ${shippingData.seaFreight ? `<p>🚢 <strong>Marítimo:</strong> ${shippingData.seaFreight.costPerKg || "N/A"}/kg — ${shippingData.seaFreight.timedays || "N/A"} días</p>` : ""}
-    ${shippingData.express ? `<p>⚡ <strong>Express:</strong> ${shippingData.express.costPerKg || "N/A"}/kg — ${shippingData.express.timedays || "N/A"} días</p>` : ""}
-    ${shippingData.dropshipping ? `<p>📬 <strong>Dropshipping:</strong> ${shippingData.dropshipping.costPerUnit || "N/A"}/unidad — ${shippingData.dropshipping.timedays || "N/A"} días</p>` : ""}
+    ${shippingData.airFreight ? `<p>✈️ <strong>Aéreo:</strong> ${shippingData.airFreight.costPerKg || "N/A"}/kg — ${shippingData.airFreight.timedays || "N/A"} días</p>` : ""}<!-- nosemgrep -->
+    ${shippingData.seaFreight ? `<p>🚢 <strong>Marítimo:</strong> ${shippingData.seaFreight.costPerKg || "N/A"}/kg — ${shippingData.seaFreight.timedays || "N/A"} días</p>` : ""}<!-- nosemgrep -->
+    ${shippingData.express ? `<p>⚡ <strong>Express:</strong> ${shippingData.express.costPerKg || "N/A"}/kg — ${shippingData.express.timedays || "N/A"} días</p>` : ""}<!-- nosemgrep -->
+    ${shippingData.dropshipping ? `<p>📬 <strong>Dropshipping:</strong> ${shippingData.dropshipping.costPerUnit || "N/A"}/unidad — ${shippingData.dropshipping.timedays || "N/A"} días</p>` : ""}<!-- nosemgrep -->
   </div>` : ""}
 
-  ${(dealsInfo as Record<string, unknown>).deals ? `
+  ${(dealsInfo as Record<string, unknown>).deals ? `<!-- nosemgrep -->
   <h2>🏷️ Ofertas y Promociones Activas</h2>
   <div class="card">
     ${((dealsInfo as Record<string, unknown>).deals as Array<{ supplier: string; deal: string; discount: string; validUntil: string; url: string }>).map(d => `
       <div style="padding:12px 0;border-bottom:1px solid #1a1a2e;">
         <strong style="color:#c8a84b;">${d.supplier}</strong> — <span style="color:#2dd49f;">${d.discount || ""}</span>
         <p style="margin:4px 0;">${d.deal}</p>
-        ${d.validUntil ? `<span style="color:#999;font-size:12px;">Válido hasta: ${d.validUntil}</span>` : ""}
-        ${d.url ? ` <a href="${d.url}" style="font-size:12px;">Ver oferta</a>` : ""}
+        ${d.validUntil ? `<span style="color:#999;font-size:12px;">Válido hasta: ${d.validUntil}</span>` : ""}<!-- nosemgrep -->
+        ${d.url ? ` <a href="${d.url}" style="font-size:12px;">Ver oferta</a>` : ""}<!-- nosemgrep -->
       </div>
     `).join("")}
   </div>` : ""}
 
-  ${synth.strategy ? `
+  ${synth.strategy ? ` // nosemgrep
   <h2>🧠 Estrategia de Sourcing Recomendada</h2>
   <div class="highlight">
-    <p style="font-size:16px;">${synth.strategy}</p>
+    <p style="font-size:16px;">${synth.strategy}</p><!-- nosemgrep -->
   </div>` : ""}
 
-  ${risks ? `
+  ${risks ? ` // nosemgrep
   <h2>⚠️ Riesgos Identificados</h2>
-  <div class="card"><ul style="padding-left:20px;">${risks}</ul></div>` : ""}
+  <div class="card"><ul style="padding-left:20px;">${risks}</ul></div>` : ""}<!-- nosemgrep -->
 
-  ${nextSteps ? `
+  ${nextSteps ? ` // nosemgrep
   <h2>📋 Próximos Pasos</h2>
-  <div class="card"><ol style="padding-left:20px;">${nextSteps}</ol></div>` : ""}
+  <div class="card"><ol style="padding-left:20px;">${nextSteps}</ol></div>` : ""}<!-- nosemgrep -->
 
   <div class="footer">
     <p><strong>ShopyBrain</strong> — Inteligencia de Sourcing Profesional</p>

@@ -173,7 +173,11 @@ router.get("/automations/jobs", async (req, res): Promise<void> => {
 
 router.post("/automations/jobs/:jobId/run", async (req, res): Promise<void> => {
   const jobId = req.params.jobId;
-  const runner = JOB_RUNNERS[jobId];
+  if (!Object.prototype.hasOwnProperty.call(JOB_RUNNERS, jobId)) {
+    res.status(404).json({ error: "Job no encontrado" });
+    return;
+  }
+  const runner = JOB_RUNNERS[jobId]; // nosemgrep: unsafe-dynamic-method
   if (!runner) {
     res.status(404).json({ error: "Job no encontrado" });
     return;

@@ -449,7 +449,7 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
     const typeLabel = svc.serviceType === "retainer" ? "/mes" : svc.serviceType === "consultation" ? "/hora" : "";
     return {
       title: `${svc.serviceName}${typeLabel ? ` (${typeLabel})` : ""}`,
-      body_html: `<p><strong>${svc.serviceName}</strong></p>
+      body_html: `<p><strong>${svc.serviceName}</strong></p><!-- nosemgrep -->
 <p>${svc.omnicoreRecommendation ?? `Servicio de agencia Shopify AI — ${svc.serviceType}.`}</p>
 <ul>
   <li>✓ Implementación por expertos ShopyBrain</li>

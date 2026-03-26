@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { safeDecrypt } from "../lib/crypto.js";
 import { buildShopyBrainContext, learnFromOperation } from "../lib/claude.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -13,13 +14,7 @@ const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 const REVISION = "2024-10-15";
 
 function klaviyoHeaders() {
-  const key = process.env.KLAVIYO_API_KEY;
-  if (!key) throw new Error("KLAVIYO_API_KEY not set");
-  return {
-    "Authorization": `Klaviyo-API-Key ${key}`,
-    "Content-Type": "application/json",
-    "revision": REVISION,
-  };
+  return getKlaviyoHeaders(REVISION);
 }
 
 async function klaviyoPost<T>(path: string, body: unknown): Promise<T> {

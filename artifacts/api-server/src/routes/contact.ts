@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, auditLogTable } from "@workspace/db";
 import { randomBytes } from "crypto";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 
@@ -50,11 +51,7 @@ router.post("/contact", async (req, res): Promise<void> => {
     try {
       await fetch("https://a.klaviyo.com/api/events/", {
         method: "POST",
-        headers: {
-          "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
-          "Content-Type": "application/json",
-          "revision": "2024-02-15",
-        },
+        headers: getKlaviyoHeaders(),
         body: JSON.stringify({
           data: {
             type: "event",
@@ -90,11 +87,7 @@ router.post("/contact", async (req, res): Promise<void> => {
 
       await fetch("https://a.klaviyo.com/api/events/", {
         method: "POST",
-        headers: {
-          "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
-          "Content-Type": "application/json",
-          "revision": "2024-02-15",
-        },
+        headers: getKlaviyoHeaders(),
         body: JSON.stringify({
           data: {
             type: "event",

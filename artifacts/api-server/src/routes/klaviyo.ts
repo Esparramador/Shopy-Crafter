@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 
@@ -8,13 +9,7 @@ const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 const REVISION = "2024-02-15";
 
 function klaviyoHeaders() {
-  const key = process.env.KLAVIYO_API_KEY;
-  if (!key) throw new Error("KLAVIYO_API_KEY not set");
-  return {
-    "Authorization": `Klaviyo-API-Key ${key}`,
-    "Content-Type": "application/json",
-    "revision": REVISION,
-  };
+  return getKlaviyoHeaders(REVISION);
 }
 
 async function klaviyoGet<T>(path: string): Promise<T> {

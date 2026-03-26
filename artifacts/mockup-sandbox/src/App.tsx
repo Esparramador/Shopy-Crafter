@@ -37,7 +37,11 @@ function PreviewRenderer({
 
     async function loadComponent(): Promise<void> {
       const key = `./components/mockups/${componentPath}.tsx`;
-      const loader = modules[key];
+      if (!Object.prototype.hasOwnProperty.call(modules, key)) {
+        setError(`No component found at ${componentPath}.tsx`);
+        return;
+      }
+      const loader = modules[key]; // nosemgrep: unsafe-dynamic-method
       if (!loader) {
         setError(`No component found at ${componentPath}.tsx`);
         return;

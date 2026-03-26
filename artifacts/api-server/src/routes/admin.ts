@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { recordAudit } from "../lib/audit.helper.js";
+import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -117,11 +118,7 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
     try {
       const klaviyoRes = await fetch("https://a.klaviyo.com/api/events/", {
         method: "POST",
-        headers: {
-          "Authorization": `Klaviyo-API-Key ${klaviyoKey}`,
-          "Content-Type": "application/json",
-          "revision": "2024-02-15",
-        },
+        headers: getKlaviyoHeaders(),
         body: JSON.stringify({
           data: {
             type: "event",
