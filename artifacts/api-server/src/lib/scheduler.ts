@@ -670,12 +670,18 @@ export async function runTokenRefresh() {
           continue;
         }
 
-        // Token invalid — attempt rotation
-        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting rotation`);
+        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting refresh via client_credentials`);
         const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-        await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
-        rotated++;
-        log("token-refresh", `✅ Token rotated: project ${project.id} (${project.shopDomain})`);
+        try {
+          await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
+          rotated++;
+          log("token-refresh", `✅ Token refreshed: project ${project.id} (${project.shopDomain})`);
+        } catch (refreshErr) {
+          log("token-refresh", `⚠️ client_credentials failed, trying rotateToken as fallback`);
+          await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, project.accessToken);
+          rotated++;
+          log("token-refresh", `✅ Token rotated (fallback): project ${project.id} (${project.shopDomain})`);
+        }
       } catch (err) {
         failed++;
         logger.error(

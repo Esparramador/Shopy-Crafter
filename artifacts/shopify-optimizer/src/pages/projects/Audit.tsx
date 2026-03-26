@@ -24,6 +24,7 @@ import {
   Sparkles,
   Loader2,
   ExternalLink,
+  Key,
 } from "lucide-react";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState } from "react";
@@ -427,8 +428,12 @@ export default function AuditPage() {
   const [activeTab, setActiveTab] = useState<"products" | "opportunities">("products");
   const [scanStatus, setScanStatus] = useState<"idle" | "syncing" | "auditing">("idle");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [scanError, setScanError] = useState<string>("");
+  const [scanResult, setScanResult] = useState<string>("");
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const { data, isLoading } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
+  const { data, isLoading, refetch } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
   const syncProducts = useSyncProducts();
   const getCatalogOpps = useGetCatalogOpportunities();
   const oppsData = getCatalogOpps.data ?? [];
@@ -437,13 +442,51 @@ export default function AuditPage() {
 
   const handleScan = async () => {
     setScanStatus("syncing");
+    setScanError("");
+    setScanResult("");
     try {
-      await syncProducts.mutateAsync({ projectId });
+      const res = await fetch(`${API}/api/projects/${projectId}/products/sync`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusFilter: "any" }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || `Error ${res.status}`);
+      }
       setScanStatus("auditing");
-      await new Promise((r) => setTimeout(r, 500));
+      setScanResult(`${result.synced} productos sincronizados${result.removed > 0 ? `, ${result.removed} eliminados` : ""}. Score medio: ${result.avgScore ? Math.round(result.avgScore) : "—"}/100`);
+      await new Promise((r) => setTimeout(r, 400));
       await queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
+      await refetch();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      setScanError(msg.includes("401") || msg.includes("403") ? "Token expirado o inválido. Regenera el token primero." : msg);
     } finally {
       setScanStatus("idle");
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    setTokenLoading(true);
+    setTokenMsg(null);
+    try {
+      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerate_token", params: { projectId } }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Error regenerando token");
+      }
+      setTokenMsg({ text: data.message || "Token regenerado correctamente", ok: true });
+    } catch (e: unknown) {
+      setTokenMsg({ text: e instanceof Error ? e.message : "Error regenerando token", ok: false });
+    } finally {
+      setTokenLoading(false);
     }
   };
 
@@ -514,6 +557,14 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
             Crear Producto
           </button>
           <button
+            onClick={handleRegenerateToken}
+            disabled={tokenLoading}
+            className="border border-[var(--gold)]/40 text-[var(--gold)] px-4 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-[var(--gold)]/10 transition-all disabled:opacity-60"
+          >
+            {tokenLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+            Regenerar Token
+          </button>
+          <button
             onClick={handleScan}
             disabled={isScanning}
             className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-70"
@@ -527,6 +578,25 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           </button>
         </div>
       </div>
+
+      {scanError && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{scanError}</span>
+        </div>
+      )}
+      {scanResult && !scanError && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-green-500/30 bg-green-500/10 text-green-400 text-sm">
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <span>{scanResult}</span>
+        </div>
+      )}
+      {tokenMsg && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm ${tokenMsg.ok ? "border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>
+          {tokenMsg.ok ? <Key className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
+          <span>{tokenMsg.text}</span>
+        </div>
+      )}
 
       {showCreateModal && (
         <CreateProductModal
