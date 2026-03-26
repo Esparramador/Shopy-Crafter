@@ -25,6 +25,29 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
 - **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
 
+### Client Portal
+- `/client/reports` — KPI summary (products optimized, images generated, SEO score, revenue impact), activity timeline, CSV/TXT export
+- Navigation: Dashboard, Productos, Aprobaciones, Mensajes, Reportes
+
+### Coach Marks
+- Sequential tooltip overlay system for first-time admin users
+- Dismissal state stored in localStorage (`shopycrafter_coach_dismissed`)
+- "Reset tour" button in `/admin/settings`
+
+### M4 ScriptTag Integration
+- `GET /api/projects/:id/scripttags` — list script tags, check M4 status
+- `POST /api/projects/:id/scripttags/m4` — install M4 tracking pixel
+- `DELETE /api/projects/:id/scripttags/m4` — remove M4 tracking pixel
+
+### Push Notifications (VAPID)
+- Auto-generate VAPID keys via `POST /api/push/vapid-generate`
+- Keys stored in `platform_settings` table or env vars
+- Configuration status shown in `/admin/settings`
+
+### Password Reset
+- `/reset-password?token=<token>` — frontend page for password reset
+- Connects to `POST /api/auth/reset-password` backend endpoint
+
 ### Database
 PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.
 

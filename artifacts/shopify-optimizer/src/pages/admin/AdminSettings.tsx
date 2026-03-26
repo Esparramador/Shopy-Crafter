@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Lock, User, Shield, CheckCircle2, Store, Copy, Check, ExternalLink, AlertTriangle, Zap } from "lucide-react";
+import { Eye, EyeOff, Lock, User, Shield, CheckCircle2, Store, Copy, Check, ExternalLink, AlertTriangle, Zap, Bell, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ResetCoachMarksButton } from "@/components/CoachMarks";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -492,6 +493,139 @@ export default function AdminSettings() {
             {savingShopify ? "Guardando..." : shopifyConfig?.configured ? "Actualizar credenciales" : "Guardar y activar OAuth"}
           </button>
         </form>
+      </div>
+
+      <VapidSection />
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <RotateCcw size={15} style={{ color: "var(--gold)" }} />
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Tour guiado</span>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 12 }}>
+          Reinicia el tour de bienvenida para volver a ver las explicaciones de la interfaz.
+        </p>
+        <ResetCoachMarksButton />
+      </div>
+    </div>
+  );
+}
+
+function VapidSection() {
+  const [vapid, setVapid] = useState<{ configured: boolean; publicKey: string | null } | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/push/vapid-key`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setVapid({ configured: d.configured, publicKey: d.key }))
+      .catch(() => {});
+  }, []);
+
+  const generateKeys = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/push/vapid-generate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok && data.publicKey) {
+        setVapid({ configured: true, publicKey: data.publicKey });
+      }
+    } catch {}
+    setGenerating(false);
+  };
+
+  const copyKey = () => {
+    if (!vapid?.publicKey) return;
+    navigator.clipboard.writeText(vapid.publicKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--bdr)" }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Bell size={18} style={{ color: "#6366f1" }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Push Notifications (VAPID)</p>
+          <p style={{ fontSize: 12, color: "var(--t2)" }}>Configura claves VAPID para enviar notificaciones push a los navegadores</p>
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "5px 12px", borderRadius: 20,
+          background: vapid?.configured ? "rgba(45,212,159,0.1)" : "rgba(232,69,88,0.1)",
+          border: `1px solid ${vapid?.configured ? "rgba(45,212,159,0.3)" : "rgba(232,69,88,0.3)"}`,
+        }}>
+          {vapid?.configured
+            ? <><Zap size={12} style={{ color: "var(--jade)" }} /><span style={{ fontSize: 11, color: "var(--jade)", fontWeight: 600 }}>Configurado</span></>
+            : <><AlertTriangle size={12} style={{ color: "var(--crim)" }} /><span style={{ fontSize: 11, color: "var(--crim)", fontWeight: 600 }}>Sin configurar</span></>
+          }
+        </div>
+      </div>
+
+      {vapid?.configured && vapid.publicKey ? (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--t1)", marginBottom: 6 }}>Clave pública VAPID</p>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: "var(--ink2)", border: "1px solid var(--bdr)",
+            borderRadius: 10, padding: "10px 14px",
+          }}>
+            <code style={{ flex: 1, fontFamily: "var(--fm)", fontSize: 11, color: "var(--jade)", wordBreak: "break-all" }}>
+              {vapid.publicKey}
+            </code>
+            <button
+              onClick={copyKey}
+              style={{
+                background: copied ? "rgba(45,212,159,0.15)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copied ? "rgba(45,212,159,0.3)" : "var(--bdr)"}`,
+                color: copied ? "var(--jade)" : "var(--t2)",
+                borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+                transition: "all 0.2s", flexShrink: 0,
+              }}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: "var(--t2)", marginBottom: 12, lineHeight: 1.6 }}>
+            Las claves VAPID son necesarias para enviar notificaciones push. Puedes generarlas automáticamente o configurar las variables de entorno <code style={{ fontFamily: "var(--fm)", fontSize: 12, color: "var(--gold)" }}>VAPID_PUBLIC_KEY</code> y <code style={{ fontFamily: "var(--fm)", fontSize: 12, color: "var(--gold)" }}>VAPID_PRIVATE_KEY</code>.
+          </p>
+          <button
+            onClick={generateKeys}
+            disabled={generating}
+            className="btn btn-gold"
+            style={{ minWidth: 200 }}
+          >
+            {generating ? "Generando..." : "Generar claves VAPID"}
+          </button>
+        </div>
+      )}
+
+      <div style={{
+        marginTop: 8, padding: "12px 16px", borderRadius: 10,
+        background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.15)",
+      }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "#6366f1", marginBottom: 6 }}>Guía de configuración</p>
+        <ol style={{ paddingLeft: 16, margin: 0, fontSize: 12, color: "var(--t2)", lineHeight: 1.8 }}>
+          <li>Genera o establece las claves VAPID (arriba)</li>
+          <li>El frontend solicita permiso de notificaciones al usuario</li>
+          <li>El servidor usa la clave privada para firmar y enviar notificaciones</li>
+          <li>Verifica en <strong>Ajustes del navegador → Notificaciones</strong> que estén permitidas</li>
+        </ol>
       </div>
     </div>
   );

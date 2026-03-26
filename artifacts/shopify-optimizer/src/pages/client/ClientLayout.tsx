@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/client/products",  label: "Productos",    icon: "📦" },
   { href: "/client/approvals", label: "Aprobaciones", icon: "✅" },
   { href: "/client/messages",  label: "Mensajes",     icon: "💬" },
+  { href: "/client/reports",   label: "Reportes",     icon: "📈" },
 ];
 
 export function ClientLayout({ children }: { children: ReactNode }) {

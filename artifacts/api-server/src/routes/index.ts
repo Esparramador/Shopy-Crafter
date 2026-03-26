@@ -35,6 +35,7 @@ import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
 import plansRouter from "./plans.js";
 import exportsRouter from "./exports.js";
+import scripttagRouter from "./scripttag.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -80,5 +81,6 @@ router.use(absorberRouter);
 router.use(entityResearchRouter);
 router.use(plansRouter);
 router.use(exportsRouter);
+router.use(scripttagRouter);
 
 export default router;

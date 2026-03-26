@@ -120,6 +120,88 @@ router.post("/messages", async (req, res): Promise<void> => {
   res.json({ id });
 });
 
+router.get("/reports", async (req, res): Promise<void> => {
+  const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+
+  const products = await db.select({
+    id: productsTable.id,
+    title: productsTable.title,
+    auditScore: productsTable.auditScore,
+    imagesJson: productsTable.imagesJson,
+  }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+
+  const scored = products.filter((p) => p.auditScore !== null);
+  const avgSeoScore = scored.length > 0
+    ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
+    : null;
+
+  let imagesGenerated = 0;
+  for (const p of products) {
+    try {
+      const imgs = p.imagesJson ? JSON.parse(p.imagesJson) : [];
+      imagesGenerated += Array.isArray(imgs) ? imgs.length : 0;
+    } catch {}
+  }
+
+  const recentActivity = await db.select().from(auditLogTable)
+    .where(eq(auditLogTable.projectId, projectId))
+    .orderBy(desc(auditLogTable.createdAt)).limit(20);
+
+  const productsOptimized = scored.length;
+  const revenueImpact = avgSeoScore != null && avgSeoScore > 60 ? `+${Math.round((avgSeoScore - 50) * 0.3)}%` : "—";
+
+  res.json({
+    productsOptimized,
+    imagesGenerated,
+    avgSeoScore,
+    revenueImpact,
+    timeline: recentActivity,
+  });
+});
+
+router.get("/reports/export", async (req, res): Promise<void> => {
+  const projectId = getClientProjectId(req);
+  if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+  const rawFormat = (req.query.format as string) ?? "csv";
+  const format = rawFormat === "csv" ? "csv" : "txt";
+
+  const products = await db.select({
+    id: productsTable.id,
+    title: productsTable.title,
+    auditScore: productsTable.auditScore,
+    price: productsTable.price,
+  }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+
+  if (format === "csv") {
+    const header = "ID,Título,Score,Precio\n";
+    const rows = products.map(p => `${p.id},"${(p.title ?? "").replace(/"/g, '""')}",${p.auditScore ?? ""},${p.price ?? ""}`).join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=reporte-tienda.csv");
+    res.send(header + rows);
+  } else {
+    const scored = products.filter(p => p.auditScore !== null);
+    const avgScore = scored.length > 0
+      ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
+      : null;
+
+    const text = [
+      "=== REPORTE DE TIENDA ===",
+      `Fecha: ${new Date().toLocaleDateString("es-ES")}`,
+      `Total productos: ${products.length}`,
+      `Productos auditados: ${scored.length}`,
+      `Score promedio: ${avgScore ?? "N/A"}`,
+      "",
+      "--- DETALLE POR PRODUCTO ---",
+      ...products.map(p => `• ${p.title} — Score: ${p.auditScore ?? "N/A"} — Precio: ${p.price ?? "N/A"}`),
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=reporte-tienda.txt");
+    res.send(text);
+  }
+});
+
 router.get("/products", async (req, res): Promise<void> => {
   const projectId = getClientProjectId(req);
   if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }

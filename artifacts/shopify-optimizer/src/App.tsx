@@ -51,10 +51,13 @@ import ClientDashboard from "@/pages/client/ClientDashboard";
 import ClientApprovals from "@/pages/client/ClientApprovals";
 import ClientMessages from "@/pages/client/ClientMessages";
 import ClientProducts from "@/pages/client/ClientProducts";
+import ClientReports from "@/pages/client/ClientReports";
+import ResetPassword from "@/pages/ResetPassword";
 
 import { VoiceButton } from "@/components/VoiceButton";
 import { CommandPalette } from "@/components/CommandPalette";
 import { OnboardingWidget } from "@/components/OnboardingWidget";
+import { CoachMarks } from "@/components/CoachMarks";
 import OmniChatbot from "@/components/OmniChatbot";
 
 const queryClient = new QueryClient({
@@ -134,6 +137,7 @@ function AdminWrapper({ children }: { children: React.ReactNode }) {
         <>
           <VoiceButton />
           <OnboardingWidget />
+          <CoachMarks />
         </>
       )}
     </>
@@ -155,6 +159,7 @@ function Router() {
         {/* Public */}
         <Route path="/login" component={LoginPage} />
         <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/invite/:token" component={InviteSetupPage} />
         <Route path="/tienda" component={Tienda} />
         <Route path="/oauth-success" component={OAuthSuccess} />
@@ -427,6 +432,9 @@ function Router() {
         </Route>
         <Route path="/client/messages">
           <RequireClient><ClientMessages /></RequireClient>
+        </Route>
+        <Route path="/client/reports">
+          <RequireClient><ClientReports /></RequireClient>
         </Route>
 
         <Route component={NotFound} />
