@@ -31,7 +31,7 @@ PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalitie
 
 ### AI Stack and OmniCore
 A three-model pipeline (Gemini → Claude → OmniCore) integrated with image generation.
-- **Gemini**: Primarily for research, market intelligence, competitor analysis, and product trends, with Google Search grounding for real market pricing.
+- **Gemini**: Primarily for research, market intelligence, competitor analysis, product trends, and SEO keyword intelligence, with Google Search grounding (threshold 0.0 = always real search) for real market pricing and keyword data.
 - **Claude**: Used for strategic analysis, content generation, and incorporating ShopyBrain context, with BrandDNA and OmniCore knowledge injection for consistency.
 - **Replicate (Flux, Recraft)**: For generating product and lifestyle images.
 - **OmniCore**: The central "brain" for permanent memory, storing all AI outputs and analysis, and acting as a floating AI chatbot for natural language commands and Shopify action execution (e.g., `optimize_product`, `create_product`, `auto_collections`, `design_all_pages`, `diagnose_app`). It also powers an Entity Research Engine and a context-aware Guide Assistant.

@@ -4,6 +4,7 @@ import { projectsTable, productsTable, seoDataTable, bulkJobsTable } from "@work
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
+import { askGeminiWithSearch } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 
@@ -414,32 +415,86 @@ router.post("/projects/:projectId/seo/keyword-intelligence", async (req, res): P
   const { productName, productId } = req.body as { productName: string; productId?: string };
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  const niche = project?.storeNiche ?? "e-commerce";
+  const storeName = project?.name ?? "";
 
-  const prompt = `Crea una estrategia de keywords completa para el producto "${productName}" en la tienda "${project?.name ?? ""}" (nicho: ${project?.storeNiche ?? "e-commerce"}).
+  const geminiSearches = await Promise.allSettled([
+    askGeminiWithSearch(
+      `Search Google for: best keywords to buy "${productName}" in Spain. What are the most searched terms, Google autocomplete suggestions, and "People Also Ask" questions for someone wanting to buy this type of product? Include related search terms shown at the bottom of Google results. List specific search queries with their approximate relative popularity.`,
+      `You are a Google Search keyword researcher. Find REAL search terms people use on Google right now. Focus on Spanish market (Spain). Return raw findings — actual search suggestions, autocomplete terms, related searches, and PAA questions you find.`
+    ),
+    askGeminiWithSearch(
+      `Search Google for: "${productName}" competitor products pricing in Spain ${niche}. What online stores sell similar products? What are their prices, product names, and how do they describe them in their titles and meta descriptions? Find real competitor listings.`,
+      `You are a competitive SEO analyst. Search Google to find REAL competitor product listings, their titles, meta descriptions, and pricing. Focus on Spanish-language results. Return specific data from actual search results.`
+    ),
+    askGeminiWithSearch(
+      `Search Google for: SEO difficulty and search volume trends for "${productName}" related keywords in Spanish market. What keywords have high search volume? What long-tail keywords are easier to rank for? Check Google Trends data for this product category. What are trending related searches?`,
+      `You are an SEO data analyst. Research REAL search trends and keyword competition from Google. Find trending terms, seasonal patterns, and emerging search queries. Return factual data from your research.`
+    ),
+  ]);
+
+  const searchResults = geminiSearches.map((r, i) => {
+    if (r.status === "fulfilled") return r.value;
+    return { text: `Search ${i + 1} failed`, sources: [], queries: [] };
+  });
+
+  const allSources = searchResults.flatMap(r => r.sources ?? []);
+  const allQueries = searchResults.flatMap(r => r.queries ?? []);
+
+  const prompt = `Crea una estrategia de keywords completa para el producto "${productName}" en la tienda "${storeName}" (nicho: ${niche}).
+
+=== DATOS REALES DE BÚSQUEDAS EN GOOGLE (investigación actual) ===
+--- Búsqueda 1: Keywords y autocompletado de Google ---
+${searchResults[0].text.slice(0, 3000)}
+
+--- Búsqueda 2: Competidores reales y sus listings ---
+${searchResults[1].text.slice(0, 3000)}
+
+--- Búsqueda 3: Tendencias y dificultad SEO ---
+${searchResults[2].text.slice(0, 3000)}
+
+=== Fuentes verificadas: ${allSources.slice(0, 10).join(", ")} ===
+
+INSTRUCCIONES CRÍTICAS:
+- Basa tus keywords en los DATOS REALES de Google de arriba, NO en suposiciones
+- Las keywords deben reflejar búsquedas que la gente REALMENTE hace según los datos
+- Las preguntas FAQ deben venir de las "People Also Ask" reales encontradas
+- La dificultad debe basarse en los datos de competencia real encontrados
+- Incluye un campo "dataSource" con valor "google_search_grounding" para indicar que los datos son reales
 
 Devuelve JSON con:
 {
-  "primaryKeyword": "keyword principal transaccional con intención de compra",
-  "secondaryKeywords": ["5 keywords relacionadas long-tail"],
-  "semanticKeywords": ["8 términos semánticos relacionados"],
-  "negativeKeywords": ["términos a evitar (intención incorrecta)"],
-  "difficulty": "Fácil|Medio|Difícil",
+  "primaryKeyword": "keyword principal transaccional con intención de compra (basada en datos reales)",
+  "secondaryKeywords": ["5 keywords relacionadas long-tail encontradas en Google"],
+  "semanticKeywords": ["8 términos semánticos que Google relaciona con este producto"],
+  "negativeKeywords": ["términos a evitar (intención incorrecta detectada en búsquedas)"],
+  "difficulty": "Fácil|Medio|Difícil (basado en competencia real encontrada)",
+  "searchInsights": "resumen de 2-3 frases sobre lo que revelan las búsquedas reales",
+  "competitorKeywords": ["3-5 keywords que usan los competidores reales encontrados"],
   "h1Tag": "H1 optimizado incluyendo keyword principal",
   "h2Tags": ["5 H2s para la descripción del producto con keywords secundarias"],
-  "faqSchema": [{"question": "pregunta real", "answer": "respuesta SEO-optimizada"}, ...5 preguntas],
+  "faqSchema": [{"question": "pregunta REAL de People Also Ask", "answer": "respuesta SEO-optimizada"}, ...5 preguntas],
   "urlHandle": "handle-seo-optimo-con-keyword",
-  "blogPostIdea": "idea de post de blog que rankea y linkea al producto"
+  "blogPostIdea": "idea de post de blog basada en búsquedas reales detectadas",
+  "sources": ["URLs de fuentes verificadas"],
+  "dataSource": "google_search_grounding"
 }`;
 
-  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined);
+  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", niche);
+
+  if (result) {
+    result.sources = allSources.slice(0, 15);
+    result.searchQueries = allQueries.slice(0, 10);
+    result.dataSource = "google_search_grounding";
+  }
 
   learnFromOperation({
     operationType: "seo_keywords",
     niche: project?.storeNiche ?? null,
     title: `Keywords: ${productName} — ${result?.primaryKeyword ?? ""}`,
-    content: `Keyword strategy para "${productName}". Primary: ${result?.primaryKeyword ?? ""}. Secondary: ${JSON.stringify(result?.secondaryKeywords ?? []).slice(0, 300)}. Semantic: ${JSON.stringify(result?.semanticKeywords ?? []).slice(0, 300)}. Difficulty: ${result?.difficulty ?? "N/A"}.`,
-    confidence: 0.72,
-    tags: ["seo", "keywords", project?.storeNiche ?? "ecommerce"].filter(Boolean),
+    content: `Keyword strategy para "${productName}" con datos reales de Google Search. Primary: ${result?.primaryKeyword ?? ""}. Secondary: ${JSON.stringify(result?.secondaryKeywords ?? []).slice(0, 300)}. Semantic: ${JSON.stringify(result?.semanticKeywords ?? []).slice(0, 300)}. Difficulty: ${result?.difficulty ?? "N/A"}. Sources: ${allSources.slice(0, 5).join(", ")}`,
+    confidence: 0.85,
+    tags: ["seo", "keywords", "google_grounded", project?.storeNiche ?? "ecommerce"].filter(Boolean),
   });
 
   res.json(result);
@@ -449,27 +504,45 @@ router.post("/projects/:projectId/seo/blog-strategy", async (req, res): Promise<
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   const products = await db.select({ title: productsTable.title }).from(productsTable).where(eq(productsTable.projectId, projectId)).limit(10);
+  const niche = project?.storeNiche ?? "e-commerce";
+  const productList = products.map((p) => p.title).join(", ");
 
-  const prompt = `Crea una estrategia de contenido de blog para la tienda "${project?.name}" (nicho: ${project?.storeNiche ?? "e-commerce"}, audiencia: ${project?.targetAudience ?? "adultos"}).
+  let trendData = "";
+  try {
+    const trendSearch = await askGeminiWithSearch(
+      `Search Google for: most popular blog topics and content trends in "${niche}" Spain 2025-2026. What questions do people ask about ${productList}? What blog posts from competitors rank well? Find "People Also Ask" questions, trending topics, and content gaps in this niche. What are the most shared articles?`,
+      `You are a content strategy researcher. Find REAL trending blog topics, popular questions, and high-performing content in this niche from Google Search. Return specific data from actual search results.`
+    );
+    trendData = trendSearch.text.slice(0, 4000);
+  } catch { trendData = ""; }
 
-Productos actuales: ${products.map((p) => p.title).join(", ")}
+  const prompt = `Crea una estrategia de contenido de blog para la tienda "${project?.name}" (nicho: ${niche}, audiencia: ${project?.targetAudience ?? "adultos"}).
+
+Productos actuales: ${productList}
+
+${trendData ? `=== DATOS REALES DE TENDENCIAS DE GOOGLE ===\n${trendData}\n\nINSTRUCCIONES: Basa los temas de blog en las tendencias REALES encontradas arriba. Los títulos deben responder preguntas que la gente REALMENTE busca en Google.\n` : ""}
 
 Devuelve JSON con:
 {
   "pillarPage": { "title": "...", "primaryKeyword": "...", "wordCountTarget": 3000, "h2Structure": ["..."], "internalLinks": ["..."], "sampleIntro": "primeros 200 palabras...", "funnel": "top" },
   "clusterPosts": [5 posts que apoyan el pilar, mismo formato],
-  "productPosts": [1 post por producto principal, mismo formato]
+  "productPosts": [1 post por producto principal, mismo formato],
+  "dataSource": "google_search_grounding"
 }`;
 
-  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", project?.storeNiche ?? undefined, 6000);
+  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", niche, 6000);
+
+  if (result && trendData) {
+    result.dataSource = "google_search_grounding";
+  }
 
   learnFromOperation({
     operationType: "seo_blog",
     niche: project?.storeNiche ?? null,
     title: `Blog strategy — ${project?.name ?? project?.shopDomain ?? "store"}`,
-    content: `Estrategia blog para ${project?.name}. Pilar: ${result?.pillarPage?.title ?? "N/A"}. Clusters: ${result?.clusterPosts?.length ?? 0}. Product posts: ${result?.productPosts?.length ?? 0}. Nicho: ${project?.storeNiche ?? "general"}.`,
-    confidence: 0.72,
-    tags: ["seo", "blog", "content_strategy"],
+    content: `Estrategia blog para ${project?.name} con datos reales de Google. Pilar: ${result?.pillarPage?.title ?? "N/A"}. Clusters: ${result?.clusterPosts?.length ?? 0}. Product posts: ${result?.productPosts?.length ?? 0}. Nicho: ${niche}.`,
+    confidence: 0.85,
+    tags: ["seo", "blog", "content_strategy", "google_grounded"],
   });
 
   res.json(result);
