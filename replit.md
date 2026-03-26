@@ -67,8 +67,11 @@ A deep absorption engine for brands, competitors, or influencers, triggered via 
 ### OmniCore Chatbot Guide Assistant
 The OmniChatbot acts as a context-aware assistant, providing step-by-step guidance based on injected app-guide knowledge and the current page context.
 
+### Server Startup Chain
+On boot, the server runs: `deduplicateProducts` → `ensureAdminUser` → `ensureProjectConfig` → `ensureAllKnowledgeDomains` → `registerCronJobs` → `warmupProdKnowledge`. The warmup function detects if production has insufficient knowledge (<250 memories) or missing products (0 synced) and automatically: (1) syncs all Shopify products, (2) runs Daily Deep Study across all 41 domains, (3) runs Cross-Synthesis, Memory Consolidation, Revenue Snapshots, Inventory Sync, and Mega-Synthesis. AI uses Gemini fallback when Anthropic credits are exhausted.
+
 ### ShopyBrain Cron Jobs
-Ten automated tasks for continuous learning, data consolidation, cross-synthesis, revenue snapshots, data integration, daily competitor scans with alerts, inventory sync, and weekly mega-synthesis.
+Ten automated tasks for continuous learning, data consolidation, cross-synthesis, revenue snapshots, data integration, daily competitor scans with alerts, inventory sync, and weekly mega-synthesis. All jobs use `aiGenerate()` helper which tries Anthropic first, then falls back to Gemini automatically.
 
 ### Price Simulator & P&L Forecast
 - **Price Simulator**: Simulates 3 scenarios (pessimistic/base/optimistic) with break-even and margin analysis.

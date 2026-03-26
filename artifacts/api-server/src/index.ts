@@ -1,9 +1,19 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { registerCronJobs } from "./lib/scheduler.js";
+import {
+  registerCronJobs,
+  runOmniCoreDailyDeepStudy,
+  runOmniCoreCrossConnections,
+  runOmniCoreMemoryConsolidation,
+  runOmniCoreMegaSynthesis,
+  runRevenueSnapshots,
+  runInventorySync,
+} from "./lib/scheduler.js";
 import { ensureAllKnowledgeDomains } from "./routes/shopybrain.js";
-import { db, usersTable, projectsTable } from "@workspace/db";
+import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable } from "@workspace/db";
 import { eq, sql, isNull, or } from "drizzle-orm";
+import { shopifyRequestPaged } from "./lib/shopify.js";
+import { auditProduct } from "./lib/audit.js";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
@@ -105,6 +115,148 @@ async function ensureAdminUser() {
   }
 }
 
+interface ShopifyProductRaw {
+  id: number; title: string; handle: string; body_html: string;
+  vendor: string; product_type: string; status: string;
+  published_at: string | null; tags: string;
+  variants?: { price: string; compare_at_price: string | null }[];
+  images?: { id: number; src: string; alt: string | null }[];
+}
+
+async function warmupProdKnowledge() {
+  try {
+    const [memCount] = await db.select({ c: sql<number>`count(*)` }).from(omnicoreMemoriesTable);
+    const totalMemories = Number(memCount?.c ?? 0);
+
+    const projects = await db.select().from(projectsTable);
+    if (projects.length === 0) { logger.info("⏭ Warmup: no projects, skipping"); return; }
+
+    for (const project of projects) {
+      if (!project.accessToken || !project.shopDomain) continue;
+
+      const [prodCount] = await db.select({ c: sql<number>`count(*)` })
+        .from(productsTable).where(eq(productsTable.projectId, project.id));
+      const productTotal = Number(prodCount?.c ?? 0);
+
+      if (productTotal === 0) {
+        logger.info({ projectId: project.id, domain: project.shopDomain }, "🔄 Warmup: syncing products from Shopify...");
+        try {
+          let allProducts: ShopifyProductRaw[] = [];
+          let nextPageInfo: string | null = null;
+          let isFirst = true;
+
+          while (true) {
+            const path = isFirst
+              ? `/products.json?limit=250&published_status=any`
+              : `/products.json?limit=250&page_info=${nextPageInfo}`;
+
+            const pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+              project.id, project.shopDomain, path
+            );
+            isFirst = false;
+            if (!pageResult.data.products?.length) break;
+            allProducts = allProducts.concat(pageResult.data.products);
+            nextPageInfo = pageResult.nextPageInfo;
+            if (!nextPageInfo) break;
+            await new Promise(r => setTimeout(r, 300));
+          }
+
+          let totalScore = 0;
+          for (const sp of allProducts) {
+            const audit = auditProduct({
+              title: sp.title, body_html: sp.body_html,
+              price: sp.variants?.[0]?.price, compare_at_price: sp.variants?.[0]?.compare_at_price,
+              images: sp.images, tags: sp.tags,
+            });
+            await db.insert(productsTable).values({
+              projectId: project.id, shopifyProductId: String(sp.id),
+              title: sp.title, handle: sp.handle, bodyHtml: sp.body_html,
+              vendor: sp.vendor, productType: sp.product_type, status: sp.status,
+              publishedAt: sp.published_at ?? null, tags: sp.tags,
+              price: sp.variants?.[0]?.price ?? null,
+              compareAtPrice: sp.variants?.[0]?.compare_at_price ?? null,
+              imageCount: sp.images?.length ?? 0, variantCount: sp.variants?.length ?? 1,
+              imagesJson: sp.images ?? [],
+              auditScore: audit.overallScore, auditGrade: audit.grade,
+              titleScore: audit.titleScore, descriptionScore: audit.descriptionScore,
+              priceScore: audit.priceScore, imageScore: audit.imageScore,
+              seoScore: audit.seoScore, auditProblems: audit.problems,
+              lastAuditedAt: new Date(),
+            }).onConflictDoUpdate({
+              target: [productsTable.projectId, productsTable.shopifyProductId],
+              set: { title: sp.title, status: sp.status, price: sp.variants?.[0]?.price ?? null },
+            });
+            totalScore += audit.overallScore;
+          }
+
+          const avgScore = allProducts.length > 0 ? totalScore / allProducts.length : null;
+          await db.update(projectsTable).set({ productCount: allProducts.length, avgAuditScore: avgScore }).where(eq(projectsTable.id, project.id));
+          logger.info({ projectId: project.id, synced: allProducts.length, avgScore }, "✅ Warmup: products synced from Shopify");
+        } catch (err) {
+          logger.error({ err, projectId: project.id }, "⚠️ Warmup: product sync failed");
+        }
+      }
+    }
+
+    if (totalMemories < 250) {
+      logger.info({ currentMemories: totalMemories }, "🧠 Warmup: knowledge below threshold, launching deep learning...");
+
+      const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+      try {
+        logger.info("🎓 Warmup: starting Daily Deep Study...");
+        await runOmniCoreDailyDeepStudy();
+        logger.info("✅ Warmup: Daily Deep Study complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Daily Deep Study failed"); }
+
+      await delay(2000);
+
+      try {
+        logger.info("🔗 Warmup: starting Cross-Synthesis...");
+        await runOmniCoreCrossConnections();
+        logger.info("✅ Warmup: Cross-Synthesis complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Cross-Synthesis failed"); }
+
+      await delay(2000);
+
+      try {
+        logger.info("🧠 Warmup: starting Memory Consolidation...");
+        await runOmniCoreMemoryConsolidation();
+        logger.info("✅ Warmup: Memory Consolidation complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Memory Consolidation failed"); }
+
+      await delay(2000);
+
+      try {
+        logger.info("📊 Warmup: starting Revenue Snapshots...");
+        await runRevenueSnapshots();
+        logger.info("✅ Warmup: Revenue Snapshots complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Revenue Snapshots failed"); }
+
+      try {
+        logger.info("📦 Warmup: starting Inventory Sync...");
+        await runInventorySync();
+        logger.info("✅ Warmup: Inventory Sync complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Inventory Sync failed"); }
+
+      await delay(2000);
+
+      try {
+        logger.info("🚀 Warmup: starting Mega-Synthesis...");
+        await runOmniCoreMegaSynthesis();
+        logger.info("✅ Warmup: Mega-Synthesis complete");
+      } catch (err) { logger.error({ err }, "⚠️ Warmup: Mega-Synthesis failed"); }
+
+      const [finalCount] = await db.select({ c: sql<number>`count(*)` }).from(omnicoreMemoriesTable);
+      logger.info({ before: totalMemories, after: Number(finalCount?.c ?? 0) }, "🏁 Warmup: knowledge generation complete");
+    } else {
+      logger.info({ totalMemories }, "✅ Warmup: knowledge already sufficient, skipping learning");
+    }
+  } catch (err) {
+    logger.error({ err }, "⚠️ Warmup failed — continuing startup");
+  }
+}
+
 const server = app.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -121,7 +273,10 @@ const server = app.listen(port, (err?: Error) => {
       else logger.info("🧠 All knowledge domains already present");
     })
     .catch((err) => logger.error({ err }, "⚠️  Knowledge domain seeding failed — continuing startup"))
-    .finally(() => registerCronJobs());
+    .finally(() => {
+      registerCronJobs();
+      setTimeout(() => warmupProdKnowledge(), 5000);
+    });
 });
 
 // ── Extended timeouts for long-running AI research tasks ─────────────────────
