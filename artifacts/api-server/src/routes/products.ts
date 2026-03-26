@@ -6,6 +6,7 @@ import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
 import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -108,31 +109,66 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
     return;
   }
 
-  // Use cursor-based pagination (Shopify deprecated ?page=N in 2022+)
+  const token = project.accessToken;
+  if (!token) {
+    res.status(400).json({ error: "No hay token de acceso. Regenera el token primero." });
+    return;
+  }
+
   let allProducts: ShopifyProductRaw[] = [];
   const limit = 250;
-  let nextPageInfo: string | null = null;
-  let isFirst = true;
+  const requestedFilter = req.body?.statusFilter || req.query?.statusFilter || "any";
 
-  while (true) {
-    const statusFilter = req.body?.statusFilter || req.query?.statusFilter || "any";
-    const path = isFirst
-      ? `/products.json?limit=${limit}&status=${statusFilter}`
-      : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
+  const statusesToFetch = requestedFilter === "any"
+    ? ["active", "draft", "archived"]
+    : [requestedFilter];
 
-    const { data, nextPageInfo: next } = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
-      id,
-      project.shopDomain,
-      path
-    );
+  logger.info({ projectId: id, domain: project.shopDomain, statusesToFetch }, "Shopify sync: starting");
 
-    isFirst = false;
-    if (!data.products?.length) break;
-    allProducts = allProducts.concat(data.products);
-    nextPageInfo = next;
-    if (!nextPageInfo) break;
-    await new Promise((r) => setTimeout(r, 300));
+  for (const status of statusesToFetch) {
+    let nextPageInfo: string | null = null;
+    let isFirst = true;
+
+    while (true) {
+      const path = isFirst
+        ? `/products.json?limit=${limit}&status=${status}`
+        : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
+
+      logger.info({ projectId: id, path, status, isFirst }, "Shopify sync: fetching page");
+
+      let pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null };
+      try {
+        pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+          id,
+          project.shopDomain,
+          path
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
+        res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
+        return;
+      }
+
+      const { data, nextPageInfo: next } = pageResult;
+
+      logger.info({
+        projectId: id,
+        status,
+        productsInPage: data.products?.length ?? 0,
+        hasNext: !!next,
+      }, "Shopify sync: page received");
+
+      isFirst = false;
+      if (!data.products?.length) break;
+      allProducts = allProducts.concat(data.products);
+      nextPageInfo = next;
+      if (!nextPageInfo) break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
   }
+
+  logger.info({ projectId: id, totalProducts: allProducts.length }, "Shopify sync: all pages fetched");
 
   let auditedCount = 0;
   let totalScore = 0;

@@ -1063,27 +1063,36 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
 
         const limit = Math.min(params?.limit ?? 20, 50);
         const statusFilter = params?.statusFilter || "any";
-        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-          parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${statusFilter}&fields=id,title,status,variants,images,tags`
-        );
+        const statusesToQuery = statusFilter === "any"
+          ? ["active", "draft", "archived"]
+          : [statusFilter];
+
+        let allProds: Array<Record<string, unknown>> = [];
+        for (const st of statusesToQuery) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&fields=id,title,status,variants,images,tags`
+          );
+          allProds = allProds.concat(d.products || []);
+        }
+        if (allProds.length > limit) allProds = allProds.slice(0, limit);
 
         const byStatus: Record<string, number> = {};
-        data.products.forEach((p: Record<string, unknown>) => {
+        allProds.forEach((p: Record<string, unknown>) => {
           const s = String(p.status || "unknown");
           byStatus[s] = (byStatus[s] || 0) + 1;
         });
 
         result = {
-          products: data.products.map((p: Record<string, unknown>) => ({
+          products: allProds.map((p: Record<string, unknown>) => ({
             id: p.id, title: p.title, status: p.status,
             price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
             imageCount: (p.images as unknown[])?.length ?? 0,
             tags: p.tags,
           })),
-          total: data.products.length,
+          total: allProds.length,
           byStatus,
           statusFilter,
-          message: `${data.products.length} productos (filtro: ${statusFilter}). Desglose: ${Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")}`,
+          message: `${allProds.length} productos (filtro: ${statusFilter}). Desglose: ${Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")}`,
         };
         break;
       }
@@ -1269,7 +1278,7 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
           try {
             const headers = await getShopifyHeaders(parseInt(projectId));
             const domain = normalizeShopDomain(project.shopDomain);
-            const countRes = await fetch(`https://${domain}/admin/api/2024-01/products/count.json?status=any`, {
+            const countRes = await fetch(`https://${domain}/admin/api/2025-01/products/count.json`, {
               headers,
               signal: AbortSignal.timeout(10000),
             });

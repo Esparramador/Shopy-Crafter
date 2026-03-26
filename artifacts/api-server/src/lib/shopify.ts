@@ -99,7 +99,7 @@ export async function shopifyRequest<T>(
 ): Promise<T> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2024-01${path}`;
+  const url = `https://${domain}/admin/api/2025-01${path}`;
 
   const resp = await fetch(url, {
     ...options,
@@ -143,7 +143,7 @@ export async function shopifyRequestPaged<T>(
 ): Promise<{ data: T; nextPageInfo: string | null }> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2024-01${path}`;
+  const url = `https://${domain}/admin/api/2025-01${path}`;
 
   let resp = await fetch(url, {
     headers,
