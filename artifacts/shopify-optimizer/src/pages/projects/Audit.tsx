@@ -607,7 +607,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14 }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label className={labelStyle}>Título del producto *</label>
                 <input className={inputStyle} value={form.title} onChange={e => set("title", e.target.value)}
@@ -713,15 +713,15 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
                 </p>
               )}
               {form.options.map((opt, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                  <input className={inputStyle} style={{ width: 120 }} value={opt.name}
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+                  <input className={inputStyle} style={{ width: 120, minWidth: 80, flex: "0 1 120px" }} value={opt.name}
                     onChange={e => updateOption(i, "name", e.target.value)} placeholder="Ej: Talla" />
-                  <input className={inputStyle} style={{ flex: 1 }} value={opt.values}
+                  <input className={inputStyle} style={{ flex: 1, minWidth: 120 }} value={opt.values}
                     onChange={e => updateOption(i, "values", e.target.value)} placeholder="S, M, L, XL" />
-                  <button onClick={() => removeOption(i)} style={{
-                    background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 4,
+                  <button onClick={() => removeOption(i)} aria-label="Eliminar opción" style={{
+                    background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 8, minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <X size={14} />
+                    <X size={16} />
                   </button>
                 </div>
               ))}
@@ -1123,7 +1123,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-white/5 pb-0">
+      <div className="flex gap-2 border-b border-white/5 pb-0 overflow-x-auto -mx-1 px-1">
         <button
           onClick={() => setActiveTab("products")}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-xl transition-all ${
@@ -1233,18 +1233,19 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                         <button
                           onClick={() => optimizeProduct(String(product.shopifyProductId || product.id))}
                           disabled={optimizingId === String(product.shopifyProductId || product.id) || bulkOptimizing}
-                          className="p-1.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50"
+                          className="p-2.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50 min-w-[36px] min-h-[36px] flex items-center justify-center"
                           title="Optimizar con ShopyBrain IA"
+                          aria-label="Optimizar producto con IA"
                         >
-                          {optimizingId === String(product.shopifyProductId || product.id) ? <Loader2 className="w-4 h-4 animate-spin text-yellow-400" /> : <Sparkles className="w-4 h-4" />}
+                          {optimizingId === String(product.shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
                         </button>
                         <button
                           onClick={() => setEditProduct(product as unknown as EditableProduct)}
-                          className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                          className="p-2.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
                           title="Editar producto"
                           aria-label="Editar producto"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <Edit3 className="w-5 h-5" />
                         </button>
                       </div>
                     </div>

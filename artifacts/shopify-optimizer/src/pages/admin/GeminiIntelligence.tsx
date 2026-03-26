@@ -74,7 +74,7 @@ function BusinessResult({ data }: { data: { profile: ReturnType<typeof Object>; 
         <Bullet label="Audiencia" value={p.targetAudience as string} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
         <Section title="✅ Fortalezas">
           <TagList items={p.strengths as string[]} color="var(--jade)" />
         </Section>
@@ -115,7 +115,7 @@ function MarketResult({ data }: { data: { market: Record<string, unknown> } }) {
         <Bullet label="Posicionamiento rec." value={m.recommendedPositioning as string} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
         <Section title="🏆 Top Players">
           <TagList items={m.topPlayers as string[]} color="var(--t2)" />
         </Section>
@@ -157,7 +157,7 @@ function CompetitorResult({ data }: { data: { competitor: Record<string, unknown
         <Bullet label="Precio medio" value={c.avgProductPrice as string} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
         <Section title="🔑 Keywords objetivo">
           <TagList items={c.topKeywords as string[]} color="var(--jade)" />
         </Section>
@@ -210,7 +210,7 @@ function TrendsResult({ data }: { data: { trends: Record<string, unknown> } }) {
         <Bullet label="Estacionalidad" value={t.seasonality as string} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
         <Section title="🏆 Competidores top">
           <TagList items={t.topCompetitors as string[]} color="var(--t2)" />
         </Section>
@@ -248,7 +248,7 @@ function FullAuditResult({ data }: { data: { businessProfile: Record<string, unk
         <pre style={{ fontSize: 12, color: "var(--t2)", whiteSpace: "pre-wrap", lineHeight: 1.8, margin: 0, fontFamily: "inherit" }}>{data.synthesis}</pre>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
         <Section title="📊 Business Profile" defaultOpen={false}>
           <BusinessResult data={{ profile: data.businessProfile, strategicPlan: "" }} />
         </Section>
@@ -312,7 +312,7 @@ export default function GeminiIntelligence() {
           <div style={{ marginLeft: "auto", fontSize: 10, padding: "4px 10px", borderRadius: 20, background: "rgba(66,133,244,0.15)", color: "#4285f4", fontWeight: 700 }}>ONLINE</div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 10, marginTop: 16 }}>
           {[{ icon: "🔍", label: "Gemini Pro", desc: "Investigación profunda" }, { icon: "🧠", label: "Claude + OmniCore", desc: "Análisis estratégico" }, { icon: "💾", label: "Auto-aprendizaje", desc: "Guarda en brain" }].map((item, i) => (
             <div key={i} className="glass-card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>

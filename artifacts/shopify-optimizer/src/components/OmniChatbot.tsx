@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -483,7 +484,7 @@ function FlowModal({ flow, onClose }: { flow: KlaviyoWorkflowResult["plan"]["flo
             <button onClick={copyHtml} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--ink3)", background: copied ? "var(--jade)" : "var(--ink2)", color: copied ? "var(--ink)" : "var(--t)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
               {copied ? "✓ Copiado" : "📋 Copiar HTML"}
             </button>
-            <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}><X size={14} /></button>
+            <button onClick={onClose} aria-label="Cerrar detalle del flujo" style={{ width: 36, height: 36, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}><X size={14} /></button>
           </div>
         </div>
         <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -546,7 +547,7 @@ function AttachmentPreview({ file, url, onRemove }: {
           {file ? `${(file.size / 1024).toFixed(0)} KB · ${file.type}` : urlInfo?.label}
         </p>
       </div>
-      <button onClick={onRemove} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 2 }}><X size={12} /></button>
+      <button onClick={onRemove} aria-label="Eliminar adjunto" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: 6, minWidth: 28, minHeight: 28, display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} /></button>
     </div>
   );
 }
@@ -575,6 +576,7 @@ Responde siempre en español. Sé directo, técnico y accionable.`;
 export default function OmniChatbot() {
   const { user } = useAuth();
   const [location] = useLocation();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
@@ -1124,15 +1126,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       {/* Floating button */}
       {!open && (
-        <button onClick={() => setOpen(true)} style={{
-          position: "fixed", bottom: 24, right: 24, width: 58, height: 58,
+        <button onClick={() => setOpen(true)} aria-label="Abrir chat ShopyBrain" style={{
+          position: "fixed", bottom: isMobile ? 12 : 24, right: isMobile ? 12 : 24, width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
           borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
           border: "none", cursor: "pointer", zIndex: 1000,
           boxShadow: "0 4px 24px rgba(200,168,75,0.45), 0 0 0 0 rgba(200,168,75,0.3)",
           display: "flex", alignItems: "center", justifyContent: "center",
           animation: "pulseGold 3s ease-in-out infinite",
         }}>
-          <Brain size={26} style={{ color: "#0a0a0f" }} />
+          <Brain size={isMobile ? 22 : 26} style={{ color: "#0a0a0f" }} />
         </button>
       )}
 
@@ -1144,12 +1146,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           style={{
-            position: "fixed", bottom: 24, right: 24,
-            width: minimized ? 290 : 440,
-            height: minimized ? 52 : 640,
+            position: "fixed",
+            bottom: isMobile ? 0 : 24, right: isMobile ? 0 : 24,
+            width: isMobile ? "100%" : (minimized ? 290 : 440),
+            height: isMobile ? (minimized ? 52 : "100dvh") : (minimized ? 52 : 640),
+            ...(isMobile ? { left: 0 } : {}),
             background: "var(--ink)",
-            border: `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
-            borderRadius: 16, zIndex: 1000, display: "flex", flexDirection: "column",
+            border: isMobile ? "none" : `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
+            borderRadius: isMobile ? 0 : 16, zIndex: 1000, display: "flex", flexDirection: "column",
             boxShadow: isDragging ? "0 0 0 2px var(--jade), 0 8px 40px rgba(0,0,0,0.6)" : "0 8px 40px rgba(0,0,0,0.6)",
             transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", overflow: "hidden",
           }}>
@@ -1163,12 +1167,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>OmniCore AI · ShopyBrain</p>
               {!minimized && <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>🔬 Gemini · 🧠 Claude · 💾 Brain — Listo</p>}
             </div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button onClick={() => setMinimized(!minimized)} style={{ width: 24, height: 24, borderRadius: 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {minimized ? <Maximize2 size={11} /> : <Minimize2 size={11} />}
+            <div style={{ display: "flex", gap: isMobile ? 8 : 4 }}>
+              <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 36 : 24, height: isMobile ? 36 : 24, borderRadius: isMobile ? 8 : 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {minimized ? <Maximize2 size={isMobile ? 16 : 11} /> : <Minimize2 size={isMobile ? 16 : 11} />}
               </button>
-              <button onClick={() => setOpen(false)} style={{ width: 24, height: 24, borderRadius: 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <X size={11} />
+              <button onClick={() => setOpen(false)} aria-label="Cerrar chat" style={{ width: isMobile ? 36 : 24, height: isMobile ? 36 : 24, borderRadius: isMobile ? 8 : 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={isMobile ? 16 : 11} />
               </button>
             </div>
           </div>
@@ -1194,7 +1198,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       borderRadius: msg.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
                       background: msg.role === "user" ? "rgba(200,168,75,0.12)" : "var(--ink2)",
                       border: `1px solid ${msg.role === "user" ? "rgba(200,168,75,0.25)" : "var(--ink3)"}`,
-                      fontSize: 12, lineHeight: 1.6, color: "var(--t)",
+                      fontSize: isMobile ? 14 : 12, lineHeight: 1.6, color: "var(--t)",
                     }}>
                       {msg.role === "assistant" && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
@@ -1280,7 +1284,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   <ChevronDown size={9} style={{ transform: showActions ? "rotate(180deg)" : "rotate(0)", transition: "0.2s" }} />
                 </button>
                 {showActions && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: 4, marginBottom: 6 }}>
                     {QUICK_ACTIONS.map((action, i) => (
                       <button key={i} onClick={() => {
                         setShowActions(false);
@@ -1337,26 +1341,26 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 )}
 
                 {/* Text input row */}
-                <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                  <button onClick={() => setShowAttach(!showAttach)}
-                    style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14 }}>
+                <div style={{ display: "flex", gap: isMobile ? 8 : 6, alignItems: "flex-end" }}>
+                  <button onClick={() => setShowAttach(!showAttach)} aria-label="Adjuntar archivo"
+                    style={{ width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: isMobile ? 18 : 14 }}>
                     📎
                   </button>
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading}
                     placeholder={attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
                     rows={1}
-                    style={{ flex: 1, padding: "8px 10px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t)", fontSize: 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: 80, overflowY: "auto" }}
-                    onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 80)}px`; }}
+                    style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: isMobile ? 10 : 8, color: "var(--t)", fontSize: isMobile ? 16 : 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto" }}
+                    onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, isMobile ? 100 : 80)}px`; }}
                   />
-                  <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)}
+                  <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)} aria-label="Enviar mensaje"
                     style={{
-                      width: 32, height: 32, borderRadius: 8, border: "none", flexShrink: 0,
+                      width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: "none", flexShrink: 0,
                       background: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--ink3)" : "var(--gold)",
                       color: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--t4)" : "var(--ink)",
                       cursor: loading || (!input.trim() && !attachFile && !attachUrl) ? "not-allowed" : "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                     }}>
-                    {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={14} />}
+                    {loading ? <Loader2 size={isMobile ? 18 : 14} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={isMobile ? 18 : 14} />}
                   </button>
                 </div>
 

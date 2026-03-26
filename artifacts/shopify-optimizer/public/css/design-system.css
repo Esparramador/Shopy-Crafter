@@ -934,6 +934,19 @@ code {
 
   /* Revenue table cards on mobile */
   .revenue-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Ensure all interactive elements have min touch targets */
+  button, a, [role="button"] { min-height: 36px; }
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Full-width modals on mobile */
+  .modal-box { max-width: 100% !important; border-radius: 12px !important; margin: 8px; }
+
+  /* Prevent text overflow */
+  h1, h2, h3 { word-break: break-word; overflow-wrap: break-word; }
+
+  /* Stack flex headers vertically on mobile */
+  .flex-header > * { width: 100%; }
 }
 
 /* always show emails tabs container only on mobile */

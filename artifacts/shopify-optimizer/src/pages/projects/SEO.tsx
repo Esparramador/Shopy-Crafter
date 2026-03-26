@@ -460,7 +460,7 @@ ${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><
             placeholder="https://tu-tienda.myshopify.com/products/producto-hero"
             className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/40 transition-colors"
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setPsStrategy("mobile")}
               className={`px-3 py-2.5 rounded-xl text-sm flex items-center gap-1.5 border transition-all ${psStrategy === "mobile" ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400" : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"}`}

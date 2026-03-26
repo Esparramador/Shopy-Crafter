@@ -429,7 +429,7 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
             <p style={{ fontSize: 14, fontWeight: 700 }}>Nueva Propuesta</p>
             <p style={{ fontSize: 11, color: "var(--t3)" }}>Para {client.name} · Proyecto #{projectId}</p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex" }}><X size={16} /></button>
+          <button onClick={onClose} aria-label="Cerrar propuesta" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 36, minHeight: 36, padding: 8 }}><X size={16} /></button>
         </div>
 
         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, maxHeight: "65vh", overflowY: "auto" }}>
@@ -447,7 +447,7 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
             <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Descripción *</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Detalle de la propuesta…" style={{ ...inputStyle, resize: "vertical" }} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 10 }}>
             <div>
               <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, display: "block" }}>Valor Actual</label>
               <input value={form.beforeValue} onChange={e => setForm(f => ({ ...f, beforeValue: e.target.value }))} placeholder="Ej: $24.99" style={inputStyle} />
@@ -720,7 +720,7 @@ export default function AdminClients() {
             <p className="empty-desc">Invita tu primer cliente usando el botón de arriba.</p>
           </div>
         ) : (
-          <div className="card" style={{ overflow: "hidden", padding: 0 }}>
+          <div className="card table-wrap" style={{ padding: 0 }}>
             <table className="data-table">
               <thead>
                 <tr>

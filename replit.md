@@ -124,6 +124,15 @@ A complete export hub at `/projects/:id/exports` with 24 export options across 4
 ### Shopify Pagination
 Utilizes cursor-based pagination for all Shopify product listings.
 
+### Responsive Design & Accessibility
+- **Breakpoints**: 920px (narrow desktop), 800px (very narrow), 1024px (tablet), 600px (mobile)
+- **Mobile Layout**: Sidebar transforms to horizontal bottom nav; topbar hidden; grids collapse to 1-2 columns
+- **Touch Targets**: All buttons min 36px height on mobile; inputs min 16px font to prevent iOS zoom
+- **OmniChatbot**: Full-screen on mobile (100dvh), regular 440px floating panel on desktop
+- **Grids**: All use `repeat(auto-fit, minmax(min(Npx, 100%), 1fr))` for automatic responsive collapse
+- **Accessibility**: `focus-visible` outlines on all interactive elements; `aria-label` on icon buttons; `prefers-reduced-motion` support; semantic roles on layout sections
+- **Tables**: Wrapped in `.table-wrap` for horizontal scroll on mobile
+
 ### Landing Page Sections
 8 core sections: Hero, Engines, Demo, Results, Pricing, Clients, Contact (with lead form), and CTA.
 

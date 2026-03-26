@@ -272,7 +272,7 @@ function CogsModal({
                   </div>
                 </button>
                 {isExpanded && (
-                  <div className="px-3 pb-3 grid grid-cols-2 gap-2">
+                  <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {cat.fields.map(field => (
                       <div key={field.key} className="space-y-1">
                         <label className="text-[11px] text-muted-foreground">{field.label}</label>
@@ -505,11 +505,11 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
             <Calculator className="w-5 h-5 text-primary" />
             Simulador de Precio
           </h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+          <button onClick={onClose} aria-label="Cerrar simulador" className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center"><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
         <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{product.title}</p>
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Nuevo Precio (€)</label>
             <input type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} className={inputClass} />

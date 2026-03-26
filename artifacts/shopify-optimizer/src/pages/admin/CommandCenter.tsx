@@ -241,7 +241,7 @@ export default function CommandCenter() {
         <ResultCard actionKey="custom" label="Resultado" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 16 }}>
         <div style={{ background: "var(--ink2)", borderRadius: 12, padding: 16, border: "1px solid var(--bdr)" }}>
           <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "var(--t)" }}>Estado & Monitoreo</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

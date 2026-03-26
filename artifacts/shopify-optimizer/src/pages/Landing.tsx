@@ -784,7 +784,7 @@ export default function Landing() {
                   display: "grid", gap: 24,
                 }}>
                   {/* Row 1: Nombre + Email */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nombre completo *</label>
                       <input
@@ -808,7 +808,7 @@ export default function Landing() {
                   </div>
 
                   {/* Row 2: Teléfono + URL tienda */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Teléfono</label>
                       <input
@@ -832,7 +832,7 @@ export default function Landing() {
                   </div>
 
                   {/* Row 3: Nicho + Facturación */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nicho / tipo de productos</label>
                       <select

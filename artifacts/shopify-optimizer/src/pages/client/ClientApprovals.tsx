@@ -106,7 +106,7 @@ export default function ClientApprovals() {
 
                 {/* Before / After */}
                 {(item.beforeValue || item.afterValue) && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 10, marginBottom: 14 }}>
                     {item.beforeValue && (
                       <div style={{ background: "rgba(220,53,69,0.05)", border: "1px solid rgba(220,53,69,0.15)", borderRadius: 10, padding: "10px 12px" }}>
                         <p style={{ fontSize: 10, color: "var(--crim)", fontWeight: 700, letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 5 }}>Antes</p>

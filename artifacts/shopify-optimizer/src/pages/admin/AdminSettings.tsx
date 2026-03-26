@@ -425,7 +425,7 @@ export default function AdminSettings() {
             Encuéntralas en tu app de Shopify Partners → <strong>App credentials</strong>. Las credenciales se guardan cifradas en la base de datos.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14, marginBottom: 14 }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">API Key (Client ID)</label>
               <input

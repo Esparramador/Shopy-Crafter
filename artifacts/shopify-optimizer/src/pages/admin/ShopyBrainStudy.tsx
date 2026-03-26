@@ -342,7 +342,7 @@ export default function ShopyBrainStudy() {
             <span style={{ fontWeight: 700, color: "var(--jade)" }}>Sesión completada</span>
             <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--t3)" }}>{lastResult.durationMs ? `${Math.round(lastResult.durationMs / 1000)}s` : ""}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 12, marginBottom: 12 }}>
             {[
               { val: lastResult.insightsCreated, label: "insights nuevos", color: "var(--jade)" },
               { val: selectedDomains.length, label: "dominios estudiados", color: "var(--gold)" },

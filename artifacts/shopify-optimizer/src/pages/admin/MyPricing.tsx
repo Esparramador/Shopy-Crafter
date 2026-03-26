@@ -499,12 +499,12 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
         </div>
       ) : tab === "budget" ? (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(250px, 100%), 1fr))", gap: 20, marginBottom: 20 }}>
             <div className="glass-card">
               <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                 <FileText size={16} color="var(--gold)" /> Datos del cliente
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 10 }}>
                 {[
                   { label: "Nombre / Razón social", key: "clientName", placeholder: "Ej: María García López" },
                   { label: "NIF / CIF", key: "clientNIF", placeholder: "Ej: 12345678A" },
@@ -526,7 +526,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
               <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                 <ShoppingBag size={16} color="var(--gold)" /> Datos del proyecto
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 10 }}>
                 {[
                   { label: "Nombre de la tienda", key: "storeName", placeholder: "Ej: Modas El Sol", type: "text" },
                   { label: "Nicho / Sector", key: "storeNiche", placeholder: "Ej: moda, tecnología", type: "text" },
@@ -633,7 +633,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                     <div style={{ fontSize: 11, color: "var(--t3)" }}>Fecha: {budget.date} · Válido: {budget.validUntil}</div>
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid var(--bdr)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", borderBottom: "1px solid var(--bdr)" }}>
                   <div style={{ padding: "14px 20px", borderLeft: "3px solid var(--gold)", background: "rgba(200,168,75,0.04)" }}>
                     <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>DE</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>{budget.agency?.name}</div>
@@ -744,7 +744,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
           )}
         </div>
       ) : tab === "quote" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 20 }}>
           <div className="glass-card">
             <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Datos del cliente</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -806,7 +806,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                   <DollarSign size={16} color="var(--gold)" />
                   <h3 style={{ fontSize: 14, fontWeight: 700 }}>Presupuesto OmniCore CFO</h3>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 10, marginBottom: 16 }}>
                   {[
                     { label: "Setup", value: `€${quote.setupPrice?.toFixed(0)}`, color: "var(--gold)" },
                     { label: "Retainer/mes", value: `€${quote.monthlyRetainer?.toFixed(0)}`, color: "var(--jade)" },

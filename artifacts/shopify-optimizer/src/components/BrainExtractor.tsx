@@ -206,7 +206,7 @@ export default function BrainExtractor({ value, fieldContext, projectId, onAutof
               )}
 
               {/* Grid of intel cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 10, marginBottom: 12 }}>
                 {/* Brand DNA */}
                 {result.intelligence?.brandDNA && (
                   <IntelCard icon={<Sparkles size={13} />} title="ADN de Marca">

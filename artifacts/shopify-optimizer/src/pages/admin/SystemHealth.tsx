@@ -200,7 +200,7 @@ export default function SystemHealth() {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16 }}>
         <div className="glass-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--t)", marginBottom: 12 }}>Variables de Entorno</h3>
           {[

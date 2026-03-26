@@ -450,7 +450,7 @@ export default function Emails() {
                       style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, padding: "10px 14px", color: "var(--t1)", fontSize: 14 }} />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14 }}>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--t3)", fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Tipo de flow</label>
                       <select value={form.flow_type} onChange={e => setForm(p => ({ ...p, flow_type: e.target.value as FlowType }))}
@@ -480,7 +480,7 @@ export default function Emails() {
                       style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 9, padding: "9px 12px", color: "var(--t1)", fontSize: 13 }} />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14 }}>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--t3)", fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Tono del email</label>
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

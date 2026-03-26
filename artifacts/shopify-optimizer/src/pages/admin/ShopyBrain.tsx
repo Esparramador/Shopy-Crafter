@@ -229,7 +229,7 @@ export default function ShopyBrain() {
             )}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14, marginTop: 20 }}>
             {[
               { label: "Explorar Memorias", desc: "Navega y gestiona el conocimiento acumulado", icon: <Database size={20} />, path: "/admin/shopybrain/memories", color: "var(--gold)" },
               { label: "Knowledge Domains", desc: "10 dominios de expertise en profundidad", icon: <Brain size={20} />, path: "/admin/shopybrain/insights", color: "#5b4eff" },

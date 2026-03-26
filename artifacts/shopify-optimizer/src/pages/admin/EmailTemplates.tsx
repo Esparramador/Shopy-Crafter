@@ -576,7 +576,7 @@ export default function EmailTemplates() {
                 })()}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Nombre de la marca</label>
                   <input value={form.brand_name} onChange={e => setForm(p => ({ ...p, brand_name: e.target.value }))}
@@ -638,7 +638,7 @@ export default function EmailTemplates() {
                   style={inputStyle} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 16, marginBottom: 16 }}>
                 <div>
                   <label style={labelStyle}>Tipo de plantilla</label>
                   <select value={form.template_type}
@@ -683,7 +683,7 @@ export default function EmailTemplates() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Remitente</label>
                   <input value={form.from_name} onChange={e => setForm(p => ({ ...p, from_name: e.target.value }))}
@@ -731,7 +731,7 @@ export default function EmailTemplates() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 10, marginBottom: 16 }}>
                 {[
                   { l: "Plantilla", v: typeMeta?.label || form.template_type },
                   { l: "Tono", v: TONES.find(t => t.value === form.tone)?.label || form.tone },
