@@ -133,6 +133,7 @@ export default function Landing() {
   const [activeEngine, setActiveEngine] = useState(0);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
+  const [testimonialPaused, setTestimonialPaused] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -317,12 +318,12 @@ export default function Landing() {
   }, [goToSection]);
 
   useEffect(() => {
-    if (!content) return;
+    if (!content || testimonialPaused) return;
     const timer = setInterval(() => {
       setActiveTestimonial(t => (t + 1) % (content.testimonials?.items?.length || 1));
-    }, 4500);
+    }, 4000);
     return () => clearInterval(timer);
-  }, [content]);
+  }, [content, testimonialPaused]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
@@ -727,7 +728,7 @@ export default function Landing() {
               </h2>
             </div>
 
-            <div className={`fp-testi-carousel ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+            <div className={`fp-testi-carousel ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onMouseEnter={() => setTestimonialPaused(true)} onMouseLeave={() => setTestimonialPaused(false)}>
               {content.testimonials.items.map((t, i) => (
                 <div key={t.id} className={`fp-testi-card${i === activeTestimonial ? " active" : i === (activeTestimonial - 1 + content.testimonials.items.length) % content.testimonials.items.length ? " prev" : " next"}`}>
                   <div className="l-testi-stars">{Array.from({ length: t.stars }).map((_, si) => <span key={si} className="l-star">★</span>)}</div>
