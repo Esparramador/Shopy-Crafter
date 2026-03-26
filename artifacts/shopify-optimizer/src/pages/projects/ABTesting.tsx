@@ -391,8 +391,9 @@ export default function ABTestingPage() {
   <div class="metric-card"><div class="label">Win Rate</div><div class="value">${dash.winRate ?? 0}%</div></div>
   <div class="metric-card"><div class="label">Impacto Revenue</div><div class="value">${formatCurrency(dash.totalRevenueImpact || 0)}</div></div>
 </div>
-${dash.insight ? `<blockquote style="border-left:3px solid #c8a84b;padding:12px 16px;margin:16px 0;font-style:italic;color:#c8a84b">${dash.insight}</blockquote>` : ""}<!-- nosemgrep -->
-${tests.length > 0 ? `<h2>Historial de Tests</h2><table><tr><th>Producto</th><th>Tipo</th><th>Estado</th><th>Variante A (CTR)</th><th>Variante B (CTR)</th><th>Ganador</th></tr>${tests.map(t => `<tr><td>${t.productTitle || t.productId}</td><td>${t.testType}</td><td>${t.status}</td><td>${((t.variantAClicks || 0) / Math.max(t.variantAImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${((t.variantBClicks || 0) / Math.max(t.variantBImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${t.winner || "—"}</td></tr>`).join("")}</table>` : "<p>No hay tests registrados aún.</p>"}`;<!-- nosemgrep -->
+${dash.insight ? `<blockquote style="border-left:3px solid #c8a84b;padding:12px 16px;margin:16px 0;font-style:italic;color:#c8a84b">${dash.insight}</blockquote>` : ""}
+${tests.length > 0 ? `<h2>Historial de Tests</h2><table><tr><th>Producto</th><th>Tipo</th><th>Estado</th><th>Variante A (CTR)</th><th>Variante B (CTR)</th><th>Ganador</th></tr>${tests.map(t => `<tr><td>${t.productTitle || t.productId}</td><td>${t.testType}</td><td>${t.status}</td><td>${((t.variantAClicks || 0) / Math.max(t.variantAImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${((t.variantBClicks || 0) / Math.max(t.variantBImpressions || 1, 1) * 100).toFixed(1)}%</td><td>${t.winner || "—"}</td></tr>`).join("")}</table>` : "<p>No hay tests registrados aún.</p>"}`;
+
             }}
           />
           <button

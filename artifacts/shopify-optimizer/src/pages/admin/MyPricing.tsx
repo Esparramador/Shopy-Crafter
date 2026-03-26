@@ -211,7 +211,7 @@ export default function MyPricing() {
     const c = budget.conditions ?? {};
     const cl = budget.client ?? {};
     const ag = budget.agency ?? {};
-    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${budget.budgetNumber ?? ""}</title> // nosemgrep
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${budget.budgetNumber ?? ""}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;padding:40px}
@@ -253,22 +253,22 @@ td:nth-child(2),td:nth-child(3),td:nth-child(4),th:nth-child(2),th:nth-child(3),
   <div><div class="budget-num">${budget.budgetNumber ?? "PRESUPUESTO"}</div><div class="budget-date">Fecha: ${budget.date ?? new Date().toLocaleDateString("es-ES")}<br/>Válido hasta: ${budget.validUntil ?? ""}</div></div>
 </div>
 <div class="parties">
-  <div class="party from"><h4>De</h4><p class="name">${ag.name ?? "Shopy Crafter"}</p><p>${ag.nif ? `NIF: ${ag.nif}<br/>` : ""}${ag.email ?? ""}<br/>${ag.web ?? ""}</p></div><!-- nosemgrep -->
-  <div class="party to"><h4>Para</h4><p class="name">${cl.name ?? budgetForm.clientName}</p><p>${cl.nif ? `NIF/CIF: ${cl.nif}<br/>` : ""}${cl.email ? `${cl.email}<br/>` : ""}${cl.phone ? `Tel: ${cl.phone}<br/>` : ""}${cl.address ?? ""}</p></div><!-- nosemgrep -->
+  <div class="party from"><h4>De</h4><p class="name">${ag.name ?? "Shopy Crafter"}</p><p>${ag.nif ? `NIF: ${ag.nif}<br/>` : ""}${ag.email ?? ""}<br/>${ag.web ?? ""}</p></div>
+  <div class="party to"><h4>Para</h4><p class="name">${cl.name ?? budgetForm.clientName}</p><p>${cl.nif ? `NIF/CIF: ${cl.nif}<br/>` : ""}${cl.email ? `${cl.email}<br/>` : ""}${cl.phone ? `Tel: ${cl.phone}<br/>` : ""}${cl.address ?? ""}</p></div>
 </div>
-${(budget.sections ?? []).map((sec: any) => `<div class="section"><div class="section-title">${sec.sectionName}</div><table><thead><tr><th style="width:55%">Concepto</th><th>Uds.</th><th>P/U</th><th>Subtotal</th></tr></thead><tbody>${(sec.items ?? []).map((it: any) => `<tr><td>${it.concept}</td><td>${it.units}</td><td>${Number(it.unitPrice).toFixed(2)} €</td><td><strong>${Number(it.subtotal).toFixed(2)} €</strong></td></tr>`).join("")}</tbody></table><div class="section-sub">Subtotal sección: ${Number(sec.sectionSubtotal).toFixed(2)} €</div></div>`).join("")}<!-- nosemgrep -->
+${(budget.sections ?? []).map((sec: any) => `<div class="section"><div class="section-title">${sec.sectionName}</div><table><thead><tr><th style="width:55%">Concepto</th><th>Uds.</th><th>P/U</th><th>Subtotal</th></tr></thead><tbody>${(sec.items ?? []).map((it: any) => `<tr><td>${it.concept}</td><td>${it.units}</td><td>${Number(it.unitPrice).toFixed(2)} €</td><td><strong>${Number(it.subtotal).toFixed(2)} €</strong></td></tr>`).join("")}</tbody></table><div class="section-sub">Subtotal sección: ${Number(sec.sectionSubtotal).toFixed(2)} €</div></div>`).join("")}
 <table class="totals"><tbody>
   <tr><td>Base imponible</td><td style="text-align:right;font-weight:700">${Number(s.baseImponible ?? 0).toFixed(2)} €</td></tr>
-  ${Number(s.ivaAmount ?? 0) > 0 ? `<tr><td>IVA (${s.ivaRate ?? 21}%)</td><td style="text-align:right">${Number(s.ivaAmount ?? 0).toFixed(2)} €</td></tr>` : ""}<!-- nosemgrep -->
+  ${Number(s.ivaAmount ?? 0) > 0 ? `<tr><td>IVA (${s.ivaRate ?? 21}%)</td><td style="text-align:right">${Number(s.ivaAmount ?? 0).toFixed(2)} €</td></tr>` : ""}
   <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${Number(s.total ?? 0).toFixed(2)} €</td></tr>
 </tbody></table>
-${s.totalInWords ? `<p class="words">${s.totalInWords}</p>` : ""}<!-- nosemgrep -->
+${s.totalInWords ? `<p class="words">${s.totalInWords}</p>` : ""}
 <div class="conditions"><h3>Condiciones</h3>
-${c.paymentTerms ? `<p><strong>Forma de pago:</strong> ${c.paymentTerms}</p>` : ""}<!-- nosemgrep -->
-${c.deliveryTime ? `<p><strong>Plazo de entrega:</strong> ${c.deliveryTime}</p>` : ""}<!-- nosemgrep -->
-${c.validity ? `<p><strong>Validez:</strong> ${c.validity}</p>` : ""}<!-- nosemgrep -->
-${c.includesRevisions ? `<p><strong>Revisiones:</strong> ${c.includesRevisions}</p>` : ""}<!-- nosemgrep -->
-${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""}<!-- nosemgrep -->
+${c.paymentTerms ? `<p><strong>Forma de pago:</strong> ${c.paymentTerms}</p>` : ""}
+${c.deliveryTime ? `<p><strong>Plazo de entrega:</strong> ${c.deliveryTime}</p>` : ""}
+${c.validity ? `<p><strong>Validez:</strong> ${c.validity}</p>` : ""}
+${c.includesRevisions ? `<p><strong>Revisiones:</strong> ${c.includesRevisions}</p>` : ""}
+${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""}
 </div>
 <div class="footer"><div class="stamp">PRESUPUESTO</div><p style="margin-top:12px">Shopy Crafter · Agencia de Optimización Shopify con IA</p></div>
 </body></html>`;

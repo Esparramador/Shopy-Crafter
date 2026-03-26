@@ -262,14 +262,14 @@ export default function RedesignPage() {
   <div class="metric-card"><div class="label">Rediseñados</div><div class="value status-ok">${redesignedProducts.length}</div></div>
   <div class="metric-card"><div class="label">Pendientes</div><div class="value">${products.length - redesignedProducts.length}</div></div>
 </div>
-${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedProducts.map(p => {<!-- nosemgrep -->
+${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedProducts.map(p => {
   const r = results[(p as any).shopifyGid || (p as any).id];
-  return `<div style="margin:16px 0;padding:16px;border:1px solid rgba(200,168,75,0.2);border-radius:12px"> // nosemgrep
+  return `<div style="margin:16px 0;padding:16px;border:1px solid rgba(200,168,75,0.2);border-radius:12px">
   <h3>${r?.title || (p as any).title}</h3>
-  ${r?.shortDescription ? `<p style="color:#aaa">${r.shortDescription}</p>` : ""}<!-- nosemgrep -->
-  ${r?.price ? `<p><strong>Precio sugerido:</strong> ${r.price}€</p>` : ""}<!-- nosemgrep -->
-  ${r?.tags?.length ? `<p><strong>Tags:</strong> ${r.tags.join(", ")}</p>` : ""}<!-- nosemgrep -->
-  ${r?.photoBriefs?.length ? `<h4>Photo Briefs</h4><ol>${r.photoBriefs.map(b => `<li>${b}</li>`).join("")}</ol>` : ""}<!-- nosemgrep -->
+  ${r?.shortDescription ? `<p style="color:#aaa">${r.shortDescription}</p>` : ""}
+  ${r?.price ? `<p><strong>Precio sugerido:</strong> ${r.price}€</p>` : ""}
+  ${r?.tags?.length ? `<p><strong>Tags:</strong> ${r.tags.join(", ")}</p>` : ""}
+  ${r?.photoBriefs?.length ? `<h4>Photo Briefs</h4><ol>${r.photoBriefs.map(b => `<li>${b}</li>`).join("")}</ol>` : ""}
 </div>`;
 }).join("")}` : "<p>Aún no se han generado rediseños en esta sesión.</p>"}`;
             }}

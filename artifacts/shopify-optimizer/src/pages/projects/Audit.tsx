@@ -956,13 +956,13 @@ export default function AuditPage() {
 </div>
 <h2>Distribución por Grado</h2>
 <table><tr><th>Grado</th><th>Cantidad</th><th>% del Total</th></tr>
-${["A", "B", "C", "D", "F"].map(g => `<tr><td><strong>${g}</strong></td><td>${grades[g] || 0}</td><td>${products.length ? ((grades[g] || 0) / products.length * 100).toFixed(1) : 0}%</td></tr>`).join("")}<!-- nosemgrep -->
+${["A", "B", "C", "D", "F"].map(g => `<tr><td><strong>${g}</strong></td><td>${grades[g] || 0}</td><td>${products.length ? ((grades[g] || 0) / products.length * 100).toFixed(1) : 0}%</td></tr>`).join("")}
 </table>
 <h2>Detalle por Producto</h2>
 <table><tr><th>Producto</th><th>Grado</th><th>Score</th><th>Precio</th><th>Estado</th></tr>
-${products.slice(0, 100).map((p: any) => `<tr><td>${p.title}</td><td><strong>${p.grade || "?"}</strong></td><td>${Math.round(p.auditScore || 0)}/100</td><td>${p.price ? p.price + "€" : "—"}</td><td>${p.status === "active" ? '<span class="status-ok">Activo</span>' : '<span class="status-warn">Borrador</span>'}</td></tr>`).join("")}<!-- nosemgrep -->
+${products.slice(0, 100).map((p: any) => `<tr><td>${p.title}</td><td><strong>${p.grade || "?"}</strong></td><td>${Math.round(p.auditScore || 0)}/100</td><td>${p.price ? p.price + "€" : "—"}</td><td>${p.status === "active" ? '<span class="status-ok">Activo</span>' : '<span class="status-warn">Borrador</span>'}</td></tr>`).join("")}
 </table>
-${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0, 20).map((o: any) => `<li><strong>${o.type}:</strong> ${o.title} — ${o.description || ""}</li>`).join("")}</ul>` : ""}`;<!-- nosemgrep -->
+${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0, 20).map((o: any) => `<li><strong>${o.type}:</strong> ${o.title} — ${o.description || ""}</li>`).join("")}</ul>` : ""}`;
             }}
           />
           <button

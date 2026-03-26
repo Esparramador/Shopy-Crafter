@@ -755,10 +755,10 @@ export default function PricingPage() {
   <div class="metric-card"><div class="label">Margen Neto</div><div class="value">${dash.netMarginPct}%</div></div>
   <div class="metric-card"><div class="label">AOV</div><div class="value">${formatCurrency(dash.aov)}</div></div>
 </div>
-${dash.alerts?.length ? `<h2>Alertas Financieras</h2><ul>${dash.alerts.map((a: any) => `<li><strong>${a.severity || "info"}:</strong> ${a.message || a}</li>`).join("")}</ul>` : ""}<!-- nosemgrep -->
+${dash.alerts?.length ? `<h2>Alertas Financieras</h2><ul>${dash.alerts.map((a: any) => `<li><strong>${a.severity || "info"}:</strong> ${a.message || a}</li>`).join("")}</ul>` : ""}
 <h2>Productos y Márgenes</h2>
 <table><tr><th>Producto</th><th>Precio</th></tr>
-${products.slice(0, 50).map((p: any) => `<tr><td>${p.title}</td><td>${p.price ? formatCurrency(Number(p.price)) : "—"}</td></tr>`).join("")}<!-- nosemgrep -->
+${products.slice(0, 50).map((p: any) => `<tr><td>${p.title}</td><td>${p.price ? formatCurrency(Number(p.price)) : "—"}</td></tr>`).join("")}
 </table>`;
           }}
         />
