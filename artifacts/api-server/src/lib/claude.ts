@@ -287,7 +287,7 @@ export async function buildShopyBrainContext(
   }
 }
 
-async function buildBrandDnaContext(projectId: number): Promise<string> {
+export async function buildBrandDnaContext(projectId: number): Promise<string> {
   try {
     const [dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
     if (!dna) return "";

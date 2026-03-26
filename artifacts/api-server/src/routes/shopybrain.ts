@@ -8,7 +8,7 @@ import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
 import * as fs from "fs";
@@ -206,6 +206,18 @@ INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es inf
     const guideBlock = isGuideRequest ? `\n\n${APP_GUIDE_KNOWLEDGE}` : "";
     const pageBlock = pageContext ? `\n\nPÁGINA ACTUAL DEL USUARIO: ${pageContext}\nRuta: ${currentRoute}\nINSTRUCCIÓN: Si el usuario pregunta algo, ten en cuenta que está en esta página. Si pide ayuda, guíale con los botones y opciones EXACTOS de esta página. Sé muy específico con nombres de botones, ubicaciones y orden de pasos.` : "";
 
+    let brandDnaBlock = "";
+    const activeProjectId = req.body.activeProjectId;
+    if (activeProjectId) {
+      try {
+        const [brandDna, brainContext] = await Promise.all([
+          buildBrandDnaContext(parseInt(activeProjectId)),
+          buildShopyBrainContext(niche, "general"),
+        ]);
+        brandDnaBlock = (brainContext || "") + (brandDna || "");
+      } catch {}
+    }
+
     const actionDetectionBlock = `
 
 CAPACIDADES DE ACCIÓN DIRECTA — SHOPIFY:
@@ -291,7 +303,7 @@ Responde siempre en español, de forma directa, clara y accionable.
 Cuando el usuario pida ayuda o pregunte cómo hacer algo, actúa como GUÍA INTERACTIVA: da instrucciones paso a paso con los nombres EXACTOS de botones, páginas y secciones de la app.
 Si conoces la página actual del usuario, contextualiza tu respuesta a esa página.
 Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.
-PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, etc., EJECUTA la acción correspondiente.`) + actionDetectionBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext;
+PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, etc., EJECUTA la acción correspondiente.`) + actionDetectionBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
 
     const projectContext = req.body.activeProjectId ? `\n[CONTEXTO: El usuario tiene el proyecto activo con ID ${req.body.activeProjectId}. Úsalo como projectId en las acciones.]` : "";
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
@@ -344,19 +356,33 @@ PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuari
     return;
   }
 
-  const systemPrompt = `Eres Shopy Brain, el megacerebro de eCommerce Shopify.
+  const activeProjectId = req.body.activeProjectId;
+  const researchSystemPrompt = `Eres Shopy Brain, el megacerebro de eCommerce Shopify con acceso a todo el conocimiento acumulado de la plataforma.
 Analiza y responde con datos concretos sobre: ${searchType ?? "estrategia general"}.
-Nicho de mercado: ${niche ?? "general"}. 
-Proporciona insights accionables y específicos.`;
+Nicho de mercado: ${niche ?? "general"}.
+Proporciona insights accionables y específicos basados en tu experiencia real con tiendas Shopify.
+Incluye datos de pricing, competencia, tendencias y estrategias probadas.`;
 
-  const aiRes = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: "user", content: query }],
-  });
-
-  const aiContent = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+  let aiContent = "";
+  if (activeProjectId) {
+    aiContent = await askClaudeWithBrain(
+      parseInt(activeProjectId),
+      [{ role: "user", content: query }],
+      researchSystemPrompt,
+      "general",
+      niche || undefined,
+      1024
+    );
+  } else {
+    const brainCtx = await buildShopyBrainContext(niche || undefined, "general");
+    const aiRes = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 1024,
+      system: researchSystemPrompt + (brainCtx || ""),
+      messages: [{ role: "user", content: query }],
+    });
+    aiContent = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+  }
 
   await db.insert(omnicoreMemoriesTable).values({
     id: randomBytes(16).toString("hex"),
@@ -432,11 +458,12 @@ Principios que guían el análisis:
 - Todo orientado a mejorar la calidad del contenido, la estrategia y la ejecución
 Responde SOLO con el JSON, sin texto adicional.`;
 
+  const brainCtx = await buildShopyBrainContext(undefined, "general");
   const aiRes = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 4096,
     messages: [{ role: "user", content: `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}` }],
-    system: systemPrompt,
+    system: systemPrompt + (brainCtx || ""),
   });
 
   const rawText = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
@@ -743,29 +770,41 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
 
         if (params?.aiGenerate !== false) {
           try {
-            const aiRes = await anthropic.messages.create({
-              model: "claude-sonnet-4-5",
-              max_tokens: 1500,
-              system: "Eres un experto en copywriting eCommerce Shopify. Genera contenido que convierta. Responde SOLO JSON válido.",
-              messages: [{
-                role: "user",
-                content: `Genera contenido optimizado para un producto Shopify.
-Título: "${title}"
-Tipo: ${params?.productType || "no especificado"}
+            const parsed = await askClaudeJsonWithBrain<{
+              title?: string;
+              description?: string;
+              tags?: string[];
+              seoTitle?: string;
+              seoDescription?: string;
+            }>(
+              parseInt(projectId),
+              `Genera contenido PROFESIONAL optimizado para un nuevo producto Shopify.
+Título base: "${title}"
+Tipo de producto: ${params?.productType || "no especificado"}
 Nicho: ${project.storeNiche || "general"}
-Tono: ${project.brandTone || "profesional"}
+Tono de marca: ${project.brandTone || "profesional"}
+Precio: ${params?.price || "no especificado"}
 
-Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","tags":["tag1","tag2"],"seoTitle":"...","seoDescription":"..."}`
-              }],
-            });
-            const text = (aiRes.content[0] as { type: string; text: string }).text;
-            const match = text.match(/\{[\s\S]*\}/);
-            if (match) {
-              const parsed = JSON.parse(match[0]);
-              finalTitle = parsed.title || title;
-              finalBody = parsed.description || finalBody;
-              finalTags = Array.isArray(parsed.tags) ? parsed.tags.join(", ") : finalTags;
-            }
+INSTRUCCIONES:
+1. Mejora el título para SEO (mantén la esencia pero hazlo irresistible)
+2. Genera una descripción HTML profesional de AL MENOS 300 palabras con:
+   - Párrafo de apertura con storytelling emocional
+   - Lista de beneficios con bullet points (✅)
+   - Especificaciones técnicas si aplica
+   - Párrafo de cierre con CTA persuasivo
+3. Genera 15+ tags SEO relevantes para el nicho
+4. Meta title SEO (max 60 chars) y meta description (max 155 chars)
+
+Responde SOLO JSON válido:
+{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"..."}`,
+              `Eres un experto ELITE en copywriting eCommerce Shopify con 15 años de experiencia. Generas contenido que convierte visitantes en compradores. Conoces las mejores prácticas de SEO, persuasión y storytelling de marca. Responde SOLO JSON válido.`,
+              "seo",
+              project.storeNiche || undefined,
+              2500
+            );
+            finalTitle = parsed.title || title;
+            finalBody = parsed.description || finalBody;
+            finalTags = Array.isArray(parsed.tags) ? parsed.tags.join(", ") : finalTags;
           } catch { /* use original data */ }
         }
 
@@ -807,6 +846,21 @@ Genera JSON: {"title":"...","description":"HTML persuasiva con bullet points","t
             shopifyId: created.product.id,
           },
         }).catch(() => {});
+
+        learnFromOperation({
+          operationType: "product_creation",
+          niche: project.storeNiche,
+          productType: params?.productType || null,
+          title: `Producto creado: ${created.product.title}`,
+          content: JSON.stringify({
+            title: created.product.title,
+            description: finalBody ? String(finalBody).slice(0, 500) : "",
+            tags: finalTags,
+            price: params?.price,
+            handle: created.product.handle,
+          }),
+          confidence: 0.8,
+        });
 
         result = {
           productId: created.product.id,
@@ -1958,7 +2012,7 @@ Crea colecciones que:
 3. Tengan títulos SEO atractivos
 4. Usen smart collections cuando sea posible (basadas en tags o product_type)
 
-JSON: {"collections":[{"title":"Nombre","type":"smart o custom","description":"descripción HTML profesional","rules":[{"column":"tag","relation":"equals","condition":"valor"}],"productIds":[ids si es custom],"sortOrder":"best-selling"}]}`, CLAUDE_EXPERT_SYSTEM, "ecommerce", project.storeNiche || undefined, 6144);
+JSON: {"collections":[{"title":"Nombre","type":"smart o custom","description":"descripción HTML profesional","rules":[{"column":"tag","relation":"equals","condition":"valor"}],"productIds":[ids si es custom],"sortOrder":"best-selling"}]}`, CLAUDE_EXPERT_SYSTEM, "general", project.storeNiche || undefined, 6144);
 
         const created: Array<{ id: unknown; title: string; type: string }> = [];
         for (const col of collectionsAi.collections || []) {
