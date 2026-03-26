@@ -60,9 +60,14 @@ async function ensureProjectConfig() {
 
       if (niche) {
         await db.update(projectsTable)
-          .set({ storeNiche: niche, brandTone: tone })
+          .set({
+            storeNiche: niche,
+            brandTone: tone,
+            targetAudience: "Fans de cómics, manga y juegos de cartas coleccionables",
+            storeMarkets: "España",
+          })
           .where(eq(projectsTable.id, project.id));
-        logger.info({ projectId: project.id, niche, tone }, "✅ Project config synced (store_niche + brand_tone)");
+        logger.info({ projectId: project.id, niche, tone }, "✅ Project config synced (niche + tone + audience + markets)");
       }
     }
   } catch (err) {
@@ -115,8 +120,8 @@ const server = app.listen(port, (err?: Error) => {
       if (created > 0) logger.info({ created }, "🧠 Knowledge domains seeded on startup");
       else logger.info("🧠 All knowledge domains already present");
     })
-    .catch((err) => logger.error({ err }, "⚠️  Knowledge domain seeding failed — continuing startup"));
-  registerCronJobs();
+    .catch((err) => logger.error({ err }, "⚠️  Knowledge domain seeding failed — continuing startup"))
+    .finally(() => registerCronJobs());
 });
 
 // ── Extended timeouts for long-running AI research tasks ─────────────────────
