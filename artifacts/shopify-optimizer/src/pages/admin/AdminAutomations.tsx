@@ -104,7 +104,7 @@ export default function AdminAutomations() {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Total Jobs", value: jobs.length, icon: "⚡", color: "#c8a84b" },
           { label: "En ejecución", value: jobs.filter(j => j.status === "running" || runningJobs.has(j.id)).length, icon: "🔄", color: "#2dd49f" },

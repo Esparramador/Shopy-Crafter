@@ -109,7 +109,7 @@ export default function Billing() {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
             {plans.map((plan: any) => {
               const isCurrent = plan.id === currentPlan;
               return (
@@ -183,7 +183,7 @@ export default function Billing() {
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 16, marginBottom: 24 }}>
                 {[
                   { icon: "👆", label: "Clicks", value: affiliateData.affiliate.clicks },
                   { icon: "✅", label: "Registros", value: affiliateData.affiliate.signups },

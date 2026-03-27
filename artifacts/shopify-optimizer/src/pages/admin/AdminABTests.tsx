@@ -76,7 +76,7 @@ export default function AdminABTests() {
         <p style={{ fontSize: 13, color: "var(--t3)", marginTop: 4 }}>Todos los tests A/B de todos los proyectos</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 12, marginBottom: 20 }}>
         {[
           { icon: <Activity size={18} />, label: "En curso", value: running, color: "#2dd49f" },
           { icon: <Award size={18} />, label: "Completados", value: completed, color: "#4a9edd" },

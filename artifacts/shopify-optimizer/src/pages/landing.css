@@ -871,6 +871,7 @@
   }
   .fp-footer-inner { grid-template-columns: 1fr 1fr; }
   .fp-footer-brand { grid-column: 1 / -1; }
+  .l-features-grid { grid-template-columns: 1fr 1fr; }
   .fp-engine-tabs { gap: 6px; }
   .fp-etab { padding: 6px 12px; }
   .fp-etab-name { display: none; }
@@ -1007,6 +1008,9 @@
   .fp-footer-col { display: none; }
   .l-footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
   .l-footer-badges { flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+  /* Features grid — stack on mobile */
+  .l-features-grid { grid-template-columns: 1fr !important; }
 
   /* Contact form */
   .fp-contact-form {

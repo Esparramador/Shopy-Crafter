@@ -133,7 +133,7 @@ export default function Competitors() {
       )}
 
       {loading ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16 }}>
           {[1,2].map(i => <div key={i} className="skeleton" style={{ height: 140, borderRadius: 12 }} />)}
         </div>
       ) : competitors.length === 0 ? (
@@ -146,7 +146,7 @@ export default function Competitors() {
           </button>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16 }}>
           {competitors.map(comp => (
             <div key={comp.id} className="glass-card" style={{ padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>

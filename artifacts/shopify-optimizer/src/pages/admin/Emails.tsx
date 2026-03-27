@@ -554,7 +554,7 @@ export default function Emails() {
                       </button>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 10, marginBottom: 16 }}>
                       {[
                         { l: "Flow", v: `${FLOW_TYPES[form.flow_type]?.icon} ${FLOW_TYPES[form.flow_type]?.label}` },
                         { l: "Tono", v: TONES[form.tone] },

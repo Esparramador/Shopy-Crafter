@@ -76,7 +76,7 @@ export default function AdminProducts() {
         <p style={{ fontSize: 13, color: "var(--t3)", marginTop: 4 }}>Todos los productos de todos los proyectos</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 12, marginBottom: 20 }}>
         {(["A", "B", "C", "D", "F"] as const).map(grade => (
           <button key={grade} onClick={() => setFilterGrade(filterGrade === grade ? "" : grade)}
             className="glass-card" style={{

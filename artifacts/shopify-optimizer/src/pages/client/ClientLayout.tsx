@@ -1,7 +1,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -26,6 +26,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [cp, setCp] = useState<ClientCmsPanel>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/cms/content`)
@@ -33,6 +34,8 @@ export function ClientLayout({ children }: { children: ReactNode }) {
       .then(d => { if (d?.clientPanel) setCp(d.clientPanel); })
       .catch(() => {});
   }, []);
+
+  useEffect(() => { setSidebarOpen(false); }, [location]);
 
   const NAV_ITEMS = DEFAULT_NAV_ITEMS.map((item, i) => ({
     ...item,
@@ -46,8 +49,15 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
+      {/* ── TABLET SIDEBAR OVERLAY ── */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? " visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       {/* ── SIDEBAR ── */}
-      <nav className="sidebar">
+      <nav className={`sidebar${sidebarOpen ? " open" : ""}`} role="navigation" aria-label="Navegación cliente">
         {/* Logo */}
         <div className="sidebar-logo">
           <div className="logo-gem">⚡</div>
@@ -150,6 +160,14 @@ export function ClientLayout({ children }: { children: ReactNode }) {
       <div className="main-area">
         {/* Topbar */}
         <div className="topbar">
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
           <div className="topbar-breadcrumb">
             <span style={{ fontSize: 13, color: "var(--t2)" }}>⚡</span>
             <span className="topbar-page">{cp.topbar ?? "Tu agencia trabaja para ti 24/7"}</span>

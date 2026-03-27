@@ -220,7 +220,7 @@ body{font-family:'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;padding:40p
 .logo span{color:#1a1a1a}
 .budget-num{font-size:22px;font-weight:800;color:#c8a84b;text-align:right}
 .budget-date{font-size:12px;color:#666;text-align:right;margin-top:4px}
-.parties{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px}
+.parties{display:grid;grid-template-columns:repeat(auto-fit, minmax(min(280px, 100%), 1fr));gap:30px;margin-bottom:30px}
 .party{padding:16px;border-radius:8px}
 .party.from{background:#f8f6f0;border-left:4px solid #c8a84b}
 .party.to{background:#f0f4f8;border-left:4px solid #2d8cf0}

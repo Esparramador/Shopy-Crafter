@@ -603,7 +603,7 @@ export default function EmailTemplates() {
 
               <div style={{ marginTop: 16 }}>
                 <label style={labelStyle}>Colores de marca</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 10 }}>
                   {[
                     { key: "primary", label: "Principal" },
                     { key: "accent", label: "Acento" },
@@ -667,7 +667,7 @@ export default function EmailTemplates() {
 
               <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>Tono del email</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: 6 }}>
                   {TONES.map(t => (
                     <button key={t.value} onClick={() => setForm(p => ({ ...p, tone: t.value }))}
                       style={{

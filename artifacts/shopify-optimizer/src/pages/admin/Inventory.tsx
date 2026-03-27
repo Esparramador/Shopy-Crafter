@@ -102,7 +102,7 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 16, marginBottom: 24 }}>
         {[
           { label: "Total Productos", value: inventory.length, icon: "📦", color: "var(--t)" },
           { label: "Stock Crítico", value: critical.length, icon: "🚨", color: "var(--crim)" },
