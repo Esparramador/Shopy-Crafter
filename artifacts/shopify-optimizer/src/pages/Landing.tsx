@@ -5,9 +5,10 @@ import "./landing.css";
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-function ApkDownloadButton() {
+function ApkDownloadButton({ labels }: { labels?: { idle: string; checking: string; downloading: string; building: string; unavailable: string } }) {
   const [status, setStatus] = useState<"idle" | "checking" | "downloading" | "unavailable">("idle");
   const [apkAvailable, setApkAvailable] = useState<boolean | null>(null);
+  const lb = labels ?? { idle: "📱 Descargar App Android", checking: "Verificando...", downloading: "⬇ Descargando...", building: "🔜 Disponible próximamente", unavailable: "No disponible" };
 
   const handleClick = async () => {
     if (status === "downloading") return;
@@ -39,10 +40,10 @@ function ApkDownloadButton() {
     }
   };
 
-  const label = status === "checking" ? "Verificando..."
-    : status === "downloading" ? "⬇ Descargando..."
-    : status === "unavailable" ? (apkAvailable === false ? "🔜 Disponible próximamente" : "No disponible")
-    : "📱 Descargar App Android";
+  const label = status === "checking" ? lb.checking
+    : status === "downloading" ? lb.downloading
+    : status === "unavailable" ? (apkAvailable === false ? lb.building : lb.unavailable)
+    : lb.idle;
 
   return (
     <button
@@ -83,21 +84,20 @@ type CMSContent = {
   testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string; avatarUrl?: string | null }[] };
   contact?: { pill: string; headline: string; headlineHighlight: string; subheadline: string; buttonLabel: string; successTitle: string; successText: string; successSubtext: string; finePrint: string; labels: Record<string, string>; placeholders: Record<string, string>; nicheOptions: string[]; revenueOptions: string[]; socialLabel?: string; socialPlaceholder?: string; servicesLabel?: string; serviceOptions?: string[] };
   cta: { pill: string; headline: string; headlineHighlight: string; subheadline: string; placeholder: string; buttonLabel: string; finePrint: string };
+  howCards?: { icon: string; title: string; sub: string; barPercent: string }[];
+  howImpact?: { icon: string; title: string; sub: string };
+  sectionNav?: string[];
+  adminBackLabel?: string;
+  apkLabels?: { idle: string; checking: string; downloading: string; building: string; unavailable: string };
+  errorMessages?: { sendFail: string; unexpected: string };
+  heroDemoTitles?: { storeHealth: string; recentActivity: string };
   footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
 };
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const FP_SECTIONS = [
-  { id: "fp-hero",    nav: "Inicio" },
-  { id: "fp-engines", nav: "Motores" },
-  { id: "fp-demo",   nav: "Demo" },
-  { id: "fp-results", nav: "Resultados" },
-  { id: "fp-pricing", nav: "Precios" },
-  { id: "fp-clients",  nav: "Clientes" },
-  { id: "fp-contact",  nav: "Contactar" },
-  { id: "fp-cta",     nav: "Empezar" },
-];
+const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-clients", "fp-contact", "fp-cta"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Motores", "Demo", "Resultados", "Precios", "Clientes", "Contactar", "Empezar"];
 
 function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
   const [val, setVal] = useState(0);
@@ -141,6 +141,9 @@ export default function Landing() {
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
 
+  const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
+  const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
+
   const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setContactForm(f => ({ ...f, [field]: e.target.value }));
 
@@ -159,11 +162,11 @@ export default function Landing() {
         body: JSON.stringify({ ...contactForm, services: contactServices }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
+      if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");
-      setContactError(err instanceof Error ? err.message : "Error inesperado. Inténtalo de nuevo.");
+      setContactError(err instanceof Error ? err.message : (content?.errorMessages?.unexpected ?? "Error inesperado. Inténtalo de nuevo."));
     }
   };
 
@@ -360,7 +363,7 @@ export default function Landing() {
           ) : (
             <div className="l-nav-gem">{content.site.logo.value}</div>
           )}
-          <div className="l-nav-logo-text">Shopy<em>Crafter</em></div>
+          <div className="l-nav-logo-text">{content.site.name}</div>
         </a>
         <ul className="l-nav-links">
           {FP_SECTIONS.map((sec, i) => (
@@ -371,7 +374,7 @@ export default function Landing() {
         </ul>
         <div className="l-nav-ctas">
           {isAdmin ? (
-            <Link href="/admin/clients" className="l-btn-gold">← Volver al panel</Link>
+            <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
           ) : (
             <>
               <Link href="/login" className="l-btn-ghost">{content.nav.ctaSecondary.label}</Link>
@@ -454,7 +457,7 @@ export default function Landing() {
                 <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.hero.ctaPrimary.label}</a>
                 <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); goToSection(2); }}>{content.hero.ctaSecondary.label}</a>
               </div>
-              <ApkDownloadButton />
+              <ApkDownloadButton labels={content.apkLabels} />
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {content.hero.trustItems.map((item, i) => (
                   <div key={i} className="l-trust-item"><div className="l-trust-check">✓</div>{item}</div>
@@ -481,7 +484,7 @@ export default function Landing() {
                   </div>
                   <div className="l-preview-body">
                     <div className="l-preview-sb">
-                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopyCrafter</div></div>
+                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">{content.site.name}</div></div>
                       {(Array.isArray(content.hero.demo?.navItems) ? content.hero.demo!.navItems : ["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"]).map((item, i) => (
                         <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
                       ))}
@@ -498,7 +501,7 @@ export default function Landing() {
                       </div>
                       <div className="l-pm-row2">
                         <div className="l-pm-card2">
-                          <div className="l-pm-c2-title">Salud de tiendas</div>
+                          <div className="l-pm-c2-title">{content.heroDemoTitles?.storeHealth ?? "Salud de tiendas"}</div>
                           {(content.hero.demo?.stores ?? [{ name: "Moda Urbana", score: "88" }, { name: "TechGadgets", score: "71" }, { name: "Casa & Arte", score: "42" }]).map((s, i) => {
                             const v = parseInt(String(s.score), 10) || 0;
                             const color = v >= 80 ? "#2dd49f" : v >= 60 ? "#4a9edd" : "#e84558";
@@ -511,7 +514,7 @@ export default function Landing() {
                           })}
                         </div>
                         <div className="l-pm-card2">
-                          <div className="l-pm-c2-title">Actividad reciente</div>
+                          <div className="l-pm-c2-title">{content.heroDemoTitles?.recentActivity ?? "Actividad reciente"}</div>
                           {(content.hero.demo?.activity ?? ["A/B Test ganador · +28% conv.", "48 imágenes · €13.44", "Schema SEO · 234 productos"]).map((txt, i) => {
                             const icons = [{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f" }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd" }];
                             const ic = icons[i % icons.length];
@@ -631,25 +634,34 @@ export default function Landing() {
               </div>
             </div>
             <div className={`fp-split-right ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.15s" }}>
-              {[
-                { ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f", title: "Auditoría completada", sub: "234 productos analizados · 12 acciones urgentes", barW: "88%", barColor: "linear-gradient(90deg,#2dd49f,#5ee8bc)" },
-                { ico: "🎨", bg: "rgba(200,168,75,.1)", color: "#e6c668", title: "Imágenes generándose", sub: "flux-1.1-pro · 48/234 productos", barW: "21%", barColor: "linear-gradient(90deg,#c8a84b,#e6c668)", animate: true },
-                { ico: "⚗️", bg: "rgba(74,158,221,.1)", color: "#4a9edd", title: "A/B Test activo", sub: "Bomber Hero · 342 visitas · 67% confianza", barW: "67%", barColor: "linear-gradient(90deg,#4a9edd,#7ec0f0)" },
-              ].map((c, i) => (
-                <div key={i} className="l-how-card">
-                  <div className="l-how-card-h">
-                    <div className="l-how-card-ico" style={{ background: c.bg, color: c.color }}>{c.ico}</div>
-                    <div><div className="l-how-card-title">{c.title}</div><div className="l-how-card-sub">{c.sub}</div></div>
+              {(content.howCards ?? [
+                { icon: "✓", title: "Auditoría completada", sub: "234 productos analizados · 12 acciones urgentes", barPercent: "88" },
+                { icon: "🎨", title: "Imágenes generándose", sub: "flux-1.1-pro · 48/234 productos", barPercent: "21" },
+                { icon: "⚗️", title: "A/B Test activo", sub: "Bomber Hero · 342 visitas · 67% confianza", barPercent: "67" },
+              ]).map((c, i) => {
+                const colors = ["#2dd49f", "#e6c668", "#4a9edd"];
+                const cl = colors[i % colors.length];
+                return (
+                  <div key={i} className="l-how-card">
+                    <div className="l-how-card-h">
+                      <div className="l-how-card-ico" style={{ background: `${cl}18`, color: cl }}>{c.icon}</div>
+                      <div><div className="l-how-card-title">{c.title}</div><div className="l-how-card-sub">{c.sub}</div></div>
+                    </div>
+                    <div className="l-how-bar"><div className="l-how-bar-f" style={{ width: `${c.barPercent}%`, background: `linear-gradient(90deg,${cl},${cl}88)`, transition: "width 3s ease" }}></div></div>
                   </div>
-                  <div className="l-how-bar"><div className="l-how-bar-f" style={{ width: c.barW, background: c.barColor, transition: "width 3s ease" }}></div></div>
-                </div>
-              ))}
-              <div className="l-how-card l-how-card-green">
-                <div className="l-how-card-h">
-                  <div className="l-how-card-ico" style={{ background: "rgba(45,212,159,.1)", color: "#2dd49f" }}>💰</div>
-                  <div><div className="l-how-card-title">Impacto estimado</div><div className="l-how-card-sub" style={{ color: "#2dd49f" }}>+€8,400/mes proyectados este mes</div></div>
-                </div>
-              </div>
+                );
+              })}
+              {(() => {
+                const imp = content.howImpact ?? { icon: "💰", title: "Impacto estimado", sub: "+€8,400/mes proyectados este mes" };
+                return (
+                  <div className="l-how-card l-how-card-green">
+                    <div className="l-how-card-h">
+                      <div className="l-how-card-ico" style={{ background: "rgba(45,212,159,.1)", color: "#2dd49f" }}>{imp.icon}</div>
+                      <div><div className="l-how-card-title">{imp.title}</div><div className="l-how-card-sub" style={{ color: "#2dd49f" }}>{imp.sub}</div></div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </section>
@@ -999,7 +1011,7 @@ export default function Landing() {
                     ) : (
                       <div className="l-nav-gem">{content.site.logo.value}</div>
                     )}
-                    <div className="l-nav-logo-text">Shopy<em>Crafter</em></div>
+                    <div className="l-nav-logo-text">{content.site.name}</div>
                   </a>
                   <p className="l-footer-desc">{content.footer.tagline}</p>
                 </div>

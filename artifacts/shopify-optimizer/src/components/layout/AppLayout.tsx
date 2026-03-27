@@ -66,10 +66,18 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [cmsNav, setCmsNav] = useState<{ modules: typeof DEFAULT_MODULE_NAV; shopybrain: typeof DEFAULT_SHOPYBRAIN_NAV; admin: typeof DEFAULT_ADMIN_NAV } | null>(null);
+  const [cmsPanel, setCmsPanel] = useState<{
+    sidebarLabels?: { yourStores?: string; noStores?: string; newStore?: string; admin?: string; config?: string; madeBy?: string };
+    header?: { offline?: string; search?: string; active?: string };
+    user?: { unlimited?: string; adminRole?: string };
+    tooltips?: { lightMode?: string; darkMode?: string; logout?: string };
+    notifications?: { title?: string; empty?: string; emptyHint?: string };
+  } | null>(null);
 
   const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
   const shopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
   const adminNav = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
+  const ap = cmsPanel ?? {};
 
   const pageLabels: Record<string, string> = {};
   moduleNav.forEach(m => { pageLabels[m.id] = m.label; });
@@ -85,6 +93,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.adminNav) setCmsNav(d.adminNav);
+        if (d?.adminPanel) setCmsPanel(d.adminPanel);
       })
       .catch(() => {});
   }, []);
@@ -122,7 +131,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           boxShadow: "0 2px 12px rgba(232,69,88,0.4)",
         }}>
           <WifiOff size={14} />
-          Sin conexión — tus cambios se guardan localmente
+          {ap.header?.offline ?? "Sin conexión — tus cambios se guardan localmente"}
         </div>
       )}
       {/* ── TABLET SIDEBAR OVERLAY ── */}
@@ -145,7 +154,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Stores list */}
         <div className="sidebar-clients">
-          <span className="sidebar-label">Tus Tiendas</span>
+          <span className="sidebar-label">{ap.sidebarLabels?.yourStores ?? "Tus Tiendas"}</span>
 
           {isLoading ? (
             <>
@@ -176,13 +185,13 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
 
           {projects?.length === 0 && !isLoading && (
-            <p style={{ fontSize: 11, color: "var(--t3)", padding: "4px 8px" }}>Sin tiendas aún</p>
+            <p style={{ fontSize: 11, color: "var(--t3)", padding: "4px 8px" }}>{ap.sidebarLabels?.noStores ?? "Sin tiendas aún"}</p>
           )}
 
           <Link href="/new-project">
             <div className="nav-item" style={{ marginTop: 4 }} role="button">
               <span className="nav-icon">＋</span>
-              Nueva tienda
+              {ap.sidebarLabels?.newStore ?? "Nueva tienda"}
             </div>
           </Link>
         </div>
@@ -208,7 +217,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Admin nav */}
         <div className="sidebar-nav">
-          <span className="sidebar-label">Administración</span>
+          <span className="sidebar-label">{ap.sidebarLabels?.admin ?? "Administración"}</span>
 
           {adminNav.map(item => (
             <Link key={item.href} href={item.href}>
@@ -238,7 +247,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Link href={`/projects/${activeProject.id}/settings`}>
               <div className={`nav-item${currentPage === "settings" ? " active" : ""}`} role="button">
                 <span className="nav-icon"><Settings size={13} /></span>
-                Configuración
+                {ap.sidebarLabels?.config ?? "Configuración"}
               </div>
             </Link>
           )}
@@ -250,7 +259,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           borderTop: "1px solid var(--bdr)",
         }}>
           <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 6 }}>
-            Hecho por
+            {ap.sidebarLabels?.madeBy ?? "Hecho por"}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {/* Instagram */}
@@ -340,7 +349,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="sidebar-bottom">
           <div className="credits-bar-label">
             <span>IA Credits</span>
-            <span style={{ color: "var(--jade)" }}>∞ Ilimitados</span>
+            <span style={{ color: "var(--jade)" }}>∞ {ap.user?.unlimited ?? "Ilimitados"}</span>
           </div>
           <div className="credits-bar">
             <div className="credits-bar-fill" style={{ width: "78%" }} />
@@ -362,7 +371,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
               <div className="client-info">
                 <p className="client-name">{user.name}</p>
-                <p className="client-domain">Administrador</p>
+                <p className="client-domain">{ap.user?.adminRole ?? "Administrador"}</p>
               </div>
               <Link href="/admin/settings" title="Ajustes de cuenta" aria-label="Ajustes de cuenta">
                 <div style={{
@@ -377,8 +386,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               </Link>
               <button
                 onClick={toggleDarkMode}
-                title={darkMode ? "Modo claro" : "Modo oscuro"}
-                aria-label={darkMode ? "Activar modo claro" : "Activar modo oscuro"}
+                title={darkMode ? (ap.tooltips?.lightMode ?? "Modo claro") : (ap.tooltips?.darkMode ?? "Modo oscuro")}
+                aria-label={darkMode ? `Activar ${ap.tooltips?.lightMode ?? "modo claro"}` : `Activar ${ap.tooltips?.darkMode ?? "modo oscuro"}`}
                 style={{
                   background: "none", border: "none", cursor: "pointer",
                   color: "var(--t3)", padding: 4, borderRadius: 4,
@@ -390,8 +399,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               </button>
               <button
                 onClick={() => logout().then(() => navigate("/login"))}
-                title="Cerrar sesión"
-                aria-label="Cerrar sesión"
+                title={ap.tooltips?.logout ?? "Cerrar sesión"}
+                aria-label={ap.tooltips?.logout ?? "Cerrar sesión"}
                 style={{
                   background: "none", border: "none", cursor: "pointer",
                   color: "var(--t3)", padding: 4, borderRadius: 4,
@@ -441,11 +450,11 @@ export function AppLayout({ children }: AppLayoutProps) {
               }}
                 onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}
               >⌘K</kbd>
-              <span style={{ fontSize: 11, color: "var(--t4)" }}>Búsqueda</span>
+              <span style={{ fontSize: 11, color: "var(--t4)" }}>{ap.header?.search ?? "Búsqueda"}</span>
             </div>
             <div className="status-chip">
               <div className="status-pulse" />
-              Activo
+              {ap.header?.active ?? "Activo"}
             </div>
             <div style={{ position: "relative" }}>
               <button
@@ -461,12 +470,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                   borderRadius: 12, width: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
                 }}>
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>Notificaciones</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>{ap.notifications?.title ?? "Notificaciones"}</span>
                     <button onClick={() => setNotifOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4)", fontSize: 16 }}>×</button>
                   </div>
                   <div style={{ padding: "16px", textAlign: "center" }}>
-                    <p style={{ fontSize: 13, color: "var(--t3)" }}>Sin notificaciones nuevas</p>
-                    <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 4 }}>Las alertas de stock, competidores y logros aparecerán aquí</p>
+                    <p style={{ fontSize: 13, color: "var(--t3)" }}>{ap.notifications?.empty ?? "Sin notificaciones nuevas"}</p>
+                    <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 4 }}>{ap.notifications?.emptyHint ?? "Las alertas de stock, competidores y logros aparecerán aquí"}</p>
                   </div>
                 </div>
               )}

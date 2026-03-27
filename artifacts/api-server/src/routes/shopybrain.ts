@@ -339,6 +339,7 @@ Acciones disponibles:
 - fix_code: Aplicar una corrección a un archivo de código fuente. Params: {filePath, oldCode (texto exacto a reemplazar), newCode (código corregido), description (descripción del fix)}
 - list_source_files: Listar archivos del código fuente de la app. Params: {directory? (ej: "src/pages", "src/components"), pattern? (ej: ".tsx", ".ts")}
 - analyze_component: Analizar un componente/página en profundidad buscando bugs, problemas de UX, errores lógicos. Params: {filePath, focusOn? ("bugs","ux","performance","logic","all")}
+- update_cms: Editar contenido del CMS (landing, panel admin, panel cliente, textos, etc.). Params: {path (ej: "hero.headline", "pricing.plans.0.price", "adminPanel.sidebarLabels.yourStores"), value (nuevo valor)}
 
 REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
@@ -373,6 +374,7 @@ REGLAS:
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
 - Si dice "ver pedidos", usa get_orders
+- Si dice "cambia el texto de X", "edita la landing", "modifica el título del hero", "cambia el precio en la landing", "actualiza el CMS", "cambia el nombre del sitio", "edita el panel admin", "cambia el texto de X en la landing", EJECUTA update_cms con el path y value correspondientes. Paths comunes: hero.headline, hero.ctaPrimary.label, pricing.plans.0.price, site.name, adminPanel.sidebarLabels.yourStores, clientPanel.topbar, contact.buttonLabel, footer.copyright, etc.
 - USA projectId del contexto si el usuario tiene un proyecto activo
 - Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
 - Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
@@ -2681,6 +2683,17 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
           products: prodResults,
           message: `✅ Optimización de imágenes completada.\n🖼 ${optimizedImages} alt texts generados para ${prodResults.length} productos.\n📊 Total imágenes procesadas: ${totalImages}`,
         };
+        break;
+      }
+
+      case "update_cms": {
+        const fieldPath = params?.path;
+        const value = params?.value;
+        if (!fieldPath || value === undefined) { res.status(400).json({ error: "path y value requeridos" }); return; }
+        const cookieHeader = req.headers.cookie ?? "";
+        const cmsRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content`, { method: "PATCH", headers: { "Content-Type": "application/json", "Cookie": cookieHeader }, body: JSON.stringify({ path: fieldPath, value }) });
+        if (!cmsRes.ok) { res.status(500).json({ error: "Error al actualizar CMS" }); return; }
+        result = { success: true, path: fieldPath, message: `CMS actualizado: ${fieldPath} = ${typeof value === "string" ? value : JSON.stringify(value)}` };
         break;
       }
 

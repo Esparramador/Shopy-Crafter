@@ -852,7 +852,23 @@
   .fp-split-layout { grid-template-columns: 1fr; }
   .fp-split-right { display: none; }
   .fp-stats-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
-  .fp-pricing-row { grid-template-columns: 1fr; max-width: 460px; margin: 0 auto; }
+  .fp-pricing-row {
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 14px;
+    max-width: 100%;
+    margin: 0;
+    padding: 14px 0 20px;
+    scrollbar-width: none;
+  }
+  .fp-pricing-row::-webkit-scrollbar { display: none; }
+  .fp-pricing-row > * {
+    flex: 0 0 80%;
+    max-width: 340px;
+    scroll-snap-align: center;
+  }
   .fp-footer-inner { grid-template-columns: 1fr 1fr; }
   .fp-footer-brand { grid-column: 1 / -1; }
   .fp-engine-tabs { gap: 6px; }
@@ -957,12 +973,23 @@
   .fp-stat-val { font-size: 36px; }
   .fp-tech-logos { flex-wrap: wrap; gap: 8px; justify-content: center; }
 
-  /* Pricing */
+  /* Pricing — carousel on mobile */
   .fp-pricing-row {
-    grid-template-columns: 1fr !important;
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
     gap: 14px;
-    max-width: 340px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
+    padding: 14px 4px 20px;
+    scrollbar-width: none;
+  }
+  .fp-pricing-row::-webkit-scrollbar { display: none; }
+  .fp-pricing-row > * {
+    flex: 0 0 85%;
+    max-width: 320px;
+    scroll-snap-align: center;
   }
   .l-pricing-card { padding: 24px 20px; }
   .l-pricing-featured { transform: none !important; }
