@@ -134,7 +134,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
               <div className="status-pulse" />
               Online
             </div>
-            <button className="notif-btn" title="Notificaciones">🔔</button>
+            <button className="notif-btn" title="Notificaciones" onClick={() => {}}>🔔</button>
           </div>
         </div>
 

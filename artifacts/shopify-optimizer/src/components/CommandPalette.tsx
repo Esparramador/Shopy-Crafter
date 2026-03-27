@@ -7,7 +7,7 @@ const COMMANDS = [
   { id: "inventory", label: "Inventario M7", icon: "📦", path: "/admin/inventory", category: "Páginas" },
   { id: "competitors", label: "Competitor Intel", icon: "🎯", path: "/admin/competitors", category: "Páginas" },
   { id: "forecast", label: "Predicciones ML", icon: "🔮", path: "/admin/forecast", category: "Páginas" },
-  { id: "billing", label: "Billing & Planes", icon: "💳", path: "/admin/billing", category: "Páginas" },
+
   { id: "achievements", label: "Logros", icon: "🏆", path: "/admin/achievements", category: "Páginas" },
   { id: "roadmap", label: "Plan 30-60-90", icon: "🗺", path: "/admin/roadmap", category: "Páginas" },
   { id: "clients", label: "Gestión de Clientes", icon: "👥", path: "/admin/clients", category: "Páginas" },

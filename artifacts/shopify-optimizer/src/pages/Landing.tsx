@@ -74,12 +74,14 @@ function ApkDownloadButton() {
 type CMSContent = {
   site: { name: string; tagline: string; logo: { type: string; value: string; imageUrl: string | null }; primaryColor: string; accentColor: string; font_heading: string; font_body: string };
   nav: { links: { id: string; label: string; href: string }[]; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string } };
-  hero: { pill: { text: string; visible: boolean }; headline: string; headlineHighlight: string; subheadline: string; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string }; trustItems: string[]; imageUrl?: string | null };
-  features: { pill: string; headline: string; subheadline: string; items: { id: string; num: string; icon: string; iconBg: string; title: string; description: string; tags: string[]; imageUrl?: string | null }[] };
+  hero: { pill: { text: string; visible: boolean }; headline: string; headlineHighlight: string; subheadline: string; ctaPrimary: { label: string; href: string }; ctaSecondary: { label: string; href: string }; trustItems: string[]; imageUrl?: string | null; ctaApk?: { label: string; href: string }; scrollHint?: string; demo?: { url: string; status: string; navItems: string[]; metrics: { label: string; value: string; change: string }[]; stores: { name: string; score: string }[]; activity: string[] } };
+  features: { pill: string; headline: string; subheadline: string; items: { id: string; num: string; icon: string; iconBg: string; title: string; description: string; tags: string[]; imageUrl?: string | null; stats?: { label: string; value: string }[] }[] };
   stats: { id: string; num: string; label: string }[];
   how: { pill: string; headline: string; headlineHighlight: string; steps: { num: string; title: string; desc: string }[] };
+  results?: { pill: string; headline: string; headlineHighlight: string; stats: { prefix: string; num: string; suffix: string; label: string; color: string }[]; techBadges: { icon: string; label: string }[] };
   pricing: { pill: string; headline: string; subheadline: string; plans: { id: string; name: string; price: string; currency: string; period: string; featured: boolean; badge: string | null; features: { text: string; included: boolean }[]; cta: { label: string; style: string } }[] };
   testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string; avatarUrl?: string | null }[] };
+  contact?: { pill: string; headline: string; headlineHighlight: string; subheadline: string; buttonLabel: string; successTitle: string; successText: string; successSubtext: string; finePrint: string; labels: Record<string, string>; placeholders: Record<string, string>; nicheOptions: string[]; revenueOptions: string[]; socialLabel?: string; socialPlaceholder?: string; servicesLabel?: string; serviceOptions?: string[] };
   cta: { pill: string; headline: string; headlineHighlight: string; subheadline: string; placeholder: string; buttonLabel: string; finePrint: string };
   footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
 };
@@ -474,19 +476,19 @@ export default function Landing() {
                       <div className="l-dot" style={{ background: "#ffbd2e" }}></div>
                       <div className="l-dot" style={{ background: "#28ca41" }}></div>
                     </div>
-                    <div className="l-preview-url">app.shopifyai.pro/admin — Moda Urbana</div>
-                    <div className="l-preview-status"><div className="l-status-dot"></div>6 motores activos</div>
+                    <div className="l-preview-url">{content.hero.demo?.url ?? "app.shopifyai.pro/admin — Moda Urbana"}</div>
+                    <div className="l-preview-status"><div className="l-status-dot"></div>{content.hero.demo?.status ?? "6 motores activos"}</div>
                   </div>
                   <div className="l-preview-body">
                     <div className="l-preview-sb">
                       <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">ShopyCrafter</div></div>
-                      {["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"].map((item, i) => (
+                      {(Array.isArray(content.hero.demo?.navItems) ? content.hero.demo!.navItems : ["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"]).map((item, i) => (
                         <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
                       ))}
                     </div>
                     <div className="l-preview-main">
                       <div className="l-pm-row">
-                        {[{ lbl: "Revenue", val: "€32.4K", ch: "↑ 22%", color: "#e6c668" }, { lbl: "Conversión", val: "4.2%", ch: "↑ 0.9pp", color: "#2dd49f" }, { lbl: "Margen", val: "61%", ch: "↑ 8pts", color: "#f2f0ff" }, { lbl: "SEO", val: "88", ch: "↑ 23pts", color: "#4a9edd" }].map((c, i) => (
+                        {(content.hero.demo?.metrics ?? [{ label: "Revenue", value: "€32.4K", change: "↑ 22%" }, { label: "Conversión", value: "4.2%", change: "↑ 0.9pp" }, { label: "Margen", value: "61%", change: "↑ 8pts" }, { label: "SEO", value: "88", change: "↑ 23pts" }]).map((m, i) => ({ lbl: m.label, val: m.value, ch: m.change, color: ["#e6c668", "#2dd49f", "#f2f0ff", "#4a9edd"][i] ?? "#e6c668" })).map((c, i) => (
                           <div key={i} className="l-pm-card">
                             <div className="l-pm-lbl">{c.lbl}</div>
                             <div className="l-pm-val" style={{ color: c.color }}>{c.val}</div>
@@ -497,21 +499,29 @@ export default function Landing() {
                       <div className="l-pm-row2">
                         <div className="l-pm-card2">
                           <div className="l-pm-c2-title">Salud de tiendas</div>
-                          {[{ name: "Moda Urbana", v: 88, color: "#2dd49f", w: "88%" }, { name: "TechGadgets", v: 71, color: "#4a9edd", w: "71%" }, { name: "Casa & Arte", v: 42, color: "#e84558", w: "42%" }].map((s, i) => (
-                            <div key={i}>
-                              <div className="l-pm-bar-row"><span>{s.name}</span><span style={{ color: s.color }}>{s.v}</span></div>
-                              <div className="l-pm-bar"><div className="l-pm-bar-f" style={{ width: s.w, background: `linear-gradient(90deg,${s.color},${s.color}88)` }}></div></div>
-                            </div>
-                          ))}
+                          {(content.hero.demo?.stores ?? [{ name: "Moda Urbana", score: "88" }, { name: "TechGadgets", score: "71" }, { name: "Casa & Arte", score: "42" }]).map((s, i) => {
+                            const v = parseInt(String(s.score), 10) || 0;
+                            const color = v >= 80 ? "#2dd49f" : v >= 60 ? "#4a9edd" : "#e84558";
+                            return (
+                              <div key={i}>
+                                <div className="l-pm-bar-row"><span>{s.name}</span><span style={{ color }}>{v}</span></div>
+                                <div className="l-pm-bar"><div className="l-pm-bar-f" style={{ width: `${v}%`, background: `linear-gradient(90deg,${color},${color}88)` }}></div></div>
+                              </div>
+                            );
+                          })}
                         </div>
                         <div className="l-pm-card2">
                           <div className="l-pm-c2-title">Actividad reciente</div>
-                          {[{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f", txt: "A/B Test ganador · +28% conv." }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668", txt: "48 imágenes · €13.44" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd", txt: "Schema SEO · 234 productos" }].map((f, i) => (
-                            <div key={i} className="l-feed-row">
-                              <div className="l-feed-ico" style={{ background: f.bg, color: f.color }}>{f.ico}</div>
-                              <div className="l-feed-txt">{f.txt}</div>
-                            </div>
-                          ))}
+                          {(content.hero.demo?.activity ?? ["A/B Test ganador · +28% conv.", "48 imágenes · €13.44", "Schema SEO · 234 productos"]).map((txt, i) => {
+                            const icons = [{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f" }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd" }];
+                            const ic = icons[i % icons.length];
+                            return (
+                              <div key={i} className="l-feed-row">
+                                <div className="l-feed-ico" style={{ background: ic.bg, color: ic.color }}>{ic.ico}</div>
+                                <div className="l-feed-txt">{txt}</div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -522,7 +532,7 @@ export default function Landing() {
           </div>
 
           <div className="fp-scroll-hint">
-            <div className="fp-scroll-hint-text">Desliza para explorar</div>
+            <div className="fp-scroll-hint-text">{content.hero.scrollHint ?? "Desliza para explorar"}</div>
             <div className="fp-scroll-hint-arrow">↓</div>
           </div>
         </section>
@@ -570,13 +580,13 @@ export default function Landing() {
                   </div>
                 </div>
                 <div className="fp-engine-stats">
-                  {[
-                    { label: "Precisión", value: "94%", color: "var(--l-jade)" },
-                    { label: "Velocidad", value: "<2s", color: "var(--l-gold)" },
-                    { label: "Uptime", value: "99.9%", color: "var(--l-sky)" },
-                  ].map((stat, si) => (
+                  {(content.features.items[activeEngine].stats ?? [
+                    { label: "Precisión", value: "94%" },
+                    { label: "Velocidad", value: "<2s" },
+                    { label: "Uptime", value: "99.9%" },
+                  ]).map((stat, si) => (
                     <div key={si} className="fp-engine-stat">
-                      <div className="fp-engine-stat-val" style={{ color: stat.color }}>{stat.value}</div>
+                      <div className="fp-engine-stat-val" style={{ color: ["var(--l-jade)", "var(--l-gold)", "var(--l-sky)"][si] ?? "var(--l-jade)" }}>{stat.value}</div>
                       <div className="fp-engine-stat-lbl">{stat.label}</div>
                     </div>
                   ))}
@@ -654,29 +664,37 @@ export default function Landing() {
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.72)" }}></div>
           <div className="fp-content fp-results-layout">
             <div className={`fp-section-header ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">Resultados probados</div>
-              <h2 className="l-h2">Números que <em>hablan solos</em></h2>
+              <div className="l-pill">{content.results?.pill ?? "Resultados probados"}</div>
+              <h2 className="l-h2">{(() => {
+                const hl = content.results?.headline ?? "Números que hablan solos";
+                const hlHighlight = content.results?.headlineHighlight ?? "hablan solos";
+                if (hl.includes(hlHighlight)) {
+                  const parts = hl.split(hlHighlight);
+                  return <>{parts[0]}<em>{hlHighlight}</em>{parts.slice(1).join(hlHighlight)}</>;
+                }
+                return hl;
+              })()}</h2>
             </div>
             <div className={`fp-stats-grid ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {[
-                { prefix: "+", num: 234, suffix: "%", label: "Incremento medio en conversión", color: "var(--l-jade)" },
-                { prefix: "€", num: 8400, suffix: "/mes", label: "Ingresos adicionales promedio", color: "var(--l-gold)" },
-                { prefix: "", num: 99, suffix: ".9%", label: "Uptime garantizado de la plataforma", color: "var(--l-sky)" },
-                { prefix: "", num: 6, suffix: " motores", label: "Optimizando tu tienda 24/7", color: "#8b5cf6" },
-              ].map((stat, i) => (
+              {(content.results?.stats ?? [
+                { prefix: "+", num: "234", suffix: "%", label: "Incremento medio en conversión", color: "var(--l-jade)" },
+                { prefix: "€", num: "8400", suffix: "/mes", label: "Ingresos adicionales promedio", color: "var(--l-gold)" },
+                { prefix: "", num: "99", suffix: ".9%", label: "Uptime garantizado de la plataforma", color: "var(--l-sky)" },
+                { prefix: "", num: "6", suffix: " motores", label: "Optimizando tu tienda 24/7", color: "#8b5cf6" },
+              ]).map((stat, i) => (
                 <div key={i} className="fp-stat-card">
                   <div className="fp-stat-val" style={{ color: stat.color }}>
-                    {stat.prefix}<AnimatedCounter target={stat.num} />{stat.suffix}
+                    {stat.prefix}<AnimatedCounter target={parseInt(String(stat.num), 10) || 0} />{stat.suffix}
                   </div>
                   <div className="fp-stat-label">{stat.label}</div>
                 </div>
               ))}
             </div>
             <div className={`fp-tech-logos ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.25s" }}>
-              {[["🛍️","Shopify API"],["🤖","Claude AI"],["🎨","Replicate"],["🔍","GSC"],["📧","Klaviyo"],["🔐","AES-256"],["⚡","Shopify Flow"]].map(([icon, label], i) => (
+              {(content.results?.techBadges ?? [{ icon: "🛍️", label: "Shopify API" }, { icon: "🤖", label: "Claude AI" }, { icon: "🎨", label: "Replicate" }, { icon: "🔍", label: "GSC" }, { icon: "📧", label: "Klaviyo" }, { icon: "🔐", label: "AES-256" }, { icon: "⚡", label: "Shopify Flow" }]).map((badge, i) => (
                 <div key={i} className="fp-tech-badge">
-                  <span>{icon}</span>
-                  <span>{label}</span>
+                  <span>{badge.icon}</span>
+                  <span>{badge.label}</span>
                 </div>
               ))}
             </div>
@@ -776,9 +794,9 @@ export default function Landing() {
           </div>
           <div className="fp-content" style={{ maxWidth: 900, padding: "0 24px" }}>
             <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }}>Trabaja con nosotros</div>
-              <h2 className="l-h2">Cuéntanos sobre tu negocio.<br /><em>Te contactamos en menos de 24h.</em></h2>
-              <p className="l-sub">Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio.</p>
+              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
+              <h2 className="l-h2">{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
+              <p className="l-sub">{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
             <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
@@ -788,9 +806,9 @@ export default function Landing() {
                   borderRadius: 16, padding: "48px 32px", textAlign: "center",
                 }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-                  <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--jade)", marginBottom: 8 }}>¡Solicitud recibida!</h3>
-                  <p style={{ color: "var(--t3)", fontSize: 15, marginBottom: 12 }}>Nuestra IA ya está analizando tu negocio, mercado, competencia y SEO.</p>
-                  <p style={{ color: "var(--t4)", fontSize: 13 }}>Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam.</p>
+                  <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--jade)", marginBottom: 8 }}>{content.contact?.successTitle ?? "¡Solicitud recibida!"}</h3>
+                  <p style={{ color: "var(--t3)", fontSize: 15, marginBottom: 12 }}>{content.contact?.successText ?? "Nuestra IA ya está analizando tu negocio, mercado, competencia y SEO."}</p>
+                  <p style={{ color: "var(--t4)", fontSize: 13 }}>{content.contact?.successSubtext ?? "Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam."}</p>
                 </div>
               ) : (
                 <form onSubmit={submitContact} className="fp-contact-form" style={{
@@ -801,20 +819,20 @@ export default function Landing() {
                   {/* Row 1: Nombre + Email */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nombre completo *</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.name ?? "Nombre completo *"}</label>
                       <input
                         type="text" required value={contactForm.name} onChange={CF("name")}
-                        placeholder="Tu nombre y apellidos"
+                        placeholder={content.contact?.placeholders?.name ?? "Tu nombre y apellidos"}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                         onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                         onBlur={e => e.target.style.borderColor = "var(--ink3)"}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Email de contacto *</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.email ?? "Email de contacto *"}</label>
                       <input
                         type="email" required value={contactForm.email} onChange={CF("email")}
-                        placeholder="tu@email.com"
+                        placeholder={content.contact?.placeholders?.email ?? "tu@email.com"}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                         onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                         onBlur={e => e.target.style.borderColor = "var(--ink3)"}
@@ -825,20 +843,20 @@ export default function Landing() {
                   {/* Row 2: Teléfono + URL tienda */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Teléfono</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.phone ?? "Teléfono"}</label>
                       <input
                         type="tel" value={contactForm.phone} onChange={CF("phone")}
-                        placeholder="+34 600 000 000"
+                        placeholder={content.contact?.placeholders?.phone ?? "+34 600 000 000"}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                         onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                         onBlur={e => e.target.style.borderColor = "var(--ink3)"}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>URL de tu tienda Shopify</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.storeUrl ?? "URL de tu tienda Shopify"}</label>
                       <input
                         type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
-                        placeholder="mitienda.myshopify.com"
+                        placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.myshopify.com"}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                         onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                         onBlur={e => e.target.style.borderColor = "var(--ink3)"}
@@ -849,46 +867,37 @@ export default function Landing() {
                   {/* Row 3: Nicho + Facturación */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nicho / tipo de productos</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.niche ?? "Nicho / tipo de productos"}</label>
                       <select
                         value={contactForm.niche} onChange={CF("niche")}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.niche ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
                       >
-                        <option value="">Selecciona tu nicho</option>
-                        <option>Moda y ropa</option>
-                        <option>Electrónica y gadgets</option>
-                        <option>Hogar y decoración</option>
-                        <option>Belleza y cosmética</option>
-                        <option>Deporte y fitness</option>
-                        <option>Alimentación y gourmet</option>
-                        <option>Arte y coleccionismo</option>
-                        <option>Mascotas</option>
-                        <option>Joyería y accesorios</option>
-                        <option>Otro</option>
+                        <option value="">{content.contact?.placeholders?.niche ?? "Selecciona tu nicho"}</option>
+                        {(Array.isArray(content.contact?.nicheOptions) ? content.contact!.nicheOptions : ["Moda y ropa", "Electrónica y gadgets", "Hogar y decoración", "Belleza y cosmética", "Deporte y fitness", "Alimentación y gourmet", "Arte y coleccionismo", "Mascotas", "Joyería y accesorios", "Otro"]).map(o => (
+                          <option key={o}>{o}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Facturación mensual aprox.</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>
                       <select
                         value={contactForm.revenue} onChange={CF("revenue")}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.revenue ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
                       >
-                        <option value="">Selecciona rango</option>
-                        <option>Menos de €1.000</option>
-                        <option>€1.000 – €5.000</option>
-                        <option>€5.000 – €15.000</option>
-                        <option>€15.000 – €50.000</option>
-                        <option>Más de €50.000</option>
+                        <option value="">{content.contact?.placeholders?.revenue ?? "Selecciona rango"}</option>
+                        {(Array.isArray(content.contact?.revenueOptions) ? content.contact!.revenueOptions : ["Menos de €1.000", "€1.000 – €5.000", "€5.000 – €15.000", "€15.000 – €50.000", "Más de €50.000"]).map(o => (
+                          <option key={o}>{o}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
                   {/* Row 4: Redes sociales */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Redes sociales / Instagram</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.socialLabel ?? "Redes sociales / Instagram"}</label>
                     <input
                       type="text" value={contactForm.socialMedia} onChange={CF("socialMedia")}
-                      placeholder="@tutienda o https://instagram.com/tutienda"
+                      placeholder={content.contact?.socialPlaceholder ?? "@tutienda o https://instagram.com/tutienda"}
                       style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                       onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                       onBlur={e => e.target.style.borderColor = "var(--ink3)"}
@@ -897,9 +906,9 @@ export default function Landing() {
 
                   {/* Servicios */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 12 }}>Servicios que necesitas</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 12 }}>{content.contact?.servicesLabel ?? "Servicios que necesitas"}</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {["SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes", "Email marketing", "A/B Testing", "Auditoría completa"].map(s => {
+                      {(Array.isArray(content.contact?.serviceOptions) ? content.contact!.serviceOptions : ["SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes", "Email marketing", "A/B Testing", "Auditoría completa"]).map(s => {
                         const active = contactServices.includes(s);
                         return (
                           <button
@@ -919,10 +928,10 @@ export default function Landing() {
 
                   {/* Mensaje */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Mensaje adicional</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.message ?? "Mensaje adicional"}</label>
                     <textarea
                       rows={3} value={contactForm.message} onChange={CF("message")}
-                      placeholder="Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"
+                      placeholder={content.contact?.placeholders?.message ?? "Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"}
                       style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
                       onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                       onBlur={e => e.target.style.borderColor = "var(--ink3)"}
@@ -936,13 +945,13 @@ export default function Landing() {
                   )}
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                    <p style={{ fontSize: 12, color: "var(--t4)", flex: 1 }}>Sin spam. Solo te contactamos para hablar de tu proyecto. Puedes darte de baja en cualquier momento.</p>
+                    <p style={{ fontSize: 12, color: "var(--t4)", flex: 1 }}>{content.contact?.finePrint ?? "Sin spam. Solo te contactamos para hablar de tu proyecto."}</p>
                     <button
                       type="submit" disabled={contactStatus === "sending"}
                       className="l-btn-gold"
                       style={{ opacity: contactStatus === "sending" ? 0.7 : 1, minWidth: 200, padding: "13px 28px", fontSize: 14 }}
                     >
-                      {contactStatus === "sending" ? "Enviando…" : "Solicitar acceso gratuito →"}
+                      {contactStatus === "sending" ? "Enviando…" : (content.contact?.buttonLabel ?? "Solicitar acceso gratuito →")}
                     </button>
                   </div>
                 </form>
