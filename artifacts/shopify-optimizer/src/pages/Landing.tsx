@@ -400,7 +400,7 @@ export default function Landing() {
     );
   }
 
-  const hLines = content.hero.headline.split("\n");
+  const hLines = String(content.hero.headline ?? "").split("\n");
   const progressPct = FP_SECTIONS.length > 1 ? (currentSection / (FP_SECTIONS.length - 1)) * 100 : 0;
 
   const bgFor = (section: string) => content.backgrounds?.[section] ?? { type: "none" };
@@ -515,7 +515,7 @@ export default function Landing() {
               <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onClick={cmsClick("hero.headline")}>
                 {hLines.map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
-                    {line.includes(content.hero.headlineHighlight)
+                    {content.hero.headlineHighlight && line.includes(content.hero.headlineHighlight)
                       ? line.split(content.hero.headlineHighlight).flatMap((part, pi, arr) =>
                           pi < arr.length - 1 ? [part, <span key={pi}>{content.hero.headlineHighlight}</span>] : [part]
                         )
@@ -619,7 +619,7 @@ export default function Landing() {
           <div className="fp-content fp-engines-layout">
             <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.features.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("features.headline")}>{content.features.headline.split(".")[0]}. <em>{content.features.headline.split(".").slice(1).join(".")}</em></h2>
+              <h2 className="l-h2" onClick={cmsClick("features.headline")}>{String(content.features.headline ?? "").split(".")[0]}. <em>{String(content.features.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub">{content.features.subheadline}</p>
             </div>
 
@@ -628,7 +628,7 @@ export default function Landing() {
                 <button key={feat.id} className={`fp-etab${activeEngine === i ? " active" : ""}`} onClick={() => setActiveEngine(i)}>
                   <span className="fp-etab-num">{feat.num}</span>
                   <span className="fp-etab-icon">{feat.icon}</span>
-                  <span className="fp-etab-name">{feat.title.split(" ")[0]}</span>
+                  <span className="fp-etab-name">{String(feat.title ?? "").split(" ")[0]}</span>
                 </button>
               ))}
             </div>
@@ -683,9 +683,9 @@ export default function Landing() {
             <div className={`fp-split-left ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.how.pill}</div>
               <h2 className="l-h2" onClick={cmsClick("how.headline")}>
-                {content.how.headline.split("\n").map((line, i) => (
+                {String(content.how.headline ?? "").split("\n").map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
-                    {line.includes(content.how.headlineHighlight)
+                    {content.how.headlineHighlight && line.includes(content.how.headlineHighlight)
                       ? line.split(content.how.headlineHighlight).flatMap((p, pi, arr) =>
                           pi < arr.length - 1 ? [p, <em key={pi}>{content.how.headlineHighlight}</em>] : [p]
                         )
@@ -794,7 +794,7 @@ export default function Landing() {
           <div className="fp-content fp-pricing-layout">
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.pricing.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("pricing.headline")}>{content.pricing.headline.split(".")[0]}. <em>{content.pricing.headline.split(".").slice(1).join(".")}</em></h2>
+              <h2 className="l-h2" onClick={cmsClick("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub">{content.pricing.subheadline}</p>
             </div>
             <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
@@ -833,11 +833,11 @@ export default function Landing() {
             <div className={`fp-section-header ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{calc.pill}</div>
               <h2 className="l-h2" onClick={cmsClick("calculator.headline")}>
-                {calc.headline.includes(calc.headlineHighlight)
-                  ? calc.headline.split(calc.headlineHighlight).flatMap((p, i, arr) =>
+                {calc.headlineHighlight && String(calc.headline ?? "").includes(calc.headlineHighlight)
+                  ? String(calc.headline ?? "").split(calc.headlineHighlight).flatMap((p, i, arr) =>
                       i < arr.length - 1 ? [p, <em key={i}>{calc.headlineHighlight}</em>] : [p]
                     )
-                  : calc.headline}
+                  : (calc.headline ?? "")}
               </h2>
               <p className="l-sub">{calc.subheadline}</p>
             </div>

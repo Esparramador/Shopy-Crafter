@@ -546,24 +546,41 @@ Proporciona insights accionables y específicos basados en tu experiencia real c
 Incluye datos de pricing, competencia, tendencias y estrategias probadas.`;
 
   let aiContent = "";
-  if (activeProjectId) {
-    aiContent = await askClaudeWithBrain(
-      parseInt(activeProjectId),
-      [{ role: "user", content: query }],
-      researchSystemPrompt,
-      "general",
-      niche || undefined,
-      1024
-    );
-  } else {
-    const brainCtx = await buildShopyBrainContext(niche || undefined, "general");
-    const aiRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 1024,
-      system: researchSystemPrompt + (brainCtx || ""),
-      messages: [{ role: "user", content: query }],
-    });
-    aiContent = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+  try {
+    if (activeProjectId) {
+      aiContent = await askClaudeWithBrain(
+        parseInt(activeProjectId),
+        [{ role: "user", content: query }],
+        researchSystemPrompt,
+        "general",
+        niche || undefined,
+        1024
+      );
+    } else {
+      const brainCtx = await buildShopyBrainContext(niche || undefined, "general");
+      const aiRes = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 1024,
+        system: researchSystemPrompt + (brainCtx || ""),
+        messages: [{ role: "user", content: query }],
+      });
+      aiContent = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+    }
+  } catch (aiErr) {
+    const errStr = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    logger.error({ error: aiErr, query }, "ShopyBrain research AI error");
+
+    let msg = "Error al procesar la investigación. Inténtalo de nuevo.";
+    if (errStr.includes("credit balance is too low") || errStr.includes("insufficient_quota")) {
+      msg = "⚠️ Créditos de IA agotados — Recarga en console.anthropic.com para continuar.";
+    } else if (errStr.includes("rate_limit") || errStr.includes("Too many requests")) {
+      msg = "⏳ Demasiadas peticiones. Espera unos segundos.";
+    } else if (errStr.includes("overloaded")) {
+      msg = "🔄 Servicio de IA sobrecargado temporalmente. Inténtalo en 1-2 minutos.";
+    }
+
+    res.json({ source: "error_recovery", confidence: 0, results: [], message: msg });
+    return;
   }
 
   await db.insert(omnicoreMemoriesTable).values({

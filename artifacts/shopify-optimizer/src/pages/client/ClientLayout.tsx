@@ -24,7 +24,7 @@ interface ClientCmsPanel {
 
 export function ClientLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [cp, setCp] = useState<ClientCmsPanel>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -177,7 +177,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
               <div className="status-pulse" />
               {cp.statusOnline ?? "Online"}
             </div>
-            <button className="notif-btn" title="Notificaciones" onClick={() => {}}>🔔</button>
+            <button className="notif-btn" title="Notificaciones" onClick={() => { navigate("/client/messages"); }}>🔔</button>
           </div>
         </div>
 
