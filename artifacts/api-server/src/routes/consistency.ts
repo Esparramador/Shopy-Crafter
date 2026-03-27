@@ -45,7 +45,7 @@ router.get("/projects/:projectId/visual-dna", async (req, res): Promise<void> =>
   });
 });
 
-router.post("/projects/:projectId/extract-visual-dna", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/visual-dna", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
 
