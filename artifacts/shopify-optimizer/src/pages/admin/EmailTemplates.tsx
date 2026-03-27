@@ -106,9 +106,9 @@ export default function EmailTemplates() {
     brand_logo_url: "",
     brand_tagline: "",
     brand_colors: { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" } as Record<string, string>,
-    from_email: "",
-    from_name: "",
-    reply_email: "",
+    from_email: "craftershopy@gmail.com",
+    from_name: "ShopyBrain",
+    reply_email: "craftershopy@gmail.com",
     customInstructions: "",
   });
 
@@ -196,7 +196,7 @@ export default function EmailTemplates() {
       brand_logo_url: "",
       brand_tagline: "",
       brand_colors: { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" },
-      from_email: "", from_name: project.name, reply_email: "",
+      from_email: "craftershopy@gmail.com", from_name: project.name || "ShopyBrain", reply_email: "craftershopy@gmail.com",
       customInstructions: "",
     });
     setCopywritingNotes("");
@@ -220,8 +220,8 @@ export default function EmailTemplates() {
       brand_logo_url: tmpl.brand_logo_url || "",
       brand_tagline: tmpl.brand_tagline || "",
       brand_colors: (tmpl.brand_colors && typeof tmpl.brand_colors === "object") ? tmpl.brand_colors : { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" },
-      from_email: tmpl.from_email || "", from_name: tmpl.from_name || "",
-      reply_email: tmpl.reply_email || "",
+      from_email: tmpl.from_email || "craftershopy@gmail.com", from_name: tmpl.from_name || "ShopyBrain",
+      reply_email: tmpl.reply_email || "craftershopy@gmail.com",
       customInstructions: "",
     });
     setCopywritingNotes("");
@@ -692,12 +692,12 @@ export default function EmailTemplates() {
                 <div>
                   <label style={labelStyle}>Email remitente</label>
                   <input value={form.from_email} onChange={e => setForm(p => ({ ...p, from_email: e.target.value }))}
-                    placeholder="hola@tienda.com" style={inputStyle} />
+                    placeholder="craftershopy@gmail.com" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Reply-to</label>
                   <input value={form.reply_email} onChange={e => setForm(p => ({ ...p, reply_email: e.target.value }))}
-                    placeholder="soporte@tienda.com" style={inputStyle} />
+                    placeholder="craftershopy@gmail.com" style={inputStyle} />
                 </div>
               </div>
             </div>
@@ -873,7 +873,7 @@ export default function EmailTemplates() {
                       </div>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--t1)" }}>{form.from_name || form.brand_name || "Tu Marca"}</div>
-                        <div style={{ fontSize: 11, color: "var(--t3)" }}>{form.from_email || "noreply@tutienda.com"}</div>
+                        <div style={{ fontSize: 11, color: "var(--t3)" }}>{form.from_email || "craftershopy@gmail.com"}</div>
                       </div>
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "var(--t1)", marginLeft: 36 }}>{form.subject_a}</div>

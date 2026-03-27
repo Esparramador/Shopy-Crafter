@@ -148,7 +148,7 @@ export default function Emails() {
     subject_a: "", subject_b: "", preview_text: "",
     tone: "urgente" as Tone, language: "es",
     include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-    from_email: "", from_name: "", reply_email: "",
+    from_email: "craftershopy@gmail.com", from_name: "ShopyBrain", reply_email: "craftershopy@gmail.com",
     html_content: "", text_content: "", variables_used: "",
   });
 
@@ -182,7 +182,7 @@ export default function Emails() {
       subject_a: "", subject_b: "", preview_text: "",
       tone: "urgente", language: "es",
       include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-      from_email: "", from_name: "", reply_email: "",
+      from_email: "craftershopy@gmail.com", from_name: "ShopyBrain", reply_email: "craftershopy@gmail.com",
       html_content: "", text_content: "", variables_used: "",
     });
     setTab("disenar");
@@ -199,7 +199,7 @@ export default function Emails() {
       preview_text: flow.preview_text || "", tone: (flow.tone || "urgente") as Tone,
       language: flow.language || "es",
       include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-      from_email: flow.from_email || "", from_name: flow.from_name || "", reply_email: flow.reply_email || "",
+      from_email: flow.from_email || "craftershopy@gmail.com", from_name: flow.from_name || "ShopyBrain", reply_email: flow.reply_email || "craftershopy@gmail.com",
       html_content: flow.html_content || "", text_content: flow.text_content || "",
       variables_used: flow.variables_used || "",
     });
@@ -515,7 +515,7 @@ export default function Emails() {
                         <input value={form.from_name} onChange={e => setForm(p => ({ ...p, from_name: e.target.value }))}
                           placeholder="Nombre" style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 7, padding: "6px 10px", color: "var(--t1)", fontSize: 12, marginBottom: 5 }} />
                         <input value={form.from_email} onChange={e => setForm(p => ({ ...p, from_email: e.target.value }))}
-                          placeholder="email@tienda.com" style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 7, padding: "6px 10px", color: "var(--t1)", fontSize: 12 }} />
+                          placeholder="craftershopy@gmail.com" style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 7, padding: "6px 10px", color: "var(--t1)", fontSize: 12 }} />
                       </div>
                     </div>
                   </div>

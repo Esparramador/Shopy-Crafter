@@ -300,9 +300,9 @@ router.post("/emails/flows/:id/push", async (req, res): Promise<void> => {
           settings: {
             subject: flow.subject_a || "{{ subject }}",
             preview_text: flow.preview_text || "",
-            from_email: flow.from_email || "noreply@shopifyai.pro",
-            from_label: flow.from_name || flow.project_name || "ShopifyAI",
-            reply_to_email: flow.reply_email || flow.from_email || "noreply@shopifyai.pro",
+            from_email: flow.from_email || "craftershopy@gmail.com",
+            from_label: flow.from_name || flow.project_name || "ShopyBrain",
+            reply_to_email: flow.reply_email || flow.from_email || "craftershopy@gmail.com",
           },
           send_options: { use_smart_sending: true },
           rendering_options: {

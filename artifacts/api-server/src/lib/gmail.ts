@@ -54,6 +54,8 @@ async function getGmailClient() {
   return google.gmail({ version: "v1", auth: oauth2Client });
 }
 
+const OFFICIAL_EMAIL = "craftershopy@gmail.com";
+
 export async function sendEmail(
   to: string,
   subject: string,
@@ -65,7 +67,7 @@ export async function sendEmail(
 
     const boundary = "boundary_" + Date.now();
     const rawParts = [
-      `From: ${fromName} <me>`,
+      `From: ${fromName} <${OFFICIAL_EMAIL}>`,
       `To: ${to}`,
       `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
       "MIME-Version: 1.0",
