@@ -785,6 +785,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
       case "optimize_images":
         return `🖼 **Optimización de imágenes completada:**\n📊 ${result.productsProcessed} productos procesados\n🖼 ${result.optimizedImages}/${result.totalImages} imágenes con alt text SEO`;
+      case "read_cms":
+        if (result.sections) return `📋 **CMS tiene ${result.totalSections} secciones:**\n${(result.sections as string[]).map(s => `· ${s}`).join("\n")}`;
+        return `📋 **CMS — ${result.section}:**\n${typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2).slice(0, 800)}`;
+      case "update_cms":
+        return `✅ **CMS actualizado:**\n📝 Campo: \`${result.path}\`\n💾 Nuevo valor: ${typeof result.value === "string" ? `"${result.value}"` : JSON.stringify(result.value)}`;
+      case "update_cms_batch":
+        return `✅ **CMS batch actualizado:**\n📝 ${result.changesApplied} campos modificados:\n${(result.paths as string[]).map(p => `· \`${p}\``).join("\n")}`;
+      case "reset_cms":
+        return `🔄 **CMS reseteado a valores por defecto.** Todos los textos de la landing, panel admin y panel cliente han vuelto a su estado original.`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }

@@ -339,7 +339,37 @@ Acciones disponibles:
 - fix_code: Aplicar una corrección a un archivo de código fuente. Params: {filePath, oldCode (texto exacto a reemplazar), newCode (código corregido), description (descripción del fix)}
 - list_source_files: Listar archivos del código fuente de la app. Params: {directory? (ej: "src/pages", "src/components"), pattern? (ej: ".tsx", ".ts")}
 - analyze_component: Analizar un componente/página en profundidad buscando bugs, problemas de UX, errores lógicos. Params: {filePath, focusOn? ("bugs","ux","performance","logic","all")}
-- update_cms: Editar contenido del CMS (landing, panel admin, panel cliente, textos, etc.). Params: {path (ej: "hero.headline", "pricing.plans.0.price", "adminPanel.sidebarLabels.yourStores"), value (nuevo valor)}
+- read_cms: Leer contenido actual del CMS. Params: {section? (ej: "hero", "pricing.plans", "adminPanel.sidebarLabels")} — sin section devuelve lista de secciones
+- update_cms: Editar UN campo del CMS. Params: {path (ej: "hero.headline"), value (nuevo valor)}
+- update_cms_batch: Editar MÚLTIPLES campos del CMS de una vez. Params: {changes: [{path, value}, ...]}
+- reset_cms: Resetear TODO el CMS a valores por defecto. Params: {} (sin params)
+
+MAPA COMPLETO DE PATHS CMS — puedes editar CUALQUIERA de estos con update_cms o update_cms_batch (N = índice numérico 0,1,2...):
+  SITE: site.name, site.tagline, site.primaryColor, site.accentColor, site.favicon, site.logo.type, site.logo.value, site.logo.imageUrl, site.font_heading, site.font_body
+  NAV: nav.links.N.label, nav.links.N.href, nav.ctaPrimary.label, nav.ctaPrimary.href, nav.ctaSecondary.label, nav.ctaSecondary.href
+  HERO: hero.pill.text, hero.pill.visible, hero.headline, hero.headlineHighlight, hero.subheadline, hero.ctaPrimary.label, hero.ctaPrimary.href, hero.ctaSecondary.label, hero.ctaSecondary.href, hero.ctaApk.label, hero.ctaApk.href, hero.trustItems, hero.scrollHint, hero.imageUrl, hero.demo.url, hero.demo.status, hero.demo.navItems, hero.demo.metrics.N.label, hero.demo.metrics.N.value, hero.demo.metrics.N.change, hero.demo.stores.N.name, hero.demo.stores.N.score, hero.demo.activity
+  FEATURES: features.pill, features.headline, features.subheadline, features.items.N.title, features.items.N.description, features.items.N.icon, features.items.N.iconBg, features.items.N.num, features.items.N.tags, features.items.N.imageUrl, features.items.N.stats.N.label, features.items.N.stats.N.value
+  STATS: stats.N.num, stats.N.label, stats.N.id
+  HOW: how.pill, how.headline, how.headlineHighlight, how.steps.N.num, how.steps.N.title, how.steps.N.desc
+  PRICING: pricing.pill, pricing.headline, pricing.subheadline, pricing.plans.N.name, pricing.plans.N.price, pricing.plans.N.currency, pricing.plans.N.period, pricing.plans.N.featured, pricing.plans.N.badge, pricing.plans.N.features.N.text, pricing.plans.N.features.N.included, pricing.plans.N.cta.label, pricing.plans.N.cta.style
+  TESTIMONIALS: testimonials.pill, testimonials.headline, testimonials.headlineHighlight, testimonials.items.N.text, testimonials.items.N.author, testimonials.items.N.role, testimonials.items.N.metric, testimonials.items.N.stars, testimonials.items.N.initials, testimonials.items.N.avatarUrl
+  RESULTS: results.pill, results.headline, results.headlineHighlight, results.stats.N.num, results.stats.N.label, results.stats.N.prefix, results.stats.N.suffix, results.stats.N.color, results.techBadges.N.icon, results.techBadges.N.label
+  CONTACT: contact.pill, contact.headline, contact.headlineHighlight, contact.subheadline, contact.buttonLabel, contact.successTitle, contact.successText, contact.successSubtext, contact.finePrint, contact.labels.name, contact.labels.email, contact.labels.phone, contact.labels.storeUrl, contact.labels.niche, contact.labels.revenue, contact.labels.message, contact.placeholders.name, contact.placeholders.email, contact.placeholders.phone, contact.placeholders.storeUrl, contact.placeholders.niche, contact.placeholders.revenue, contact.placeholders.message, contact.nicheOptions, contact.revenueOptions, contact.socialLabel, contact.socialPlaceholder, contact.servicesLabel, contact.serviceOptions
+  CTA: cta.pill, cta.headline, cta.headlineHighlight, cta.subheadline, cta.buttonLabel, cta.placeholder, cta.finePrint
+  BACKGROUNDS: backgrounds.hero.type, backgrounds.hero.videoUrl, backgrounds.hero.particleColor, backgrounds.hero.galleryImages, backgrounds.features.type, backgrounds.features.videoUrl, backgrounds.features.particleColor, backgrounds.pricing.type, backgrounds.pricing.videoUrl, backgrounds.pricing.particleColor
+  FOOTER: footer.tagline, footer.copyright, footer.badges, footer.columns.N.title, footer.columns.N.links.N.label, footer.columns.N.links.N.href
+  ADMIN PANEL: adminPanel.sidebarLabels.yourStores, adminPanel.sidebarLabels.noStores, adminPanel.sidebarLabels.newStore, adminPanel.sidebarLabels.admin, adminPanel.sidebarLabels.config, adminPanel.sidebarLabels.madeBy, adminPanel.header.offline, adminPanel.header.search, adminPanel.header.active, adminPanel.user.unlimited, adminPanel.user.adminRole, adminPanel.tooltips.lightMode, adminPanel.tooltips.darkMode, adminPanel.tooltips.activateLight, adminPanel.tooltips.activateDark, adminPanel.tooltips.logout, adminPanel.tooltips.mainNav, adminPanel.tooltips.shopify, adminPanel.tooltips.accountSettings, adminPanel.tooltips.notifications, adminPanel.tooltips.openNotifications, adminPanel.tooltips.closeMenu, adminPanel.tooltips.openMenu, adminPanel.notifications.title, adminPanel.notifications.empty, adminPanel.notifications.emptyHint
+  CLIENT PANEL: clientPanel.navItems.N.label, clientPanel.navItems.N.icon, clientPanel.navItems.N.href, clientPanel.sidebar.yourStore, clientPanel.sidebar.defaultName, clientPanel.sidebar.storePanel, clientPanel.sidebar.managedBy, clientPanel.sidebar.agency, clientPanel.sidebar.enginesActive, clientPanel.sidebar.navigation, clientPanel.sidebar.aiOptimizations, clientPanel.topbar, clientPanel.tooltips.logout, clientPanel.tooltips.notifications, clientPanel.statusOnline, clientPanel.logoBadge
+  ADMIN NAV: adminNav.modules.N.label, adminNav.modules.N.icon, adminNav.modules.N.id, adminNav.shopybrain.N.label, adminNav.shopybrain.N.icon, adminNav.shopybrain.N.href, adminNav.admin.N.label, adminNav.admin.N.icon, adminNav.admin.N.href
+  HOW CARDS: howCards.N.title, howCards.N.sub, howCards.N.icon, howCards.N.barPercent
+  HOW IMPACT: howImpact.icon, howImpact.title, howImpact.sub
+  SECTION NAV: sectionNav (array of strings)
+  SECTION ORDER: sectionOrder (array de secciones visibles en landing)
+  ADMIN BACK LABEL: adminBackLabel
+  APK LABELS: apkLabels.idle, apkLabels.checking, apkLabels.downloading, apkLabels.building, apkLabels.unavailable
+  ERROR MESSAGES: errorMessages.sendFail, errorMessages.unexpected
+  HERO DEMO TITLES: heroDemoTitles.storeHealth, heroDemoTitles.recentActivity
+  NOTA: Para editar arrays enteros (como trustItems, sectionNav, nicheOptions), pasa el array completo como value. Para editar items de arrays por índice, usa N (ej: pricing.plans.0.price = "99")
 
 REGLAS:
 - Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
@@ -374,7 +404,10 @@ REGLAS:
 - Si dice "borra el producto X", usa delete_product
 - Si dice "busca productos de X", usa search_product
 - Si dice "ver pedidos", usa get_orders
-- Si dice "cambia el texto de X", "edita la landing", "modifica el título del hero", "cambia el precio en la landing", "actualiza el CMS", "cambia el nombre del sitio", "edita el panel admin", "cambia el texto de X en la landing", EJECUTA update_cms con el path y value correspondientes. Paths comunes: hero.headline, hero.ctaPrimary.label, pricing.plans.0.price, site.name, adminPanel.sidebarLabels.yourStores, clientPanel.topbar, contact.buttonLabel, footer.copyright, etc.
+- Si dice "cambia el texto de X", "edita la landing", "modifica el título del hero", "cambia el precio en la landing", "actualiza el CMS", "cambia el nombre del sitio", "edita el panel admin", "cambia el texto de X en la landing", EJECUTA update_cms con el path y value correspondientes
+- Si dice "cambia varias cosas", "actualiza el hero y el pricing", "modifica varios textos a la vez", "haz varios cambios en la landing", EJECUTA update_cms_batch con changes[] conteniendo todos los cambios
+- Si dice "qué tiene el CMS", "muéstrame el contenido actual", "qué dice el hero ahora", "lee el CMS", "ver contenido actual de X", EJECUTA read_cms con section si pide algo específico
+- Si dice "resetea el CMS", "vuelve al original", "restaura los textos por defecto", "resetea la landing", "pon todo como estaba", EJECUTA reset_cms
 - USA projectId del contexto si el usuario tiene un proyecto activo
 - Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
 - Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
@@ -1767,13 +1800,14 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
       case "inspect_code": {
         const filePath = params?.filePath;
         if (!filePath) { res.status(400).json({ error: "filePath requerido (ej: src/pages/projects/Audit.tsx)" }); return; }
+        if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
 
         const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
         const candidates = [
           path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
           path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
           path.resolve(WORKSPACE_ROOT, filePath),
-        ];
+        ].filter(c => c.startsWith(WORKSPACE_ROOT));
 
         let resolvedPath = "";
         let fileContent = "";
@@ -1832,6 +1866,7 @@ ${truncated}
       case "analyze_component": {
         const filePath = params?.filePath;
         if (!filePath) { res.status(400).json({ error: "filePath requerido" }); return; }
+        if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
         const focusOn = params?.focusOn || "all";
 
         const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
@@ -1839,7 +1874,7 @@ ${truncated}
           path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
           path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
           path.resolve(WORKSPACE_ROOT, filePath),
-        ];
+        ].filter(c => c.startsWith(WORKSPACE_ROOT));
 
         let fileContent = "";
         for (const c of candidates) {
@@ -1917,13 +1952,14 @@ ${truncated}
           res.status(400).json({ error: "filePath, oldCode y newCode son requeridos" });
           return;
         }
+        if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
 
         const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
         const candidates = [
           path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
           path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
           path.resolve(WORKSPACE_ROOT, filePath),
-        ];
+        ].filter(c => c.startsWith(WORKSPACE_ROOT));
 
         let resolvedPath = "";
         let fileContent = "";
@@ -2686,6 +2722,24 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
         break;
       }
 
+      case "read_cms": {
+        const cookieH = req.headers.cookie ?? "";
+        const cmsReadRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content`, { headers: { "Cookie": cookieH } });
+        if (!cmsReadRes.ok) { res.status(500).json({ error: "Error al leer CMS" }); return; }
+        const cmsData = await cmsReadRes.json();
+        const sectionToRead = params?.section;
+        if (sectionToRead && typeof sectionToRead === "string") {
+          const parts = sectionToRead.split(".");
+          let val: unknown = cmsData;
+          for (const p of parts) { val = (val as Record<string, unknown>)?.[p]; if (val === undefined) break; }
+          result = { section: sectionToRead, value: val ?? null, message: `CMS sección "${sectionToRead}": ${JSON.stringify(val).slice(0, 500)}` };
+        } else {
+          const sections = Object.keys(cmsData).filter(k => k !== "meta");
+          result = { sections, totalSections: sections.length, message: `CMS tiene ${sections.length} secciones: ${sections.join(", ")}` };
+        }
+        break;
+      }
+
       case "update_cms": {
         const fieldPath = params?.path;
         const value = params?.value;
@@ -2693,7 +2747,25 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
         const cookieHeader = req.headers.cookie ?? "";
         const cmsRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content`, { method: "PATCH", headers: { "Content-Type": "application/json", "Cookie": cookieHeader }, body: JSON.stringify({ path: fieldPath, value }) });
         if (!cmsRes.ok) { res.status(500).json({ error: "Error al actualizar CMS" }); return; }
-        result = { success: true, path: fieldPath, message: `CMS actualizado: ${fieldPath} = ${typeof value === "string" ? value : JSON.stringify(value)}` };
+        result = { success: true, path: fieldPath, value, message: `CMS actualizado: ${fieldPath} = ${typeof value === "string" ? value : JSON.stringify(value)}` };
+        break;
+      }
+
+      case "update_cms_batch": {
+        const changes = params?.changes as Array<{ path: string; value: unknown }>;
+        if (!Array.isArray(changes) || !changes.length) { res.status(400).json({ error: "changes[] requerido con {path, value}" }); return; }
+        const cookieBatch = req.headers.cookie ?? "";
+        const batchRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content/batch`, { method: "POST", headers: { "Content-Type": "application/json", "Cookie": cookieBatch }, body: JSON.stringify({ changes }) });
+        if (!batchRes.ok) { res.status(500).json({ error: "Error al actualizar CMS batch" }); return; }
+        result = { success: true, changesApplied: changes.length, paths: changes.map(c => c.path), message: `CMS batch: ${changes.length} campos actualizados (${changes.map(c => c.path).join(", ")})` };
+        break;
+      }
+
+      case "reset_cms": {
+        const cookieReset = req.headers.cookie ?? "";
+        const resetRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content/reset`, { method: "POST", headers: { "Content-Type": "application/json", "Cookie": cookieReset }, body: JSON.stringify({}) });
+        if (!resetRes.ok) { res.status(500).json({ error: "Error al resetear CMS" }); return; }
+        result = { success: true, message: "CMS reseteado a valores por defecto. Todos los textos vuelven a su estado original." };
         break;
       }
 
