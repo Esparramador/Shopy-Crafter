@@ -140,7 +140,7 @@ export default function Landing() {
   const [content, setContent] = useState<CMSContent | null>(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
-  const [calcSelectedOneTime, setCalcSelectedOneTime] = useState<Set<string>>(new Set());
+  const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "" });
@@ -417,9 +417,10 @@ export default function Landing() {
 
   const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
   const calc = content.calculator ?? calcDefaults;
-  const calcOneTimeTotal = calc.oneTimeServices.filter(s => calcSelectedOneTime.has(s.id)).reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  const calcOneTimeTotal = calc.oneTimeServices.reduce((sum, s) => sum + (Number(s.price) || 0) * (calcQuantities[s.id] || 0), 0);
   const calcRecurringService = calcSelectedRecurring ? calc.recurringServices.find(s => s.id === calcSelectedRecurring) : null;
   const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
+  const calcActiveServices = calc.oneTimeServices.filter(s => (calcQuantities[s.id] || 0) > 0);
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
@@ -847,23 +848,27 @@ export default function Landing() {
                   <h3 className="fp-calc-group-title">{calc.oneTimeLabel}</h3>
                   <div className="fp-calc-items">
                     {calc.oneTimeServices.map(s => {
-                      const selected = calcSelectedOneTime.has(s.id);
+                      const qty = calcQuantities[s.id] || 0;
                       return (
-                        <button key={s.id} type="button" className={`fp-calc-item${selected ? " selected" : ""}`} onClick={() => {
-                          setCalcSelectedOneTime(prev => {
-                            const next = new Set(prev);
-                            if (next.has(s.id)) next.delete(s.id); else next.add(s.id);
-                            return next;
-                          });
-                        }}>
+                        <div key={s.id} className={`fp-calc-item${qty > 0 ? " selected" : ""}`}>
                           <span className="fp-calc-item-icon">{s.icon}</span>
                           <div className="fp-calc-item-info">
                             <span className="fp-calc-item-name">{s.name}</span>
                             <span className="fp-calc-item-desc">{s.description}</span>
                           </div>
-                          <span className="fp-calc-item-price">{s.price}€</span>
-                          <span className="fp-calc-item-check">{selected ? "✓" : "+"}</span>
-                        </button>
+                          <span className="fp-calc-item-price">{s.price}€<small>/ud</small></span>
+                          <div className="fp-calc-qty">
+                            <button type="button" className="fp-calc-qty-btn" onClick={() => setCalcQuantities(prev => {
+                              const n = Math.max(0, (prev[s.id] || 0) - 1);
+                              return { ...prev, [s.id]: n };
+                            })}>−</button>
+                            <span className="fp-calc-qty-val">{qty}</span>
+                            <button type="button" className="fp-calc-qty-btn" onClick={() => setCalcQuantities(prev => ({
+                              ...prev, [s.id]: Math.min(50, (prev[s.id] || 0) + 1)
+                            }))}>+</button>
+                          </div>
+                          {qty > 0 && <span className="fp-calc-line-total">{(Number(s.price) || 0) * qty}€</span>}
+                        </div>
                       );
                     })}
                   </div>
@@ -884,7 +889,7 @@ export default function Landing() {
                             <span className="fp-calc-item-desc">{s.description}</span>
                           </div>
                           <span className="fp-calc-item-price">{s.price}€<small>{s.period}</small></span>
-                          <span className="fp-calc-item-check">{selected ? "✓" : "+"}</span>
+                          <span className="fp-calc-item-check">{selected ? "✓" : "○"}</span>
                         </button>
                       );
                     })}
@@ -899,6 +904,20 @@ export default function Landing() {
                     <p className="fp-calc-empty">{calc.emptyLabel}</p>
                   ) : (
                     <>
+                      {calcActiveServices.length > 0 && (
+                        <div className="fp-calc-breakdown">
+                          <div className="fp-calc-breakdown-header">
+                            <span>Servicio</span><span>Cant.</span><span>Subtotal</span>
+                          </div>
+                          {calcActiveServices.map(s => (
+                            <div key={s.id} className="fp-calc-breakdown-row">
+                              <span className="fp-calc-breakdown-name">{s.icon} {s.name}</span>
+                              <span className="fp-calc-breakdown-qty">×{calcQuantities[s.id]}</span>
+                              <span className="fp-calc-breakdown-price">{(Number(s.price) || 0) * (calcQuantities[s.id] || 0)}€</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {calcOneTimeTotal > 0 && (
                         <div className="fp-calc-total-row">
                           <span className="fp-calc-total-label">{calc.oneTimeLabel}</span>
@@ -919,14 +938,9 @@ export default function Landing() {
                           {calcRecurringTotal > 0 && <div className="fp-calc-grand-value fp-calc-grand-recurring">+ {calcRecurringTotal}€<small>/mes</small></div>}
                         </div>
                       </div>
-                      <div className="fp-calc-selected-list">
-                        {calc.oneTimeServices.filter(s => calcSelectedOneTime.has(s.id)).map(s => (
-                          <div key={s.id} className="fp-calc-selected-item"><span>{s.icon}</span> {s.name} — {s.price}€</div>
-                        ))}
-                        {calcSelectedRecurring && calc.recurringServices.filter(s => s.id === calcSelectedRecurring).map(s => (
-                          <div key={s.id} className="fp-calc-selected-item fp-calc-selected-recurring"><span>{s.icon}</span> {s.name} — {s.price}€{s.period}</div>
-                        ))}
-                      </div>
+                      {calcActiveServices.length >= 3 && (
+                        <div className="fp-calc-discount-hint">💡 ¿Necesitas más de 3 servicios? Solicita presupuesto personalizado con descuento por volumen.</div>
+                      )}
                     </>
                   )}
                   <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }}>{calc.ctaLabel}</a>

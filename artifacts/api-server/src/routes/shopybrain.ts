@@ -253,6 +253,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   }
 
   if (returnRaw) {
+   try {
     let entityKnowledgeContext = "";
     const entityMatches = query.match(/[@]([a-zA-Z0-9_.]+)|(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]{3,})\.[a-zA-Z]{2,}|(?:sobre|investigar?|analiza|dame información de|qué sabes de|qué tienes sobre)\s+([^\?\.]+)/i);
     const potentialEntity = entityMatches?.[1] ?? entityMatches?.[2] ?? entityMatches?.[3]?.trim();
@@ -347,80 +348,46 @@ Acciones disponibles:
 - audit_app_offerings: Auditar la oferta de la app, features, pricing actual, y generar recomendaciones. Params: {} (sin params)
 - modify_ui: Aplicar cambios visuales/UI/CSS/layout a la app (scroll horizontal, animaciones, responsive, colores, etc.). Params: {target (qué cambiar, ej: "pricing carousel", "hero section", "sidebar"), change (qué hacer, ej: "hacer scroll horizontal en móvil", "añadir animación fade-in")}
 
-MAPA COMPLETO DE PATHS CMS — puedes editar CUALQUIERA de estos con update_cms o update_cms_batch (N = índice numérico 0,1,2...):
-  SITE: site.name, site.tagline, site.primaryColor, site.accentColor, site.favicon, site.logo.type, site.logo.value, site.logo.imageUrl, site.font_heading, site.font_body
-  NAV: nav.links.N.label, nav.links.N.href, nav.ctaPrimary.label, nav.ctaPrimary.href, nav.ctaSecondary.label, nav.ctaSecondary.href
-  HERO: hero.pill.text, hero.pill.visible, hero.headline, hero.headlineHighlight, hero.subheadline, hero.ctaPrimary.label, hero.ctaPrimary.href, hero.ctaSecondary.label, hero.ctaSecondary.href, hero.ctaApk.label, hero.ctaApk.href, hero.trustItems, hero.scrollHint, hero.imageUrl, hero.demo.url, hero.demo.status, hero.demo.navItems, hero.demo.metrics.N.label, hero.demo.metrics.N.value, hero.demo.metrics.N.change, hero.demo.stores.N.name, hero.demo.stores.N.score, hero.demo.activity
-  FEATURES: features.pill, features.headline, features.subheadline, features.items.N.title, features.items.N.description, features.items.N.icon, features.items.N.iconBg, features.items.N.num, features.items.N.tags, features.items.N.imageUrl, features.items.N.stats.N.label, features.items.N.stats.N.value
-  STATS: stats.N.num, stats.N.label, stats.N.id
-  HOW: how.pill, how.headline, how.headlineHighlight, how.steps.N.num, how.steps.N.title, how.steps.N.desc
-  PRICING: pricing.pill, pricing.headline, pricing.subheadline, pricing.plans.N.name, pricing.plans.N.price, pricing.plans.N.currency, pricing.plans.N.period, pricing.plans.N.featured, pricing.plans.N.badge, pricing.plans.N.features.N.text, pricing.plans.N.features.N.included, pricing.plans.N.cta.label, pricing.plans.N.cta.style
-  TESTIMONIALS: testimonials.pill, testimonials.headline, testimonials.headlineHighlight, testimonials.items.N.text, testimonials.items.N.author, testimonials.items.N.role, testimonials.items.N.metric, testimonials.items.N.stars, testimonials.items.N.initials, testimonials.items.N.avatarUrl
-  CALCULATOR: calculator.pill, calculator.headline, calculator.headlineHighlight, calculator.subheadline, calculator.disclaimer, calculator.resultLabel, calculator.oneTimeLabel, calculator.recurringLabel, calculator.ctaLabel, calculator.emptyLabel, calculator.oneTimeServices.N.name, calculator.oneTimeServices.N.description, calculator.oneTimeServices.N.price, calculator.oneTimeServices.N.icon, calculator.recurringServices.N.name, calculator.recurringServices.N.description, calculator.recurringServices.N.price, calculator.recurringServices.N.period, calculator.recurringServices.N.icon
-  RESULTS: results.pill, results.headline, results.headlineHighlight, results.stats.N.num, results.stats.N.label, results.stats.N.prefix, results.stats.N.suffix, results.stats.N.color, results.techBadges.N.icon, results.techBadges.N.label
-  CONTACT: contact.pill, contact.headline, contact.headlineHighlight, contact.subheadline, contact.buttonLabel, contact.successTitle, contact.successText, contact.successSubtext, contact.finePrint, contact.labels.name, contact.labels.email, contact.labels.phone, contact.labels.storeUrl, contact.labels.niche, contact.labels.revenue, contact.labels.message, contact.placeholders.name, contact.placeholders.email, contact.placeholders.phone, contact.placeholders.storeUrl, contact.placeholders.niche, contact.placeholders.revenue, contact.placeholders.message, contact.nicheOptions, contact.revenueOptions, contact.socialLabel, contact.socialPlaceholder, contact.servicesLabel, contact.serviceOptions
-  CTA: cta.pill, cta.headline, cta.headlineHighlight, cta.subheadline, cta.buttonLabel, cta.placeholder, cta.finePrint
-  BACKGROUNDS: backgrounds.hero.type, backgrounds.hero.videoUrl, backgrounds.hero.particleColor, backgrounds.hero.galleryImages, backgrounds.features.type, backgrounds.features.videoUrl, backgrounds.features.particleColor, backgrounds.pricing.type, backgrounds.pricing.videoUrl, backgrounds.pricing.particleColor
-  FOOTER: footer.tagline, footer.copyright, footer.badges, footer.columns.N.title, footer.columns.N.links.N.label, footer.columns.N.links.N.href
-  ADMIN PANEL: adminPanel.sidebarLabels.yourStores, adminPanel.sidebarLabels.noStores, adminPanel.sidebarLabels.newStore, adminPanel.sidebarLabels.admin, adminPanel.sidebarLabels.config, adminPanel.sidebarLabels.madeBy, adminPanel.header.offline, adminPanel.header.search, adminPanel.header.active, adminPanel.user.unlimited, adminPanel.user.adminRole, adminPanel.tooltips.lightMode, adminPanel.tooltips.darkMode, adminPanel.tooltips.activateLight, adminPanel.tooltips.activateDark, adminPanel.tooltips.logout, adminPanel.tooltips.mainNav, adminPanel.tooltips.shopify, adminPanel.tooltips.accountSettings, adminPanel.tooltips.notifications, adminPanel.tooltips.openNotifications, adminPanel.tooltips.closeMenu, adminPanel.tooltips.openMenu, adminPanel.notifications.title, adminPanel.notifications.empty, adminPanel.notifications.emptyHint
-  CLIENT PANEL: clientPanel.navItems.N.label, clientPanel.navItems.N.icon, clientPanel.navItems.N.href, clientPanel.sidebar.yourStore, clientPanel.sidebar.defaultName, clientPanel.sidebar.storePanel, clientPanel.sidebar.managedBy, clientPanel.sidebar.agency, clientPanel.sidebar.enginesActive, clientPanel.sidebar.navigation, clientPanel.sidebar.aiOptimizations, clientPanel.topbar, clientPanel.tooltips.logout, clientPanel.tooltips.notifications, clientPanel.statusOnline, clientPanel.logoBadge
-  ADMIN NAV: adminNav.modules.N.label, adminNav.modules.N.icon, adminNav.modules.N.id, adminNav.shopybrain.N.label, adminNav.shopybrain.N.icon, adminNav.shopybrain.N.href, adminNav.admin.N.label, adminNav.admin.N.icon, adminNav.admin.N.href
-  HOW CARDS: howCards.N.title, howCards.N.sub, howCards.N.icon, howCards.N.barPercent
-  HOW IMPACT: howImpact.icon, howImpact.title, howImpact.sub
-  SECTION NAV: sectionNav (array of strings)
-  SECTION ORDER: sectionOrder (array de secciones visibles en landing)
+CMS PATHS (usa update_cms/update_cms_batch, N=índice):
+  site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
+  nav.links.N.label|href, nav.ctaPrimary|ctaSecondary.label|href
+  hero.pill.text|visible, hero.headline|headlineHighlight|subheadline|ctaPrimary.label|ctaSecondary.label|ctaApk.label|trustItems|scrollHint
+  features.pill|headline|subheadline, features.items.N.title|description|icon|stats.N.label|value
+  pricing.plans.N.name|price|currency|period|featured|badge|features.N.text|included|cta.label|style
+  calculator.pill|headline|subheadline|disclaimer|oneTimeServices.N.name|price|recurringServices.N.name|price
+  results.pill|headline|stats.N.num|label|prefix|suffix, contact.pill|headline|buttonLabel
+  backgrounds.SECTION.type|videoUrl|particleColor (SECTION=hero|features|pricing|how|results|calculator|contact)
+  footer.tagline|copyright, adminPanel.sidebarLabels.*, clientPanel.sidebar.*
   ADMIN BACK LABEL: adminBackLabel
   APK LABELS: apkLabels.idle, apkLabels.checking, apkLabels.downloading, apkLabels.building, apkLabels.unavailable
   ERROR MESSAGES: errorMessages.sendFail, errorMessages.unexpected
   HERO DEMO TITLES: heroDemoTitles.storeHealth, heroDemoTitles.recentActivity
   NOTA: Para editar arrays enteros (como trustItems, sectionNav, nicheOptions), pasa el array completo como value. Para editar items de arrays por índice, usa N (ej: pricing.plans.0.price = "99")
 
-REGLAS:
-- Si el usuario dice "busca proveedores de X", "encuentra proveedores", "proveedores para X", "suppliers", "sourcing", EJECUTA search_suppliers
-- Si el usuario dice "crea un producto llamado X", "créame un producto de X", "hazme una taza de X", "necesito una camiseta", "crea un producto sobre X", EJECUTA la acción create_product — el sistema genera automáticamente TODO: título SEO, descripción profesional, precio real investigado, meta tags, e imágenes con IA según el plan del proyecto
-- Si dice "muéstrame los productos", EJECUTA list_products
-- Si dice "muéstrame TODOS los productos" o "productos draft" o "productos ocultos" o "productos archivados", EJECUTA list_all_products con statusFilter="any" o el filtro específico
-- Si dice "regenera el token", EJECUTA regenerate_token
-- Si dice "cuántos productos tiene la tienda", EJECUTA store_status
-- Si dice "cambia el precio de X a Y", necesitas primero buscar el producto, o si dan el ID, usa change_price
-- Si dice "publica el producto X", usa publish_product o set_product_status con status="active"
-- Si dice "despublica", "pon en borrador", "oculta el producto X", usa set_product_status con status="draft"
-- Si dice "archiva el producto X", usa set_product_status con status="archived"
-- Si dice "escanea la tienda", "audita todos los productos", "escanear tienda", "hacer auditoría", EJECUTA scan_store con statusFilter="any" para incluir TODOS los productos
-- Si dice "modifica el filtro de auditoría", "cambia el filtro", "incluye productos draft en la auditoría", "filtra por draft", "filtra por archivados", EJECUTA modify_audit_filter con statusFilter apropiado
-- Si dice "diagnostica la app", "audita el funcionamiento", "revisa errores de la app", "hay algún problema", "la app no funciona bien", "self-check", "autodiagnóstico", EJECUTA diagnose_app
-- Si dice "muéstrame el código de X", "lee el archivo X", "inspecciona X", "revisa el código de X", "qué hace el archivo X", EJECUTA inspect_code con el filePath correspondiente
-- Si dice "arregla X", "repara X", "fix X", "corrige el bug de X", "modifica la función X", "cambia el código de X", PRIMERO usa inspect_code para leer el código, LUEGO analízalo y usa fix_code para aplicar el fix
-- Si dice "qué archivos tiene la app", "lista los componentes", "qué páginas hay", "muéstrame la estructura", EJECUTA list_source_files
-- Si dice "analiza la página X", "busca bugs en X", "hay errores en X", "revisa X en profundidad", "analiza el componente X", EJECUTA analyze_component con el filePath
-- Si dice "arregla la app", "repara errores de la app", necesitas PRIMERO ejecutar analyze_component en los archivos relevantes, y LUEGO fix_code para cada error encontrado
-- Si dice "optimiza este producto", "mejora el producto X", "genera contenido para el producto X", "rellena el producto X", EJECUTA optimize_product con productId
-- Si dice "optimiza todos los productos", "mejora todos", "rellena todo el catálogo", "genera contenido para todos", EJECUTA optimize_all_products
-- Si dice "crea una colección", "nueva colección de X", "agrupa los productos por X", EJECUTA create_collection
-- Si dice "crea las colecciones automáticamente", "organiza los productos en colecciones", "genera colecciones", EJECUTA auto_collections
-- Si dice "lista las colecciones", "qué colecciones hay", "ver colecciones", EJECUTA list_collections
-- Si dice "crea la página de X", "haz la página About", "diseña la página FAQ", "crea página de envíos", EJECUTA create_page con el pageType adecuado
-- Si dice "diseña todas las páginas", "crea todas las páginas de la tienda", "páginas esenciales", EJECUTA design_all_pages
-- Si dice "lista las páginas", "qué páginas tiene la tienda", EJECUTA list_pages
-- Si dice "optimiza las imágenes", "genera alt text", "SEO de imágenes", "alt texts", EJECUTA optimize_images
-- Si dice "prepara la tienda completa", "configura toda la tienda", "setup completo", ejecuta en secuencia: optimize_all_products, auto_collections, design_all_pages, optimize_images
-- Para filePath: los archivos frontend están en "src/pages/..." y "src/components/...", los backend en rutas del api-server. Siempre usa rutas relativas desde la raíz del proyecto correspondiente
-- Si dice "borra el producto X", usa delete_product
-- Si dice "busca productos de X", usa search_product
-- Si dice "ver pedidos", usa get_orders
-- Si dice "cambia el texto de X", "edita la landing", "modifica el título del hero", "cambia el precio en la landing", "actualiza el CMS", "cambia el nombre del sitio", "edita el panel admin", "cambia el texto de X en la landing", EJECUTA update_cms con el path y value correspondientes
-- Si dice "cambia varias cosas", "actualiza el hero y el pricing", "modifica varios textos a la vez", "haz varios cambios en la landing", EJECUTA update_cms_batch con changes[] conteniendo todos los cambios
-- Si dice "qué tiene el CMS", "muéstrame el contenido actual", "qué dice el hero ahora", "lee el CMS", "ver contenido actual de X", EJECUTA read_cms con section si pide algo específico
-- Si dice "resetea el CMS", "vuelve al original", "restaura los textos por defecto", "resetea la landing", "pon todo como estaba", EJECUTA reset_cms
-- Si dice "genera planes de precio", "créame un catálogo de precios", "genera pricing competitivo", "investiga la competencia y crea planes", "necesito planes profesionales", "genera 5 planes de precio", "pricing competitivo", "crea planes y ponlos en Shopify", EJECUTA generate_competitive_pricing
-- Si dice "audita la app", "qué ofrecemos", "analiza nuestra oferta", "qué features tenemos", "audita lo que vendemos", "review de la app", EJECUTA audit_app_offerings
-- Si dice "compara los precios", "compara nuestros precios", "están bien los precios", "analiza mis precios", "estudio de precios", "audita los precios", "los precios son correctos", "debo subir precios", "debo bajar precios", EJECUTA generate_competitive_pricing para investigar el mercado real y comparar
-- Si dice "crea los productos de suscripción", "crea los servicios en Shopify", "crea productos recurrentes", "pon los planes en Shopify", "crear suscripciones", crea cada plan como un producto Shopify individual con create_product (un :::ACTION::: por cada plan que pida crear)
-- Si dice "cuánto cobramos", "cuáles son nuestros precios", "qué precios tenemos", "nuestro catálogo", "nuestros servicios", responde directamente con TODOS los precios del catálogo que tienes en memoria (planes + servicios one-time + recurring). NO necesitas ejecutar ninguna acción para esto.
-- Si dice "cambia el diseño de X", "haz scroll horizontal", "modifica el layout", "pon X en columnas", "cambia el CSS", "haz responsive", "cambia el estilo de X", "modifica la UI", "añade animación", "cambia el diseño del pricing", "haz que X se vea diferente", EJECUTA modify_ui con target y change
-- USA projectId del contexto si el usuario tiene un proyecto activo
-- Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
-- Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
+REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción correcta):
+- Proveedores/suppliers → search_suppliers
+- Crear producto → create_product (genera todo automáticamente: SEO, descripción, precio, imágenes)
+- Ver/listar productos → list_products; TODOS/draft/archivados → list_all_products con statusFilter
+- Estado tienda → store_status; Regenerar token → regenerate_token
+- Cambiar precio → change_price; Publicar → set_product_status(active); Despublicar → set_product_status(draft); Archivar → set_product_status(archived)
+- Escanear/auditar tienda → scan_store; Diagnosticar app → diagnose_app
+- Ver/inspeccionar código → inspect_code; Arreglar código → inspect_code + fix_code
+- Listar archivos → list_source_files; Analizar componente → analyze_component
+- Optimizar producto → optimize_product; Optimizar todos → optimize_all_products
+- Colecciones → create_collection / list_collections / auto_collections
+- Páginas → create_page / list_pages / design_all_pages
+- Imágenes/alt text → optimize_images
+- Borrar producto → delete_product; Buscar → search_product; Pedidos → get_orders
+- Editar CMS (textos, landing, admin) → update_cms o update_cms_batch; Leer CMS → read_cms; Resetear → reset_cms
+- Generar/comparar precios → generate_competitive_pricing; Auditar oferta → audit_app_offerings
+- Preguntar nuestros precios/catálogo → responde directamente con TODOS los precios de memoria, SIN ejecutar acción
+- Crear productos de suscripción en Shopify → create_product por cada plan (múltiples :::ACTION:::)
+- Cambiar diseño/UI/CSS → modify_ui
+- Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
+- USA projectId del contexto si hay proyecto activo
+- Explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
+- Si no necesitas acción, responde normalmente sin :::ACTION:::
+- SIGUE la conversación: comprende el contexto previo y lo que el usuario ya pidió. No repitas ni ignores instrucciones anteriores.
 `;
 
     const agencyPricingKnowledge = `
@@ -435,16 +402,17 @@ MODELO DE NEGOCIO: Agencia Shopify con servicios puntuales (one-time) + retainer
 3. Enterprise — €399/mes + €1.497 setup. Tiendas ilimitadas, imágenes ilimitadas. White-label, API access, SLA, account manager dedicado por Slack.
 4. One-Shot Audit — €197 pago único (sin retainer). 1 auditoría completa + 30 redesigns + informe SEO + análisis COGS.
 
-9 SERVICIOS PUNTUALES (one-time, precio fijo):
-1. Auditoría completa de tienda — €197
-2. Rediseño IA de 30 productos — €147
-3. Pack 30 imágenes IA — €89
-4. Informe pricing y márgenes — €97
-5. Optimización SEO técnica — €147
-6. Informe de competencia — €97
-7. Investigación de proveedores — €97
+9 SERVICIOS PUNTUALES (one-time, precio por unidad — escalables):
+1. Auditoría completa de tienda — €197/tienda
+2. Rediseño IA por producto — €9/producto (título, descripción 400+ palabras, tags SEO)
+3. Imagen IA profesional — €3/imagen (Hero, Lifestyle, Detalle)
+4. Informe pricing y márgenes — €97/informe
+5. Optimización SEO por producto — €7/producto (meta tags, keywords, Schema JSON-LD)
+6. Informe de competencia — €97/informe
+7. Investigación de proveedores — €97/investigación
 8. Setup email marketing — €197
-9. Proyección de ventas — €127
+9. Proyección de ventas — €127/informe
+PACKS SUGERIDOS: 30 productos redesign = 30×9€ = 270€. 30 imágenes = 30×3€ = 90€. SEO 30 productos = 30×7€ = 210€.
 
 3 SERVICIOS RECURRENTES (mensuales):
 1. Mantenimiento básico — €49/mes
@@ -497,8 +465,8 @@ IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, in
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
 
     const aiRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 2000,
+      model: "claude-haiku-4-20250404",
+      max_tokens: 1500,
       system: sysPrompt,
       messages: [{ role: "user", content: userContent }],
     });
@@ -529,6 +497,15 @@ IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, in
       detectedActions: detectedActions.length > 1 ? detectedActions : undefined,
     });
     return;
+   } catch (searchErr) {
+    logger.error({ error: searchErr, query }, "ShopyBrain search error");
+    res.status(200).json({
+      answer: "Lo siento, hubo un problema procesando tu solicitud. Puede ser un error temporal de la IA o un mensaje demasiado largo. Intenta reformular tu pregunta de forma más corta y directa.",
+      source: "error_recovery",
+      detectedAction: null,
+    });
+    return;
+   }
   }
 
   const conditions = [gte(omnicoreMemoriesTable.confidence, 0.3)];

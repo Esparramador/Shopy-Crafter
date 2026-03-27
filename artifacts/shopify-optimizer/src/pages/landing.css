@@ -1115,6 +1115,50 @@
 .fp-calc-item.selected .fp-calc-item-check {
   background: rgba(200,168,75,0.85); color: #0a0a14;
 }
+.fp-calc-qty {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.fp-calc-qty-btn {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05); color: #fff; font-size: 16px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-family: inherit; padding: 0; line-height: 1;
+}
+.fp-calc-qty-btn:hover { background: rgba(200,168,75,0.2); border-color: rgba(200,168,75,0.5); }
+.fp-calc-qty-val {
+  width: 28px; text-align: center; font-size: 14px; font-weight: 700; color: #fff;
+}
+.fp-calc-line-total {
+  font-size: 13px; font-weight: 600; color: rgba(200,168,75,0.8);
+  flex-shrink: 0; min-width: 50px; text-align: right;
+}
+.fp-calc-breakdown {
+  text-align: left; margin-bottom: 16px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  overflow: hidden;
+}
+.fp-calc-breakdown-header {
+  display: grid; grid-template-columns: 1fr 50px 70px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: rgba(255,255,255,0.4);
+  padding: 10px 14px; background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.fp-calc-breakdown-header span:last-child { text-align: right; }
+.fp-calc-breakdown-row {
+  display: grid; grid-template-columns: 1fr 50px 70px;
+  padding: 8px 14px; font-size: 13px; align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.fp-calc-breakdown-row:last-child { border-bottom: none; }
+.fp-calc-breakdown-name { color: rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-calc-breakdown-qty { text-align: center; color: rgba(255,255,255,0.5); font-weight: 500; }
+.fp-calc-breakdown-price { text-align: right; font-weight: 700; color: rgba(200,168,75,0.9); }
+.fp-calc-discount-hint {
+  margin-top: 14px; padding: 10px 14px; border-radius: 8px;
+  background: rgba(200,168,75,0.08); border: 1px solid rgba(200,168,75,0.2);
+  font-size: 12px; color: rgba(200,168,75,0.9); text-align: left;
+}
 .fp-calc-item-recurring { border-left: 3px solid rgba(100,180,255,0.3); }
 .fp-calc-item-recurring.selected { border-left-color: rgba(100,180,255,0.7); }
 .fp-calc-item-recurring .fp-calc-item-price { color: rgba(100,180,255,0.9); }
@@ -1149,15 +1193,6 @@
 .fp-calc-grand-value small { font-size: 12px; font-weight: 400; opacity: 0.6; margin-left: 4px; }
 .fp-calc-grand-recurring { color: rgba(100,180,255,0.9); font-size: 16px; margin-top: 4px; }
 .fp-calc-grand-recurring small { font-size: 11px; }
-.fp-calc-selected-list {
-  margin-top: 16px; text-align: left;
-  display: flex; flex-direction: column; gap: 4px;
-}
-.fp-calc-selected-item {
-  font-size: 12px; color: rgba(255,255,255,0.5); padding: 4px 0;
-}
-.fp-calc-selected-item span { margin-right: 6px; }
-.fp-calc-selected-recurring { color: rgba(100,180,255,0.6); }
 .fp-calc-cta {
   display: block; width: 100%; margin-top: 20px; padding: 14px 24px;
   font-size: 14px; text-align: center; text-decoration: none; border-radius: 10px;
