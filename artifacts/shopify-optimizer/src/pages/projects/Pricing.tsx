@@ -156,9 +156,23 @@ function CogsModal({
 
   const [optimalData, setOptimalData] = useState<{
     suggestedPrice?: number;
+    optimalPrice?: number;
+    psychologicalPrice?: number;
     compareAtPrice?: number;
     margin?: number;
     reasoning?: string;
+    recommendedStrategy?: string;
+    competitorAnalysis?: string;
+    supplierAnalysis?: string;
+    marginWaterfall?: { revenue: number; platformFees: number; cogs: number; packaging: number; shipping: number; returns: number; marketing: number; overhead: number; netMargin: number; netMarginPct: number };
+    priceImpactEstimate?: { currentPrice: number; suggestedPrice: number; expectedSalesChange: string; expectedRevenueChange: string; confidenceLevel: string };
+    marketResearch?: {
+      competitorPrices: Array<{ source: string; price: string; productName?: string }>;
+      marketPriceRange: { min: number; max: number; median: number };
+      marketPosition: string;
+      avgSupplierCost: number;
+      supplierInsight: string;
+    };
   } | null>(null);
 
   const [aiEstimating, setAiEstimating] = useState(false);
@@ -275,9 +289,9 @@ function CogsModal({
     );
   };
 
-  const handleApply = (price: number, compareAt: number) => {
+  const handleApply = (price: number, compareAt?: number) => {
     applyPrice.mutate(
-      { projectId, productId: product.id, data: { price: String(price), compareAtPrice: String(compareAt) } },
+      { projectId, productId: product.id, data: { price: String(price), compareAtPrice: compareAt ? String(compareAt) : undefined } },
       {
         onSuccess: () => { toast({ title: "Precio aplicado en Shopify" }); onClose(); },
         onError: () => toast({ title: "Error aplicando precio", variant: "destructive" }),
@@ -554,32 +568,94 @@ function CogsModal({
           </div>
 
           {optimalData && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
-              <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-green-500/5 border border-green-500/20 rounded-xl p-5 space-y-4">
+              <h4 className="text-sm font-semibold text-green-400 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
-                Recomendación IA (basada en costes reales)
+                Recomendación IA{optimalData.marketResearch?.competitorPrices?.length ? " (con datos de mercado reales)" : ""}
               </h4>
-              <div className="flex gap-6 mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Precio Sugerido</p>
-                  <p className="text-2xl font-bold text-green-400">{formatCurrency(optimalData.suggestedPrice ?? 0)}</p>
+
+              <div className="flex flex-wrap gap-4">
+                <div className="bg-green-500/10 rounded-lg p-3 flex-1 min-w-[120px]">
+                  <p className="text-xs text-muted-foreground">Precio Óptimo</p>
+                  <p className="text-2xl font-bold text-green-400">{formatCurrency(optimalData.optimalPrice ?? optimalData.suggestedPrice ?? 0)}</p>
                 </div>
+                {optimalData.psychologicalPrice && (
+                  <div className="bg-blue-500/10 rounded-lg p-3 flex-1 min-w-[120px]">
+                    <p className="text-xs text-muted-foreground">Precio Psicológico</p>
+                    <p className="text-2xl font-bold text-blue-400">{formatCurrency(optimalData.psychologicalPrice)}</p>
+                  </div>
+                )}
                 {optimalData.compareAtPrice && (
-                  <div>
+                  <div className="bg-white/5 rounded-lg p-3 flex-1 min-w-[120px]">
                     <p className="text-xs text-muted-foreground">Compare At</p>
                     <p className="text-2xl font-bold text-muted-foreground line-through">{formatCurrency(optimalData.compareAtPrice)}</p>
                   </div>
                 )}
-                {optimalData.margin && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Margen</p>
-                    <p className="text-2xl font-bold text-primary">{optimalData.margin}%</p>
+                {(optimalData.marginWaterfall?.netMarginPct ?? optimalData.margin) != null && (
+                  <div className="bg-primary/10 rounded-lg p-3 flex-1 min-w-[120px]">
+                    <p className="text-xs text-muted-foreground">Margen Neto</p>
+                    <p className="text-2xl font-bold text-primary">{optimalData.marginWaterfall?.netMarginPct ?? optimalData.margin}%</p>
                   </div>
                 )}
               </div>
-              {optimalData.reasoning && <p className="text-xs text-muted-foreground mb-4">{optimalData.reasoning}</p>}
-              <button onClick={() => handleApply(optimalData.suggestedPrice!, optimalData.compareAtPrice!)} disabled={applyPrice.isPending}
-                className="w-full bg-green-500 text-black py-2.5 rounded-xl text-sm font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2">
+
+              {optimalData.recommendedStrategy && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-primary mb-1">Estrategia Recomendada</p>
+                  <p className="text-xs text-foreground">{optimalData.recommendedStrategy}</p>
+                </div>
+              )}
+
+              {optimalData.marketResearch && optimalData.marketResearch.competitorPrices.length > 0 && (
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-400 mb-2">Precios de Competidores ({optimalData.marketResearch.competitorPrices.length} encontrados)</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {optimalData.marketResearch.competitorPrices.slice(0, 6).map((c, i) => (
+                      <span key={i} className="text-xs bg-blue-500/10 px-2 py-1 rounded-lg">
+                        {c.source}: <span className="font-semibold text-blue-300">€{c.price}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>Rango: €{optimalData.marketResearch.marketPriceRange.min} – €{optimalData.marketResearch.marketPriceRange.max}</span>
+                    <span>Mediana: <span className="text-blue-300 font-semibold">€{optimalData.marketResearch.marketPriceRange.median}</span></span>
+                  </div>
+                </div>
+              )}
+
+              {optimalData.marketResearch && optimalData.marketResearch.avgSupplierCost > 0 && (
+                <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-orange-400 mb-1">Coste Medio Proveedores</p>
+                  <p className="text-lg font-bold text-orange-300">€{optimalData.marketResearch.avgSupplierCost.toFixed(2)}</p>
+                  {optimalData.marketResearch.supplierInsight && (
+                    <p className="text-xs text-muted-foreground mt-1">{optimalData.marketResearch.supplierInsight}</p>
+                  )}
+                </div>
+              )}
+
+              {optimalData.priceImpactEstimate && (
+                <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-purple-400 mb-2">Impacto Estimado del Cambio</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Ventas: </span><span className="text-foreground">{optimalData.priceImpactEstimate.expectedSalesChange}</span></div>
+                    <div><span className="text-muted-foreground">Revenue: </span><span className="text-foreground">{optimalData.priceImpactEstimate.expectedRevenueChange}</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Confianza: </span><span className="text-purple-300">{optimalData.priceImpactEstimate.confidenceLevel}</span></div>
+                  </div>
+                </div>
+              )}
+
+              {optimalData.reasoning && <p className="text-xs text-muted-foreground">{optimalData.reasoning}</p>}
+
+              <button
+                onClick={() => {
+                  const price = optimalData.optimalPrice ?? optimalData.suggestedPrice;
+                  if (price && isFinite(price)) {
+                    handleApply(price, optimalData.compareAtPrice ?? price * 1.3);
+                  }
+                }}
+                disabled={applyPrice.isPending || !(optimalData.optimalPrice ?? optimalData.suggestedPrice)}
+                className="w-full bg-green-500 text-black py-2.5 rounded-xl text-sm font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
                 {applyPrice.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 Aplicar Precio en Shopify
               </button>

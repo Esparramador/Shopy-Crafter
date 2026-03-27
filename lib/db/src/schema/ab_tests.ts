@@ -5,6 +5,7 @@ import {
   timestamp,
   integer,
   real,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -15,8 +16,12 @@ export const abTestsTable = pgTable("ab_tests", {
   projectId: integer("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
   shopifyProductId: text("shopify_product_id").notNull(),
   productTitle: text("product_title").notNull(),
+  testType: text("test_type").notNull().default("image"),
   imageType: text("image_type").notNull(),
   hypothesis: text("hypothesis").notNull(),
+  variantAPrice: text("variant_a_price"),
+  variantBPrice: text("variant_b_price"),
+  aiPrediction: jsonb("ai_prediction"),
   variantAUrl: text("variant_a_url"),
   variantAShopifyImageId: text("variant_a_shopify_image_id"),
   variantBUrl: text("variant_b_url"),

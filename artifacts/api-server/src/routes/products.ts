@@ -814,6 +814,7 @@ router.post("/projects/:projectId/products/create", async (req, res): Promise<vo
   let finalTags = tags ?? "";
   let seoTitle = "";
   let seoDescription = "";
+  let aiSuggestedVariants: Array<{ name: string; values: string[] }> = [];
 
   if (aiGenerate) {
     try {
@@ -821,11 +822,17 @@ router.post("/projects/:projectId/products/create", async (req, res): Promise<vo
         title: string;
         description: string;
         tags: string[];
+        hashtags: string[];
         seoTitle: string;
         seoDescription: string;
+        suggestedVariants: Array<{ name: string; values: string[] }>;
+        recommendedImageCount: number;
+        imageTypes: string[];
+        brandConsistencyNotes: string;
       }>(
         projectId,
-        `Genera contenido optimizado para un producto Shopify.
+        `Genera contenido COMPLETO y PROFESIONAL para un producto Shopify de la tienda "${project.name}".
+
 Datos del producto:
 - Título original: "${title}"
 - Tipo: ${productType || "no especificado"}
@@ -833,26 +840,53 @@ Datos del producto:
 - Nicho de la tienda: ${project.storeNiche || "general"}
 - Tono de marca: ${project.brandTone || "profesional"}
 - Público objetivo: ${project.targetAudience || "general"}
+- Mercados: ${project.storeMarkets || "España"}
 
-Genera:
-1. "title": Título optimizado para SEO y conversión (max 70 chars)
-2. "description": Descripción HTML persuasiva y profesional (min 150 palabras, con bullet points, beneficios, CTA). Usa <h3>, <ul>, <li>, <p>, <strong>.
-3. "tags": Array de 5-8 tags relevantes para SEO y categorización
-4. "seoTitle": Meta title optimizado (max 60 chars)
-5. "seoDescription": Meta description persuasiva (max 155 chars)
+Genera un producto SUPER PROFESIONAL como lo haría una tienda de €10M+/año:
+
+1. "title": Título optimizado para SEO y conversión (max 70 chars). Incluye keyword principal del nicho.
+2. "description": Descripción HTML persuasiva (min 200 palabras). Estructura profesional:
+   - <h3> con beneficio principal
+   - <p> párrafo de enganche emocional
+   - <ul><li> 5-8 características/beneficios con iconos (✓, ⭐, 🔒)
+   - <p> párrafo de uso/aplicación
+   - <h3> especificaciones técnicas si aplica
+   - <p> CTA final con urgencia sutil
+   Usa <h3>, <ul>, <li>, <p>, <strong>, <em>.
+3. "tags": Array de 8-12 tags relevantes para SEO y categorización (sin #, solo palabras)
+4. "hashtags": Array de 5-8 hashtags para redes sociales (con #). Relevantes al nicho y tendencias.
+5. "seoTitle": Meta title (max 60 chars) con keyword + beneficio + marca
+6. "seoDescription": Meta description (max 155 chars) con keyword, precio indicativo, CTA
+7. "suggestedVariants": Array de opciones recomendadas [{"name": "Talla/Color/Material", "values": ["S","M","L"]}]. Solo si tiene sentido para el tipo de producto.
+8. "recommendedImageCount": Número de imágenes recomendado (mínimo 5, ideal 8-9 para tienda profesional)
+9. "imageTypes": Array de tipos de imagen necesarios (ej: ["hero", "lifestyle", "detail", "scale", "packaging", "ugc"])
+10. "brandConsistencyNotes": Notas sobre cómo mantener coherencia con el ADN de marca de la tienda
+
+REGLAS:
+- Sé COHERENTE con la estética y tono de la marca
+- NO uses lenguaje genérico — adapta todo al nicho "${project.storeNiche || "general"}"
+- Las descripciones deben vender, no solo describir
+- Los tags deben incluir long-tail keywords del nicho
+- Los hashtags deben ser los que usa la comunidad del nicho
 
 Responde SOLO JSON válido.`,
-        `${SHOPIFY_EXPERT_SYSTEM} Eres experto en copywriting de eCommerce. Genera contenido que convierta, usando el conocimiento acumulado del nicho.`,
+        `${SHOPIFY_EXPERT_SYSTEM} Eres experto en copywriting de eCommerce de alto nivel. Generas contenido de tienda premium que convierte. Usas el conocimiento acumulado del nicho para crear productos coherentes con la marca.`,
         "redesign",
-        project.storeNiche ?? undefined
+        project.storeNiche ?? undefined,
+        4096
       );
 
       if (aiResult) {
         finalTitle = aiResult.title || title;
         finalBody = aiResult.description || bodyHtml || "";
-        finalTags = Array.isArray(aiResult.tags) ? aiResult.tags.join(", ") : (tags ?? "");
+        const allTags = [
+          ...(Array.isArray(aiResult.tags) ? aiResult.tags : []),
+          ...(Array.isArray(aiResult.hashtags) ? aiResult.hashtags.map(h => h.replace(/^#/, "")) : []),
+        ];
+        finalTags = allTags.length > 0 ? allTags.join(", ") : (tags ?? "");
         seoTitle = aiResult.seoTitle || "";
         seoDescription = aiResult.seoDescription || "";
+        aiSuggestedVariants = aiResult.suggestedVariants || [];
       }
     } catch (e) {
       console.error("AI generation for product failed, using original data:", e);
@@ -904,6 +938,12 @@ Responde SOLO JSON válido.`,
       name: o.name,
       position: i + 1,
       values: o.values,
+    }));
+  } else if (aiSuggestedVariants.length > 0 && !variants?.length) {
+    shopifyProduct.options = aiSuggestedVariants.map((v, i) => ({
+      name: v.name,
+      position: i + 1,
+      values: v.values,
     }));
   }
 

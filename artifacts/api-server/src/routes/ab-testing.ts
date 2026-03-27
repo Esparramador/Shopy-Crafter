@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, abTestsTable, trackEventsTable } from "@workspace/db";
+import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 
 const router = Router();
 
@@ -72,8 +72,12 @@ router.get("/admin/all-ab-tests", async (req, res): Promise<void> => {
         projectName: projectMap.get(t.projectId) ?? "Unknown",
         productId: t.shopifyProductId,
         productTitle: t.productTitle,
+        testType: t.testType,
         imageType: t.imageType,
         hypothesis: t.hypothesis,
+        variantAPrice: t.variantAPrice,
+        variantBPrice: t.variantBPrice,
+        aiPrediction: t.aiPrediction,
         variantAVisitors: t.variantAVisitors,
         variantBVisitors: t.variantBVisitors,
         variantAConversions: t.variantAConversions,
@@ -116,10 +120,14 @@ router.get("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
     projectId: t.projectId,
     productId: t.shopifyProductId,
     productTitle: t.productTitle,
+    testType: t.testType,
     imageType: t.imageType,
     hypothesis: t.hypothesis,
     variantAUrl: t.variantAUrl,
     variantBUrl: t.variantBUrl,
+    variantAPrice: t.variantAPrice,
+    variantBPrice: t.variantBPrice,
+    aiPrediction: t.aiPrediction,
     variantAVisitors: t.variantAVisitors,
     variantBVisitors: t.variantBVisitors,
     variantAConversions: t.variantAConversions,
@@ -137,9 +145,10 @@ router.get("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
 
 router.post("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const { productId, imageType, hypothesis, targetMetric } = req.body as {
+  const { productId, imageType, hypothesis, targetMetric, testType, variantAPrice, variantBPrice } = req.body as {
     productId: string; imageType: string; hypothesis: string;
     variantAImageId?: string; variantBImageId?: string; targetMetric: string;
+    testType?: string; variantAPrice?: string; variantBPrice?: string;
   };
 
   const [product] = await db
@@ -147,13 +156,85 @@ router.post("/projects/:projectId/ab-tests", async (req, res): Promise<void> => 
     .from(productsTable)
     .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, productId)));
 
+  const effectiveTestType = testType || "image";
+
+  let aiPrediction = null;
+  if (effectiveTestType === "price" && variantAPrice && variantBPrice) {
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [cogs] = await db.select().from(cogsTable).where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, productId)));
+
+    try {
+      aiPrediction = await askClaudeJsonWithBrain<{
+        predictedConversionChangeA: string;
+        predictedConversionChangeB: string;
+        predictedRevenueImpactA: string;
+        predictedRevenueImpactB: string;
+        predictedMarginA: number;
+        predictedMarginB: number;
+        salesVolumeImpact: string;
+        visualImpact: string;
+        economicImpact: string;
+        recommendation: string;
+        riskLevel: string;
+        priceElasticity: string;
+      }>(
+        projectId,
+        `Predice el impacto de un test A/B de PRECIO para el producto "${product?.title ?? productId}".
+
+Hipótesis: ${hypothesis}
+Variante A (Control): €${variantAPrice} (precio actual)
+Variante B (Challenger): €${variantBPrice} (precio sugerido)
+COGS por unidad: €${cogs?.totalCogs ?? "desconocido"}
+Margen actual: ${cogs?.totalCogs ? `${((parseFloat(variantAPrice) - cogs.totalCogs) / parseFloat(variantAPrice) * 100).toFixed(1)}%` : "desconocido"}
+Nicho: ${project?.storeNiche ?? "e-commerce"}
+Audiencia: ${project?.targetAudience ?? "general"}
+
+Analiza y predice:
+1. Cómo afectará el cambio de precio a la tasa de conversión (para AMBAS variantes)
+2. Impacto estimado en revenue mensual (para AMBAS variantes)
+3. Margen de beneficio con cada precio
+4. Impacto en volumen de ventas
+5. Impacto visual en la percepción del cliente
+6. Impacto económico global del cambio
+7. Elasticidad de precio estimada para este tipo de producto
+8. Nivel de riesgo del cambio
+9. Recomendación: ¿vale la pena el test?
+
+Devuelve JSON:
+{
+  "predictedConversionChangeA": "0% (baseline)",
+  "predictedConversionChangeB": "+X% o -X%",
+  "predictedRevenueImpactA": "€XXX/mes (baseline)",
+  "predictedRevenueImpactB": "€XXX/mes estimado",
+  "predictedMarginA": XX.X,
+  "predictedMarginB": XX.X,
+  "salesVolumeImpact": "Descripción del impacto en volumen",
+  "visualImpact": "Cómo percibe el cliente el cambio de precio",
+  "economicImpact": "Análisis económico completo",
+  "recommendation": "Recomendación clara y accionable",
+  "riskLevel": "bajo|medio|alto",
+  "priceElasticity": "Elasticidad estimada para este nicho"
+}`,
+        `You are a senior pricing strategist and behavioral economist. Analyze A/B price test scenarios with data-driven predictions. Respond in Spanish.`,
+        "ab_test_prediction",
+        project?.storeNiche ?? undefined
+      );
+    } catch {
+      aiPrediction = null;
+    }
+  }
+
   const [test] = await db.insert(abTestsTable).values({
     projectId,
     shopifyProductId: productId,
     productTitle: product?.title ?? productId,
-    imageType,
+    testType: effectiveTestType,
+    imageType: imageType || effectiveTestType,
     hypothesis,
-    targetMetric,
+    targetMetric: targetMetric || "conversion",
+    variantAPrice: variantAPrice ?? null,
+    variantBPrice: variantBPrice ?? null,
+    aiPrediction: aiPrediction as Record<string, unknown> | null,
     status: "running",
     startDate: new Date(),
   }).returning();
@@ -163,10 +244,14 @@ router.post("/projects/:projectId/ab-tests", async (req, res): Promise<void> => 
     projectId: test.projectId,
     productId: test.shopifyProductId,
     productTitle: test.productTitle,
+    testType: test.testType,
     imageType: test.imageType,
     hypothesis: test.hypothesis,
     variantAUrl: test.variantAUrl,
     variantBUrl: test.variantBUrl,
+    variantAPrice: test.variantAPrice,
+    variantBPrice: test.variantBPrice,
+    aiPrediction: test.aiPrediction,
     variantAVisitors: test.variantAVisitors,
     variantBVisitors: test.variantBVisitors,
     variantAConversions: test.variantAConversions,

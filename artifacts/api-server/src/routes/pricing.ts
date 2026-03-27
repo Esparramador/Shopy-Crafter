@@ -4,6 +4,7 @@ import { projectsTable, productsTable, cogsTable, priceHistoryTable } from "@wor
 import { eq, and, desc, gte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
+import { askGeminiWithSearch } from "../lib/gemini.js";
 
 const router = Router();
 
@@ -288,53 +289,186 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
 
   const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  const [cogs] = await db.select().from(cogsTable).where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
+  let [cogs] = await db.select().from(cogsTable).where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
 
   if (!product || !project) {
     res.status(404).json({ error: "Producto no encontrado" });
     return;
   }
 
+  const niche = project.storeNiche ?? "e-commerce";
+  const currentPrice = product.price ?? "0";
+
+  let competitorResearch = { competitorPrices: [] as Array<{ source: string; price: string; url?: string; productName?: string }>, marketPriceRange: { min: 0, max: 0, median: 0 }, marketPosition: "", pricingStrategy: "" };
+  let supplierResearch = { supplierPrices: [] as Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>, avgSupplierCost: 0, supplierInsight: "" };
+
+  try {
+    const [compResult, suppResult] = await Promise.allSettled([
+      askGeminiWithSearch(
+        `BUSCA PRECIOS REALES en tiendas online para este tipo de producto:
+
+Producto: "${product.title}"
+Tipo: ${product.productType || "no especificado"}
+Nicho/industria: ${niche}
+Precio actual: ${currentPrice}€
+
+INSTRUCCIONES:
+1. Busca en Google Shopping, Amazon España, tiendas especializadas del nicho "${niche}"
+2. Encuentra AL MENOS 5-10 precios REALES de productos similares o competidores directos
+3. Extrae precios concretos con decimales y la URL/fuente de cada uno
+4. Calcula el rango de mercado real (mínimo, máximo, mediana)
+5. Determina la posición de mercado del precio actual €${currentPrice}
+
+RESPONDE con este formato JSON exacto (sin texto adicional):
+{
+  "competitorPrices": [{"source": "nombre tienda", "price": "XX.XX", "url": "URL", "productName": "nombre encontrado"}],
+  "marketPriceRange": {"min": XX.XX, "max": XX.XX, "median": XX.XX},
+  "marketPosition": "budget|mid-range|premium|luxury",
+  "pricingStrategy": "Explicación de la estrategia recomendada basada en datos reales"
+}`,
+        `You are a pricing analyst. Search for REAL current prices of similar products online in Spain and Europe. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
+      ),
+      askGeminiWithSearch(
+        `BUSCA PRECIOS REALES DE PROVEEDORES/MAYORISTAS para fabricar o comprar al por mayor este producto:
+
+Producto: "${product.title}"
+Tipo: ${product.productType || "no especificado"}
+Nicho: ${niche}
+
+INSTRUCCIONES:
+1. Busca en Alibaba, AliExpress mayorista, proveedores europeos, fabricantes del sector "${niche}"
+2. Encuentra precios de coste/proveedor REALES para productos similares
+3. Incluye MOQ (cantidad mínima de pedido) si está disponible
+4. Indica el país de origen del proveedor
+
+RESPONDE con este formato JSON exacto:
+{
+  "supplierPrices": [{"supplier": "nombre", "priceRange": "X.XX - X.XX €/ud", "moq": "50 unidades", "origin": "China/España/etc"}],
+  "avgSupplierCost": XX.XX,
+  "supplierInsight": "Análisis del coste de aprovisionamiento y recomendación"
+}`,
+        `You are a supply chain analyst. Search for REAL wholesale/supplier prices for this type of product. Use Google Search to find actual B2B prices. Return ONLY valid JSON.`
+      ),
+    ]);
+
+    if (compResult.status === "fulfilled") {
+      const jsonMatch = compResult.value.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        competitorResearch = { ...competitorResearch, ...parsed };
+      }
+    }
+    if (suppResult.status === "fulfilled") {
+      const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        supplierResearch = { ...supplierResearch, ...parsed };
+      }
+    }
+  } catch {}
+
   const cogsTotal = cogs?.totalCogs ?? 0;
-  const cogsInfo = cogs ? `COGS total: €${cogsTotal}, Precio mínimo viable: €${cogs.minimumViablePrice}` : "COGS: no configurado";
-  const competitorInfo = cogs?.lastCompetitorAnalysis ? `Análisis de competencia: ${JSON.stringify(cogs.lastCompetitorAnalysis)}` : "Sin análisis de competencia previo";
+  const cogsInfo = cogs ? `COGS total calculado: €${cogsTotal}, Precio mínimo viable: €${cogs.minimumViablePrice}, Break-even: €${cogs.breakEvenPrice}` : "COGS: no configurado — usa los datos de proveedores para estimar";
+
+  const competitorDataStr = competitorResearch.competitorPrices.length > 0
+    ? `PRECIOS REALES DE COMPETIDORES (datos de mercado actual):\n${competitorResearch.competitorPrices.map(c => `  - ${c.source}: €${c.price} ${c.productName ? `(${c.productName})` : ""} ${c.url ? `[${c.url}]` : ""}`).join("\n")}\n  Rango de mercado: €${competitorResearch.marketPriceRange.min} - €${competitorResearch.marketPriceRange.max} (mediana: €${competitorResearch.marketPriceRange.median})\n  Posición actual en mercado: ${competitorResearch.marketPosition}`
+    : "Sin datos de competidores disponibles — estima basándote en tu conocimiento del nicho";
+
+  const supplierDataStr = supplierResearch.supplierPrices.length > 0
+    ? `PRECIOS REALES DE PROVEEDORES:\n${supplierResearch.supplierPrices.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""} ${s.origin ? `[${s.origin}]` : ""}`).join("\n")}\n  Coste medio proveedor: €${supplierResearch.avgSupplierCost}\n  Insight: ${supplierResearch.supplierInsight}`
+    : "Sin datos de proveedores disponibles";
 
   const prompt = `Calcula el precio óptimo para el producto "${product.title}" de la tienda "${project.name}".
 
 ${cogsInfo}
-${competitorInfo}
-Nicho: ${project.storeNiche ?? "e-commerce"}
+
+${competitorDataStr}
+
+${supplierDataStr}
+
+CONTEXTO DE LA TIENDA:
+Nicho: ${niche}
 Audiencia: ${project.targetAudience ?? "adultos"}
 Tono de marca: ${project.brandTone ?? "profesional"}
-Precio actual: ${product.price ?? "no configurado"}
+Mercados: ${project.storeMarkets ?? "España"}
+Precio actual: €${currentPrice}
+
+REGLAS CRÍTICAS DE PRICING:
+- El precio DEBE ser COHERENTE con los datos reales de mercado encontrados
+- NO pongas precios irrisorios (demasiado bajos destruyen percepción de valor)
+- NO pongas precios inflados sin justificación (mata conversión)
+- El precio debe posicionar el producto correctamente según la calidad y el nicho
+- Si la mediana de mercado es €X, el precio óptimo debe estar justificado respecto a esa mediana
+- Margen mínimo viable: 30% sobre COGS para cubrir operaciones
+- Si el precio actual difiere mucho del mercado, explica POR QUÉ y sugiere cambio gradual
 
 Calcula:
-1. Precio matemáticamente óptimo para máximo profit
-2. Precio psicológico para máxima conversión
-3. Compare_at_price (30% más alto mínimo, psicológico)
-4. Estrategia recomendada
+1. Precio matemáticamente óptimo para máximo profit (basado en datos REALES)
+2. Precio psicológico para máxima conversión (charm pricing: .99, .95, etc.)
+3. Compare_at_price (30% más alto mínimo, psicológico para anclar)
+4. Estrategia recomendada (posicionamiento vs competencia)
 5. Waterfall de márgenes (desglose de cada €1 de revenue)
 6. Advertencias de margen si hay riesgo
 7. Sugerencias de bundle para aumentar AOV
 8. Proyección de revenue mensual estimado
+9. Análisis comparativo: tu precio actual vs mediana de mercado vs precio sugerido
+10. Impacto estimado del cambio de precio en ventas
 
-Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null).`;
+Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español detallado), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null), competitorAnalysis (string — resumen de datos encontrados), supplierAnalysis (string — resumen de costes proveedor), priceImpactEstimate (objeto con: currentPrice, suggestedPrice, expectedSalesChange (string), expectedRevenueChange (string), confidenceLevel (string)).`;
 
-  const result = await askClaudeJsonWithBrain<{
-    optimalPrice: number; psychologicalPrice: number; compareAtPrice: number;
-    recommendedStrategy: string;
-    marginWaterfall: { revenue: number; platformFees: number; cogs: number; packaging: number; shipping: number; returns: number; marketing: number; overhead: number; netMargin: number; netMarginPct: number };
-    reasoning: string; marginWarnings: string[]; bundleSuggestions: string[];
-    monthlyRevenueProjection: number | null;
-  }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", project.storeNiche ?? undefined);
+  let result;
+  try {
+    result = await askClaudeJsonWithBrain<{
+      optimalPrice: number; psychologicalPrice: number; compareAtPrice: number;
+      recommendedStrategy: string;
+      marginWaterfall: { revenue: number; platformFees: number; cogs: number; packaging: number; shipping: number; returns: number; marketing: number; overhead: number; netMargin: number; netMarginPct: number };
+      reasoning: string; marginWarnings: string[]; bundleSuggestions: string[];
+      monthlyRevenueProjection: number | null;
+      competitorAnalysis: string; supplierAnalysis: string;
+      priceImpactEstimate: { currentPrice: number; suggestedPrice: number; expectedSalesChange: string; expectedRevenueChange: string; confidenceLevel: string };
+    }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", niche, 8192);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ error: `Error calculando precio óptimo: ${msg}` });
+    return;
+  }
+
+  const lastCompetitorAnalysis = {
+    date: new Date().toISOString(),
+    competitorPrices: competitorResearch.competitorPrices,
+    marketPriceRange: competitorResearch.marketPriceRange,
+    marketPosition: competitorResearch.marketPosition,
+    supplierPrices: supplierResearch.supplierPrices,
+    avgSupplierCost: supplierResearch.avgSupplierCost,
+  };
 
   if (cogs) {
     await db.update(cogsTable)
-      .set({ lastPricingRecommendation: result as Record<string, unknown> })
+      .set({ lastPricingRecommendation: result as Record<string, unknown>, lastCompetitorAnalysis: lastCompetitorAnalysis as Record<string, unknown> })
       .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
   }
 
-  res.json(result);
+  learnFromOperation({
+    operationType: "pricing_analysis",
+    niche: niche,
+    productType: product.productType ?? null,
+    title: `Análisis pricing: ${product.title}`,
+    content: `Precio actual: €${currentPrice}. Óptimo: €${result.optimalPrice}. Psicológico: €${result.psychologicalPrice}. Mediana mercado: €${competitorResearch.marketPriceRange.median}. Competidores: ${competitorResearch.competitorPrices.length} encontrados. Proveedores: coste medio €${supplierResearch.avgSupplierCost}. Estrategia: ${result.recommendedStrategy}. Margen neto: ${result.marginWaterfall?.netMarginPct ?? "?"}%.`,
+    confidence: competitorResearch.competitorPrices.length >= 5 ? 0.85 : 0.6,
+    tags: ["pricing", "optimal_price", "competitor_analysis", product.productType ?? "general"],
+  });
+
+  res.json({
+    ...result,
+    marketResearch: {
+      competitorPrices: competitorResearch.competitorPrices,
+      marketPriceRange: competitorResearch.marketPriceRange,
+      marketPosition: competitorResearch.marketPosition,
+      supplierPrices: supplierResearch.supplierPrices,
+      avgSupplierCost: supplierResearch.avgSupplierCost,
+      supplierInsight: supplierResearch.supplierInsight,
+    },
+  });
 });
 
 router.post("/projects/:projectId/products/:productId/apply-price", async (req, res): Promise<void> => {
