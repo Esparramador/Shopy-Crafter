@@ -324,7 +324,23 @@ export async function runOmniCoreMicroLearning() {
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
 
-        const parsed = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string; tags?: string[] }> };
+        let parsed: { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string; tags?: string[] }> };
+        try {
+          let jsonStr = match[0]
+            .replace(/,\s*]/g, "]")
+            .replace(/,\s*}/g, "}")
+            .replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          log("omnicore-micro", `Malformed JSON from AI for domain ${domain.domain}, attempting line-by-line repair`);
+          try {
+            const raw = match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+            parsed = JSON.parse(raw.replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+          } catch {
+            log("omnicore-micro", `JSON repair failed for domain ${domain.domain} — skipping`);
+            continue;
+          }
+        }
 
         for (const ins of parsed.insights ?? []) {
           const insId = `micro-${domain.id}-${uid()}`;
@@ -440,9 +456,25 @@ export async function runOmniCoreCrossConnections() {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
 
-    const parsed = JSON.parse(match[0]) as {
+    let parsed: {
       connections: Array<{ fromDomain: string; toDomain: string; insight: string; synergy: string; confidence: number }>
     };
+    try {
+      const jsonStr = match[0]
+        .replace(/,\s*]/g, "]")
+        .replace(/,\s*}/g, "}")
+        .replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      log("omnicore-cross", "Malformed JSON from AI, attempting repair");
+      try {
+        const raw = match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+        parsed = JSON.parse(raw.replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+      } catch {
+        log("omnicore-cross", "JSON repair failed — skipping cross-synthesis");
+        return;
+      }
+    }
 
     for (const conn of parsed.connections ?? []) {
       const crossId = `cross-${uid()}`;
@@ -519,7 +551,17 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) continue;
 
-        const parsed = JSON.parse(match[0]) as { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string }> };
+        let parsed: { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string }> };
+        try {
+          parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+        } catch {
+          try {
+            parsed = JSON.parse(match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim().replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+          } catch {
+            log("omnicore-daily", `JSON repair failed for domain ${domain.domain} — skipping`);
+            continue;
+          }
+        }
 
         for (const ins of parsed.insights ?? []) {
           const insId = `daily-${domain.id}-${uid()}`;
@@ -619,9 +661,19 @@ Return ONLY valid JSON:
     });
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
-      const parsed = JSON.parse(match[0]) as {
+      let parsed: {
         insights: Array<{ title: string; insight: string; confidence: number; domains?: string[]; priority?: string }>
       };
+      try {
+        parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+      } catch {
+        try {
+          parsed = JSON.parse(match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim().replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+        } catch {
+          log("omnicore-mega", "JSON repair failed for mega-synthesis — skipping");
+          return;
+        }
+      }
 
       for (const ins of parsed.insights ?? []) {
         const insId = `mega-${uid()}`;
@@ -769,9 +821,15 @@ Return ONLY valid JSON:
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) continue;
 
-        const parsed = JSON.parse(match[0]) as {
+        let parsed: {
           evaluations: Array<{ index: number; newConfidence: number; stillValid: boolean; notes: string }>
         };
+        try {
+          parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
+        } catch {
+          log("omnicore-retro", "JSON repair failed for retroanalysis batch — skipping");
+          continue;
+        }
 
         for (const ev of parsed.evaluations ?? []) {
           const ins = batch[ev.index - 1];

@@ -222,8 +222,18 @@ ALL email HTML must:
 
     res.json({ plan, marketIntel, source: "gemini+claude+omnicore" });
   } catch (err) {
+    const errStr = err instanceof Error ? err.message : String(err);
     logger.error(err, "Klaviyo workflow generation failed");
-    res.status(500).json({ error: String(err) });
+
+    if (errStr.includes("credit balance is too low") || errStr.includes("insufficient_quota")) {
+      res.status(402).json({ error: "⚠️ Créditos de IA agotados — Recarga en console.anthropic.com para continuar." });
+    } else if (errStr.includes("rate_limit") || errStr.includes("Too many requests")) {
+      res.status(429).json({ error: "⏳ Demasiadas peticiones. Espera unos segundos e inténtalo de nuevo." });
+    } else if (errStr.includes("overloaded")) {
+      res.status(503).json({ error: "🔄 Servicio de IA sobrecargado temporalmente. Inténtalo en 1-2 minutos." });
+    } else {
+      res.status(500).json({ error: "Error generando el workflow de Klaviyo. Inténtalo de nuevo." });
+    }
   }
 });
 
@@ -250,8 +260,18 @@ router.post("/klaviyo-ai/generate-email", requireAdmin, async (req: Request, res
 
     res.json({ html, flowType, emailPosition });
   } catch (err) {
+    const errStr = err instanceof Error ? err.message : String(err);
     logger.error(err, "Klaviyo email generation failed");
-    res.status(500).json({ error: String(err) });
+
+    if (errStr.includes("credit balance is too low") || errStr.includes("insufficient_quota")) {
+      res.status(402).json({ error: "⚠️ Créditos de IA agotados — Recarga en console.anthropic.com para continuar." });
+    } else if (errStr.includes("rate_limit") || errStr.includes("Too many requests")) {
+      res.status(429).json({ error: "⏳ Demasiadas peticiones. Espera unos segundos." });
+    } else if (errStr.includes("overloaded")) {
+      res.status(503).json({ error: "🔄 Servicio de IA sobrecargado. Inténtalo en 1-2 minutos." });
+    } else {
+      res.status(500).json({ error: "Error generando el email. Inténtalo de nuevo." });
+    }
   }
 });
 
