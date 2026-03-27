@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Brain, X, Send, Loader2, Minimize2, Maximize2, Sparkles, ChevronDown,
   Link, Image, Video, Upload, Eye, Palette, Layers, Cpu, Globe,
-  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle
+  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle, Mic, MicOff
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -112,6 +112,17 @@ function formatMessage(content: string): React.ReactNode {
     if (part === "\n") return <br key={i} />;
     return part;
   });
+}
+
+function createSpeechRecognition(): any | null {
+  const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SR) return null;
+  const recognition = new SR();
+  recognition.lang = "es-ES";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  return recognition;
 }
 
 // ─── ABSORB RESULT CARD ───────────────────────────────────────────────────────
@@ -607,12 +618,23 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [attachUrl, setAttachUrl] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* already stopped */ }
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
 
   // ─── Drag & drop ──────────────────────────────────────────────────────────
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
@@ -633,6 +655,33 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const handleUrlAdd = () => {
     if (urlInput.trim()) { setAttachUrl(urlInput.trim()); setAttachFile(null); setUrlInput(""); }
   };
+
+  const pendingTranscriptRef = useRef<string | null>(null);
+
+  const toggleMic = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    let rec = recognitionRef.current;
+    if (!rec) {
+      rec = createSpeechRecognition();
+      if (!rec) return;
+      recognitionRef.current = rec;
+    }
+    rec.onresult = (e: any) => {
+      const t = Array.from(e.results as any[]).map((r: any) => r[0].transcript).join("");
+      setInput(t);
+      if (e.results[e.results.length - 1].isFinal) {
+        setIsListening(false);
+        pendingTranscriptRef.current = t;
+      }
+    };
+    rec.onerror = () => setIsListening(false);
+    rec.onend = () => setIsListening(false);
+    try { rec.start(); setIsListening(true); } catch { setIsListening(false); }
+  }, [isListening]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
   const executeShopifyAction = async (action: string, params: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
@@ -886,8 +935,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   // ─── Detect Klaviyo request ────────────────────────────────────────────────
   const detectKlaviyo = (text: string) => {
     const lower = text.toLowerCase();
-    const isKlaviyo = lower.includes("klaviyo") || lower.includes("workflow") || lower.includes("flujo") || lower.includes("email marketing");
-    if (!isKlaviyo) return null;
+    const hasKlaviyoExplicit = lower.includes("klaviyo");
+    const hasEmailWorkflow = (lower.includes("workflow") || lower.includes("flujo")) && (lower.includes("email") || lower.includes("correo") || lower.includes("newsletter") || lower.includes("klaviyo"));
+    const hasEmailMarketing = lower.includes("email marketing") && (lower.includes("genera") || lower.includes("crea") || lower.includes("diseña") || lower.includes("workflow") || lower.includes("flujo"));
+    if (!hasKlaviyoExplicit && !hasEmailWorkflow && !hasEmailMarketing) return null;
     const domainMatch = text.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
     const shopDomain = domainMatch?.[1] ?? "comic-crafter.myshopify.com";
     const storeName = shopDomain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -1062,7 +1113,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             assistantContent = "❌ Error generando workflow. Verifica KLAVIYO_API_KEY y GEMINI_API_KEY.";
           }
         } else {
-          assistantContent = "❌ Error en el servidor. Revisa los logs.";
+          const errBody = await wfRes.text().catch(() => "");
+          assistantContent = `❌ Error generando flujo de email${errBody ? `: ${errBody.slice(0, 200)}` : ". Verifica la configuración de Klaviyo."}`;
         }
 
       // ── CASE 3: Entity research — URL, @handle, brand name, "investiga X" ──
@@ -1172,6 +1224,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [input, loading, messages, attachFile, attachUrl]);
+
+  useEffect(() => {
+    if (!isListening && pendingTranscriptRef.current) {
+      const t = pendingTranscriptRef.current;
+      pendingTranscriptRef.current = null;
+      sendMessage(t);
+    }
+  }, [isListening, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -1406,11 +1466,22 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                     📎
                   </button>
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading}
-                    placeholder={attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
+                    placeholder={isListening ? "🎙 Escuchando..." : attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
                     rows={1}
-                    style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: isMobile ? 10 : 8, color: "var(--t)", fontSize: isMobile ? 16 : 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto" }}
+                    style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: isListening ? "rgba(232,69,88,0.08)" : "var(--ink2)", border: `1px solid ${isListening ? "var(--crim)" : "var(--ink3)"}`, borderRadius: isMobile ? 10 : 8, color: "var(--t)", fontSize: isMobile ? 16 : 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto", transition: "border-color 0.2s, background 0.2s" }}
                     onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, isMobile ? 100 : 80)}px`; }}
                   />
+                  <button onClick={toggleMic} disabled={loading} aria-label={isListening ? "Detener micrófono" : "Activar micrófono"}
+                    style={{
+                      width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: "none", flexShrink: 0,
+                      background: isListening ? "var(--crim)" : "var(--ink2)",
+                      color: isListening ? "#fff" : "var(--t3)",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
+                      animation: isListening ? "pulseGold 1.5s ease-in-out infinite" : "none",
+                    }}>
+                    {isListening ? <MicOff size={isMobile ? 18 : 14} /> : <Mic size={isMobile ? 18 : 14} />}
+                  </button>
                   <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)} aria-label="Enviar mensaje"
                     style={{
                       width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: "none", flexShrink: 0,
