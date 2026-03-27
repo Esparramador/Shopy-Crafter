@@ -498,9 +498,20 @@ IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, in
     });
     return;
    } catch (searchErr) {
+    const errStr = searchErr instanceof Error ? searchErr.message : String(searchErr);
     logger.error({ error: searchErr, query }, "ShopyBrain search error");
+
+    let recoveryMsg = "Lo siento, hubo un problema procesando tu solicitud. Intenta reformular tu pregunta de forma más corta y directa.";
+    if (errStr.includes("credit balance is too low") || errStr.includes("insufficient_quota")) {
+      recoveryMsg = "⚠️ **Créditos de IA agotados** — La API de Claude no tiene saldo suficiente. Recarga tus créditos en console.anthropic.com para seguir chateando.";
+    } else if (errStr.includes("rate_limit") || errStr.includes("Too many requests")) {
+      recoveryMsg = "⏳ Demasiadas peticiones. Espera unos segundos e inténtalo de nuevo.";
+    } else if (errStr.includes("overloaded")) {
+      recoveryMsg = "🔄 El servicio de IA está sobrecargado temporalmente. Inténtalo en 1-2 minutos.";
+    }
+
     res.status(200).json({
-      answer: "Lo siento, hubo un problema procesando tu solicitud. Puede ser un error temporal de la IA o un mensaje demasiado largo. Intenta reformular tu pregunta de forma más corta y directa.",
+      answer: recoveryMsg,
       source: "error_recovery",
       detectedAction: null,
     });
@@ -3172,7 +3183,21 @@ Responde SOLO JSON:
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e);
     logger.error({ action, params, error: errMsg }, "Chatbot action failed");
-    res.status(500).json({ error: `Error ejecutando ${action}: ${errMsg}` });
+
+    let friendlyError = `Error ejecutando ${action}`;
+    if (errMsg.includes("credit balance is too low") || errMsg.includes("insufficient_quota") || errMsg.includes("billing")) {
+      friendlyError = `⚠️ Créditos de IA agotados — La API de Claude (Anthropic) no tiene saldo. Recarga créditos en console.anthropic.com para seguir usando ${action}.`;
+    } else if (errMsg.includes("rate_limit") || errMsg.includes("Too many requests")) {
+      friendlyError = `⏳ Límite de velocidad alcanzado — Espera unos segundos e inténtalo de nuevo.`;
+    } else if (errMsg.includes("Could not verify API key") || errMsg.includes("authentication_error")) {
+      friendlyError = `🔑 Error de autenticación con la API de Claude — Verifica ANTHROPIC_API_KEY en la configuración.`;
+    } else if (errMsg.includes("overloaded") || errMsg.includes("529")) {
+      friendlyError = `🔄 El servicio de IA está sobrecargado temporalmente. Inténtalo de nuevo en 1-2 minutos.`;
+    } else {
+      friendlyError = `Error en ${action}: ${errMsg.slice(0, 200)}`;
+    }
+
+    res.status(500).json({ error: friendlyError });
   }
 });
 

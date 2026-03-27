@@ -692,8 +692,20 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         body: JSON.stringify({ action, params }),
       });
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: "Error desconocido" }));
-        return { error: true, message: `Error: ${errData.error || res.statusText}` };
+        const errText = await res.text().catch(() => "");
+        let friendlyMsg = `Error ejecutando ${action}`;
+        if (errText.includes("credit balance is too low") || errText.includes("insufficient_quota")) {
+          friendlyMsg = `⚠️ **Créditos de IA agotados** — La API de Claude (Anthropic) no tiene saldo suficiente. Recarga tus créditos en anthropic.com para continuar usando esta función.`;
+        } else if (errText.includes("rate_limit") || errText.includes("429")) {
+          friendlyMsg = `⏳ **Límite de velocidad** — Demasiadas peticiones a la IA. Espera unos segundos e inténtalo de nuevo.`;
+        } else if (errText.includes("authentication") || errText.includes("401") || errText.includes("api_key")) {
+          friendlyMsg = `🔑 **Error de autenticación** — La clave API de Claude necesita ser verificada. Contacta al administrador.`;
+        } else if (res.status === 400) {
+          try { const d = JSON.parse(errText); friendlyMsg = d.error || errText.slice(0, 200); } catch { friendlyMsg = errText.slice(0, 200); }
+        } else {
+          friendlyMsg = errText.slice(0, 200) || res.statusText;
+        }
+        return { error: true, message: friendlyMsg };
       }
       return res.json();
     } catch (e) {
