@@ -1507,23 +1507,48 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         const statusFilter = params?.statusFilter || "any";
-        const syncRes = await fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync?statusFilter=${statusFilter}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
-          body: JSON.stringify({ statusFilter }),
-        });
+        const storeUrlScan = project.shopDomain
+          ? (project.shopDomain.includes("://") ? project.shopDomain : `https://${project.shopDomain}`)
+          : "";
 
-        if (!syncRes.ok) {
-          const errText = await syncRes.text();
+        const [syncRes, psRes] = await Promise.allSettled([
+          fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync?statusFilter=${statusFilter}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+            body: JSON.stringify({ statusFilter }),
+          }),
+          (async () => {
+            if (!storeUrlScan) return null;
+            const { runDualPageSpeed } = await import("../lib/pagespeed.js");
+            return runDualPageSpeed(storeUrlScan);
+          })(),
+        ]);
+
+        if (syncRes.status === "rejected" || (syncRes.status === "fulfilled" && !syncRes.value.ok)) {
+          const errText = syncRes.status === "fulfilled" ? await syncRes.value.text() : String(syncRes.reason);
           res.status(500).json({ error: `Error escaneando: ${errText}` });
           return;
         }
 
-        const syncData = await syncRes.json() as Record<string, unknown>;
+        const syncData = await syncRes.value.json() as Record<string, unknown>;
+        const psData = psRes.status === "fulfilled" ? psRes.value : null;
+
+        let psMessage = "";
+        if (psData?.mobile || psData?.desktop) {
+          const m = psData.mobile;
+          const d = psData.desktop;
+          psMessage = `\n\n📊 PageSpeed Insights:`;
+          if (m) psMessage += `\n📱 Móvil: Rendimiento ${m.performanceScore}/100, SEO ${m.seoScore}/100, Accesibilidad ${m.accessibilityScore}/100`;
+          if (d) psMessage += `\n🖥️ Escritorio: Rendimiento ${d.performanceScore}/100, SEO ${d.seoScore}/100, Accesibilidad ${d.accessibilityScore}/100`;
+          const allIssues = [...(m?.issues ?? []), ...(d?.issues ?? [])];
+          if (allIssues.length > 0) psMessage += `\n⚠️ Problemas: ${allIssues.slice(0, 3).join("; ")}`;
+        }
+
         result = {
           ...syncData,
           statusFilter,
-          message: `Escaneo completado (filtro: ${statusFilter}). ${syncData.total ?? 0} productos analizados. Nota media: ${typeof syncData.avgScore === "number" ? syncData.avgScore.toFixed(0) : "N/A"}/100`,
+          pageSpeed: psData ? { mobile: psData.mobile, desktop: psData.desktop } : null,
+          message: `Escaneo completado (filtro: ${statusFilter}). ${syncData.total ?? 0} productos analizados. Nota media: ${typeof syncData.avgScore === "number" ? syncData.avgScore.toFixed(0) : "N/A"}/100${psMessage}`,
         };
         break;
       }

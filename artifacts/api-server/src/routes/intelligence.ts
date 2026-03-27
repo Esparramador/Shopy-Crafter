@@ -214,14 +214,26 @@ router.post("/projects/:projectId/intelligence/build-profile", async (req, res):
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-  // Scrape the store's website
   let webData = { html: "", title: "", description: "", keywords: "", jsonLd: "" };
-  if (project.shopDomain) {
-    const storeUrl = project.shopDomain.includes("myshopify.com")
-      ? `https://${project.shopDomain}`
-      : `https://${project.shopDomain}`;
-    webData = await scrapeUrl(storeUrl);
-  }
+  const storeUrl = project.shopDomain
+    ? (project.shopDomain.includes("://") ? project.shopDomain : `https://${project.shopDomain}`)
+    : "";
+
+  const [webDataResult, pageSpeedResult] = await Promise.allSettled([
+    storeUrl ? scrapeUrl(storeUrl) : Promise.resolve(webData),
+    (async () => {
+      if (!storeUrl) return null;
+      const { runDualPageSpeed } = await import("../lib/pagespeed.js");
+      return runDualPageSpeed(storeUrl);
+    })(),
+  ]);
+
+  if (webDataResult.status === "fulfilled") webData = webDataResult.value;
+  const psData = pageSpeedResult.status === "fulfilled" ? pageSpeedResult.value : null;
+
+  const pageSpeedBlock = psData?.summary
+    ? `\n\n${psData.summary}\n`
+    : "\n\n⚠️ PageSpeed: No se pudieron obtener datos (la URL puede no ser pública aún).\n";
 
   const prompt = `Construye un perfil de inteligencia de marca COMPLETO para esta tienda Shopify.
 
@@ -234,6 +246,7 @@ Audiencia: ${project.targetAudience ?? "no configurada"}
 Mercados: ${project.storeMarkets ?? "no configurados"}
 
 ${webData.html ? `DATOS SCRAPEADOS DE LA TIENDA:\n${webData.html}\n` : ""}
+${pageSpeedBlock}
 
 Genera un perfil exhaustivo con:
 - Análisis de marca completo
@@ -243,6 +256,7 @@ Genera un perfil exhaustivo con:
 - Plan de escalado 90 días
 - Oportunidades de revenue inmediatas
 - Mejoras CRO prioritarias
+- Análisis de rendimiento web (usa los datos reales de PageSpeed proporcionados)
 
 Devuelve JSON estructurado con todos estos campos. Sé extremadamente específico y accionable.
 
@@ -253,6 +267,7 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
   "revenueOpportunities": [{ "opportunity": "", "estimatedImpact": "", "effort": "low|mid|high", "priority": 1 }],
   "cro90Days": [{ "week": 1, "action": "", "expectedLift": "" }],
   "brandDNA": { "tone": "", "personality": [], "colors": [], "messaging": "" },
+  "performanceAnalysis": { "mobileScore": 0, "desktopScore": 0, "seoScore": 0, "coreWebVitals": {}, "criticalIssues": [], "quickWins": [] },
   "executiveSummary": ""
 }`;
 
@@ -260,7 +275,7 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
     const { dualAI } = await import("../lib/dual-ai.js");
     const dualResult = await dualAI(projectId, prompt, {
       mode: "gemini_research_claude_redact",
-      claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations.`,
+      claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations. When PageSpeed data is provided, integrate it into your analysis with specific performance recommendations.`,
       geminiUseSearch: true,
       maxTokens: 4096,
       niche: project.storeNiche ?? undefined,
@@ -270,7 +285,6 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     const profile = match ? JSON.parse(match[1] ?? match[0]) : { executiveSummary: text };
 
-    // Save brand profile as high-confidence OmniCore memory
     if (project.storeNiche) {
       learnFromOperation({
         operationType: "redesign",
@@ -282,7 +296,26 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
       });
     }
 
-    res.json({ ok: true, projectId, profile, scrapedDomain: project.shopDomain, hadWebData: !!webData.html });
+    if (psData?.mobile || psData?.desktop) {
+      learnFromOperation({
+        operationType: "seo",
+        niche: project.storeNiche ?? undefined,
+        title: `PageSpeed: ${project.shopDomain}`,
+        content: `Mobile: ${psData.mobile?.performanceScore ?? "N/A"}/100, Desktop: ${psData.desktop?.performanceScore ?? "N/A"}/100, SEO: ${psData.mobile?.seoScore ?? psData.desktop?.seoScore ?? "N/A"}/100. Issues: ${[...(psData.mobile?.issues ?? []), ...(psData.desktop?.issues ?? [])].slice(0, 5).join("; ")}`,
+        confidence: 0.92,
+        tags: ["pagespeed", "performance", project.shopDomain].filter(Boolean),
+      });
+    }
+
+    res.json({
+      ok: true,
+      projectId,
+      profile,
+      pageSpeed: psData ? { mobile: psData.mobile, desktop: psData.desktop } : null,
+      scrapedDomain: project.shopDomain,
+      hadWebData: !!webData.html,
+      dualAI: { mode: dualResult.mode, timings: dualResult.timings },
+    });
   } catch (e: any) {
     res.status(500).json({ error: e.message ?? "Profile build failed" });
   }
