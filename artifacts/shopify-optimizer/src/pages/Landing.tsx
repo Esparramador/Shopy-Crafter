@@ -800,7 +800,8 @@ export default function Landing() {
                 }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
                   <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--jade)", marginBottom: 8 }}>¡Solicitud recibida!</h3>
-                  <p style={{ color: "var(--t3)", fontSize: 15 }}>Te contactaremos en menos de 24h. Revisa también tu carpeta de spam.</p>
+                  <p style={{ color: "var(--t3)", fontSize: 15, marginBottom: 12 }}>Nuestra IA ya está analizando tu negocio, mercado, competencia y SEO.</p>
+                  <p style={{ color: "var(--t4)", fontSize: 13 }}>Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam.</p>
                 </div>
               ) : (
                 <form onSubmit={submitContact} style={{

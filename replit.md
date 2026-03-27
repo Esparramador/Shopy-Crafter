@@ -43,6 +43,7 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 - **Push Notifications**: VAPID-based system for user notifications.
 - **CMS Editor**: Visual content editor for landing pages with AI copywriting and version history.
 - **Email Template Studio**: AI-powered editor for professional email templates with brand identity integration and Klaviyo push.
+- **AI-Powered Lead Pre-Report**: Landing form submissions trigger 3 parallel Gemini searches (business, market/competition, SEO) and send a detailed HTML pre-report email to craftershopy@gmail.com via Gmail API. Background processing — doesn't block form response.
 - **Client Invite Flow**: Secure, token-based system for client onboarding.
 - **Professional Budget/Invoice Generator**: AI-powered tool for generating detailed budgets and invoices.
 - **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, real price research, SEO metafields, and AI-generated images. Supports image-to-product creation via chat.
@@ -70,6 +71,7 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 - **Archiver**: Server-side ZIP generation.
 - **Shopify**: Storefront API and Admin API.
 - **Klaviyo**: For email flow integration and lead form notifications.
+- **Gmail (Replit Integration)**: OAuth-based Gmail API for sending real emails (lead pre-reports to craftershopy@gmail.com).
 - **connect-pg-simple**: PostgreSQL session store.
 - **ExcelJS**: XLSX workbook generation.
 - **@google/genai**: For direct Gemini API integration.
