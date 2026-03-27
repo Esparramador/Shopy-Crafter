@@ -843,11 +843,26 @@
   .fp-sidenav { display: none; }
   .fp-progress { display: none; }
   .fp-counter { display: none; }
-  .fp-section { padding: 0 24px; }
+  .fp-section {
+    padding: 0 24px;
+    height: auto !important;
+    min-height: auto !important;
+    padding-top: 60px !important;
+    padding-bottom: 60px !important;
+  }
+  .fp-container {
+    height: auto !important;
+    overflow-y: visible !important;
+    scroll-snap-type: none !important;
+  }
   .fp-hero-layout { grid-template-columns: 1fr; gap: 24px; }
   .fp-hero-right { display: none; }
   .fp-hero-left .l-hero-h1 { font-size: 38px; }
   .fp-hero-left .l-hero-ctas { flex-wrap: wrap; }
+  .fp-hero-left { text-align: center; }
+  .fp-hero-left .l-hero-sub { margin-left: auto; margin-right: auto; }
+  .fp-hero-left .l-hero-ctas { justify-content: center; }
+  .fp-hero-left .l-hero-trust { justify-content: center; }
   .fp-engine-panel { grid-template-columns: auto 1fr; }
   .fp-engine-stats { display: none; }
   .fp-split-layout { grid-template-columns: 1fr; }
@@ -861,6 +876,10 @@
   .fp-etab-name { display: none; }
   .l-testi-card { padding: 24px; }
   .fp-testi-carousel { perspective: none; }
+  .fp-scroll-hint { display: none; }
+  .l-cursor, .l-cursor-ring { display: none; }
+  .fp-contact-form { padding: 32px 28px !important; }
+  .fp-testi-carousel { height: auto; min-height: 300px; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -965,9 +984,10 @@
   .l-pricing-featured { transform: none !important; }
 
   /* Testimonials */
-  .fp-testi-carousel { min-height: 280px; }
-  .fp-testi-card { padding: 20px; font-size: 14px; }
-  .fp-testi-card.prev, .fp-testi-card.next { display: none; }
+  .fp-testi-carousel { height: auto !important; min-height: 280px; position: relative; }
+  .fp-testi-card { padding: 20px; font-size: 14px; position: relative !important; }
+  .fp-testi-card:not(.active) { display: none !important; }
+  .fp-testi-card.active { position: relative !important; transform: none !important; }
 
   /* Footer */
   .fp-footer-inner { grid-template-columns: 1fr !important; gap: 24px; }
@@ -976,6 +996,15 @@
   .fp-footer-col { display: none; }
   .l-footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
   .l-footer-badges { flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+  /* Contact form */
+  .fp-contact-form {
+    padding: 24px 16px !important;
+    border-radius: 14px !important;
+  }
+  .fp-contact-form .fp-contact-row {
+    grid-template-columns: 1fr !important;
+  }
 
   /* CTA form */
   .l-cta-form { flex-direction: column; gap: 10px; }

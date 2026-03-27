@@ -24,7 +24,7 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Colors**: `--ink:#080810`, `--gold:#c8a84b`, `--jade:#2dd49f`, `--crim:#e84558`
 - **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
 - **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
-- **Responsive Design**: Utilizes `minmax` for flexible grids, mobile-specific layouts for sidebar/topbar/chatbot, and accessibility features like `focus-visible` and `aria-label`.
+- **Responsive Design**: Three breakpoints — Desktop (>900px: fullpage scroll-snap with side dots), Tablet (≤900px: auto-height sections, natural scroll, centered hero), Mobile (≤768px: stacked layouts, contact form reduced padding, hidden cursor). JS breakpoints in Landing.tsx aligned to CSS at 900px. Admin panel: sidebar off-canvas on tablet (601-1024px), horizontal nav bar on mobile (≤600px). Accessibility: `focus-visible`, `aria-label`, `prefers-reduced-motion`.
 
 ### Database
 PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.

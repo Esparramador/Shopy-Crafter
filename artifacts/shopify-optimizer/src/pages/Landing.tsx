@@ -193,8 +193,8 @@ export default function Landing() {
     if (!container) return;
     currentRef.current = index;
     setCurrentSection(index);
-    if (window.innerWidth <= 768) {
-      // Mobile: sections are auto-height, scroll the body via scrollIntoView
+    if (window.innerWidth <= 900) {
+      // Tablet/Mobile: sections are auto-height, scroll the body via scrollIntoView
       const sections = container.querySelectorAll<HTMLElement>(".fp-section");
       const section = sections[index];
       if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -258,7 +258,7 @@ export default function Landing() {
 
   // Lock body scroll ONLY on desktop — mobile uses native scroll
   useEffect(() => {
-    const isMobile = () => window.innerWidth <= 768;
+    const isMobile = () => window.innerWidth <= 900;
     if (isMobile()) return;
     const prev = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
@@ -283,7 +283,7 @@ export default function Landing() {
 
   // Wheel → section scroll (desktop only, re-runs when content loads)
   useEffect(() => {
-    if (window.innerWidth <= 768) return;
+    if (window.innerWidth <= 900) return;
     const container = fpRef.current;
     if (!container) return;
     let lastWheel = 0;
@@ -804,13 +804,13 @@ export default function Landing() {
                   <p style={{ color: "var(--t4)", fontSize: 13 }}>Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam.</p>
                 </div>
               ) : (
-                <form onSubmit={submitContact} style={{
+                <form onSubmit={submitContact} className="fp-contact-form" style={{
                   background: "var(--ink2)", border: "1px solid var(--ink3)",
                   borderRadius: 20, padding: "40px 36px",
                   display: "grid", gap: 24,
                 }}>
                   {/* Row 1: Nombre + Email */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
+                  <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nombre completo *</label>
                       <input
@@ -834,7 +834,7 @@ export default function Landing() {
                   </div>
 
                   {/* Row 2: Teléfono + URL tienda */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
+                  <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Teléfono</label>
                       <input
@@ -858,7 +858,7 @@ export default function Landing() {
                   </div>
 
                   {/* Row 3: Nicho + Facturación */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
+                  <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>Nicho / tipo de productos</label>
                       <select
