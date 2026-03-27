@@ -214,7 +214,7 @@ router.post("/klaviyo/welcome-client", requireAdmin, async (req, res): Promise<v
             plan: plan ?? "Starter",
             loginUrl: loginUrl ?? "https://shopifyai.pro/login",
             inviteUrl: inviteToken ? `https://shopifyai.pro/invite/${inviteToken}` : null,
-            agencyName: "ShopyBrain",
+            agencyName: "Shopy Crafter",
           },
           metric: { data: { type: "metric", attributes: { name: "Client Welcome" } } },
           profile: { data: { type: "profile", attributes: { email, first_name: name } } },

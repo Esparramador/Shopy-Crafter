@@ -148,7 +148,7 @@ export default function Emails() {
     subject_a: "", subject_b: "", preview_text: "",
     tone: "urgente" as Tone, language: "es",
     include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-    from_email: "craftershopy@gmail.com", from_name: "ShopyBrain", reply_email: "craftershopy@gmail.com",
+    from_email: "craftershopy@gmail.com", from_name: "Shopy Crafter", reply_email: "craftershopy@gmail.com",
     html_content: "", text_content: "", variables_used: "",
   });
 
@@ -182,7 +182,7 @@ export default function Emails() {
       subject_a: "", subject_b: "", preview_text: "",
       tone: "urgente", language: "es",
       include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-      from_email: "craftershopy@gmail.com", from_name: "ShopyBrain", reply_email: "craftershopy@gmail.com",
+      from_email: "craftershopy@gmail.com", from_name: "Shopy Crafter", reply_email: "craftershopy@gmail.com",
       html_content: "", text_content: "", variables_used: "",
     });
     setTab("disenar");
@@ -199,7 +199,7 @@ export default function Emails() {
       preview_text: flow.preview_text || "", tone: (flow.tone || "urgente") as Tone,
       language: flow.language || "es",
       include_image: true, include_discount: true, include_urgency: true, include_reviews: false,
-      from_email: flow.from_email || "craftershopy@gmail.com", from_name: flow.from_name || "ShopyBrain", reply_email: flow.reply_email || "craftershopy@gmail.com",
+      from_email: flow.from_email || "craftershopy@gmail.com", from_name: flow.from_name || "Shopy Crafter", reply_email: flow.reply_email || "craftershopy@gmail.com",
       html_content: flow.html_content || "", text_content: flow.text_content || "",
       variables_used: flow.variables_used || "",
     });

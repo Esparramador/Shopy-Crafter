@@ -76,9 +76,10 @@ router.post("/email-templates", async (req, res): Promise<void> => {
     subject_a, subject_b, preview_text, html_content, text_content,
     tone = "profesional", language = "es",
     brand_name, brand_logo_url, brand_colors, brand_tagline,
-    variables_used, from_email, from_name, reply_email,
+    variables_used, from_name, reply_email,
   } = req.body;
 
+  const AGENCY_EMAIL = "craftershopy@gmail.com";
   try {
     const { rows } = await pool.query(
       `INSERT INTO email_templates 
@@ -89,7 +90,7 @@ router.post("/email-templates", async (req, res): Promise<void> => {
       [project_id, name, template_type, category, subject_a, subject_b, preview_text,
         html_content, text_content, tone, language, brand_name, brand_logo_url,
         brand_colors ? JSON.stringify(brand_colors) : "{}", brand_tagline,
-        variables_used, from_email, from_name, reply_email]
+        variables_used, AGENCY_EMAIL, from_name || "Shopy Crafter", reply_email || AGENCY_EMAIL]
     );
     res.json(rows[0]);
   } catch (err: any) {
@@ -198,7 +199,7 @@ router.post("/email-templates/generate", async (req, res): Promise<void> => {
     const typeName = typeMeta?.label || templateType;
     const typeDesc = typeMeta?.description || "";
 
-    const systemPrompt = `Eres ShopyBrain, el copywriter de email más cotizado del mundo. Combinas la precisión de David Ogilvy con la creatividad de Apple y la conversión de Amazon.
+    const systemPrompt = `Eres el motor de copywriting de Shopy Crafter, la agencia de optimización Shopify más avanzada. Combinas la precisión de David Ogilvy con la creatividad de Apple y la conversión de Amazon.
 
 REGLAS INQUEBRANTABLES:
 1. SIEMPRE escribes copy que suena humano, nunca robótico ni genérico
@@ -210,14 +211,27 @@ REGLAS INQUEBRANTABLES:
 7. TODOS los estilos son inline — los email clients ignoran <style> tags
 8. Máximo 600px de ancho para el contenido principal
 
-⚠️ REGLA CRÍTICA DE IDENTIDAD DE MARCA ⚠️
-Este email es EXCLUSIVAMENTE para la marca "${effectiveBrandName}".
-- El nombre de la empresa que aparece en TODOS los textos, header, footer, alt-texts y subjects DEBE ser "${effectiveBrandName}" — NUNCA otro nombre.
+⚠️ IDENTIDAD DEL EMISOR (ADN DE EMPRESA) ⚠️
+- El email se envía SIEMPRE desde Shopy Crafter (craftershopy@gmail.com) — la agencia de optimización Shopify.
+- Shopy Crafter es la empresa que gestiona la tienda del cliente. Todos los emails salen desde esta identidad.
+- En el footer del email SIEMPRE incluir: "Enviado por Shopy Crafter · Tu agencia de optimización Shopify" con un estilo sutil (gris claro, tamaño pequeño).
+- El Reply-To es SIEMPRE craftershopy@gmail.com.
+
+⚠️ REGLA CRÍTICA DE ADAPTACIÓN AL CLIENTE ⚠️
+Aunque el emisor es Shopy Crafter, el CONTENIDO del email se adapta 100% a la marca del cliente "${effectiveBrandName}".
+- El nombre de la marca del CLIENTE que aparece en los textos, header, hero y subjects DEBE ser "${effectiveBrandName}".
+- Los colores, tono, estilo y contenido visual reflejan la identidad del CLIENTE, no de Shopy Crafter.
 - Si el negocio es "${realNiche}", el copy debe reflejar ESE nicho exacto, no otro genérico.
-- ${realDomain ? `El dominio real es "${realDomain}" — NUNCA uses otro dominio ni URLs inventadas.` : "No uses dominios inventados."}
+- ${realDomain ? `El dominio real del cliente es "${realDomain}" — NUNCA uses otro dominio ni URLs inventadas.` : "No uses dominios inventados."}
 - ${realBrandTone ? `El tono de voz de esta marca es: "${realBrandTone}" — respeta este tono en TODO el copy.` : ""}
 - NUNCA uses nombres como "Tu Tienda", "Mi Marca", "Acme", "Store Name", "Your Brand" ni NINGÚN placeholder genérico. Siempre "${effectiveBrandName}".
-- Cuando uses {{ store_name }}, su valor real será "${effectiveBrandName}".`;
+- Cuando uses {{ store_name }}, su valor real será "${effectiveBrandName}".
+
+ESTRUCTURA DE IDENTIDAD EN EL EMAIL:
+- HEADER: Logo/nombre del CLIENTE ("${effectiveBrandName}") — es su email, su marca
+- CONTENIDO: Todo adaptado al cliente, sus productos, su nicho
+- FOOTER SUPERIOR: Links del cliente (redes sociales, contacto, legal)
+- FOOTER INFERIOR: "Powered by Shopy Crafter · craftershopy@gmail.com" — marca de empresa sutil y profesional`;
 
     const brandBlock = [
       `EMPRESA/MARCA: ${effectiveBrandName}`,
@@ -266,6 +280,7 @@ ESTRUCTURA DEL EMAIL:
 5. CTA PRINCIPAL — botón grande, centrado, con microcopy debajo
 6. SOCIAL PROOF / TRUST — si aplica, adaptado al nicho ${realNiche}
 7. FOOTER — con "${effectiveBrandName}", links legales, redes sociales, dirección, unsubscribe
+8. AGENCY BADGE (debajo del footer del cliente) — texto sutil: "Powered by Shopy Crafter · craftershopy@gmail.com" con color #6b6b85, font-size 11px, padding-top 20px
 
 VARIABLES DISPONIBLES (usa las que apliquen al tipo):
 - {{ first_name }} — nombre del destinatario
@@ -344,7 +359,7 @@ router.post("/email-templates/:id/push-klaviyo", async (req, res): Promise<void>
     const key = process.env.KLAVIYO_API_KEY;
     if (!key) { res.status(400).json({ error: "KLAVIYO_API_KEY no configurada" }); return; }
 
-    const templateName = `[${tmpl.project_name || "ShopyBrain"}] ${tmpl.name}`;
+    const templateName = `[${tmpl.project_name || "Shopy Crafter"}] ${tmpl.name}`;
 
     const klaviyoRes = await fetch("https://a.klaviyo.com/api/templates/", {
       method: "POST",

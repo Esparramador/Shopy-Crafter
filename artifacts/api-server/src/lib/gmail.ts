@@ -60,7 +60,7 @@ export async function sendEmail(
   to: string,
   subject: string,
   htmlBody: string,
-  fromName = "ShopyBrain",
+  fromName = "Shopy Crafter",
 ): Promise<boolean> {
   try {
     const gmail = await getGmailClient();

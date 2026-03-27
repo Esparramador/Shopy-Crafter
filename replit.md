@@ -73,7 +73,7 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 - **Archiver**: Server-side ZIP generation.
 - **Shopify**: Storefront API and Admin API.
 - **Klaviyo**: For email flow integration and lead form notifications.
-- **Gmail (Replit Integration)**: OAuth-based Gmail API for sending ALL emails from `craftershopy@gmail.com` (official business email). Direct sends via `sendEmail()` in `lib/gmail.ts` use explicit From header. Klaviyo flows default to `craftershopy@gmail.com` as from_email. Frontend form defaults pre-fill craftershopy@gmail.com in all email builder fields.
+- **Gmail (Replit Integration)**: OAuth-based Gmail API for sending ALL emails from `craftershopy@gmail.com` (official business email). Sender name is "Shopy Crafter" (the company) — NOT "ShopyBrain" (ShopyBrain is the AI brain engine, Shopy Crafter is the company). Direct sends via `sendEmail()` in `lib/gmail.ts` use explicit From header. Klaviyo flows default to `craftershopy@gmail.com` as from_email. Backend enforces AGENCY_EMAIL on INSERT — `from_email` is always `craftershopy@gmail.com` regardless of frontend input. Email templates generate client-branded content but with "Powered by Shopy Crafter" in footer.
 - **connect-pg-simple**: PostgreSQL session store.
 - **ExcelJS**: XLSX workbook generation.
 - **@google/genai**: For direct Gemini API integration.

@@ -128,7 +128,7 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
                 shopDomain: project?.shopDomain ?? "",
                 storeName: project?.name ?? "",
                 inviteUrl: inviteLink,
-                agencyName: "ShopyBrain",
+                agencyName: "Shopy Crafter",
                 expiresIn: "48 horas",
               },
               metric: { data: { type: "metric", attributes: { name: "Client Invite" } } },

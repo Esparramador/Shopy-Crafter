@@ -107,7 +107,7 @@ export default function EmailTemplates() {
     brand_tagline: "",
     brand_colors: { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" } as Record<string, string>,
     from_email: "craftershopy@gmail.com",
-    from_name: "ShopyBrain",
+    from_name: "Shopy Crafter",
     reply_email: "craftershopy@gmail.com",
     customInstructions: "",
   });
@@ -196,7 +196,7 @@ export default function EmailTemplates() {
       brand_logo_url: "",
       brand_tagline: "",
       brand_colors: { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" },
-      from_email: "craftershopy@gmail.com", from_name: project.name || "ShopyBrain", reply_email: "craftershopy@gmail.com",
+      from_email: "craftershopy@gmail.com", from_name: project.name || "Shopy Crafter", reply_email: "craftershopy@gmail.com",
       customInstructions: "",
     });
     setCopywritingNotes("");
@@ -220,7 +220,7 @@ export default function EmailTemplates() {
       brand_logo_url: tmpl.brand_logo_url || "",
       brand_tagline: tmpl.brand_tagline || "",
       brand_colors: (tmpl.brand_colors && typeof tmpl.brand_colors === "object") ? tmpl.brand_colors : { primary: "#c8a84b", accent: "#2dd49f", dark: "#0a0a0f", light: "#f0eefc" },
-      from_email: tmpl.from_email || "craftershopy@gmail.com", from_name: tmpl.from_name || "ShopyBrain",
+      from_email: tmpl.from_email || "craftershopy@gmail.com", from_name: tmpl.from_name || "Shopy Crafter",
       reply_email: tmpl.reply_email || "craftershopy@gmail.com",
       customInstructions: "",
     });

@@ -79,9 +79,10 @@ router.post("/emails/flows", async (req, res): Promise<void> => {
   const {
     project_id, name, flow_type, trigger_type,
     send_delay = "1h", subject_a, subject_b, preview_text,
-    tone = "urgente", language = "es", from_email, from_name, reply_email,
+    tone = "urgente", language = "es", from_name, reply_email,
   } = req.body;
 
+  const AGENCY_EMAIL = "craftershopy@gmail.com";
   try {
     const { rows } = await pool.query(
       `INSERT INTO email_flows 
@@ -89,7 +90,7 @@ router.post("/emails/flows", async (req, res): Promise<void> => {
          preview_text, tone, language, from_email, from_name, reply_email)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [project_id, name, flow_type, trigger_type, send_delay, subject_a, subject_b,
-        preview_text, tone, language, from_email, from_name, reply_email]
+        preview_text, tone, language, AGENCY_EMAIL, from_name || "Shopy Crafter", reply_email || AGENCY_EMAIL]
     );
     res.json(rows[0]);
   } catch (err: any) {
@@ -161,8 +162,15 @@ router.post("/emails/generate", async (req, res): Promise<void> => {
 Generas emails HTML completos, profesionales y que realmente convierten para tiendas Shopify.
 SIEMPRE devuelves JSON válido y nada más.
 
-⚠️ REGLA CRÍTICA: Este email es EXCLUSIVAMENTE para "${storeName}".
-- TODOS los textos, headers, footers y subjects DEBEN usar "${storeName}" — NUNCA otro nombre.
+⚠️ IDENTIDAD DEL EMISOR (ADN DE EMPRESA) ⚠️
+- El email se envía SIEMPRE desde Shopy Crafter (craftershopy@gmail.com) — la agencia de optimización Shopify.
+- En el footer SIEMPRE incluir al final: "Powered by Shopy Crafter · craftershopy@gmail.com" con color #6b6b85, font-size 11px.
+- El Reply-To es SIEMPRE craftershopy@gmail.com.
+
+⚠️ ADAPTACIÓN AL CLIENTE ⚠️
+Aunque el emisor es Shopy Crafter, el CONTENIDO se adapta 100% a la marca del cliente "${storeName}".
+- TODOS los textos, headers, hero y subjects DEBEN usar "${storeName}" — NUNCA otro nombre.
+- Los colores, tono, estilo y contenido visual reflejan la identidad del CLIENTE, no de Shopy Crafter.
 - NUNCA uses nombres genéricos como "Tu Tienda", "Mi Marca", "Acme", "Store Name".
 - El nicho es "${niche}" — todo el copy debe ser relevante a este nicho.
 ${brandTone ? `- El tono de voz de la marca es: "${brandTone}".` : ""}
@@ -301,7 +309,7 @@ router.post("/emails/flows/:id/push", async (req, res): Promise<void> => {
             subject: flow.subject_a || "{{ subject }}",
             preview_text: flow.preview_text || "",
             from_email: flow.from_email || "craftershopy@gmail.com",
-            from_label: flow.from_name || flow.project_name || "ShopyBrain",
+            from_label: flow.from_name || flow.project_name || "Shopy Crafter",
             reply_to_email: flow.reply_email || flow.from_email || "craftershopy@gmail.com",
           },
           send_options: { use_smart_sending: true },
