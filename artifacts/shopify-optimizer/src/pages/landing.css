@@ -838,6 +838,12 @@
    RESPONSIVE — TABLET (≤900px)
 ════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
+  .l-root {
+    overflow: visible !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
   .l-nav { padding: 0 24px; }
   .l-nav-links { display: none; }
   .fp-sidenav { display: none; }
