@@ -429,6 +429,12 @@
   z-index: 0;
   overflow: hidden;
 }
+.fp-video-bg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
 .fp-bg-overlay {
   position: absolute; inset: 0;
   z-index: 1;
@@ -438,6 +444,7 @@
   position: absolute; inset: 0;
   background: var(--l-ink2);
   z-index: 0;
+  overflow: hidden;
 }
 
 /* PARTICLES (pure CSS) */

@@ -9,6 +9,10 @@ export const DEFAULT_CMS_CONTENT = {
     hero: { type: "particles", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
     features: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#2dd49f" },
     pricing: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
+    how: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
+    results: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#2dd49f" },
+    calculator: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
+    contact: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
   },
   site: {
     name: "ShopyBrain",

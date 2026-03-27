@@ -150,6 +150,24 @@ router.post("/media/upload", upload.single("file"), async (req: Request, res: Re
   }
 });
 
+const videoUpload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+
+router.post("/media/upload-video", videoUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const allowed = [".mp4", ".webm", ".mov"];
+    if (!allowed.includes(ext)) { res.status(400).json({ error: "Formato no soportado. Usa MP4, WebM o MOV." }); return; }
+    const filename = `${uuidv4()}${ext === ".mov" ? ".mp4" : ext}`;
+    const filepath = path.join(MEDIA_DIR, filename);
+    fs.writeFileSync(filepath, req.file.buffer);
+    broadcast("media_uploaded", { filename, type: "video" });
+    res.json({ url: `/media/${filename}`, size: req.file.size, originalName: req.file.originalname });
+  } catch (e) {
+    res.status(500).json({ error: "Video upload failed" });
+  }
+});
+
 router.delete("/media/:filename", async (req: Request, res: Response) => {
   try {
     const rawName = String(req.params.filename);

@@ -97,6 +97,7 @@ type CMSContent = {
   apkLabels?: { idle: string; checking: string; downloading: string; building: string; unavailable: string };
   errorMessages?: { sendFail: string; unexpected: string };
   heroDemoTitles?: { storeHealth: string; recentActivity: string };
+  backgrounds?: Record<string, { type: string; videoUrl?: string; galleryImages?: string[]; particleColor?: string }>;
   footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
 };
 
@@ -402,6 +403,18 @@ export default function Landing() {
   const hLines = content.hero.headline.split("\n");
   const progressPct = FP_SECTIONS.length > 1 ? (currentSection / (FP_SECTIONS.length - 1)) * 100 : 0;
 
+  const bgFor = (section: string) => content.backgrounds?.[section] ?? { type: "none" };
+  const videoBg = (section: string) => {
+    const bg = bgFor(section);
+    if (bg.type !== "video" || !bg.videoUrl) return null;
+    const src = bg.videoUrl.startsWith("/") ? `${API_BASE_LANDING}${bg.videoUrl}` : bg.videoUrl;
+    return (
+      <video className="fp-video-bg" autoPlay muted loop playsInline preload="auto" key={src}>
+        <source src={src} />
+      </video>
+    );
+  };
+
   const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
   const calc = content.calculator ?? calcDefaults;
   const calcOneTimeTotal = calc.oneTimeServices.filter(s => calcSelectedOneTime.has(s.id)).reduce((sum, s) => sum + (Number(s.price) || 0), 0);
@@ -470,6 +483,7 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section" id="fp-hero" data-nav="Inicio">
           <div className="fp-bg">
+            {videoBg("hero")}
             <div className="l-hero-grid"></div>
             <div className="l-hero-glow"></div>
             <div className="l-hero-glow2"></div>
@@ -600,7 +614,7 @@ export default function Landing() {
             SECTION 02 — ENGINES (6 motors)
         ══════════════════════════════════════ */}
         <section className="fp-section fp-section-dark" id="fp-engines" data-nav="Motores">
-          <div className="fp-bg-solid"></div>
+          <div className="fp-bg-solid">{videoBg("features")}</div>
           <div className="fp-content fp-engines-layout">
             <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.features.pill}</div>
@@ -660,6 +674,7 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section" id="fp-demo" data-nav="Demo">
           <div className="fp-bg">
+            {videoBg("how")}
             <div className="l-hero-grid" style={{ opacity: 0.3 }}></div>
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
@@ -727,6 +742,7 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section fp-results-section" id="fp-results" data-nav="Resultados">
           <div className="fp-bg">
+            {videoBg("results")}
             <div className="fp-results-bg-pattern"></div>
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.72)" }}></div>
@@ -773,7 +789,7 @@ export default function Landing() {
             SECTION 05 — PRICING (3 cards)
         ══════════════════════════════════════ */}
         <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios">
-          <div className="fp-bg-solid"></div>
+          <div className="fp-bg-solid">{videoBg("pricing")}</div>
           <div className="fp-content fp-pricing-layout">
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill">{content.pricing.pill}</div>
@@ -808,6 +824,7 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section" id="fp-calculator" data-nav="Calculadora">
           <div className="fp-bg">
+            {videoBg("calculator")}
             <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.75)" }}></div>
@@ -925,6 +942,7 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar">
           <div className="fp-bg">
+            {videoBg("contact")}
             <div className="l-contact-bg" style={{
               position: "absolute", inset: 0,
               background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",

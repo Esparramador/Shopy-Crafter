@@ -918,12 +918,43 @@ function BackgroundTypeSelector({ sectionId, content, onChange }: { sectionId: s
       </div>
 
       {bgType === "video" && (
-        <input
-          value={sectionBg.videoUrl ?? ""}
-          placeholder="URL de video (YouTube o MP4)"
-          onChange={e => onChange(`${bgKey}.videoUrl`, e.target.value)}
-          style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, color: "var(--t)", outline: "none", boxSizing: "border-box" }}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              value={sectionBg.videoUrl ?? ""}
+              placeholder="URL de video o sube uno"
+              onChange={e => onChange(`${bgKey}.videoUrl`, e.target.value)}
+              style={{ flex: 1, padding: "6px 10px", fontSize: 12, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, color: "var(--t)", outline: "none", boxSizing: "border-box" }}
+            />
+            <label style={{
+              padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+              background: "rgba(200,168,75,0.15)", border: "1px solid var(--gold)", borderRadius: 8,
+              color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+            }}>
+              <Upload size={12} /> Subir
+              <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 100 * 1024 * 1024) { alert("El video no puede superar 100MB"); return; }
+                  const form = new FormData();
+                  form.append("file", file);
+                  try {
+                    const resp = await fetch(`${BASE_URL}/api/cms/media/upload-video`, { method: "POST", body: form, credentials: "include" });
+                    const data = await resp.json();
+                    if (data.url) onChange(`${bgKey}.videoUrl`, data.url);
+                  } catch { alert("Error al subir el video"); }
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          {sectionBg.videoUrl && (
+            <div style={{ fontSize: 10, color: "var(--jade)", display: "flex", alignItems: "center", gap: 4 }}>
+              <Film size={10} /> Video configurado: {sectionBg.videoUrl.split("/").pop()}
+            </div>
+          )}
+        </div>
       )}
       {bgType === "particles" && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1415,7 +1446,7 @@ export default function CMSEditor() {
                     </button>
                     <button
                       onClick={() => {
-                        const map: Record<string, string> = { site: "fp-hero", hero: "fp-hero", features: "fp-engines", stats: "fp-results", how: "fp-demo", pricing: "fp-pricing", testimonials: "fp-clients", cta: "fp-cta", footer: "fp-contact" };
+                        const map: Record<string, string> = { site: "fp-hero", hero: "fp-hero", features: "fp-engines", stats: "fp-results", how: "fp-demo", pricing: "fp-pricing", calculator: "fp-calculator", contact: "fp-contact", footer: "fp-contact" };
                         scrollPreviewToSection(map[section.id] || "fp-hero");
                       }}
                       title="Ver en preview"
@@ -1429,7 +1460,7 @@ export default function CMSEditor() {
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
-                      {["hero", "features", "pricing", "testimonials", "cta"].includes(section.id) && (
+                      {["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
                         <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
                       )}
                       {section.fields.map(field => {
