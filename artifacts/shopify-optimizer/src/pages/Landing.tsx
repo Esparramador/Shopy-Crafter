@@ -84,6 +84,12 @@ type CMSContent = {
   testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string; avatarUrl?: string | null }[] };
   contact?: { pill: string; headline: string; headlineHighlight: string; subheadline: string; buttonLabel: string; successTitle: string; successText: string; successSubtext: string; finePrint: string; labels: Record<string, string>; placeholders: Record<string, string>; nicheOptions: string[]; revenueOptions: string[]; socialLabel?: string; socialPlaceholder?: string; servicesLabel?: string; serviceOptions?: string[] };
   cta: { pill: string; headline: string; headlineHighlight: string; subheadline: string; placeholder: string; buttonLabel: string; finePrint: string };
+  calculator?: {
+    pill: string; headline: string; headlineHighlight: string; subheadline: string; disclaimer: string;
+    resultLabel: string; oneTimeLabel: string; recurringLabel: string; ctaLabel: string; emptyLabel: string;
+    oneTimeServices: { id: string; name: string; description: string; price: number; icon: string }[];
+    recurringServices: { id: string; name: string; description: string; price: number; period: string; icon: string }[];
+  };
   howCards?: { icon: string; title: string; sub: string; barPercent: string }[];
   howImpact?: { icon: string; title: string; sub: string };
   sectionNav?: string[];
@@ -96,8 +102,8 @@ type CMSContent = {
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-clients", "fp-contact", "fp-cta"];
-const DEFAULT_SECTION_NAV = ["Inicio", "Motores", "Demo", "Resultados", "Precios", "Clientes", "Contactar", "Empezar"];
+const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-calculator", "fp-contact"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Motores", "Demo", "Resultados", "Precios", "Calculadora", "Contactar"];
 
 function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
   const [val, setVal] = useState(0);
@@ -133,9 +139,9 @@ export default function Landing() {
   const [content, setContent] = useState<CMSContent | null>(null);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [calcSelectedOneTime, setCalcSelectedOneTime] = useState<Set<string>>(new Set());
+  const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
-  const [testimonialPaused, setTestimonialPaused] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -346,14 +352,6 @@ export default function Landing() {
     return () => document.removeEventListener("keydown", onKey);
   }, [goToSection]);
 
-  useEffect(() => {
-    if (!content || testimonialPaused) return;
-    const timer = setInterval(() => {
-      setActiveTestimonial(t => (t + 1) % (content.testimonials?.items?.length || 1));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [content, testimonialPaused]);
-
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
 
@@ -390,6 +388,12 @@ export default function Landing() {
 
   const hLines = content.hero.headline.split("\n");
   const progressPct = FP_SECTIONS.length > 1 ? (currentSection / (FP_SECTIONS.length - 1)) * 100 : 0;
+
+  const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
+  const calc = content.calculator ?? calcDefaults;
+  const calcOneTimeTotal = calc.oneTimeServices.filter(s => calcSelectedOneTime.has(s.id)).reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  const calcRecurringService = calcSelectedRecurring ? calc.recurringServices.find(s => s.id === calcSelectedRecurring) : null;
+  const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
@@ -787,48 +791,118 @@ export default function Landing() {
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 06 — CLIENTS (testimonials)
+            SECTION 06 — CALCULADORA DE PRECIOS
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-clients" data-nav="Clientes">
+        <section className="fp-section" id="fp-calculator" data-nav="Calculadora">
           <div className="fp-bg">
             <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.75)" }}></div>
-          <div className="fp-content fp-clients-layout">
-            <div className={`fp-section-header ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{content.testimonials.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("testimonials.headline")}>
-                {content.testimonials.headline.includes(content.testimonials.headlineHighlight)
-                  ? content.testimonials.headline.split(content.testimonials.headlineHighlight).flatMap((p, i, arr) =>
-                      i < arr.length - 1 ? [p, <em key={i}>{content.testimonials.headlineHighlight}</em>] : [p]
+          <div className="fp-content" style={{ maxWidth: 1100, padding: "0 24px" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
+              <div className="l-pill">{calc.pill}</div>
+              <h2 className="l-h2" onClick={cmsClick("calculator.headline")}>
+                {calc.headline.includes(calc.headlineHighlight)
+                  ? calc.headline.split(calc.headlineHighlight).flatMap((p, i, arr) =>
+                      i < arr.length - 1 ? [p, <em key={i}>{calc.headlineHighlight}</em>] : [p]
                     )
-                  : content.testimonials.headline}
+                  : calc.headline}
               </h2>
+              <p className="l-sub">{calc.subheadline}</p>
             </div>
 
-            <div className={`fp-testi-carousel ${!isAnimated("fp-clients") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onMouseEnter={() => setTestimonialPaused(true)} onMouseLeave={() => setTestimonialPaused(false)}>
-              {content.testimonials.items.map((t, i) => (
-                <div key={t.id} className={`fp-testi-card${i === activeTestimonial ? " active" : i === (activeTestimonial - 1 + content.testimonials.items.length) % content.testimonials.items.length ? " prev" : " next"}`}>
-                  <div className="l-testi-stars">{Array.from({ length: t.stars }).map((_, si) => <span key={si} className="l-star">★</span>)}</div>
-                  <div className="l-testi-quote">"</div>
-                  <p className="fp-testi-text">{t.text}</p>
-                  <div className="l-testi-metric">{t.metric}</div>
-                  <div className="l-testi-author">
-                    {t.avatarUrl ? (
-                      <img src={t.avatarUrl} alt={t.author} className="l-testi-avatar" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
-                    ) : (
-                      <div className="l-testi-avatar" style={{ background: t.avatarColor, color: t.avatarTextColor }}>{t.initials}</div>
-                    )}
-                    <div><div className="l-testi-name">{t.author}</div><div className="l-testi-role">{t.role}</div></div>
+            <div className={`fp-calc-grid ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              <div className="fp-calc-services">
+                <div className="fp-calc-group">
+                  <h3 className="fp-calc-group-title">{calc.oneTimeLabel}</h3>
+                  <div className="fp-calc-items">
+                    {calc.oneTimeServices.map(s => {
+                      const selected = calcSelectedOneTime.has(s.id);
+                      return (
+                        <button key={s.id} type="button" className={`fp-calc-item${selected ? " selected" : ""}`} onClick={() => {
+                          setCalcSelectedOneTime(prev => {
+                            const next = new Set(prev);
+                            if (next.has(s.id)) next.delete(s.id); else next.add(s.id);
+                            return next;
+                          });
+                        }}>
+                          <span className="fp-calc-item-icon">{s.icon}</span>
+                          <div className="fp-calc-item-info">
+                            <span className="fp-calc-item-name">{s.name}</span>
+                            <span className="fp-calc-item-desc">{s.description}</span>
+                          </div>
+                          <span className="fp-calc-item-price">{s.price}€</span>
+                          <span className="fp-calc-item-check">{selected ? "✓" : "+"}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="fp-testi-dots">
-              {content.testimonials.items.map((_, i) => (
-                <button key={i} className={`fp-testi-dot${i === activeTestimonial ? " active" : ""}`} onClick={() => setActiveTestimonial(i)}></button>
-              ))}
+                <div className="fp-calc-group">
+                  <h3 className="fp-calc-group-title">{calc.recurringLabel}</h3>
+                  <div className="fp-calc-items">
+                    {calc.recurringServices.map(s => {
+                      const selected = calcSelectedRecurring === s.id;
+                      return (
+                        <button key={s.id} type="button" className={`fp-calc-item fp-calc-item-recurring${selected ? " selected" : ""}`} onClick={() => {
+                          setCalcSelectedRecurring(prev => prev === s.id ? null : s.id);
+                        }}>
+                          <span className="fp-calc-item-icon">{s.icon}</span>
+                          <div className="fp-calc-item-info">
+                            <span className="fp-calc-item-name">{s.name}</span>
+                            <span className="fp-calc-item-desc">{s.description}</span>
+                          </div>
+                          <span className="fp-calc-item-price">{s.price}€<small>{s.period}</small></span>
+                          <span className="fp-calc-item-check">{selected ? "✓" : "+"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="fp-calc-summary">
+                <div className="fp-calc-summary-inner">
+                  <h3 className="fp-calc-summary-title">{calc.resultLabel}</h3>
+                  {calcOneTimeTotal === 0 && !calcSelectedRecurring ? (
+                    <p className="fp-calc-empty">{calc.emptyLabel}</p>
+                  ) : (
+                    <>
+                      {calcOneTimeTotal > 0 && (
+                        <div className="fp-calc-total-row">
+                          <span className="fp-calc-total-label">{calc.oneTimeLabel}</span>
+                          <span className="fp-calc-total-value">{calcOneTimeTotal}€</span>
+                        </div>
+                      )}
+                      {calcRecurringTotal > 0 && (
+                        <div className="fp-calc-total-row fp-calc-total-recurring">
+                          <span className="fp-calc-total-label">{calc.recurringLabel}</span>
+                          <span className="fp-calc-total-value">{calcRecurringTotal}€<small>/mes</small></span>
+                        </div>
+                      )}
+                      <div className="fp-calc-divider" />
+                      <div className="fp-calc-total-row fp-calc-grand-total">
+                        <span className="fp-calc-total-label">Total</span>
+                        <div style={{ textAlign: "right" }}>
+                          {calcOneTimeTotal > 0 && <div className="fp-calc-grand-value">{calcOneTimeTotal}€ <small>pago único</small></div>}
+                          {calcRecurringTotal > 0 && <div className="fp-calc-grand-value fp-calc-grand-recurring">+ {calcRecurringTotal}€<small>/mes</small></div>}
+                        </div>
+                      </div>
+                      <div className="fp-calc-selected-list">
+                        {calc.oneTimeServices.filter(s => calcSelectedOneTime.has(s.id)).map(s => (
+                          <div key={s.id} className="fp-calc-selected-item"><span>{s.icon}</span> {s.name} — {s.price}€</div>
+                        ))}
+                        {calcSelectedRecurring && calc.recurringServices.filter(s => s.id === calcSelectedRecurring).map(s => (
+                          <div key={s.id} className="fp-calc-selected-item fp-calc-selected-recurring"><span>{s.icon}</span> {s.name} — {s.price}€{s.period}</div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }}>{calc.ctaLabel}</a>
+                  <p className="fp-calc-disclaimer">{calc.disclaimer}</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1008,40 +1082,9 @@ export default function Landing() {
                 </form>
               )}
             </div>
-          </div>
-        </section>
 
-        {/* ══════════════════════════════════════
-            SECTION 07 — CTA FINAL + FOOTER
-        ══════════════════════════════════════ */}
-        <section className="fp-section fp-cta-section" id="fp-cta" data-nav="Empezar">
-          <div className="fp-bg">
-            <div className="l-cta-bg"></div>
-          </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.6)" }}></div>
-          <div className="fp-content fp-cta-layout">
-            <div className={`fp-cta-content ${!isAnimated("fp-cta") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" style={{ margin: "0 auto 24px" }}>{content.cta.pill}</div>
-              <h2 className="l-cta-h2" onClick={cmsClick("cta.headline")}>
-                {content.cta.headline.split("\n").map((line, i) => (
-                  <span key={i} className={i > 0 ? "l-block" : undefined}>
-                    {line.includes(content.cta.headlineHighlight)
-                      ? line.split(content.cta.headlineHighlight).flatMap((p, pi, arr) =>
-                          pi < arr.length - 1 ? [p, <em key={pi}>{content.cta.headlineHighlight}</em>] : [p]
-                        )
-                      : line}
-                  </span>
-                ))}
-              </h2>
-              <p className="l-cta-sub">{content.cta.subheadline}</p>
-              <div className="l-cta-form">
-                <input type="email" className="l-cta-input" placeholder={content.cta.placeholder} />
-                <Link href="/login" className="l-btn-primary" style={{ padding: "13px 24px", fontSize: 14 }}>{content.cta.buttonLabel}</Link>
-              </div>
-              <p className="l-cta-fine">{content.cta.finePrint}</p>
-            </div>
-
-            <footer className={`fp-footer ${!isAnimated("fp-cta") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
+            {/* ── FOOTER ── */}
+            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40 }}>
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>

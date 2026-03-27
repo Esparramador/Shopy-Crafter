@@ -28,9 +28,27 @@ function broadcast(event: string, data: unknown) {
   });
 }
 
+function deepMergeDefaults(defaults: Record<string, unknown>, stored: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...stored };
+  for (const key of Object.keys(defaults)) {
+    if (!(key in result)) {
+      result[key] = defaults[key];
+    } else if (
+      defaults[key] && typeof defaults[key] === "object" && !Array.isArray(defaults[key]) &&
+      result[key] && typeof result[key] === "object" && !Array.isArray(result[key])
+    ) {
+      result[key] = deepMergeDefaults(defaults[key] as Record<string, unknown>, result[key] as Record<string, unknown>);
+    }
+  }
+  return result;
+}
+
 async function getOrInitContent() {
   const rows = await db.select().from(cmsContent).limit(1);
-  if (rows.length > 0) return rows[0];
+  if (rows.length > 0) {
+    const merged = deepMergeDefaults(DEFAULT_CMS_CONTENT as Record<string, unknown>, rows[0].content as Record<string, unknown>);
+    return { ...rows[0], content: merged };
+  }
   const [row] = await db.insert(cmsContent).values({ content: DEFAULT_CMS_CONTENT, version: 1 }).returning();
   return row;
 }
