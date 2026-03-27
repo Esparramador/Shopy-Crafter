@@ -861,20 +861,25 @@
   .fp-split-layout { grid-template-columns: 1fr; }
   .fp-split-right { display: none; }
   .fp-stats-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fp-pricing-layout { overflow: visible !important; }
   .fp-pricing-row {
     display: flex !important;
-    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x !important;
     gap: 14px;
-    max-width: 100%;
+    width: 100%;
     margin: 0;
-    padding: 14px 0 20px;
+    padding: 14px 16px 20px;
     scrollbar-width: none;
   }
   .fp-pricing-row::-webkit-scrollbar { display: none; }
   .fp-pricing-row > * {
-    flex: 0 0 80%;
+    flex: 0 0 80% !important;
+    min-width: 260px;
     max-width: 340px;
     scroll-snap-align: center;
   }
@@ -905,6 +910,9 @@
   .l-btn-gold { padding: 8px 14px; font-size: 12px; white-space: nowrap; }
   .l-nav-gem { width: 26px; height: 26px; font-size: 13px; border-radius: 7px; }
   .l-nav-logo-text { font-size: 16px; }
+
+  .l-root { cursor: auto !important; }
+  .l-root *, .l-root a, .l-root button { cursor: auto !important; }
 
   .fp-container {
     position: relative !important;
@@ -986,20 +994,25 @@
   .fp-tech-logos { flex-wrap: wrap; gap: 8px; justify-content: center; }
 
   /* Pricing — carousel on mobile */
+  .fp-pricing-layout { overflow: visible !important; }
   .fp-pricing-row {
     display: flex !important;
-    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x !important;
     gap: 14px;
-    max-width: 100%;
+    width: 100%;
     margin: 0;
-    padding: 14px 4px 20px;
+    padding: 14px 16px 20px;
     scrollbar-width: none;
   }
   .fp-pricing-row::-webkit-scrollbar { display: none; }
   .fp-pricing-row > * {
-    flex: 0 0 85%;
+    flex: 0 0 82% !important;
+    min-width: 260px;
     max-width: 320px;
     scroll-snap-align: center;
   }
