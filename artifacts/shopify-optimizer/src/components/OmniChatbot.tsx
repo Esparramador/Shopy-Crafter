@@ -1114,12 +1114,45 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           const d = await res.json();
           assistantContent = d.answer ?? d.result ?? "No pude procesar la respuesta.";
 
-          if (d.detectedAction) {
-            const actionResult = await executeShopifyAction(d.detectedAction.action, d.detectedAction.params);
-            if (actionResult) {
-              assistantContent += "\n\n" + formatActionResult(d.detectedAction.action, actionResult);
-              const actionType = d.detectedAction.action === "search_suppliers" ? "supplier-research" : "shopify-action";
-              action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult };
+          const longActions: Record<string, string> = {
+            generate_competitive_pricing: "🔍 **Investigación de mercado en curso...**\n\n**Paso 1** — Buscando precios reales de competidores con Google Search\n**Paso 2** — Analizando posicionamiento del mercado\n**Paso 3** — Generando catálogo de precios competitivo\n**Paso 4** — Actualizando CMS y creando productos en Shopify\n\n_⏱️ Esto toma 30-90 segundos. Investigando datos reales del mercado..._",
+            audit_app_offerings: "🔍 **Auditando la oferta de ShopyBrain...**\n\n**Paso 1** — Leyendo planes y features actuales del CMS\n**Paso 2** — Comparando con capacidades reales de la plataforma\n**Paso 3** — Analizando pricing vs. valor entregado\n**Paso 4** — Generando recomendaciones estratégicas\n\n_⏱️ Analizando con Claude... 15-30 segundos._",
+            scan_store: "📊 **Escaneando tienda Shopify...**\n\n**Paso 1** — Conectando con Shopify API\n**Paso 2** — Descargando catálogo completo\n**Paso 3** — Analizando calidad de cada producto\n\n_⏱️ Dependiendo del catálogo, 10-60 segundos..._",
+            optimize_all_products: "🧠 **Optimización masiva con IA...**\n\n**Paso 1** — Cargando productos de Shopify\n**Paso 2** — Claude genera SEO + copywriting para cada producto\n**Paso 3** — Actualizando títulos, descripciones, tags y meta\n\n_⏱️ ~5 segundos por producto..._",
+            design_all_pages: "📄 **Diseñando páginas de la tienda...**\n\n**Paso 1** — Analizando nicho y marca\n**Paso 2** — Claude genera contenido profesional para cada página\n**Paso 3** — Creando páginas en Shopify\n\n_⏱️ ~10 segundos por página..._",
+            search_suppliers: "🔍 **Investigando proveedores...**\n\n**Paso 1** — 6 búsquedas Google paralelas (proveedores, fábricas, mayoristas...)\n**Paso 2** — Analizando costes, MOQs y tiempos de entrega\n**Paso 3** — Claude genera informe estratégico\n\n_⏱️ 30-60 segundos..._",
+            diagnose_app: "🔬 **Diagnóstico de la app en curso...**\n\n**Paso 1** — Verificando tokens y conectividad\n**Paso 2** — Comprobando sincronización de datos\n**Paso 3** — Reparando automáticamente lo que sea posible\n\n_⏱️ 10-20 segundos..._",
+          };
+
+          const allActions = d.detectedActions ?? (d.detectedAction ? [d.detectedAction] : []);
+
+          if (allActions.length > 0) {
+            const firstAction = allActions[0].action;
+            if (longActions[firstAction]) {
+              setMessages(m => [...m, {
+                id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+                content: allActions.length > 1
+                  ? `⚡ **Ejecutando ${allActions.length} acciones en secuencia...**\n\n${longActions[firstAction]}`
+                  : longActions[firstAction],
+              }]);
+            } else if (allActions.length > 1) {
+              setMessages(m => [...m, {
+                id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+                content: `⚡ **Ejecutando ${allActions.length} acciones en secuencia...**`,
+              }]);
+            }
+
+            const results: string[] = [];
+            for (const act of allActions) {
+              const actionResult = await executeShopifyAction(act.action, act.params);
+              if (actionResult) {
+                results.push(formatActionResult(act.action, actionResult));
+                const actionType = act.action === "search_suppliers" ? "supplier-research" : "shopify-action";
+                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult };
+              }
+            }
+            if (results.length > 0) {
+              assistantContent += "\n\n" + results.join("\n\n---\n\n");
             }
           }
         } else {
@@ -1128,7 +1161,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
 
       setMessages(m => {
-        const filtered = m.filter(msg => !(msg.role === "assistant" && (msg.content.includes("Absorbiendo") || msg.content.includes("Generando workflow") || msg.content.includes("detectada. Absorbiendo") || msg.content.includes("Investigación exhaustiva paralela iniciada"))));
+        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda Shopify", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia"];
+        const filtered = m.filter(msg => !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });
     } catch (err) {

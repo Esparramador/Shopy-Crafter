@@ -414,20 +414,84 @@ REGLAS:
 - Si dice "resetea el CMS", "vuelve al original", "restaura los textos por defecto", "resetea la landing", "pon todo como estaba", EJECUTA reset_cms
 - Si dice "genera planes de precio", "créame un catálogo de precios", "genera pricing competitivo", "investiga la competencia y crea planes", "necesito planes profesionales", "genera 5 planes de precio", "pricing competitivo", "crea planes y ponlos en Shopify", EJECUTA generate_competitive_pricing
 - Si dice "audita la app", "qué ofrecemos", "analiza nuestra oferta", "qué features tenemos", "audita lo que vendemos", "review de la app", EJECUTA audit_app_offerings
+- Si dice "compara los precios", "compara nuestros precios", "están bien los precios", "analiza mis precios", "estudio de precios", "audita los precios", "los precios son correctos", "debo subir precios", "debo bajar precios", EJECUTA generate_competitive_pricing para investigar el mercado real y comparar
+- Si dice "crea los productos de suscripción", "crea los servicios en Shopify", "crea productos recurrentes", "pon los planes en Shopify", "crear suscripciones", crea cada plan como un producto Shopify individual con create_product (un :::ACTION::: por cada plan que pida crear)
+- Si dice "cuánto cobramos", "cuáles son nuestros precios", "qué precios tenemos", "nuestro catálogo", "nuestros servicios", responde directamente con TODOS los precios del catálogo que tienes en memoria (planes + servicios one-time + recurring). NO necesitas ejecutar ninguna acción para esto.
 - Si dice "cambia el diseño de X", "haz scroll horizontal", "modifica el layout", "pon X en columnas", "cambia el CSS", "haz responsive", "cambia el estilo de X", "modifica la UI", "añade animación", "cambia el diseño del pricing", "haz que X se vea diferente", EJECUTA modify_ui con target y change
 - USA projectId del contexto si el usuario tiene un proyecto activo
 - Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
 - Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
 `;
 
+    const agencyPricingKnowledge = `
+
+CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS ShopyBrain (Shopy Crafter):
+
+MODELO DE NEGOCIO: Agencia Shopify con servicios puntuales (one-time) + retainers mensuales (recurring). Pagos por Shopify (NO Stripe). La plataforma ShopyBrain es el motor IA que impulsa la agencia "Shopy Crafter".
+
+4 PLANES DE SUSCRIPCIÓN (retainer mensual + setup único):
+1. Starter — €49/mes + €297 setup único. Hasta 3 tiendas Shopify. Incluye: auditoría automática, M1 generación de imágenes (100/mes), M5 pricing COGS básico, M6 SEO técnico. NO incluye: OmniCore Brain, A/B Testing, portal cliente.
+2. Agency Pro — €149/mes + €597 setup. Hasta 15 tiendas. Los 6 motores completos + 500 imágenes/mes + OmniCore Brain (memoria acumulada) + A/B Testing con pixel + Portal cliente. Badge "Más popular".
+3. Enterprise — €399/mes + €1.497 setup. Tiendas ilimitadas, imágenes ilimitadas. White-label, API access, SLA, account manager dedicado por Slack.
+4. One-Shot Audit — €197 pago único (sin retainer). 1 auditoría completa + 30 redesigns + informe SEO + análisis COGS.
+
+9 SERVICIOS PUNTUALES (one-time, precio fijo):
+1. Auditoría completa de tienda — €197
+2. Rediseño IA de 30 productos — €147
+3. Pack 30 imágenes IA — €89
+4. Informe pricing y márgenes — €97
+5. Optimización SEO técnica — €147
+6. Informe de competencia — €97
+7. Investigación de proveedores — €97
+8. Setup email marketing — €197
+9. Proyección de ventas — €127
+
+3 SERVICIOS RECURRENTES (mensuales):
+1. Mantenimiento básico — €49/mes
+2. Gestión activa — €149/mes
+3. Premium ilimitado — €399/mes
+
+CAPACIDADES REALES DE LA PLATAFORMA (para justificar precios):
+- 6 motores IA: M1 Imágenes (Replicate Flux+Recraft), M2 Consistencia Visual, M3 A/B Testing (pixel tracking), M4 Auto-Pilot 24/7 (cron jobs), M5 Pricing Financiero (P&L, COGS, márgenes), M6 SEO Técnico (Schema, meta tags, alt texts)
+- OmniCore Brain: 37 acciones Shopify + investigación de entidades + memoria permanente + 12 cron jobs de aprendizaje continuo
+- Investigación de mercado REAL con Google Search Grounding (Gemini)
+- Generación de imágenes profesionales con IA (Replicate)
+- Análisis financiero con Claude (pricing, unit economics, cash flow)
+- Email marketing con templates IA + Klaviyo integration
+- Sistema de proveedores con investigación IA
+- Encriptación AES-256, RGPD compliant
+- Panel admin completo + panel cliente read-only
+- Exportación de reportes en PDF
+
+CUANDO TE PREGUNTEN SOBRE PRECIOS:
+- Siempre conoces los precios exactos. No digas "no sé" o "comprueba la landing".
+- Si te piden comparar precios con la competencia, EJECUTA generate_competitive_pricing para investigar en REAL TIME con Google Search.
+- Si te piden auditar la oferta actual, EJECUTA audit_app_offerings.
+- Si te piden crear productos de suscripción en Shopify, usa create_product con los datos del plan correspondiente.
+- Sugiere proactivamente ajustes de precio cuando detectes oportunidades.
+- Usa psicología de precios: precios acabados en 7 o 9, anclaje con el plan Enterprise, badge "Más popular" en el mid-tier.
+
+PARA CREAR PRODUCTOS DE SUSCRIPCIÓN EN SHOPIFY:
+Cuando el usuario pida crear productos de servicios/suscripciones en Shopify, crea productos con:
+- Título profesional del servicio
+- Descripción detallada HTML con beneficios y qué incluye
+- Precio del servicio
+- Tags: "servicio", "suscripcion" o "one-time", "shopybrain"
+- productType: "Service" o "Subscription"
+- vendor: "Shopy Crafter"
+Ejemplo: create_product con title="Plan Agency Pro — Gestión Shopify IA", price="149.00", bodyHtml="<h2>Plan Agency Pro</h2><p>Gestión completa de hasta 15 tiendas...</p>", tags="servicio, suscripcion, mensual, shopybrain"
+`;
+
     const sysPrompt = (customSystemPrompt ?? `Eres OmniCore AI, el asistente central de la plataforma ShopyBrain para agencias Shopify.
 Eres experto en Shopify, Klaviyo, email marketing, SEO, pricing y estrategia eCommerce.
+Eres el CFO y estratega de precios de la agencia Shopy Crafter. Conoces TODOS los servicios y precios de memoria.
 Tienes acceso al conocimiento acumulado de ShopyBrain — memorias de investigaciones anteriores sobre marcas, nichos y estrategias.
 Responde siempre en español, de forma directa, clara y accionable.
 Cuando el usuario pida ayuda o pregunte cómo hacer algo, actúa como GUÍA INTERACTIVA: da instrucciones paso a paso con los nombres EXACTOS de botones, páginas y secciones de la app.
 Si conoces la página actual del usuario, contextualiza tu respuesta a esa página.
 Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.
-PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, etc., EJECUTA la acción correspondiente.`) + actionDetectionBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
+PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, etc., EJECUTA la acción correspondiente.
+IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, investigación), NO digas "dame 10 segundos". Ejecuta la acción directamente con :::ACTION::: y el sistema mostrará progreso automáticamente.`) + agencyPricingKnowledge + actionDetectionBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
 
     const projectContext = req.body.activeProjectId ? `\n[CONTEXTO: El usuario tiene el proyecto activo con ID ${req.body.activeProjectId}. Úsalo como projectId en las acciones.]` : "";
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
@@ -442,11 +506,16 @@ PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuari
     const answer = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
 
     let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
-    const actionMatch = answer.match(/:::ACTION:::([\s\S]*?):::END_ACTION:::/);
-    if (actionMatch) {
+    const detectedActions: { action: string; params: Record<string, unknown> }[] = [];
+    const actionRegex = /:::ACTION:::([\s\S]*?):::END_ACTION:::/g;
+    let actionMatch;
+    while ((actionMatch = actionRegex.exec(answer)) !== null) {
       try {
-        detectedAction = JSON.parse(actionMatch[1]);
-      } catch { /* invalid JSON, ignore */ }
+        detectedActions.push(JSON.parse(actionMatch[1]));
+      } catch { /* invalid JSON, skip */ }
+    }
+    if (detectedActions.length > 0) {
+      detectedAction = detectedActions[0];
     }
 
     const cleanAnswer = answer.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
@@ -457,6 +526,7 @@ PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuari
       entityKnowledgeUsed: !!entityKnowledgeContext,
       potentialEntity: potentialEntity ?? null,
       detectedAction,
+      detectedActions: detectedActions.length > 1 ? detectedActions : undefined,
     });
     return;
   }
@@ -1789,9 +1859,9 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
           return results;
         };
 
-        const frontendDir = directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "");
+        const frontendDir = directory ? (directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "")) : "src";
         const frontendFiles = listDir(FRONTEND_ROOT, frontendDir, "[frontend] ");
-        const backendDir = directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "");
+        const backendDir = directory ? (directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "")) : "src";
         const backendFiles = listDir(BACKEND_ROOT, backendDir, "[backend] ");
 
         result = {
