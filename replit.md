@@ -1,7 +1,7 @@
 # ShopyBrain Agency Platform
 
 ## Overview
-ShopyBrain is a multi-user Shopify AI optimization agency platform designed to enhance e-commerce operations. It supports `admin` and `client` roles, leveraging advanced AI models (Gemini, Claude, OmniCore) for market research, competitor analysis, product trend identification, and content generation. The platform integrates deeply with Shopify's ecosystem to provide comprehensive business intelligence and automation, driving optimization and strategic growth for agencies and their clients. Its core purpose is to maximize ROI for Shopify stores through AI-driven insights and actions.
+ShopyBrain is a multi-user Shopify AI optimization agency platform designed to enhance e-commerce operations for `admin` and `client` roles. It leverages advanced AI models (Gemini, Claude, OmniCore) for market research, competitor analysis, product trend identification, and content generation. The platform deeply integrates with Shopify's ecosystem to provide comprehensive business intelligence and automation, driving optimization and strategic growth for agencies and their clients by maximizing ROI for Shopify stores through AI-driven insights and actions.
 
 ## User Preferences
 - Admin email: `sadiagiljoan@gmail.com` (password stored in DB, bcrypt-hashed)
@@ -24,63 +24,60 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Colors**: `--ink:#080810`, `--gold:#c8a84b`, `--jade:#2dd49f`, `--crim:#e84558`
 - **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
 - **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
-- **Custom Cursor**: SCCursor component (`src/components/ui/SCCursor.tsx`) renders a 28px gold circle with "SC" initials + trailing 44px ring. Mounted at App root (App.tsx) so it covers all routes. CSS in `design-system.css` sets `body { cursor: none }` on desktop; `@media (max-width: 900px)` reverts to auto. JS touch detection in component skips animation on touch devices. Hover effect uses JS-driven class toggling (`sc-cursor-hover`, `sc-ring-hover`).
-- **Responsive Design**: Three breakpoints — Desktop (>900px: fullpage scroll-snap with side dots), Tablet (≤900px: auto-height sections, natural scroll, centered hero), Mobile (≤768px: stacked layouts, contact form reduced padding). JS breakpoints in Landing.tsx aligned to CSS at 900px. Admin panel: sidebar off-canvas on tablet (601-1024px), horizontal nav bar on mobile (≤600px). Accessibility: `focus-visible`, `aria-label`, `prefers-reduced-motion`.
-- **Landing Page Sections** (7 sections): Hero → Engines → Demo → Results → Pricing → **Calculator** → Contact (with footer). No CTA section, no testimonials section. Calculator and contact sections have `overflow-y: auto` for long content.
+- **Custom Cursor**: SCCursor component renders a 28px gold circle with "SC" initials + trailing 44px ring.
+- **Responsive Design**: Three breakpoints — Desktop (>900px), Tablet (≤900px), Mobile (≤768px). Admin panel features adaptive layouts.
+- **Landing Page Sections**: 7 sections including Hero, Engines, Demo, Results, Pricing, Calculator, and Contact.
 
 ### Database
-PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.
+PostgreSQL with Drizzle ORM, utilizing over 42 tables for user management, project data, product information, and extensive AI-related memory and insight storage.
 
 ### AI Stack and OmniCore
-A **Dual AI Engine** architecture where Claude and Gemini work in parallel, independently analyze the same task, and then synthesize results for superior output. Integrated with image generation via Replicate.
-- **Dual AI Engine** (`lib/dual-ai.ts`): Core system with 4 modes — `parallel_synthesis` (both IAs work simultaneously, Claude synthesizes best of both), `gemini_research_claude_redact` (Gemini researches with web search, Claude writes final using Gemini's data), `claude_only`, `gemini_only`. Graceful fallback: if either AI fails, the other continues alone. Returns timings and source attribution. Used in: product optimization, page creation, competitive pricing, intelligence profiles, revenue analysis, image alt-text generation.
-- **Google PageSpeed Insights** (`lib/pagespeed.ts`): Reusable module with `runPageSpeedAudit(url, strategy)` and `runDualPageSpeed(url)` (mobile+desktop in parallel). Auto-injected into intelligence `build-profile` and chatbot `scan_store` action. Returns Core Web Vitals (LCP, CLS, INP, FCP, TBT, SI, TTI, TTFB), performance/SEO/accessibility scores, field data, actionable issues/fixes, and opportunities. Results saved as OmniCore memories. Uses `GOOGLE_PAGESPEED_API_KEY` env var.
-- **Gemini**: Research engine with Google Search grounding (threshold 0.0 = always real search). Handles market intelligence, competitor analysis, product trends, SEO keywords, and web data gathering. Provides factual data for dual synthesis.
-- **Claude**: Premium copywriting and strategic analysis engine with BrandDNA and OmniCore knowledge injection. Handles final redaction, synthesis of dual results, and expert-level content generation.
-- **Replicate (Flux, Recraft)**: For generating product and lifestyle images.
-- **OmniCore**: The central "brain" for permanent memory, storing all AI outputs and analysis, and acting as a floating AI chatbot for natural language commands. **37 total actions**: Shopify CRUD (store_status, list/create/edit/delete/search/publish products, change_price, set_product_status, scan_store, get_orders, get_scopes, regenerate_token, optimize_product/all, create/list/auto collections, create/list/design pages, optimize_images), app diagnostics (diagnose_app, modify_audit_filter), source code editing (inspect_code, fix_code, list_source_files, analyze_component — all path-sandboxed), CMS editing (read_cms, update_cms, update_cms_batch, reset_cms — covers ALL CMS paths exhaustively), **strategic capabilities** (generate_competitive_pricing — researches real market + generates plans + updates CMS + creates products in Shopify; audit_app_offerings — full app offering audit with recommendations; modify_ui — applies CSS/layout/visual changes to the app), and supplier research. System prompt includes complete CMS path map for every editable field. It also powers an Entity Research Engine and a context-aware Guide Assistant. **Voice input**: OmniChatbot has built-in microphone button using Web Speech API (es-ES) — user speaks, transcript auto-fills and auto-sends to ShopyBrain. Separate VoiceButton component in admin dashboard uses `/api/voice/command` for voice-to-action with Claude NLU.
-- **Retroactive Learning**: Every chatbot action triggers `learnFromOperation()` (fire-and-forget) that saves results as categorized OmniCore memories. All 37 action types have explicit memory-type mappings (prompt_template, pricing_pattern, image_pattern, competitor_intel, ab_insight, niche_keyword, general). `buildShopyBrainContext()` injects top-15 memories + 5 prompt patterns + 10 strategic insights + visual insights into every Claude prompt, so future responses benefit from all past operations. 12 scheduled cron jobs handle continuous learning (micro-learning every 3h, consolidation every 6h, deep study at 1am, cross-synthesis every 12h, weekly mega-synthesis).
+A **Dual AI Engine** architecture integrates Claude and Gemini in parallel for superior output. It also integrates with Replicate for image generation.
+- **Dual AI Engine**: Supports `parallel_synthesis`, `gemini_research_claude_redact`, `claude_only`, `gemini_only` modes with graceful fallback.
+- **Google PageSpeed Insights**: Reusable module for performance audits, integrated into intelligence building and chatbot actions.
+- **Gemini**: Primary research engine with Google Search grounding for market intelligence, competitor analysis, product trends, and SEO.
+- **Claude**: Premium copywriting and strategic analysis engine for final redaction, synthesis, and content generation.
+- **Replicate (Flux, Recraft)**: Used for generating product and lifestyle images.
+- **OmniCore**: The central AI "brain" for permanent memory, storing AI outputs, and acting as a floating AI chatbot. It includes **46 actions** covering Shopify CRUD operations (products, collections, pages, themes), app diagnostics, source code editing, CMS editing, and strategic capabilities (competitive pricing, app offerings, UI modification, supplier research). It also features voice input and an Entity Research Engine and Guide Assistant.
+- **Retroactive Learning**: Every chatbot action triggers `learnFromOperation()` to save results as categorized OmniCore memories, which are then injected into future Claude prompts via `buildShopyBrainContext()`. Twelve scheduled cron jobs ensure continuous learning and consolidation.
 
 ### Key Features
-- **Client Portal**: Provides KPI summaries, activity timelines, and export options.
-- **Coach Marks**: Sequential tooltip system for first-time admin users.
-- **M4 ScriptTag Integration**: For installing and managing tracking pixels.
-- **Push Notifications**: VAPID-based system for user notifications.
-- **CMS Editor**: Visual content editor with AI copywriting and version history. Zero hardcoded content mandate across ALL panels. Covers: site config, backgrounds, navigation, hero (pill, headline, CTAs, demo dashboard, scroll hint, APK button labels), features/motors (6 motors with stats), results (animated stats, tech badges), pricing (plans with features), **interactive price calculator** (9 one-time services with quantity +/- controls + 3 recurring plans, per-unit pricing for scalable services like redesign €9/product and images €3/image, itemized breakdown table with line totals, volume discount hint at 3+ services, gold=one-time / blue=recurring distinction), contact form (labels, placeholders, dropdowns, success messages), footer. Also covers: howCards (3 demo cards + impact card), sectionNav (7 landing nav labels), adminBackLabel, apkLabels (5 status states), errorMessages, heroDemoTitles, adminPanel (sidebar labels, header, user, tooltips, notifications), clientPanel (nav items, sidebar, topbar, badges, status). Admin panel sidebar/header/tooltips/notifications all CMS-driven. Client panel sidebar/topbar/nav/status all CMS-driven. OmniCore chatbot can edit CMS via `update_cms` action. Pricing cards display as horizontal scroll carousel on mobile (≤900px). CMS mutating routes protected by requireAdmin middleware. Boolean coercion and array/string tag handling in Landing. CMS defaults deep-merged with stored content so new sections (like calculator) are available without DB reset.
-- **Video Backgrounds**: All 7 landing sections (hero, features, how/demo, results, pricing, calculator, contact) support per-section video backgrounds via CMS. Admin uploads videos through `/api/cms/media/upload-video` (100MB limit, MP4/WebM/MOV). `BackgroundTypeSelector` in CMSEditor allows switching between none/particles/video/gallery per section. `videoBg()` helper in Landing.tsx renders `<video className="fp-video-bg">` elements. CSS `.fp-video-bg` is absolute fullscreen with `object-fit: cover`. Works in both `.fp-bg` and `.fp-bg-solid` containers. Background keys in CMS defaults: hero, features, pricing, how, results, calculator, contact.
-- **Email Template Studio**: AI-powered editor for professional email templates with brand identity integration and Klaviyo push.
-- **AI-Powered Lead Pre-Report**: Landing form submissions trigger 3 parallel Gemini searches (business, market/competition, SEO) and send a detailed HTML pre-report email to craftershopy@gmail.com via Gmail API. Background processing — doesn't block form response.
-- **Client Invite Flow**: Secure, token-based system for client onboarding.
-- **Professional Budget/Invoice Generator**: AI-powered tool for generating detailed budgets and invoices.
-- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, real price research, SEO metafields, and AI-generated images. Supports image-to-product creation via chat. AI generation includes: professional hashtags for social media, suggested variants (size/color/material auto-applied), recommended image counts (5-9 for professional stores) with image type guidance (hero, lifestyle, detail, scale, packaging, UGC), and brand DNA consistency notes.
-- **Supplier Research System**: AI-driven intelligence for supplier identification and cost analysis.
-- **Universal Export System**: Comprehensive hub for various report types and data exports.
-- **AI Economist with Market Research**: Optimal price calculation runs parallel Gemini searches (competitor prices + supplier costs) BEFORE Claude analysis. Returns real competitor prices with sources, market price ranges (min/max/median), supplier cost averages, price impact estimates (expected sales/revenue change), and margin waterfall breakdown. Frontend displays competitor badges, supplier costs, price impact estimates, and recommended strategy.
-- **A/B Testing (Image + Price)**: Supports both image and price variant tests. Price tests include AI-generated impact predictions (revenue change, margin analysis, conversion rate impact, visual/economic impact, risk level). Test cards show visitors, conversion rates, and statistical confidence with significance indicator.
-- **Price Simulator & P&L Forecast**: Tools for financial analysis, including scenario simulation, price elasticity calculation, and multi-month forecasts. Auto-fetches COGS via AI if none saved before simulating.
-- **Comprehensive COGS System**: Detailed cost of goods sold tracking across multiple categories. AI auto-estimation via Claude (dual scenarios: own equipment vs external service) with material breakdown, shipping tariffs by carrier, production method, color complexity, and confidence level.
-- **Partial Redesign**: Users can select which parts to redesign (title, description, price, tags, SEO meta, photo briefs) instead of rewriting everything. Field mapping aligns frontend keys (bodyHtml, metafields) to backend keys (description, meta) for apply-redesign.
-- **Knowledge Graph Visualization**: Interactive D3.js graph to visualize knowledge domains and insights.
-- **Automated Cron Jobs**: Twelve tasks for continuous learning, data consolidation, and operational intelligence, with AI fallback.
+- **Client Portal**: Provides KPI summaries and activity timelines.
+- **Coach Marks**: Sequential tooltip system for new admin users.
+- **M4 ScriptTag Integration**: For tracking pixel management.
+- **Push Notifications**: VAPID-based system.
+- **CMS Editor**: Visual content editor with AI copywriting and version history, supporting all UI content, including video backgrounds.
+- **AI-Powered Lead Pre-Report**: Generates detailed pre-reports for landing form submissions via Gemini.
+- **Client Invite Flow**: Secure, token-based onboarding.
+- **Professional Budget/Invoice Generator**: AI-powered tool.
+- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, and images.
+- **Supplier Research System**: AI-driven intelligence.
+- **Universal Export System**: For various reports and data exports.
+- **AI Economist with Market Research**: Calculates optimal prices using parallel Gemini searches and Claude analysis.
+- **A/B Testing (Image + Price)**: Supports image and price variant tests with AI-generated impact predictions.
+- **Price Simulator & P&L Forecast**: Tools for financial analysis and scenario simulation.
+- **Comprehensive COGS System**: Detailed cost of goods sold tracking with AI auto-estimation.
+- **Partial Redesign**: Allows users to select specific product attributes for AI-driven redesign.
+- **Knowledge Graph Visualization**: Interactive D3.js graph.
+- **Automated Cron Jobs**: Twelve tasks for continuous learning and intelligence.
 
 ### Security
 - AES-256-GCM encryption for credentials.
-- Comprehensive audit logging for all critical actions.
-- Database-backed rate limiting for all endpoints (PostgreSQL store for express-rate-limit with prefixed keys: auth/api/ai, plus route-level DB rate limiting for login in auth.ts).
-- AI API concurrency queues and exponential backoff for retries.
+- Comprehensive audit logging.
+- Database-backed rate limiting for all endpoints.
+- AI API concurrency queues and exponential backoff.
 - Frontend ErrorBoundary and global error handlers.
-- Admin route protection, CORS configuration, and secure session management.
-- SVG sanitization, PostMessage origin validation, HTML escaping, prototype pollution, path traversal, and dynamic method access protection.
-- SAST scan compliance with minimal findings.
+- Admin route protection, CORS, and secure session management.
+- SVG sanitization, PostMessage origin validation, HTML escaping, and protection against common web vulnerabilities.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
-- **Anthropic Claude**: AI model for analysis and content generation.
-- **Replicate**: For image generation (Flux, Recraft).
+- **Anthropic Claude**: AI model.
+- **Replicate**: For image generation.
 - **Archiver**: Server-side ZIP generation.
 - **Shopify**: Storefront API and Admin API.
 - **Klaviyo**: For email flow integration and lead form notifications.
-- **Gmail (Replit Integration)**: OAuth-based Gmail API for sending ALL emails from `craftershopy@gmail.com` (official business email). Sender name is "Shopy Crafter" (the company) — NOT "ShopyBrain" (ShopyBrain is the AI brain engine, Shopy Crafter is the company). Direct sends via `sendEmail()` in `lib/gmail.ts` use explicit From header. Klaviyo flows default to `craftershopy@gmail.com` as from_email. Backend enforces AGENCY_EMAIL on INSERT — `from_email` is always `craftershopy@gmail.com` regardless of frontend input. Email templates generate client-branded content but with "Powered by Shopy Crafter" in footer.
+- **Gmail (Replit Integration)**: For sending all emails from `craftershopy@gmail.com`.
 - **connect-pg-simple**: PostgreSQL session store.
 - **ExcelJS**: XLSX workbook generation.
 - **@google/genai**: For direct Gemini API integration.

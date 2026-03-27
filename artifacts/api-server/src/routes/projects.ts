@@ -35,7 +35,7 @@ const OAUTH_SCOPES = [
   "read_analytics", "read_inventory", "write_inventory",
   "read_price_rules", "write_price_rules",
   "read_content", "write_content",
-  "read_themes",
+  "read_themes", "write_themes",
 ].join(",");
 
 const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string; clientId: string; clientSecret: string }>();
