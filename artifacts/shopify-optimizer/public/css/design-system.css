@@ -44,6 +44,8 @@ body {
   cursor: none;
 }
 a, button, input, select, textarea, [role="button"] { cursor: none; }
+select { color-scheme: dark; }
+option { background: #1c1c2e; color: #f2f0ff; }
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--t4); border-radius: 2px; }
