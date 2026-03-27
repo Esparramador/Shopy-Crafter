@@ -403,16 +403,12 @@
 .fp-container {
   margin-top: 64px;
   height: calc(100vh - 64px);
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  scroll-behavior: smooth;
+  overflow-y: hidden;
   overscroll-behavior: none;
 }
 .fp-section {
   height: calc(100vh - 64px);
   min-height: calc(100vh - 64px);
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -421,6 +417,9 @@
   align-items: center;
   padding: 0 48px;
   box-sizing: border-box;
+}
+.fp-wrapper {
+  will-change: transform;
 }
 .fp-section-dark { background: var(--l-ink2); }
 
@@ -837,7 +836,10 @@
   .fp-container {
     height: auto !important;
     overflow-y: visible !important;
-    scroll-snap-type: none !important;
+  }
+  .fp-wrapper {
+    transform: none !important;
+    transition: none !important;
   }
   .fp-hero-layout { grid-template-columns: 1fr; gap: 24px; }
   .fp-hero-right { display: none; }
@@ -897,13 +899,15 @@
   .l-nav-gem { width: 26px; height: 26px; font-size: 13px; border-radius: 7px; }
   .l-nav-logo-text { font-size: 16px; }
 
-  /* fp-container: volver a scroll normal (sin snap) */
   .fp-container {
     position: relative !important;
     height: auto !important;
     overflow-y: visible !important;
-    scroll-snap-type: none !important;
     margin-top: 56px !important;
+  }
+  .fp-wrapper {
+    transform: none !important;
+    transition: none !important;
   }
 
   /* Secciones: auto-height, flex-start en vez de center */

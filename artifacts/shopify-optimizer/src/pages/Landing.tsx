@@ -178,50 +178,71 @@ export default function Landing() {
   }, []);
 
 
+  const isAnimatingRef = useRef(false);
+
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
     if (!container) return;
-    currentRef.current = index;
-    setCurrentSection(index);
     if (window.innerWidth <= 900) {
-      // Tablet/Mobile: sections are auto-height, scroll the body via scrollIntoView
+      currentRef.current = index;
+      setCurrentSection(index);
       const sections = container.querySelectorAll<HTMLElement>(".fp-section");
       const section = sections[index];
       if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      // Desktop: fp-container is fixed-height scroll box, use direct scrollTo
-      container.scrollTo({ top: index * container.clientHeight, behavior: "smooth" });
+      return;
     }
+    if (index === currentRef.current) return;
+    if (isAnimatingRef.current) return;
+    const clamped = Math.max(0, Math.min(index, FP_SECTION_IDS.length - 1));
+    isAnimatingRef.current = true;
+    currentRef.current = clamped;
+    setCurrentSection(clamped);
+    setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[clamped]]));
+    const sectionHeight = container.clientHeight;
+    const wrapper = container.querySelector<HTMLElement>(".fp-wrapper");
+    if (wrapper) {
+      wrapper.style.transition = "transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      wrapper.style.transform = `translateY(-${clamped * sectionHeight}px)`;
+    }
+    setTimeout(() => { isAnimatingRef.current = false; }, 800);
   }, []);
 
   useEffect(() => {
+    if (!content) return;
+    setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[0]]));
+    setCurrentSection(0);
+    currentRef.current = 0;
+
     const container = fpRef.current;
     if (!container) return;
-    const sections = [...container.querySelectorAll<HTMLElement>(".fp-section")];
 
+    if (window.innerWidth > 900) {
+      const wrapper = container.querySelector<HTMLElement>(".fp-wrapper");
+      if (wrapper) {
+        wrapper.style.transform = "translateY(0px)";
+      }
+      return;
+    }
+
+    const sections = [...container.querySelectorAll<HTMLElement>(".fp-section")];
     const obs = new IntersectionObserver(entries => {
+      let best: { idx: number; ratio: number } | null = null;
       entries.forEach(e => {
-        if (e.isIntersecting && (e.intersectionRatio ?? 0) > 0.3) {
+        if (e.isIntersecting) {
           const idx = sections.indexOf(e.target as HTMLElement);
-          if (idx !== -1) {
-            currentRef.current = idx;
-            setCurrentSection(idx);
-            setAnimatedSections(prev => new Set([...prev, e.target.id]));
+          if (idx !== -1 && (!best || e.intersectionRatio > best.ratio)) {
+            best = { idx, ratio: e.intersectionRatio };
           }
         }
       });
-    }, { threshold: [0.3, 0.5], root: container });
+      if (best) {
+        currentRef.current = best.idx;
+        setCurrentSection(best.idx);
+        setAnimatedSections(prev => new Set([...prev, sections[best!.idx].id]));
+      }
+    }, { threshold: [0.3, 0.5, 0.7] });
 
     sections.forEach(s => obs.observe(s));
-
-    // Trigger first section immediately — don't wait for scroll
-    const firstId = sections[0]?.id;
-    if (firstId) {
-      setAnimatedSections(prev => new Set([...prev, firstId]));
-      setCurrentSection(0);
-      currentRef.current = 0;
-    }
-
     return () => obs.disconnect();
   }, [content]);
 
@@ -261,6 +282,14 @@ export default function Landing() {
       } else {
         document.body.style.overflow = "hidden";
         document.documentElement.style.overflow = "hidden";
+        const container = fpRef.current;
+        if (container) {
+          const wrapper = container.querySelector<HTMLElement>(".fp-wrapper");
+          if (wrapper) {
+            wrapper.style.transition = "none";
+            wrapper.style.transform = `translateY(-${currentRef.current * container.clientHeight}px)`;
+          }
+        }
       }
     };
     window.addEventListener("resize", onResize);
@@ -271,22 +300,31 @@ export default function Landing() {
     };
   }, []);
 
-  // Wheel → section scroll (desktop only, re-runs when content loads)
   useEffect(() => {
     if (window.innerWidth <= 900) return;
     const container = fpRef.current;
     if (!container) return;
-    let lastWheel = 0;
-    const THROTTLE = 900;
+
+    let accumulated = 0;
+    const THRESHOLD = 60;
+    let resetTimer: ReturnType<typeof setTimeout> | null = null;
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const now = Date.now();
-      if (now - lastWheel < THROTTLE) return;
-      lastWheel = now;
-      if (e.deltaY > 0) {
-        goToSection(Math.min(currentRef.current + 1, FP_SECTIONS.length - 1));
-      } else if (e.deltaY < 0) {
-        goToSection(Math.max(currentRef.current - 1, 0));
+      if (isAnimatingRef.current) return;
+
+      accumulated += e.deltaY;
+
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { accumulated = 0; }, 200);
+
+      if (Math.abs(accumulated) >= THRESHOLD) {
+        if (accumulated > 0) {
+          goToSection(currentRef.current + 1);
+        } else {
+          goToSection(currentRef.current - 1);
+        }
+        accumulated = 0;
       }
     };
     container.addEventListener("wheel", onWheel, { passive: false });
@@ -408,6 +446,7 @@ export default function Landing() {
 
       {/* ── FULLPAGE CONTAINER ── */}
       <div className="fp-container" ref={fpRef} id="fullpage">
+        <div className="fp-wrapper">
 
         {/* ══════════════════════════════════════
             SECTION 01 — HERO
@@ -1032,6 +1071,7 @@ export default function Landing() {
           </div>
         </section>
 
+        </div>{/* /fp-wrapper */}
       </div>{/* /fp-container */}
     </div>
   );
