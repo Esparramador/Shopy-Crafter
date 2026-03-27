@@ -24,7 +24,8 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Colors**: `--ink:#080810`, `--gold:#c8a84b`, `--jade:#2dd49f`, `--crim:#e84558`
 - **Typography**: Instrument Serif (headings), Geist (body), Geist Mono (code)
 - **Layout**: Fixed 2px gold gradient topline, 220px sidebar, topbar
-- **Responsive Design**: Three breakpoints — Desktop (>900px: fullpage scroll-snap with side dots), Tablet (≤900px: auto-height sections, natural scroll, centered hero), Mobile (≤768px: stacked layouts, contact form reduced padding, hidden cursor). JS breakpoints in Landing.tsx aligned to CSS at 900px. Admin panel: sidebar off-canvas on tablet (601-1024px), horizontal nav bar on mobile (≤600px). Accessibility: `focus-visible`, `aria-label`, `prefers-reduced-motion`.
+- **Custom Cursor**: SCCursor component (`src/components/ui/SCCursor.tsx`) renders a 28px gold circle with "SC" initials + trailing 44px ring. Mounted at App root (App.tsx) so it covers all routes. CSS in `design-system.css` sets `body { cursor: none }` on desktop; `@media (max-width: 900px)` reverts to auto. JS touch detection in component skips animation on touch devices. Hover effect uses JS-driven class toggling (`sc-cursor-hover`, `sc-ring-hover`).
+- **Responsive Design**: Three breakpoints — Desktop (>900px: fullpage scroll-snap with side dots), Tablet (≤900px: auto-height sections, natural scroll, centered hero), Mobile (≤768px: stacked layouts, contact form reduced padding). JS breakpoints in Landing.tsx aligned to CSS at 900px. Admin panel: sidebar off-canvas on tablet (601-1024px), horizontal nav bar on mobile (≤600px). Accessibility: `focus-visible`, `aria-label`, `prefers-reduced-motion`.
 
 ### Database
 PostgreSQL with Drizzle ORM, utilizing over 42 tables for various functionalities including user management, project data, product information, and extensive AI-related memory and insight storage.
@@ -41,7 +42,7 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 - **Coach Marks**: Sequential tooltip system for first-time admin users.
 - **M4 ScriptTag Integration**: For installing and managing tracking pixels.
 - **Push Notifications**: VAPID-based system for user notifications.
-- **CMS Editor**: Visual content editor for landing pages with AI copywriting and version history.
+- **CMS Editor**: Visual content editor for landing pages with AI copywriting and version history. Covers all landing sections: site config (name, tagline, logo, favicon, colors, fonts), navigation (links + CTAs), hero (pill, headline, subheadline, trust badges, CTAs, image), features/motors (icon, title, description, image per motor), stats, how-it-works (steps with descriptions), pricing (4 plans with full feature lists), testimonials (text, metric, author, role, avatar per testimonial), CTA final, and footer (3 columns with link labels + hrefs, badges).
 - **Email Template Studio**: AI-powered editor for professional email templates with brand identity integration and Klaviyo push.
 - **AI-Powered Lead Pre-Report**: Landing form submissions trigger 3 parallel Gemini searches (business, market/competition, SEO) and send a detailed HTML pre-report email to craftershopy@gmail.com via Gmail API. Background processing — doesn't block form response.
 - **Client Invite Flow**: Secure, token-based system for client onboarding.

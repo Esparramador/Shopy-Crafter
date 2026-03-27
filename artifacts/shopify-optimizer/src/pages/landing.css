@@ -42,28 +42,6 @@
   z-index: 9998;
 }
 
-/* CURSOR */
-.l-cursor {
-  width: 8px; height: 8px;
-  background: var(--l-gold2);
-  border-radius: 50%;
-  position: fixed;
-  pointer-events: none;
-  z-index: 10000;
-  mix-blend-mode: difference;
-}
-.l-cursor-ring {
-  width: 32px; height: 32px;
-  border: 1px solid rgba(200,168,75,0.4);
-  border-radius: 50%;
-  position: fixed;
-  pointer-events: none;
-  z-index: 9999;
-  transition: transform 0.12s ease, border-color 0.12s ease;
-}
-.l-root a:hover ~ .l-cursor-ring,
-.l-root button:hover ~ .l-cursor-ring { transform: scale(1.8); border-color: rgba(200,168,75,0.8); }
-
 /* LOADING */
 .l-loading {
   min-height: 100vh;
@@ -883,7 +861,6 @@
   .l-testi-card { padding: 24px; }
   .fp-testi-carousel { perspective: none; }
   .fp-scroll-hint { display: none; }
-  .l-cursor, .l-cursor-ring { display: none; }
   .fp-contact-form { padding: 32px 28px !important; }
   .fp-testi-carousel { height: auto; min-height: 300px; }
 }
@@ -1025,8 +1002,6 @@
   .fp-demo-steps { gap: 16px; }
   .fp-demo-step { gap: 12px; }
 
-  /* Cursor: ocultar en mobile (no tiene sentido) */
-  .l-cursor, .l-cursor-ring { display: none; }
 }
 
 /* ── CMS Preview Mode: click-to-edit hover indicators ── */

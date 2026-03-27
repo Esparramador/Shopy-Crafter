@@ -165,28 +165,13 @@ export default function Landing() {
     }
   };
 
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
   const fpRef = useRef<HTMLDivElement>(null);
-  const mx = useRef(0), my = useRef(0), rx = useRef(0), ry = useRef(0);
   const currentRef = useRef(0);
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/cms/content`).then(r => r.json()).then(setContent).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const move = (e: MouseEvent) => { mx.current = e.clientX; my.current = e.clientY; };
-    document.addEventListener("mousemove", move);
-    let raf: number;
-    const anim = () => {
-      if (cursorRef.current) { cursorRef.current.style.left = (mx.current - 4) + "px"; cursorRef.current.style.top = (my.current - 4) + "px"; }
-      if (ringRef.current) { rx.current += (mx.current - rx.current) * 0.12; ry.current += (my.current - ry.current) * 0.12; ringRef.current.style.left = (rx.current - 16) + "px"; ringRef.current.style.top = (ry.current - 16) + "px"; }
-      raf = requestAnimationFrame(anim);
-    };
-    anim();
-    return () => { document.removeEventListener("mousemove", move); cancelAnimationFrame(raf); };
-  }, []);
 
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
@@ -365,9 +350,6 @@ export default function Landing() {
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
-      <div className="l-cursor" ref={cursorRef}></div>
-      <div className="l-cursor-ring" ref={ringRef}></div>
-
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>

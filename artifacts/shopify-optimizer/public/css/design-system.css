@@ -41,6 +41,14 @@ body {
   line-height: 1.6;
   font-size: 14px;
   overflow-x: hidden;
+  cursor: none;
+}
+@media (max-width: 900px) {
+  body { cursor: auto; }
+}
+a, button, input, select, textarea, [role="button"] { cursor: none; }
+@media (max-width: 900px) {
+  a, button, input, select, textarea, [role="button"] { cursor: auto; }
 }
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -64,6 +72,43 @@ body::after {
   opacity: 0.65;
   z-index: 10001;
   pointer-events: none;
+}
+
+/* ── SC CURSOR (global) ── */
+.sc-cursor {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2, #e6c668));
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 10002;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--fb, 'Geist', sans-serif);
+  font-size: 9px; font-weight: 800;
+  color: #060500;
+  letter-spacing: 0.3px;
+  mix-blend-mode: normal;
+  opacity: 0.95;
+  transition: transform 0.15s ease;
+}
+.sc-cursor-ring {
+  width: 44px; height: 44px;
+  border: 1.5px solid rgba(200,168,75,0.35);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 10001;
+  transition: transform 0.12s ease, border-color 0.12s ease, width 0.2s ease, height 0.2s ease;
+}
+.sc-ring-hover {
+  transform: scale(1.6);
+  border-color: rgba(200,168,75,0.7);
+}
+.sc-cursor-hover {
+  transform: scale(1.15);
+}
+@media (max-width: 900px) {
+  .sc-cursor, .sc-cursor-ring { display: none !important; }
 }
 
 /* ── APP SHELL ── */

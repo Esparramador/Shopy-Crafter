@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import SCCursor from "@/components/ui/SCCursor";
 
 import Home from "@/pages/Home";
 import NewProject from "@/pages/NewProject";
@@ -482,6 +483,7 @@ function App() {
               <OmniChatbot />
             </WouterRouter>
           </AuthProvider>
+          <SCCursor />
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
