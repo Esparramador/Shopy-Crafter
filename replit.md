@@ -62,7 +62,7 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 ### Security
 - AES-256-GCM encryption for credentials.
 - Comprehensive audit logging for all critical actions.
-- Database-backed rate limiting for auth endpoints.
+- Database-backed rate limiting for all endpoints (PostgreSQL store for express-rate-limit with prefixed keys: auth/api/ai, plus route-level DB rate limiting for login in auth.ts).
 - AI API concurrency queues and exponential backoff for retries.
 - Frontend ErrorBoundary and global error handlers.
 - Admin route protection, CORS configuration, and secure session management.

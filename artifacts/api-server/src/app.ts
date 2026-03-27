@@ -9,6 +9,7 @@ import compression from "compression";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
+import { PgRateLimitStore, startRateLimitCleanup } from "./lib/pg-rate-limit-store.js";
 
 const PgSession = ConnectPg(session);
 
@@ -58,12 +59,13 @@ app.use(cors({
   credentials: true,
 }));
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
+// ── Rate limiting (PostgreSQL-backed — persists across restarts) ──────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new PgRateLimitStore("auth"),
   message: { error: "Demasiados intentos. Espera 15 minutos antes de reintentar.", code: "RATE_LIMITED" },
   skip: (req) => process.env.NODE_ENV !== "production",
 });
@@ -73,6 +75,7 @@ const apiLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new PgRateLimitStore("api"),
   message: { error: "Límite de peticiones alcanzado. Inténtalo en un momento.", code: "RATE_LIMITED" },
   skip: (req) => process.env.NODE_ENV !== "production",
 });
@@ -82,9 +85,12 @@ const aiLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new PgRateLimitStore("ai"),
   message: { error: "Demasiadas solicitudes de IA simultáneas. Espera un momento.", code: "AI_RATE_LIMITED" },
   skip: (req) => process.env.NODE_ENV !== "production",
 });
+
+startRateLimitCleanup();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
 // 50mb to support up to 5 base64-encoded high-res images in reference analysis
