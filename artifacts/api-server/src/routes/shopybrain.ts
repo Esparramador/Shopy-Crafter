@@ -2168,7 +2168,8 @@ REGLAS CRÍTICAS:
   Si NO hay datos de mercado, mantén el precio actual o sugiere ajuste basado en el nicho.
 - Responde SOLO el JSON, sin texto adicional`;
 
-        const optimized = await askClaudeJsonWithBrain<{
+        const { dualAIJson } = await import("../lib/dual-ai.js");
+        const dualResult = await dualAIJson<{
           title: string;
           bodyHtml: string;
           tags: string[];
@@ -2183,7 +2184,14 @@ REGLAS CRÍTICAS:
             marketPosition?: string;
             competitorsAnalyzed?: number;
           };
-        }>(parseInt(projectId), optimizePrompt, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 8192);
+        }>(parseInt(projectId), optimizePrompt, {
+          mode: "parallel_synthesis",
+          claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
+          useCase: "seo",
+          niche: project.storeNiche || undefined,
+          maxTokens: 8192,
+        });
+        const optimized = dualResult.data;
 
         const shopifyUpdate: Record<string, unknown> = { id: parseInt(productId) };
         if (optimized.title) shopifyUpdate.title = optimized.title;
@@ -2579,9 +2587,7 @@ JSON: {"collections":[{"title":"Nombre","type":"smart o custom","description":"d
 
         const pageTitle = title || pageTemplates[pageType] || pageType;
 
-        const pageContent = await askClaudeWithBrain(
-          parseInt(projectId),
-          [{ role: "user", content: `Diseña la página "${pageTitle}" para una tienda Shopify PROFESIONAL.
+        const pagePrompt = `Diseña la página "${pageTitle}" para una tienda Shopify PROFESIONAL.
 
 Tienda: ${project.name || "Tienda Online"}
 Nicho: ${project.storeNiche || "general"}
@@ -2602,12 +2608,18 @@ GENERA HTML COMPLETO y PROFESIONAL para esta página. Incluye:
 - NO uses placeholders, lorem ipsum ni [insertar aquí]
 - Incluye CTAs relevantes
 
-Responde SOLO el HTML, sin envolver en \`\`\`html.` }],
-          CLAUDE_EXPERT_SYSTEM,
-          "general",
-          project.storeNiche || undefined,
-          8192
-        );
+Responde SOLO el HTML, sin envolver en \`\`\`html.`;
+
+        const { dualAI } = await import("../lib/dual-ai.js");
+        const dualPage = await dualAI(parseInt(projectId), pagePrompt, {
+          mode: "gemini_research_claude_redact",
+          claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
+          geminiUseSearch: true,
+          maxTokens: 8192,
+          useCase: "ecommerce",
+          niche: project.storeNiche || undefined,
+        });
+        const pageContent = dualPage.final;
 
         const handle = params?.handle || pageTitle.toLowerCase().replace(/[^a-z0-9áéíóúñü]+/gi, "-").replace(/^-|-$/g, "");
 
@@ -2754,7 +2766,8 @@ SOLO HTML.` }],
           }
 
           try {
-            const altTexts = await askClaudeJsonWithBrain<{ alts: string[] }>(
+            const { dualAIJson: dualImgJson } = await import("../lib/dual-ai.js");
+            const imgDual = await dualImgJson<{ alts: string[] }>(
               parseInt(projectId),
               `Genera alt texts SEO profesionales para las ${images.length} imágenes de este producto Shopify.
 
@@ -2770,8 +2783,10 @@ Genera un alt text descriptivo y SEO para cada imagen. Los alt texts deben:
 - Estar en español
 
 JSON: {"alts":["alt text imagen 1","alt text imagen 2",...]}
-Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images", project.storeNiche || undefined, 2048
+Genera exactamente ${images.length} alt texts.`,
+              { claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM, useCase: "images", niche: project.storeNiche || undefined, maxTokens: 2048 }
             );
+            const altTexts = imgDual.data;
 
             if (altTexts.alts && altTexts.alts.length > 0) {
               const imageUpdates = images.map((img, i) => ({
@@ -2858,7 +2873,7 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
         const syncToShopify = params?.syncToShopify !== false;
 
         try {
-          const researchPrompt = `INVESTIGA el mercado REAL de pricing para agencias y plataformas SaaS de optimización Shopify / eCommerce en 2025-2026.
+          const pricingPrompt = `INVESTIGA el mercado REAL de pricing para agencias y plataformas SaaS de optimización Shopify / eCommerce en 2025-2026.
 
 INDUSTRIA: ${industry}
 
@@ -2868,43 +2883,13 @@ BUSCA precios REALES de:
 3. Servicios de IA para eCommerce (Claude, ChatGPT wrappers, automated tools)
 4. Competidores directos: Shogun, PageFly, Privy, Klaviyo, Yotpo, Bold Commerce, Nosto, etc.
 
-Para cada competidor encontrado:
-- Nombre de la empresa/servicio
-- Rango de precios (plan mínimo a máximo)
-- Qué incluye cada plan
-- URL si disponible
-
-RESPONDE SOLO JSON válido:
-{
-  "competitors": [{"name": "...", "plans": [{"name": "...", "price": "...", "features": ["..."]}], "url": "..."}],
-  "marketRange": {"low": X, "mid": X, "high": X, "enterprise": X},
-  "insights": "análisis del mercado y recomendaciones de posicionamiento",
-  "positioning": "cómo posicionar ShopyBrain competitivamente"
-}`;
-
-          const marketResearch = await askGeminiWithSearch(researchPrompt,
-            "You are a pricing strategy consultant specializing in SaaS and eCommerce. Search for REAL current pricing from actual companies. Return ONLY valid JSON."
-          );
-
-          let marketData: Record<string, unknown> = {};
-          try {
-            const jsonM = marketResearch.text.match(/\{[\s\S]*\}/);
-            if (jsonM) marketData = JSON.parse(jsonM[0]);
-          } catch { /* continue with AI generation */ }
-
-          const generatePrompt = `Eres un ESTRATEGA DE PRICING de agencia premium Shopify. 
-Datos del mercado real investigado:
-${JSON.stringify(marketData).slice(0, 3000)}
-
-Fuentes consultadas: ${(marketResearch.sources || []).join(", ")}
-
-GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para ShopyBrain (plataforma de agencia Shopify con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
+Luego GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para ShopyBrain (plataforma de agencia Shopify con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
 
 REQUISITOS:
 1. Los precios deben ser COMPETITIVOS con el mercado real investigado
 2. Incluye planes desde entrada hasta enterprise
 3. Cada plan debe tener un DIFERENCIADOR claro
-4. Features deben ser REALES (no inventados) — basados en las capacidades reales de ShopyBrain
+4. Features deben ser REALES — basados en capacidades reales de ShopyBrain
 5. Usa pricing psicológico (precios que terminan en 7 o 9)
 6. Incluye al menos un plan "one-shot" o pago único
 7. El plan más popular debe ser el de mejor relación calidad/precio
@@ -2921,9 +2906,7 @@ RESPONDE SOLO JSON válido con un array "plans":
       "period": "por mes · + €XXX setup único",
       "featured": false,
       "badge": null,
-      "features": [
-        {"text": "Feature description", "included": true}
-      ],
+      "features": [{"text": "Feature description", "included": true}],
       "cta": {"label": "Solicitar Plan →", "style": "ghost"},
       "shopifyProductTitle": "ShopyBrain - Nombre Plan (Mensual)",
       "shopifyProductDescription": "Descripción completa para Shopify..."
@@ -2933,7 +2916,8 @@ RESPONDE SOLO JSON válido con un array "plans":
   "marketPosition": "Dónde se posiciona ShopyBrain vs competencia"
 }`;
 
-          const plansResult = await askClaudeJsonWithBrain<{
+          const { dualAIJson } = await import("../lib/dual-ai.js");
+          const dualPricing = await dualAIJson<{
             plans: Array<{
               id: string; name: string; price: string; currency: string; period: string;
               featured: boolean; badge: string | null;
@@ -2944,14 +2928,14 @@ RESPONDE SOLO JSON válido con un array "plans":
             }>;
             strategy?: string;
             marketPosition?: string;
-          }>(
-            projectId ? parseInt(String(projectId)) : 0,
-            generatePrompt,
-            "Eres un consultor de pricing SaaS con 15 años de experiencia en agencias Shopify. Generas catálogos de precios que maximizan conversión y revenue. Responde SOLO JSON válido.",
-            "pricing_science",
-            undefined,
-            4000
-          );
+          }>(projectId ? parseInt(String(projectId)) : 0, pricingPrompt, {
+            mode: "gemini_research_claude_redact",
+            claudeSystemPrompt: "Eres un consultor de pricing SaaS con 15 años de experiencia en agencias Shopify. Generas catálogos de precios que maximizan conversión y revenue. Responde SOLO JSON válido.",
+            geminiUseSearch: true,
+            useCase: "pricing",
+            maxTokens: 4000,
+          });
+          const plansResult = dualPricing.data;
 
           if (!plansResult?.plans?.length) {
             result = { error: true, message: "No se pudieron generar planes de precio. Inténtalo de nuevo." };
@@ -3033,8 +3017,8 @@ RESPONDE SOLO JSON válido con un array "plans":
             shopifyProducts,
             strategy: plansResult.strategy || "",
             marketPosition: plansResult.marketPosition || "",
-            competitorsAnalyzed: (marketData as { competitors?: unknown[] }).competitors?.length ?? 0,
-            sources: marketResearch.sources || [],
+            dualAIMode: dualPricing.mode,
+            dualAITimings: dualPricing.timings,
             message: `🎯 ${plansResult.plans.length} planes generados y guardados en CMS${shopifyProducts.length > 0 ? ` + ${shopifyProducts.length} productos creados en Shopify` : ""}.\n\n📊 Planes:\n${plansResult.plans.map((p, i) => `${i + 1}. **${p.name}** — ${p.price}${p.currency || "€"} ${p.period}${p.badge ? ` [${p.badge}]` : ""}`).join("\n")}\n\n🧠 Estrategia: ${plansResult.strategy || "Pricing competitivo basado en investigación de mercado"}`,
           };
         } catch (err) {

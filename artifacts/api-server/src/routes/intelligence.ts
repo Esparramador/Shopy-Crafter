@@ -257,14 +257,16 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
 }`;
 
   try {
-    const text = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: prompt }],
-      `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations.`,
-      "general",
-      project.storeNiche ?? undefined,
-      4096
-    );
+    const { dualAI } = await import("../lib/dual-ai.js");
+    const dualResult = await dualAI(projectId, prompt, {
+      mode: "gemini_research_claude_redact",
+      claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations.`,
+      geminiUseSearch: true,
+      maxTokens: 4096,
+      niche: project.storeNiche ?? undefined,
+      useCase: "intelligence",
+    });
+    const text = dualResult.final;
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     const profile = match ? JSON.parse(match[1] ?? match[0]) : { executiveSummary: text };
 
@@ -471,16 +473,18 @@ Return JSON:
 }`;
 
   try {
-    const text = await askClaudeWithBrain(
-      parseInt(projectId),
-      [{ role: "user", content: prompt }],
-      `${SHOPIFY_EXPERT_SYSTEM} You are also a revenue attribution expert and growth analyst. Identify which AI optimizations generated the most measurable revenue impact and provide specific, data-backed recommendations.`,
-      "general",
-      project?.storeNiche ?? undefined
-    );
+    const { dualAI: dualRevenue } = await import("../lib/dual-ai.js");
+    const dualResult = await dualRevenue(parseInt(projectId), prompt, {
+      mode: "parallel_synthesis",
+      claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are also a revenue attribution expert and growth analyst. Identify which AI optimizations generated the most measurable revenue impact and provide specific, data-backed recommendations.`,
+      geminiUseSearch: true,
+      useCase: "intelligence",
+      niche: project?.storeNiche ?? undefined,
+    });
+    const text = dualResult.final;
     const match = text.match(/\{[\s\S]*\}/);
     const analysis = match ? JSON.parse(match[0]) : { summary: text, topInsights: [], recommendations: [] };
-    res.json({ analysis, projectId, analyzedAt: new Date().toISOString() });
+    res.json({ analysis, projectId, analyzedAt: new Date().toISOString(), dualAI: { mode: dualResult.mode, timings: dualResult.timings } });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
