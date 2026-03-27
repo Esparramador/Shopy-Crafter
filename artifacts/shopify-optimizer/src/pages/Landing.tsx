@@ -210,6 +210,9 @@ export default function Landing() {
       wrapper.style.transition = "transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
       wrapper.style.transform = `translateY(-${clamped * sectionHeight}px)`;
     }
+    const sections = container.querySelectorAll<HTMLElement>(".fp-section");
+    const targetSection = sections[clamped];
+    if (targetSection) targetSection.scrollTop = 0;
     setTimeout(() => { isAnimatingRef.current = false; }, 800);
   }, []);
 
@@ -316,9 +319,19 @@ export default function Landing() {
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
     const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (isAnimatingRef.current) return;
+      if (isAnimatingRef.current) { e.preventDefault(); return; }
 
+      const sections = container.querySelectorAll<HTMLElement>(".fp-section");
+      const currentEl = sections[currentRef.current];
+      if (currentEl && currentEl.scrollHeight > currentEl.clientHeight + 2) {
+        const atTop = currentEl.scrollTop <= 0;
+        const atBottom = currentEl.scrollTop + currentEl.clientHeight >= currentEl.scrollHeight - 2;
+        if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
+          return;
+        }
+      }
+
+      e.preventDefault();
       accumulated += e.deltaY;
 
       if (resetTimer) clearTimeout(resetTimer);
