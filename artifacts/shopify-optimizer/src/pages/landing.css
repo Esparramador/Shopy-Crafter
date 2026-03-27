@@ -1063,7 +1063,11 @@
    CALCULATOR SECTION
 ══════════════════════════════════════ */
 #fp-calculator,
-#fp-contact { overflow-y: auto; justify-content: flex-start; }
+#fp-contact { justify-content: flex-start; }
+@media (min-width: 901px) {
+  #fp-calculator,
+  #fp-contact { overflow-y: auto; }
+}
 #fp-calculator .fp-content { padding-top: 60px; padding-bottom: 60px; }
 #fp-contact .fp-content { padding-top: 60px; padding-bottom: 40px; }
 .fp-calc-grid {
