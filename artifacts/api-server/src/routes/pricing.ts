@@ -451,6 +451,157 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
   });
 });
 
+// ── AI COGS AUTO-ESTIMATION ────────────────────────────────────────────────────
+router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+  const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+
+  if (!product || !project) {
+    res.status(404).json({ error: "Producto o proyecto no encontrado" });
+    return;
+  }
+
+  let shopifyDetails = "";
+  try {
+    const live = await shopifyRequest<{ product: Record<string, unknown> }>(
+      projectId, project.shopDomain, `/products/${shopifyProductId}.json`
+    );
+    const p = live.product;
+    const variants = (p.variants as Array<Record<string, unknown>>) || [];
+    const weight = variants[0]?.weight ? `${variants[0].weight} ${variants[0].weight_unit || "g"}` : "desconocido";
+    shopifyDetails = `
+Peso del producto: ${weight}
+SKU: ${variants[0]?.sku || "sin SKU"}
+Barcode: ${variants[0]?.barcode || "sin barcode"}
+Vendor: ${p.vendor || "desconocido"}
+Tipo de producto: ${p.product_type || "sin tipo"}
+Variantes: ${variants.length} (precios: ${variants.map((v: Record<string, unknown>) => `€${v.price}`).join(", ")})
+`;
+  } catch {}
+
+  const prompt = `Eres un experto en costes de producción, logística, fabricación, materiales, envíos e impuestos con 20 años de experiencia.
+
+PRODUCTO A ANALIZAR:
+- Título: "${product.title}"
+- Precio de venta: €${product.price || "sin configurar"}
+- Tipo: ${product.productType || "sin definir"}
+- Vendor: ${product.vendor || "sin definir"}
+- Imágenes: ${product.imageCount || 0}
+- Tags: ${product.tags || "ninguno"}
+- Tienda: "${project.name}" (Nicho: ${project.storeNiche || "e-commerce"})
+- Mercados: ${project.storeMarkets || "España"}
+${shopifyDetails}
+
+Tu tarea es ESTIMAR todos los costes de producción y operación basándote en DATOS REALES del mercado.
+Usa tu conocimiento de:
+- Costes reales de materiales (madera, textiles, resina, PLA, ABS, PVA, PETG, nylon, metacrilato, metal, cristal, cerámica, papel, cartón, etc.)
+- Costes de impresión 3D (FDM, SLA, SLS) — tiempo de máquina, electricidad, material, post-procesado
+- Costes de APIs de IA (Tripo3D ~$0.50-2/modelo, Meshy ~$0.30-1/modelo, Midjourney, DALL-E, etc.)
+- Tarifas reales de envío: Correos (2-5€ nacional), SEUR (4-8€), Nacex (5-9€), FedEx (8-15€ nacional, 15-40€ internacional), DHL, UPS, MRW, GLS
+- Peso medio de paquetes según tipo de producto
+- Costes de embalaje (cajas, burbujas, relleno, cinta, etiquetas) — 0.30-2€ según tamaño
+- Costes de plataforma Shopify (2.9% + 0.30€ por transacción en plan Basic)
+- IVA España 21%, impuesto sociedades 25%
+- Aranceles y aduanas para importación (si aplica por el tipo de producto)
+- Costes de almacén (0.50-3€/m³/día según ubicación)
+- Tasas de devolución e-commerce (~5-15% según nicho)
+- Marketing digital medio (CAC €5-30 según nicho)
+
+IMPORTANTE: Proporciona DOS escenarios:
+1. "ownEquipment" — Producción propia (impresora 3D propia, taller propio, etc.)
+   - Amortización de equipos (ej: impresora 3D €300-1500, amortizada en 500-2000 unidades)
+   - Solo coste de material + electricidad + tiempo
+2. "externalService" — Servicio externo (encargado a empresa de fabricación/impresión)
+   - Precios de servicios profesionales de impresión 3D (3-15€/pieza según tamaño)
+   - Precios de fabricación por encargo
+
+Para CADA escenario, estima estos campos (en euros, por unidad):
+- unitCost: coste unitario de producción del producto
+- materialCost: coste de materiales (marcos, componentes, materia prima)
+- fabricCost: tejidos/telas (si aplica, sino 0)
+- printingCost: impresión digital/3D (si aplica)
+- screenPrintingCost: serigrafía (si aplica, sino 0)
+- moldAmortization: amortización de moldes/utillajes
+- assemblyCost: montaje/ensamblaje
+- laborCostPerUnit: mano de obra por unidad
+- qualityControlCost: control de calidad
+- packagingCost: embalaje completo (caja + protección + presentación)
+- labelCost: etiquetas/pegatinas
+- shippingCostDomestic: envío nacional medio (promedio transportistas)
+- shippingCostInternational: envío internacional medio
+- fulfillmentFee: preparación de pedido
+- warehouseCostPerUnit: almacén por unidad
+- customsDuty: aranceles (si importación)
+- insuranceCost: seguro de envío
+- returnRate: tasa de devolución (como decimal, ej: 0.08)
+- returnProcessingCost: coste de procesar una devolución
+- shopifyPaymentFee: comisión Shopify (como decimal, ej: 0.029)
+- shopifyPlanCostPerOrder: coste del plan por pedido
+- paymentProcessingFee: comisión pasarela de pago
+- platformCommission: comisión marketplace
+- cac: coste de adquisición de cliente
+- affiliateFee: comisión afiliados
+- digitalMarketingCost: marketing digital por unidad
+- influencerCostPerUnit: influencers por unidad
+- seoCostPerUnit: SEO por unidad
+- vatRate: tipo de IVA (como decimal, ej: 0.21)
+- corporateTaxRate: impuesto sociedades (decimal)
+- consultingFee: asesoría
+- legalCostPerUnit: legal por unidad
+- aiApiCostPerUnit: APIs de IA por unidad
+- designCostPerUnit: diseño gráfico por unidad
+- overheadPerUnit: gastos generales por unidad
+
+También incluye:
+- reasoning: explicación detallada de por qué estimas cada coste
+- shippingBreakdown: desglose por transportista { carrier: string, domestic: number, international: number, estimatedWeight: string }[]
+- materialBreakdown: desglose de materiales { material: string, costPerUnit: number, notes: string }[]
+- productionMethod: método de producción identificado (ej: "Impresión 3D FDM", "Fabricación textil", "Artesanía manual", etc.)
+- colorComplexity: complejidad de color ("monocolor", "bicolor", "multicolor_completo") y cómo afecta al coste
+
+Devuelve JSON con: { ownEquipment: { ...todos los campos }, externalService: { ...todos los campos }, reasoning: string, shippingBreakdown: [...], materialBreakdown: [...], productionMethod: string, colorComplexity: string, confidenceLevel: "high"|"medium"|"low" }
+
+SÉ PRECISO. Usa datos REALES del mercado español/europeo. No inventes — estima basándote en tu conocimiento real de costes industriales y logísticos.
+Responde SOLO el JSON.`;
+
+  let estimated;
+  try {
+    estimated = await askClaudeJsonWithBrain<{
+      ownEquipment: Record<string, number>;
+      externalService: Record<string, number>;
+      reasoning: string;
+      shippingBreakdown: Array<{ carrier: string; domestic: number; international: number; estimatedWeight: string }>;
+      materialBreakdown: Array<{ material: string; costPerUnit: number; notes: string }>;
+      productionMethod: string;
+      colorComplexity: string;
+      confidenceLevel: string;
+    }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "cogs_estimation", project.storeNiche ?? undefined, 8192);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ error: `Error al estimar costes con IA: ${msg}` });
+    return;
+  }
+
+  learnFromOperation({
+    operationType: "cogs_estimation",
+    niche: project.storeNiche ?? null,
+    productType: product.productType ?? null,
+    title: `COGS estimado IA: ${product.title}`,
+    content: `Estimación COGS para "${product.title}" (${estimated.productionMethod ?? "desconocido"}): Propio €${estimated.ownEquipment?.unitCost ?? "?"}, Externo €${estimated.externalService?.unitCost ?? "?"}. Materiales: ${estimated.materialBreakdown?.map(m => `${m.material}: €${m.costPerUnit}`).join(", ") ?? "N/A"}. Color: ${estimated.colorComplexity ?? "N/A"}. Confianza: ${estimated.confidenceLevel ?? "N/A"}.`,
+    confidence: estimated.confidenceLevel === "high" ? 0.85 : estimated.confidenceLevel === "medium" ? 0.65 : 0.45,
+    tags: ["cogs", "estimation", "ai", product.productType ?? "general"],
+  });
+
+  res.json({
+    productId: shopifyProductId,
+    productTitle: product.title,
+    ...estimated,
+  });
+});
+
 // ── T001: SIMULADOR DE PRECIO ─────────────────────────────────────────────────
 router.post("/projects/:projectId/products/:productId/price-simulator", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);

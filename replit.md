@@ -51,8 +51,9 @@ A three-model pipeline (Gemini → Claude → OmniCore) integrated with image ge
 - **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, real price research, SEO metafields, and AI-generated images. Supports image-to-product creation via chat.
 - **Supplier Research System**: AI-driven intelligence for supplier identification and cost analysis.
 - **Universal Export System**: Comprehensive hub for various report types and data exports.
-- **Price Simulator & P&L Forecast**: Tools for financial analysis, including scenario simulation, price elasticity calculation, and multi-month forecasts.
-- **Comprehensive COGS System**: Detailed cost of goods sold tracking across multiple categories.
+- **Price Simulator & P&L Forecast**: Tools for financial analysis, including scenario simulation, price elasticity calculation, and multi-month forecasts. Auto-fetches COGS via AI if none saved before simulating.
+- **Comprehensive COGS System**: Detailed cost of goods sold tracking across multiple categories. AI auto-estimation via Claude (dual scenarios: own equipment vs external service) with material breakdown, shipping tariffs by carrier, production method, color complexity, and confidence level.
+- **Partial Redesign**: Users can select which parts to redesign (title, description, price, tags, SEO meta, photo briefs) instead of rewriting everything. Field mapping aligns frontend keys (bodyHtml, metafields) to backend keys (description, meta) for apply-redesign.
 - **Knowledge Graph Visualization**: Interactive D3.js graph to visualize knowledge domains and insights.
 - **Automated Cron Jobs**: Twelve tasks for continuous learning, data consolidation, and operational intelligence, with AI fallback.
 

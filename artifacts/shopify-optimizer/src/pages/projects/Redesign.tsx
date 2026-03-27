@@ -176,11 +176,43 @@ export default function RedesignPage() {
     title: string;
     briefs: string[];
   } | null>(null);
+  const [partialConfig, setPartialConfig] = useState<Record<string, Set<string>>>({});
+  const [showPartialFor, setShowPartialFor] = useState<string | null>(null);
+
+  const REDESIGN_PARTS = [
+    { key: "title", label: "Título SEO", icon: "📝" },
+    { key: "bodyHtml", label: "Descripción", icon: "📄" },
+    { key: "price", label: "Precio", icon: "💰" },
+    { key: "tags", label: "Tags", icon: "🏷" },
+    { key: "metafields", label: "SEO Meta", icon: "🔍" },
+    { key: "photoBriefs", label: "Photo Briefs", icon: "📸" },
+  ];
+
+  const getSelectedParts = (productId: string) => {
+    const parts = partialConfig[productId];
+    if (!parts || parts.size === 0) return REDESIGN_PARTS.map(p => p.key);
+    return Array.from(parts);
+  };
+
+  const togglePart = (productId: string, part: string) => {
+    setPartialConfig(prev => {
+      const current = prev[productId] || new Set(REDESIGN_PARTS.map(p => p.key));
+      const next = new Set(current);
+      if (next.has(part)) {
+        if (next.size > 1) next.delete(part);
+      } else {
+        next.add(part);
+      }
+      return { ...prev, [productId]: next };
+    });
+  };
 
   const handleRedesign = (productId: string) => {
     setActiveRedesign(productId);
+    setShowPartialFor(null);
+    const parts = getSelectedParts(productId);
     redesign.mutate(
-      { projectId, productId },
+      { projectId, productId, data: { parts } as any },
       {
         onSuccess: (res) => {
           setRedesignResults((prev) => ({ ...prev, [productId]: res as unknown as RedesignResult }));
@@ -196,11 +228,21 @@ export default function RedesignPage() {
   };
 
   const handleApply = (productId: string) => {
+    const selectedParts = getSelectedParts(productId);
+    const fieldMap: Record<string, string> = {
+      title: "title",
+      bodyHtml: "description",
+      price: "price",
+      tags: "tags",
+      metafields: "meta",
+      photoBriefs: "photoBriefs",
+    };
+    const applyFields = selectedParts.map(p => fieldMap[p] || p).filter(Boolean);
     apply.mutate(
       {
         projectId,
         productId,
-        data: { fields: ["title", "bodyHtml", "price", "tags", "metafields"] },
+        data: { fields: applyFields },
       },
       {
         onSuccess: () => {
@@ -352,18 +394,72 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
                   </div>
 
                   {!result && (
-                    <button
-                      onClick={() => handleRedesign(product.id)}
-                      disabled={isRedesigning}
-                      className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50 w-fit"
-                    >
-                      {isRedesigning ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Wand2 className="w-4 h-4" />
-                      )}
-                      {isRedesigning ? "Claude pensando..." : "Generar Rediseño"}
-                    </button>
+                    <div className="space-y-3">
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => handleRedesign(product.id)}
+                          disabled={isRedesigning}
+                          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50"
+                        >
+                          {isRedesigning ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Wand2 className="w-4 h-4" />
+                          )}
+                          {isRedesigning ? "Claude pensando..." : "Rediseño Completo"}
+                        </button>
+                        <button
+                          onClick={() => setShowPartialFor(showPartialFor === product.id ? null : product.id)}
+                          className="bg-white/5 border border-white/10 text-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2"
+                        >
+                          {showPartialFor === product.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          Rediseño Parcial
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {showPartialFor === product.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="bg-black/20 border border-white/5 rounded-xl p-3 space-y-2">
+                              <p className="text-[11px] text-muted-foreground">Selecciona qué partes rediseñar:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {REDESIGN_PARTS.map(part => {
+                                  const selected = partialConfig[product.id]
+                                    ? partialConfig[product.id].has(part.key)
+                                    : true;
+                                  return (
+                                    <button
+                                      key={part.key}
+                                      onClick={() => togglePart(product.id, part.key)}
+                                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                                        selected
+                                          ? "bg-primary/20 text-primary border-primary/30"
+                                          : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10"
+                                      }`}
+                                    >
+                                      <span>{part.icon}</span>
+                                      {part.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <button
+                                onClick={() => handleRedesign(product.id)}
+                                disabled={isRedesigning}
+                                className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50 w-full justify-center mt-2"
+                              >
+                                {isRedesigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                                Rediseñar Selección
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   )}
                 </div>
 

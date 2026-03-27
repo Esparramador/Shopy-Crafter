@@ -850,20 +850,20 @@ export default function AuditPage() {
 
   const optimizeProduct = async (shopifyProductId: string) => {
     setOptimizingId(shopifyProductId);
-    setOptimizeMsg(null);
+    setOptimizeMsg({ text: "Optimizando con IA... esto puede tardar 30-60 segundos", ok: true });
     try {
-      const res = await fetch(`${API}/api/shopybrain/action`, {
+      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "optimize_product", params: { projectId, productId: shopifyProductId } }),
+        body: JSON.stringify({ action: "optimize_product", params: { projectId: String(projectId), productId: shopifyProductId } }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error optimizando");
-      setOptimizeMsg({ text: `"${data.title}" optimizado con IA`, ok: true });
+      setOptimizeMsg({ text: data.message || `"${data.title}" optimizado con IA`, ok: true });
       refetch();
     } catch (e: unknown) {
-      setOptimizeMsg({ text: e instanceof Error ? e.message : "Error", ok: false });
+      setOptimizeMsg({ text: e instanceof Error ? e.message : "Error optimizando producto", ok: false });
     } finally {
       setOptimizingId(null);
     }
@@ -871,13 +871,13 @@ export default function AuditPage() {
 
   const optimizeAll = async () => {
     setBulkOptimizing(true);
-    setOptimizeMsg(null);
+    setOptimizeMsg({ text: "Optimizando todos los productos con IA... esto puede tardar varios minutos", ok: true });
     try {
-      const res = await fetch(`${API}/api/shopybrain/action`, {
+      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "optimize_all_products", params: { projectId, limit: 25 } }),
+        body: JSON.stringify({ action: "optimize_all_products", params: { projectId: String(projectId), limit: 25 } }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error en optimización masiva");

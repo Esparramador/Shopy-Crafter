@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
-import { eq, and, lte } from "drizzle-orm";
+import { eq, and, lte, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
@@ -99,6 +99,7 @@ Genera un rediseño COMPLETO y profesional. Devuelve SOLO un JSON con estos camp
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+  const parts: string[] | undefined = req.body?.parts;
 
   const [product] = await db
     .select()
@@ -111,6 +112,27 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
   }
 
   const result = await doRedesign(projectId, shopifyProductId);
+
+  if (parts && parts.length > 0 && parts.length < 6) {
+    const allParts = ["title", "bodyHtml", "price", "tags", "metafields", "photoBriefs"];
+    for (const key of allParts) {
+      if (!parts.includes(key)) {
+        if (key === "title") result.title = product.title;
+        if (key === "bodyHtml" || key === "body_html") result.body_html = product.bodyHtml ?? "";
+        if (key === "price") {
+          result.price = product.price ?? "0";
+          result.compare_at_price = "";
+          result.price_reasoning = "Precio original mantenido (no incluido en rediseño parcial)";
+        }
+        if (key === "tags") result.tags = product.tags ?? "";
+        if (key === "metafields") {
+          result.meta_title = "";
+          result.meta_description = "";
+        }
+        if (key === "photoBriefs") result.photo_brief = [];
+      }
+    }
+  }
 
   await db.insert(redesignsTable).values({
     projectId,
@@ -195,7 +217,7 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     .select()
     .from(redesignsTable)
     .where(and(eq(redesignsTable.projectId, projectId), eq(redesignsTable.shopifyProductId, shopifyProductId)))
-    .orderBy(redesignsTable.createdAt)
+    .orderBy(desc(redesignsTable.createdAt))
     .limit(1);
 
   if (!project || !redesign) {

@@ -161,6 +161,60 @@ function CogsModal({
     reasoning?: string;
   } | null>(null);
 
+  const [aiEstimating, setAiEstimating] = useState(false);
+  const [aiEstimate, setAiEstimate] = useState<{
+    ownEquipment: Record<string, number>;
+    externalService: Record<string, number>;
+    reasoning: string;
+    shippingBreakdown?: Array<{ carrier: string; domestic: number; international: number; estimatedWeight: string }>;
+    materialBreakdown?: Array<{ material: string; costPerUnit: number; notes: string }>;
+    productionMethod?: string;
+    colorComplexity?: string;
+    confidenceLevel?: string;
+  } | null>(null);
+  const [activeScenario, setActiveScenario] = useState<"ownEquipment" | "externalService">("ownEquipment");
+
+  const handleAiEstimate = async () => {
+    setAiEstimating(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/ai-estimate-cogs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Error estimando costes");
+      const data = await res.json();
+      setAiEstimate(data);
+      const scenario = data.ownEquipment || {};
+      const newCogs: Record<string, string> = { ...cogs };
+      for (const k of allKeys) {
+        if (scenario[k] != null) {
+          newCogs[k] = String(scenario[k]);
+        }
+      }
+      setCogs(newCogs);
+      setExpandedCats(new Set(COST_CATEGORIES.map(c => c.id)));
+      toast({ title: "Costes estimados por IA — revisa y ajusta" });
+    } catch {
+      toast({ title: "Error estimando costes con IA", variant: "destructive" });
+    } finally {
+      setAiEstimating(false);
+    }
+  };
+
+  const applyScenario = (scenario: "ownEquipment" | "externalService") => {
+    if (!aiEstimate) return;
+    setActiveScenario(scenario);
+    const data = aiEstimate[scenario] || {};
+    const newCogs: Record<string, string> = { ...cogs };
+    for (const k of allKeys) {
+      if (data[k] != null) {
+        newCogs[k] = String(data[k]);
+      }
+    }
+    setCogs(newCogs);
+  };
+
   const toggleCat = (id: string) => {
     setExpandedCats(prev => {
       const next = new Set(prev);
@@ -251,6 +305,76 @@ function CogsModal({
         </div>
 
         <div className="p-5 space-y-3">
+          <div className="border border-primary/30 rounded-xl p-4 bg-primary/[0.03]">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-3">
+              <button
+                onClick={handleAiEstimate}
+                disabled={aiEstimating}
+                className="flex-1 w-full sm:w-auto bg-primary text-white py-2.5 px-4 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {aiEstimating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+                {aiEstimating ? "Analizando producto..." : "Auto-estimar con IA"}
+              </button>
+              {aiEstimate && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => applyScenario("ownEquipment")}
+                    className={`flex-1 sm:flex-none text-xs px-3 py-2 rounded-lg border transition-colors ${activeScenario === "ownEquipment" ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10"}`}
+                  >
+                    Equipo Propio
+                  </button>
+                  <button
+                    onClick={() => applyScenario("externalService")}
+                    className={`flex-1 sm:flex-none text-xs px-3 py-2 rounded-lg border transition-colors ${activeScenario === "externalService" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10"}`}
+                  >
+                    Servicio Externo
+                  </button>
+                </div>
+              )}
+            </div>
+            {aiEstimate && (
+              <div className="space-y-2">
+                {aiEstimate.productionMethod && (
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md border border-primary/20">{aiEstimate.productionMethod}</span>
+                    {aiEstimate.colorComplexity && <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md border border-white/10">{aiEstimate.colorComplexity}</span>}
+                    {aiEstimate.confidenceLevel && <span className={`px-2 py-0.5 rounded-md border ${aiEstimate.confidenceLevel === "high" ? "bg-green-500/10 text-green-400 border-green-500/20" : aiEstimate.confidenceLevel === "medium" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>{aiEstimate.confidenceLevel === "high" ? "Alta confianza" : aiEstimate.confidenceLevel === "medium" ? "Confianza media" : "Confianza baja"}</span>}
+                  </div>
+                )}
+                {aiEstimate.materialBreakdown && aiEstimate.materialBreakdown.length > 0 && (
+                  <div className="bg-black/20 rounded-lg p-3 border border-white/5">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Desglose de Materiales</p>
+                    {aiEstimate.materialBreakdown.map((m, i) => (
+                      <div key={i} className="flex justify-between text-[11px] py-0.5">
+                        <span className="text-muted-foreground">{m.material}</span>
+                        <span className="text-foreground font-medium">{formatCurrency(m.costPerUnit)} <span className="text-muted-foreground">{m.notes}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {aiEstimate.shippingBreakdown && aiEstimate.shippingBreakdown.length > 0 && (
+                  <div className="bg-black/20 rounded-lg p-3 border border-white/5">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Tarifas por Transportista</p>
+                    {aiEstimate.shippingBreakdown.map((s, i) => (
+                      <div key={i} className="flex justify-between text-[11px] py-0.5">
+                        <span className="text-muted-foreground">{s.carrier} ({s.estimatedWeight})</span>
+                        <span className="text-foreground font-medium">Nacional: {formatCurrency(s.domestic)} · Int: {formatCurrency(s.international)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {aiEstimate.reasoning && (
+                  <details className="text-[11px]">
+                    <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">Ver razonamiento completo</summary>
+                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap bg-black/20 rounded-lg p-3 border border-white/5 max-h-32 overflow-y-auto">{aiEstimate.reasoning}</p>
+                  </details>
+                )}
+              </div>
+            )}
+            {!aiEstimate && !aiEstimating && (
+              <p className="text-[11px] text-muted-foreground">ShopyBrain analiza el producto, materiales, logística, y estima todos los costes automáticamente. Proporciona 2 escenarios: equipo propio vs servicio externo.</p>
+            )}
+          </div>
           {COST_CATEGORIES.map(cat => {
             const catTotal = categoryTotals.find(c => c.id === cat.id)?.total ?? 0;
             const isExpanded = expandedCats.has(cat.id);
@@ -422,7 +546,7 @@ function CogsModal({
               {saveCogs.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Guardar Costes
             </button>
-            <button onClick={handleCalcOptimal} disabled={calcOptimal.isPending || subtotal === 0}
+            <button onClick={handleCalcOptimal} disabled={calcOptimal.isPending}
               className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               {calcOptimal.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4" />}
               Calcular Precio Óptimo
@@ -473,19 +597,60 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
   const [units, setUnits] = useState("30");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [estimatingCogs, setEstimatingCogs] = useState(false);
+  const { toast } = useToast();
 
   const simulate = async () => {
     setLoading(true);
     try {
+      const cogsRes = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/cogs`, { credentials: "include" });
+      if (cogsRes.ok) {
+        const cogsData = await cogsRes.json();
+        if (!cogsData?.totalCogs || cogsData.totalCogs === 0) {
+          setEstimatingCogs(true);
+          toast({ title: "Sin COGS guardados — estimando con IA..." });
+          try {
+            const estRes = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/ai-estimate-cogs`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+            });
+            if (estRes.ok) {
+              const estimate = await estRes.json();
+              const scenario = estimate.ownEquipment || {};
+              scenario.finalPrice = product.price ?? 0;
+              const saveRes = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/cogs`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify(scenario),
+              });
+              if (saveRes.ok) {
+                toast({ title: "COGS estimados y guardados — simulando..." });
+              }
+            } else {
+              toast({ title: "No se pudieron estimar los COGS, simulando con datos parciales", variant: "destructive" });
+            }
+          } catch {
+            toast({ title: "Error estimando COGS con IA", variant: "destructive" });
+          }
+          setEstimatingCogs(false);
+        }
+      }
+
       const res = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/price-simulator`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ newPrice: parseFloat(newPrice), unitsPerMonth: parseInt(units) }),
       });
+      if (!res.ok) throw new Error("Error en simulación");
       setResult(await res.json());
+    } catch {
+      toast({ title: "Error al simular precio", variant: "destructive" });
     } finally {
       setLoading(false);
+      setEstimatingCogs(false);
     }
   };
 
@@ -522,7 +687,7 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
 
         <button onClick={simulate} disabled={loading || !newPrice} className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 mb-4">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
-          Simular Impacto
+          {estimatingCogs ? "Estimando costes con IA..." : loading ? "Simulando..." : "Simular Impacto"}
         </button>
 
         {result && (
