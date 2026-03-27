@@ -343,6 +343,9 @@ Acciones disponibles:
 - update_cms: Editar UN campo del CMS. Params: {path (ej: "hero.headline"), value (nuevo valor)}
 - update_cms_batch: Editar MÚLTIPLES campos del CMS de una vez. Params: {changes: [{path, value}, ...]}
 - reset_cms: Resetear TODO el CMS a valores por defecto. Params: {} (sin params)
+- generate_competitive_pricing: Investigar mercado real, generar catálogo de precios competitivos, actualizar CMS Y crear productos en Shopify. Params: {projectId? (para sync con Shopify), numPlans? (3-8, default 6), industry? (default "Shopify agency / eCommerce SaaS"), syncToShopify? (default true)}
+- audit_app_offerings: Auditar la oferta de la app, features, pricing actual, y generar recomendaciones. Params: {} (sin params)
+- modify_ui: Aplicar cambios visuales/UI/CSS/layout a la app (scroll horizontal, animaciones, responsive, colores, etc.). Params: {target (qué cambiar, ej: "pricing carousel", "hero section", "sidebar"), change (qué hacer, ej: "hacer scroll horizontal en móvil", "añadir animación fade-in")}
 
 MAPA COMPLETO DE PATHS CMS — puedes editar CUALQUIERA de estos con update_cms o update_cms_batch (N = índice numérico 0,1,2...):
   SITE: site.name, site.tagline, site.primaryColor, site.accentColor, site.favicon, site.logo.type, site.logo.value, site.logo.imageUrl, site.font_heading, site.font_body
@@ -408,6 +411,9 @@ REGLAS:
 - Si dice "cambia varias cosas", "actualiza el hero y el pricing", "modifica varios textos a la vez", "haz varios cambios en la landing", EJECUTA update_cms_batch con changes[] conteniendo todos los cambios
 - Si dice "qué tiene el CMS", "muéstrame el contenido actual", "qué dice el hero ahora", "lee el CMS", "ver contenido actual de X", EJECUTA read_cms con section si pide algo específico
 - Si dice "resetea el CMS", "vuelve al original", "restaura los textos por defecto", "resetea la landing", "pon todo como estaba", EJECUTA reset_cms
+- Si dice "genera planes de precio", "créame un catálogo de precios", "genera pricing competitivo", "investiga la competencia y crea planes", "necesito planes profesionales", "genera 5 planes de precio", "pricing competitivo", "crea planes y ponlos en Shopify", EJECUTA generate_competitive_pricing
+- Si dice "audita la app", "qué ofrecemos", "analiza nuestra oferta", "qué features tenemos", "audita lo que vendemos", "review de la app", EJECUTA audit_app_offerings
+- Si dice "cambia el diseño de X", "haz scroll horizontal", "modifica el layout", "pon X en columnas", "cambia el CSS", "haz responsive", "cambia el estilo de X", "modifica la UI", "añade animación", "cambia el diseño del pricing", "haz que X se vea diferente", EJECUTA modify_ui con target y change
 - USA projectId del contexto si el usuario tiene un proyecto activo
 - Cuando ejecutes una acción, explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
 - Si no se necesita una acción, simplemente responde normalmente sin el bloque :::ACTION:::
@@ -2766,6 +2772,338 @@ Genera exactamente ${images.length} alt texts.`, CLAUDE_EXPERT_SYSTEM, "images",
         const resetRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content/reset`, { method: "POST", headers: { "Content-Type": "application/json", "Cookie": cookieReset }, body: JSON.stringify({}) });
         if (!resetRes.ok) { res.status(500).json({ error: "Error al resetear CMS" }); return; }
         result = { success: true, message: "CMS reseteado a valores por defecto. Todos los textos vuelven a su estado original." };
+        break;
+      }
+
+      case "generate_competitive_pricing": {
+        const projectId = params?.projectId;
+        const numPlans = Math.min(Math.max(parseInt(String(params?.numPlans ?? 6)), 3), 8);
+        const industry = params?.industry || "Shopify agency / eCommerce SaaS";
+        const syncToShopify = params?.syncToShopify !== false;
+
+        try {
+          const researchPrompt = `INVESTIGA el mercado REAL de pricing para agencias y plataformas SaaS de optimización Shopify / eCommerce en 2025-2026.
+
+INDUSTRIA: ${industry}
+
+BUSCA precios REALES de:
+1. Agencias Shopify (servicios mensuales de optimización, SEO, imágenes, A/B testing)
+2. Plataformas SaaS de eCommerce (herramientas de optimización, pricing tools, image generation)
+3. Servicios de IA para eCommerce (Claude, ChatGPT wrappers, automated tools)
+4. Competidores directos: Shogun, PageFly, Privy, Klaviyo, Yotpo, Bold Commerce, Nosto, etc.
+
+Para cada competidor encontrado:
+- Nombre de la empresa/servicio
+- Rango de precios (plan mínimo a máximo)
+- Qué incluye cada plan
+- URL si disponible
+
+RESPONDE SOLO JSON válido:
+{
+  "competitors": [{"name": "...", "plans": [{"name": "...", "price": "...", "features": ["..."]}], "url": "..."}],
+  "marketRange": {"low": X, "mid": X, "high": X, "enterprise": X},
+  "insights": "análisis del mercado y recomendaciones de posicionamiento",
+  "positioning": "cómo posicionar ShopyBrain competitivamente"
+}`;
+
+          const marketResearch = await askGeminiWithSearch(researchPrompt,
+            "You are a pricing strategy consultant specializing in SaaS and eCommerce. Search for REAL current pricing from actual companies. Return ONLY valid JSON."
+          );
+
+          let marketData: Record<string, unknown> = {};
+          try {
+            const jsonM = marketResearch.text.match(/\{[\s\S]*\}/);
+            if (jsonM) marketData = JSON.parse(jsonM[0]);
+          } catch { /* continue with AI generation */ }
+
+          const generatePrompt = `Eres un ESTRATEGA DE PRICING de agencia premium Shopify. 
+Datos del mercado real investigado:
+${JSON.stringify(marketData).slice(0, 3000)}
+
+Fuentes consultadas: ${(marketResearch.sources || []).join(", ")}
+
+GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para ShopyBrain (plataforma de agencia Shopify con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
+
+REQUISITOS:
+1. Los precios deben ser COMPETITIVOS con el mercado real investigado
+2. Incluye planes desde entrada hasta enterprise
+3. Cada plan debe tener un DIFERENCIADOR claro
+4. Features deben ser REALES (no inventados) — basados en las capacidades reales de ShopyBrain
+5. Usa pricing psicológico (precios que terminan en 7 o 9)
+6. Incluye al menos un plan "one-shot" o pago único
+7. El plan más popular debe ser el de mejor relación calidad/precio
+8. Incluye badges estratégicos ("MÁS POPULAR", "MEJOR VALOR", "SIN RETAINER", etc.)
+
+RESPONDE SOLO JSON válido con un array "plans":
+{
+  "plans": [
+    {
+      "id": "plan-slug",
+      "name": "Nombre del Plan",
+      "price": "XX",
+      "currency": "€",
+      "period": "por mes · + €XXX setup único",
+      "featured": false,
+      "badge": null,
+      "features": [
+        {"text": "Feature description", "included": true}
+      ],
+      "cta": {"label": "Solicitar Plan →", "style": "ghost"},
+      "shopifyProductTitle": "ShopyBrain - Nombre Plan (Mensual)",
+      "shopifyProductDescription": "Descripción completa para Shopify..."
+    }
+  ],
+  "strategy": "Explicación de la estrategia de pricing elegida",
+  "marketPosition": "Dónde se posiciona ShopyBrain vs competencia"
+}`;
+
+          const plansResult = await askClaudeJsonWithBrain<{
+            plans: Array<{
+              id: string; name: string; price: string; currency: string; period: string;
+              featured: boolean; badge: string | null;
+              features: Array<{ text: string; included: boolean }>;
+              cta: { label: string; style: string };
+              shopifyProductTitle?: string;
+              shopifyProductDescription?: string;
+            }>;
+            strategy?: string;
+            marketPosition?: string;
+          }>(
+            projectId ? parseInt(String(projectId)) : 0,
+            generatePrompt,
+            "Eres un consultor de pricing SaaS con 15 años de experiencia en agencias Shopify. Generas catálogos de precios que maximizan conversión y revenue. Responde SOLO JSON válido.",
+            "pricing_science",
+            undefined,
+            4000
+          );
+
+          if (!plansResult?.plans?.length) {
+            result = { error: true, message: "No se pudieron generar planes de precio. Inténtalo de nuevo." };
+            break;
+          }
+
+          const cookiePricing = req.headers.cookie ?? "";
+          const cmsChanges: Array<{ path: string; value: unknown }> = [];
+
+          plansResult.plans.forEach((plan, i) => {
+            cmsChanges.push({ path: `pricing.plans.${i}`, value: {
+              id: plan.id || `plan-${i}`,
+              name: plan.name,
+              price: plan.price,
+              currency: plan.currency || "€",
+              period: plan.period,
+              featured: plan.featured || false,
+              badge: plan.badge || null,
+              features: plan.features,
+              cta: plan.cta || { label: `Solicitar ${plan.name} →`, style: plan.featured ? "gold" : "ghost" },
+            }});
+          });
+
+          const batchCmsRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content/batch`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cookie": cookiePricing },
+            body: JSON.stringify({ changes: cmsChanges }),
+          });
+
+          let shopifyProducts: Array<{ title: string; id: string; price: string }> = [];
+
+          if (syncToShopify && projectId) {
+            try {
+              const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+              if (project) {
+                for (const plan of plansResult.plans) {
+                  try {
+                    const shopifyProduct = {
+                      title: plan.shopifyProductTitle || `ShopyBrain — ${plan.name}`,
+                      body_html: plan.shopifyProductDescription || `<h2>${plan.name}</h2><p>${plan.period}</p><ul>${plan.features.filter(f => f.included).map(f => `<li>✅ ${f.text}</li>`).join("")}</ul>`,
+                      product_type: "Servicio SaaS",
+                      tags: `shopybrain, plan, pricing, ${plan.name.toLowerCase()}, saas, agency`,
+                      status: "active",
+                      variants: [{
+                        title: plan.name,
+                        price: plan.price,
+                        requires_shipping: false,
+                        taxable: true,
+                        sku: plan.id,
+                      }],
+                    };
+
+                    const created = await shopifyRequest<{ product: Record<string, unknown> }>(
+                      parseInt(String(projectId)),
+                      project.shopDomain,
+                      "/products.json",
+                      { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
+                    );
+
+                    shopifyProducts.push({
+                      title: String(created.product.title),
+                      id: String(created.product.id),
+                      price: plan.price,
+                    });
+                  } catch (shopErr) {
+                    logger.warn({ plan: plan.name, error: shopErr }, "Failed to create plan in Shopify");
+                  }
+                }
+              }
+            } catch { /* Shopify sync failed, CMS still updated */ }
+          }
+
+          result = {
+            success: true,
+            plansGenerated: plansResult.plans.length,
+            plans: plansResult.plans.map(p => ({ name: p.name, price: `${p.price}${p.currency || "€"}`, featured: p.featured, badge: p.badge })),
+            cmsUpdated: batchCmsRes.ok,
+            shopifyProductsCreated: shopifyProducts.length,
+            shopifyProducts,
+            strategy: plansResult.strategy || "",
+            marketPosition: plansResult.marketPosition || "",
+            competitorsAnalyzed: (marketData as { competitors?: unknown[] }).competitors?.length ?? 0,
+            sources: marketResearch.sources || [],
+            message: `🎯 ${plansResult.plans.length} planes generados y guardados en CMS${shopifyProducts.length > 0 ? ` + ${shopifyProducts.length} productos creados en Shopify` : ""}.\n\n📊 Planes:\n${plansResult.plans.map((p, i) => `${i + 1}. **${p.name}** — ${p.price}${p.currency || "€"} ${p.period}${p.badge ? ` [${p.badge}]` : ""}`).join("\n")}\n\n🧠 Estrategia: ${plansResult.strategy || "Pricing competitivo basado en investigación de mercado"}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `Error generando pricing: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "audit_app_offerings": {
+        try {
+          const cookieAudit = req.headers.cookie ?? "";
+          const cmsReadRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content`, { headers: { "Cookie": cookieAudit } });
+          const cmsData = cmsReadRes.ok ? await cmsReadRes.json() : {};
+
+          const features = (cmsData.features?.items as Array<{ title: string; description: string }>) ?? [];
+          const plans = (cmsData.pricing?.plans as Array<{ name: string; price: string; features: Array<{ text: string; included: boolean }> }>) ?? [];
+
+          const auditPrompt = `Audita la oferta de ShopyBrain basándote en lo que realmente ofrece la plataforma:
+
+MOTORES IA (features reales):
+${features.map((f, i) => `${i + 1}. ${f.title}: ${f.description}`).join("\n")}
+
+PLANES DE PRECIO ACTUALES:
+${plans.map(p => `${p.name} (${p.price}€): ${p.features?.filter(f => f.included).map(f => f.text).join(", ")}`).join("\n")}
+
+FUNCIONALIDADES REALES DE LA APP:
+- OmniCore Brain (chatbot IA con 34 acciones: gestión Shopify, CMS, código, proveedores, diagnóstico)
+- 6 motores IA (imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico)
+- Panel de cliente read-only con dashboard, productos, aprobaciones, mensajes, reportes
+- Panel admin completo con CRM, auditoría, rediseño IA, vault, exports
+- Email marketing con templates IA y Klaviyo
+- Sistema de proveedores con investigación IA
+- Generación de imágenes con Replicate (Flux + Recraft)
+- Investigación de mercado con Gemini (Google Search grounding)
+- Auto-pilot 24/7 con cron jobs
+- Encriptación AES-256, RGPD compliant
+
+ANALIZA:
+1. ¿El pricing refleja el valor real de la plataforma?
+2. ¿Los features listados cubren todo lo que hace la app?
+3. ¿Falta algo en la landing que debería estar?
+4. ¿Cómo se compara con la competencia?
+5. Recomendaciones específicas de mejora
+
+Responde en español, de forma directa y accionable.`;
+
+          const auditResult = await anthropic.messages.create({
+            model: "claude-sonnet-4-5", max_tokens: 3000,
+            messages: [{ role: "user", content: auditPrompt }],
+            system: "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables.",
+          });
+
+          const auditText = auditResult.content[0].type === "text" ? auditResult.content[0].text : "";
+
+          result = {
+            success: true,
+            featuresCount: features.length,
+            plansCount: plans.length,
+            audit: auditText,
+            message: `🔍 **Auditoría de la oferta de ShopyBrain:**\n\n${auditText}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `Error en auditoría: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "modify_ui": {
+        const target = params?.target;
+        const change = params?.change;
+        if (!target || !change) { res.status(400).json({ error: "target y change requeridos (ej: target='pricing carousel', change='hacer scroll horizontal en móvil')" }); return; }
+        if (String(target).includes("..") || path.isAbsolute(String(target))) { res.status(400).json({ error: "Target inválido" }); return; }
+
+        try {
+          const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
+          const frontendSrc = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer/src");
+
+          const analyzePrompt = `Eres un experto frontend React+TypeScript+CSS. El usuario quiere hacer este cambio visual/UI:
+
+TARGET: ${target}
+CAMBIO DESEADO: ${change}
+
+Necesito que me digas:
+1. Qué archivo(s) hay que modificar (path relativo desde src/)
+2. Qué código hay que buscar (oldCode exacto)
+3. Qué código nuevo poner (newCode)
+
+Si es un cambio CSS, busca en archivos .css
+Si es un cambio de layout/componente, busca en archivos .tsx
+
+Responde SOLO JSON:
+{
+  "files": [
+    {
+      "filePath": "ruta/desde/src/...",
+      "changes": [
+        {"oldCode": "código exacto a reemplazar", "newCode": "código nuevo", "description": "qué hace este cambio"}
+      ]
+    }
+  ],
+  "summary": "resumen del cambio"
+}`;
+
+          const uiAnalysis = await anthropic.messages.create({
+            model: "claude-sonnet-4-5", max_tokens: 3000,
+            messages: [{ role: "user", content: analyzePrompt }],
+            system: "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/.",
+          });
+
+          const uiText = uiAnalysis.content[0].type === "text" ? uiAnalysis.content[0].text : "";
+          const uiJson = JSON.parse(uiText.match(/\{[\s\S]*\}/)?.[0] || "{}");
+
+          let changesApplied = 0;
+          const appliedFiles: string[] = [];
+
+          if (uiJson.files) {
+            for (const file of uiJson.files) {
+              const fullPath = path.resolve(frontendSrc, file.filePath);
+              if (!fullPath.startsWith(frontendSrc)) continue;
+              if (!fs.existsSync(fullPath)) continue;
+
+              let content = fs.readFileSync(fullPath, "utf-8");
+              for (const change of file.changes || []) {
+                if (content.includes(change.oldCode)) {
+                  content = content.replace(change.oldCode, change.newCode);
+                  changesApplied++;
+                }
+              }
+              fs.writeFileSync(fullPath, content, "utf-8");
+              appliedFiles.push(file.filePath);
+            }
+          }
+
+          result = {
+            success: changesApplied > 0,
+            changesApplied,
+            files: appliedFiles,
+            summary: uiJson.summary || "Cambio UI aplicado",
+            message: changesApplied > 0
+              ? `✅ **Cambio UI aplicado:** ${uiJson.summary || change}\n📁 Archivos: ${appliedFiles.join(", ")}\n🔧 ${changesApplied} cambios aplicados\n⚠️ Recarga la página para ver los cambios.`
+              : `⚠️ No se pudieron aplicar los cambios automáticamente. Usa fix_code manualmente para hacer el cambio.`,
+          };
+        } catch (err) {
+          result = { error: true, message: `Error modificando UI: ${err instanceof Error ? err.message : String(err)}` };
+        }
         break;
       }
 

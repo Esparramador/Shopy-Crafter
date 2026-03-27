@@ -794,6 +794,22 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `✅ **CMS batch actualizado:**\n📝 ${result.changesApplied} campos modificados:\n${(result.paths as string[]).map(p => `· \`${p}\``).join("\n")}`;
       case "reset_cms":
         return `🔄 **CMS reseteado a valores por defecto.** Todos los textos de la landing, panel admin y panel cliente han vuelto a su estado original.`;
+      case "generate_competitive_pricing": {
+        const plans = (result.plans as Array<{ name: string; price: string; featured: boolean; badge: string | null }>) ?? [];
+        let msg = `🎯 **${result.plansGenerated} planes de precio generados**\n\n`;
+        msg += plans.map((p, i) => `${i + 1}. **${p.name}** — ${p.price}${p.featured ? " ⭐" : ""}${p.badge ? ` [${p.badge}]` : ""}`).join("\n");
+        if (result.cmsUpdated) msg += `\n\n✅ CMS actualizado con los nuevos planes`;
+        if (result.shopifyProductsCreated) msg += `\n🛍️ ${result.shopifyProductsCreated} productos creados en Shopify`;
+        if (result.strategy) msg += `\n\n🧠 ${result.strategy}`;
+        if (result.competitorsAnalyzed) msg += `\n📊 ${result.competitorsAnalyzed} competidores analizados`;
+        return msg;
+      }
+      case "audit_app_offerings":
+        return result.audit ? `🔍 **Auditoría de la oferta:**\n\n${result.audit}` : (result.message as string ?? "Auditoría completada.");
+      case "modify_ui":
+        return result.success
+          ? `✅ **Cambio UI aplicado:**\n${result.summary}\n📁 Archivos: ${(result.files as string[])?.join(", ")}\n🔧 ${result.changesApplied} cambios\n⚠️ Recarga la página para ver los cambios.`
+          : `⚠️ ${result.message ?? "No se pudieron aplicar los cambios automáticamente."}`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }
