@@ -561,7 +561,10 @@ export default function Landing() {
                   <h3 className="fp-engine-title">{content.features.items[activeEngine].title}</h3>
                   <p className="fp-engine-desc">{content.features.items[activeEngine].description}</p>
                   <div className="fp-engine-tags">
-                    {content.features.items[activeEngine].tags.map((tag, ti) => (
+                    {(Array.isArray(content.features.items[activeEngine].tags)
+                      ? content.features.items[activeEngine].tags
+                      : String(content.features.items[activeEngine].tags ?? "").split(",").map((s: string) => s.trim()).filter(Boolean)
+                    ).map((tag: string, ti: number) => (
                       <span key={ti} className="fp-engine-tag">{tag}</span>
                     ))}
                   </div>
@@ -693,17 +696,17 @@ export default function Landing() {
             </div>
             <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {content.pricing.plans.map(plan => (
-                <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
+                <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured === true || plan.featured === "true" ? " l-pricing-featured" : ""}`}>
                   {plan.badge && <div className="l-pricing-badge">{plan.badge}</div>}
                   <div className="l-pricing-plan">{plan.name}</div>
                   <div className="l-pricing-price"><span>{plan.currency}</span>{plan.price}</div>
                   <div className="l-pricing-period">{plan.period}</div>
                   <div className="l-pricing-divider"></div>
                   <ul className="l-pricing-features">
-                    {plan.features.slice(0, 6).map((f, fi) => (
+                    {plan.features.map((f, fi) => (
                       <li key={fi} className="l-pricing-feature">
-                        <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
-                        <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
+                        <div className={(f.included === true || f.included === "true") ? "l-pricing-check" : "l-pricing-x"}>{(f.included === true || f.included === "true") ? "✓" : "✕"}</div>
+                        <span style={(f.included === true || f.included === "true") ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
                       </li>
                     ))}
                   </ul>
@@ -742,7 +745,11 @@ export default function Landing() {
                   <p className="fp-testi-text">{t.text}</p>
                   <div className="l-testi-metric">{t.metric}</div>
                   <div className="l-testi-author">
-                    <div className="l-testi-avatar" style={{ background: t.avatarColor, color: t.avatarTextColor }}>{t.initials}</div>
+                    {t.avatarUrl ? (
+                      <img src={t.avatarUrl} alt={t.author} className="l-testi-avatar" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
+                    ) : (
+                      <div className="l-testi-avatar" style={{ background: t.avatarColor, color: t.avatarTextColor }}>{t.initials}</div>
+                    )}
                     <div><div className="l-testi-name">{t.author}</div><div className="l-testi-role">{t.role}</div></div>
                   </div>
                 </div>

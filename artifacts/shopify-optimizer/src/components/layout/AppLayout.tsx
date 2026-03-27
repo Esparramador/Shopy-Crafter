@@ -9,7 +9,9 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const MODULE_NAV = [
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+const DEFAULT_MODULE_NAV = [
   { id: "audit",       label: "Auditoría",    icon: "📊" },
   { id: "redesign",    label: "Rediseño IA",  icon: "✏️" },
   { id: "images",      label: "Imágenes",     icon: "🖼" },
@@ -21,7 +23,7 @@ const MODULE_NAV = [
   { id: "exports",     label: "Exportar",     icon: "📥" },
 ];
 
-const SHOPYBRAIN_NAV = [
+const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Shopy Brain", icon: "🧠", href: "/admin/shopybrain" },
   { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
   { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
@@ -34,7 +36,7 @@ const SHOPYBRAIN_NAV = [
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
 ];
 
-const ADMIN_NAV = [
+const DEFAULT_ADMIN_NAV = [
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
   { label: "Productos Global", icon: "📦", href: "/admin/products" },
   { label: "A/B Tests Global", icon: "📈", href: "/admin/abtests" },
@@ -52,19 +54,6 @@ const ADMIN_NAV = [
   { label: "System Health", icon: "🖥", href: "/admin/system" },
 ];
 
-const PAGE_LABELS: Record<string, string> = {
-  audit: "Auditoría",
-  redesign: "Rediseño IA",
-  images: "Imágenes",
-  consistency: "Consistencia",
-  "ab-testing": "A/B Testing",
-  pricing: "Pricing",
-  seo: "SEO Engine",
-  settings: "Configuración",
-  vault: "Repositorio",
-  exports: "Exportar",
-};
-
 export function AppLayout({ children }: AppLayoutProps) {
   const { data: projects, isLoading } = useListProjects();
   const [match, params] = useRoute("/projects/:id/*");
@@ -76,14 +65,31 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [cmsNav, setCmsNav] = useState<{ modules: typeof DEFAULT_MODULE_NAV; shopybrain: typeof DEFAULT_SHOPYBRAIN_NAV; admin: typeof DEFAULT_ADMIN_NAV } | null>(null);
+
+  const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
+  const shopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
+  const adminNav = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
+
+  const pageLabels: Record<string, string> = {};
+  moduleNav.forEach(m => { pageLabels[m.id] = m.label; });
+  pageLabels["settings"] = "Configuración";
 
   const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
-  const pageLabel = PAGE_LABELS[currentPage] ?? "Dashboard";
+  const pageLabel = pageLabels[currentPage] ?? "Dashboard";
 
-  // Close sidebar when route changes (tablet)
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
-  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/cms/content`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.adminNav) setCmsNav(d.adminNav);
+      })
+      .catch(() => {});
+  }, []);
+
+  const API_BASE = BASE_URL;
   useEffect(() => {
     if (user?.role !== "admin") return;
     const poll = () => {
@@ -186,7 +192,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
             🧠 Shopy Brain
           </span>
-          {SHOPYBRAIN_NAV.map(item => (
+          {shopybrainNav.map(item => (
             <Link key={item.href} href={item.href}>
               <div
                 className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
@@ -204,7 +210,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="sidebar-nav">
           <span className="sidebar-label">Administración</span>
 
-          {ADMIN_NAV.map(item => (
+          {adminNav.map(item => (
             <Link key={item.href} href={item.href}>
               <div
                 className={`nav-item${location === item.href ? " active" : ""}`}
@@ -471,7 +477,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Module tab nav (only when a project is active) */}
         {activeProject && (
           <div className="module-tabs" role="tablist">
-            {MODULE_NAV.map((item) => {
+            {moduleNav.map((item) => {
               const isActive = currentPage === item.id;
               return (
                 <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>
