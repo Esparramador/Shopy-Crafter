@@ -355,6 +355,9 @@ Acciones disponibles:
 - audit_theme: Auditoría COMPLETA del theme (estructura, SEO, rendimiento, accesibilidad, mejores prácticas). Params: {projectId, themeId?}
 - edit_theme_css: Editar CSS del theme de forma inteligente (añadir, modificar, no borrar). Params: {projectId, cssFile? (default: primer .css en assets/), action ("add"|"replace"|"remove_and_add"), selector? (para replace), cssCode, themeId?}
 - edit_theme_settings: Editar settings del theme (settings_data.json) con deep merge. Params: {projectId, settingsPath (ej: "current.sections.header"), value (nuevo valor), themeId?}
+- brain_sync: Sincronizar/importar conocimiento desde un cerebro externo. Params: {url (URL base del cerebro externo), apiKey? (API key si requiere auth), source? (etiqueta origen)}
+- brain_stats: Ver estadísticas completas del cerebro OmniCore (memorias, insights, dominios, prompts, fuentes). Sin params.
+- brain_export: Exportar todo el conocimiento del cerebro. Params: {domain? (filtrar por dominio), format? ("json"|"ndjson")}
 
 CMS PATHS (usa update_cms/update_cms_batch, N=índice):
   site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
@@ -395,6 +398,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Ver theme / listar themes → list_themes; Archivos del theme → list_theme_files; Leer archivo theme → read_theme_file
 - Editar theme / cambiar CSS tienda / modificar Liquid → edit_theme_file o edit_theme_css; Crear sección → create_theme_section
 - Auditar theme / revisar theme → audit_theme; Cambiar settings theme → edit_theme_settings
+- Sincronizar cerebro / importar conocimiento / brain sync → brain_sync; Estadísticas cerebro / brain stats → brain_stats; Exportar cerebro / brain export → brain_export
 - IMPORTANTE: SIEMPRE leer el archivo ANTES de editarlo (read_theme_file → edit_theme_file). NUNCA sobrescribir a ciegas.
 - Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
 - USA projectId del contexto si hay proyecto activo
@@ -3669,6 +3673,65 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           };
         } catch (err) {
           result = { error: true, message: `❌ Error parseando settings_data.json: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "brain_sync": {
+        const syncUrl = params?.url as string;
+        const syncApiKey = params?.apiKey as string | undefined;
+        const syncSource = params?.source as string | undefined;
+        if (!syncUrl) {
+          result = { error: true, message: "❌ URL requerida. Ejemplo: brain_sync {url: 'https://comiccrafter.es', apiKey: 'sck_...'}" };
+          break;
+        }
+        try {
+          const { syncFromExternalBrain } = await import("./brain-sync.js");
+          const syncResult = await syncFromExternalBrain(syncUrl, syncApiKey, syncSource);
+          if (!syncResult.success) {
+            result = { error: true, message: `❌ ${syncResult.error || "No se pudo sincronizar"}${syncResult.errors?.length ? `\n${syncResult.errors.join("\n")}` : ""}` };
+            break;
+          }
+          const s = syncResult.stats!;
+          result = {
+            ...syncResult,
+            message: `🧠 **Sincronización completada desde ${syncUrl}**\n📥 Importados: ${s.memoriesImported} memorias, ${s.insightsImported} insights, ${s.domainsImported} dominios, ${s.promptsImported} prompts\n⏭️ Duplicados saltados: ${s.duplicatesSkipped}\n📄 Páginas procesadas: ${syncResult.totalPages}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error en brain_sync: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "brain_stats": {
+        try {
+          const { getBrainStats } = await import("./brain-sync.js");
+          const stats = await getBrainStats();
+          const memorySources = stats.memorySources as Record<string, number> || {};
+          const insightsByDomain = stats.insightsByDomain as Record<string, number> || {};
+          const topDomains = Object.entries(insightsByDomain).sort((a, b) => b[1] - a[1]).slice(0, 10);
+          result = {
+            ...stats,
+            message: `🧠 **Estado del Cerebro OmniCore**\n\n📦 **${stats.totalMemories}** memorias\n💡 **${stats.totalInsights}** insights\n🏷️ **${stats.totalDomains}** dominios\n📝 **${stats.totalPrompts}** prompts\n🎯 **${stats.totalNicheProfiles}** perfiles de nicho\n🔗 **${stats.totalCrossConnections}** conexiones cruzadas\n\n📊 **Top dominios:**\n${topDomains.map(([d, c]) => `  • ${d}: ${c} insights`).join("\n")}\n\n🔍 **Fuentes de memorias:**\n${Object.entries(memorySources).map(([s, c]) => `  • ${s}: ${c}`).join("\n")}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error obteniendo stats: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "brain_export": {
+        try {
+          const { getExportData } = await import("./brain-sync.js");
+          const domain = params?.domain as string | undefined;
+          const exportData = await getExportData({ domain });
+          const s = exportData.stats;
+          result = {
+            exportData,
+            message: `📤 **Exportación del Cerebro OmniCore**\n\n📦 Memorias: ${s.totalMemories}\n💡 Insights: ${s.totalInsights}\n🏷️ Dominios: ${s.totalDomains}\n📝 Prompts: ${s.totalPrompts}\n\n${domain ? `🔍 Filtrado por dominio: ${domain}` : "📋 Exportación completa"}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error exportando: ${err instanceof Error ? err.message : String(err)}` };
         }
         break;
       }
