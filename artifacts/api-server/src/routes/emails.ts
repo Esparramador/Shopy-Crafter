@@ -156,7 +156,7 @@ router.post("/emails/generate", async (req, res): Promise<void> => {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const client = new Anthropic({ apiKey: anthropicKey });
 
-    const brainContext = await buildShopyBrainContext(niche, "general");
+    const brainContext = await buildShopyBrainContext(niche, "general", `email marketing para ${niche || "ecommerce"} tienda Shopify`);
 
     const systemPrompt = `Eres un experto en email marketing de eCommerce con años de experiencia creando emails de alta conversión.
 Generas emails HTML completos, profesionales y que realmente convierten para tiendas Shopify.

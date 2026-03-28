@@ -153,14 +153,16 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
  */
 export async function buildShopyBrainContext(
   niche?: string,
-  useCase?: "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce"
+  useCase?: "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce",
+  userQuery?: string
 ): Promise<string> {
   try {
     const minConfidence = 0.6;
     const isVisualTask = useCase === "images" || useCase === "redesign";
 
-    const [memories, prompts, topInsights, visualInsights] = await Promise.all([
-      // Standard memories (all types)
+    const { searchRelevantKnowledge, searchDomainKnowledge, formatKnowledgeContext, getOmniCorePrompts } = await import("./knowledge-search.js");
+
+    const [memories, prompts, topInsights, visualInsights, omniQueryResults, omniDomainResults, omniPrompts] = await Promise.all([
       db
         .select({
           memoryType: omnicoreMemoriesTable.memoryType,
@@ -174,7 +176,6 @@ export async function buildShopyBrainContext(
         .orderBy(desc(omnicoreMemoriesTable.confidence))
         .limit(15),
 
-      // Proven prompt patterns
       db
         .select({
           useCase: omnicorePromptLibraryTable.useCase,
@@ -185,7 +186,6 @@ export async function buildShopyBrainContext(
         .orderBy(desc(omnicorePromptLibraryTable.avgQualityScore))
         .limit(5),
 
-      // Top cross-domain strategic insights
       db
         .select({
           domain: omnicoreInsightsTable.domain,
@@ -200,8 +200,6 @@ export async function buildShopyBrainContext(
         .orderBy(desc(omnicoreInsightsTable.confidence))
         .limit(10),
 
-      // Visual production insights — from reference image/video analysis
-      // Always included for visual tasks; lightly included for all others
       db
         .select({
           title: omnicoreInsightsTable.title,
@@ -215,16 +213,53 @@ export async function buildShopyBrainContext(
         ))
         .orderBy(desc(omnicoreInsightsTable.confidence))
         .limit(isVisualTask ? 6 : 2),
+
+      userQuery
+        ? searchRelevantKnowledge(userQuery, { useCase: useCase || "general", niche, maxResults: 12, minConfidence: 0.5 })
+        : Promise.resolve([]),
+
+      searchDomainKnowledge(useCase || "general", 8, 0.7),
+
+      getOmniCorePrompts(),
     ]);
 
-    if (memories.length === 0 && prompts.length === 0 && topInsights.length === 0 && visualInsights.length === 0) return "";
+    const hasAnyData = memories.length > 0 || prompts.length > 0 || topInsights.length > 0 || visualInsights.length > 0 || omniQueryResults.length > 0 || omniDomainResults.length > 0;
+    if (!hasAnyData) return "";
 
-    const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — INTELIGENCIA ACUMULADA ━━━"];
+    const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — INTELIGENCIA ACUMULADA (46,000+ insights) ━━━"];
 
     if (niche) lines.push(`Nicho activo: ${niche}`);
     if (useCase) lines.push(`Contexto de tarea: ${useCase}`);
 
-    // Top strategic insights (cross-domain)
+    const seenTitles = new Set<string>();
+    const omniMerged = [...omniQueryResults, ...omniDomainResults].filter(r => {
+      if (seenTitles.has(r.title)) return false;
+      seenTitles.add(r.title);
+      return true;
+    });
+
+    if (omniMerged.length > 0) {
+      lines.push(formatKnowledgeContext(omniMerged.slice(0, 15), "CONOCIMIENTO OMNICORE INYECTADO"));
+    }
+
+    if (omniPrompts.length > 0) {
+      const relevantOmniPrompts = omniPrompts.filter(p => {
+        const name = p.name.toLowerCase();
+        if (useCase === "pricing" && name.includes("economist")) return true;
+        if (useCase === "seo" && name.includes("shopify")) return true;
+        if ((useCase === "redesign" || useCase === "images") && name.includes("product")) return true;
+        if (name.includes("identity")) return true;
+        if (name.includes("research") && (useCase === "competitors" || useCase === "intelligence")) return true;
+        return false;
+      });
+      if (relevantOmniPrompts.length > 0) {
+        lines.push("\n🔮 Protocolos OmniCore activos:");
+        for (const p of relevantOmniPrompts.slice(0, 2)) {
+          lines.push(`  [${p.name}]: ${p.promptTemplate.slice(0, 300)}…`);
+        }
+      }
+    }
+
     const nonVisualInsights = topInsights.filter(i => i.domain !== "visual_production");
     if (nonVisualInsights.length > 0) {
       lines.push("\n🧠 Insights estratégicos (aprendizaje continuo):");
@@ -233,7 +268,6 @@ export async function buildShopyBrainContext(
       }
     }
 
-    // Visual production intelligence (from reference analyses)
     if (visualInsights.length > 0) {
       lines.push(`\n🎬 Inteligencia visual absorbida de referencias${isVisualTask ? " (alta prioridad)" : ""}:`);
       for (const v of visualInsights) {
@@ -241,12 +275,10 @@ export async function buildShopyBrainContext(
       }
     }
 
-    // Niche-specific memories
     const nicheMemories = niche
       ? memories.filter(m => m.niche && m.niche.toLowerCase().includes(niche.toLowerCase()))
       : [];
 
-    // Image pattern memories (from reference ingestion) — for visual tasks
     const imagePatternMemories = isVisualTask
       ? memories.filter(m => m.memoryType === "image_pattern" && !nicheMemories.includes(m))
       : [];
@@ -277,7 +309,6 @@ export async function buildShopyBrainContext(
       }
     }
 
-    // Proven prompt patterns for this use case
     const useCasePrompts = useCase
       ? prompts.filter(p => p.useCase === useCase || p.useCase === "general")
       : prompts;
@@ -289,7 +320,7 @@ export async function buildShopyBrainContext(
       }
     }
 
-    lines.push("━━━ FIN CONTEXTO SHOPYBRAIN ━━━");
+    lines.push("━━━ FIN CONTEXTO SHOPYBRAIN (base: 46,000+ insights OmniCore) ━━━");
     return lines.join("\n");
   } catch {
     return "";
@@ -330,8 +361,9 @@ export async function askClaudeWithBrain(
   niche?: string,
   maxTokens = 4096
 ): Promise<string> {
+  const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase),
+    buildShopyBrainContext(niche, useCase, lastUserMsg),
     buildBrandDnaContext(projectId),
   ]);
   const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
@@ -339,9 +371,6 @@ export async function askClaudeWithBrain(
   return askClaude(projectId, messages, enrichedSystem, maxTokens);
 }
 
-/**
- * askClaudeJson enhanced with ShopyBrain + BrandDNA context injection.
- */
 export async function askClaudeJsonWithBrain<T>(
   projectId: number,
   prompt: string,
@@ -351,7 +380,7 @@ export async function askClaudeJsonWithBrain<T>(
   maxTokens = 4096
 ): Promise<T> {
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase),
+    buildShopyBrainContext(niche, useCase, prompt),
     buildBrandDnaContext(projectId),
   ]);
   const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");

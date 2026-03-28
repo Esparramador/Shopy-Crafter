@@ -291,15 +291,13 @@ INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es inf
 
     let brandDnaBlock = "";
     const activeProjectId = req.body.activeProjectId;
-    if (activeProjectId) {
-      try {
-        const [brandDna, brainContext] = await Promise.all([
-          buildBrandDnaContext(parseInt(activeProjectId)),
-          buildShopyBrainContext(niche, "general"),
-        ]);
-        brandDnaBlock = (brainContext || "") + (brandDna || "");
-      } catch {}
-    }
+    try {
+      const [brandDnaResult, brainCtx] = await Promise.all([
+        activeProjectId ? buildBrandDnaContext(parseInt(activeProjectId)) : Promise.resolve(""),
+        buildShopyBrainContext(niche, "general", query),
+      ]);
+      brandDnaBlock = (brainCtx || "") + (brandDnaResult || "");
+    } catch {}
 
     const actionDetectionBlock = `
 
@@ -501,7 +499,9 @@ Si conoces la página actual del usuario, contextualiza tu respuesta a esa pági
 Cuando tengas conocimiento previo sobre una entidad, úsalo activamente en tu respuesta e indica qué parte viene de tu memoria.
 PUEDES EJECUTAR ACCIONES EN SHOPIFY directamente desde el chat. Cuando el usuario pida crear, editar, eliminar, publicar productos, cambiar precios, ver estado de la tienda, regenerar tokens, editar el theme, auditar SEO, etc., EJECUTA la acción correspondiente.
 PUEDES EDITAR EL THEME DE SHOPIFY: Liquid templates, CSS, secciones, snippets, configuración. Usa las acciones de theme (read_theme_file, edit_theme_file, edit_theme_css, etc.) para gestionar el diseño de la tienda.
-IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, investigación), NO digas "dame 10 segundos". Ejecuta la acción directamente con :::ACTION::: y el sistema mostrará progreso automáticamente.`) + agencyPricingKnowledge + actionDetectionBlock + expertKnowledgeBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
+IMPORTANTE: Cuando ejecutes acciones largas (auditoría, pricing competitivo, investigación), NO digas "dame 10 segundos". Ejecuta la acción directamente con :::ACTION::: y el sistema mostrará progreso automáticamente.
+
+CEREBRO OMNICORE: Tienes acceso a 46,000+ insights de conocimiento importados del cerebro OmniCore — cubriendo IA, 3D, diseño, marketing, ecommerce, SEO, pricing, programación, prompt engineering, y cientos de dominios más. Usa este conocimiento para dar respuestas MÁS profundas, con más contexto técnico y ejemplos reales. Si el usuario pregunta algo técnico, busca en tu conocimiento OmniCore antes de responder genéricamente.`) + agencyPricingKnowledge + actionDetectionBlock + expertKnowledgeBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
 
     const projectContext = req.body.activeProjectId ? `\n[CONTEXTO: El usuario tiene el proyecto activo con ID ${req.body.activeProjectId}. Úsalo como projectId en las acciones.]` : "";
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
@@ -599,7 +599,7 @@ Incluye datos de pricing, competencia, tendencias y estrategias probadas.`;
         1024
       );
     } else {
-      const brainCtx = await buildShopyBrainContext(niche || undefined, "general");
+      const brainCtx = await buildShopyBrainContext(niche || undefined, "general", query);
       const aiRes = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
@@ -699,11 +699,12 @@ Principios que guían el análisis:
 - Todo orientado a mejorar la calidad del contenido, la estrategia y la ejecución
 Responde SOLO con el JSON, sin texto adicional.`;
 
-  const brainCtx = await buildShopyBrainContext(undefined, "general");
+  const studyQuery = `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}`;
+  const brainCtx = await buildShopyBrainContext(undefined, "general", studyQuery);
   const aiRes = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 4096,
-    messages: [{ role: "user", content: `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}` }],
+    messages: [{ role: "user", content: studyQuery }],
     system: systemPrompt + (brainCtx || ""),
   });
 

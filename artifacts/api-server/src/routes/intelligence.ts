@@ -154,7 +154,7 @@ Si no hay datos web disponibles, usa tu conocimiento sobre la empresa/marca. Si 
 Sé específico y concreto — nada de respuestas genéricas. Este análisis debe ser tan preciso como si hubieras investigado la empresa durante 10 horas.`;
 
   try {
-    const brainCtx = await buildShopyBrainContext(undefined, "intelligence");
+    const brainCtx = await buildShopyBrainContext(undefined, "intelligence", req.body?.input || req.body?.query || req.body?.url || "brand intelligence analysis");
     const intelligenceSystem = `${SHOPIFY_EXPERT_SYSTEM} You are a master brand intelligence analyst with deep expertise in e-commerce, digital marketing, and competitive positioning. You extract maximum strategic value from any input — URLs, brand names, company names, or text.${brainCtx}`;
     const { getClaudeClient } = await import("../lib/claude.js");
     const client = await getClaudeClient(0);

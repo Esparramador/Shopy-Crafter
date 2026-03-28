@@ -132,10 +132,10 @@ export async function dualAI(
     };
   }
 
-  const brainCtx = await buildShopyBrainContext(niche, useCase);
+  const brainCtx = await buildShopyBrainContext(niche, useCase, prompt);
   const geminiPromptText = opts.geminiSystemPrompt
     ? prompt
-    : `${prompt}\n\nContexto del cerebro de la agencia:\n${brainCtx.slice(0, 2000)}`;
+    : `${prompt}\n\nContexto del cerebro de la agencia (46,000+ insights):\n${brainCtx.slice(0, 3000)}`;
 
   const [claudeSettled, geminiSettled] = await Promise.allSettled([
     (async () => {

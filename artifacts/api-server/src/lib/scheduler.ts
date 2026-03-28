@@ -308,7 +308,7 @@ export async function runOmniCoreMicroLearning() {
       return;
     }
 
-    const brainCtxMicro = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtxMicro = await buildShopyBrainContext(undefined, "ecommerce", "micro-learning ecommerce shopify optimization insights");
 
     for (const domain of domains) {
       try {
@@ -444,7 +444,7 @@ export async function runOmniCoreCrossConnections() {
     const shuffled = [...allDomains].sort(() => Math.random() - 0.5).slice(0, 3);
     const names = shuffled.map(d => ALL_DOMAINS[d.domain ?? ""] ?? d.domain);
 
-    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
     const prompt = `Find 3 powerful hidden cross-domain insights connecting these knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy — drawing from ANY discipline (neuroscience, art, architecture, behavioral economics, technology, culture, science, nature, music, etc.) that creates compounding value. The BEST cross-domain insights connect fields that nobody would think are related. Return ONLY valid JSON:
 {"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
 
@@ -524,7 +524,7 @@ export async function runOmniCoreDailyDeepStudy() {
       trigger: "cron_daily_1am",
     }).onConflictDoNothing();
 
-    const brainCtxDaily = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtxDaily = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
     let consecutiveFails = 0;
 
     for (const domain of domains) {
@@ -638,7 +638,7 @@ export async function runOmniCoreMegaSynthesis() {
     }).onConflictDoNothing();
 
     const memorySummary = topMemories.slice(0, 10).map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 100)}`).join("\n");
-    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
 
     const prompt = `Based on this week's accumulated knowledge across ALL domains, synthesize 8 meta-level MASTERCLASS insights that:
 1. Connect knowledge from 3+ different disciplines (e.g., neuroscience + photography + pricing)
@@ -793,7 +793,7 @@ export async function runRetroactiveReanalysis() {
       trigger: "cron_weekly_sunday_3am",
     }).onConflictDoNothing();
 
-    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
 
     const batchSize = 10;
     for (let i = 0; i < oldInsights.length; i += batchSize) {
@@ -910,7 +910,7 @@ export async function runMonthlySelfEvaluation() {
       domainCount: domains.length,
     };
 
-    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce");
+    const brainCtx = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
 
     const text = await aiGenerate({
       system: `You are OmniCore Self-Evaluation Engine. You produce honest, data-driven monthly performance reports about the brain's learning progress. Be specific, use the numbers provided, and give actionable recommendations. Respond in Spanish. ${brainCtx}`,
