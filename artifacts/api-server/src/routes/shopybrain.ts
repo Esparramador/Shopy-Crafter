@@ -1980,9 +1980,11 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
 
         if (params?.analyze !== false) {
           try {
+            const codeAnalysisBrain = await buildShopyBrainContext(undefined, "general", `code analysis shopify app bugs ${filePath}`);
             const analyzeMsg = await anthropic.messages.create({
               model: "claude-sonnet-4-5",
               max_tokens: 2000,
+              system: codeAnalysisBrain || undefined,
               messages: [{
                 role: "user",
                 content: `Analiza este archivo de código fuente de una app Shopify (React+TypeScript frontend, Express+Node backend).
@@ -2047,9 +2049,11 @@ ${truncated}
         };
 
         try {
+          const focusedBrain = await buildShopyBrainContext(undefined, "general", `code audit ${focusOn} shopify ${filePath}`);
           const analyzeMsg = await anthropic.messages.create({
             model: "claude-sonnet-4-5",
             max_tokens: 4000,
+            system: focusedBrain || undefined,
             messages: [{
               role: "user",
               content: `Eres un senior developer auditando código de producción de una app Shopify (React+Vite frontend, Express+Node backend, PostgreSQL, Drizzle ORM).
@@ -3133,10 +3137,11 @@ ANALIZA:
 
 Responde en español, de forma directa y accionable.`;
 
+          const bizBrain = await buildShopyBrainContext(undefined, "general", "business audit SaaS shopify agency pricing features landing");
           const auditResult = await anthropic.messages.create({
             model: "claude-sonnet-4-5", max_tokens: 3000,
             messages: [{ role: "user", content: auditPrompt }],
-            system: "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables.",
+            system: "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables." + (bizBrain || ""),
           });
 
           const auditText = auditResult.content[0].type === "text" ? auditResult.content[0].text : "";
@@ -3190,10 +3195,11 @@ Responde SOLO JSON:
   "summary": "resumen del cambio"
 }`;
 
+          const uiBrain = await buildShopyBrainContext(undefined, "general", "frontend UI UX shopify design components react");
           const uiAnalysis = await anthropic.messages.create({
             model: "claude-sonnet-4-5", max_tokens: 3000,
             messages: [{ role: "user", content: analyzePrompt }],
-            system: "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/.",
+            system: "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/." + (uiBrain || ""),
           });
 
           const uiText = uiAnalysis.content[0].type === "text" ? uiAnalysis.content[0].text : "";

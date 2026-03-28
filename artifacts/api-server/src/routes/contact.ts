@@ -6,6 +6,7 @@ import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
+import { requireAdmin } from "../lib/auth.js";
 
 const router = Router();
 
@@ -344,7 +345,7 @@ router.post("/contact", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/leads", async (req, res): Promise<void> => {
+router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
   const { pool } = await import("@workspace/db");
   const result = await pool.query(
     `SELECT id, details, created_at FROM audit_log WHERE action = 'lead_form_submitted' ORDER BY created_at DESC LIMIT 100`
