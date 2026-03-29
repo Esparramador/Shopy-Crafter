@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { GlassCard } from "../../components/ui/GlassCard";
 import {
   FileText, Download, BarChart3, ShoppingBag, Palette, TestTubes, Image,
   FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package, Eye,
-  Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search, Camera, Table2
+  Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search, Camera, Table2,
+  X, Printer, Sparkles
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -25,6 +26,13 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [viewerTitle, setViewerTitle] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiDone, setAiDone] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const exports: ExportOption[] = [
     {
@@ -303,6 +311,45 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
     }
   };
 
+  const handleViewReport = useCallback((exp: ExportOption) => {
+    setViewerUrl(`${API_BASE}${exp.endpoint}${exp.endpoint.includes("?") ? "&" : "?"}view=true`);
+    setViewerTitle(exp.title);
+    setViewerOpen(true);
+  }, []);
+
+  const handlePrintReport = useCallback(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.print();
+    }
+  }, []);
+
+  const handleDownloadFromViewer = useCallback(() => {
+    const exp = exports.find(e => e.title === viewerTitle);
+    if (exp) handleDownload(exp);
+  }, [viewerTitle]);
+
+  const handleGenerateAiReport = async () => {
+    setAiGenerating(true);
+    setAiError(null);
+    setAiDone(false);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/exports/generate-ai-report`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+      setAiDone(true);
+    } catch (e: any) {
+      setAiError(e.message);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const formatBadge = (format: ExportFormat) => {
     const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346" };
     return (
@@ -323,6 +370,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   const renderCard = (exp: ExportOption) => {
     const isDownloading = downloading === exp.id;
     const isCompleted = completed.has(exp.id);
+    const canView = exp.format === "HTML" && exp.id === "complete";
 
     return (
       <GlassCard key={exp.id} className="p-0 overflow-hidden">
@@ -343,11 +391,24 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
             </div>
           </div>
         </div>
-        <div className="px-5 pb-4">
+        <div className="px-5 pb-4 flex gap-2">
+          {canView && (
+            <button
+              onClick={() => handleViewReport(exp)}
+              className="flex-1 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+              style={{
+                background: `${exp.color}08`,
+                border: `1px solid ${exp.color}25`,
+                color: exp.color,
+              }}
+            >
+              <Eye className="w-4 h-4" /> Ver
+            </button>
+          )}
           <button
             onClick={() => handleDownload(exp)}
             disabled={isDownloading}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+            className={`${canView ? "flex-1" : "w-full"} py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all`}
             style={{
               background: isCompleted ? "rgba(46,204,113,.1)" : `${exp.color}12`,
               border: `1px solid ${isCompleted ? "rgba(46,204,113,.3)" : exp.color + "30"}`,
@@ -359,7 +420,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
             ) : isCompleted ? (
               <><CheckCircle className="w-4 h-4" /> Descargado</>
             ) : (
-              <><Download className="w-4 h-4" /> Descargar {exp.format}</>
+              <><Download className="w-4 h-4" /> Descargar</>
             )}
           </button>
         </div>
@@ -369,24 +430,70 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Centro de Exportación Universal</h1>
           <p className="text-muted-foreground text-sm mt-1">Descarga informes profesionales, datos y contenidos en cualquier formato</p>
         </div>
-        <button
-          onClick={handleDownloadAllReports}
-          disabled={downloading !== null}
-          className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all hover:scale-105"
-          style={{ background: "linear-gradient(135deg, #c8a84b 0%, #a08630 100%)" }}
-        >
-          <Download className="w-4 h-4" /> Descargar Todos los Informes
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGenerateAiReport}
+            disabled={aiGenerating}
+            className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all hover:scale-105"
+            style={{
+              background: aiDone
+                ? "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
+                : "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+              opacity: aiGenerating ? 0.7 : 1,
+            }}
+          >
+            {aiGenerating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Analizando con IA...</>
+            ) : aiDone ? (
+              <><CheckCircle className="w-4 h-4" /> Análisis IA Generado</>
+            ) : (
+              <><Sparkles className="w-4 h-4" /> Generar Análisis IA</>
+            )}
+          </button>
+          <button
+            onClick={handleDownloadAllReports}
+            disabled={downloading !== null}
+            className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all hover:scale-105"
+            style={{ background: "linear-gradient(135deg, #c8a84b 0%, #a08630 100%)" }}
+          >
+            <Download className="w-4 h-4" /> Descargar Todos
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="p-3 rounded-xl flex items-center gap-2 text-sm" style={{ background: "rgba(232,69,88,.1)", border: "1px solid rgba(232,69,88,.2)", color: "#e84558" }}>
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {aiError && (
+        <div className="p-3 rounded-xl flex items-center gap-2 text-sm" style={{ background: "rgba(232,69,88,.1)", border: "1px solid rgba(232,69,88,.2)", color: "#e84558" }}>
+          <AlertCircle className="w-4 h-4 shrink-0" /> Error generando análisis IA: {aiError}
+        </div>
+      )}
+
+      {aiDone && (
+        <div className="p-3 rounded-xl flex items-center gap-2 text-sm" style={{ background: "rgba(46,204,113,.08)", border: "1px solid rgba(46,204,113,.2)", color: "#2ecc71" }}>
+          <CheckCircle className="w-4 h-4 shrink-0" /> Análisis IA completado. Los informes HTML ahora incluyen secciones de análisis profundo de ShopyBrain AI en cada apartado.
+        </div>
+      )}
+
+      {aiGenerating && (
+        <div className="p-4 rounded-xl flex items-center gap-3" style={{ background: "rgba(139,92,246,.06)", border: "1px solid rgba(139,92,246,.15)" }}>
+          <div className="relative">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#8b5cf6" }} />
+            <Sparkles className="w-3 h-3 absolute -top-1 -right-1" style={{ color: "#c8a84b" }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">ShopyBrain AI está analizando tu tienda...</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Análisis exhaustivo: SEO, precios, marca, mix de productos, competencia, plan de acción 30 días. Esto puede tomar 30-60 segundos.</p>
+          </div>
         </div>
       )}
 
@@ -435,6 +542,56 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
           <p className="text-xs text-muted-foreground mb-3">Descarga todas las imágenes del proyecto (vault + IA generadas) convertidas al formato que necesites. Calidad máxima 100%.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {images.map(renderCard)}
+          </div>
+        </div>
+      )}
+
+      {viewerOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col"
+          style={{ background: "rgba(0,0,0,.92)" }}
+        >
+          <div
+            className="flex items-center justify-between px-6 py-3 shrink-0"
+            style={{ background: "rgba(20,20,28,.95)", borderBottom: "1px solid rgba(200,168,75,.15)" }}
+          >
+            <div className="flex items-center gap-3">
+              <Package className="w-5 h-5" style={{ color: "#c8a84b" }} />
+              <span className="text-sm font-semibold text-white">{viewerTitle}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrintReport}
+                className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105"
+                style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", color: "#fff" }}
+              >
+                <Printer className="w-3.5 h-3.5" /> Imprimir / PDF
+              </button>
+              <button
+                onClick={handleDownloadFromViewer}
+                disabled={downloading !== null}
+                className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all hover:scale-105"
+                style={{ background: "rgba(200,168,75,.12)", border: "1px solid rgba(200,168,75,.25)", color: "#c8a84b" }}
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar HTML
+              </button>
+              <button
+                onClick={() => setViewerOpen(false)}
+                className="p-2 rounded-lg transition-all hover:scale-110"
+                style={{ background: "rgba(232,69,88,.12)", color: "#e84558" }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <iframe
+              ref={iframeRef}
+              src={viewerUrl}
+              className="w-full h-full border-0"
+              title={viewerTitle}
+              sandbox="allow-popups"
+            />
           </div>
         </div>
       )}

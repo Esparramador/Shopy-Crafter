@@ -28,6 +28,8 @@ export const projectsTable = pgTable("projects", {
   productCount: integer("product_count"),
   avgAuditScore: real("avg_audit_score"),
   webhookId: text("webhook_id"),
+  aiReportJson: text("ai_report_json"),
+  aiReportGeneratedAt: timestamp("ai_report_generated_at", { withTimezone: true }),
   // Plan & limits
   plan: text("plan").notNull().default("starter").$type<"admin" | "starter" | "agency_pro" | "enterprise" | "trial">(),
   productsUsedThisMonth: integer("products_used_this_month").notNull().default(0),

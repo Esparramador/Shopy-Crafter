@@ -17,6 +17,7 @@ import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
+import { askClaude, buildShopyBrainContext } from "../lib/claude.js";
 
 const router = Router();
 
@@ -846,6 +847,177 @@ router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Pro
   }
 });
 
+router.post("/projects/:projectId/exports/generate-ai-report", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  if (isNaN(projectId) || projectId <= 0) { res.status(400).json({ error: "ID de proyecto invalido" }); return; }
+
+  try {
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    const seoData = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+    const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+    const tests = await db.select().from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
+    const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
+    const revenueSnapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.date)).limit(90);
+    const visualDna = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId)).limit(1);
+
+    const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
+    const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
+    const activeProducts = products.filter(p => p.status === "active");
+    const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
+    const catalogPrices = products.map(p => parseFloat(p.price ?? "0"));
+    const totalCatalogValue = catalogPrices.reduce((s, p) => s + p, 0);
+    const totalCogs = allCogs.reduce((s, c) => s + c.totalCogs, 0);
+    const avgMargin = totalCatalogValue > 0 ? ((totalCatalogValue - totalCogs) / totalCatalogValue) * 100 : 0;
+    const totalRevenue = revenueSnapshots.reduce((s, r) => s + (r.revenue ?? 0), 0);
+    const totalOrders = revenueSnapshots.reduce((s, r) => s + (r.orders ?? 0), 0);
+
+    const liveAudit = products.map(p => {
+      const seo = seoMap.get(p.shopifyProductId);
+      return { product: p, seo, ...calculateSeoScoreInline(p, seo) };
+    });
+    const avgSeo = liveAudit.length > 0 ? liveAudit.reduce((s, a) => s + a.score, 0) / liveAudit.length : 0;
+    const storeGrade = avgSeo >= 90 ? "A" : avgSeo >= 75 ? "B" : avgSeo >= 60 ? "C" : avgSeo >= 45 ? "D" : "F";
+
+    const productTypes = [...new Set(products.map(p => p.productType).filter(Boolean))];
+    const priceRange = products.length > 0
+      ? { min: Math.min(...catalogPrices), max: Math.max(...catalogPrices) }
+      : { min: 0, max: 0 };
+
+    const top10ByPrice = [...products].sort((a, b) => parseFloat(b.price ?? "0") - parseFloat(a.price ?? "0")).slice(0, 10);
+    const worst5Seo = [...liveAudit].sort((a, b) => a.score - b.score).slice(0, 5);
+    const best5Seo = [...liveAudit].sort((a, b) => b.score - a.score).slice(0, 5);
+
+    const productSummary = products.slice(0, 25).map(p => {
+      const cogs = cogsMap.get(p.shopifyProductId);
+      const price = parseFloat(p.price ?? "0");
+      const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
+      const audit = liveAudit.find(a => a.product.shopifyProductId === p.shopifyProductId);
+      return `- "${p.title}" | ${price.toFixed(2)}€ | ${p.status} | COGS: ${cogs ? cogs.totalCogs.toFixed(2) + "€" : "sin datos"} | Margen: ${margin != null ? margin.toFixed(0) + "%" : "N/A"} | SEO: ${audit ? audit.grade + " (" + audit.score + "/100)" : "N/A"} | Imgs: ${p.imageCount ?? 0} | Tipo: ${p.productType || "sin tipo"} | Handle: ${p.handle}`;
+    }).join("\n");
+
+    const seoIssuesSummary = worst5Seo.map(a =>
+      `- "${a.product.title}" SEO ${a.grade} (${a.score}/100): Meta title: ${a.hasMetaTitle ? "SI" : "NO"}, Meta desc: ${a.hasMetaDesc ? "SI" : "NO"}, Schema: ${a.hasSchema ? "SI" : "NO"}, Alt texts: ${a.hasAltTexts ? "SI" : "NO"}, Handle limpio: ${a.cleanHandle ? "SI" : "NO"}, Desc: ${a.descLen} chars`
+    ).join("\n");
+
+    const competitorList = competitors.slice(0, 5).map(c => `- ${c.name} (${c.url || "sin URL"}) — tipo: ${c.type || "direct"}`).join("\n");
+
+    const brainContext = await buildShopyBrainContext(project.storeNiche || undefined, "general", `analisis exhaustivo tienda ${project.name}`);
+
+    const dataBlock = `
+=== DATOS DE LA TIENDA ===
+Nombre: ${project.name}
+Dominio: ${project.shopDomain}
+Nicho: ${project.storeNiche || "No definido"}
+Tono de marca: ${project.brandTone || "No definido"}
+Audiencia objetivo: ${project.targetAudience || "No definida"}
+Mercados: ${project.storeMarkets || "No definidos"}
+
+=== CATALOGO ===
+Total productos: ${products.length} (${activeProducts.length} activos, ${products.length - activeProducts.length} borradores)
+Precio medio: ${avgPrice.toFixed(2)}€
+Rango: ${priceRange.min.toFixed(2)}€ – ${priceRange.max.toFixed(2)}€
+Mediana: ${(() => { const sorted = [...catalogPrices].sort((a, b) => a - b); return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)].toFixed(2) : "0.00"; })()}€
+Categorias: ${productTypes.join(", ") || "sin categorizar"}
+Visual DNA: ${visualDna.length > 0 ? JSON.stringify({ bg: visualDna[0].backgroundStyle, lighting: visualDna[0].lightingStyle, mood: visualDna[0].mood, composition: visualDna[0].composition }) : "No configurado"}
+
+=== SEO ===
+Score medio: ${avgSeo.toFixed(1)}/100 (Grade ${storeGrade})
+Con meta title: ${liveAudit.filter(a => a.hasMetaTitle).length}/${products.length}
+Con meta description: ${liveAudit.filter(a => a.hasMetaDesc).length}/${products.length}
+Con Schema JSON-LD: ${liveAudit.filter(a => a.hasSchema).length}/${products.length}
+Con alt texts: ${liveAudit.filter(a => a.hasAltTexts).length}/${products.length}
+Con handle limpio: ${liveAudit.filter(a => a.cleanHandle).length}/${products.length}
+Con descripcion +300 chars: ${liveAudit.filter(a => a.descLen >= 300).length}/${products.length}
+
+Top 5 PEORES SEO:
+${seoIssuesSummary}
+
+Top 5 MEJORES SEO:
+${best5Seo.map(a => `- "${a.product.title}" SEO ${a.grade} (${a.score}/100)`).join("\n")}
+
+=== FINANCIERO ===
+Valor catalogo total: ${totalCatalogValue.toFixed(2)}€
+COGS total registrado: ${totalCogs.toFixed(2)}€ (${allCogs.length}/${products.length} productos)
+Margen bruto medio: ${allCogs.length > 0 ? avgMargin.toFixed(1) + "%" : "sin datos COGS"}
+Revenue Shopify (ultimos 90 dias): ${totalRevenue.toFixed(2)}€
+Pedidos totales: ${totalOrders}
+AOV: ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) + "€" : "sin pedidos"}
+
+=== A/B TESTING ===
+Tests totales: ${tests.length}
+Activos: ${tests.filter(t => t.status === "running").length}
+Completados: ${tests.filter(t => t.status === "completed" || t.status === "winner_applied").length}
+
+=== COMPETIDORES ===
+${competitorList || "Sin competidores registrados"}
+
+=== DETALLE DE PRODUCTOS (hasta 25) ===
+${productSummary}
+`;
+
+    const systemPrompt = `Eres ShopyBrain, el motor de inteligencia artificial de una agencia Shopify profesional de alto nivel. Generas informes exhaustivos, estrategicos y profundamente analiticos para clientes de e-commerce.
+
+Tu analisis debe ser EXTENSO, DETALLADO, ESPECIFICO al negocio del cliente. No uses frases genericas ni recomendaciones vagas. Cada parrafo debe contener datos concretos del cliente, numeros exactos, y recomendaciones accionables con estimaciones de impacto.
+
+Escribe SIEMPRE en español. Usa lenguaje profesional pero accesible. Se exhaustivo — cuanto mas largo y detallado, mejor. Minimo 3-4 parrafos por seccion.
+
+${brainContext}`;
+
+    const userPrompt = `Genera un analisis EXHAUSTIVO y PROFUNDO de esta tienda Shopify. Responde en formato JSON con las siguientes claves (cada valor es texto largo en HTML con parrafos <p>, negritas <strong>, listas <ul><li>, etc.):
+
+${dataBlock}
+
+FORMATO JSON REQUERIDO:
+{
+  "executiveSummary": "Narrativa de 4-5 parrafos: estado general de la tienda, hallazgos criticos, fortalezas detectadas, debilidades principales, y una valoracion profesional honesta. Incluye datos numericos concretos.",
+  "brandAnalysis": "3-4 parrafos: analisis de coherencia de marca, alineacion entre nicho declarado y catalogo real, consistencia visual (basado en Visual DNA si existe), y recomendaciones de posicionamiento de marca con acciones concretas.",
+  "seoDeepAnalysis": "4-5 parrafos: diagnostico detallado de la situacion SEO actual con numeros exactos, analisis de los 5 peores productos y que les falta especificamente, oportunidades de quick-wins (que mejorar primero para maximo impacto), estrategia de schema markup, y plan de accion SEO priorizado por esfuerzo/impacto.",
+  "pricingStrategy": "4-5 parrafos: analisis de la estructura de precios actual, distribucion por rangos, coherencia de pricing dentro de cada categoria, oportunidades de pricing psicologico (con ejemplos concretos de productos), estrategia de compare-at-price, y recomendaciones de ajuste con estimacion de impacto en revenue.",
+  "financialAnalysis": "3-4 parrafos: analisis de margenes (si hay COGS), productos con margen critico, productos con margen saludable, estructura de costes, y recomendaciones para mejorar rentabilidad. Si no hay COGS, explicar por que es critico registrarlos y que impacto tiene no tenerlos.",
+  "productMixStrategy": "3-4 parrafos: analisis del mix de productos, oportunidades de bundle y cross-sell con productos ESPECIFICOS del catalogo (nombrar los productos), estrategia de upsell, productos ancla vs productos de entrada, y como optimizar el AOV.",
+  "competitivePosition": "2-3 parrafos: posicionamiento competitivo basado en los competidores registrados (o analisis general del nicho si no hay competidores), ventajas diferenciales, areas de mejora competitiva.",
+  "actionPlan30Days": "Lista HTML detallada de las 7-10 acciones prioritarias para los proximos 30 dias, ordenadas por impacto esperado. Cada accion debe incluir: que hacer exactamente, en que productos, resultado esperado, y nivel de esfuerzo (bajo/medio/alto). Usar <ol> con <li> detallados.",
+  "revenueProjection": "2-3 parrafos: proyeccion realista de revenue basada en los datos actuales, escenarios optimista/base/pesimista para 30/60/90 dias, y que palancas mover para alcanzar cada escenario."
+}
+
+IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nombrar productos concretos del catalogo), y con DATOS NUMERICOS del cliente. No uses placeholder ni contenido generico. El JSON debe ser valido.`;
+
+    const aiResponse = await askClaude(projectId, [{ role: "user", content: userPrompt }], systemPrompt, 8192);
+
+    let aiReport: Record<string, string>;
+    try {
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON found in response");
+      aiReport = JSON.parse(jsonMatch[0]);
+    } catch {
+      aiReport = { executiveSummary: aiResponse, raw: "true" };
+    }
+
+    await db.update(projectsTable)
+      .set({
+        aiReportJson: JSON.stringify(aiReport),
+        aiReportGeneratedAt: new Date(),
+      })
+      .where(eq(projectsTable.id, projectId));
+
+    res.json({
+      ok: true,
+      projectId,
+      sections: Object.keys(aiReport).length,
+      generatedAt: new Date().toISOString(),
+      preview: Object.fromEntries(
+        Object.entries(aiReport).map(([k, v]) => [k, typeof v === "string" ? v.substring(0, 200) + "..." : v])
+      ),
+    });
+  } catch (err: any) {
+    console.error("generate-ai-report error:", err);
+    res.status(500).json({ error: "Error generando analisis IA. Intentalo de nuevo." });
+  }
+});
+
 function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number } {
   const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
   const imgsInline = p.imagesJson as Array<{ alt: string | null }> | null;
@@ -898,6 +1070,11 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const esc = sanitizeHtml;
+
+  let aiReport: Record<string, string> | null = null;
+  if (project.aiReportJson) {
+    try { aiReport = JSON.parse(project.aiReportJson); } catch {}
+  }
 
   const activeProducts = products.filter(p => p.status === "active").length;
   const draftProducts = products.filter(p => p.status === "draft").length;
@@ -1174,6 +1351,38 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
 
   const reportTitle = "Auditoria Completa";
 
+  const sanitizeAiHtml = (html: string): string => {
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+      .replace(/<object[\s\S]*?<\/object>/gi, "")
+      .replace(/<embed[\s\S]*?>/gi, "")
+      .replace(/<form[\s\S]*?<\/form>/gi, "")
+      .replace(/<input[\s\S]*?>/gi, "")
+      .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
+      .replace(/<button[\s\S]*?<\/button>/gi, "")
+      .replace(/<link[\s\S]*?>/gi, "")
+      .replace(/<meta[\s\S]*?>/gi, "")
+      .replace(/<base[\s\S]*?>/gi, "")
+      .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+      .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+      .replace(/javascript\s*:/gi, "")
+      .replace(/data\s*:/gi, "data-blocked:")
+      .replace(/vbscript\s*:/gi, "");
+  };
+
+  const aiBlock = (key: string, fallback = "") => {
+    if (!aiReport || !aiReport[key]) return fallback;
+    const safeHtml = sanitizeAiHtml(aiReport[key]);
+    return `<div class="card" style="margin-top:16px;border-left:3px solid ${BRAND.gold};padding:20px 24px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:16px;">&#129504;</span>
+        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${BRAND.gold};">Analisis ShopyBrain AI</span>
+      </div>
+      <div style="font-size:13px;line-height:1.9;color:${BRAND.mutedLight};">${safeHtml}</div>
+    </div>`;
+  };
+
   const body = `
     <!-- PAGE 1: EXECUTIVE SUMMARY + TABLE OF CONTENTS -->
     <div class="section">
@@ -1201,6 +1410,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           </div>
         </div>
       </div>
+      ${aiBlock("executiveSummary")}
       <div class="metric-row">
         <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
         <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
@@ -1244,6 +1454,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
         ${vendors.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Proveedores (${vendors.length})</div><div>${vendors.map(v => `<span class="tag">${esc(v || "")}</span>`).join(" ")}</div></div>` : ""}
         ${visualDna.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Visual DNA</div><div class="stat-grid">${visualDna[0].backgroundStyle ? `<div class="stat-item"><div class="stat-item-label">Fondo</div><div class="stat-item-value">${esc(visualDna[0].backgroundStyle)}</div></div>` : ""}${visualDna[0].lightingStyle ? `<div class="stat-item"><div class="stat-item-label">Iluminacion</div><div class="stat-item-value">${esc(visualDna[0].lightingStyle)}</div></div>` : ""}${visualDna[0].mood ? `<div class="stat-item"><div class="stat-item-label">Mood</div><div class="stat-item-value">${esc(visualDna[0].mood)}</div></div>` : ""}${visualDna[0].composition ? `<div class="stat-item"><div class="stat-item-label">Composicion</div><div class="stat-item-value">${esc(visualDna[0].composition)}</div></div>` : ""}</div></div>` : ""}
         <div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de precios del catalogo</div>${priceDist}</div>
+        ${aiBlock("brandAnalysis")}
       </div>
     </div>
 
@@ -1272,6 +1483,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
             <tbody>${seoDetailRows}</tbody>
           </table>
         </div>
+        ${aiBlock("seoDeepAnalysis")}
       </div>
     </div>
 
@@ -1299,6 +1511,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           </table>
         </div>` : ""}
         ${priceHistoryRows ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Historial de cambios de precio</div><table><thead><tr><th>Fecha</th><th>Producto</th><th>Anterior</th><th>Nuevo</th><th>Cambio</th><th>Fuente</th></tr></thead><tbody>${priceHistoryRows}</tbody></table></div>` : ""}
+        ${aiBlock("financialAnalysis")}
       </div>
     </div>
 
@@ -1360,6 +1573,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           </table>
         </div>` : ""}
         ${competitors.length > 0 ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Competidores monitorizados</div><table><thead><tr><th>Competidor</th><th>URL</th><th>Tipo</th><th>Estado</th></tr></thead><tbody>${compRows}</tbody></table></div>` : ""}
+        ${aiBlock("pricingStrategy")}
+        ${aiBlock("competitivePosition")}
       </div>
     </div>
 
@@ -1416,6 +1631,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           })()}
           ${totalShopifyOrders > 0 && shopifyAov > 0 ? `<div class="recommendation recommendation-success">AOV actual: ${shopifyAov.toFixed(2)}€. Con bundles y upsell, objetivo: ${(shopifyAov * 1.25).toFixed(2)}€ (+25%).</div>` : ""}
         </div>
+        ${aiBlock("productMixStrategy")}
         ${totalShopifyOrders > 0 ? `<div class="card">
           <div class="stat-item-label" style="margin-bottom:12px;">Proyeccion de revenue (30 dias)</div>
           <div class="stat-grid">
@@ -1442,6 +1658,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
         ${issues.length > 0 ? `<div class="stat-item-label" style="margin:20px 0 12px;color:${BRAND.orange};">&#9888; Areas de mejora prioritarias</div>` : ""}
         ${issues.map(i => `<div class="recommendation recommendation-critical">${i}</div>`).join("")}
         ${issues.length === 0 && successes.length === 0 ? '<div class="recommendation recommendation-info">Completa la configuracion de costes y sincroniza ventas para obtener recomendaciones personalizadas.</div>' : ""}
+        ${aiBlock("actionPlan30Days")}
+        ${aiBlock("revenueProjection")}
       </div>
       <div class="section">
         <div class="section-header">
@@ -1481,7 +1699,9 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     body, date
   );
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.html"`);
+  if (req.query.view !== "true") {
+    res.setHeader("Content-Disposition", `attachment; filename="Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.html"`);
+  }
   res.send(html);
   } catch (err: any) {
     console.error("complete-report error:", err);
