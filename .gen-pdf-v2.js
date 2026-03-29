@@ -87,6 +87,13 @@ function chapter(s) {
   if (!pageHasContent && pageNum > 0) {
     currentSection = s;
     pageLog[pageLog.length - 1].section = s + ' (reused)';
+  } else if (pageNum > 0 && Y < PT + (PB - PT) * 0.35) {
+    Y += 10;
+    doc.moveTo(50, Y).lineTo(545, Y).strokeColor(GOLD).lineWidth(1).stroke();
+    Y += 18;
+    currentSection = s;
+    pageLog[pageLog.length - 1].section += ' + ' + s;
+    logContent('section-break');
   } else {
     newPage(s);
   }
@@ -191,23 +198,21 @@ function horizBar(label, cur, max, col) {
 }
 
 function dualHorizBar(label, before, after, max) {
-  need(22);
+  need(36);
+  doc.font('SansBold').fontSize(8).fillColor(WHITE).text(label, 50, Y, { width: 100, lineBreak: false });
+  const bw = 300; const x0 = 160;
   const pct = after > before ? Math.round(((after - before) / Math.max(before, 1)) * 100) : 0;
   const pctCol = pct > 100 ? GREEN : pct > 50 ? GOLD : ORANGE;
-  const bw = 180; const x0 = 145; const x1 = x0 + bw + 6;
-  doc.font('SansBold').fontSize(7.5).fillColor(WHITE).text(label, 50, Y + 2, { width: 90, lineBreak: false });
-  doc.roundedRect(x0, Y + 1, bw, 10, 3).fill(DARK3);
+  doc.roundedRect(x0, Y, bw, 10, 3).fill(DARK3);
   const fw1 = Math.max((before / max) * bw, 2);
-  doc.roundedRect(x0, Y + 1, fw1, 10, 3).fill('#4A4A5A');
-  doc.font('Sans').fontSize(6).fillColor(MUTED).text(String(before), x0 + fw1 + 3, Y + 2, { lineBreak: false });
-  doc.font('Sans').fontSize(7).fillColor(MUTED).text('\u2192', x1, Y + 1, { lineBreak: false });
-  const x2 = x1 + 14;
-  doc.roundedRect(x2, Y + 1, bw, 10, 3).fill(DARK3);
+  doc.roundedRect(x0, Y, fw1, 10, 3).fill('#3A3A4A');
+  doc.font('Sans').fontSize(6).fillColor(MUTED).text(String(before), x0 + fw1 + 4, Y + 1, { lineBreak: false });
+  doc.roundedRect(x0, Y + 14, bw, 10, 3).fill(DARK3);
   const fw2 = Math.max((after / max) * bw, 2);
-  doc.roundedRect(x2, Y + 1, fw2, 10, 3).fill(pctCol);
-  doc.font('SansBold').fontSize(6).fillColor(WHITE).text(String(after), x2 + fw2 + 3, Y + 2, { lineBreak: false });
-  doc.font('SansBold').fontSize(8).fillColor(pctCol).text('+' + pct + '%', x2 + bw + 8, Y + 1, { lineBreak: false });
-  Y += 18;
+  doc.roundedRect(x0, Y + 14, fw2, 10, 3).fill(pctCol);
+  doc.font('SansBold').fontSize(6).fillColor(WHITE).text(String(after), x0 + fw2 + 4, Y + 15, { lineBreak: false });
+  doc.font('SansBold').fontSize(9).fillColor(pctCol).text('+' + pct + '%', x0 + bw + 15, Y + 7, { lineBreak: false });
+  Y += 30;
   logContent('dualBar');
 }
 
@@ -392,9 +397,8 @@ barChart([
   { l: 'Imgs', b: 1.2, a: 8, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
-], 'KPIs Clave: Estado Actual vs Post-Optimizaci\u00f3n', 100);
+], 'KPIs Clave: Estado Actual vs Post-Optimizaci\u00f3n', 120);
 p('El multiplicador \u00d72.8\u20133.5 en revenue resulta de la combinaci\u00f3n de mejoras en conversi\u00f3n (+150%), AOV (+45%), tr\u00e1fico org\u00e1nico (+120%) y trust (+20%). No es suma lineal sino multiplicaci\u00f3n de factores independientes.', { fontSize: 9, color: MUTED });
-p('Conclusi\u00f3n del Resumen Ejecutivo: La tienda Comic Crafter tiene un potencial masivo de mejora. Los 29 productos requieren intervenci\u00f3n en 5 \u00e1reas clave. Con la optimizaci\u00f3n completa, el score pasar\u00eda de 37 (D) a 93 (A), multiplicando el revenue por 2.8\u20133.5x.', { fontSize: 9, color: MUTED });
 
 // ================================================================
 //  CAP 2 \u2014 AUDITOR\u00cdA DE CAT\u00c1LOGO
@@ -444,8 +448,7 @@ barChart([
   { l: 'Creativos', b: 66, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'SaaS/Packs', b: 56, a: 92, bc: RED, ac: GREEN },
   { l: 'Media Total', b: 37, a: 93, bc: RED, ac: GREEN },
-], 'Score por Categor\u00eda: Antes vs Despu\u00e9s de Optimizaci\u00f3n', 100);
-p('Conclusi\u00f3n: Los productos creativos (Comic Crafter) tienen mejor base (66 vs 56) pero ambas categor\u00edas necesitan optimizaci\u00f3n integral. La categor\u00eda SaaS/Packs requiere intervenci\u00f3n prioritaria: descripciones m\u00ednimas, 1 imagen por producto, sin trust signals ni SEO t\u00e9cnico.', { fontSize: 9, color: MUTED });
+], 'Score por Categor\u00eda: Antes vs Despu\u00e9s de Optimizaci\u00f3n', 130);
 
 // ================================================================
 //  CAP 3 \u2014 7 DIMENSIONES
@@ -641,7 +644,7 @@ barChart([
   { l: 'Schema', b: 0.5, a: 95, bc: RED, ac: GREEN },
   { l: 'Links', b: 10, a: 80, bc: RED, ac: GREEN },
   { l: 'Keywords', b: 40, a: 90, bc: ORANGE, ac: GREEN },
-], 'Score SEO por Criterio: Actual vs Post-Optimizaci\u00f3n', 120);
+], 'Score SEO por Criterio: Actual vs Post-Optimizaci\u00f3n', 140);
 p('Proyecci\u00f3n: Con SEO completo implementado, el tr\u00e1fico org\u00e1nico puede incrementarse un 60-120% en 6 meses. Nicho de c\u00f3mics y arte digital en Espa\u00f1a: competencia moderada-baja, alta oportunidad.', { fontSize: 9, color: MUTED });
 
 // ================================================================
@@ -686,7 +689,7 @@ barChart([
   { l: 'Competidor Medio', b: 5, a: 5, bc: ORANGE, ac: ORANGE },
   { l: 'Top Sellers', b: 10, a: 10, bc: GREEN, ac: GREEN },
   { l: 'Est\u00e1ndar WC', b: 8, a: 8, bc: GOLD, ac: GOLD },
-], 'Im\u00e1genes/Producto: Comic Crafter vs Mercado', 100);
+], 'Im\u00e1genes/Producto: Comic Crafter vs Mercado', 130);
 
 h3('Coste de Generaci\u00f3n IA vs Fotograf\u00eda Tradicional');
 tbl(['M\u00e9todo', 'Coste/Prod', '29 Productos', 'Tiempo', 'Calidad'],
@@ -700,7 +703,6 @@ impactCards([
   { value: '2-3h', label: 'Tiempo Generaci\u00f3n', sub: '232 im\u00e1genes con IA', color: GOLD, sub_color: GOLD },
   { value: '+50%', label: 'Boost Conversi\u00f3n', sub: 'Con 8 imgs/producto', color: GREEN, sub_color: GREEN },
 ]);
-p('Conclusi\u00f3n: Las im\u00e1genes son la debilidad m\u00e1s cr\u00edtica y la oportunidad m\u00e1s grande. Pasar de 1.2 a 8 im\u00e1genes por producto con generaci\u00f3n IA (Flux 1.1 Pro) cuesta solo \u20ac7.25 para todo el cat\u00e1logo vs \u20ac1.450-5.800 con fotograf\u00eda tradicional, con un impacto directo del +30-50% en conversi\u00f3n.', { fontSize: 9, color: MUTED });
 
 // ================================================================
 //  CAP 7 \u2014 ANTES VS DESPU\u00c9S
@@ -726,7 +728,7 @@ barChart([
   { l: 'Im\u00e1genes', b: 24, a: 95, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
-], 'Score por Dimensi\u00f3n: ANTES vs DESPU\u00c9S', 130);
+], 'Score por Dimensi\u00f3n: ANTES vs DESPU\u00c9S', 150);
 
 h3('Impacto en M\u00e9tricas de Negocio');
 tbl(['M\u00e9trica', 'Antes (Real)', 'Despu\u00e9s', 'Mejora', 'Fuente'],
@@ -842,7 +844,7 @@ barChart([
   { l: 'Conservador', b: 1200, a: 2818, bc: RED, ac: ORANGE },
   { l: 'Base', b: 1200, a: 6282, bc: RED, ac: GOLD },
   { l: 'Optimista', b: 1200, a: 13159, bc: RED, ac: GREEN },
-], 'Revenue Acumulado 6 Meses (\u20ac)', 95);
+], 'Revenue Acumulado 6 Meses (\u20ac)', 110);
 p('El escenario BASE proyecta un crecimiento de \u20ac1.200 actuales a \u20ac6.282 en revenue acumulado a 6 meses. En el escenario OPTIMISTA, el revenue acumulado alcanza \u20ac13.159.', { fontSize: 9, color: MUTED });
 
 // ================================================================
@@ -893,7 +895,7 @@ barChart([
   { l: 'Pack Premium', v: 404, c: GREEN },
   { l: 'Growth 6M', v: 257, c: GOLD },
   { l: 'Growth Opt.', v: 604, c: GREEN },
-], 'ROI Comparativo por Opci\u00f3n de Inversi\u00f3n (%)', 95);
+], 'ROI Comparativo por Opci\u00f3n de Inversi\u00f3n (%)', 110);
 
 impactCards([
   { value: '404%', label: 'ROI Pack Premium', sub: '\u20ac1 invertido \u2192 \u20ac4.04 retorno', color: GREEN, sub_color: GREEN },
