@@ -1186,6 +1186,18 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             design_all_pages: "📄 **Diseñando páginas de la tienda...**\n\n**Paso 1** — Analizando nicho y marca\n**Paso 2** — Claude genera contenido profesional para cada página\n**Paso 3** — Creando páginas en Shopify\n\n_⏱️ ~10 segundos por página..._",
             search_suppliers: "🔍 **Investigando proveedores...**\n\n**Paso 1** — 6 búsquedas Google paralelas (proveedores, fábricas, mayoristas...)\n**Paso 2** — Analizando costes, MOQs y tiempos de entrega\n**Paso 3** — Claude genera informe estratégico\n\n_⏱️ 30-60 segundos..._",
             diagnose_app: "🔬 **Diagnóstico de la app en curso...**\n\n**Paso 1** — Verificando tokens y conectividad\n**Paso 2** — Comprobando sincronización de datos\n**Paso 3** — Reparando automáticamente lo que sea posible\n\n_⏱️ 10-20 segundos..._",
+            create_product: "🛍️ **Creando producto profesional 100/100...**\n\n**Paso 1** — Investigando precios del mercado real\n**Paso 2** — Claude genera título SEO + descripción 800-1200 palabras\n**Paso 3** — Generando tags, meta tags y schema\n**Paso 4** — Generando imágenes IA profesionales\n\n_⏱️ ~15-30 segundos por producto..._",
+            redesign_product: "✨ **Rediseñando producto con calidad 100/100...**\n\n**Paso 1** — Analizando producto actual\n**Paso 2** — Generando nuevo contenido Semrush-level\n**Paso 3** — Optimizando SEO + pricing\n\n_⏱️ ~15 segundos..._",
+            bulk_redesign: "🚀 **Rediseño masivo en curso...**\n\n**Paso 1** — Cargando catálogo completo\n**Paso 2** — Claude rediseña cada producto con calidad 100/100\n\n_⏱️ ~10 segundos por producto..._",
+            seo_full_audit: "🔍 **Auditoría SEO Semrush-level en curso...**\n\n**Paso 1** — Evaluando 16 criterios ponderados por producto\n**Paso 2** — Keyword consistency + readability analysis\n**Paso 3** — Generando plan de mejoras priorizado\n\n_⏱️ 15-30 segundos..._",
+            keyword_intelligence: "🔑 **Investigando keywords...**\n\n**Paso 1** — Buscando volumen y dificultad con Google Search\n**Paso 2** — Analizando autocomplete y People Also Ask\n**Paso 3** — Generando estrategia de keywords\n\n_⏱️ 15-30 segundos..._",
+            blog_strategy: "📝 **Generando estrategia de blog...**\n\n**Paso 1** — Analizando productos y nicho\n**Paso 2** — Creando pillar content + cluster topics\n**Paso 3** — Generando calendario editorial\n\n_⏱️ 20-40 segundos..._",
+            generate_blog_post: "📄 **Escribiendo artículo SEO...**\n\n**Paso 1** — Investigando keyword objetivo\n**Paso 2** — Claude escribe artículo optimizado\n\n_⏱️ 15-30 segundos..._",
+            setup_full_store: "🏗️ **Configuración completa de tienda...**\n\n**Paso 1** — Sincronizando productos\n**Paso 2** — Generando meta tags SEO\n**Paso 3** — Optimizando alt texts\n**Paso 4** — Generando schemas JSON-LD\n\n_⏱️ 30-60 segundos..._",
+            generate_email_flow: "📧 **Creando flujo de email marketing...**\n\n**Paso 1** — Analizando tienda y nicho\n**Paso 2** — Generando secuencia de emails con IA\n**Paso 3** — Optimizando asuntos y contenido\n\n_⏱️ 20-40 segundos..._",
+            financial_forecast: "📊 **Generando forecast financiero...**\n\n**Paso 1** — Analizando datos históricos\n**Paso 2** — Calculando escenarios\n**Paso 3** — Proyectando revenue a 6 meses\n\n_⏱️ 15-30 segundos..._",
+            agency_proposal: "📋 **Generando propuesta comercial...**\n\n**Paso 1** — Analizando tienda del cliente\n**Paso 2** — Calculando servicios necesarios\n**Paso 3** — Creando propuesta profesional\n\n_⏱️ 20-40 segundos..._",
+            bulk_generate_images: "🎨 **Generando imágenes IA en lote...**\n\n**Paso 1** — Preparando prompts por producto\n**Paso 2** — Flux genera imágenes profesionales\n\n_⏱️ ~3 segundos por imagen..._",
           };
 
           const allActions = d.detectedActions ?? (d.detectedAction ? [d.detectedAction] : []);
@@ -1225,7 +1237,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
 
       setMessages(m => {
-        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda Shopify", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia"];
+        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda Shopify", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA"];
         const filtered = m.filter(msg => !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });
