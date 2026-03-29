@@ -30,40 +30,46 @@ let pageNum = 0;
 let Y = 65;
 let currentSection = '';
 let pageHasContent = false;
+let isCover = false;
 const PT = 58;
-const PB = 775;
+const PB = 770;
 const pageLog = [];
 
-function bg() { doc.rect(0, 0, 595, 842).fill(DARK); }
+function drawBg() { doc.save(); doc.rect(0, 0, 595, 842).fill(DARK); doc.restore(); }
 
-function hdr(s) {
-  doc.font('SansBold').fontSize(9).fillColor(GOLD).text('SC', 50, 28);
-  doc.font('Sans').fontSize(8).fillColor(MUTED).text(s, 80, 30, { width: 465, align: 'right' });
+function drawHdr(s) {
+  doc.save();
+  doc.font('SansBold').fontSize(9).fillColor(GOLD).text('SC', 50, 28, { lineBreak: false });
+  doc.font('Sans').fontSize(8).fillColor(MUTED).text(s, 80, 30, { width: 465, align: 'right', lineBreak: false });
   doc.moveTo(50, 46).lineTo(545, 46).strokeColor(LINE).lineWidth(0.5).stroke();
+  doc.restore();
 }
 
-function ftr() {
+function drawFtr(pn) {
+  doc.save();
   doc.moveTo(50, 790).lineTo(545, 790).strokeColor(LINE).lineWidth(0.5).stroke();
-  doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Shopy Crafter \u2014 Informe Ejecutivo 2026', 50, 796, { width: 200 });
-  doc.font('Sans').fontSize(7).fillColor(MUTED).text('Confidencial', 250, 796, { width: 95, align: 'center' });
-  doc.font('Sans').fontSize(7).fillColor(MUTED).text('P\u00e1gina ' + pageNum, 400, 796, { width: 145, align: 'right' });
+  doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Shopy Crafter \u2014 Informe Ejecutivo 2026', 50, 796, { width: 200, lineBreak: false });
+  doc.font('Sans').fontSize(7).fillColor(MUTED).text('Confidencial', 250, 796, { width: 95, align: 'center', lineBreak: false });
+  doc.font('Sans').fontSize(7).fillColor(MUTED).text('P\u00e1gina ' + pn, 400, 796, { width: 145, align: 'right', lineBreak: false });
+  doc.restore();
 }
 
 function newPage(section) {
   doc.addPage({ size: 'A4', margin: 50 });
   pageNum++;
-  bg();
-  if (section) { currentSection = section; hdr(section); }
-  ftr();
+  drawBg();
+  if (section) currentSection = section;
+  drawHdr(currentSection);
+  drawFtr(pageNum);
   Y = PT;
   pageHasContent = false;
-  pageLog.push({ page: pageNum, section: section || currentSection, content: [] });
+  pageLog.push({ page: pageNum, section: currentSection, content: [] });
 }
 
 function coverPage() {
   doc.addPage({ size: 'A4', margin: 50 });
   pageNum++;
-  bg();
+  drawBg();
   Y = PT;
   pageHasContent = true;
   pageLog.push({ page: pageNum, section: 'PORTADA', content: ['cover'] });
@@ -75,16 +81,12 @@ function logContent(what) {
 }
 
 function need(h) {
-  if (Y + h > PB) {
-    newPage(currentSection);
-  }
+  if (Y + h > PB) newPage();
 }
 
 function chapter(s) {
   if (!pageHasContent && pageNum > 0) {
     currentSection = s;
-    hdr(s);
-    Y = PT;
     pageLog[pageLog.length - 1].section = s + ' (reused)';
   } else {
     newPage(s);
@@ -93,14 +95,14 @@ function chapter(s) {
 
 function h2g(a, b) {
   need(42);
-  doc.font('SansBold').fontSize(18).fillColor(WHITE).text(a, 50, Y, { continued: true }).fillColor(GOLD).text(b);
+  doc.font('SansBold').fontSize(18).fillColor(WHITE).text(a, 50, Y, { continued: true }).fillColor(GOLD).text(b, { lineBreak: false });
   Y += 30;
   logContent('h2: ' + a + b);
 }
 
 function h3(t) {
   need(36);
-  doc.font('SansBold').fontSize(13).fillColor(GOLD).text(t, 50, Y, { width: 495 });
+  doc.font('SansBold').fontSize(13).fillColor(GOLD).text(t, 50, Y, { width: 495, lineBreak: false });
   Y += 22;
   logContent('h3: ' + t.substring(0, 40));
 }
@@ -111,18 +113,18 @@ function p(text, opts) {
   const fn = (opts && opts.bold) ? 'SansBold' : 'Sans';
   doc.font(fn).fontSize(sz).fillColor(col);
   const h = doc.heightOfString(text, { width: 495, lineGap: 3 });
-  need(h + 8);
-  doc.text(text, 50, Y, { width: 495, lineGap: 3 });
+  need(h + 12);
+  doc.text(text, 50, Y, { width: 495, lineGap: 3, height: h + 4 });
   Y += h + 10;
-  logContent('p: ' + text.substring(0, 30) + '...');
+  logContent('p');
 }
 
 function checks(items) {
   items.forEach(item => {
     doc.font('Sans').fontSize(10);
     const h = doc.heightOfString(item, { width: 465 }) + 2;
-    need(h + 4);
-    doc.font('Sans').fontSize(10).fillColor(GREEN).text('\u2713 ', 55, Y, { continued: true }).fillColor(TEXT).text(item, { width: 465, lineGap: 2 });
+    need(h + 6);
+    doc.font('Sans').fontSize(10).fillColor(GREEN).text('\u2713 ', 55, Y, { continued: true }).fillColor(TEXT).text(item, { width: 465, lineGap: 2, height: h + 2 });
     Y += h + 4;
     logContent('check');
   });
@@ -135,11 +137,11 @@ function tbl(headers, rows, cw, opts) {
   doc.rect(x0, Y, tw, 18).fill(DARK3);
   let cx = x0;
   headers.forEach((hd, i) => {
-    doc.font('SansBold').fontSize(6.5).fillColor(GOLD).text(hd.toUpperCase(), cx + pd, Y + 5, { width: cw[i] - pd * 2 });
+    doc.font('SansBold').fontSize(6.5).fillColor(GOLD).text(hd.toUpperCase(), cx + pd, Y + 5, { width: cw[i] - pd * 2, height: 12, lineBreak: false });
     cx += cw[i];
   });
   Y += 18;
-  logContent('tbl-hdr: ' + headers[0]);
+  logContent('tbl-hdr');
 
   rows.forEach((row, ri) => {
     const hs = row.map((c, ci) => {
@@ -155,7 +157,7 @@ function tbl(headers, rows, cw, opts) {
       const pc = opts && opts.priceCol === ci;
       const isFirst = ci === 0;
       doc.font(isFirst ? 'SansBold' : 'Sans').fontSize(7.5).fillColor(pc ? GOLD : (isFirst ? WHITE : TEXT));
-      doc.text(String(c), cx + pd, Y + 3, { width: cw[ci] - pd * 2, lineGap: 1 });
+      doc.text(String(c), cx + pd, Y + 3, { width: cw[ci] - pd * 2, height: rh - 4, lineBreak: true, ellipsis: true });
       cx += cw[ci];
     });
     doc.moveTo(x0, Y + rh).lineTo(x0 + tw, Y + rh).strokeColor(LINE2).lineWidth(0.3).stroke();
@@ -172,8 +174,8 @@ function statRow(stats) {
     const x = 50 + i * (w + 8);
     doc.roundedRect(x, Y, w, 60, 6).fill(DARK2);
     doc.roundedRect(x, Y, w, 3, 3).fill(s.color || GOLD);
-    doc.font('SansBold').fontSize(22).fillColor(s.color || GOLD).text(s.v, x, Y + 12, { width: w, align: 'center' });
-    doc.font('Sans').fontSize(6.5).fillColor(MUTED).text(s.l.toUpperCase(), x, Y + 40, { width: w, align: 'center' });
+    doc.font('SansBold').fontSize(22).fillColor(s.color || GOLD).text(s.v, x, Y + 12, { width: w, align: 'center', height: 26, lineBreak: false });
+    doc.font('Sans').fontSize(6.5).fillColor(MUTED).text(s.l.toUpperCase(), x, Y + 40, { width: w, align: 'center', height: 14, lineBreak: false });
   });
   Y += 70;
   logContent('statRow');
@@ -181,22 +183,22 @@ function statRow(stats) {
 
 function horizBar(label, cur, max, col) {
   need(26);
-  doc.font('SansBold').fontSize(9).fillColor(WHITE).text(label, 50, Y + 2, { width: 135 });
+  doc.font('SansBold').fontSize(9).fillColor(WHITE).text(label, 50, Y + 2, { width: 135, height: 14, lineBreak: false });
   const bw = 270; const x0 = 195;
   doc.roundedRect(x0, Y, bw, 14, 4).fill(DARK3);
   const fw = Math.max((cur / max) * bw, 4);
   const c = col || (cur / max > 0.7 ? GREEN : cur / max > 0.4 ? ORANGE : RED);
   doc.roundedRect(x0, Y, fw, 14, 4).fill(c);
-  doc.font('SansBold').fontSize(8).fillColor(WHITE).text(cur + '/100', x0 + bw + 10, Y + 2);
+  doc.font('SansBold').fontSize(8).fillColor(WHITE).text(cur + '/100', x0 + bw + 10, Y + 2, { lineBreak: false });
   Y += 24;
-  logContent('bar: ' + label);
+  logContent('bar');
 }
 
 function barChart(data, title, ch) {
   ch = ch || 150;
   const total = ch + 55;
   need(total);
-  if (title) { doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(title, 50, Y, { width: 495, align: 'center' }); Y += 14; }
+  if (title) { doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(title, 50, Y, { width: 495, align: 'center', lineBreak: false }); Y += 14; }
   const sy = Y;
   const barH = ch - 15;
   const maxV = Math.max(...data.map(d => Math.max(d.b || 0, d.a || 0, d.v || 0)));
@@ -205,7 +207,7 @@ function barChart(data, title, ch) {
   for (let i = 0; i <= 4; i++) {
     const ly = sy + 8 + (barH / 4) * i;
     doc.moveTo(78, ly).lineTo(540, ly).strokeColor('#1A1A2A').lineWidth(0.3).stroke();
-    doc.font('Sans').fontSize(5.5).fillColor(MUTED).text(String(Math.round(maxV - (maxV / 4) * i)), 50, ly - 3, { width: 25, align: 'right' });
+    doc.font('Sans').fontSize(5.5).fillColor(MUTED).text(String(Math.round(maxV - (maxV / 4) * i)), 50, ly - 3, { width: 25, align: 'right', lineBreak: false });
   }
 
   const dual = data[0].b !== undefined;
@@ -219,27 +221,27 @@ function barChart(data, title, ch) {
       const h2 = ((d.a || 0) / maxV) * barH;
       if (h1 > 0) doc.roundedRect(gx, sy + 8 + barH - h1, bw, h1, 2).fill(d.bc || '#3A3A4A');
       if (h2 > 0) doc.roundedRect(gx + bw + 2, sy + 8 + barH - h2, bw, h2, 2).fill(d.ac || GOLD);
-      if (d.b > 0) doc.font('Sans').fontSize(5).fillColor(MUTED).text(String(Math.round(d.b)), gx, sy + 5 + barH - h1, { width: bw, align: 'center' });
-      if (d.a > 0) doc.font('SansBold').fontSize(5).fillColor(GOLD).text(String(Math.round(d.a)), gx + bw + 2, sy + 5 + barH - h2, { width: bw, align: 'center' });
+      if (d.b > 0) doc.font('Sans').fontSize(5).fillColor(MUTED).text(String(Math.round(d.b)), gx, sy + 5 + barH - h1, { width: bw, align: 'center', lineBreak: false });
+      if (d.a > 0) doc.font('SansBold').fontSize(5).fillColor(GOLD).text(String(Math.round(d.a)), gx + bw + 2, sy + 5 + barH - h2, { width: bw, align: 'center', lineBreak: false });
     } else {
       const hv = ((d.v || 0) / maxV) * barH;
       if (hv > 0) doc.roundedRect(gx + (gw - bw) / 2, sy + 8 + barH - hv, bw, hv, 2).fill(d.c || GOLD);
-      doc.font('Sans').fontSize(5).fillColor(WHITE).text(String(Math.round(d.v)), gx, sy + 4 + barH - hv, { width: gw - 4, align: 'center' });
+      doc.font('Sans').fontSize(5).fillColor(WHITE).text(String(Math.round(d.v)), gx, sy + 4 + barH - hv, { width: gw - 4, align: 'center', lineBreak: false });
     }
-    doc.font('Sans').fontSize(6).fillColor(MUTED).text(d.l, gx - 2, sy + ch + 3, { width: gw + 4, align: 'center' });
+    doc.font('Sans').fontSize(6).fillColor(MUTED).text(d.l, gx - 2, sy + ch + 3, { width: gw + 4, align: 'center', lineBreak: false });
   });
 
   if (dual) {
     const ly = sy + ch + 18;
     doc.roundedRect(200, ly, 8, 8, 2).fill('#3A3A4A');
-    doc.font('Sans').fontSize(7).fillColor(MUTED).text('Actual', 212, ly + 1);
+    doc.font('Sans').fontSize(7).fillColor(MUTED).text('Actual', 212, ly + 1, { lineBreak: false });
     doc.roundedRect(280, ly, 8, 8, 2).fill(GOLD);
-    doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Optimizado', 292, ly + 1);
+    doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Optimizado', 292, ly + 1, { lineBreak: false });
     Y = ly + 16;
   } else {
     Y = sy + ch + 18;
   }
-  logContent('chart: ' + (title || '').substring(0, 30));
+  logContent('chart');
 }
 
 // ================================================================
@@ -247,15 +249,15 @@ function barChart(data, title, ch) {
 // ================================================================
 coverPage();
 doc.roundedRect(197, 80, 200, 22, 11).strokeColor(GOLD).lineWidth(1).stroke();
-doc.font('SansBold').fontSize(8).fillColor(GOLD).text('DOCUMENTO CONFIDENCIAL', 197, 86, { width: 200, align: 'center' });
+doc.font('SansBold').fontSize(8).fillColor(GOLD).text('DOCUMENTO CONFIDENCIAL', 197, 86, { width: 200, align: 'center', lineBreak: false });
 doc.roundedRect(247, 125, 60, 60, 14).fill(GOLD);
-doc.font('SansBold').fontSize(28).fillColor(DARK).text('SC', 247, 143, { width: 60, align: 'center' });
-doc.font('SansBold').fontSize(32).fillColor(WHITE).text('Informe de Auditor\u00eda y', 0, 218, { align: 'center' });
-doc.font('SansBold').fontSize(32).fillColor(GOLD).text('Plan de Optimizaci\u00f3n', 0, 256, { align: 'center' });
+doc.font('SansBold').fontSize(28).fillColor(DARK).text('SC', 247, 143, { width: 60, align: 'center', lineBreak: false });
+doc.font('SansBold').fontSize(32).fillColor(WHITE).text('Informe de Auditor\u00eda y', 0, 218, { align: 'center', width: 595, lineBreak: false });
+doc.font('SansBold').fontSize(32).fillColor(GOLD).text('Plan de Optimizaci\u00f3n', 0, 256, { align: 'center', width: 595, lineBreak: false });
 doc.moveTo(247, 302).lineTo(347, 302).strokeColor(GOLD).lineWidth(2).stroke();
-doc.font('SansBold').fontSize(20).fillColor(WHITE).text('Comic Crafter', 0, 320, { align: 'center' });
-doc.font('Sans').fontSize(11).fillColor(MUTED).text('comic-crafter.myshopify.com', 0, 348, { align: 'center' });
-doc.font('Sans').fontSize(10).fillColor(MUTED).text('An\u00e1lisis exhaustivo con datos reales de los 29 productos del cat\u00e1logo.\nDiagn\u00f3stico por dimensiones, proyecciones de mejora cuantificadas\ny plan de acci\u00f3n priorizado por impacto en revenue.', 50, 385, { align: 'center', lineGap: 5, width: 495 });
+doc.font('SansBold').fontSize(20).fillColor(WHITE).text('Comic Crafter', 0, 320, { align: 'center', width: 595, lineBreak: false });
+doc.font('Sans').fontSize(11).fillColor(MUTED).text('comic-crafter.myshopify.com', 0, 348, { align: 'center', width: 595, lineBreak: false });
+doc.font('Sans').fontSize(10).fillColor(MUTED).text('An\u00e1lisis exhaustivo con datos reales de los 29 productos del cat\u00e1logo.\nDiagn\u00f3stico por dimensiones, proyecciones de mejora cuantificadas\ny plan de acci\u00f3n priorizado por impacto en revenue.', 50, 385, { align: 'center', lineGap: 5, width: 495, height: 60 });
 const my = 475; const c1 = 100, c2 = 310;
 [['TIENDA', 'Comic Crafter', 'NICHO', 'C\u00f3mics y Arte Digital', 0],
  ['DOMINIO', 'comic-crafter.myshopify.com', 'MERCADO', 'Espa\u00f1a (EUR)', 38],
@@ -263,10 +265,10 @@ const my = 475; const c1 = 100, c2 = 310;
  ['PREPARADO POR', 'Shopy Crafter (OmniCore AI)', 'FECHA', 'Marzo 2026', 114],
  ['CONTACTO', 'craftershopy@gmail.com', 'WEB', 'shopycrafter.com', 152],
 ].forEach(([l1, v1, l2, v2, dy]) => {
-  doc.font('SansBold').fontSize(7).fillColor(GOLD).text(l1, c1, my + dy);
-  doc.font('Sans').fontSize(10).fillColor(TEXT).text(v1, c1, my + dy + 12);
-  doc.font('SansBold').fontSize(7).fillColor(GOLD).text(l2, c2, my + dy);
-  doc.font('Sans').fontSize(10).fillColor(l2 === 'SCORE ACTUAL' ? RED : TEXT).text(v2, c2, my + dy + 12);
+  doc.font('SansBold').fontSize(7).fillColor(GOLD).text(l1, c1, my + dy, { lineBreak: false });
+  doc.font('Sans').fontSize(10).fillColor(TEXT).text(v1, c1, my + dy + 12, { lineBreak: false });
+  doc.font('SansBold').fontSize(7).fillColor(GOLD).text(l2, c2, my + dy, { lineBreak: false });
+  doc.font('Sans').fontSize(10).fillColor(l2 === 'SCORE ACTUAL' ? RED : TEXT).text(v2, c2, my + dy + 12, { lineBreak: false });
 });
 
 // ================================================================
@@ -292,9 +294,9 @@ Y += 4;
 ].forEach(([num, title, desc]) => {
   need(42);
   doc.moveTo(50, Y + 36).lineTo(545, Y + 36).strokeColor(LINE2).lineWidth(0.3).stroke();
-  doc.font('SansBold').fontSize(12).fillColor(GOLD).text(num, 55, Y + 4);
-  doc.font('SansBold').fontSize(11).fillColor(WHITE).text(title, 82, Y + 5);
-  doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(desc, 82, Y + 22, { width: 440 });
+  doc.font('SansBold').fontSize(12).fillColor(GOLD).text(num, 55, Y + 4, { lineBreak: false });
+  doc.font('SansBold').fontSize(11).fillColor(WHITE).text(title, 82, Y + 5, { lineBreak: false });
+  doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(desc, 82, Y + 22, { width: 440, lineBreak: false });
   Y += 42;
   logContent('idx-' + num);
 });
@@ -563,12 +565,12 @@ h3('Score SEO por Criterio (16 Criterios)');
  ['Content Quality', 65, 'Decente pero sin estructura SEO']
 ].forEach(([name, score, note]) => {
   need(20);
-  doc.font('SansBold').fontSize(7.5).fillColor(WHITE).text(name, 50, Y + 1, { width: 100 });
+  doc.font('SansBold').fontSize(7.5).fillColor(WHITE).text(name, 50, Y + 1, { width: 100, lineBreak: false });
   doc.roundedRect(155, Y, 195, 13, 4).fill(DARK3);
   const fw = Math.max((score / 100) * 195, score > 0 ? 4 : 0);
   doc.roundedRect(155, Y, fw, 13, 4).fill(score >= 70 ? GREEN : score >= 40 ? ORANGE : RED);
-  doc.font('SansBold').fontSize(7).fillColor(WHITE).text(score + '%', 355, Y + 2);
-  doc.font('Sans').fontSize(7).fillColor(MUTED).text(note, 380, Y + 1, { width: 165 });
+  doc.font('SansBold').fontSize(7).fillColor(WHITE).text(score + '%', 355, Y + 2, { lineBreak: false });
+  doc.font('Sans').fontSize(7).fillColor(MUTED).text(note, 380, Y + 1, { width: 165, lineBreak: false });
   Y += 18;
   logContent('seo-bar');
 });
@@ -857,13 +859,13 @@ if (Y + closingH > PB) {
 }
 doc.moveTo(50, Y).lineTo(545, Y).strokeColor(LINE).lineWidth(0.5).stroke(); Y += 25;
 doc.roundedRect(247, Y, 60, 60, 14).fill(GOLD);
-doc.font('SansBold').fontSize(28).fillColor(DARK).text('SC', 247, Y + 18, { width: 60, align: 'center' });
+doc.font('SansBold').fontSize(28).fillColor(DARK).text('SC', 247, Y + 18, { width: 60, align: 'center', lineBreak: false });
 Y += 75;
-doc.font('SansBold').fontSize(22).fillColor(GOLD).text('Shopy ', 0, Y, { continued: true, align: 'center', width: 595 }).fillColor(WHITE).text('Crafter'); Y += 35;
-doc.font('Sans').fontSize(11).fillColor(MUTED).text('La agencia Shopify que trabaja 24/7 por ti', 0, Y, { align: 'center', width: 595 }); Y += 22;
-doc.font('Sans').fontSize(9).fillColor(MUTED).text('craftershopy@gmail.com  \u00b7  shopycrafter.com', 0, Y, { align: 'center', width: 595 }); Y += 22;
-doc.font('Sans').fontSize(8).fillColor(MUTED).text('\u00a9 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595 }); Y += 14;
-doc.font('Sans').fontSize(7).fillColor(MUTED).text('Generado con datos reales de Comic Crafter \u2014 Marzo 2026', 0, Y, { align: 'center', width: 595 });
+doc.font('SansBold').fontSize(22).fillColor(GOLD).text('Shopy ', 0, Y, { continued: true, align: 'center', width: 595 }).fillColor(WHITE).text('Crafter', { lineBreak: false }); Y += 35;
+doc.font('Sans').fontSize(11).fillColor(MUTED).text('La agencia Shopify que trabaja 24/7 por ti', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 22;
+doc.font('Sans').fontSize(9).fillColor(MUTED).text('craftershopy@gmail.com  \u00b7  shopycrafter.com', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 22;
+doc.font('Sans').fontSize(8).fillColor(MUTED).text('\u00a9 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 14;
+doc.font('Sans').fontSize(7).fillColor(MUTED).text('Generado con datos reales de Comic Crafter \u2014 Marzo 2026', 0, Y, { align: 'center', width: 595, lineBreak: false });
 
 doc.end();
 stream.on('finish', () => {
