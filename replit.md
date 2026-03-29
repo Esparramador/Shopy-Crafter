@@ -54,7 +54,7 @@ A **Dual AI Engine** architecture integrates Claude and Gemini in parallel for s
 - **Professional Budget/Invoice Generator**: AI-powered tool.
 - **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, and images.
 - **Supplier Research System**: AI-driven intelligence.
-- **Universal Export System**: For various reports and data exports.
+- **Universal Export System**: For various reports and data exports. Includes `complete-report` endpoint with 9-section comprehensive audit (Executive Summary, Brand Identity, SEO Audit, Financial/COGS, A/B Testing, Images AI, Competitors, Inventory, OmniCore Brain, Recommendations, Product Detail Table). Premium dark-theme HTML with print-ready CSS, XSS-safe escaping, and URL protocol validation.
 - **AI Economist with Market Research**: Calculates optimal prices using parallel Gemini searches and Claude analysis.
 - **A/B Testing (Image + Price)**: Supports image and price variant tests with AI-generated impact predictions.
 - **Price Simulator & P&L Forecast**: Tools for financial analysis and scenario simulation.

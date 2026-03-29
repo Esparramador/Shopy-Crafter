@@ -96,8 +96,8 @@ function buildReportHtml(
   }
 
   const servicesHtml = lead.services.length > 0
-    ? lead.services.map(s => `<span style="display:inline-block;background:#1a1a2e;color:#e6c668;padding:4px 12px;border-radius:12px;font-size:13px;margin:2px 4px;border:1px solid rgba(200,168,75,0.3);">${esc(s)}</span>`).join("")
-    : '<span style="color:#888;">No especificados</span>';
+    ? lead.services.map(s => `<span style="display:inline-block;background:rgba(200,168,75,.06);color:#c8a84b;padding:4px 12px;border-radius:6px;font-size:12px;margin:2px 4px;border:1px solid rgba(200,168,75,.15);font-weight:600;">${esc(s)}</span>`).join("")
+    : '<span style="color:#6b6b80;">No especificados</span>';
 
   const sourcesHtml = research.sources.length > 0
     ? research.sources.map(s => `<li style="margin-bottom:4px;"><a href="${safeUrl(s)}" style="color:#4a9eff;font-size:12px;word-break:break-all;">${esc(s)}</a></li>`).join("")
@@ -124,89 +124,141 @@ function buildReportHtml(
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#0a0a1a;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a1a;padding:20px 0;">
+<body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;">
 <tr><td align="center">
-<table width="680" cellpadding="0" cellspacing="0" style="background:#12122a;border:1px solid #1e1e3a;border-radius:12px;overflow:hidden;">
+<table width="680" cellpadding="0" cellspacing="0" style="background:#101018;border-radius:16px;overflow:hidden;">
 
-<tr><td style="background:linear-gradient(135deg,#1a1a2e,#16162e);padding:32px 40px;border-bottom:1px solid #2a2a4a;">
-  <table width="100%"><tr>
-    <td><span style="font-size:24px;font-weight:800;color:#e6c668;letter-spacing:1px;">SHOPYBRAIN</span></td>
-    <td align="right"><span style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;">Pre-Informe AI</span></td>
+<!-- HEADER -->
+<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 36px;position:relative;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="44" valign="top"><div style="width:40px;height:40px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:10px;text-align:center;line-height:40px;font-size:20px;font-weight:900;color:#0a0a0f;">S</div></td>
+    <td style="padding-left:12px;" valign="middle"><span style="font-size:20px;font-weight:800;color:#c8a84b;letter-spacing:-0.3px;">ShopyBrain</span></td>
+    <td align="right" valign="top">
+      <div style="background:#16161f;border:1px solid #24243a;border-radius:8px;padding:8px 16px;display:inline-block;">
+        <div style="font-size:9px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;">Pre-Informe AI</div>
+        <div style="font-size:12px;color:#f0f0f5;font-weight:600;margin-top:2px;">${new Date().toLocaleString("es-ES", { dateStyle: "long" })}</div>
+      </div>
+    </td>
+  </tr></table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;"><tr><td>
+    <h1 style="color:#f0f0f5;font-size:26px;font-weight:900;margin:0 0 4px;letter-spacing:-0.5px;">Nuevo Lead: ${esc(lead.name)}</h1>
+    <p style="color:#9494a8;font-size:14px;margin:0;">${esc(lead.company || lead.niche || "Shopify Store")}</p>
+  </td></tr></table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;"><tr>
+    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Generado por IA</span></td>
+    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Datos verificados</span></td>
+    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Confidencial</span></td>
   </tr></table>
 </td></tr>
 
-<tr><td style="padding:32px 40px;">
-  <h1 style="color:#fff;font-size:22px;margin:0 0 4px;">Nuevo Lead: ${esc(lead.name)}</h1>
-  <p style="color:#888;font-size:14px;margin:0 0 24px;">${new Date().toLocaleString("es-ES", { dateStyle: "full", timeStyle: "short" })}</p>
-
-  <table width="100%" style="background:#1a1a2e;border-radius:10px;padding:20px;border:1px solid #2a2a4a;margin-bottom:28px;" cellpadding="8">
+<!-- LEAD DATA CARD -->
+<tr><td style="padding:32px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128100;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">Datos del Lead</span>
+  </td></tr></table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#16161f;border:1px solid #1a1a28;border-radius:12px;overflow:hidden;">
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;width:140px;vertical-align:top;">Nombre</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.name)}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;width:130px;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Nombre</td>
+      <td style="color:#f0f0f5;font-size:14px;font-weight:600;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.name)}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Email</td>
-      <td style="color:#4a9eff;font-size:14px;"><a href="mailto:${esc(lead.email)}" style="color:#4a9eff;text-decoration:none;">${esc(lead.email)}</a></td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Email</td>
+      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;"><a href="mailto:${esc(lead.email)}" style="color:#3b82f6;text-decoration:none;font-size:14px;font-weight:500;">${esc(lead.email)}</a></td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Teléfono</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.phone || "—")}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Telefono</td>
+      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.phone || "—")}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Tienda</td>
-      <td style="color:#fff;font-size:14px;">${storeLink}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Tienda</td>
+      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;">${storeLink}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Nicho</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.niche || "—")}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Nicho</td>
+      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.niche || "—")}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Facturación</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.revenue || "—")}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Facturacion</td>
+      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.revenue || "—")}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Redes</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.socialMedia || "—")}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Redes</td>
+      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.socialMedia || "—")}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Servicios</td>
-      <td>${servicesHtml}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Servicios</td>
+      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;">${servicesHtml}</td>
     </tr>
     <tr>
-      <td style="color:#888;font-size:12px;text-transform:uppercase;vertical-align:top;">Mensaje</td>
-      <td style="color:#fff;font-size:14px;">${esc(lead.message || "—")}</td>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;">Mensaje</td>
+      <td style="color:#9494a8;font-size:14px;padding:14px 20px;line-height:1.6;font-style:italic;">"${esc(lead.message || "—")}"</td>
     </tr>
   </table>
+</td></tr>
 
-  <div style="background:#0f0f25;border:1px solid #2a2a4a;border-radius:10px;padding:24px 28px;margin-bottom:24px;">
-    <h2 style="color:#e6c668;font-size:18px;margin:0 0 16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px;">1. Investigación del Negocio</h2>
-    <div style="color:#ccc;font-size:14px;line-height:1.7;">${mdToHtml(research.business)}</div>
-  </div>
-
-  <div style="background:#0f0f25;border:1px solid #2a2a4a;border-radius:10px;padding:24px 28px;margin-bottom:24px;">
-    <h2 style="color:#e6c668;font-size:18px;margin:0 0 16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px;">2. Análisis de Mercado y Competencia</h2>
-    <div style="color:#ccc;font-size:14px;line-height:1.7;">${mdToHtml(research.market)}</div>
-  </div>
-
-  <div style="background:#0f0f25;border:1px solid #2a2a4a;border-radius:10px;padding:24px 28px;margin-bottom:24px;">
-    <h2 style="color:#e6c668;font-size:18px;margin:0 0 16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px;">3. Auditoría SEO y Presencia Digital</h2>
-    <div style="color:#ccc;font-size:14px;line-height:1.7;">${mdToHtml(research.seo)}</div>
-  </div>
-
-  <div style="background:#0f0f25;border:1px solid #2a2a4a;border-radius:10px;padding:24px 28px;margin-bottom:24px;">
-    <h2 style="color:#e6c668;font-size:18px;margin:0 0 16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px;">Fuentes Verificadas</h2>
-    <ul style="margin:0;padding-left:20px;">${sourcesHtml}</ul>
-  </div>
-
-  <div style="background:rgba(200,168,75,0.08);border:1px solid rgba(200,168,75,0.25);border-radius:10px;padding:20px 24px;text-align:center;">
-    <p style="color:#e6c668;font-size:14px;font-weight:700;margin:0 0 6px;">Pre-informe generado por ShopyBrain AI</p>
-    <p style="color:#888;font-size:12px;margin:0;">Gemini (Google Search Grounding) — Datos reales, no simulados</p>
+<!-- SECTION 1: Business Research -->
+<tr><td style="padding:32px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128269;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">1. Investigacion del Negocio</span>
+  </td></tr></table>
+  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
+    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.business)}</div>
   </div>
 </td></tr>
 
-<tr><td style="background:#0a0a1a;padding:20px 40px;border-top:1px solid #1e1e3a;">
-  <p style="color:#666;font-size:11px;margin:0;text-align:center;">ShopyBrain &copy; ${new Date().getFullYear()} — Pre-informe automático de lead</p>
+<!-- SECTION 2: Market Analysis -->
+<tr><td style="padding:28px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128200;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">2. Analisis de Mercado y Competencia</span>
+  </td></tr></table>
+  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
+    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.market)}</div>
+  </div>
+</td></tr>
+
+<!-- SECTION 3: SEO Audit -->
+<tr><td style="padding:28px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128640;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">3. Auditoria SEO y Presencia Digital</span>
+  </td></tr></table>
+  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
+    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.seo)}</div>
+  </div>
+</td></tr>
+
+<!-- SOURCES -->
+<tr><td style="padding:28px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128279;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">Fuentes Verificadas</span>
+  </td></tr></table>
+  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:20px 28px;">
+    <ul style="margin:0;padding-left:16px;list-style:none;">${research.sources.length > 0
+      ? research.sources.map(s => `<li style="margin-bottom:6px;padding:4px 0;"><span style="color:#c8a84b;margin-right:8px;">&#8594;</span><a href="${safeUrl(s)}" style="color:#3b82f6;font-size:12px;word-break:break-all;text-decoration:none;">${esc(s)}</a></li>`).join("")
+      : '<li style="color:#6b6b80;">Sin fuentes verificadas</li>'}</ul>
+  </div>
+</td></tr>
+
+<!-- AI BADGE -->
+<tr><td style="padding:32px 48px;">
+  <div style="background:rgba(200,168,75,0.04);border:1px solid rgba(200,168,75,0.15);border-radius:12px;padding:24px;text-align:center;">
+    <div style="width:36px;height:36px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:8px;margin:0 auto 12px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
+    <p style="color:#c8a84b;font-size:14px;font-weight:700;margin:0 0 4px;">Pre-informe generado por ShopyBrain AI</p>
+    <p style="color:#6b6b80;font-size:11px;margin:0;">Dual AI Engine (Gemini + Claude) &middot; Datos reales verificados</p>
+  </div>
+</td></tr>
+
+<!-- FOOTER -->
+<tr><td style="background:#0c0c14;padding:24px 48px;border-top:1px solid #1a1a28;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="color:#c8a84b;font-size:12px;font-weight:700;">ShopyBrain</span></td>
+    <td align="right"><span style="color:#6b6b80;font-size:10px;">&copy; ${new Date().getFullYear()} &middot; Confidencial</span></td>
+  </tr></table>
 </td></tr>
 
 </table>

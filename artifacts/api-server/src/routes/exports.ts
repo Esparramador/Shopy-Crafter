@@ -24,95 +24,192 @@ function sanitizeFilename(name: string): string {
 
 const BRAND = {
   gold: "#c8a84b",
-  dark: "#0a0a0f",
-  card: "#111118",
-  muted: "#8b8b9e",
-  jade: "#2ecc71",
-  red: "#e84558",
-  white: "#f5f5f7",
-  border: "#1e1e2e",
+  goldLight: "#e6d9a8",
+  goldDark: "#8b6914",
+  dark: "#08080e",
+  darkAlt: "#0c0c14",
+  card: "#101018",
+  cardHover: "#141420",
+  surface: "#16161f",
+  muted: "#6b6b80",
+  mutedLight: "#9494a8",
+  jade: "#34d399",
+  jadeBg: "rgba(52,211,153,.08)",
+  red: "#f43f5e",
+  redBg: "rgba(244,63,94,.08)",
+  orange: "#f59e0b",
+  orangeBg: "rgba(245,158,11,.08)",
+  blue: "#3b82f6",
+  blueBg: "rgba(59,130,246,.08)",
+  white: "#f0f0f5",
+  border: "#1a1a28",
+  borderLight: "#24243a",
 };
 
 function reportShell(title: string, subtitle: string, body: string, date: string): string {
   const safeTitle = sanitizeHtml(title);
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
-  return `<!DOCTYPE html> // nosemgrep
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${safeTitle}</title>
+<title>${safeTitle} — ShopyBrain</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', -apple-system, sans-serif; background: ${BRAND.dark}; color: ${BRAND.white}; line-height: 1.6; }
-  .page { max-width: 900px; margin: 0 auto; padding: 40px 48px; }
-  .header { border-bottom: 2px solid ${BRAND.gold}; padding-bottom: 28px; margin-bottom: 36px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .header-left h1 { font-size: 28px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: -0.5px; }
-  .header-left p { font-size: 14px; color: ${BRAND.muted}; margin-top: 4px; }
-  .header-right { text-align: right; }
-  .header-right .logo { font-size: 18px; font-weight: 700; color: ${BRAND.gold}; }
-  .header-right .date { font-size: 12px; color: ${BRAND.muted}; margin-top: 2px; }
-  .section { margin-bottom: 32px; }
-  .section-title { font-size: 18px; font-weight: 700; color: ${BRAND.gold}; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid ${BRAND.border}; }
-  .card { background: ${BRAND.card}; border: 1px solid ${BRAND.border}; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  .metric-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-  .metric { flex: 1; min-width: 140px; background: ${BRAND.dark}; border: 1px solid ${BRAND.border}; border-radius: 10px; padding: 16px; text-align: center; }
-  .metric .value { font-size: 28px; font-weight: 800; color: ${BRAND.gold}; }
-  .metric .label { font-size: 11px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: ${BRAND.dark}; color: ${BRAND.gold}; font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 2px solid ${BRAND.gold}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 10px 12px; border-bottom: 1px solid ${BRAND.border}; color: ${BRAND.white}; }
-  tr:hover td { background: rgba(200,168,75,.04); }
-  .grade { display: inline-block; padding: 3px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; }
-  .grade-a { background: rgba(46,204,113,.15); color: #2ecc71; }
-  .grade-b { background: rgba(200,168,75,.15); color: #c8a84b; }
-  .grade-c { background: rgba(255,165,0,.15); color: #ffa500; }
-  .grade-d { background: rgba(232,69,88,.15); color: #e84558; }
-  .grade-f { background: rgba(232,69,88,.25); color: #e84558; }
-  .tag { display: inline-block; background: rgba(200,168,75,.12); color: ${BRAND.gold}; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; font-weight: 500; }
-  .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid ${BRAND.border}; text-align: center; font-size: 11px; color: ${BRAND.muted}; }
-  .footer .brand { color: ${BRAND.gold}; font-weight: 700; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: ${BRAND.dark}; color: ${BRAND.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+
+  .cover { background: linear-gradient(160deg, #0e0e18 0%, #12121f 50%, #0a0a14 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${BRAND.border}; position: relative; overflow: hidden; }
+  .cover::before { content: ''; position: absolute; top: -120px; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(200,168,75,.06) 0%, transparent 70%); pointer-events: none; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.gold}44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark}); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #0a0a0f; }
+  .cover-logo-text { font-size: 20px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: -0.3px; }
+  .cover-badge { background: ${BRAND.surface}; border: 1px solid ${BRAND.borderLight}; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: ${BRAND.white}; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-size: 32px; font-weight: 900; color: ${BRAND.white}; letter-spacing: -0.8px; line-height: 1.2; }
+  .cover-title h1 span { color: ${BRAND.gold}; }
+  .cover-title .subtitle { font-size: 15px; color: ${BRAND.mutedLight}; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${BRAND.muted}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${BRAND.gold}; }
+
+  .body-content { padding: 40px 56px 48px; }
+
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${BRAND.border}; }
+  .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-icon-gold { background: rgba(200,168,75,.1); border: 1px solid rgba(200,168,75,.2); }
+  .section-icon-jade { background: ${BRAND.jadeBg}; border: 1px solid rgba(52,211,153,.2); }
+  .section-icon-blue { background: ${BRAND.blueBg}; border: 1px solid rgba(59,130,246,.2); }
+  .section-icon-red { background: ${BRAND.redBg}; border: 1px solid rgba(244,63,94,.2); }
+  .section-icon-orange { background: ${BRAND.orangeBg}; border: 1px solid rgba(245,158,11,.2); }
+  .section-title { font-size: 18px; font-weight: 700; color: ${BRAND.white}; letter-spacing: -0.3px; }
+  .section-count { font-size: 11px; color: ${BRAND.muted}; background: ${BRAND.surface}; padding: 2px 8px; border-radius: 4px; margin-left: auto; }
+
+  .card { background: ${BRAND.card}; border: 1px solid ${BRAND.border}; border-radius: 14px; padding: 24px; margin-bottom: 16px; transition: border-color .15s; }
+  .card:hover { border-color: ${BRAND.borderLight}; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric { background: ${BRAND.card}; border: 1px solid ${BRAND.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${BRAND.gold}33, transparent); }
+  .metric .value { font-size: 30px; font-weight: 900; color: ${BRAND.gold}; letter-spacing: -0.5px; line-height: 1.1; }
+  .metric .label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
+  .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
+  .metric .delta-up { color: ${BRAND.jade}; }
+  .metric .delta-down { color: ${BRAND.red}; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  thead { position: sticky; top: 0; }
+  th { background: ${BRAND.surface}; color: ${BRAND.gold}; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 12px 16px; border-bottom: 1px solid ${BRAND.border}; color: ${BRAND.white}; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(200,168,75,.02); }
+  tbody tr { transition: background .1s; }
+
+  .grade { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; letter-spacing: 0.3px; }
+  .grade-a { background: rgba(52,211,153,.12); color: ${BRAND.jade}; }
+  .grade-b { background: rgba(200,168,75,.12); color: ${BRAND.gold}; }
+  .grade-c { background: rgba(245,158,11,.12); color: ${BRAND.orange}; }
+  .grade-d { background: rgba(244,63,94,.12); color: ${BRAND.red}; }
+  .grade-f { background: rgba(244,63,94,.18); color: ${BRAND.red}; }
+
+  .tag { display: inline-block; background: rgba(200,168,75,.08); color: ${BRAND.gold}; padding: 3px 10px; border-radius: 6px; font-size: 11px; margin: 2px 4px 2px 0; font-weight: 600; border: 1px solid rgba(200,168,75,.15); }
+  .tag-jade { background: ${BRAND.jadeBg}; color: ${BRAND.jade}; border-color: rgba(52,211,153,.15); }
+  .tag-red { background: ${BRAND.redBg}; color: ${BRAND.red}; border-color: rgba(244,63,94,.15); }
+  .tag-blue { background: ${BRAND.blueBg}; color: ${BRAND.blue}; border-color: rgba(59,130,246,.15); }
+
   .text-jade { color: ${BRAND.jade}; }
   .text-red { color: ${BRAND.red}; }
   .text-gold { color: ${BRAND.gold}; }
+  .text-blue { color: ${BRAND.blue}; }
+  .text-orange { color: ${BRAND.orange}; }
   .text-muted { color: ${BRAND.muted}; }
-  .score-bar { height: 8px; border-radius: 4px; background: ${BRAND.border}; overflow: hidden; margin-top: 6px; }
-  .score-fill { height: 100%; border-radius: 4px; }
-  .recommendation { padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; border-left: 3px solid ${BRAND.gold}; background: rgba(200,168,75,.04); font-size: 13px; }
+  .text-white { color: ${BRAND.white}; }
+  .fw-600 { font-weight: 600; }
+  .fw-700 { font-weight: 700; }
+  .fw-800 { font-weight: 800; }
+  .fs-sm { font-size: 12px; }
+
+  .score-bar { height: 6px; border-radius: 3px; background: ${BRAND.border}; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  .recommendation { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid ${BRAND.gold}; background: rgba(200,168,75,.03); font-size: 13px; line-height: 1.7; }
+  .recommendation-critical { border-left-color: ${BRAND.red}; background: ${BRAND.redBg}; }
+  .recommendation-success { border-left-color: ${BRAND.jade}; background: ${BRAND.jadeBg}; }
+  .recommendation-info { border-left-color: ${BRAND.blue}; background: ${BRAND.blueBg}; }
+
+  .progress-ring { display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .progress-ring svg { transform: rotate(-90deg); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat-item { padding: 16px 20px; background: ${BRAND.surface}; border-radius: 10px; border: 1px solid ${BRAND.border}; }
+  .stat-item-label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  .stat-item-value { font-size: 16px; font-weight: 700; color: ${BRAND.white}; margin-top: 4px; }
+
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.border}, transparent); margin: 32px 0; }
+
   .blog-content { font-size: 14px; line-height: 1.8; }
   .blog-content h1, .blog-content h2, .blog-content h3 { color: ${BRAND.gold}; margin: 20px 0 10px; }
   .blog-content p { margin-bottom: 12px; }
   .blog-content ul, .blog-content ol { margin: 10px 0 10px 20px; }
+
+  .footer { padding: 32px 56px; border-top: 1px solid ${BRAND.border}; background: ${BRAND.darkAlt}; text-align: center; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: ${BRAND.gold}; }
+  .footer-sub { font-size: 11px; color: ${BRAND.muted}; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: ${BRAND.gold}; margin: 12px auto; border-radius: 1px; }
+
   @media print {
     body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { padding: 20px; }
-    .card { border: 1px solid #ddd; background: #f9f9f9; }
-    .metric { background: #f0f0f0; border-color: #ddd; }
-    .metric .value { color: #8b6914; }
-    th { background: #f0f0f0; color: #8b6914; border-color: #8b6914; }
-    td { border-color: #ddd; color: #1a1a1a; }
-    .footer { color: #999; }
+    .page { max-width: 100%; }
+    .cover { background: #f8f7f4; padding: 32px; }
+    .cover-title h1 { color: #1a1a1a; }
+    .card, .metric { background: #fafafa; border: 1px solid #e0e0e0; }
+    .metric .value { color: ${BRAND.goldDark}; }
+    th { background: #f0f0f0; color: ${BRAND.goldDark}; }
+    td { border-color: #e8e8e8; color: #1a1a1a; }
+    .footer { background: #fafafa; border-color: #e0e0e0; }
   }
 </style>
 </head>
 <body>
 <div class="page">
-  <div class="header">
-    <div class="header-left">
-      <h1>${safeTitle}</h1>
-      <p>${safeSub}</p>
+  <div class="cover">
+    <div class="cover-top">
+      <div class="cover-logo">
+        <div class="cover-logo-icon">S</div>
+        <div class="cover-logo-text">ShopyBrain</div>
+      </div>
+      <div class="cover-badge">
+        <div class="cover-badge-label">Fecha del informe</div>
+        <div class="cover-badge-value">${safeDate}</div>
+      </div>
     </div>
-    <div class="header-right">
-      <div class="logo">ShopyBrain</div>
-      <div class="date">${safeDate}</div>
+    <div class="cover-title">
+      <h1>${safeTitle}</h1>
+      <p class="subtitle">${safeSub}</p>
+    </div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Generado por IA</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Datos reales</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Confidencial</div>
     </div>
   </div>
-  ${body}
+  <div class="body-content">
+    ${body}
+  </div>
   <div class="footer">
-    <p>Informe generado por <span class="brand">ShopyBrain AI</span> — Agencia Shopify con Inteligencia Artificial</p>
-    <p style="margin-top:4px;">Confidencial · ${safeDate}</p>
+    <div class="footer-line"></div>
+    <div class="footer-brand">ShopyBrain AI</div>
+    <div class="footer-sub">Agencia Shopify con Inteligencia Artificial &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>
@@ -542,6 +639,8 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
 
 router.get("/projects/:projectId/exports/complete-report", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
+  if (isNaN(projectId) || projectId <= 0) { res.status(400).json({ error: "ID de proyecto invalido" }); return; }
+  try {
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -551,80 +650,345 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const tests = await db.select().from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
   const jobs = await db.select().from(generationJobsTable).where(eq(generationJobsTable.projectId, projectId));
   const redesigns = await db.select().from(redesignsTable).where(eq(redesignsTable.projectId, projectId));
+  const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
+  const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
+  const revenueSnapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.date)).limit(30);
+  const memories = await db.select().from(omnicoreMemoriesTable).orderBy(desc(omnicoreMemoriesTable.createdAt)).limit(10);
+  const priceHistory = await db.select().from(priceHistoryTable).where(eq(priceHistoryTable.projectId, projectId)).orderBy(desc(priceHistoryTable.recordedAt)).limit(20);
+  const visualDna = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId)).limit(1);
 
   const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
   const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const esc = sanitizeHtml;
 
   const activeProducts = products.filter(p => p.status === "active").length;
+  const draftProducts = products.filter(p => p.status === "draft").length;
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
-  const avgSeo = seoData.filter(s => s.seoScore != null).length > 0 ? seoData.reduce((s, d) => s + (d.seoScore ?? 0), 0) / seoData.filter(s => s.seoScore != null).length : 0;
+  const withSeo = seoData.filter(s => s.seoScore != null);
+  const avgSeo = withSeo.length > 0 ? withSeo.reduce((s, d) => s + (d.seoScore ?? 0), 0) / withSeo.length : 0;
   const totalRevenue = products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0);
   const totalCogs = allCogs.reduce((s, c) => s + c.totalCogs, 0);
   const avgMargin = totalRevenue > 0 ? ((totalRevenue - totalCogs) / totalRevenue) * 100 : 0;
   const imagesGenerated = jobs.filter(j => j.status === "succeeded").length;
+  const imagesFailed = jobs.filter(j => j.status === "failed").length;
+  const withSchema = seoData.filter(s => s.hasSchema).length;
+  const withAltTexts = seoData.filter(s => s.hasAltTexts).length;
+  const completedTests = tests.filter(t => t.status === "completed" || t.status === "winner_applied").length;
+  const activeTests = tests.filter(t => t.status === "running").length;
+  const productTypes = [...new Set(products.map(p => p.productType).filter(Boolean))];
+  const vendors = [...new Set(products.map(p => p.vendor).filter(Boolean))];
+  const priceRange = products.length > 0
+    ? { min: Math.min(...products.map(p => parseFloat(p.price ?? "0"))), max: Math.max(...products.map(p => parseFloat(p.price ?? "0"))) }
+    : { min: 0, max: 0 };
 
-  let productSummary = "";
-  for (const p of products.slice(0, 50)) {
+  function healthScore(): number {
+    let score = 0;
+    if (avgSeo >= 70) score += 25; else if (avgSeo >= 40) score += 12;
+    if (avgMargin >= 40) score += 25; else if (avgMargin >= 20) score += 12;
+    if (withSchema >= products.length * 0.5) score += 15; else if (withSchema > 0) score += 7;
+    if (imagesGenerated >= products.length) score += 15; else if (imagesGenerated > 0) score += 7;
+    if (tests.length > 0) score += 10;
+    if (project.brandTone) score += 5;
+    if (project.targetAudience) score += 5;
+    return Math.min(score, 100);
+  }
+  const health = healthScore();
+  const healthLabel = health >= 80 ? "Excelente" : health >= 60 ? "Bueno" : health >= 40 ? "Mejorable" : "Necesita atencion";
+  const healthColor = health >= 80 ? BRAND.jade : health >= 60 ? BRAND.gold : health >= 40 ? BRAND.orange : BRAND.red;
+
+  const seoGrades: Record<string, number> = {};
+  seoData.forEach(s => { const g = s.seoGrade || "Sin auditar"; seoGrades[g] = (seoGrades[g] || 0) + 1; });
+
+  let gradeBreakdown = "";
+  for (const [g, count] of Object.entries(seoGrades).sort()) {
+    const pct = products.length > 0 ? Math.round((count / products.length) * 100) : 0;
+    gradeBreakdown += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <span class="grade ${gradeClass(g)}" style="min-width:44px;text-align:center;">${g}</span>
+      <div class="score-bar" style="flex:1;height:8px;"><div class="score-fill" style="width:${pct}%;background:${scoreColor(g === "A+" || g === "A" ? 90 : g === "B" ? 70 : g === "C" ? 50 : 30)};"></div></div>
+      <span style="min-width:70px;font-size:12px;font-weight:600;">${count} (${pct}%)</span>
+    </div>`;
+  }
+
+  let productRows = "";
+  for (const p of products.slice(0, 60)) {
     const seo = seoMap.get(p.shopifyProductId);
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
-    productSummary += `<tr><!-- nosemgrep -->
-      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
-      <td>${price.toFixed(2)}€</td><!-- nosemgrep -->
-      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
-      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td><!-- nosemgrep -->
-      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td><!-- nosemgrep -->
-      <td>${p.imageCount ?? 0}</td><!-- nosemgrep -->
+    productRows += `<tr>
+      <td style="font-weight:600;">${esc(p.title)}</td>
+      <td>${p.status === "active" ? '<span class="tag tag-jade">Activo</span>' : '<span class="tag">Borrador</span>'}</td>
+      <td style="font-weight:600;">${price > 0 ? price.toFixed(2) + "€" : "—"}</td>
+      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td>
+      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
+      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td>
+      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td>
+      <td>${p.imageCount ?? 0}</td>
     </tr>`;
   }
 
-  const body = ` // nosemgrep
+  let testRows = "";
+  for (const t of tests.slice(0, 20)) {
+    const convA = t.variantAVisitors > 0 ? (t.variantAConversions / t.variantAVisitors) * 100 : 0;
+    const convB = t.variantBVisitors > 0 ? (t.variantBConversions / t.variantBVisitors) * 100 : 0;
+    const improvement = convA > 0 ? ((convB - convA) / convA) * 100 : 0;
+    testRows += `<tr>
+      <td style="font-weight:600;">${esc(t.productTitle)}</td>
+      <td><span class="tag">${esc(t.testType)}</span></td>
+      <td><span class="tag ${t.status === "running" ? "tag-jade" : t.status === "completed" || t.status === "winner_applied" ? "tag-blue" : ""}">${esc(t.status)}</span></td>
+      <td>${t.winner ? esc(t.winner) : "—"}</td>
+      <td>${t.variantAVisitors + t.variantBVisitors > 0 ? `<span class="${improvement >= 0 ? "text-jade" : "text-red"} fw-700">${improvement >= 0 ? "+" : ""}${improvement.toFixed(1)}%</span>` : "—"}</td>
+    </tr>`;
+  }
+
+  let compRows = "";
+  for (const c of competitors.slice(0, 10)) {
+    const safeUrl = c.url && /^https?:\/\//i.test(c.url) ? c.url : null;
+    compRows += `<tr>
+      <td style="font-weight:600;">${esc(c.name)}</td>
+      <td>${safeUrl ? `<a href="${esc(safeUrl)}" class="text-blue" style="text-decoration:none;" target="_blank" rel="noopener">${esc(safeUrl.slice(0, 35))}...</a>` : "—"}</td>
+      <td><span class="tag">${esc(c.type || "direct")}</span></td>
+      <td><span class="tag ${c.active === 1 ? "tag-jade" : ""}">${c.active === 1 ? "activo" : "inactivo"}</span></td>
+    </tr>`;
+  }
+
+  let priceHistoryRows = "";
+  for (const h of priceHistory) {
+    const pct = h.oldPrice && h.oldPrice > 0 ? (((h.newPrice - h.oldPrice) / h.oldPrice) * 100) : 0;
+    priceHistoryRows += `<tr>
+      <td>${h.recordedAt?.toLocaleDateString("es-ES") ?? "—"}</td>
+      <td>${esc(h.shopifyProductId)}</td>
+      <td>${h.oldPrice?.toFixed(2) ?? "—"}€</td>
+      <td style="font-weight:600;">${h.newPrice.toFixed(2)}€</td>
+      <td><span class="${pct >= 0 ? "text-jade fw-700" : "text-red fw-700"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></td>
+      <td class="text-muted">${esc(h.changeSource ?? "—")}</td>
+    </tr>`;
+  }
+
+  const issues: string[] = [];
+  const successes: string[] = [];
+  if (withSchema < products.length * 0.5 && products.length > 0) issues.push(`Solo ${withSchema}/${products.length} productos tienen Schema JSON-LD. Implementar structured data mejora CTR +30%.`);
+  if (withAltTexts < products.length * 0.5 && products.length > 0) issues.push(`Solo ${withAltTexts}/${products.length} productos tienen alt texts optimizados. Google Image Search puede generar hasta 20% trafico adicional.`);
+  if (avgSeo < 60 && withSeo.length > 0) issues.push(`Puntuacion SEO media (${Math.round(avgSeo)}/100) por debajo del umbral competitivo de 60. Se recomienda optimizar meta titles, descriptions y contenido.`);
+  if (avgMargin < 30 && totalRevenue > 0) issues.push(`Margen medio (${avgMargin.toFixed(1)}%) por debajo del 30% recomendado. Revisar estructura de costes o ajustar pricing.`);
+  if (tests.length === 0) issues.push(`Sin A/B tests activos. Activar testing continuo para mejorar conversion.`);
+  if (!project.brandTone) issues.push(`Tono de marca no definido. Establecerlo mejora la consistencia en copywriting e IA.`);
+  if (imagesGenerated > 0) successes.push(`${imagesGenerated} imagenes IA generadas con exito${imagesFailed > 0 ? ` (${imagesFailed} fallidas)` : ""}.`);
+  if (completedTests > 0) successes.push(`${completedTests} A/B tests completados — datos de conversion reales.`);
+  if (avgSeo >= 70) successes.push(`Puntuacion SEO media de ${Math.round(avgSeo)}/100 — por encima del umbral competitivo.`);
+  if (avgMargin >= 40) successes.push(`Margen bruto del ${avgMargin.toFixed(1)}% — saludable y competitivo.`);
+  if (redesigns.length > 0) successes.push(`${redesigns.length} fichas de producto rediseñadas con IA.`);
+
+  const body = `
+    <!-- EXECUTIVE SUMMARY -->
     <div class="section">
-      <div class="section-title">Resumen Ejecutivo</div>
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#9733;</div>
+        <div class="section-title">Resumen Ejecutivo</div>
+      </div>
       <div class="card">
-        <p style="font-size:14px;line-height:1.8;">Este informe presenta un análisis completo del proyecto <strong>${project.name}</strong> (${project.shopDomain || "sin dominio"})<!-- nosemgrep -->
-        en el nicho de <strong>${project.storeNiche || "e-commerce"}</strong>. El catálogo cuenta con ${activeProducts} productos activos,<!-- nosemgrep -->
-        con un precio medio de ${avgPrice.toFixed(2)}€ y un margen bruto promedio del ${avgMargin.toFixed(1)}%.
-        La puntuación SEO media es ${Math.round(avgSeo)}/100. Se han generado ${imagesGenerated} imágenes IA
-        y ejecutado ${tests.length} tests A/B${redesigns.length > 0 ? `, con ${redesigns.length} rediseños de fichas` : ""}.</p>
+        <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;">
+          <div style="text-align:center;">
+            <div style="width:80px;height:80px;border-radius:50%;border:3px solid ${healthColor};display:flex;align-items:center;justify-content:center;background:${healthColor}11;">
+              <span style="font-size:28px;font-weight:900;color:${healthColor};">${health}</span>
+            </div>
+            <div style="font-size:11px;color:${healthColor};font-weight:700;margin-top:6px;text-transform:uppercase;">${healthLabel}</div>
+          </div>
+          <div style="flex:1;">
+            <p style="font-size:15px;line-height:1.8;color:${BRAND.mutedLight};">
+              Auditoria completa de <strong style="color:${BRAND.white};">${esc(project.name)}</strong>
+              ${project.shopDomain ? `(<strong style="color:${BRAND.white};">${esc(project.shopDomain)}</strong>)` : ""}
+              en el nicho de <strong style="color:${BRAND.gold};">${esc(project.storeNiche || "e-commerce")}</strong>.
+              El catalogo cuenta con <strong style="color:${BRAND.white};">${activeProducts} productos activos</strong>${draftProducts > 0 ? ` y ${draftProducts} borradores` : ""},
+              con un precio medio de <strong style="color:${BRAND.white};">${avgPrice.toFixed(2)}€</strong> y un rango de ${priceRange.min.toFixed(0)}€–${priceRange.max.toFixed(0)}€.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
+    <!-- KPI GRID -->
     <div class="metric-row">
-      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div><!-- nosemgrep -->
-      <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div><!-- nosemgrep -->
-      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div><!-- nosemgrep -->
-      <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">SEO medio</div></div><!-- nosemgrep -->
-      <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imágenes IA</div></div><!-- nosemgrep -->
-      <div class="metric"><div class="value">${tests.length}</div><div class="label">A/B Tests</div></div><!-- nosemgrep -->
+      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
+      <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
+      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen bruto</div></div>
+      <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">Score SEO</div></div>
+      <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imagenes IA</div></div>
+      <div class="metric"><div class="value">${tests.length}</div><div class="label">A/B Tests</div></div>
     </div>
 
+    <div class="divider"></div>
+
+    <!-- BRAND & IDENTITY -->
     <div class="section">
-      <div class="section-title">Identidad y Estrategia</div>
-      <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Nicho</p><p>${project.storeNiche || "No definido"}</p></div><!-- nosemgrep -->
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Tono de marca</p><p>${project.brandTone || "No definido"}</p></div><!-- nosemgrep -->
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Audiencia</p><p>${project.targetAudience || "No definida"}</p></div><!-- nosemgrep -->
-        <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;">Mercados</p><p>${project.storeMarkets || "Global"}</p></div><!-- nosemgrep -->
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#127912;</div>
+        <div class="section-title">Identidad de Marca</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="stat-item-label">Nicho</div><div class="stat-item-value">${esc(project.storeNiche || "No definido")}</div></div>
+        <div class="stat-item"><div class="stat-item-label">Tono de marca</div><div class="stat-item-value">${esc(project.brandTone || "No definido")}</div></div>
+        <div class="stat-item"><div class="stat-item-label">Audiencia objetivo</div><div class="stat-item-value">${esc(project.targetAudience || "No definida")}</div></div>
+        <div class="stat-item"><div class="stat-item-label">Mercados</div><div class="stat-item-value">${esc(project.storeMarkets || "Global")}</div></div>
+      </div>
+      ${productTypes.length > 0 ? `<div class="card" style="margin-top:12px;"><div class="stat-item-label" style="margin-bottom:8px;">Categorias de producto</div><div>${productTypes.map(t => `<span class="tag">${esc(t || "")}</span>`).join(" ")}</div></div>` : ""}
+      ${vendors.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Proveedores</div><div>${vendors.map(v => `<span class="tag">${esc(v || "")}</span>`).join(" ")}</div></div>` : ""}
+      ${visualDna.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Visual DNA</div><p class="text-muted" style="font-size:13px;line-height:1.7;">StyleLock activo — coherencia visual aplicada a todas las generaciones de imagenes.</p></div>` : ""}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- SEO AUDIT -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-jade">&#128270;</div>
+        <div class="section-title">Auditoria SEO Tecnico</div>
+        <div class="section-count">${withSeo.length} auditados</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">${Math.round(avgSeo)}<span style="font-size:14px;color:${BRAND.muted};">/100</span></div><div class="label">Score medio</div></div>
+        <div class="metric"><div class="value">${withSchema}</div><div class="label">Con Schema</div></div>
+        <div class="metric"><div class="value">${withAltTexts}</div><div class="label">Con Alt Texts</div></div>
+        <div class="metric"><div class="value">${withSeo.length}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Auditados</div></div>
+      </div>
+      ${Object.keys(seoGrades).length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de grados</div>${gradeBreakdown}</div>` : ""}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- FINANCIAL -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-orange">&#128176;</div>
+        <div class="section-title">Analisis Financiero y COGS</div>
+        <div class="section-count">${allCogs.length} con COGS</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">${totalRevenue.toFixed(0)}€</div><div class="label">Revenue potencial</div></div>
+        <div class="metric"><div class="value">${totalCogs.toFixed(0)}€</div><div class="label">COGS total</div></div>
+        <div class="metric"><div class="value">${(totalRevenue - totalCogs).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div>
+        <div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : BRAND.red};">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div>
+      </div>
+      ${priceHistoryRows ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Historial de cambios de precio</div><table><thead><tr><th>Fecha</th><th>Producto</th><th>Anterior</th><th>Nuevo</th><th>Cambio</th><th>Fuente</th></tr></thead><tbody>${priceHistoryRows}</tbody></table></div>` : ""}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- A/B TESTING -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-blue">&#9879;</div>
+        <div class="section-title">A/B Testing</div>
+        <div class="section-count">${tests.length} tests</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">${tests.length}</div><div class="label">Tests totales</div></div>
+        <div class="metric"><div class="value" style="color:${BRAND.jade};">${activeTests}</div><div class="label">Activos</div></div>
+        <div class="metric"><div class="value">${completedTests}</div><div class="label">Completados</div></div>
+      </div>
+      ${testRows ? `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>Test</th><th>Tipo</th><th>Estado</th><th>Ganador</th><th>Mejora</th></tr></thead><tbody>${testRows}</tbody></table></div>` : '<div class="card"><p class="text-muted" style="text-align:center;padding:16px;">No hay A/B tests registrados. Activar testing mejora conversion.</p></div>'}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- IMAGES AI -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#127912;</div>
+        <div class="section-title">Imagenes IA Generadas</div>
+        <div class="section-count">${imagesGenerated} exitosas</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value" style="color:${BRAND.jade};">${imagesGenerated}</div><div class="label">Generadas</div></div>
+        <div class="metric"><div class="value" style="color:${imagesFailed > 0 ? BRAND.red : BRAND.muted};">${imagesFailed}</div><div class="label">Fallidas</div></div>
+        <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Fichas rediseñadas</div></div>
       </div>
     </div>
 
+    <div class="divider"></div>
+
+    <!-- COMPETITORS -->
+    ${competitors.length > 0 ? `<div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-red">&#128161;</div>
+        <div class="section-title">Inteligencia Competitiva</div>
+        <div class="section-count">${competitors.length} monitorizados</div>
+      </div>
+      <div class="card" style="overflow-x:auto;"><table><thead><tr><th>Competidor</th><th>URL</th><th>Tipo</th><th>Estado</th></tr></thead><tbody>${compRows}</tbody></table></div>
+    </div><div class="divider"></div>` : ""}
+
+    <!-- INVENTORY -->
+    ${inventory.length > 0 ? `<div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-orange">&#128230;</div>
+        <div class="section-title">Inventario y Stock</div>
+        <div class="section-count">${inventory.length} trackings</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">${inventory.length}</div><div class="label">Productos trackeados</div></div>
+        <div class="metric"><div class="value">${inventory.filter(i => i.currentStock != null && i.restockThreshold != null && i.currentStock <= i.restockThreshold).length}</div><div class="label">Stock bajo</div></div>
+      </div>
+    </div><div class="divider"></div>` : ""}
+
+    <!-- OMNICORE BRAIN -->
     <div class="section">
-      <div class="section-title">Detalle por Producto</div>
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#129504;</div>
+        <div class="section-title">OmniCore Brain - IA</div>
+      </div>
+      <div class="card">
+        <div class="stat-grid">
+          <div class="stat-item"><div class="stat-item-label">Memorias consolidadas</div><div class="stat-item-value">${memories.length > 0 ? "Activo" : "Sin memorias"}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Piloto automatico</div><div class="stat-item-value">${project.autoPilotEnabled ? '<span class="text-jade">Activado</span>' : '<span class="text-muted">Desactivado</span>'}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Plan activo</div><div class="stat-item-value text-gold fw-800" style="text-transform:uppercase;">${esc(project.plan)}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Score audit medio</div><div class="stat-item-value">${project.avgAuditScore != null ? Math.round(project.avgAuditScore) + "/100" : "Sin auditar"}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- RECOMMENDATIONS -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-jade">&#9989;</div>
+        <div class="section-title">Recomendaciones y Acciones</div>
+      </div>
+      ${successes.map(s => `<div class="recommendation recommendation-success">${s}</div>`).join("")}
+      ${issues.map(i => `<div class="recommendation">${i}</div>`).join("")}
+      ${issues.length === 0 && successes.length === 0 ? '<div class="recommendation recommendation-info">Completa la auditoria de mas productos para obtener recomendaciones personalizadas.</div>' : ""}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- PRODUCT TABLE -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-blue">&#128203;</div>
+        <div class="section-title">Detalle por Producto</div>
+        <div class="section-count">${products.length} productos</div>
+      </div>
       <div class="card" style="overflow-x:auto;">
         <table>
-          <thead><tr><th>Producto</th><th>Precio</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
-          <tbody>${productSummary}</tbody><!-- nosemgrep -->
+          <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
+          <tbody>${productRows || '<tr><td colspan="8" class="text-muted" style="text-align:center;">Sin productos importados</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
 
-  const html = reportShell("Informe Completo del Proyecto", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const html = reportShell(
+    `Auditoria Completa — ${project.name}`,
+    `${project.shopDomain || "Sin dominio"} — ${project.storeNiche || "eCommerce"}`,
+    body, date
+  );
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Complete_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  res.setHeader("Content-Disposition", `attachment; filename="Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.html"`);
   res.send(html);
+  } catch (err: any) {
+    console.error("complete-report error:", err);
+    res.status(500).json({ error: "Error generando el informe completo" });
+  }
 });
 
 router.get("/projects/:projectId/exports/csv/products", async (req, res): Promise<void> => {
