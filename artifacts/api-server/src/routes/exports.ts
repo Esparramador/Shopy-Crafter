@@ -15,6 +15,8 @@ import { visualDnaTable } from "@workspace/db/schema";
 import archiver from "archiver";
 import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
+import { shopifyRequest } from "../lib/shopify";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
@@ -156,6 +158,24 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .stat-item-value { font-size: 16px; font-weight: 700; color: ${BRAND.white}; margin-top: 4px; }
 
   .divider { height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.border}, transparent); margin: 32px 0; }
+
+  .report-page { page-break-before: always; padding-top: 12px; }
+  .report-page:first-child { page-break-before: avoid; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; margin-bottom: 12px; border-bottom: 1px solid ${BRAND.border}; }
+  .page-header-title { font-size: 11px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  .page-header-num { font-size: 11px; color: ${BRAND.gold}; font-weight: 700; }
+
+  .toc { padding: 24px 0; }
+  .toc-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 6px; border-radius: 10px; background: ${BRAND.card}; border: 1px solid ${BRAND.border}; }
+  .toc-num { width: 32px; height: 32px; border-radius: 8px; background: rgba(200,168,75,.1); border: 1px solid rgba(200,168,75,.2); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: ${BRAND.gold}; margin-right: 16px; flex-shrink: 0; }
+  .toc-label { font-size: 14px; font-weight: 600; color: ${BRAND.white}; }
+  .toc-desc { font-size: 11px; color: ${BRAND.muted}; margin-top: 2px; }
+  .toc-dot { flex: 1; border-bottom: 1px dotted ${BRAND.border}; margin: 0 12px; min-width: 40px; }
+
+  .waterfall-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .waterfall-label { font-size: 12px; color: ${BRAND.mutedLight}; min-width: 120px; text-align: right; }
+  .waterfall-fill { height: 24px; border-radius: 6px; min-width: 2px; display: flex; align-items: center; padding: 0 8px; }
+  .waterfall-val { font-size: 11px; font-weight: 700; color: ${BRAND.white}; }
 
   .blog-content { font-size: 14px; line-height: 1.8; }
   .blog-content h1, .blog-content h2, .blog-content h3 { color: ${BRAND.gold}; margin: 20px 0 10px; }
@@ -637,6 +657,221 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
   res.send(html);
 });
 
+router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId), 10);
+  if (isNaN(projectId) || projectId <= 0) { res.status(400).json({ error: "ID de proyecto invalido" }); return; }
+
+  const log: string[] = [];
+  const started = Date.now();
+
+  try {
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    log.push(`Catalogo: ${products.length} productos cargados`);
+
+    const existingSeo = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+    const seoMap = new Map(existingSeo.map(s => [s.shopifyProductId, s]));
+
+    let seoUpdated = 0;
+    let seoCreated = 0;
+    for (const p of products) {
+      const seo = seoMap.get(p.shopifyProductId);
+      const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
+      const imgs = p.imagesJson as Array<{ alt: string | null }> | null;
+      const hasAltTexts = Array.isArray(imgs) && imgs.length > 0 && imgs.every((img: any) => img.alt && img.alt.trim() !== "");
+      const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
+      const hasMetaTitle = !!seo?.metaTitle;
+      const hasMetaDesc = !!seo?.metaDescription;
+      const hasSchema = seo?.hasSchema ?? false;
+
+      let score = 0;
+      if (hasMetaTitle) score += 20;
+      if (hasMetaDesc) score += 15;
+      if (hasSchema) score += 15;
+      if (hasAltTexts || p.imageCount === 0) score += 10;
+      if (cleanHandle) score += 5;
+      if (descLen >= 300) score += 10;
+      if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) score += 10;
+      score += 10;
+      if (descLen >= 100) score += 5;
+      const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
+
+      if (seo) {
+        await db.update(seoDataTable)
+          .set({ seoScore: score, seoGrade: grade, hasAltTexts, cleanHandle, descriptionLength: descLen, lastAuditedAt: new Date() })
+          .where(eq(seoDataTable.id, seo.id));
+        seoUpdated++;
+      } else {
+        await db.insert(seoDataTable).values({
+          projectId,
+          shopifyProductId: p.shopifyProductId,
+          metaTitle: null,
+          metaDescription: null,
+          hasSchema: false,
+          hasAltTexts,
+          cleanHandle,
+          seoScore: score,
+          seoGrade: grade,
+          descriptionLength: descLen,
+          lastAuditedAt: new Date(),
+        });
+        seoCreated++;
+      }
+    }
+    log.push(`SEO: ${seoUpdated} actualizados, ${seoCreated} nuevos — ${products.length} productos auditados`);
+
+    const avgScore = products.length > 0
+      ? Math.round(products.reduce((s, p) => {
+          const seo = seoMap.get(p.shopifyProductId);
+          const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
+          const imgsArr = p.imagesJson as Array<{ alt: string | null }> | null;
+          const hasAlt = Array.isArray(imgsArr) && imgsArr.length > 0 && imgsArr.every((img: any) => img.alt && img.alt.trim() !== "");
+          const ch = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
+          let sc = 10;
+          if (seo?.metaTitle) sc += 20;
+          if (seo?.metaDescription) sc += 15;
+          if (seo?.hasSchema) sc += 15;
+          if (hasAlt || p.imageCount === 0) sc += 10;
+          if (ch) sc += 5;
+          if (descLen >= 300) sc += 10;
+          if (descLen >= 100) sc += 5;
+          if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) sc += 10;
+          return s + sc;
+        }, 0) / products.length)
+      : 0;
+
+    await db.update(projectsTable).set({ avgAuditScore: avgScore }).where(eq(projectsTable.id, projectId));
+    log.push(`Avg audit score actualizado: ${avgScore}/100`);
+
+    let revenueResult = { totalRevenue: 0, totalOrders: 0, daysLoaded: 0, variantsTracked: 0 };
+    if (project.accessToken) {
+      try {
+        const days = parseInt(String(req.body?.days)) || 90;
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        const dailyMap: Record<string, { revenue: number; orders: number }> = {};
+        const variantSales: Record<string, { title: string; productTitle: string; quantity: number; revenue: number }> = {};
+        let hasMore = true;
+        let pageInfo: string | null = null;
+        let fetchCount = 0;
+
+        while (hasMore && fetchCount < 10) {
+          const url = pageInfo
+            ? `/orders.json?status=any&financial_status=paid&limit=250&page_info=${pageInfo}`
+            : `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`;
+          const data = await shopifyRequest<{
+            orders: Array<{
+              id: number; created_at: string; total_price: string;
+              line_items: Array<{ variant_id: number; title: string; variant_title: string; quantity: number; price: string; product_id: number }>;
+            }>;
+          }>(projectId, project.shopDomain, url);
+
+          for (const order of data.orders) {
+            const date = order.created_at.split("T")[0];
+            if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0 };
+            dailyMap[date].revenue += parseFloat(order.total_price || "0");
+            dailyMap[date].orders += 1;
+
+            for (const li of (order.line_items || [])) {
+              const key = `${li.product_id}::${li.variant_title || "default"}`;
+              if (!variantSales[key]) variantSales[key] = { title: li.variant_title || "default", productTitle: li.title, quantity: 0, revenue: 0 };
+              variantSales[key].quantity += li.quantity;
+              variantSales[key].revenue += parseFloat(li.price || "0") * li.quantity;
+            }
+          }
+
+          hasMore = data.orders.length === 250;
+          pageInfo = null;
+          fetchCount++;
+        }
+
+        for (const [date, vals] of Object.entries(dailyMap)) {
+          const aov = vals.orders > 0 ? vals.revenue / vals.orders : 0;
+          const existing = await db.select({ id: revenueSnapshotsTable.id })
+            .from(revenueSnapshotsTable)
+            .where(and(eq(revenueSnapshotsTable.projectId, String(projectId)), eq(revenueSnapshotsTable.date, date)))
+            .limit(1);
+
+          if (existing.length > 0) {
+            await db.update(revenueSnapshotsTable)
+              .set({ revenue: vals.revenue, orders: vals.orders, aov })
+              .where(eq(revenueSnapshotsTable.id, existing[0].id));
+          } else {
+            await db.insert(revenueSnapshotsTable).values({
+              id: randomUUID(),
+              projectId: String(projectId),
+              date,
+              revenue: vals.revenue,
+              orders: vals.orders,
+              aov,
+            });
+          }
+        }
+
+        revenueResult = {
+          totalRevenue: Object.values(dailyMap).reduce((s, v) => s + v.revenue, 0),
+          totalOrders: Object.values(dailyMap).reduce((s, v) => s + v.orders, 0),
+          daysLoaded: Object.keys(dailyMap).length,
+          variantsTracked: Object.keys(variantSales).length,
+        };
+        log.push(`Revenue: ${revenueResult.daysLoaded} dias sincronizados, ${revenueResult.totalOrders} pedidos, ${revenueResult.totalRevenue.toFixed(2)}€`);
+        log.push(`Variantes: ${revenueResult.variantsTracked} combinaciones producto/variante rastreadas`);
+      } catch (err: any) {
+        log.push(`Revenue sync error: ${err.message || "fallo al conectar con Shopify"}`);
+      }
+    } else {
+      log.push(`Revenue: sin token Shopify — no se pueden sincronizar pedidos`);
+    }
+
+    const existingCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+    log.push(`COGS: ${existingCogs.length}/${products.length} productos con costes registrados`);
+
+    const elapsed = ((Date.now() - started) / 1000).toFixed(1);
+    log.push(`Auditoria completa en ${elapsed}s`);
+
+    res.json({
+      ok: true,
+      projectId,
+      storeName: project.name,
+      elapsed: `${elapsed}s`,
+      seo: { audited: products.length, updated: seoUpdated, created: seoCreated, avgScore },
+      revenue: revenueResult,
+      cogs: { registered: existingCogs.length, total: products.length },
+      products: products.length,
+      log,
+    });
+  } catch (err: any) {
+    console.error("run-full-audit error:", err);
+    res.status(500).json({ error: err.message ?? "Error ejecutando auditoria completa", log });
+  }
+});
+
+function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number } {
+  const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
+  const imgsInline = p.imagesJson as Array<{ alt: string | null }> | null;
+  const hasAltTexts = Array.isArray(imgsInline) && imgsInline.length > 0 && imgsInline.every((img: any) => img.alt && img.alt.trim() !== "");
+  const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
+  const hasMetaTitle = !!seo?.metaTitle;
+  const hasMetaDesc = !!seo?.metaDescription;
+  const hasSchema = seo?.hasSchema ?? false;
+  let score = 0;
+  if (hasMetaTitle) score += 20;
+  if (hasMetaDesc) score += 15;
+  if (hasSchema) score += 15;
+  if (hasAltTexts || p.imageCount === 0) score += 10;
+  if (cleanHandle) score += 5;
+  if (descLen >= 300) score += 10;
+  if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) score += 10;
+  score += 10;
+  if (descLen >= 100) score += 5;
+  const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
+  return { score, grade, hasMetaTitle, hasMetaDesc, hasSchema, hasAltTexts, cleanHandle, descLen };
+}
+
+function pageHdr(title: string, num: number) {
+  return `<div class="page-header"><div class="page-header-title">${sanitizeHtml(title)}</div><div class="page-header-num">Pagina ${num}</div></div>`;
+}
+
 router.get("/projects/:projectId/exports/complete-report", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
   if (isNaN(projectId) || projectId <= 0) { res.status(400).json({ error: "ID de proyecto invalido" }); return; }
@@ -652,10 +887,12 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const redesigns = await db.select().from(redesignsTable).where(eq(redesignsTable.projectId, projectId));
   const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
   const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
-  const revenueSnapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.date)).limit(30);
+  const revenueSnapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.date)).limit(90);
   const memories = await db.select().from(omnicoreMemoriesTable).orderBy(desc(omnicoreMemoriesTable.createdAt)).limit(10);
   const priceHistory = await db.select().from(priceHistoryTable).where(eq(priceHistoryTable.projectId, projectId)).orderBy(desc(priceHistoryTable.recordedAt)).limit(20);
   const visualDna = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId)).limit(1);
+  const insightCount = await db.select({ count: sql<number>`count(*)` }).from(omnicoreInsightsTable);
+  const totalInsights = insightCount[0]?.count ?? 0;
 
   const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
   const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
@@ -665,32 +902,50 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const activeProducts = products.filter(p => p.status === "active").length;
   const draftProducts = products.filter(p => p.status === "draft").length;
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
-  const withSeo = seoData.filter(s => s.seoScore != null);
-  const avgSeo = withSeo.length > 0 ? withSeo.reduce((s, d) => s + (d.seoScore ?? 0), 0) / withSeo.length : 0;
-  const totalRevenue = products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0);
+
+  const liveAudit = products.map(p => {
+    const seo = seoMap.get(p.shopifyProductId);
+    return { product: p, seo, ...calculateSeoScoreInline(p, seo) };
+  });
+  const avgSeo = liveAudit.length > 0 ? liveAudit.reduce((s, a) => s + a.score, 0) / liveAudit.length : 0;
+  const storeGrade = avgSeo >= 90 ? "A" : avgSeo >= 75 ? "B" : avgSeo >= 60 ? "C" : avgSeo >= 45 ? "D" : "F";
+
+  const catalogPrices = products.map(p => parseFloat(p.price ?? "0"));
+  const totalCatalogValue = catalogPrices.reduce((s, p) => s + p, 0);
   const totalCogs = allCogs.reduce((s, c) => s + c.totalCogs, 0);
-  const avgMargin = totalRevenue > 0 ? ((totalRevenue - totalCogs) / totalRevenue) * 100 : 0;
+  const avgMargin = totalCatalogValue > 0 ? ((totalCatalogValue - totalCogs) / totalCatalogValue) * 100 : 0;
   const imagesGenerated = jobs.filter(j => j.status === "succeeded").length;
   const imagesFailed = jobs.filter(j => j.status === "failed").length;
-  const withSchema = seoData.filter(s => s.hasSchema).length;
-  const withAltTexts = seoData.filter(s => s.hasAltTexts).length;
+  const withSchema = liveAudit.filter(a => a.hasSchema).length;
+  const withAltTexts = liveAudit.filter(a => a.hasAltTexts).length;
+  const withMetaTitle = liveAudit.filter(a => a.hasMetaTitle).length;
+  const withMetaDesc = liveAudit.filter(a => a.hasMetaDesc).length;
+  const withCleanHandle = liveAudit.filter(a => a.cleanHandle).length;
+  const withLongDesc = liveAudit.filter(a => a.descLen >= 300).length;
   const completedTests = tests.filter(t => t.status === "completed" || t.status === "winner_applied").length;
   const activeTests = tests.filter(t => t.status === "running").length;
   const productTypes = [...new Set(products.map(p => p.productType).filter(Boolean))];
   const vendors = [...new Set(products.map(p => p.vendor).filter(Boolean))];
   const priceRange = products.length > 0
-    ? { min: Math.min(...products.map(p => parseFloat(p.price ?? "0"))), max: Math.max(...products.map(p => parseFloat(p.price ?? "0"))) }
+    ? { min: Math.min(...catalogPrices), max: Math.max(...catalogPrices) }
     : { min: 0, max: 0 };
+
+  const totalShopifyRevenue = revenueSnapshots.reduce((s, r) => s + (r.revenue ?? 0), 0);
+  const totalShopifyOrders = revenueSnapshots.reduce((s, r) => s + (r.orders ?? 0), 0);
+  const shopifyAov = totalShopifyOrders > 0 ? totalShopifyRevenue / totalShopifyOrders : 0;
 
   function healthScore(): number {
     let score = 0;
-    if (avgSeo >= 70) score += 25; else if (avgSeo >= 40) score += 12;
-    if (avgMargin >= 40) score += 25; else if (avgMargin >= 20) score += 12;
-    if (withSchema >= products.length * 0.5) score += 15; else if (withSchema > 0) score += 7;
-    if (imagesGenerated >= products.length) score += 15; else if (imagesGenerated > 0) score += 7;
+    if (avgSeo >= 70) score += 20; else if (avgSeo >= 40) score += 10;
+    if (avgMargin >= 40) score += 15; else if (avgMargin >= 20) score += 8;
+    if (withSchema >= products.length * 0.5) score += 10; else if (withSchema > 0) score += 5;
+    if (withMetaTitle >= products.length * 0.8) score += 10; else if (withMetaTitle > 0) score += 5;
+    if (imagesGenerated >= products.length) score += 10; else if (imagesGenerated > 0) score += 5;
     if (tests.length > 0) score += 10;
     if (project.brandTone) score += 5;
     if (project.targetAudience) score += 5;
+    if (allCogs.length >= products.length * 0.5) score += 10; else if (allCogs.length > 0) score += 5;
+    if (totalShopifyOrders > 0) score += 5;
     return Math.min(score, 100);
   }
   const health = healthScore();
@@ -698,7 +953,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const healthColor = health >= 80 ? BRAND.jade : health >= 60 ? BRAND.gold : health >= 40 ? BRAND.orange : BRAND.red;
 
   const seoGrades: Record<string, number> = {};
-  seoData.forEach(s => { const g = s.seoGrade || "Sin auditar"; seoGrades[g] = (seoGrades[g] || 0) + 1; });
+  liveAudit.forEach(a => { seoGrades[a.grade] = (seoGrades[a.grade] || 0) + 1; });
 
   let gradeBreakdown = "";
   for (const [g, count] of Object.entries(seoGrades).sort()) {
@@ -710,21 +965,55 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>`;
   }
 
+  let seoDetailRows = "";
+  for (const a of liveAudit.slice(0, 60)) {
+    seoDetailRows += `<tr>
+      <td style="font-weight:600;">${esc(a.product.title).slice(0, 45)}</td>
+      <td><span class="grade ${gradeClass(a.grade)}">${a.grade}</span></td>
+      <td>${a.score}</td>
+      <td>${a.hasMetaTitle ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
+      <td>${a.hasMetaDesc ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
+      <td>${a.hasSchema ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
+      <td>${a.hasAltTexts ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
+      <td>${a.cleanHandle ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
+      <td>${a.descLen}</td>
+    </tr>`;
+  }
+
   let productRows = "";
   for (const p of products.slice(0, 60)) {
     const seo = seoMap.get(p.shopifyProductId);
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
+    const audit = liveAudit.find(a => a.product.shopifyProductId === p.shopifyProductId);
     productRows += `<tr>
       <td style="font-weight:600;">${esc(p.title)}</td>
       <td>${p.status === "active" ? '<span class="tag tag-jade">Activo</span>' : '<span class="tag">Borrador</span>'}</td>
       <td style="font-weight:600;">${price > 0 ? price.toFixed(2) + "€" : "—"}</td>
-      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td>
+      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : '<span class="text-muted fs-sm">Sin datos</span>'}</td>
       <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
-      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td>
+      <td>${audit ? `<span class="grade ${gradeClass(audit.grade)}">${audit.grade}</span>` : "—"}</td>
       <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td>
       <td>${p.imageCount ?? 0}</td>
+    </tr>`;
+  }
+
+  let cogsDetailRows = "";
+  for (const p of products.slice(0, 60)) {
+    const cogs = cogsMap.get(p.shopifyProductId);
+    const price = parseFloat(p.price ?? "0");
+    const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
+    const breakEven = cogs?.breakEvenPrice ?? null;
+    cogsDetailRows += `<tr>
+      <td style="font-weight:600;">${esc(p.title).slice(0, 40)}</td>
+      <td>${price.toFixed(2)}€</td>
+      <td>${cogs ? `${cogs.unitCost?.toFixed(2) ?? "0.00"}€` : "—"}</td>
+      <td>${cogs ? `${(cogs.packaging ?? 0).toFixed(2)}€` : "—"}</td>
+      <td>${cogs ? `${(cogs.shippingDomestic ?? 0).toFixed(2)}€` : "—"}</td>
+      <td style="font-weight:700;">${cogs ? `${cogs.totalCogs.toFixed(2)}€` : "—"}</td>
+      <td>${breakEven != null ? `${breakEven.toFixed(2)}€` : "—"}</td>
+      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
     </tr>`;
   }
 
@@ -766,22 +1055,127 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </tr>`;
   }
 
+  let revenueRows = "";
+  for (const s of revenueSnapshots.slice(0, 30)) {
+    revenueRows += `<tr>
+      <td>${esc(s.date)}</td>
+      <td style="font-weight:700;">${(s.revenue ?? 0).toFixed(2)}€</td>
+      <td>${s.orders ?? 0}</td>
+      <td>${(s.aov ?? 0).toFixed(2)}€</td>
+    </tr>`;
+  }
+
+  const priceBuckets: Record<string, number> = {};
+  products.forEach(p => {
+    const pr = parseFloat(p.price ?? "0");
+    const bucket = pr < 10 ? "0-9€" : pr < 25 ? "10-24€" : pr < 50 ? "25-49€" : pr < 100 ? "50-99€" : pr < 200 ? "100-199€" : "200€+";
+    priceBuckets[bucket] = (priceBuckets[bucket] || 0) + 1;
+  });
+  let priceDist = "";
+  for (const [bucket, count] of Object.entries(priceBuckets)) {
+    const pct = Math.round((count / products.length) * 100);
+    priceDist += `<div class="waterfall-bar"><div class="waterfall-label">${bucket}</div><div class="waterfall-fill" style="width:${Math.max(pct, 5)}%;background:${BRAND.gold};"><div class="waterfall-val">${count} (${pct}%)</div></div></div>`;
+  }
+
   const issues: string[] = [];
   const successes: string[] = [];
   if (withSchema < products.length * 0.5 && products.length > 0) issues.push(`Solo ${withSchema}/${products.length} productos tienen Schema JSON-LD. Implementar structured data mejora CTR +30%.`);
-  if (withAltTexts < products.length * 0.5 && products.length > 0) issues.push(`Solo ${withAltTexts}/${products.length} productos tienen alt texts optimizados. Google Image Search puede generar hasta 20% trafico adicional.`);
-  if (avgSeo < 60 && withSeo.length > 0) issues.push(`Puntuacion SEO media (${Math.round(avgSeo)}/100) por debajo del umbral competitivo de 60. Se recomienda optimizar meta titles, descriptions y contenido.`);
-  if (avgMargin < 30 && totalRevenue > 0) issues.push(`Margen medio (${avgMargin.toFixed(1)}%) por debajo del 30% recomendado. Revisar estructura de costes o ajustar pricing.`);
-  if (tests.length === 0) issues.push(`Sin A/B tests activos. Activar testing continuo para mejorar conversion.`);
-  if (!project.brandTone) issues.push(`Tono de marca no definido. Establecerlo mejora la consistencia en copywriting e IA.`);
-  if (imagesGenerated > 0) successes.push(`${imagesGenerated} imagenes IA generadas con exito${imagesFailed > 0 ? ` (${imagesFailed} fallidas)` : ""}.`);
-  if (completedTests > 0) successes.push(`${completedTests} A/B tests completados — datos de conversion reales.`);
-  if (avgSeo >= 70) successes.push(`Puntuacion SEO media de ${Math.round(avgSeo)}/100 — por encima del umbral competitivo.`);
-  if (avgMargin >= 40) successes.push(`Margen bruto del ${avgMargin.toFixed(1)}% — saludable y competitivo.`);
+  if (withAltTexts < products.length * 0.5 && products.length > 0) issues.push(`Solo ${withAltTexts}/${products.length} productos tienen alt texts optimizados.`);
+  if (withMetaTitle < products.length * 0.8 && products.length > 0) issues.push(`${products.length - withMetaTitle} productos sin meta title optimizado — impacto directo en CTR de Google.`);
+  if (withMetaDesc < products.length * 0.8 && products.length > 0) issues.push(`${products.length - withMetaDesc} productos sin meta description — Google muestra snippets genericos.`);
+  if (avgSeo < 60) issues.push(`Score SEO medio (${Math.round(avgSeo)}/100, Grade ${storeGrade}) por debajo del umbral competitivo de 60.`);
+  if (avgMargin < 30 && totalCatalogValue > 0 && allCogs.length > 0) issues.push(`Margen medio (${avgMargin.toFixed(1)}%) por debajo del 30% recomendado. Revisar costes o pricing.`);
+  if (allCogs.length < products.length * 0.5 && products.length > 0) issues.push(`Solo ${allCogs.length}/${products.length} productos tienen costes (COGS) registrados. Sin costes no hay analisis de rentabilidad real.`);
+  if (tests.length === 0) issues.push(`Sin A/B tests activos. Activar testing continuo de imagenes y precios mejora conversion +15-30%.`);
+  if (!project.brandTone) issues.push(`Tono de marca no definido — la IA genera contenido sin personalidad de marca.`);
+  if (totalShopifyOrders === 0) issues.push(`Sin datos de ventas sincronizados desde Shopify. Sincronizar pedidos para analisis de revenue real.`);
+  if (withLongDesc < products.length * 0.5 && products.length > 0) issues.push(`${products.length - withLongDesc} productos con descripciones cortas (<300 chars). Google penaliza contenido thin.`);
+
+  if (imagesGenerated > 0) successes.push(`${imagesGenerated} imagenes IA generadas con exito.`);
+  if (completedTests > 0) successes.push(`${completedTests} A/B tests completados con datos reales.`);
+  if (avgSeo >= 70) successes.push(`Score SEO medio de ${Math.round(avgSeo)}/100 (${storeGrade}) — competitivo.`);
+  if (avgMargin >= 40 && allCogs.length > 0) successes.push(`Margen bruto del ${avgMargin.toFixed(1)}% — saludable.`);
   if (redesigns.length > 0) successes.push(`${redesigns.length} fichas de producto rediseñadas con IA.`);
+  if (totalShopifyOrders > 0) successes.push(`${totalShopifyOrders} pedidos registrados — ${totalShopifyRevenue.toFixed(0)}€ en revenue real.`);
+  if (allCogs.length > 0) successes.push(`${allCogs.length} productos con estructura de costes completa.`);
+
+  const sortedByPrice = [...products].sort((a, b) => parseFloat(b.price ?? "0") - parseFloat(a.price ?? "0"));
+  const topExpensive = sortedByPrice.slice(0, 5);
+  const topCheap = sortedByPrice.slice(-5).reverse();
+
+  let priceSuggestionRows = "";
+  for (const p of products.slice(0, 30)) {
+    const price = parseFloat(p.price ?? "0");
+    const cogs = cogsMap.get(p.shopifyProductId);
+    const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
+    const compareAt = p.compareAtPrice ? parseFloat(p.compareAtPrice) : null;
+
+    const psychPrice = Math.ceil(price) - 0.01;
+    const hasCompareAt = compareAt && compareAt > price;
+
+    let suggestion = "";
+    let suggestedPrice = price;
+    let impact = "";
+
+    if (margin !== null && margin < 15 && price > 0) {
+      const minViable = cogs ? cogs.totalCogs / 0.6 : price * 1.2;
+      suggestedPrice = Math.ceil(minViable) - 0.01;
+      suggestion = `Margen critico (${margin.toFixed(0)}%). Subir a ${suggestedPrice.toFixed(2)}€ para alcanzar ~40% margen.`;
+      impact = `+${((suggestedPrice - price) / price * 100).toFixed(0)}% precio`;
+    } else if (price > avgPrice * 2 && !hasCompareAt) {
+      suggestedPrice = psychPrice;
+      suggestion = `Producto premium. Activar "Compare at Price" a ${(price * 1.25).toFixed(2)}€ para anclaje psicologico.`;
+      impact = "CTR +15-25%";
+    } else if (price < avgPrice * 0.4 && price > 0) {
+      suggestedPrice = Math.ceil(price * 1.15) - 0.01;
+      suggestion = `Precio bajo vs catalogo. Subir ${((suggestedPrice - price) / price * 100).toFixed(0)}% sin impacto en conversion.`;
+      impact = `+${((suggestedPrice - price)).toFixed(2)}€/unidad`;
+    } else if (price !== psychPrice && price > 5) {
+      suggestedPrice = psychPrice;
+      suggestion = `Aplicar precio psicologico: ${psychPrice.toFixed(2)}€ en lugar de ${price.toFixed(2)}€.`;
+      impact = "Conversion +3-8%";
+    } else {
+      continue;
+    }
+
+    priceSuggestionRows += `<tr>
+      <td style="font-weight:600;">${esc(p.title).slice(0, 35)}</td>
+      <td>${price.toFixed(2)}€</td>
+      <td style="font-weight:700;color:${BRAND.gold};">${suggestedPrice.toFixed(2)}€</td>
+      <td>${margin !== null ? `${margin.toFixed(0)}%` : "—"}</td>
+      <td class="text-muted" style="font-size:12px;">${suggestion}</td>
+      <td><span class="tag tag-jade">${impact}</span></td>
+    </tr>`;
+  }
+
+  const marginBuckets: Record<string, number> = {};
+  products.forEach(p => {
+    const cogs = cogsMap.get(p.shopifyProductId);
+    const price = parseFloat(p.price ?? "0");
+    if (!cogs || price === 0) { marginBuckets["Sin COGS"] = (marginBuckets["Sin COGS"] || 0) + 1; return; }
+    const m = ((price - cogs.totalCogs) / price) * 100;
+    const bucket = m < 0 ? "Negativo" : m < 15 ? "0-14%" : m < 30 ? "15-29%" : m < 50 ? "30-49%" : m < 70 ? "50-69%" : "70%+";
+    marginBuckets[bucket] = (marginBuckets[bucket] || 0) + 1;
+  });
+  let marginDist = "";
+  const marginOrder = ["Negativo", "0-14%", "15-29%", "30-49%", "50-69%", "70%+", "Sin COGS"];
+  for (const bucket of marginOrder) {
+    const count = marginBuckets[bucket] || 0;
+    if (count === 0) continue;
+    const pct = Math.round((count / products.length) * 100);
+    const color = bucket === "Negativo" ? BRAND.red : bucket === "0-14%" ? BRAND.orange : bucket.startsWith("Sin") ? BRAND.muted : BRAND.jade;
+    marginDist += `<div class="waterfall-bar"><div class="waterfall-label">${bucket}</div><div class="waterfall-fill" style="width:${Math.max(pct, 5)}%;background:${color};"><div class="waterfall-val">${count} (${pct}%)</div></div></div>`;
+  }
+
+  const avgImages = products.length > 0 ? (products.reduce((s, p) => s + (p.imageCount ?? 0), 0) / products.length).toFixed(1) : "0";
+  const noImages = products.filter(p => (p.imageCount ?? 0) === 0).length;
+  const singleImage = products.filter(p => (p.imageCount ?? 0) === 1).length;
+  const goodImages = products.filter(p => (p.imageCount ?? 0) >= 4).length;
+
+  const reportTitle = "Auditoria Completa";
 
   const body = `
-    <!-- EXECUTIVE SUMMARY -->
+    <!-- PAGE 1: EXECUTIVE SUMMARY + TABLE OF CONTENTS -->
     <div class="section">
       <div class="section-header">
         <div class="section-icon section-icon-gold">&#9733;</div>
@@ -790,8 +1184,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       <div class="card">
         <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;">
           <div style="text-align:center;">
-            <div style="width:80px;height:80px;border-radius:50%;border:3px solid ${healthColor};display:flex;align-items:center;justify-content:center;background:${healthColor}11;">
-              <span style="font-size:28px;font-weight:900;color:${healthColor};">${health}</span>
+            <div style="width:90px;height:90px;border-radius:50%;border:3px solid ${healthColor};display:flex;align-items:center;justify-content:center;background:${healthColor}11;">
+              <span style="font-size:32px;font-weight:900;color:${healthColor};">${health}</span>
             </div>
             <div style="font-size:11px;color:${healthColor};font-weight:700;margin-top:6px;text-transform:uppercase;">${healthLabel}</div>
           </div>
@@ -800,180 +1194,284 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
               Auditoria completa de <strong style="color:${BRAND.white};">${esc(project.name)}</strong>
               ${project.shopDomain ? `(<strong style="color:${BRAND.white};">${esc(project.shopDomain)}</strong>)` : ""}
               en el nicho de <strong style="color:${BRAND.gold};">${esc(project.storeNiche || "e-commerce")}</strong>.
-              El catalogo cuenta con <strong style="color:${BRAND.white};">${activeProducts} productos activos</strong>${draftProducts > 0 ? ` y ${draftProducts} borradores` : ""},
-              con un precio medio de <strong style="color:${BRAND.white};">${avgPrice.toFixed(2)}€</strong> y un rango de ${priceRange.min.toFixed(0)}€–${priceRange.max.toFixed(0)}€.
+              Catalogo: <strong style="color:${BRAND.white};">${activeProducts} activos</strong>${draftProducts > 0 ? ` + ${draftProducts} borradores` : ""},
+              precio medio <strong style="color:${BRAND.white};">${avgPrice.toFixed(2)}€</strong> (rango ${priceRange.min.toFixed(0)}€–${priceRange.max.toFixed(0)}€).
+              ${totalShopifyOrders > 0 ? `Revenue real: <strong style="color:${BRAND.jade};">${totalShopifyRevenue.toFixed(0)}€</strong> en ${totalShopifyOrders} pedidos.` : ""}
             </p>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- KPI GRID -->
-    <div class="metric-row">
-      <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
-      <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
-      <div class="metric"><div class="value">${avgMargin.toFixed(1)}%</div><div class="label">Margen bruto</div></div>
-      <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">Score SEO</div></div>
-      <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imagenes IA</div></div>
-      <div class="metric"><div class="value">${tests.length}</div><div class="label">A/B Tests</div></div>
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- BRAND & IDENTITY -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-gold">&#127912;</div>
-        <div class="section-title">Identidad de Marca</div>
-      </div>
-      <div class="stat-grid">
-        <div class="stat-item"><div class="stat-item-label">Nicho</div><div class="stat-item-value">${esc(project.storeNiche || "No definido")}</div></div>
-        <div class="stat-item"><div class="stat-item-label">Tono de marca</div><div class="stat-item-value">${esc(project.brandTone || "No definido")}</div></div>
-        <div class="stat-item"><div class="stat-item-label">Audiencia objetivo</div><div class="stat-item-value">${esc(project.targetAudience || "No definida")}</div></div>
-        <div class="stat-item"><div class="stat-item-label">Mercados</div><div class="stat-item-value">${esc(project.storeMarkets || "Global")}</div></div>
-      </div>
-      ${productTypes.length > 0 ? `<div class="card" style="margin-top:12px;"><div class="stat-item-label" style="margin-bottom:8px;">Categorias de producto</div><div>${productTypes.map(t => `<span class="tag">${esc(t || "")}</span>`).join(" ")}</div></div>` : ""}
-      ${vendors.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Proveedores</div><div>${vendors.map(v => `<span class="tag">${esc(v || "")}</span>`).join(" ")}</div></div>` : ""}
-      ${visualDna.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Visual DNA</div><p class="text-muted" style="font-size:13px;line-height:1.7;">StyleLock activo — coherencia visual aplicada a todas las generaciones de imagenes.</p></div>` : ""}
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- SEO AUDIT -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-jade">&#128270;</div>
-        <div class="section-title">Auditoria SEO Tecnico</div>
-        <div class="section-count">${withSeo.length} auditados</div>
-      </div>
       <div class="metric-row">
-        <div class="metric"><div class="value">${Math.round(avgSeo)}<span style="font-size:14px;color:${BRAND.muted};">/100</span></div><div class="label">Score medio</div></div>
-        <div class="metric"><div class="value">${withSchema}</div><div class="label">Con Schema</div></div>
-        <div class="metric"><div class="value">${withAltTexts}</div><div class="label">Con Alt Texts</div></div>
-        <div class="metric"><div class="value">${withSeo.length}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Auditados</div></div>
-      </div>
-      ${Object.keys(seoGrades).length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de grados</div>${gradeBreakdown}</div>` : ""}
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- FINANCIAL -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-orange">&#128176;</div>
-        <div class="section-title">Analisis Financiero y COGS</div>
-        <div class="section-count">${allCogs.length} con COGS</div>
-      </div>
-      <div class="metric-row">
-        <div class="metric"><div class="value">${totalRevenue.toFixed(0)}€</div><div class="label">Revenue potencial</div></div>
-        <div class="metric"><div class="value">${totalCogs.toFixed(0)}€</div><div class="label">COGS total</div></div>
-        <div class="metric"><div class="value">${(totalRevenue - totalCogs).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div>
-        <div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : BRAND.red};">${avgMargin.toFixed(1)}%</div><div class="label">Margen medio</div></div>
-      </div>
-      ${priceHistoryRows ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Historial de cambios de precio</div><table><thead><tr><th>Fecha</th><th>Producto</th><th>Anterior</th><th>Nuevo</th><th>Cambio</th><th>Fuente</th></tr></thead><tbody>${priceHistoryRows}</tbody></table></div>` : ""}
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- A/B TESTING -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-blue">&#9879;</div>
-        <div class="section-title">A/B Testing</div>
-        <div class="section-count">${tests.length} tests</div>
-      </div>
-      <div class="metric-row">
-        <div class="metric"><div class="value">${tests.length}</div><div class="label">Tests totales</div></div>
-        <div class="metric"><div class="value" style="color:${BRAND.jade};">${activeTests}</div><div class="label">Activos</div></div>
-        <div class="metric"><div class="value">${completedTests}</div><div class="label">Completados</div></div>
-      </div>
-      ${testRows ? `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>Test</th><th>Tipo</th><th>Estado</th><th>Ganador</th><th>Mejora</th></tr></thead><tbody>${testRows}</tbody></table></div>` : '<div class="card"><p class="text-muted" style="text-align:center;padding:16px;">No hay A/B tests registrados. Activar testing mejora conversion.</p></div>'}
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- IMAGES AI -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-gold">&#127912;</div>
-        <div class="section-title">Imagenes IA Generadas</div>
-        <div class="section-count">${imagesGenerated} exitosas</div>
-      </div>
-      <div class="metric-row">
-        <div class="metric"><div class="value" style="color:${BRAND.jade};">${imagesGenerated}</div><div class="label">Generadas</div></div>
-        <div class="metric"><div class="value" style="color:${imagesFailed > 0 ? BRAND.red : BRAND.muted};">${imagesFailed}</div><div class="label">Fallidas</div></div>
-        <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Fichas rediseñadas</div></div>
+        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
+        <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
+        <div class="metric"><div class="value"><span class="grade ${gradeClass(storeGrade)}" style="font-size:24px;">${storeGrade}</span></div><div class="label">Grade SEO</div></div>
+        <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">Score SEO</div></div>
+        ${allCogs.length > 0 ? `<div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : BRAND.red};">${avgMargin.toFixed(0)}%</div><div class="label">Margen medio</div></div>` : ""}
+        ${totalShopifyOrders > 0 ? `<div class="metric"><div class="value" style="color:${BRAND.jade};">${totalShopifyRevenue.toFixed(0)}€</div><div class="label">Revenue real</div></div>` : ""}
       </div>
     </div>
 
-    <div class="divider"></div>
-
-    <!-- COMPETITORS -->
-    ${competitors.length > 0 ? `<div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-red">&#128161;</div>
-        <div class="section-title">Inteligencia Competitiva</div>
-        <div class="section-count">${competitors.length} monitorizados</div>
-      </div>
-      <div class="card" style="overflow-x:auto;"><table><thead><tr><th>Competidor</th><th>URL</th><th>Tipo</th><th>Estado</th></tr></thead><tbody>${compRows}</tbody></table></div>
-    </div><div class="divider"></div>` : ""}
-
-    <!-- INVENTORY -->
-    ${inventory.length > 0 ? `<div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-orange">&#128230;</div>
-        <div class="section-title">Inventario y Stock</div>
-        <div class="section-count">${inventory.length} trackings</div>
-      </div>
-      <div class="metric-row">
-        <div class="metric"><div class="value">${inventory.length}</div><div class="label">Productos trackeados</div></div>
-        <div class="metric"><div class="value">${inventory.filter(i => i.currentStock != null && i.restockThreshold != null && i.currentStock <= i.restockThreshold).length}</div><div class="label">Stock bajo</div></div>
-      </div>
-    </div><div class="divider"></div>` : ""}
-
-    <!-- OMNICORE BRAIN -->
     <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-gold">&#129504;</div>
-        <div class="section-title">OmniCore Brain - IA</div>
+      <div class="section-header"><div class="section-icon section-icon-gold">&#128196;</div><div class="section-title">Indice del Informe</div></div>
+      <div class="toc">
+        <div class="toc-item"><div class="toc-num">1</div><div><div class="toc-label">Resumen Ejecutivo</div><div class="toc-desc">Health score, KPIs y vision general</div></div></div>
+        <div class="toc-item"><div class="toc-num">2</div><div><div class="toc-label">Identidad de Marca</div><div class="toc-desc">Nicho, tono, audiencia, categorias</div></div></div>
+        <div class="toc-item"><div class="toc-num">3</div><div><div class="toc-label">Auditoria SEO Tecnico</div><div class="toc-desc">Score por producto, meta tags, schema, alt texts</div></div></div>
+        <div class="toc-item"><div class="toc-num">4</div><div><div class="toc-label">Analisis Economico y COGS</div><div class="toc-desc">Estructura de costes, margenes, distribucion de precios</div></div></div>
+        ${totalShopifyOrders > 0 ? '<div class="toc-item"><div class="toc-num">5</div><div><div class="toc-label">Analisis de Ventas</div><div class="toc-desc">Revenue real, pedidos, AOV, tendencias</div></div></div>' : ""}
+        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 6 : 5}</div><div><div class="toc-label">A/B Testing y Optimizacion de Precios</div><div class="toc-desc">Tests activos, resultados, sugerencias de precio IA</div></div></div>
+        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 7 : 6}</div><div><div class="toc-label">AI Economist — Analisis Economico</div><div class="toc-desc">Posicionamiento, margenes, bundles, proyecciones</div></div></div>
+        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 8 : 7}</div><div><div class="toc-label">Recomendaciones Estrategicas</div><div class="toc-desc">Acciones priorizadas por impacto</div></div></div>
+        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 9 : 8}</div><div><div class="toc-label">Catalogo Completo</div><div class="toc-desc">Detalle por producto: precio, COGS, SEO, imagenes</div></div></div>
       </div>
-      <div class="card">
+    </div>
+
+    <!-- PAGE 2: BRAND & IDENTITY -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, 2)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-gold">&#127912;</div>
+          <div class="section-title">Identidad de Marca</div>
+        </div>
         <div class="stat-grid">
-          <div class="stat-item"><div class="stat-item-label">Memorias consolidadas</div><div class="stat-item-value">${memories.length > 0 ? "Activo" : "Sin memorias"}</div></div>
-          <div class="stat-item"><div class="stat-item-label">Piloto automatico</div><div class="stat-item-value">${project.autoPilotEnabled ? '<span class="text-jade">Activado</span>' : '<span class="text-muted">Desactivado</span>'}</div></div>
-          <div class="stat-item"><div class="stat-item-label">Plan activo</div><div class="stat-item-value text-gold fw-800" style="text-transform:uppercase;">${esc(project.plan)}</div></div>
-          <div class="stat-item"><div class="stat-item-label">Score audit medio</div><div class="stat-item-value">${project.avgAuditScore != null ? Math.round(project.avgAuditScore) + "/100" : "Sin auditar"}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Nicho</div><div class="stat-item-value">${esc(project.storeNiche || "No definido")}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Tono de marca</div><div class="stat-item-value">${esc(project.brandTone || "No definido")}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Audiencia objetivo</div><div class="stat-item-value">${esc(project.targetAudience || "No definida")}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Mercados</div><div class="stat-item-value">${esc(project.storeMarkets || "Global")}</div></div>
+        </div>
+        ${productTypes.length > 0 ? `<div class="card" style="margin-top:12px;"><div class="stat-item-label" style="margin-bottom:8px;">Categorias de producto (${productTypes.length})</div><div>${productTypes.map(t => `<span class="tag">${esc(t || "")}</span>`).join(" ")}</div></div>` : ""}
+        ${vendors.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Proveedores (${vendors.length})</div><div>${vendors.map(v => `<span class="tag">${esc(v || "")}</span>`).join(" ")}</div></div>` : ""}
+        ${visualDna.length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Visual DNA</div><div class="stat-grid">${visualDna[0].backgroundStyle ? `<div class="stat-item"><div class="stat-item-label">Fondo</div><div class="stat-item-value">${esc(visualDna[0].backgroundStyle)}</div></div>` : ""}${visualDna[0].lightingStyle ? `<div class="stat-item"><div class="stat-item-label">Iluminacion</div><div class="stat-item-value">${esc(visualDna[0].lightingStyle)}</div></div>` : ""}${visualDna[0].mood ? `<div class="stat-item"><div class="stat-item-label">Mood</div><div class="stat-item-value">${esc(visualDna[0].mood)}</div></div>` : ""}${visualDna[0].composition ? `<div class="stat-item"><div class="stat-item-label">Composicion</div><div class="stat-item-value">${esc(visualDna[0].composition)}</div></div>` : ""}</div></div>` : ""}
+        <div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de precios del catalogo</div>${priceDist}</div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: SEO AUDIT (REAL) -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, 3)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-jade">&#128270;</div>
+          <div class="section-title">Auditoria SEO Tecnico</div>
+          <div class="section-count">${products.length} auditados en tiempo real</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric"><div class="value">${Math.round(avgSeo)}<span style="font-size:14px;color:${BRAND.muted};">/100</span></div><div class="label">Score medio</div></div>
+          <div class="metric"><div class="value"><span class="grade ${gradeClass(storeGrade)}" style="font-size:20px;">${storeGrade}</span></div><div class="label">Grade global</div></div>
+          <div class="metric"><div class="value">${withMetaTitle}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Meta Titles</div></div>
+          <div class="metric"><div class="value">${withMetaDesc}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Meta Desc</div></div>
+          <div class="metric"><div class="value">${withSchema}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Schema</div></div>
+          <div class="metric"><div class="value">${withAltTexts}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Alt Texts</div></div>
+        </div>
+        ${Object.keys(seoGrades).length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de grados SEO</div>${gradeBreakdown}</div>` : ""}
+        <div class="card" style="overflow-x:auto;">
+          <div class="stat-item-label" style="margin-bottom:12px;">Detalle SEO por producto</div>
+          <table>
+            <thead><tr><th>Producto</th><th>Grade</th><th>Score</th><th>Title</th><th>Desc</th><th>Schema</th><th>Alt</th><th>Handle</th><th>Chars</th></tr></thead>
+            <tbody>${seoDetailRows}</tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <div class="divider"></div>
-
-    <!-- RECOMMENDATIONS -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-jade">&#9989;</div>
-        <div class="section-title">Recomendaciones y Acciones</div>
+    <!-- PAGE 4: FINANCIAL & COGS -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, 4)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-orange">&#128176;</div>
+          <div class="section-title">Analisis Economico y Estructura de Costes</div>
+          <div class="section-count">${allCogs.length}/${products.length} con COGS</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric"><div class="value">${totalCatalogValue.toFixed(0)}€</div><div class="label">Valor catalogo</div></div>
+          <div class="metric"><div class="value">${totalCogs.toFixed(0)}€</div><div class="label">COGS total</div></div>
+          <div class="metric"><div class="value">${(totalCatalogValue - totalCogs).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div>
+          <div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : allCogs.length > 0 ? BRAND.red : BRAND.muted};">${allCogs.length > 0 ? avgMargin.toFixed(1) + "%" : "—"}</div><div class="label">Margen medio</div></div>
+        </div>
+        ${allCogs.length === 0 ? `<div class="recommendation recommendation-critical">No hay datos de costes (COGS) registrados. Sin costes no es posible calcular margenes reales ni rentabilidad. Usa la funcion "Estimar COGS con IA" en cada producto o registra costes manualmente (materiales, envio, empaquetado, APIs, mano de obra, etc.).</div>` : ""}
+        ${allCogs.length > 0 ? `<div class="card" style="overflow-x:auto;">
+          <div class="stat-item-label" style="margin-bottom:12px;">Desglose de costes por producto</div>
+          <table>
+            <thead><tr><th>Producto</th><th>PVP</th><th>Produccion</th><th>Empaquetado</th><th>Envio</th><th>COGS Total</th><th>Break Even</th><th>Margen</th></tr></thead>
+            <tbody>${cogsDetailRows}</tbody>
+          </table>
+        </div>` : ""}
+        ${priceHistoryRows ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Historial de cambios de precio</div><table><thead><tr><th>Fecha</th><th>Producto</th><th>Anterior</th><th>Nuevo</th><th>Cambio</th><th>Fuente</th></tr></thead><tbody>${priceHistoryRows}</tbody></table></div>` : ""}
       </div>
-      ${successes.map(s => `<div class="recommendation recommendation-success">${s}</div>`).join("")}
-      ${issues.map(i => `<div class="recommendation">${i}</div>`).join("")}
-      ${issues.length === 0 && successes.length === 0 ? '<div class="recommendation recommendation-info">Completa la auditoria de mas productos para obtener recomendaciones personalizadas.</div>' : ""}
     </div>
 
-    <div class="divider"></div>
-
-    <!-- PRODUCT TABLE -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon section-icon-blue">&#128203;</div>
-        <div class="section-title">Detalle por Producto</div>
-        <div class="section-count">${products.length} productos</div>
+    <!-- PAGE 5: SALES ANALYSIS (only if data exists) -->
+    ${totalShopifyOrders > 0 ? `<div class="report-page">
+      ${pageHdr(reportTitle, 5)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-jade">&#128200;</div>
+          <div class="section-title">Analisis de Ventas Reales</div>
+          <div class="section-count">${revenueSnapshots.length} dias</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric"><div class="value" style="color:${BRAND.jade};">${totalShopifyRevenue.toFixed(0)}€</div><div class="label">Revenue total</div></div>
+          <div class="metric"><div class="value">${totalShopifyOrders}</div><div class="label">Pedidos</div></div>
+          <div class="metric"><div class="value">${shopifyAov.toFixed(2)}€</div><div class="label">AOV medio</div></div>
+          <div class="metric"><div class="value">${revenueSnapshots.length > 0 ? (totalShopifyRevenue / revenueSnapshots.length).toFixed(0) + "€" : "—"}</div><div class="label">Revenue/dia</div></div>
+        </div>
+        <div class="card" style="overflow-x:auto;">
+          <div class="stat-item-label" style="margin-bottom:12px;">Ventas diarias</div>
+          <table>
+            <thead><tr><th>Fecha</th><th>Revenue</th><th>Pedidos</th><th>AOV</th></tr></thead>
+            <tbody>${revenueRows}</tbody>
+          </table>
+        </div>
       </div>
-      <div class="card" style="overflow-x:auto;">
-        <table>
-          <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
-          <tbody>${productRows || '<tr><td colspan="8" class="text-muted" style="text-align:center;">Sin productos importados</td></tr>'}</tbody>
-        </table>
+    </div>` : ""}
+
+    <!-- PAGE 6: A/B TESTING + PRICE OPTIMIZATION -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 6 : 5)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-blue">&#9879;</div>
+          <div class="section-title">A/B Testing y Optimizacion</div>
+          <div class="section-count">${tests.length} tests</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric"><div class="value">${tests.length}</div><div class="label">Tests totales</div></div>
+          <div class="metric"><div class="value" style="color:${BRAND.jade};">${activeTests}</div><div class="label">Activos</div></div>
+          <div class="metric"><div class="value">${completedTests}</div><div class="label">Completados</div></div>
+          <div class="metric"><div class="value">${imagesGenerated}</div><div class="label">Imagenes IA</div></div>
+          <div class="metric"><div class="value">${redesigns.length}</div><div class="label">Fichas rediseñadas</div></div>
+        </div>
+        ${testRows ? `<div class="card" style="overflow-x:auto;"><table><thead><tr><th>Test</th><th>Tipo</th><th>Estado</th><th>Ganador</th><th>Mejora</th></tr></thead><tbody>${testRows}</tbody></table></div>` : ""}
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Oportunidades de optimizacion detectadas</div>
+          ${tests.length === 0 ? '<div class="recommendation">Activar A/B tests de imagenes y de precios. Testing continuo puede mejorar conversion entre 15-30%.</div>' : ""}
+          ${products.filter(p => p.imageCount <= 1).length > 0 ? `<div class="recommendation">&#128247; ${products.filter(p => p.imageCount <= 1).length} productos con 1 o menos imagenes — añadir fotos lifestyle, detalle y uso.</div>` : ""}
+          ${(() => { const highPrice = products.filter(p => parseFloat(p.price ?? "0") > avgPrice * 1.5); return highPrice.length > 0 ? `<div class="recommendation">&#128184; ${highPrice.length} productos con precio >50% sobre la media — candidatos a test de pricing agresivo.</div>` : ""; })()}
+          ${(() => { const lowPrice = products.filter(p => { const pr = parseFloat(p.price ?? "0"); return pr > 0 && pr < avgPrice * 0.5; }); return lowPrice.length > 0 ? `<div class="recommendation">&#128200; ${lowPrice.length} productos con precio bajo vs catalogo — posible subida de precio sin impacto en conversion.</div>` : ""; })()}
+          ${products.filter(p => !p.compareAtPrice).length > 0 ? `<div class="recommendation">&#127991; ${products.filter(p => !p.compareAtPrice).length} productos sin "Compare at Price" — activar precio tachado mejora percepcion de descuento y CTR.</div>` : ""}
+        </div>
+        ${priceSuggestionRows ? `<div class="card" style="overflow-x:auto;">
+          <div class="stat-item-label" style="margin-bottom:12px;">&#128176; Sugerencias de precio por producto</div>
+          <table>
+            <thead><tr><th>Producto</th><th>Actual</th><th>Sugerido</th><th>Margen</th><th>Razon</th><th>Impacto</th></tr></thead>
+            <tbody>${priceSuggestionRows}</tbody>
+          </table>
+        </div>` : ""}
+        ${competitors.length > 0 ? `<div class="card" style="overflow-x:auto;"><div class="stat-item-label" style="margin-bottom:12px;">Competidores monitorizados</div><table><thead><tr><th>Competidor</th><th>URL</th><th>Tipo</th><th>Estado</th></tr></thead><tbody>${compRows}</tbody></table></div>` : ""}
+      </div>
+    </div>
+
+    <!-- PAGE 7: AI ECONOMIST ANALYSIS -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 7 : 6)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-gold">&#128202;</div>
+          <div class="section-title">Analisis del AI Economist</div>
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Posicionamiento de mercado</div>
+          <div class="stat-grid">
+            <div class="stat-item"><div class="stat-item-label">Precio medio catalogo</div><div class="stat-item-value">${avgPrice.toFixed(2)}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Rango de precios</div><div class="stat-item-value">${priceRange.min.toFixed(0)}€ – ${priceRange.max.toFixed(0)}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Precio mediano</div><div class="stat-item-value">${(() => { const sorted = [...catalogPrices].sort((a, b) => a - b); return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)].toFixed(2) : "0.00"; })()}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Imagenes por producto</div><div class="stat-item-value">${avgImages} media</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Distribucion de margenes</div>
+          ${marginDist || '<div class="text-muted" style="text-align:center;padding:16px;">Registra COGS para ver distribucion de margenes</div>'}
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Salud visual del catalogo</div>
+          <div class="metric-row">
+            <div class="metric"><div class="value">${avgImages}</div><div class="label">Imagenes/producto</div></div>
+            <div class="metric"><div class="value" style="color:${noImages > 0 ? BRAND.red : BRAND.jade};">${noImages}</div><div class="label">Sin imagenes</div></div>
+            <div class="metric"><div class="value" style="color:${singleImage > 0 ? BRAND.orange : BRAND.jade};">${singleImage}</div><div class="label">Solo 1 imagen</div></div>
+            <div class="metric"><div class="value" style="color:${BRAND.jade};">${goodImages}</div><div class="label">4+ imagenes</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Productos premium (Top 5 por precio)</div>
+          ${topExpensive.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid ${BRAND.border};"><span style="font-weight:600;">${esc(p.title).slice(0, 40)}</span><span class="text-gold fw-800">${parseFloat(p.price ?? "0").toFixed(2)}€</span></div>`).join("")}
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Productos entrada (Top 5 mas baratos)</div>
+          ${topCheap.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid ${BRAND.border};"><span style="font-weight:600;">${esc(p.title).slice(0, 40)}</span><span class="text-blue fw-800">${parseFloat(p.price ?? "0").toFixed(2)}€</span></div>`).join("")}
+        </div>
+        <div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Oportunidades de bundle y upsell</div>
+          ${(() => {
+            const typeGroups: Record<string, typeof products> = {};
+            products.forEach(p => { const t = p.productType || "Sin tipo"; if (!typeGroups[t]) typeGroups[t] = []; typeGroups[t].push(p); });
+            const bundleable = Object.entries(typeGroups).filter(([_, ps]) => ps.length >= 3).slice(0, 5);
+            if (bundleable.length === 0) return '<div class="recommendation recommendation-info">Necesitas al menos 3 productos del mismo tipo para crear bundles.</div>';
+            return bundleable.map(([type, ps]) => {
+              const bundlePrice = ps.slice(0, 3).reduce((s, p) => s + parseFloat(p.price ?? "0"), 0);
+              const discountedPrice = bundlePrice * 0.85;
+              return `<div class="recommendation">&#127873; <strong>Bundle "${esc(type)}"</strong>: ${ps.length} productos disponibles. Pack de 3 a ${discountedPrice.toFixed(2)}€ (vs ${bundlePrice.toFixed(2)}€ individual, -15%). AOV estimado +${(discountedPrice - avgPrice).toFixed(0)}€.</div>`;
+            }).join("");
+          })()}
+          ${totalShopifyOrders > 0 && shopifyAov > 0 ? `<div class="recommendation recommendation-success">AOV actual: ${shopifyAov.toFixed(2)}€. Con bundles y upsell, objetivo: ${(shopifyAov * 1.25).toFixed(2)}€ (+25%).</div>` : ""}
+        </div>
+        ${totalShopifyOrders > 0 ? `<div class="card">
+          <div class="stat-item-label" style="margin-bottom:12px;">Proyeccion de revenue (30 dias)</div>
+          <div class="stat-grid">
+            <div class="stat-item"><div class="stat-item-label">Revenue diario actual</div><div class="stat-item-value">${(totalShopifyRevenue / Math.max(revenueSnapshots.length, 1)).toFixed(2)}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Proyeccion mensual (base)</div><div class="stat-item-value">${(totalShopifyRevenue / Math.max(revenueSnapshots.length, 1) * 30).toFixed(0)}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Con optimizacion (+20%)</div><div class="stat-item-value text-jade">${(totalShopifyRevenue / Math.max(revenueSnapshots.length, 1) * 30 * 1.2).toFixed(0)}€</div></div>
+            <div class="stat-item"><div class="stat-item-label">Con bundles (+35%)</div><div class="stat-item-value text-gold">${(totalShopifyRevenue / Math.max(revenueSnapshots.length, 1) * 30 * 1.35).toFixed(0)}€</div></div>
+          </div>
+        </div>` : ""}
+      </div>
+    </div>
+
+    <!-- PAGE 8: RECOMMENDATIONS -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 8 : 7)}
+
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-jade">&#9989;</div>
+          <div class="section-title">Recomendaciones Estrategicas</div>
+        </div>
+        ${successes.length > 0 ? `<div class="stat-item-label" style="margin-bottom:12px;color:${BRAND.jade};">&#10003; Logros y fortalezas</div>` : ""}
+        ${successes.map(s => `<div class="recommendation recommendation-success">${s}</div>`).join("")}
+        ${issues.length > 0 ? `<div class="stat-item-label" style="margin:20px 0 12px;color:${BRAND.orange};">&#9888; Areas de mejora prioritarias</div>` : ""}
+        ${issues.map(i => `<div class="recommendation recommendation-critical">${i}</div>`).join("")}
+        ${issues.length === 0 && successes.length === 0 ? '<div class="recommendation recommendation-info">Completa la configuracion de costes y sincroniza ventas para obtener recomendaciones personalizadas.</div>' : ""}
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-gold">&#129504;</div>
+          <div class="section-title">Motor IA OmniCore</div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-item"><div class="stat-item-label">Insights de conocimiento</div><div class="stat-item-value">${Number(totalInsights).toLocaleString("es-ES")}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Memorias consolidadas</div><div class="stat-item-value">${memories.length > 0 ? "Activo" : "Sin memorias"}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Piloto automatico</div><div class="stat-item-value">${project.autoPilotEnabled ? '<span class="text-jade">Activado</span>' : '<span class="text-muted">Desactivado</span>'}</div></div>
+          <div class="stat-item"><div class="stat-item-label">Plan</div><div class="stat-item-value text-gold fw-800" style="text-transform:uppercase;">${esc(project.plan)}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 9: FULL PRODUCT TABLE -->
+    <div class="report-page">
+      ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 9 : 8)}
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon section-icon-blue">&#128203;</div>
+          <div class="section-title">Catalogo Completo</div>
+          <div class="section-count">${products.length} productos</div>
+        </div>
+        <div class="card" style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
+            <tbody>${productRows || '<tr><td colspan="8" class="text-muted" style="text-align:center;">Sin productos importados</td></tr>'}</tbody>
+          </table>
+        </div>
       </div>
     </div>`;
 
