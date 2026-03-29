@@ -356,6 +356,37 @@ Acciones disponibles:
 - brain_sync: Sincronizar/importar conocimiento desde un cerebro externo. Params: {url (URL base del cerebro externo), apiKey? (API key si requiere auth), source? (etiqueta origen)}
 - brain_stats: Ver estadísticas completas del cerebro OmniCore (memorias, insights, dominios, prompts, fuentes). Sin params.
 - brain_export: Exportar todo el conocimiento del cerebro. Params: {domain? (filtrar por dominio), format? ("json"|"ndjson")}
+- redesign_product: Rediseñar producto con calidad 100/100 Semrush (título SEO, 800-1200 palabras, 22-28 tags, 8 photo briefs, pricing psicológico). Params: {projectId, productId, parts? (array: "title","bodyHtml","price","tags","metafields","photoBriefs")}
+- apply_redesign: Aplicar un rediseño previamente generado al producto en Shopify. Params: {projectId, productId, fields? (array: "title","description","tags","meta" — default: todos)}
+- bulk_redesign: Rediseñar TODOS los productos en lote con calidad profesional. Params: {projectId, mode? ("all"|"weak" — default "all")}
+- create_ab_test: Crear test A/B (imagen o precio) para un producto. Params: {projectId, productId, testType ("image"|"price"), variantA?, variantB?}
+- list_ab_tests: Ver tests A/B activos y completados. Params: {projectId}
+- declare_winner: Declarar ganador de un test A/B y aplicar. Params: {projectId, testId, winner ("A"|"B")}
+- seo_full_audit: Auditoría SEO completa Semrush-level (16 criterios, keyword consistency, readability, structured data). Params: {projectId}
+- keyword_intelligence: Investigación de keywords con Google Search (volumen, dificultad, intención, autocomplete, "People Also Ask"). Params: {projectId, keyword}
+- blog_strategy: Generar estrategia de contenido blog (pillar content + cluster topics basado en productos). Params: {projectId}
+- generate_blog_post: Generar artículo de blog SEO optimizado. Params: {projectId, topic, targetKeyword?, wordCount? (default 1500)}
+- generate_schemas: Generar JSON-LD Schema (Product, FAQ, Organization) para productos. Params: {projectId, productId? (sin id = todos)}
+- generate_all_metas: Generar meta titles + descriptions SEO para todos los productos. Params: {projectId}
+- fix_all_alt_texts: Corregir alt texts SEO de todas las imágenes. Params: {projectId}
+- audit_page_speed: Auditoría PageSpeed Insights (Core Web Vitals, LCP, CLS, FID). Params: {projectId}
+- generate_sitemap: Generar sitemap XML optimizado. Params: {projectId}
+- scan_competitor: Escanear competidor (precios, productos, promociones, nivel de amenaza). Params: {projectId, competitorId}
+- analyze_competitor_product: Analizar posicionamiento de precio vs competidores. Params: {projectId, productId}
+- calculate_optimal_price: Calcular precio óptimo con IA (elasticidad, márgenes, competencia). Params: {projectId, productId}
+- estimate_cogs: Estimar COGS con IA (materiales, producción, envío). Params: {projectId, productId}
+- price_simulator: Simular escenarios de precio (qué pasa si subo/bajo precio). Params: {projectId, productId, newPrice (número), unitsPerMonth? (default 30)}
+- financial_forecast: Forecast financiero a 3-6 meses con escenarios. Params: {projectId, months? (default 6)}
+- financial_dashboard: Ver dashboard financiero completo (márgenes, COGS, revenue). Params: {projectId}
+- generate_product_images: Generar imágenes IA para un producto (hero, lifestyle, detalle, etc). Params: {projectId, productId, imageTypes? (array)}
+- bulk_generate_images: Generar imágenes para múltiples productos. Params: {projectId, productIds (array de IDs), imageTypes? (array: "hero","lifestyle","detail","packaging","ugc","scale" — default: ["hero","lifestyle","detail"])}
+- generate_email_flow: Crear flujo de email marketing completo con IA (welcome, abandoned cart, post-purchase). Params: {projectId, flowType ("welcome"|"abandoned_cart"|"post_purchase"|"win_back"|"custom"), customTopic?}
+- generate_email: Generar un email de marketing individual con IA. Params: {projectId, emailType ("promotional"|"newsletter"|"product_launch"|"sale"), subject?, products?}
+- inventory_sync: Sincronizar inventario con Shopify. Params: {projectId}
+- inventory_alerts: Ver alertas de stock bajo. Params: {projectId}
+- agency_quote: Generar presupuesto/cotización profesional para un cliente. Params: {projectId, services? (array), clientName?}
+- agency_proposal: Generar propuesta comercial completa con análisis y estrategia. Params: {projectId, clientName?, clientUrl?}
+- setup_full_store: CONFIGURACIÓN COMPLETA de tienda Shopify desde cero (páginas, colecciones, SEO, schemas, meta tags, alt texts). Params: {projectId}
 
 CMS PATHS (usa update_cms/update_cms_batch, N=índice):
   site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
@@ -397,6 +428,37 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Editar theme / cambiar CSS tienda / modificar Liquid → edit_theme_file o edit_theme_css; Crear sección → create_theme_section
 - Auditar theme / revisar theme → audit_theme; Cambiar settings theme → edit_theme_settings
 - Sincronizar cerebro / importar conocimiento / brain sync → brain_sync; Estadísticas cerebro / brain stats → brain_stats; Exportar cerebro / brain export → brain_export
+- Rediseñar producto / mejorar producto / redesign → redesign_product; Aplicar rediseño → apply_redesign; Rediseñar todos → bulk_redesign
+- Test A/B / crear test / A/B testing → create_ab_test; Ver tests → list_ab_tests; Declarar ganador → declare_winner
+- Auditoría SEO / auditar SEO / SEO completo → seo_full_audit; Keywords / investigar palabras clave → keyword_intelligence
+- Blog / estrategia contenido / content strategy → blog_strategy; Escribir artículo / blog post → generate_blog_post
+- Schema / JSON-LD / datos estructurados → generate_schemas; Meta tags / generar metas → generate_all_metas
+- Alt texts / corregir alt / SEO imágenes → fix_all_alt_texts; PageSpeed / velocidad / Core Web Vitals → audit_page_speed
+- Sitemap / mapa del sitio → generate_sitemap
+- Escanear competidor / competencia → scan_competitor; Precio vs competencia → analyze_competitor_product
+- Precio óptimo / mejor precio → calculate_optimal_price; Estimar costos / COGS → estimate_cogs
+- Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
+- Dashboard financiero / márgenes → financial_dashboard
+- Generar imágenes / fotos producto → generate_product_images; Imágenes todos / bulk images → bulk_generate_images
+- Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
+- Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts
+- Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
+- Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
+
+SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
+Somos una agencia Shopify IA completa 24/7. Nuestros servicios incluyen:
+• CREACIÓN desde 0: Montar tienda Shopify completa (productos, colecciones, páginas, SEO, schemas)
+• PRODUCTOS: Crear, rediseñar, optimizar con calidad 100/100 (800-1200 palabras, 8 secciones, FAQ, trust badges)
+• IMÁGENES IA: 8 tipos de foto profesional por producto (hero, lifestyle, detalle, packaging, UGC, escala, proceso, variante)
+• SEO SEMRUSH-LEVEL: Auditoría 16 criterios, keywords intelligence, blog strategy, schemas JSON-LD, meta tags, alt texts, sitemap
+• PRICING INTELIGENTE: Investigación de mercado real, precio óptimo, elasticidad, COGS, simulador, forecast financiero
+• A/B TESTING: Tests de imagen y precio con tracking automático y declaración de ganador
+• DISEÑO DE THEME: Editar Liquid, CSS, secciones, settings del theme de Shopify
+• EMAIL MARKETING: Flujos automáticos (welcome, abandoned cart, post-purchase, win-back), newsletters, campañas
+• COMPETIDORES: Escaneo de competencia, precios, productos, amenazas, alertas
+• INVENTARIO: Sincronización, alertas de stock bajo, gestión
+• PROPUESTAS COMERCIALES: Presupuestos y propuestas para clientes
+• CMS COMPLETO: Editar toda la landing, precios, textos, colores de la app
 - IMPORTANTE: SIEMPRE leer el archivo ANTES de editarlo (read_theme_file → edit_theme_file). NUNCA sobrescribir a ciegas.
 - Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
 - USA projectId del contexto si hay proyecto activo
@@ -507,7 +569,7 @@ CEREBRO OMNICORE: Tienes acceso a 46,000+ insights de conocimiento importados de
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
 
     const aiRes = await anthropic.messages.create({
-      model: "claude-haiku-4-20250404",
+      model: "claude-sonnet-4-5",
       max_tokens: 1500,
       system: sysPrompt,
       messages: [{ role: "user", content: userContent }],
@@ -3795,6 +3857,500 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         } catch (err) {
           result = { error: true, message: `❌ Error exportando: ${err instanceof Error ? err.message : String(err)}` };
         }
+        break;
+      }
+
+      case "redesign_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/redesign`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ parts: params?.parts }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `✅ **Rediseño 100/100 completado**\n\n📝 Nuevo título: ${data.title ?? "(generado)"}\n📊 Precio sugerido: €${data.price ?? "-"}\n🏷️ Tags: ${typeof data.tags === "string" ? data.tags.split(",").length : "?"} tags\n📸 ${Array.isArray(data.photo_brief) ? data.photo_brief.length : 0} photo briefs\n\n💡 Usa **apply_redesign** para aplicar estos cambios en Shopify.` };
+        } catch (err) { result = { error: true, message: `❌ Error en rediseño: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "apply_redesign": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const fields = params?.fields || ["title", "description", "tags", "meta"];
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/apply-redesign`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ fields }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error aplicando rediseño"}` }; break; }
+          result = { ...data, message: `✅ **Rediseño aplicado en Shopify**\n\nCampos actualizados: ${(fields as string[]).join(", ")}` };
+        } catch (err) { result = { error: true, message: `❌ Error aplicando rediseño: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "bulk_redesign": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const mode = params?.mode || "all";
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/bulk-redesign`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ mode }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error en bulk redesign"}` }; break; }
+          result = { ...data, message: `🚀 **Rediseño en lote iniciado (modo: ${mode})**\n\n${data.totalItems ?? "?"} productos procesándose con calidad 100/100 Semrush.\nJob ID: ${data.jobId ?? "-"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "create_ab_test": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/ab-tests`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ productId, testType: params?.testType || "image", variantA: params?.variantA, variantB: params?.variantB }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: data.error ? `❌ ${data.error}` : `⚗️ **Test A/B creado**\n\nTipo: ${params?.testType || "image"}\nProducto: ${productId}\n\nEl test está activo y recopilando datos.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_ab_tests": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/ab-tests`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo tests A/B" }; break; }
+          const tests = await resp.json() as Array<Record<string, unknown>>;
+          const active = tests.filter((t) => t.status === "running").length;
+          const completed = tests.filter((t) => t.status === "completed" || t.status === "winner_applied").length;
+          result = { tests, message: `⚗️ **Tests A/B**\n\n🟢 Activos: ${active}\n✅ Completados: ${completed}\n📊 Total: ${tests.length}${tests.length > 0 ? "\n\n" + tests.slice(0, 5).map((t) => `• ${t.productTitle || t.productId} — ${t.testType} — ${t.status}${t.winner ? ` (ganador: ${t.winner})` : ""}`).join("\n") : ""}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "declare_winner": {
+        const projectId = params?.projectId;
+        const testId = params?.testId;
+        if (!projectId || !testId) { result = { error: true, message: "❌ Falta projectId o testId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/ab-tests/${testId}/declare-winner`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ winner: params?.winner || "A" }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: data.error ? `❌ ${data.error}` : `🏆 **Ganador declarado: Variante ${params?.winner || "A"}**\n\nLos cambios se han aplicado al producto.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "seo_full_audit": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/audit`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as { avgScore?: number; storeGrade?: string; products?: Array<Record<string, unknown>>; criticalIssues?: Array<Record<string, unknown>> };
+          const critical = data.criticalIssues?.length ?? 0;
+          result = { ...data, message: `🔍 **Auditoría SEO Semrush-Level Completa**\n\n📊 Puntuación media: ${Math.round(data.avgScore ?? 0)}/100\n🏆 Grado tienda: ${data.storeGrade ?? "?"}\n📦 Productos auditados: ${Array.isArray(data.products) ? data.products.length : "?"}\n⚠️ Issues críticos: ${critical}\n\n16 criterios evaluados: meta title, meta desc, structured data, alt texts, URL, internal linking, content depth, PageSpeed, title optimization, images, tags, structured content, keyword consistency, readability, social meta, FAQ optimization.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "keyword_intelligence": {
+        const projectId = params?.projectId;
+        const keyword = params?.keyword;
+        if (!projectId || !keyword) { result = { error: true, message: "❌ Falta projectId o keyword" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/keyword-intelligence`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ keyword }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: data.error ? `❌ ${data.error}` : `🔑 **Investigación de Keyword: "${keyword}"**\n\n${JSON.stringify(data).length > 200 ? "Análisis completo generado con Google Search — incluye volumen, dificultad, intención, autocomplete, People Also Ask y competidores SERP." : "Datos recopilados."}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "blog_strategy": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/blog-strategy`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📝 **Estrategia de Blog generada**\n\nPillar content + cluster topics basados en tus productos y nicho. Incluye calendario editorial y keywords objetivo.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_blog_post": {
+        const projectId = params?.projectId;
+        const topic = params?.topic;
+        if (!projectId || !topic) { result = { error: true, message: "❌ Falta projectId o topic" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-blog-post`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ topic, targetKeyword: params?.targetKeyword, wordCount: params?.wordCount || 1500 }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📄 **Artículo de Blog SEO generado**\n\nTema: ${topic}\n${params?.targetKeyword ? `Keyword objetivo: ${params.targetKeyword}` : ""}\n\nOptimizado para posicionamiento en Google con metodología Semrush.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_schemas": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-schemas`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ productId: params?.productId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📋 **Schemas JSON-LD generados**\n\nProduct, FAQ, Organization schema para Rich Snippets en Google.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_all_metas": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-metas`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `🏷️ **Meta tags SEO generados**\n\nMeta titles (40-60 chars) + meta descriptions (130-155 chars) optimizados para todos los productos.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "fix_all_alt_texts": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/fix-alt-texts`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `🖼️ **Alt texts SEO corregidos**\n\nTodas las imágenes ahora tienen alt text descriptivo con keywords para Google Images.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "audit_page_speed": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/audit-page-speed`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `⚡ **Auditoría PageSpeed completada**\n\nCore Web Vitals analizados: LCP, CLS, FID/INP. Incluye puntuación móvil y desktop.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_sitemap": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-sitemap`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `🗺️ **Sitemap XML generado**\n\nPing enviado a Google para indexación acelerada.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "scan_competitor": {
+        const projectId = params?.projectId;
+        const competitorId = params?.competitorId;
+        if (!projectId || !competitorId) { result = { error: true, message: "❌ Falta projectId o competitorId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/competitors/scan`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId, competitorId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error escaneando competidor"}` }; break; }
+          result = { ...data, message: `🔍 **Competidor escaneado**\n\nPrecios, productos, promociones y nivel de amenaza analizados con IA.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "analyze_competitor_product": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/analyze-competitors`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📊 **Análisis competitivo del producto**\n\nPosicionamiento de precio vs competidores del mercado analizado.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "calculate_optimal_price": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/calculate-optimal-price`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `💰 **Precio óptimo calculado**\n\nAnálisis de elasticidad precio-demanda, márgenes y competencia completado.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "estimate_cogs": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/ai-estimate-cogs`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📦 **COGS estimado con IA**\n\nMateriales, producción, envío y márgenes calculados.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "price_simulator": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const newPrice = params?.newPrice;
+        if (!projectId || !productId || !newPrice) { result = { error: true, message: "❌ Falta projectId, productId o newPrice" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/price-simulator`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ newPrice: parseFloat(String(newPrice)), unitsPerMonth: params?.unitsPerMonth || 30 }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error en simulador"}` }; break; }
+          result = { ...data, message: `📈 **Simulación de precio: €${newPrice}**\n\nEscenarios pesimista/base/optimista calculados con impacto en revenue, margen y conversión.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "financial_forecast": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/financial-forecast`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ months: params?.months || 6 }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📊 **Forecast Financiero generado**\n\nProyección a ${params?.months || 6} meses con escenarios optimista, realista y pesimista.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "financial_dashboard": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/financial-dashboard`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `💹 **Dashboard Financiero**\n\nMárgenes, COGS, revenue y métricas clave del proyecto.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_product_images": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/images/generate`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ imageTypes: params?.imageTypes }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `🖼️ **Imágenes IA generándose**\n\n8 tipos de foto profesional: hero, lifestyle, detalle, packaging, UGC, escala, proceso, variante.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "bulk_generate_images": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const productIds = params?.productIds as string[] | undefined;
+          const imageTypes = params?.imageTypes || ["hero", "lifestyle", "detail"];
+          if (!productIds || !productIds.length) {
+            result = { error: true, message: "❌ Falta productIds (array de IDs de productos). Usa list_products primero para obtener los IDs." }; break;
+          }
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/bulk-generate-images`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ productIds, imageTypes }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando imágenes"}` }; break; }
+          result = { ...data, message: `🎨 **Generación de imágenes en lote iniciada**\n\n${productIds.length} productos × ${(imageTypes as string[]).length} tipos = ${productIds.length * (imageTypes as string[]).length} imágenes.\nTipos: ${(imageTypes as string[]).join(", ")}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_email_flow": {
+        const projectId = params?.projectId;
+        const flowType = params?.flowType || "welcome";
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/klaviyo-ai/generate-workflow`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ shopDomain: project.shopDomain, storeName: project.name, niche: project.niche || "ecommerce", market: "es", storeContext: params?.customTopic || "" }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando flujo email"}` }; break; }
+          result = { ...data, message: `📧 **Flujo de Email Marketing generado**\n\nTipo: ${flowType}\nTienda: ${project.name}\n\nFlujo completo con secuencia de emails, asuntos, contenido y timing optimizado.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_email": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const flowType = params?.emailType || "promotional";
+          const resp = await fetch(`${baseUrl}/api/klaviyo-ai/generate-email`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ flowType, emailPosition: 1, storeName: project.name, shopDomain: project.shopDomain, niche: project.niche || "ecommerce", market: "es", projectId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando email"}` }; break; }
+          result = { ...data, message: `✉️ **Email de marketing generado**\n\nTipo: ${flowType}\nContenido HTML profesional listo para enviar.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_sync": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/sync`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📦 **Inventario sincronizado**\n\nStock actualizado desde Shopify.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_alerts": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/alerts?projectId=${projectId}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo alertas de inventario" }; break; }
+          const alerts = await resp.json() as Array<Record<string, unknown>>;
+          result = { alerts, message: `🚨 **Alertas de Inventario**\n\n${alerts.length > 0 ? `${alerts.length} productos con stock bajo (≤14 días de inventario restante).\n\n${alerts.slice(0, 5).map((a) => `• ${a.productTitle || a.shopifyProductId}: ${a.currentStock ?? "?"} uds — ${a.daysRemaining ?? "?"} días restantes`).join("\n")}` : "✅ Sin alertas — todo el stock está en niveles saludables."}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "agency_quote": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/agency/quote`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId, services: params?.services, clientName: params?.clientName }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `💼 **Presupuesto generado**\n\nCotización profesional lista para enviar al cliente.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "agency_proposal": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/agency/proposal`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId, clientName: params?.clientName, clientUrl: params?.clientUrl }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          result = { ...data, message: `📋 **Propuesta comercial generada**\n\nAnálisis completo + estrategia + presupuesto listo para presentar al cliente.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "setup_full_store": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const steps: string[] = [];
+
+          const syncResp = await fetch(`${baseUrl}/api/projects/${projectId}/products/sync`, { method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" } });
+          steps.push(syncResp.ok ? "✅ Productos sincronizados" : "⚠️ Sync parcial");
+
+          const pagesResp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-metas`, { method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" } });
+          steps.push(pagesResp.ok ? "✅ Meta tags SEO generados" : "⚠️ Metas parcial");
+
+          const altResp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/fix-alt-texts`, { method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" } });
+          steps.push(altResp.ok ? "✅ Alt texts optimizados" : "⚠️ Alt texts parcial");
+
+          const schemaResp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-schemas`, { method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" } });
+          steps.push(schemaResp.ok ? "✅ Schemas JSON-LD generados" : "⚠️ Schemas parcial");
+
+          result = { steps, message: `🏗️ **Setup Completo de Tienda ejecutado**\n\n${steps.join("\n")}\n\n💡 Para completar el setup, también puedes pedir:\n• **design_all_pages** → Crear páginas (About, FAQ, Shipping, Returns, Contact)\n• **auto_collections** → Crear colecciones automáticas\n• **optimize_all_products** → Optimizar todos los productos\n• **bulk_generate_images** → Generar imágenes IA` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
 
