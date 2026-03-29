@@ -311,7 +311,7 @@ Acciones disponibles:
 - store_status: Ver estado de la tienda. Params: {projectId}
 - list_products: Listar productos activos. Params: {projectId, limit?}
 - list_all_products: Listar TODOS los productos (active+draft+archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
-- create_product: Crear producto COMPLETO con IA (título SEO, descripción 400+ palabras, tags, precio real del mercado, meta tags SEO, e imágenes generadas con IA según plan). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?}
+- create_product: Crear producto CALIDAD 100/100 con IA (título SEO 45-65 chars, descripción 800-1200 palabras con 8 secciones: storytelling, beneficios, specs, FAQ, trust badges; 22-28 tags; precio investigado del mercado; meta tags SEO optimizados; 8 imágenes generadas con IA). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
 - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
@@ -1019,11 +1019,11 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         const plan = (project.plan ?? "starter") as string;
 
         const IMAGE_TYPES_BY_PLAN: Record<string, string[]> = {
-          trial: ["hero"],
-          starter: ["hero", "lifestyle"],
-          agency_pro: ["hero", "lifestyle", "detail", "packaging"],
-          enterprise: ["hero", "lifestyle", "detail", "packaging", "ugc"],
-          admin: ["hero", "lifestyle", "detail", "packaging", "ugc", "bundle"],
+          trial: ["hero", "lifestyle"],
+          starter: ["hero", "lifestyle", "detail", "packaging"],
+          agency_pro: ["hero", "lifestyle", "detail", "packaging", "ugc", "scale", "process", "variant"],
+          enterprise: ["hero", "lifestyle", "detail", "packaging", "ugc", "scale", "process", "variant"],
+          admin: ["hero", "lifestyle", "detail", "packaging", "ugc", "scale", "process", "variant"],
         };
 
         if (params?.aiGenerate !== false) {
@@ -1043,37 +1043,83 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 productType?: string;
               }>(
                 parseInt(projectId),
-                `Genera contenido PROFESIONAL COMPLETO optimizado para un nuevo producto Shopify.
+                `Genera contenido de CALIDAD ABSOLUTA 100/100 para un nuevo producto Shopify — al nivel de las mejores tiendas del mundo (Gymshark, Allbirds, Fenty Beauty, Skims).
+
 Título base: "${title}"
-Tipo de producto: ${params?.productType || "DETECTA el tipo de producto a partir del título (ej: 'taza', 'camiseta', 'poster', 'accesorio', etc.)"}
+Tipo de producto: ${params?.productType || "DETECTA el tipo de producto a partir del título"}
 Nicho: ${storeNiche}
 Tono de marca: ${project.brandTone || "profesional"}
-Plan de suscripción: ${plan} (adapta la profundidad del contenido)
-Precio proporcionado: ${params?.price || "NO proporcionado — investiga y sugiere un precio competitivo REAL del mercado"}
+Audiencia: ${project.targetAudience || "adultos con gusto por la calidad"}
+Mercados: ${project.storeMarkets || "España/Europa"}
+Precio proporcionado: ${params?.price || "NO proporcionado — investiga y sugiere precio competitivo REAL"}
 
-INSTRUCCIONES (contenido PREMIUM de agencia profesional):
-1. Mejora el título para SEO (mantén la esencia pero hazlo irresistible, incluye keywords del nicho)
-2. Genera una descripción HTML profesional de AL MENOS 400 palabras con:
-   - Headline emotivo con H2
-   - Párrafo de apertura con storytelling emocional que conecte con el buyer persona
-   - Sección de características con bullet points (✅) — mínimo 6 beneficios
-   - Especificaciones técnicas en tabla HTML si aplica (materiales, dimensiones, peso, etc.)
-   - Sección "¿Para quién es?" con casos de uso
-   - Sección de garantía/confianza
-   - Párrafo de cierre con CTA persuasivo y urgencia sutil
-   - Usa clases CSS inline para darle estilo profesional
-3. Genera 20+ tags SEO relevantes (incluye long-tail keywords, variaciones, sinónimos)
-4. Meta title SEO (max 60 chars, incluye keyword principal + beneficio)
-5. Meta description SEO (max 155 chars, incluye CTA y keywords)
-6. Si NO hay precio, sugiere precio competitivo basado en el mercado real
-7. Detecta automáticamente el tipo de producto si no se proporcionó
+ESTÁNDAR DE CALIDAD 100/100 — REQUISITOS OBLIGATORIOS:
+
+1. TÍTULO (45-65 chars):
+   - Keyword principal AL INICIO del título
+   - Incluye modificador emocional o beneficio clave
+   - Formato: [Keyword Principal] — [Beneficio/Diferenciador] | [Material/Detalle]
+   - Ejemplo perfecto: "Taza Cerámica Artesanal — Diseño Exclusivo Pintado a Mano | 350ml"
+
+2. DESCRIPCIÓN HTML (mínimo 800-1200 palabras, 8 secciones obligatorias):
+   <div class="product-description">
+   SECCIÓN 1 — HERO HOOK (H2 emotivo + párrafo apertura con storytelling 80-100 palabras):
+   Conecta emocionalmente. Describe la EXPERIENCIA, no solo el producto. Pinta una escena vivida.
+
+   SECCIÓN 2 — BENEFICIOS CLAVE (H2 + lista con ✅ emojis, mínimo 8 beneficios):
+   Cada beneficio = resultado concreto para el comprador, no característica genérica.
+
+   SECCIÓN 3 — ESPECIFICACIONES TÉCNICAS (H2 + tabla HTML):
+   Tabla con: Material, Dimensiones, Peso, Color, Capacidad, Origen, Certificaciones.
+
+   SECCIÓN 4 — ¿PARA QUIÉN ES PERFECTO? (H2 + 4-5 casos de uso con emojis):
+   Buyer personas específicos con situaciones concretas de uso.
+
+   SECCIÓN 5 — CUIDADO Y MANTENIMIENTO (H3 + instrucciones):
+   Instrucciones claras de cuidado, limpieza, almacenamiento.
+
+   SECCIÓN 6 — PREGUNTAS FRECUENTES (H2 "FAQ" + 4-5 Q&A con <strong> para preguntas):
+   Resuelve objeciones de compra: envío, devoluciones, garantía, materiales.
+
+   SECCIÓN 7 — CIERRE Y CTA (párrafo persuasivo + urgencia sutil):
+   CTA claro, mención de stock limitado o edición especial si aplica.
+
+   SECCIÓN 8 — TRUST BADGES (iconos de confianza):
+   📦 Envío Seguro | 🔄 Devolución 30 días | ✅ Garantía de Calidad | 🌿 Materiales Premium
+   </div>
+
+   USA ESTILO PROFESIONAL: <h2>, <h3>, <ul>/<li>, <table>, <strong>, <p>. NO uses estilos inline.
+
+3. TAGS SEO (22-28 tags obligatorios en array):
+   Categorías de tags que DEBES incluir:
+   - Nombre producto + variaciones (3-4 tags)
+   - Material/composición (2-3 tags)
+   - Uso/ocasión (3-4 tags)
+   - Audiencia target (2-3 tags)
+   - Estilo/estética (2-3 tags)
+   - Keywords long-tail en español (3-4 tags)
+   - Keywords en inglés para SEO internacional (2-3 tags)
+   - Temporada/momento si aplica (1-2 tags)
+   - Nicho específico (2-3 tags)
+
+4. META TITLE SEO (40-60 chars EXACTOS):
+   Formato: [Keyword] — [Beneficio] | [Marca/Tienda]
+   Keyword principal SIEMPRE al inicio.
+
+5. META DESCRIPTION SEO (130-155 chars EXACTOS):
+   Formato: [Beneficio principal]. [Keyword + detalle]. [CTA con urgencia]. Incluye precio si hay.
+
+6. PRECIO:
+   - Si no hay precio, sugiere basándote en el mercado real del nicho
+   - SIEMPRE incluye suggestedCompareAtPrice (20-35% más alto que el precio)
+   - Usa pricing psicológico: .99, .95, .90
 
 Responde SOLO JSON válido:
-{"title":"...","description":"<div>HTML completa...</div>","tags":["tag1","tag2",...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.XX,"suggestedCompareAtPrice":XX.XX,"productType":"tipo_detectado"}`,
-                `Eres un equipo ELITE de copywriting eCommerce Shopify con 15 años de experiencia trabajando para marcas premium. Generas fichas de producto que CONVIERTEN al nivel de agencias que cobran €5.000+/mes. Tu contenido es indistinguible del de una agencia top. Conoces las mejores prácticas de SEO, persuasión, storytelling y CRO (Conversion Rate Optimization). Responde SOLO JSON válido.`,
+{"title":"...","description":"<div class=\\"product-description\\">HTML completa 800+ palabras con las 8 secciones...</div>","tags":["tag1","tag2",...mínimo 22 tags],"seoTitle":"...40-60 chars...","seoDescription":"...130-155 chars...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo"}`,
+                `Eres el equipo de producto de las tiendas Shopify más exitosas del mundo combinado en uno. Has estudiado qué hace que Gymshark, Allbirds, Fenty Beauty, Skims, y las 100 mejores tiendas Shopify del mundo tengan fichas de producto PERFECTAS que convierten al máximo nivel. Tu misión: generar fichas que puntuarían 100/100 en cualquier auditoría de calidad Shopify. Cada ficha que generas es indistinguible de las de agencias que cobran €10.000+/mes. Dominas SEO técnico, copywriting persuasivo, storytelling emocional, CRO, y psicología de precios. Responde SOLO JSON válido.`,
                 "seo",
                 storeNiche || undefined,
-                4000
+                8000
               ),
             ]);
 

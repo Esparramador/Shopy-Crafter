@@ -56,44 +56,61 @@ async function doRedesign(projectId: number, shopifyProductId: string): Promise<
     variantsSection = "";
   }
 
-  const prompt = `Estás rediseñando un producto de Shopify para la tienda "${project.name}".
-Nicho: ${project.storeNiche ?? "e-commerce"}
-Audiencia: ${project.targetAudience ?? "adultos"}
-Tono de marca: ${project.brandTone ?? "profesional"}
-Mercados: ${project.storeMarkets ?? "España"}
+  const prompt = `Estás rediseñando un producto de Shopify para la tienda "${project.name}" al ESTÁNDAR DE CALIDAD 100/100 — el nivel de las mejores tiendas Shopify del mundo.
 
-DATOS REALES ACTUALES DEL PRODUCTO (extraídos de Shopify en tiempo real):
+Nicho: ${project.storeNiche ?? "e-commerce"}
+Audiencia: ${project.targetAudience ?? "adultos con gusto por la calidad"}
+Tono de marca: ${project.brandTone ?? "profesional"}
+Mercados: ${project.storeMarkets ?? "España/Europa"}
+
+DATOS REALES ACTUALES DEL PRODUCTO:
 Título: ${product.title}
 Tipo de producto: ${product.productType ?? "sin definir"}
-Descripción actual: ${product.bodyHtml?.replace(/<[^>]+>/g, "").slice(0, 600) ?? "(vacía)"}
+Descripción actual: ${product.bodyHtml?.replace(/<[^>]+>/g, "").slice(0, 800) ?? "(vacía)"}
 Precio actual: €${livePrice ?? "no configurado"}
 Tags actuales: ${product.tags ?? "ninguno"}
-Imágenes: ${product.imageCount}
+Imágenes actuales: ${product.imageCount}
 Vendor: ${product.vendor ?? "no definido"}
 ${optionsSection ? `\nOpciones del producto:\n${optionsSection}` : ""}
-${variantsSection ? `\nVariantes reales (IMPORTANTE: el precio sugerido debe ser coherente con estas variantes):\n${variantsSection}` : ""}
+${variantsSection ? `\nVariantes reales:\n${variantsSection}` : ""}
 
-INSTRUCCIONES CRÍTICAS:
-1. El título y descripción deben hacer referencia al producto EXACTO que ves arriba (no inventes otro tipo de producto)
-2. Los photo_brief deben describir imágenes de "${product.title}" específicamente — NUNCA objetos no relacionados
-3. El precio recomendado debe ser coherente con las variantes actuales del producto
-4. La descripción HTML debe mencionar las opciones/variantes reales si las hay
+INSTRUCCIONES CRÍTICAS — CALIDAD 100/100:
+1. El título y descripción DEBEN hacer referencia al producto EXACTO (no inventes otro)
+2. Los photo_brief DEBEN describir imágenes de "${product.title}" específicamente
 
-Genera un rediseño COMPLETO y profesional. Devuelve SOLO un JSON con estos campos exactos:
+REQUISITOS DE CALIDAD ABSOLUTA:
+
+TÍTULO (45-65 chars):
+- Keyword principal AL INICIO
+- Formato: [Keyword] — [Beneficio/Diferenciador] | [Detalle]
+
+DESCRIPCIÓN HTML (800-1200 palabras MÍNIMO, 8 secciones obligatorias):
+Sección 1: HERO HOOK — H2 emotivo + storytelling emocional (80-100 palabras)
+Sección 2: BENEFICIOS CLAVE — H2 + lista ✅ con mínimo 8 beneficios concretos
+Sección 3: ESPECIFICACIONES TÉCNICAS — H2 + tabla HTML (material, dimensiones, peso, color, origen)
+Sección 4: ¿PARA QUIÉN ES PERFECTO? — H2 + 4-5 buyer personas con emojis
+Sección 5: CUIDADO Y MANTENIMIENTO — H3 + instrucciones específicas
+Sección 6: FAQ — H2 + 4-5 preguntas/respuestas que resuelven objeciones de compra
+Sección 7: CTA Y CIERRE — Párrafo persuasivo con urgencia sutil
+Sección 8: TRUST BADGES — 📦 Envío Seguro | 🔄 Devolución 30 días | ✅ Garantía | 🌿 Premium
+
+USA: <h2>, <h3>, <ul>/<li>, <table>, <strong>, <p>. SIN estilos inline.
+
+Devuelve SOLO JSON:
 {
-  "title": "título SEO 55-65 chars, keyword principal primero",
-  "body_html": "descripción HTML completa 500-700 palabras con hook emocional, lista de beneficios, características premium con ✓, bloque de confianza (garantía/envío/devolución), y CTA",
-  "short_description": "descripción corta 50 palabras para meta",
-  "price": "precio recomendado como string ej: '29.99' — debe ser coherente con el producto real",
-  "compare_at_price": "precio tachado 25-40% más alto como string",
-  "tags": "15 tags separados por coma mezcla español+inglés, relevantes para el producto exacto",
-  "meta_title": "meta title 60 chars exactos con keyword del producto",
-  "meta_description": "meta description 155 chars con keyword, precio, CTA",
-  "photo_brief": ["brief foto 1: descripción detallada de cómo fotografiar ${product.title} específicamente", "brief foto 2", "brief foto 3", "brief foto 4"],
-  "price_reasoning": "explicación del precio recomendado basada en el producto real"
+  "title": "título SEO 45-65 chars, keyword primero",
+  "body_html": "<div class='product-description'>HTML 800-1200 palabras con 8 secciones...</div>",
+  "short_description": "50 palabras para meta/preview",
+  "price": "precio con pricing psicológico (.99/.95)",
+  "compare_at_price": "PVP tachado 20-35% superior",
+  "tags": "22-28 tags: producto+material+uso+audiencia+estilo+long-tail+inglés",
+  "meta_title": "40-60 chars: [Keyword] — [Beneficio] | [Marca]",
+  "meta_description": "130-155 chars: [Beneficio]. [Keyword+detalle]. [CTA urgencia]",
+  "photo_brief": ["8 briefs: hero frontal", "lifestyle en contexto", "detalle/textura macro", "escala/tamaño con referencia", "packaging premium", "proceso/behind-the-scenes", "variante/color alternativo", "UGC/modelo real"],
+  "price_reasoning": "justificación detallada con contexto de mercado"
 }`;
 
-  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 6000);
+  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 8000);
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {

@@ -16,21 +16,60 @@ function calculateSeoScore(data: {
   hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean;
   hasAltTexts: boolean; cleanHandle: boolean; descriptionLength: number;
   pageSpeedScore?: number; internalLinks?: number;
+  metaTitleLength?: number; metaDescLength?: number;
+  titleLength?: number; imageCount?: number; tagCount?: number;
+  wordCount?: number; hasStructuredContent?: boolean;
 }): { score: number; grade: string } {
   let score = 0;
-  if (data.hasMetaTitle) score += 20;
-  if (data.hasMetaDesc) score += 15;
-  if (data.hasSchema) score += 15;
-  if (data.hasAltTexts) score += 10;
-  if (data.cleanHandle) score += 5;
-  if (data.internalLinks && data.internalLinks >= 2) score += 5;
-  if (data.descriptionLength >= 300) score += 10;
-  if (data.pageSpeedScore && data.pageSpeedScore >= 70) score += 10;
-  const primaryKeywordInTitle = true;
-  if (primaryKeywordInTitle) score += 10;
+
+  if (data.hasMetaTitle) {
+    score += 12;
+    if (data.metaTitleLength && data.metaTitleLength >= 40 && data.metaTitleLength <= 60) score += 3;
+  }
+
+  if (data.hasMetaDesc) {
+    score += 10;
+    if (data.metaDescLength && data.metaDescLength >= 130 && data.metaDescLength <= 160) score += 3;
+  }
+
+  if (data.hasSchema) score += 12;
+
+  if (data.hasAltTexts) score += 8;
+
+  if (data.cleanHandle) score += 4;
+
+  if (data.internalLinks && data.internalLinks >= 2) score += 3;
+  if (data.internalLinks && data.internalLinks >= 4) score += 2;
+
+  const wc = data.wordCount ?? Math.round(data.descriptionLength / 5);
+  if (wc >= 800) score += 10;
+  else if (wc >= 500) score += 8;
+  else if (wc >= 300) score += 5;
+  else if (wc >= 100) score += 2;
+
+  if (data.pageSpeedScore && data.pageSpeedScore >= 90) score += 8;
+  else if (data.pageSpeedScore && data.pageSpeedScore >= 70) score += 5;
+  else if (data.pageSpeedScore && data.pageSpeedScore >= 50) score += 2;
+
+  if (data.titleLength && data.titleLength >= 45 && data.titleLength <= 70) score += 5;
+  else if (data.titleLength && data.titleLength >= 30) score += 2;
+
+  const ic = data.imageCount ?? 0;
+  if (ic >= 8) score += 8;
+  else if (ic >= 5) score += 5;
+  else if (ic >= 3) score += 3;
+  else if (ic >= 1) score += 1;
+
+  const tc = data.tagCount ?? 0;
+  if (tc >= 20) score += 7;
+  else if (tc >= 15) score += 5;
+  else if (tc >= 10) score += 3;
+  else if (tc >= 5) score += 1;
+
+  if (data.hasStructuredContent) score += 5;
 
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
-  return { score, grade };
+  return { score: Math.min(100, score), grade };
 }
 
 router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> => {
@@ -51,9 +90,13 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
   let totalScore = 0;
   const productScores = products.map((p) => {
     const seo = seoMap.get(p.shopifyProductId);
-    const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
+    const bodyText = p.bodyHtml?.replace(/<[^>]+>/g, "") ?? "";
+    const descLen = bodyText.length;
+    const wordCount = bodyText.split(/\s+/).filter(w => w.length > 0).length;
     const hasAltTexts = (p.imagesJson as Array<{ alt: string | null }> | null)?.every((img) => img.alt && img.alt.trim() !== "") ?? false;
     const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
+    const tagCount = p.tags ? p.tags.split(",").filter(t => t.trim()).length : 0;
+    const hasStructuredContent = /<(h2|h3|ul|ol|table)[\s>]/i.test(p.bodyHtml ?? "");
 
     const { score, grade } = calculateSeoScore({
       hasMetaTitle: !!seo?.metaTitle,
@@ -63,6 +106,13 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
       cleanHandle,
       descriptionLength: descLen,
       pageSpeedScore: seo?.pageSpeedScore ?? undefined,
+      metaTitleLength: seo?.metaTitle?.length,
+      metaDescLength: seo?.metaDescription?.length,
+      titleLength: p.title.length,
+      imageCount: p.imageCount ?? 0,
+      tagCount,
+      wordCount,
+      hasStructuredContent,
     });
 
     totalScore += score;
@@ -78,6 +128,9 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
       hasAltTexts: hasAltTexts || p.imageCount === 0,
       cleanHandle,
       descriptionLength: descLen,
+      wordCount,
+      imageCount: p.imageCount ?? 0,
+      tagCount,
     };
   });
 

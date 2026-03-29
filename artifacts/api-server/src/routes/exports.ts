@@ -1018,26 +1018,37 @@ IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nom
   }
 });
 
-function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number } {
-  const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
+function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number; wordCount: number; tagCount: number } {
+  const bodyText = p.bodyHtml?.replace(/<[^>]+>/g, "") ?? "";
+  const descLen = bodyText.length;
+  const wordCount = bodyText.split(/\s+/).filter((w: string) => w.length > 0).length;
   const imgsInline = p.imagesJson as Array<{ alt: string | null }> | null;
   const hasAltTexts = Array.isArray(imgsInline) && imgsInline.length > 0 && imgsInline.every((img: any) => img.alt && img.alt.trim() !== "");
   const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
   const hasMetaTitle = !!seo?.metaTitle;
   const hasMetaDesc = !!seo?.metaDescription;
   const hasSchema = seo?.hasSchema ?? false;
+  const tagCount = p.tags ? p.tags.split(",").filter((t: string) => t.trim()).length : 0;
+  const imgCount = p.imageCount ?? 0;
+  const titleLen = (p.title ?? "").length;
+  const hasStructuredContent = /<(h2|h3|ul|ol|table)[\s>]/i.test(p.bodyHtml ?? "");
+
   let score = 0;
-  if (hasMetaTitle) score += 20;
-  if (hasMetaDesc) score += 15;
-  if (hasSchema) score += 15;
-  if (hasAltTexts || p.imageCount === 0) score += 10;
-  if (cleanHandle) score += 5;
-  if (descLen >= 300) score += 10;
-  if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) score += 10;
-  score += 10;
-  if (descLen >= 100) score += 5;
+  if (hasMetaTitle) { score += 12; if (seo?.metaTitle?.length >= 40 && seo?.metaTitle?.length <= 60) score += 3; }
+  if (hasMetaDesc) { score += 10; if (seo?.metaDescription?.length >= 130 && seo?.metaDescription?.length <= 160) score += 3; }
+  if (hasSchema) score += 12;
+  if (hasAltTexts) score += 8;
+  if (cleanHandle) score += 4;
+  if (wordCount >= 800) score += 10; else if (wordCount >= 500) score += 8; else if (wordCount >= 300) score += 5; else if (wordCount >= 100) score += 2;
+  if (seo?.pageSpeedScore >= 90) score += 8; else if (seo?.pageSpeedScore >= 70) score += 5; else if (seo?.pageSpeedScore >= 50) score += 2;
+  if (titleLen >= 45 && titleLen <= 70) score += 5; else if (titleLen >= 30) score += 2;
+  if (imgCount >= 8) score += 8; else if (imgCount >= 5) score += 5; else if (imgCount >= 3) score += 3; else if (imgCount >= 1) score += 1;
+  if (tagCount >= 20) score += 7; else if (tagCount >= 15) score += 5; else if (tagCount >= 10) score += 3; else if (tagCount >= 5) score += 1;
+  if (hasStructuredContent) score += 5;
+  score = Math.min(100, score);
+
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
-  return { score, grade, hasMetaTitle, hasMetaDesc, hasSchema, hasAltTexts, cleanHandle, descLen };
+  return { score, grade, hasMetaTitle, hasMetaDesc, hasSchema, hasAltTexts, cleanHandle, descLen, wordCount, tagCount };
 }
 
 function pageHdr(title: string, num: number) {
