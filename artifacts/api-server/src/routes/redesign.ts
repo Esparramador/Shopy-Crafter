@@ -96,18 +96,26 @@ Sección 8: TRUST BADGES — 📦 Envío Seguro | 🔄 Devolución 30 días | �
 
 USA: <h2>, <h3>, <ul>/<li>, <table>, <strong>, <p>. SIN estilos inline.
 
+OPTIMIZACIÓN SEO AVANZADA (Metodología Semrush):
+- KEYWORD DENSITY: Keyword principal 3-5 veces en la descripción (densidad 1.5-2.5%)
+- KEYWORD PROMINENCE: Keyword principal en el PRIMER PÁRRAFO (Hero Hook) y en al menos 2 H2
+- LSI KEYWORDS: 5-8 keywords semánticas relacionadas distribuidas naturalmente
+- READABILITY: Frases 15-25 palabras. Párrafos 2-4 líneas. Voz activa. Score Flesch legible.
+- FAQ SCHEMA-READY: Formato <strong>¿Pregunta?</strong> + <p>Respuesta</p> para Rich Snippets Google
+- SEARCH INTENT: Todo el contenido orientado a intención TRANSACCIONAL (comprar, conseguir, pedir)
+
 Devuelve SOLO JSON:
 {
-  "title": "título SEO 45-65 chars, keyword primero",
-  "body_html": "<div class='product-description'>HTML 800-1200 palabras con 8 secciones...</div>",
-  "short_description": "50 palabras para meta/preview",
+  "title": "título SEO 45-65 chars, keyword transaccional primero",
+  "body_html": "<div class='product-description'>HTML 800-1200 palabras, 8 secciones, keyword density 1.5-2.5%, FAQ schema-ready</div>",
+  "short_description": "50 palabras para meta/preview con keyword principal",
   "price": "precio con pricing psicológico (.99/.95)",
   "compare_at_price": "PVP tachado 20-35% superior",
-  "tags": "22-28 tags: producto+material+uso+audiencia+estilo+long-tail+inglés",
+  "tags": "22-28 tags: producto+material+intención transaccional+audiencia+estilo+long-tail+LSI+inglés",
   "meta_title": "40-60 chars: [Keyword] — [Beneficio] | [Marca]",
-  "meta_description": "130-155 chars: [Beneficio]. [Keyword+detalle]. [CTA urgencia]",
+  "meta_description": "130-155 chars: [Beneficio]. [Keyword+detalle]. [CTA urgencia]. Responder intent en primeros 100 chars",
   "photo_brief": ["8 briefs: hero frontal", "lifestyle en contexto", "detalle/textura macro", "escala/tamaño con referencia", "packaging premium", "proceso/behind-the-scenes", "variante/color alternativo", "UGC/modelo real"],
-  "price_reasoning": "justificación detallada con contexto de mercado"
+  "price_reasoning": "justificación con análisis competitivo y posicionamiento de mercado"
 }`;
 
   return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 8000);

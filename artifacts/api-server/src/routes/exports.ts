@@ -1018,12 +1018,12 @@ IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nom
   }
 });
 
-function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number; wordCount: number; tagCount: number } {
+function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: string; hasMetaTitle: boolean; hasMetaDesc: boolean; hasSchema: boolean; hasAltTexts: boolean; cleanHandle: boolean; descLen: number; wordCount: number; tagCount: number; details?: Record<string, number> } {
   const bodyText = p.bodyHtml?.replace(/<[^>]+>/g, "") ?? "";
   const descLen = bodyText.length;
   const wordCount = bodyText.split(/\s+/).filter((w: string) => w.length > 0).length;
   const imgsInline = p.imagesJson as Array<{ alt: string | null }> | null;
-  const hasAltTexts = Array.isArray(imgsInline) && imgsInline.length > 0 && imgsInline.every((img: any) => img.alt && img.alt.trim() !== "");
+  const hasAltTexts = imgCount === 0 || (Array.isArray(imgsInline) && imgsInline.length > 0 && imgsInline.every((img: any) => img.alt && img.alt.trim() !== ""));
   const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
   const hasMetaTitle = !!seo?.metaTitle;
   const hasMetaDesc = !!seo?.metaDescription;
@@ -1032,23 +1032,100 @@ function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: stri
   const imgCount = p.imageCount ?? 0;
   const titleLen = (p.title ?? "").length;
   const hasStructuredContent = /<(h2|h3|ul|ol|table)[\s>]/i.test(p.bodyHtml ?? "");
+  const hasFaqContent = /faq|pregunta|¿/i.test(p.bodyHtml ?? "");
 
-  let score = 0;
-  if (hasMetaTitle) { score += 12; if (seo?.metaTitle?.length >= 40 && seo?.metaTitle?.length <= 60) score += 3; }
-  if (hasMetaDesc) { score += 10; if (seo?.metaDescription?.length >= 130 && seo?.metaDescription?.length <= 160) score += 3; }
-  if (hasSchema) score += 12;
-  if (hasAltTexts) score += 8;
-  if (cleanHandle) score += 4;
-  if (wordCount >= 800) score += 10; else if (wordCount >= 500) score += 8; else if (wordCount >= 300) score += 5; else if (wordCount >= 100) score += 2;
-  if (seo?.pageSpeedScore >= 90) score += 8; else if (seo?.pageSpeedScore >= 70) score += 5; else if (seo?.pageSpeedScore >= 50) score += 2;
-  if (titleLen >= 45 && titleLen <= 70) score += 5; else if (titleLen >= 30) score += 2;
-  if (imgCount >= 8) score += 8; else if (imgCount >= 5) score += 5; else if (imgCount >= 3) score += 3; else if (imgCount >= 1) score += 1;
-  if (tagCount >= 20) score += 7; else if (tagCount >= 15) score += 5; else if (tagCount >= 10) score += 3; else if (tagCount >= 5) score += 1;
-  if (hasStructuredContent) score += 5;
-  score = Math.min(100, score);
+  const details: Record<string, number> = {};
+  let totalWeight = 0;
+  let weightedSum = 0;
 
+  function addC(name: string, pts: number, weight: number) {
+    details[name] = Math.round(pts);
+    weightedSum += pts * weight;
+    totalWeight += weight;
+  }
+
+  let mtPts = 0;
+  if (hasMetaTitle) { mtPts = 60; if (seo?.metaTitle?.length >= 40 && seo?.metaTitle?.length <= 60) mtPts = 100; else if (seo?.metaTitle?.length >= 30 && seo?.metaTitle?.length <= 70) mtPts = 80; }
+  addC("metaTitle", mtPts, 10);
+
+  let mdPts = 0;
+  if (hasMetaDesc) { mdPts = 60; if (seo?.metaDescription?.length >= 130 && seo?.metaDescription?.length <= 160) mdPts = 100; else if (seo?.metaDescription?.length >= 100 && seo?.metaDescription?.length <= 170) mdPts = 80; }
+  addC("metaDescription", mdPts, 8);
+
+  let schPts = 0;
+  if (hasSchema) { schPts = 85; if (hasFaqContent) schPts = 100; } else { if (hasFaqContent) schPts = 30; }
+  addC("structuredData", schPts, 10);
+
+  addC("altTexts", hasAltTexts ? 100 : 0, 6);
+  addC("urlHandle", cleanHandle ? (titleLen >= 10 && titleLen <= 50 ? 100 : 80) : 0, 3);
+
+  let wcPts = 0;
+  if (wordCount >= 800) wcPts = 100; else if (wordCount >= 500) wcPts = 80; else if (wordCount >= 300) wcPts = 55; else if (wordCount >= 100) wcPts = 25;
+  addC("contentDepth", wcPts, 9);
+
+  let spPts = 0;
+  if (seo?.pageSpeedScore >= 90) spPts = 100; else if (seo?.pageSpeedScore >= 70) spPts = 70; else if (seo?.pageSpeedScore >= 50) spPts = 40;
+  addC("pageSpeed", spPts, 7);
+
+  let tPts = 0;
+  if (titleLen >= 45 && titleLen <= 70) tPts = 100; else if (titleLen >= 30 && titleLen <= 80) tPts = 60; else if (titleLen >= 20) tPts = 30;
+  addC("titleOptimization", tPts, 5);
+
+  let iPts = 0;
+  if (imgCount >= 8) iPts = 100; else if (imgCount >= 5) iPts = 70; else if (imgCount >= 3) iPts = 45; else if (imgCount >= 1) iPts = 15;
+  addC("imageCount", iPts, 7);
+
+  let tgPts = 0;
+  if (tagCount >= 20) tgPts = 100; else if (tagCount >= 15) tgPts = 75; else if (tagCount >= 10) tgPts = 50; else if (tagCount >= 5) tgPts = 25;
+  addC("tagOptimization", tgPts, 5);
+
+  addC("structuredContent", hasStructuredContent ? 100 : 0, 4);
+
+  let kwPts = 0;
+  const title = p.title ?? "";
+  if (title && bodyText) {
+    const tw = title.toLowerCase().replace(/[—–|·\-]/g, " ").split(/\s+/).filter((w: string) => w.length > 3);
+    const bl = bodyText.toLowerCase();
+    const first200 = bl.substring(0, 800);
+    if (tw.length > 0) {
+      const br = tw.filter((w: string) => bl.includes(w)).length / tw.length;
+      const pr = tw.filter((w: string) => first200.includes(w)).length / tw.length;
+      if (br >= 0.6) kwPts += 40; else if (br >= 0.3) kwPts += 20;
+      if (pr >= 0.5) kwPts += 35; else if (pr >= 0.25) kwPts += 15;
+    }
+    if (p.tags) {
+      const tl = (p.tags as string).toLowerCase();
+      const tkm = tw.filter((w: string) => tl.includes(w)).length;
+      if (tw.length > 0 && tkm / tw.length >= 0.4) kwPts += 25;
+    }
+  }
+  addC("keywordConsistency", Math.min(100, kwPts), 8);
+
+  let rdPts = 0;
+  if (bodyText && wordCount >= 50) {
+    const sents = bodyText.split(/[.!?¿¡]+/).filter((s: string) => s.trim().length > 5);
+    const avg = sents.length > 0 ? wordCount / sents.length : 0;
+    if (avg >= 10 && avg <= 25) rdPts = 100; else if (avg >= 8 && avg <= 30) rdPts = 70; else if (avg > 0) rdPts = 35;
+    const paras = bodyText.split(/\n\n|\r\n\r\n/).filter((pp: string) => pp.trim().length > 20);
+    if (paras.length >= 5) rdPts = Math.min(100, rdPts + 10);
+  }
+  addC("readability", rdPts, 6);
+
+  let smPts = 0;
+  if (hasMetaTitle && hasMetaDesc && imgCount >= 1) smPts = 100;
+  else if (hasMetaTitle && hasMetaDesc) smPts = 60;
+  else if (hasMetaTitle || hasMetaDesc) smPts = 30;
+  addC("socialMeta", smPts, 3);
+
+  let fqPts = 0;
+  if (hasFaqContent && hasSchema) fqPts = 100; else if (hasFaqContent) fqPts = 60;
+  addC("faqOptimization", fqPts, 5);
+
+  addC("internalLinking", 0, 4);
+
+  const score = totalWeight > 0 ? Math.min(100, Math.round(weightedSum / totalWeight)) : 0;
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
-  return { score, grade, hasMetaTitle, hasMetaDesc, hasSchema, hasAltTexts, cleanHandle, descLen, wordCount, tagCount };
+  return { score, grade, hasMetaTitle, hasMetaDesc, hasSchema, hasAltTexts, cleanHandle, descLen, wordCount, tagCount, details };
 }
 
 function pageHdr(title: string, num: number) {

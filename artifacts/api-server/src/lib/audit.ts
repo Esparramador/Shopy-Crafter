@@ -289,31 +289,64 @@ export function auditProduct(product: {
   const hasGuarantee = /garant|devoluci|envío|shipping|gratis|free/i.test(lowerBody);
   const hasStorytelling = wordCount >= 200 && hasH2;
 
-  if (hasBenefits) contentQualityScore += 15;
-  if (hasSpecs) contentQualityScore += 15;
-  if (hasFaq) contentQualityScore += 15;
-  if (hasCta) contentQualityScore += 10;
-  if (hasGuarantee) contentQualityScore += 10;
-  if (hasStorytelling) contentQualityScore += 15;
-  if (wordCount >= 500) contentQualityScore += 10;
-  if (hasEmoji) contentQualityScore += 5;
-  if (hasH3) contentQualityScore += 5;
+  if (hasBenefits) contentQualityScore += 12;
+  if (hasSpecs) contentQualityScore += 12;
+  if (hasFaq) contentQualityScore += 12;
+  if (hasCta) contentQualityScore += 8;
+  if (hasGuarantee) contentQualityScore += 8;
+  if (hasStorytelling) contentQualityScore += 12;
+  if (wordCount >= 500) contentQualityScore += 8;
+  if (hasEmoji) contentQualityScore += 3;
+  if (hasH3) contentQualityScore += 3;
 
+  let readabilityPts = 0;
+  if (wordCount >= 50) {
+    const sentences = bodyText.split(/[.!?¿¡]+/).filter(s => s.trim().length > 5);
+    const avgSentLen = sentences.length > 0 ? wordCount / sentences.length : 0;
+    if (avgSentLen >= 10 && avgSentLen <= 25) readabilityPts = 8;
+    else if (avgSentLen >= 8 && avgSentLen <= 30) readabilityPts = 5;
+    else if (avgSentLen > 0) readabilityPts = 2;
+
+    const paragraphs = bodyText.split(/\n\s*\n/).filter(p => p.trim().length > 20);
+    if (paragraphs.length >= 6) readabilityPts += 4;
+    else if (paragraphs.length >= 3) readabilityPts += 2;
+  }
+  contentQualityScore += readabilityPts;
+
+  const titleWords = title.toLowerCase().replace(/[—–|·\-]/g, " ").split(/\s+/).filter(w => w.length > 3);
+  let keywordConsistencyPts = 0;
+  if (titleWords.length > 0 && wordCount >= 50) {
+    const matchedInBody = titleWords.filter(w => lowerBody.includes(w)).length;
+    const bodyRatio = matchedInBody / titleWords.length;
+    if (bodyRatio >= 0.6) keywordConsistencyPts += 4;
+    else if (bodyRatio >= 0.3) keywordConsistencyPts += 2;
+
+    const first300 = lowerBody.substring(0, Math.min(lowerBody.length, 1200));
+    const prominenceMatch = titleWords.filter(w => first300.includes(w)).length;
+    if (prominenceMatch / titleWords.length >= 0.5) keywordConsistencyPts += 4;
+    else if (prominenceMatch / titleWords.length >= 0.25) keywordConsistencyPts += 2;
+  }
+  contentQualityScore += keywordConsistencyPts;
+
+  if (readabilityPts <= 2 && wordCount >= 100) suggestions.push("Mejora la legibilidad: frases de 10-25 palabras, párrafos cortos (estilo Semrush SEO Writing Assistant)");
+  if (keywordConsistencyPts <= 2 && titleWords.length > 0) suggestions.push("Las keywords del título no aparecen en la descripción — Semrush recomienda repetir keywords en los primeros párrafos");
   if (!hasBenefits && bodyLen > 0) suggestions.push("Añade sección de beneficios con bullet points — es lo primero que leen los compradores");
   if (!hasSpecs && bodyLen > 0) suggestions.push("Añade tabla de especificaciones técnicas (material, dimensiones, peso, color)");
-  if (!hasFaq && bodyLen > 0) suggestions.push("Añade sección FAQ (3-5 preguntas frecuentes) — mejora SEO y reduce abandonos");
+  if (!hasFaq && bodyLen > 0) suggestions.push("Añade sección FAQ (3-5 preguntas frecuentes) — activa Rich Snippets en Google y reduce abandonos");
   if (!hasCta && bodyLen > 0) suggestions.push("Añade un CTA claro al final de la descripción");
   if (!hasGuarantee && bodyLen > 0) suggestions.push("Añade información de garantía, envío y devoluciones — aumenta confianza un 18%");
 
   let trustScore = 0;
-  if (hasGuarantee) trustScore += 20;
-  if (imgCount >= 5) trustScore += 15;
-  if (hasAltTexts) trustScore += 10;
-  if (wordCount >= 300) trustScore += 15;
+  if (hasGuarantee) trustScore += 18;
+  if (imgCount >= 5) trustScore += 12;
+  if (hasAltTexts) trustScore += 8;
+  if (wordCount >= 300) trustScore += 12;
   if (product.compare_at_price) trustScore += 10;
-  if (tagCount >= 10) trustScore += 10;
-  if (metaDesc) trustScore += 10;
-  if (metaTitle) trustScore += 10;
+  if (tagCount >= 10) trustScore += 8;
+  if (metaDesc) trustScore += 8;
+  if (metaTitle) trustScore += 8;
+  if (hasFaq) trustScore += 8;
+  if (hasSpecs) trustScore += 8;
 
   const weights = {
     title: 0.12,

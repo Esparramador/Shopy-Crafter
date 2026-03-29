@@ -19,57 +19,157 @@ function calculateSeoScore(data: {
   metaTitleLength?: number; metaDescLength?: number;
   titleLength?: number; imageCount?: number; tagCount?: number;
   wordCount?: number; hasStructuredContent?: boolean;
-}): { score: number; grade: string } {
-  let score = 0;
+  title?: string; bodyText?: string; metaTitle?: string; metaDesc?: string;
+  tags?: string; schemaType?: string;
+  hasOpenGraph?: boolean; hasFaqSchema?: boolean;
+}): { score: number; grade: string; details?: Record<string, number> } {
+  const details: Record<string, number> = {};
+  let totalWeight = 0;
+  let weightedSum = 0;
 
+  function addCriterion(name: string, points: number, maxPoints: number, weight: number) {
+    const normalized = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
+    details[name] = Math.round(normalized);
+    weightedSum += normalized * weight;
+    totalWeight += weight;
+  }
+
+  let metaTitlePts = 0;
   if (data.hasMetaTitle) {
-    score += 12;
-    if (data.metaTitleLength && data.metaTitleLength >= 40 && data.metaTitleLength <= 60) score += 3;
+    metaTitlePts = 60;
+    if (data.metaTitleLength && data.metaTitleLength >= 40 && data.metaTitleLength <= 60) metaTitlePts = 100;
+    else if (data.metaTitleLength && data.metaTitleLength >= 30 && data.metaTitleLength <= 70) metaTitlePts = 80;
   }
+  addCriterion("metaTitle", metaTitlePts, 100, 10);
 
+  let metaDescPts = 0;
   if (data.hasMetaDesc) {
-    score += 10;
-    if (data.metaDescLength && data.metaDescLength >= 130 && data.metaDescLength <= 160) score += 3;
+    metaDescPts = 60;
+    if (data.metaDescLength && data.metaDescLength >= 130 && data.metaDescLength <= 160) metaDescPts = 100;
+    else if (data.metaDescLength && data.metaDescLength >= 100 && data.metaDescLength <= 170) metaDescPts = 80;
   }
+  addCriterion("metaDescription", metaDescPts, 100, 8);
 
-  if (data.hasSchema) score += 12;
+  let schemaPts = 0;
+  if (data.hasSchema) {
+    schemaPts = 60;
+    if (data.schemaType === "Product" || data.schemaType === "product") schemaPts = 85;
+    if (data.hasFaqSchema) schemaPts = 100;
+  } else {
+    if (data.hasFaqSchema) schemaPts = 30;
+  }
+  addCriterion("structuredData", schemaPts, 100, 10);
 
-  if (data.hasAltTexts) score += 8;
+  addCriterion("altTexts", data.hasAltTexts ? 100 : 0, 100, 6);
 
-  if (data.cleanHandle) score += 4;
+  let handlePts = 0;
+  if (data.cleanHandle) {
+    handlePts = 80;
+    const handleLen = data.titleLength ? Math.min(data.titleLength, 60) : 30;
+    if (handleLen >= 10 && handleLen <= 50) handlePts = 100;
+  }
+  addCriterion("urlHandle", handlePts, 100, 3);
 
-  if (data.internalLinks && data.internalLinks >= 2) score += 3;
-  if (data.internalLinks && data.internalLinks >= 4) score += 2;
+  let linkPts = 0;
+  if (data.internalLinks && data.internalLinks >= 4) linkPts = 100;
+  else if (data.internalLinks && data.internalLinks >= 2) linkPts = 60;
+  else if (data.internalLinks && data.internalLinks >= 1) linkPts = 30;
+  addCriterion("internalLinking", linkPts, 100, 4);
 
   const wc = data.wordCount ?? Math.round(data.descriptionLength / 5);
-  if (wc >= 800) score += 10;
-  else if (wc >= 500) score += 8;
-  else if (wc >= 300) score += 5;
-  else if (wc >= 100) score += 2;
+  let wcPts = 0;
+  if (wc >= 800) wcPts = 100;
+  else if (wc >= 500) wcPts = 80;
+  else if (wc >= 300) wcPts = 55;
+  else if (wc >= 100) wcPts = 25;
+  addCriterion("contentDepth", wcPts, 100, 9);
 
-  if (data.pageSpeedScore && data.pageSpeedScore >= 90) score += 8;
-  else if (data.pageSpeedScore && data.pageSpeedScore >= 70) score += 5;
-  else if (data.pageSpeedScore && data.pageSpeedScore >= 50) score += 2;
+  let speedPts = 0;
+  if (data.pageSpeedScore && data.pageSpeedScore >= 90) speedPts = 100;
+  else if (data.pageSpeedScore && data.pageSpeedScore >= 70) speedPts = 70;
+  else if (data.pageSpeedScore && data.pageSpeedScore >= 50) speedPts = 40;
+  addCriterion("pageSpeed", speedPts, 100, 7);
 
-  if (data.titleLength && data.titleLength >= 45 && data.titleLength <= 70) score += 5;
-  else if (data.titleLength && data.titleLength >= 30) score += 2;
+  let titlePts = 0;
+  if (data.titleLength && data.titleLength >= 45 && data.titleLength <= 70) titlePts = 100;
+  else if (data.titleLength && data.titleLength >= 30 && data.titleLength <= 80) titlePts = 60;
+  else if (data.titleLength && data.titleLength >= 20) titlePts = 30;
+  addCriterion("titleOptimization", titlePts, 100, 5);
 
   const ic = data.imageCount ?? 0;
-  if (ic >= 8) score += 8;
-  else if (ic >= 5) score += 5;
-  else if (ic >= 3) score += 3;
-  else if (ic >= 1) score += 1;
+  let imgPts = 0;
+  if (ic >= 8) imgPts = 100;
+  else if (ic >= 5) imgPts = 70;
+  else if (ic >= 3) imgPts = 45;
+  else if (ic >= 1) imgPts = 15;
+  addCriterion("imageCount", imgPts, 100, 7);
 
   const tc = data.tagCount ?? 0;
-  if (tc >= 20) score += 7;
-  else if (tc >= 15) score += 5;
-  else if (tc >= 10) score += 3;
-  else if (tc >= 5) score += 1;
+  let tagPts = 0;
+  if (tc >= 20) tagPts = 100;
+  else if (tc >= 15) tagPts = 75;
+  else if (tc >= 10) tagPts = 50;
+  else if (tc >= 5) tagPts = 25;
+  addCriterion("tagOptimization", tagPts, 100, 5);
 
-  if (data.hasStructuredContent) score += 5;
+  addCriterion("structuredContent", data.hasStructuredContent ? 100 : 0, 100, 4);
 
+  let keywordPts = 0;
+  if (data.title && data.bodyText) {
+    const titleWords = data.title.toLowerCase().replace(/[—–|·\-]/g, " ").split(/\s+/).filter(w => w.length > 3);
+    const bodyLower = data.bodyText.toLowerCase();
+    const first200 = bodyLower.substring(0, Math.min(bodyLower.length, 800));
+    const matchedInBody = titleWords.filter(w => bodyLower.includes(w)).length;
+    const matchedInFirst = titleWords.filter(w => first200.includes(w)).length;
+
+    if (titleWords.length > 0) {
+      const bodyRatio = matchedInBody / titleWords.length;
+      const prominenceRatio = matchedInFirst / titleWords.length;
+      if (bodyRatio >= 0.6) keywordPts += 40;
+      else if (bodyRatio >= 0.3) keywordPts += 20;
+      if (prominenceRatio >= 0.5) keywordPts += 35;
+      else if (prominenceRatio >= 0.25) keywordPts += 15;
+    }
+
+    if (data.tags) {
+      const tagsLower = data.tags.toLowerCase();
+      const tagKeywordMatch = titleWords.filter(w => tagsLower.includes(w)).length;
+      if (titleWords.length > 0 && tagKeywordMatch / titleWords.length >= 0.4) keywordPts += 25;
+    }
+  }
+  addCriterion("keywordConsistency", Math.min(100, keywordPts), 100, 8);
+
+  let readPts = 0;
+  if (data.bodyText && wc >= 50) {
+    const sentences = data.bodyText.split(/[.!?¿¡]+/).filter(s => s.trim().length > 5);
+    const avgSentLen = sentences.length > 0 ? wc / sentences.length : 0;
+    if (avgSentLen >= 10 && avgSentLen <= 25) readPts = 100;
+    else if (avgSentLen >= 8 && avgSentLen <= 30) readPts = 70;
+    else if (avgSentLen > 0) readPts = 35;
+
+    const paragraphs = data.bodyText.split(/\n\n|\r\n\r\n/).filter(p => p.trim().length > 20);
+    if (paragraphs.length >= 5) readPts = Math.min(100, readPts + 10);
+  }
+  addCriterion("readability", readPts, 100, 6);
+
+  let ogPts = 0;
+  if (data.hasMetaTitle && data.hasMetaDesc && (data.imageCount ?? 0) >= 1) ogPts = 100;
+  else if (data.hasMetaTitle && data.hasMetaDesc) ogPts = 60;
+  else if (data.hasMetaTitle || data.hasMetaDesc) ogPts = 30;
+  addCriterion("socialMeta", ogPts, 100, 3);
+
+  let faqPts = 0;
+  if (data.bodyText) {
+    const hasFaq = /faq|pregunta|¿.*\?/i.test(data.bodyText);
+    if (hasFaq && data.hasFaqSchema) faqPts = 100;
+    else if (hasFaq) faqPts = 60;
+    else if (data.hasFaqSchema) faqPts = 50;
+  }
+  addCriterion("faqOptimization", faqPts, 100, 5);
+
+  const score = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
-  return { score: Math.min(100, score), grade };
+  return { score: Math.min(100, score), grade, details };
 }
 
 router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> => {
@@ -98,7 +198,7 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
     const tagCount = p.tags ? p.tags.split(",").filter(t => t.trim()).length : 0;
     const hasStructuredContent = /<(h2|h3|ul|ol|table)[\s>]/i.test(p.bodyHtml ?? "");
 
-    const { score, grade } = calculateSeoScore({
+    const { score, grade, details } = calculateSeoScore({
       hasMetaTitle: !!seo?.metaTitle,
       hasMetaDesc: !!seo?.metaDescription,
       hasSchema: seo?.hasSchema ?? false,
@@ -113,6 +213,13 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
       tagCount,
       wordCount,
       hasStructuredContent,
+      title: p.title,
+      bodyText: bodyText,
+      metaTitle: seo?.metaTitle ?? undefined,
+      metaDesc: seo?.metaDescription ?? undefined,
+      tags: p.tags ?? undefined,
+      schemaType: seo?.hasSchema ? "Product" : undefined,
+      hasFaqSchema: /faq|pregunta/i.test(p.bodyHtml ?? ""),
     });
 
     totalScore += score;
@@ -122,6 +229,7 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
       title: p.title,
       score,
       grade,
+      details,
       hasMetaTitle: !!seo?.metaTitle,
       hasMetaDesc: !!seo?.metaDescription,
       hasSchema: seo?.hasSchema ?? false,

@@ -1090,24 +1090,33 @@ ESTÁNDAR DE CALIDAD 100/100 — REQUISITOS OBLIGATORIOS:
 
    USA ESTILO PROFESIONAL: <h2>, <h3>, <ul>/<li>, <table>, <strong>, <p>. NO uses estilos inline.
 
+OPTIMIZACIÓN SEO AVANZADA (Metodología Semrush):
+- KEYWORD DENSITY: La keyword principal debe aparecer 3-5 veces en la descripción (densidad 1.5-2.5%)
+- KEYWORD PROMINENCE: La keyword principal DEBE aparecer en el PRIMER PÁRRAFO (Hero Hook)
+- LSI KEYWORDS: Incluye 5-8 keywords semánticas relacionadas distribuidas naturalmente en el texto
+- READABILITY: Frases de 15-25 palabras máximo. Párrafos de 2-4 líneas. Voz activa siempre.
+- FAQ SCHEMA-READY: La sección FAQ debe usar formato <strong>¿Pregunta?</strong> seguido de <p>Respuesta</p> para activar Rich Snippets en Google
+- INTERNAL LINKING: Si conoces otros productos de la tienda, sugiere enlaces internos con anchor text keyword-rich
+
 3. TAGS SEO (22-28 tags obligatorios en array):
-   Categorías de tags que DEBES incluir:
-   - Nombre producto + variaciones (3-4 tags)
-   - Material/composición (2-3 tags)
-   - Uso/ocasión (3-4 tags)
-   - Audiencia target (2-3 tags)
-   - Estilo/estética (2-3 tags)
-   - Keywords long-tail en español (3-4 tags)
+   Categorías de tags que DEBES incluir (metodología Semrush Keyword Magic Tool):
+   - Keyword principal + variaciones de cola corta (3-4 tags)
+   - Material/composición/ingredientes (2-3 tags)
+   - Intención de búsqueda: transaccional ("comprar X", "X online") (2-3 tags)
+   - Audiencia target + buyer persona (2-3 tags)
+   - Estilo/estética/categoría visual (2-3 tags)
+   - Keywords long-tail en español con intención clara (3-4 tags)
    - Keywords en inglés para SEO internacional (2-3 tags)
-   - Temporada/momento si aplica (1-2 tags)
-   - Nicho específico (2-3 tags)
+   - Temporada/momento/ocasión si aplica (1-2 tags)
+   - Nicho específico + keywords LSI semánticas (2-3 tags)
 
 4. META TITLE SEO (40-60 chars EXACTOS):
    Formato: [Keyword] — [Beneficio] | [Marca/Tienda]
-   Keyword principal SIEMPRE al inicio.
+   Keyword principal SIEMPRE al inicio. Debe coincidir con intención de búsqueda transaccional.
 
 5. META DESCRIPTION SEO (130-155 chars EXACTOS):
    Formato: [Beneficio principal]. [Keyword + detalle]. [CTA con urgencia]. Incluye precio si hay.
+   Debe responder la intención de búsqueda del usuario en las primeras 100 chars (visible en SERP móvil).
 
 6. PRECIO:
    - Si no hay precio, sugiere basándote en el mercado real del nicho
@@ -1115,8 +1124,8 @@ ESTÁNDAR DE CALIDAD 100/100 — REQUISITOS OBLIGATORIOS:
    - Usa pricing psicológico: .99, .95, .90
 
 Responde SOLO JSON válido:
-{"title":"...","description":"<div class=\\"product-description\\">HTML completa 800+ palabras con las 8 secciones...</div>","tags":["tag1","tag2",...mínimo 22 tags],"seoTitle":"...40-60 chars...","seoDescription":"...130-155 chars...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo"}`,
-                `Eres el equipo de producto de las tiendas Shopify más exitosas del mundo combinado en uno. Has estudiado qué hace que Gymshark, Allbirds, Fenty Beauty, Skims, y las 100 mejores tiendas Shopify del mundo tengan fichas de producto PERFECTAS que convierten al máximo nivel. Tu misión: generar fichas que puntuarían 100/100 en cualquier auditoría de calidad Shopify. Cada ficha que generas es indistinguible de las de agencias que cobran €10.000+/mes. Dominas SEO técnico, copywriting persuasivo, storytelling emocional, CRO, y psicología de precios. Responde SOLO JSON válido.`,
+{"title":"...","description":"<div class=\\"product-description\\">HTML completa 800+ palabras con las 8 secciones, keyword density 1.5-2.5%, FAQ schema-ready...</div>","tags":["tag1","tag2",...mínimo 22 tags incluyendo long-tail + LSI],"seoTitle":"...40-60 chars...","seoDescription":"...130-155 chars...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo"}`,
+                `Eres el equipo de producto de las tiendas Shopify más exitosas del mundo combinado con la inteligencia SEO de Semrush. Has estudiado qué hace que Gymshark, Allbirds, Fenty Beauty, Skims, y las 100 mejores tiendas Shopify del mundo tengan fichas de producto PERFECTAS. Aplicas metodología Semrush: keyword density 1.5-2.5%, keyword prominence (keyword en primer párrafo), LSI keywords semánticas, readability optimizada (frases 15-25 palabras), FAQ schema-ready para Rich Snippets, y tags con intención transaccional. Tu misión: generar fichas que puntuarían 100/100 en Semrush On-Page SEO Checker y en cualquier auditoría de calidad Shopify. Responde SOLO JSON válido.`,
                 "seo",
                 storeNiche || undefined,
                 8000
