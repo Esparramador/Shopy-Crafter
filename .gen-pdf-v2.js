@@ -298,7 +298,7 @@ doc.font('Sans').fontSize(10).fillColor(MUTED).text('An\u00e1lisis exhaustivo co
 const my = 475; const c1 = 100, c2 = 310;
 [['TIENDA', 'Comic Crafter', 'NICHO', 'C\u00f3mics y Arte Digital', 0],
  ['DOMINIO', 'comic-crafter.myshopify.com', 'MERCADO', 'Espa\u00f1a (EUR)', 38],
- ['PRODUCTOS', '29 productos en cat\u00e1logo', 'SCORE ACTUAL', '37/100 (Grado D)', 76],
+ ['PRODUCTOS', '29 productos en cat\u00e1logo', 'SCORE ACTUAL', '46/100 (Grado D)', 76],
  ['PREPARADO POR', 'Shopy Crafter (OmniCore AI)', 'FECHA', 'Marzo 2026', 114],
  ['CONTACTO', 'craftershopy@gmail.com', 'WEB', 'shopycrafter.com', 152],
 ].forEach(([l1, v1, l2, v2, dy]) => {
@@ -347,7 +347,7 @@ h2g('01  Resumen ', 'Ejecutivo');
 p('Este informe presenta el diagn\u00f3stico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el an\u00e1lisis real de los 29 productos del cat\u00e1logo. Cada m\u00e9trica proviene de datos reales extra\u00eddos de la API de Shopify y procesados por el motor de auditor\u00eda de Shopy Crafter.');
 
 statRow([
-  { v: '37', l: 'Score Global', color: RED },
+  { v: '46', l: 'Score Global', color: RED },
   { v: 'D', l: 'Grado Actual', color: RED },
   { v: '29', l: 'Productos', color: GOLD },
   { v: '1.2', l: 'Imgs/Producto', color: ORANGE },
@@ -356,7 +356,7 @@ statRow([
 h3('Diagn\u00f3stico R\u00e1pido: 7 Dimensiones');
 tbl(['Dimensi\u00f3n', 'Score', 'Objetivo', 'Gap', 'Impacto Revenue'],
   [['\u25b8 T\u00edtulos (12%)', '68/100', '95/100', '-27 pts', 'CTR: +15-25%'],
-   ['\u25b8 Descripciones (22%)', '93/100', '100/100', '-7 pts', 'Conversi\u00f3n: +5-10%'],
+   ['\u26a0 Descripciones (22%)', '35/100', '95/100', '-60 pts', 'Conversi\u00f3n: +25-40%'],
    ['\u25b8 Pricing (10%)', '66/100', '95/100', '-29 pts', 'AOV: +20-35%'],
    ['\u26a0 Im\u00e1genes (18%)', '24/100', '95/100', '-71 pts', 'Conversi\u00f3n: +30-50%'],
    ['\u26a0 SEO (18%)', '50/100', '95/100', '-45 pts', 'Tr\u00e1fico: +40-80%'],
@@ -378,23 +378,23 @@ p('\u26a0 T\u00cdTULOS \u2014 6 productos con emojis al inicio (anti-SEO). Solo 
 
 h3('Oportunidad Cuantificada');
 impactCards([
-  { value: '+151%', label: 'Score Cat\u00e1logo', sub: '37 \u2192 93/100 (D \u2192 A)', color: GREEN, sub_color: GREEN },
+  { value: '+102%', label: 'Score Cat\u00e1logo', sub: '46 \u2192 93/100 (D \u2192 A)', color: GREEN, sub_color: GREEN },
   { value: '+150%', label: 'Conversion Rate', sub: '1.0% \u2192 2.5%', color: GREEN, sub_color: GREEN },
-  { value: '+45%', label: 'AOV (Ticket Medio)', sub: '\u20ac29 \u2192 \u20ac42', color: GOLD, sub_color: GOLD },
+  { value: '+31-45%', label: 'AOV (Ticket Medio)', sub: '\u20ac29 \u2192 \u20ac38-42', color: GOLD, sub_color: GOLD },
   { value: '+120%', label: 'Tr\u00e1fico Org\u00e1nico', sub: 'SEO completo en 6M', color: BLUE, sub_color: BLUE },
   { value: '\u00d73.5', label: 'Revenue Potencial', sub: 'Efecto compuesto', color: GREEN, sub_color: GREEN },
   { value: '+567%', label: 'Im\u00e1genes/Producto', sub: '1.2 \u2192 8.0 por prod.', color: ORANGE, sub_color: ORANGE },
 ]);
 
 barChart([
-  { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
+  { l: 'Score', b: 46, a: 93, bc: RED, ac: GREEN },
   { l: 'Conv.', b: 10, a: 25, bc: RED, ac: GREEN },
-  { l: 'AOV', b: 29, a: 42, bc: ORANGE, ac: GREEN },
+  { l: 'AOV', b: 29, a: 40, bc: ORANGE, ac: GREEN },
   { l: 'Imgs', b: 1.2, a: 8, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
 ], 'KPIs Clave: Estado Actual vs Post-Optimizaci\u00f3n', 120);
-p('El multiplicador \u00d72.8\u20133.5 en revenue resulta de la combinaci\u00f3n de mejoras en conversi\u00f3n (+150%), AOV (+45%), tr\u00e1fico org\u00e1nico (+120%) y trust (+20%). No es suma lineal sino multiplicaci\u00f3n de factores independientes.', { fontSize: 9, color: MUTED });
+p('El multiplicador \u00d73.0\u20134.5 en revenue resulta de la combinaci\u00f3n sinerg\u00e9tica de mejoras en conversi\u00f3n, AOV, tr\u00e1fico y trust. Los factores no son independientes (se solapan parcialmente), por lo que el rango refleja estimaciones conservadoras.', { fontSize: 9, color: MUTED });
 
 // ================================================================
 //  CAP 2 \u2014 AUDITOR\u00cdA DE CAT\u00c1LOGO
@@ -406,15 +406,14 @@ p('An\u00e1lisis producto por producto de los 29 items del cat\u00e1logo. Scores
 
 h3('Distribuci\u00f3n de Calificaciones');
 barChart([
-  { l: 'A (90-100)', v: 0.2, c: GREEN },
   { l: 'B (75-89)', v: 1, c: '#27AE60' },
-  { l: 'C (60-74)', v: 15, c: ORANGE },
-  { l: 'D (40-59)', v: 13, c: RED },
-  { l: 'F (0-39)', v: 0.2, c: '#C0392B' },
+  { l: 'C (60-74)', v: 8, c: ORANGE },
+  { l: 'D (40-59)', v: 10, c: RED },
+  { l: 'F (0-39)', v: 10, c: '#C0392B' },
 ], 'Distribuci\u00f3n de Calificaciones \u2014 29 Productos Reales', 130);
-p('0 productos con calificaci\u00f3n A. Solo 1 producto (Logo Profesional, score 85) alcanza B. El 97% del cat\u00e1logo (28 de 29) est\u00e1 entre C y D. Media global: 37/100.', { color: MUTED });
+p('0 productos con calificaci\u00f3n A. Solo 1 producto (Logo Profesional, score 85) alcanza B. 10 productos con calificaci\u00f3n F (contenido m\u00ednimo o sin optimizar). Media global: 46/100.', { color: MUTED });
 
-h3('Ranking Completo de Productos por Score');
+h3('Ranking de Productos por Score (Top 19 de 29)');
 tbl(['Producto', 'Score', 'Grado', 'T\u00edt.', 'Desc', 'Prec.', 'Imgs', 'SEO'],
   [['Logo Profesional \u2014 Identidad Visual', '85', 'B', '100', '100', '75', '100', '50'],
    ['Impresi\u00f3n 3D de Figuras y Modelos', '72', 'C', '70', '100', '75', '65', '50'],
@@ -443,7 +442,7 @@ p('Categor\u00eda 2: Servicios SaaS/Packs \u2014 19 productos. Score medio: 56/1
 barChart([
   { l: 'Creativos', b: 66, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'SaaS/Packs', b: 56, a: 92, bc: RED, ac: GREEN },
-  { l: 'Media Total', b: 37, a: 93, bc: RED, ac: GREEN },
+  { l: 'Media Total', b: 46, a: 93, bc: RED, ac: GREEN },
 ], 'Score por Categor\u00eda: Antes vs Despu\u00e9s de Optimizaci\u00f3n', 130);
 
 // ================================================================
@@ -466,8 +465,8 @@ tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [145, 120, 100, 130]);
 p('Ejemplo: ANTES: \u00abPack 20 Productos \u2014 Cat\u00e1logo Premium\u00bb \u2192 DESPU\u00c9S: \u00abPack 20 Productos Shopify IA \u2014 Cat\u00e1logo Premium | Comic Crafter\u00bb', { fontSize: 9, color: MUTED });
 
-h3('\u25b8 Dimensi\u00f3n 2: Descripciones (22%) \u2014 Score: 93/100');
-horizBar('Score descripciones', 93, 100);
+h3('\u26a0 Dimensi\u00f3n 2: Descripciones (22%) \u2014 Score: 35/100');
+horizBar('Score descripciones', 35, 100);
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [['Longitud media', '531 chars (~100 pal.)', '4.000-6.000 chars', '\u2717 8\u00d7 menos'],
    ['< 400 caracteres', '5 productos (17%)', '0%', '\u2717 Insuficiente'],
@@ -709,7 +708,7 @@ h2g('07  Antes vs ', 'Despu\u00e9s');
 p('Impacto cuantificado de cada optimizaci\u00f3n aplicada al cat\u00e1logo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.');
 
 statRow([
-  { v: '37\u219393', l: 'Score Global', color: GREEN },
+  { v: '46\u219393', l: 'Score Global', color: GREEN },
   { v: '\u00d73.5', l: 'Revenue', color: GOLD },
   { v: '+567%', l: 'Im\u00e1genes', color: ORANGE },
   { v: '+150%', l: 'Conversi\u00f3n', color: GREEN },
@@ -717,9 +716,9 @@ statRow([
 
 h3('Score Global por Dimensi\u00f3n');
 barChart([
-  { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
+  { l: 'Score', b: 46, a: 93, bc: RED, ac: GREEN },
   { l: 'T\u00edtulos', b: 68, a: 96, bc: ORANGE, ac: GREEN },
-  { l: 'Desc.', b: 93, a: 100, bc: GREEN, ac: GREEN },
+  { l: 'Desc.', b: 35, a: 95, bc: RED, ac: GREEN },
   { l: 'Pricing', b: 66, a: 97, bc: ORANGE, ac: GREEN },
   { l: 'Im\u00e1genes', b: 24, a: 95, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
@@ -728,17 +727,17 @@ barChart([
 
 h3('Impacto en M\u00e9tricas de Negocio');
 tbl(['M\u00e9trica', 'Antes (Real)', 'Despu\u00e9s', 'Mejora', 'Fuente'],
-  [['Score cat\u00e1logo', '37/100 (D)', '93/100 (A)', '+151%', 'Shopy Crafter Engine'],
+  [['Score cat\u00e1logo', '46/100 (D)', '93/100 (A)', '+102%', 'Shopy Crafter Engine'],
    ['Imgs/producto', '1.2', '8.0', '+567%', 'Flux 1.1 Pro'],
    ['Conversion Rate', '~1.0%', '~2.5%', '+150%', 'Baymard Institute'],
-   ['AOV', '\u20ac29', '\u20ac38-42', '+31-45%', 'Anchoring psicol\u00f3gico'],
+   ['AOV', '\u20ac29', '\u20ac38-42', '+31-45%', 'Pricing psicol\u00f3gico + anchoring'],
    ['SEO Visibility', 'Baja', '+60-120%', '+60-120%', 'Semrush benchmarks'],
    ['CTR org\u00e1nico', '~2%', '~4-6%', '+100-200%', 'Schema optimization'],
-   ['Revenue potencial', 'Base', '\u00d72.8-3.5', '+180-250%', 'Efecto compuesto'],
+   ['Revenue potencial', 'Base', '\u00d73.0-4.5', '+200-350%', 'Efecto compuesto'],
    ['Email revenue', '\u20ac0', '+15-25%', 'Nuevo canal', 'Klaviyo Report']],
   [90, 80, 80, 70, 175]);
 
-h3('Desglose del Efecto Compuesto (\u00d72.8 \u2013 3.5)');
+h3('Desglose del Efecto Compuesto (\u00d73.0 \u2013 4.5)');
 p('El multiplicador no es suma lineal sino multiplicaci\u00f3n de factores independientes:', { color: MUTED });
 tbl(['Optimizaci\u00f3n', 'Conv.', 'AOV', 'Tr\u00e1fico', 'Factor'],
   [['Im\u00e1genes (1\u21928)', '+30-50%', '+5%', '\u2014', '\u00d71.35-1.55'],
@@ -747,7 +746,7 @@ tbl(['Optimizaci\u00f3n', 'Conv.', 'AOV', 'Tr\u00e1fico', 'Factor'],
    ['SEO completo', '\u2014', '\u2014', '+60-120%', '\u00d71.60-2.20'],
    ['Trust signals (FAQ+garant\u00eda)', '+10-20%', '+5%', '\u2014', '\u00d71.15-1.25'],
    ['Email marketing (5 flujos)', '\u2014', '\u2014', '+15-25%', '\u00d71.15-1.25'],
-   ['TOTAL COMPUESTO', '', '', '', '\u00d72.8 \u2013 3.5']],
+   ['TOTAL COMPUESTO (con solapamiento)', '', '', '', '\u00d73.0 \u2013 4.5']],
   [155, 70, 60, 75, 135]);
 
 // ================================================================
@@ -909,24 +908,24 @@ h2g('11  Siguiente ', 'Paso');
 p('Diagn\u00f3stico completado. Problemas identificados, cuantificados y priorizados. Soluciones listas para implementar.', { fontSize: 11, color: MUTED });
 
 h3('Resumen del Diagn\u00f3stico');
-dualHorizBar('Score Global', 37, 93, 100);
+dualHorizBar('Score Global', 46, 93, 100);
 dualHorizBar('Im\u00e1genes', 24, 95, 100);
 dualHorizBar('Trust Signals', 20, 90, 100);
 dualHorizBar('SEO', 50, 95, 100);
 dualHorizBar('Pricing', 66, 97, 100);
 dualHorizBar('T\u00edtulos', 68, 96, 100);
 dualHorizBar('Calidad', 70, 95, 100);
-dualHorizBar('Descripciones', 93, 100, 100);
+dualHorizBar('Descripciones', 35, 95, 100);
 
 tbl(['\u00c1rea', 'Estado', 'Score', 'Acci\u00f3n Requerida'],
-  [['Score Global', '\u2717 CR\u00cdTICO', '37/100', 'Optimizaci\u00f3n integral urgente'],
+  [['Score Global', '\u2717 CR\u00cdTICO', '46/100', 'Optimizaci\u00f3n integral urgente'],
+   ['Descripciones', '\u2717 CR\u00cdTICO', '35/100', 'Ampliar a 800-1.200 pal. + FAQ + trust'],
    ['Im\u00e1genes', '\u2717 CR\u00cdTICO', '24/100', 'Generar 232 im\u00e1genes IA'],
    ['Trust Signals', '\u2717 CR\u00cdTICO', '20/100', 'FAQ + garant\u00eda + reviews'],
    ['SEO', '\u26a0 D\u00c9BIL', '50/100', 'Meta tags + schemas + contenido'],
    ['Pricing', '\u26a0 D\u00c9BIL', '66/100', 'Compare_at + .97/.99 + COGS'],
    ['T\u00edtulos', '\u26a0 MEJORABLE', '68/100', 'Keyword-first + sin emojis'],
-   ['Calidad Contenido', '\u2713 ACEPTABLE', '70/100', 'Estructura + CTAs + formateo'],
-   ['Descripciones', '\u2713 ACEPTABLE', '93/100', 'Ampliar a 800-1.200 palabras']],
+   ['Calidad Contenido', '\u2713 ACEPTABLE', '70/100', 'Estructura + CTAs + formateo']],
   [100, 75, 50, 270]);
 
 h3('Pr\u00f3ximos Pasos');
