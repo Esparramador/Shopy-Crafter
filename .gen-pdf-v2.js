@@ -81,19 +81,6 @@ function p(text, opts) {
   Y += h + 10;
 }
 
-function bullets(items, opts) {
-  const bc = (opts && opts.bulletColor) || GREEN;
-  const tc = (opts && opts.color) || TEXT;
-  items.forEach(item => {
-    doc.fontSize(10);
-    const h = doc.heightOfString(item, { width: 470 }) + 2;
-    need(h + 4);
-    doc.fontSize(10).fillColor(bc).text('> ', 55, Y, { continued: true }).fillColor(tc).text(item, { width: 470, lineGap: 2 });
-    Y += h + 4;
-  });
-  Y += 4;
-}
-
 function checks(items) {
   items.forEach(item => {
     doc.fontSize(10);
@@ -207,10 +194,6 @@ function barChart(data, title, h) {
   }
 }
 
-function colorDot(x, y, col) {
-  doc.circle(x + 5, y + 5, 4).fill(col);
-}
-
 // ================================================================
 //  PORTADA — sin header ni footer
 // ================================================================
@@ -219,16 +202,16 @@ doc.roundedRect(197, 80, 200, 22, 11).strokeColor(GOLD).lineWidth(1).stroke();
 doc.fontSize(9).fillColor(GOLD).text('DOCUMENTO CONFIDENCIAL', 197, 85, { width: 200, align: 'center' });
 doc.roundedRect(247, 125, 60, 60, 14).fill(GOLD);
 doc.fontSize(28).fillColor(DARK).text('SC', 247, 143, { width: 60, align: 'center' });
-doc.fontSize(34).fillColor(WHITE).text('Informe de Auditoria y', 0, 215, { align: 'center' });
-doc.fontSize(34).fillColor(GOLD).text('Plan de Optimizacion', 0, 254, { align: 'center' });
+doc.fontSize(34).fillColor(WHITE).text('Informe de Auditor\u00EDa y', 0, 215, { align: 'center' });
+doc.fontSize(34).fillColor(GOLD).text('Plan de Optimizaci\u00F3n', 0, 254, { align: 'center' });
 doc.moveTo(247, 302).lineTo(347, 302).strokeColor(GOLD).lineWidth(2).stroke();
 doc.fontSize(22).fillColor(WHITE).text('Comic Crafter', 0, 320, { align: 'center' });
 doc.fontSize(12).fillColor(MUTED).text('comic-crafter.myshopify.com', 0, 348, { align: 'center' });
-doc.fontSize(11).fillColor(MUTED).text('Analisis exhaustivo con datos reales de los 29 productos del catalogo.\nDiagnostico por dimensiones, proyecciones de mejora cuantificadas\ny plan de accion priorizado por impacto en revenue.', 50, 385, { align: 'center', lineGap: 5, width: 495 });
+doc.fontSize(11).fillColor(MUTED).text('An\u00E1lisis exhaustivo con datos reales de los 29 productos del cat\u00E1logo.\nDiagn\u00F3stico por dimensiones, proyecciones de mejora cuantificadas\ny plan de acci\u00F3n priorizado por impacto en revenue.', 50, 385, { align: 'center', lineGap: 5, width: 495 });
 const my = 470; const c1 = 100, c2 = 310;
-[['TIENDA', 'Comic Crafter', 'NICHO', 'Comics y Arte Digital', 0],
- ['DOMINIO', 'comic-crafter.myshopify.com', 'MERCADO', 'Espana (EUR)', 40],
- ['PRODUCTOS', '29 productos en catalogo', 'SCORE ACTUAL', '37/100 (Grado D)', 80],
+[['TIENDA', 'Comic Crafter', 'NICHO', 'C\u00F3mics y Arte Digital', 0],
+ ['DOMINIO', 'comic-crafter.myshopify.com', 'MERCADO', 'Espa\u00F1a (EUR)', 40],
+ ['PRODUCTOS', '29 productos en cat\u00E1logo', 'SCORE ACTUAL', '37/100 (Grado D)', 80],
  ['PREPARADO POR', 'ShopyBrain (OmniCore AI)', 'FECHA', 'Marzo 2026', 120],
  ['CONTACTO', 'craftershopy@gmail.com', 'WEB', 'shopycrafter.com', 160],
 ].forEach(([l1, v1, l2, v2, dy]) => {
@@ -239,24 +222,24 @@ const my = 470; const c1 = 100, c2 = 310;
 });
 
 // ================================================================
-//  INDICE
+//  \u00CDNDICE
 // ================================================================
-let S = 'Indice';
+let S = '\u00CDndice';
 startPage(S);
 Y = PAGE_TOP;
-doc.fontSize(22).fillColor(WHITE).text('Indice de ', 50, Y, { continued: true }).fillColor(GOLD).text('Contenidos'); Y += 30;
-p('Cada capitulo se desarrolla con el detalle necesario para su correcta comprension, utilizando datos reales del catalogo de Comic Crafter.', { fontSize: 11, color: MUTED });
-[['01', 'Resumen Ejecutivo', 'Diagnostico global, KPIs y oportunidades cuantificadas'],
- ['02', 'Auditoria de Catalogo', 'Analisis de los 29 productos por las 7 dimensiones'],
- ['03', 'Diagnostico por Dimensiones', 'Titulos, descripciones, imagenes, pricing, SEO, trust, calidad'],
- ['04', 'Analisis de Precios y Competencia', 'Pricing actual vs mercado, psicologia de precios'],
- ['05', 'Analisis SEO Tecnico', '16 criterios aplicados al catalogo actual'],
- ['06', 'Analisis de Imagenes', 'Estado actual y plan de generacion con IA'],
- ['07', 'Proyecciones Antes vs Despues', 'Impacto cuantificado con datos reales'],
- ['08', 'Plan de Accion (Roadmap)', 'Priorizacion por impacto con timeline concreto'],
- ['09', 'Proyeccion Financiera a 6 Meses', 'Forecast con 3 escenarios basados en benchmarks'],
- ['10', 'Inversion y ROI', 'Costes de optimizacion vs retorno esperado'],
- ['11', 'Siguiente Paso', 'Proceso, garantias y contacto'],
+doc.fontSize(22).fillColor(WHITE).text('\u00CDndice de ', 50, Y, { continued: true }).fillColor(GOLD).text('Contenidos'); Y += 30;
+p('Cada cap\u00EDtulo se desarrolla con el detalle necesario para su correcta comprensi\u00F3n, utilizando datos reales del cat\u00E1logo de Comic Crafter.', { fontSize: 11, color: MUTED });
+[['01', 'Resumen Ejecutivo', 'Diagn\u00F3stico global, KPIs y oportunidades cuantificadas'],
+ ['02', 'Auditor\u00EDa de Cat\u00E1logo', 'An\u00E1lisis de los 29 productos por las 7 dimensiones'],
+ ['03', 'Diagn\u00F3stico por Dimensiones', 'T\u00EDtulos, descripciones, im\u00E1genes, pricing, SEO, trust, calidad'],
+ ['04', 'An\u00E1lisis de Precios y Competencia', 'Pricing actual vs mercado, psicolog\u00EDa de precios'],
+ ['05', 'An\u00E1lisis SEO T\u00E9cnico', '16 criterios aplicados al cat\u00E1logo actual'],
+ ['06', 'An\u00E1lisis de Im\u00E1genes', 'Estado actual y plan de generaci\u00F3n con IA'],
+ ['07', 'Proyecciones Antes vs Despu\u00E9s', 'Impacto cuantificado con datos reales'],
+ ['08', 'Plan de Acci\u00F3n (Roadmap)', 'Priorizaci\u00F3n por impacto con timeline concreto'],
+ ['09', 'Proyecci\u00F3n Financiera a 6 Meses', 'Forecast con 3 escenarios basados en benchmarks'],
+ ['10', 'Inversi\u00F3n y ROI', 'Costes de optimizaci\u00F3n vs retorno esperado'],
+ ['11', 'Siguiente Paso', 'Proceso, garant\u00EDas y contacto'],
 ].forEach(([num, title, desc]) => {
   need(40);
   doc.moveTo(50, Y + 34).lineTo(545, Y + 34).strokeColor('#1E1E2A').lineWidth(0.3).stroke();
@@ -269,10 +252,10 @@ p('Cada capitulo se desarrolla con el detalle necesario para su correcta compren
 // ================================================================
 //  CAP 1 — RESUMEN EJECUTIVO
 // ================================================================
-S = '01 - Resumen Ejecutivo';
+S = '01 \u00B7 Resumen Ejecutivo';
 chapterPage(S);
 doc.fontSize(22).fillColor(WHITE).text('01  Resumen ', 50, Y, { continued: true }).fillColor(GOLD).text('Ejecutivo'); Y += 35;
-p('Este informe presenta el diagnostico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el analisis real de los 29 productos del catalogo. Cada metrica, porcentaje y puntuacion proviene de datos reales extraidos de la API de Shopify y procesados por el motor de auditoria de ShopyBrain.', { fontSize: 11 });
+p('Este informe presenta el diagn\u00F3stico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el an\u00E1lisis real de los 29 productos del cat\u00E1logo. Cada m\u00E9trica, porcentaje y puntuaci\u00F3n proviene de datos reales extra\u00EDdos de la API de Shopify y procesados por el motor de auditor\u00EDa de ShopyBrain.', { fontSize: 11 });
 
 statRow([
   { v: '37', l: 'Score Global', color: RED },
@@ -281,252 +264,252 @@ statRow([
   { v: '1.2', l: 'Imgs/Producto', color: ORANGE },
 ]);
 
-h3('Diagnostico Rapido: Estado Critico');
-tbl(['Dimension', 'Score Actual', 'Objetivo', 'Gap', 'Impacto Revenue'],
-  [['Titulos (12%)', '68/100', '95/100', '-27 pts', 'CTR: +15-25%'],
-   ['Descripciones (22%)', '93/100', '100/100', '-7 pts', 'Conversion: +5-10%'],
+h3('Diagn\u00F3stico R\u00E1pido: Estado Cr\u00EDtico');
+tbl(['Dimensi\u00F3n', 'Score Actual', 'Objetivo', 'Gap', 'Impacto Revenue'],
+  [['T\u00EDtulos (12%)', '68/100', '95/100', '-27 pts', 'CTR: +15-25%'],
+   ['Descripciones (22%)', '93/100', '100/100', '-7 pts', 'Conversi\u00F3n: +5-10%'],
    ['Pricing (10%)', '66/100', '95/100', '-29 pts', 'AOV: +20-35%'],
-   ['Imagenes (18%)', '24/100', '95/100', '-71 pts', 'Conversion: +30-50%'],
-   ['SEO (18%)', '50/100', '95/100', '-45 pts', 'Trafico: +40-80%'],
+   ['Im\u00E1genes (18%)', '24/100', '95/100', '-71 pts', 'Conversi\u00F3n: +30-50%'],
+   ['SEO (18%)', '50/100', '95/100', '-45 pts', 'Tr\u00E1fico: +40-80%'],
    ['Calidad (12%)', '70/100', '95/100', '-25 pts', 'Engagement: +20-30%'],
-   ['Trust Signals (8%)', '20/100', '90/100', '-70 pts', 'Conversion: +10-20%']],
+   ['Trust Signals (8%)', '20/100', '90/100', '-70 pts', 'Conversi\u00F3n: +10-20%']],
   [110, 75, 70, 65, 175]);
 
-h3('Las 5 Debilidades Mas Criticas (Datos Reales)');
-p('1. IMAGENES -- Score: 24/100 -- 25 de 29 productos tienen SOLO 1 imagen. El estandar world-class requiere 8 minimo. Solo 1 producto (Logo Profesional) tiene suficientes imagenes (14). Esto reduce la conversion entre un 30-50% respecto al potencial maximo.', { color: RED });
-p('2. COMPARE AT PRICE -- Solo 1 de 29 productos (3.4%) tiene precio tachado. El efecto "antes 49.99, ahora 29.99" incrementa la conversion un 15-25%. El 96.6% del catalogo no aplica el anclaje psicologico mas efectivo del eCommerce.', { color: RED });
-p('3. PSICOLOGIA DE PRECIOS -- 0 productos usan terminaciones .97/.99. Tienes 10 productos con precios redondos (49, 79, 89). Los precios con terminacion .97 o .99 convierten un 8-12% mas que los redondos.', { color: ORANGE });
-p('4. SEO -- Score medio: 50/100. Ningun producto tiene Schema JSON-LD, meta descriptions optimizadas ni alt texts descriptivos. Invisible para Google en busquedas de tu nicho.', { color: ORANGE });
-p('5. DESCRIPCIONES -- Longitud media de 531 caracteres. Para SEO competitivo se necesitan 4000-6000 caracteres (800-1200 palabras). Las descripciones son buenas en calidad pero insuficientes en profundidad.', { color: ORANGE });
+h3('Las 5 Debilidades M\u00E1s Cr\u00EDticas (Datos Reales)');
+p('1. IM\u00C1GENES \u2014 Score: 24/100 \u2014 25 de 29 productos tienen SOLO 1 imagen. El est\u00E1ndar world-class requiere 8 m\u00EDnimo. Solo 1 producto (Logo Profesional) tiene suficientes im\u00E1genes (14). Esto reduce la conversi\u00F3n entre un 30-50% respecto al potencial m\u00E1ximo.', { color: RED });
+p('2. COMPARE AT PRICE \u2014 Solo 1 de 29 productos (3.4%) tiene precio tachado. El efecto \u00ABantes \u20AC49.99, ahora \u20AC29.99\u00BB incrementa la conversi\u00F3n un 15-25%. El 96.6% del cat\u00E1logo no aplica el anclaje psicol\u00F3gico m\u00E1s efectivo del eCommerce.', { color: RED });
+p('3. PSICOLOG\u00CDA DE PRECIOS \u2014 0 productos usan terminaciones .97/.99. Tienes 10 productos con precios redondos (\u20AC49, \u20AC79, \u20AC89). Los precios con terminaci\u00F3n .97 o .99 convierten un 8-12% m\u00E1s que los redondos.', { color: ORANGE });
+p('4. SEO \u2014 Score medio: 50/100. Ning\u00FAn producto tiene Schema JSON-LD, meta descriptions optimizadas ni alt texts descriptivos. Invisible para Google en b\u00FAsquedas de tu nicho.', { color: ORANGE });
+p('5. DESCRIPCIONES \u2014 Longitud media de 531 caracteres. Para SEO competitivo se necesitan 4000-6000 caracteres (800-1200 palabras). Las descripciones son buenas en calidad pero insuficientes en profundidad.', { color: ORANGE });
 
 h3('Oportunidad Cuantificada');
-tbl(['Metrica', 'Actual (Real)', 'Proyectado (Optimizado)', 'Mejora'],
-  [['Score catalogo', '37/100 (Grado D)', '93/100 (Grado A)', '+151%'],
+tbl(['M\u00E9trica', 'Actual (Real)', 'Proyectado (Optimizado)', 'Mejora'],
+  [['Score cat\u00E1logo', '37/100 (Grado D)', '93/100 (Grado A)', '+151%'],
    ['Conversion Rate', '~1.0% (sector bajo)', '~2.5% (sector alto)', '+150%'],
-   ['AOV', 'EUR 29 (mediana real)', 'EUR 38-42 (con anchoring)', '+31-45%'],
-   ['Trafico organico (6M)', 'Base actual', '+60-120% vs actual', '+60-120%'],
-   ['Revenue mensual', 'Base', 'x2.8 - 3.5', '+180-250%'],
-   ['Imagenes/producto', '1.2 media real', '8.0 minimo', '+567%'],
-   ['Pricing psicologico', '0% del catalogo', '100% del catalogo', '+100pp']],
+   ['AOV', '\u20AC29 (mediana real)', '\u20AC38-42 (con anchoring)', '+31-45%'],
+   ['Tr\u00E1fico org\u00E1nico (6M)', 'Base actual', '+60-120% vs actual', '+60-120%'],
+   ['Revenue mensual', 'Base', '\u00D72.8 \u2013 3.5', '+180-250%'],
+   ['Im\u00E1genes/producto', '1.2 media real', '8.0 m\u00EDnimo', '+567%'],
+   ['Pricing psicol\u00F3gico', '0% del cat\u00E1logo', '100% del cat\u00E1logo', '+100pp']],
   [120, 130, 140, 105]);
 
 // ================================================================
-//  CAP 2 — AUDITORIA DE CATALOGO
+//  CAP 2 — AUDITOR\u00CDA DE CAT\u00C1LOGO
 // ================================================================
-S = '02 - Auditoria de Catalogo';
+S = '02 \u00B7 Auditor\u00EDa de Cat\u00E1logo';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('02  Auditoria de ', 50, Y, { continued: true }).fillColor(GOLD).text('Catalogo'); Y += 35;
-p('Analisis producto por producto de los 29 items del catalogo de Comic Crafter. Scores calculados con el sistema de 7 dimensiones ponderadas de ShopyBrain, alineado con estandares Semrush y Google Search Quality Guidelines.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('02  Auditor\u00EDa de ', 50, Y, { continued: true }).fillColor(GOLD).text('Cat\u00E1logo'); Y += 35;
+p('An\u00E1lisis producto por producto de los 29 items del cat\u00E1logo de Comic Crafter. Scores calculados con el sistema de 7 dimensiones ponderadas de ShopyBrain, alineado con est\u00E1ndares Semrush y Google Search Quality Guidelines.', { fontSize: 11 });
 
-h3('Distribucion de Calificaciones');
+h3('Distribuci\u00F3n de Calificaciones');
 barChart([
   { l: 'A (90-100)', v: 0.1, c: GREEN },
   { l: 'B (75-89)', v: 1, c: '#27AE60' },
   { l: 'C (60-74)', v: 15, c: ORANGE },
   { l: 'D (40-59)', v: 13, c: RED },
   { l: 'F (0-39)', v: 0.1, c: '#C0392B' },
-], 'Distribucion de Calificaciones -- 29 Productos Reales', 140);
+], 'Distribuci\u00F3n de Calificaciones \u2014 29 Productos Reales', 140);
 
-p('0 productos con calificacion A. Solo 1 producto (Logo Profesional, score 85) alcanza B. El 97% del catalogo (28 de 29) esta entre C y D. Media global: 37/100.', { color: MUTED });
+p('0 productos con calificaci\u00F3n A. Solo 1 producto (Logo Profesional, score 85) alcanza B. El 97% del cat\u00E1logo (28 de 29) est\u00E1 entre C y D. Media global: 37/100.', { color: MUTED });
 
 h3('Ranking Completo de Productos por Score');
-tbl(['Producto', 'Score', 'Grado', 'Titulo', 'Desc', 'Precio', 'Imgs', 'SEO'],
-  [['Logo Profesional - Identidad Visual', '85', 'B', '100', '100', '75', '100', '50'],
-   ['Impresion 3D de Figuras y Modelos', '72', 'C', '70', '100', '75', '65', '50'],
+tbl(['Producto', 'Score', 'Grado', 'T\u00EDtulo', 'Desc', 'Precio', 'Imgs', 'SEO'],
+  [['Logo Profesional \u2014 Identidad Visual', '85', 'B', '100', '100', '75', '100', '50'],
+   ['Impresi\u00F3n 3D de Figuras y Modelos', '72', 'C', '70', '100', '75', '65', '50'],
    ['Funko Pop Personalizado 3D', '67', 'C', '70', '100', '75', '40', '50'],
    ['Merchandising Personalizado con IA', '67', 'C', '70', '100', '75', '20', '70'],
    ['Modelos 3D Realistas con IA', '67', 'C', '70', '100', '75', '20', '70'],
-   ['Posters y Lienzos Canvas', '67', 'C', '70', '100', '75', '20', '70'],
-   ['Pack Identidad de Personaje 360', '65', 'C', '70', '90', '75', '20', '70'],
-   ['Ilustracion de Portada Profesional', '63', 'C', '70', '100', '75', '20', '50'],
+   ['P\u00F3sters y Lienzos Canvas', '67', 'C', '70', '100', '75', '20', '70'],
+   ['Pack Identidad de Personaje 360\u00B0', '65', 'C', '70', '90', '75', '20', '70'],
+   ['Ilustraci\u00F3n de Portada Profesional', '63', 'C', '70', '100', '75', '20', '50'],
    ['ShopyBrain Enterprise', '62', 'C', '100', '85', '60', '20', '45'],
    ['Pack 30 Productos Enterprise', '59', 'D', '70', '100', '60', '20', '45'],
    ['Pack 20 Productos', '57', 'D', '70', '90', '60', '20', '45'],
-   ['Creacion Producto Unitario', '57', 'D', '70', '90', '60', '20', '45'],
+   ['Creaci\u00F3n Producto Unitario', '57', 'D', '70', '90', '60', '20', '45'],
    ['Pack 10 Productos', '57', 'D', '70', '90', '60', '20', '45'],
    ['Pack 15 Productos', '57', 'D', '70', '90', '60', '20', '45'],
    ['Pack 5 Productos', '57', 'D', '70', '90', '60', '20', '45'],
-   ['Analisis Completo One-Shot', '55', 'D', '60', '90', '60', '20', '45'],
-   ['Sesion Estrategica 1:1', '55', 'D', '60', '90', '60', '20', '45'],
+   ['An\u00E1lisis Completo One-Shot', '55', 'D', '60', '90', '60', '20', '45'],
+   ['Sesi\u00F3n Estrat\u00E9gica 1:1', '55', 'D', '60', '90', '60', '20', '45'],
    ['ShopyBrain Agency Pro', '54', 'D', '60', '85', '60', '20', '45'],
    ['ShopyBrain Starter', '49', 'D', '60', '85', '60', '20', '20']],
   [155, 35, 38, 38, 35, 42, 35, 35]);
 
-h3('Analisis por Categorias de Producto');
-p('Categoria 1: Productos Creativos (Comic Crafter) -- 10 productos\nScore medio: 66/100 (C). Mejor contenido, mas tags, pero fallan en imagenes (1.2/producto media) y SEO tecnico.', { color: MUTED });
-p('Categoria 2: Servicios SaaS/Packs (ShopyBrain) -- 19 productos\nScore medio: 56/100 (D). Titulos cortos con emojis, descripciones minimas (402-531 chars), 1 imagen cada uno, 5-6 tags. Intervencion URGENTE.', { color: RED });
+h3('An\u00E1lisis por Categor\u00EDas de Producto');
+p('Categor\u00EDa 1: Productos Creativos (Comic Crafter) \u2014 10 productos\nScore medio: 66/100 (C). Mejor contenido, m\u00E1s tags, pero fallan en im\u00E1genes (1.2/producto media) y SEO t\u00E9cnico.', { color: MUTED });
+p('Categor\u00EDa 2: Servicios SaaS/Packs (ShopyBrain) \u2014 19 productos\nScore medio: 56/100 (D). T\u00EDtulos cortos con emojis, descripciones m\u00EDnimas (402-531 chars), 1 imagen cada uno, 5-6 tags. Intervenci\u00F3n URGENTE.', { color: RED });
 
 barChart([
   { l: 'Creativos', b: 66, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'SaaS/Packs', b: 56, a: 92, bc: RED, ac: GREEN },
   { l: 'Media Total', b: 37, a: 93, bc: RED, ac: GREEN },
-], 'Score por Categoria: Antes vs Despues de Optimizacion', 140);
+], 'Score por Categor\u00EDa: Antes vs Despu\u00E9s de Optimizaci\u00F3n', 140);
 
 // ================================================================
-//  CAP 3 — DIAGNOSTICO POR DIMENSIONES (7 DIMENSIONES)
+//  CAP 3 — DIAGN\u00D3STICO POR DIMENSIONES (7 DIMENSIONES)
 // ================================================================
-S = '03 - Diagnostico por Dimensiones';
+S = '03 \u00B7 Diagn\u00F3stico por Dimensiones';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('03  Diagnostico ', 50, Y, { continued: true }).fillColor(GOLD).text('por Dimensiones'); Y += 35;
-p('Diagnostico detallado de cada una de las 7 dimensiones de auditoria con datos reales extraidos del catalogo.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('03  Diagn\u00F3stico ', 50, Y, { continued: true }).fillColor(GOLD).text('por Dimensiones'); Y += 35;
+p('Diagn\u00F3stico detallado de cada una de las 7 dimensiones de auditor\u00EDa con datos reales extra\u00EDdos del cat\u00E1logo.', { fontSize: 11 });
 
-h3('Dimension 1: Titulos (Peso: 12%) -- Score: 68/100');
-horizBar('Score titulos', 68, 100);
-tbl(['Metrica', 'Valor Actual', 'Estandar', 'Estado'],
+h3('Dimensi\u00F3n 1: T\u00EDtulos (Peso: 12%) \u2014 Score: 68/100');
+horizBar('Score t\u00EDtulos', 68, 100);
+tbl(['M\u00E9trica', 'Valor Actual', 'Est\u00E1ndar', 'Estado'],
   [['Longitud media', '55 caracteres', '45-65 chars', 'Variable'],
-   ['Titulos < 45 chars', '10 productos (34%)', '0%', 'CRITICO'],
-   ['Titulos 45-65 chars (optimo)', '4 productos (14%)', '100%', 'Solo 14%'],
-   ['Titulos > 65 chars', '15 productos (52%)', '0%', 'Se truncan en Google'],
+   ['T\u00EDtulos < 45 chars', '10 productos (34%)', '0%', 'CR\u00CDTICO'],
+   ['T\u00EDtulos 45-65 chars (\u00F3ptimo)', '4 productos (14%)', '100%', 'Solo 14%'],
+   ['T\u00EDtulos > 65 chars', '15 productos (52%)', '0%', 'Se truncan en Google'],
    ['Con emojis al inicio', '6 productos (21%)', '0%', 'Anti-SEO'],
-   ['Keyword-first', '~3 productos (10%)', '100%', 'CRITICO']],
+   ['Keyword-first', '~3 productos (10%)', '100%', 'CR\u00CDTICO']],
   [145, 120, 100, 130]);
-p('Ejemplo de correccion:\nANTES: "Pack 20 Productos -- Catalogo Premium Shopify" (emoji, sin keyword)\nDESPUES: "Pack 20 Productos Shopify IA -- Catalogo Premium Completo | Comic Crafter" (keyword-first, con marca)', { fontSize: 9, color: MUTED });
+p('Ejemplo de correcci\u00F3n:\nANTES: \u00ABPack 20 Productos \u2014 Cat\u00E1logo Premium Shopify\u00BB (emoji, sin keyword)\nDESPU\u00C9S: \u00ABPack 20 Productos Shopify IA \u2014 Cat\u00E1logo Premium Completo | Comic Crafter\u00BB (keyword-first, con marca)', { fontSize: 9, color: MUTED });
 
-h3('Dimension 2: Descripciones (Peso: 22%) -- Score: 93/100');
+h3('Dimensi\u00F3n 2: Descripciones (Peso: 22%) \u2014 Score: 93/100');
 horizBar('Score descripciones', 93, 100);
-tbl(['Metrica', 'Valor Actual', 'Estandar', 'Estado'],
+tbl(['M\u00E9trica', 'Valor Actual', 'Est\u00E1ndar', 'Estado'],
   [['Longitud media', '531 chars (~100 palabras)', '4000-6000 chars (800-1200 pal.)', '8x menos'],
    ['< 400 caracteres', '5 productos (17%)', '0%', 'Insuficiente'],
    ['400-800 caracteres', '24 productos (83%)', '0%', 'No competitivo'],
    ['800+ caracteres', '0 productos (0%)', '100%', 'Ninguno alcanza'],
-   ['Con seccion FAQ', '0 (0%)', '100%', 'Sin FAQs'],
+   ['Con secci\u00F3n FAQ', '0 (0%)', '100%', 'Sin FAQs'],
    ['Con trust signals', '0 (0%)', '100%', 'Sin confianza'],
    ['Estructura 8 secciones', '0 (0%)', '100%', 'Incompleta']],
   [140, 145, 130, 80]);
 
-h3('Dimension 3: Imagenes (Peso: 18%) -- Score: 24/100');
-horizBar('Score imagenes', 24, 100);
-p('La debilidad MAS CRITICA. 25 de 29 productos tienen solo 1 imagen. El estandar exige 8 tipos diferentes.', { color: RED });
-tbl(['Metrica', 'Valor Actual', 'Estandar', 'Gap'],
-  [['Media imgs/producto', '1.2', '8 minimo', '-85%'],
-   ['Total imagenes catalogo', '36', '232 min. (29x8)', '-84%'],
+h3('Dimensi\u00F3n 3: Im\u00E1genes (Peso: 18%) \u2014 Score: 24/100');
+horizBar('Score im\u00E1genes', 24, 100);
+p('La debilidad M\u00C1S CR\u00CDTICA. 25 de 29 productos tienen solo 1 imagen. El est\u00E1ndar exige 8 tipos diferentes.', { color: RED });
+tbl(['M\u00E9trica', 'Valor Actual', 'Est\u00E1ndar', 'Gap'],
+  [['Media imgs/producto', '1.2', '8 m\u00EDnimo', '-85%'],
+   ['Total im\u00E1genes cat\u00E1logo', '36', '232 m\u00EDn. (29\u00D78)', '-84%'],
    ['Prods. con 1 sola imagen', '25 (86%)', '0%', '-86pp'],
-   ['Prods. con 8+ imagenes', '0 (0%)', '100%', '-100pp'],
+   ['Prods. con 8+ im\u00E1genes', '0 (0%)', '100%', '-100pp'],
    ['Con alt text descriptivo', '~0%', '100%', '-100pp'],
    ['Tipos de imagen', '1 (hero)', '8 tipos', '-7 tipos']],
   [140, 100, 120, 135]);
 
-h3('Dimension 4: Pricing (Peso: 10%) -- Score: 66/100');
+h3('Dimensi\u00F3n 4: Pricing (Peso: 10%) \u2014 Score: 66/100');
 horizBar('Score pricing', 66, 100);
-tbl(['Metrica', 'Valor Actual', 'Estandar', 'Estado'],
-  [['Precio medio', 'EUR 58.17', 'Segun producto', '--'],
-   ['Precio mediana', 'EUR 29.00', 'AOV sector: EUR 20-80', 'En rango'],
-   ['Rango', 'EUR 3.99 - EUR 399.00', '--', 'Amplio (bien)'],
-   ['Con compare_at_price', '1 de 29 (3.4%)', '100%', 'CRITICO'],
-   ['Compare_at invertido', 'Si (EUR 19.95 < EUR 29.99)', 'Debe ser MAYOR', 'Error grave'],
-   ['Terminacion .97/.99', '0 productos (0%)', '100%', 'Sin psicologia'],
-   ['Precios redondos', '10 productos (34%)', '0%', 'Anti-conversion']],
+tbl(['M\u00E9trica', 'Valor Actual', 'Est\u00E1ndar', 'Estado'],
+  [[' Precio medio', '\u20AC58.17', 'Seg\u00FAn producto', '\u2014'],
+   ['Precio mediana', '\u20AC29.00', 'AOV sector: \u20AC20-80', 'En rango'],
+   ['Rango', '\u20AC3.99 \u2013 \u20AC399.00', '\u2014', 'Amplio (bien)'],
+   ['Con compare_at_price', '1 de 29 (3.4%)', '100%', 'CR\u00CDTICO'],
+   ['Compare_at invertido', 'S\u00ED (\u20AC19.95 < \u20AC29.99)', 'Debe ser MAYOR', 'Error grave'],
+   ['Terminaci\u00F3n .97/.99', '0 productos (0%)', '100%', 'Sin psicolog\u00EDa'],
+   ['Precios redondos', '10 productos (34%)', '0%', 'Anti-conversi\u00F3n']],
   [140, 155, 100, 100]);
-p('Error critico: El unico producto con compare_at_price tiene el valor INVERTIDO (EUR 19.95 < precio EUR 29.99). Esto muestra al cliente que el precio ha SUBIDO, efecto contrario al deseado.', { color: RED });
+p('Error cr\u00EDtico: El \u00FAnico producto con compare_at_price tiene el valor INVERTIDO (\u20AC19.95 < precio \u20AC29.99). Esto muestra al cliente que el precio ha SUBIDO, efecto contrario al deseado.', { color: RED });
 
-h3('Dimension 5: SEO Meta (Peso: 18%) -- Score: 50/100');
+h3('Dimensi\u00F3n 5: SEO Meta (Peso: 18%) \u2014 Score: 50/100');
 horizBar('Score SEO', 50, 100);
 tbl(['Criterio', 'Estado', 'Impacto'],
-  [['Meta Title optimizado', 'No configurado en la mayoria', 'Alto -- CTR en Google'],
-   ['Meta Description (130-155)', 'No configurada', 'Alto -- CTR en SERPs'],
-   ['Schema JSON-LD Product', 'No implementado', 'Alto -- Rich Snippets'],
-   ['Schema FAQ', 'No implementado', 'Alto -- Espacio en SERPs'],
-   ['Alt text en imagenes', 'Generico o vacio', 'Medio -- Google Images'],
-   ['Internal linking', 'Minimo', 'Medio -- Link equity']],
+  [['Meta Title optimizado', 'No configurado en la mayor\u00EDa', 'Alto \u2014 CTR en Google'],
+   ['Meta Description (130-155)', 'No configurada', 'Alto \u2014 CTR en SERPs'],
+   ['Schema JSON-LD Product', 'No implementado', 'Alto \u2014 Rich Snippets'],
+   ['Schema FAQ', 'No implementado', 'Alto \u2014 Espacio en SERPs'],
+   ['Alt text en im\u00E1genes', 'Gen\u00E9rico o vac\u00EDo', 'Medio \u2014 Google Images'],
+   ['Internal linking', 'M\u00EDnimo', 'Medio \u2014 Link equity']],
   [155, 185, 155]);
 
-h3('Dimension 6: Calidad de Contenido (Peso: 12%) -- Score: 70/100');
+h3('Dimensi\u00F3n 6: Calidad de Contenido (Peso: 12%) \u2014 Score: 70/100');
 horizBar('Score calidad', 70, 100);
-tbl(['Criterio', 'Estado Actual', 'Estandar', 'Estado'],
+tbl(['Criterio', 'Estado Actual', 'Est\u00E1ndar', 'Estado'],
   [['Legibilidad Flesch-Kincaid', 'Buena (nativo ES)', 'Score > 60', 'OK'],
-   ['Consistencia de keywords', 'Baja -- sin estrategia', 'Keywords en title+desc+tags', 'MEJORAR'],
-   ['Formateo HTML', 'Basico -- solo parrafos', 'H2, H3, listas, negritas', 'CRITICO'],
+   ['Consistencia de keywords', 'Baja \u2014 sin estrategia', 'Keywords en title+desc+tags', 'MEJORAR'],
+   ['Formateo HTML', 'B\u00E1sico \u2014 solo p\u00E1rrafos', 'H2, H3, listas, negritas', 'CR\u00CDTICO'],
    ['Densidad de contenido', '531 chars media', '4000-6000 chars', '8x menos'],
-   ['Unicidad del contenido', 'Alta -- no duplicado', '100% unico', 'OK'],
-   ['Llamada a la accion (CTA)', 'No presente', '1-2 CTAs por producto', 'CRITICO']],
+   ['Unicidad del contenido', 'Alta \u2014 no duplicado', '100% \u00FAnico', 'OK'],
+   ['Llamada a la acci\u00F3n (CTA)', 'No presente', '1-2 CTAs por producto', 'CR\u00CDTICO']],
   [145, 140, 120, 90]);
 
-h3('Dimension 7: Trust Signals (Peso: 8%) -- Score: 20/100');
+h3('Dimensi\u00F3n 7: Trust Signals (Peso: 8%) \u2014 Score: 20/100');
 horizBar('Score trust', 20, 100);
-tbl(['Trust Signal', 'Presente', 'Impacto Conversion'],
+tbl(['Trust Signal', 'Presente', 'Impacto Conversi\u00F3n'],
   [['FAQ en productos', 'No (0/29)', '+5-15%'],
-   ['Mencion de garantia', 'No (0/29)', '+8-12%'],
-   ['Politica devoluciones visible', 'No en fichas', '+5-10%'],
+   ['Menci\u00F3n de garant\u00EDa', 'No (0/29)', '+8-12%'],
+   ['Pol\u00EDtica devoluciones visible', 'No en fichas', '+5-10%'],
    ['Badges de seguridad', 'No', '+3-8%'],
    ['Reviews/testimonios', 'No', '+10-25%'],
-   ['Envio gratuito / policy', 'No en ficha', '+5-15%']],
+   ['Env\u00EDo gratuito / policy', 'No en ficha', '+5-15%']],
   [175, 110, 210]);
 
 // ================================================================
 //  CAP 4 — PRECIOS Y COMPETENCIA
 // ================================================================
-S = '04 - Precios y Competencia';
+S = '04 \u00B7 Precios y Competencia';
 chapterPage(S);
 doc.fontSize(22).fillColor(WHITE).text('04  Precios y ', 50, Y, { continued: true }).fillColor(GOLD).text('Competencia'); Y += 35;
-p('Analisis de pricing del catalogo real con plan de correccion por producto y comparativa con competidores directos del sector.', { fontSize: 11 });
+p('An\u00E1lisis de pricing del cat\u00E1logo real con plan de correcci\u00F3n por producto y comparativa con competidores directos del sector.', { fontSize: 11 });
 
-h3('Distribucion de Precios Actual');
+h3('Distribuci\u00F3n de Precios Actual');
 barChart([
-  { l: 'EUR 3-10', v: 5, c: BLUE },
-  { l: 'EUR 10-20', v: 6, c: BLUE },
-  { l: 'EUR 20-30', v: 6, c: GOLD },
-  { l: 'EUR 30-50', v: 3, c: GOLD },
-  { l: 'EUR 50-90', v: 3, c: ORANGE },
-  { l: 'EUR 90-200', v: 4, c: ORANGE },
-  { l: 'EUR 200+', v: 2, c: RED },
-], 'Distribucion de Precios -- 29 Productos (datos reales)', 130);
+  { l: '\u20AC3-10', v: 5, c: BLUE },
+  { l: '\u20AC10-20', v: 6, c: BLUE },
+  { l: '\u20AC20-30', v: 6, c: GOLD },
+  { l: '\u20AC30-50', v: 3, c: GOLD },
+  { l: '\u20AC50-90', v: 3, c: ORANGE },
+  { l: '\u20AC90-200', v: 4, c: ORANGE },
+  { l: '\u20AC200+', v: 2, c: RED },
+], 'Distribuci\u00F3n de Precios \u2014 29 Productos (datos reales)', 130);
 
-h3('Plan de Pricing Psicologico por Producto');
-tbl(['Producto', 'Actual', 'Optimo', 'Compare At', 'Ahorro Visible'],
-  [['ShopyBrain Starter', 'EUR 49.00', 'EUR 47.97', 'EUR 69.99', '-31% (EUR 22)'],
-   ['Pack 5 Productos', 'EUR 29.00', 'EUR 27.97', 'EUR 39.99', '-30% (EUR 12)'],
-   ['Pack 10 Productos', 'EUR 49.00', 'EUR 47.97', 'EUR 69.99', '-31% (EUR 22)'],
-   ['Pack 15 Productos', 'EUR 69.00', 'EUR 67.97', 'EUR 99.99', '-32% (EUR 32)'],
-   ['Analisis One-Shot', 'EUR 79.00', 'EUR 77.97', 'EUR 119.99', '-35% (EUR 42)'],
-   ['Pack 20 Productos', 'EUR 89.00', 'EUR 87.97', 'EUR 129.99', '-32% (EUR 42)'],
-   ['ShopyBrain Pro', 'EUR 149.00', 'EUR 147.97', 'EUR 199.99', '-26% (EUR 52)'],
-   ['Sesion Estrategica', 'EUR 199.00', 'EUR 197.97', 'EUR 299.99', '-34% (EUR 102)'],
-   ['ShopyBrain Enterprise', 'EUR 399.00', 'EUR 397.97', 'EUR 599.99', '-34% (EUR 202)'],
-   ['Pack 30 Productos', 'EUR 119.00', 'EUR 117.97', 'EUR 169.99', '-31% (EUR 52)']],
+h3('Plan de Pricing Psicol\u00F3gico por Producto');
+tbl(['Producto', 'Actual', '\u00D3ptimo', 'Compare At', 'Ahorro Visible'],
+  [['ShopyBrain Starter', '\u20AC49.00', '\u20AC47.97', '\u20AC69.99', '-31% (\u20AC22)'],
+   ['Pack 5 Productos', '\u20AC29.00', '\u20AC27.97', '\u20AC39.99', '-30% (\u20AC12)'],
+   ['Pack 10 Productos', '\u20AC49.00', '\u20AC47.97', '\u20AC69.99', '-31% (\u20AC22)'],
+   ['Pack 15 Productos', '\u20AC69.00', '\u20AC67.97', '\u20AC99.99', '-32% (\u20AC32)'],
+   ['An\u00E1lisis One-Shot', '\u20AC79.00', '\u20AC77.97', '\u20AC119.99', '-35% (\u20AC42)'],
+   ['Pack 20 Productos', '\u20AC89.00', '\u20AC87.97', '\u20AC129.99', '-32% (\u20AC42)'],
+   ['ShopyBrain Pro', '\u20AC149.00', '\u20AC147.97', '\u20AC199.99', '-26% (\u20AC52)'],
+   ['Sesi\u00F3n Estrat\u00E9gica', '\u20AC199.00', '\u20AC197.97', '\u20AC299.99', '-34% (\u20AC102)'],
+   ['ShopyBrain Enterprise', '\u20AC399.00', '\u20AC397.97', '\u20AC599.99', '-34% (\u20AC202)'],
+   ['Pack 30 Productos', '\u20AC119.00', '\u20AC117.97', '\u20AC169.99', '-31% (\u20AC52)']],
   [125, 70, 70, 80, 150], { priceCol: 2 });
 
 h3('Competidores Directos en el Sector');
 tbl(['Competidor', 'Rango Precios', 'Productos', 'Imgs/Prod', 'Fortaleza'],
-  [['Funko (oficial)', 'EUR 12-35', '5000+', '4-8', 'Marca, volumen'],
-   ['Etsy sellers (arte IA)', 'EUR 5-50', 'Variable', '5-10', 'UGC, reviews'],
-   ['Printful/Gelato (POD)', 'EUR 15-45', 'Custom', '3-6', 'Integracion Shopify'],
-   ['Amazon Merch', 'EUR 12-30', 'Masivo', '4-7', 'Trafico organico'],
-   ['Comic Crafter (actual)', 'EUR 7-399', '29', '1.2', 'Menor contenido visual']],
+  [['Funko (oficial)', '\u20AC12-35', '5000+', '4-8', 'Marca, volumen'],
+   ['Etsy sellers (arte IA)', '\u20AC5-50', 'Variable', '5-10', 'UGC, reviews'],
+   ['Printful/Gelato (POD)', '\u20AC15-45', 'Custom', '3-6', 'Integraci\u00F3n Shopify'],
+   ['Amazon Merch', '\u20AC12-30', 'Masivo', '4-7', 'Tr\u00E1fico org\u00E1nico'],
+   ['Comic Crafter (actual)', '\u20AC7-399', '29', '1.2', 'Menor contenido visual']],
   [125, 80, 65, 65, 160]);
 
-h3('Benchmarks Sector Comics y Arte Digital en Espana');
-tbl(['Metrica', 'Mercado Espana', 'Comic Crafter', 'Oportunidad'],
-  [['AOV', 'EUR 25-65', 'EUR 29 (mediana)', 'Subir a EUR 38-42 (+31-45%)'],
-   ['Margen bruto', '50-75%', 'Sin tracking COGS', 'Implementar analisis'],
+h3('Benchmarks Sector C\u00F3mics y Arte Digital en Espa\u00F1a');
+tbl(['M\u00E9trica', 'Mercado Espa\u00F1a', 'Comic Crafter', 'Oportunidad'],
+  [['AOV', '\u20AC25-65', '\u20AC29 (mediana)', 'Subir a \u20AC38-42 (+31-45%)'],
+   ['Margen bruto', '50-75%', 'Sin tracking COGS', 'Implementar an\u00E1lisis'],
    ['Conversion rate', '1-3%', '~1.0% (est.)', 'Objetivo: 2.5%'],
    ['Prods/pedido', '1.2-1.8', '~1.0 (est.)', 'Cross-sell + bundles'],
    ['Email open rate', '25-35%', 'Sin email marketing', 'Implementar 5 flujos']],
   [120, 110, 110, 155]);
 
 // ================================================================
-//  CAP 5 — SEO TECNICO
+//  CAP 5 — SEO T\u00C9CNICO
 // ================================================================
-S = '05 - SEO Tecnico';
+S = '05 \u00B7 SEO T\u00E9cnico';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('05  Analisis ', 50, Y, { continued: true }).fillColor(GOLD).text('SEO Tecnico'); Y += 35;
-p('Evaluacion de los 16 criterios de auditoria SEO nivel Semrush aplicados a los 29 productos reales de Comic Crafter.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('05  An\u00E1lisis ', 50, Y, { continued: true }).fillColor(GOLD).text('SEO T\u00E9cnico'); Y += 35;
+p('Evaluaci\u00F3n de los 16 criterios de auditor\u00EDa SEO nivel Semrush aplicados a los 29 productos reales de Comic Crafter.', { fontSize: 11 });
 
 h3('Score SEO por Criterio (16 Criterios)');
-[['Title Tag', 35, 'Titulos default de Shopify, sin optimizar'],
- ['Meta Description', 15, 'No configurada en ningun producto'],
+[['Title Tag', 35, 'T\u00EDtulos default de Shopify, sin optimizar'],
+ ['Meta Description', 15, 'No configurada en ning\u00FAn producto'],
  ['URL Slug', 60, 'Aceptable, no optimizado con keywords'],
  ['H1 Heading', 70, 'Funciona como H1, no optimizado'],
  ['Content Length', 25, '531 chars media, necesario 4000-6000'],
  ['Keyword Density', 40, 'Baja, sin estrategia de keywords'],
- ['Internal Linking', 10, 'Minimo, gran oportunidad'],
- ['Image Alt Text', 15, 'Generico o vacio en 28/29 prods'],
+ ['Internal Linking', 10, 'M\u00EDnimo, gran oportunidad'],
+ ['Image Alt Text', 15, 'Gen\u00E9rico o vac\u00EDo en 28/29 prods'],
  ['Schema Product', 0, 'No implementado'],
  ['BreadcrumbList', 0, 'No implementado'],
  ['Open Graph', 50, 'Parcial (Shopify default)'],
  ['Twitter Cards', 40, 'Parcial (Shopify default)'],
- ['Canonical URL', 90, 'OK -- gestionado por Shopify'],
+ ['Canonical URL', 90, 'OK \u2014 gestionado por Shopify'],
  ['Mobile Responsive', 85, 'Theme responsive'],
- ['Core Web Vitals', 60, 'Estimado, necesita auditoria'],
+ ['Core Web Vitals', 60, 'Estimado, necesita auditor\u00EDa'],
  ['Content Quality', 65, 'Decente pero sin estructura SEO']
 ].forEach(([name, score, note]) => {
   need(20);
@@ -540,7 +523,7 @@ h3('Score SEO por Criterio (16 Criterios)');
 });
 Y += 8;
 
-h3('Impacto SEO: Antes vs Despues');
+h3('Impacto SEO: Antes vs Despu\u00E9s');
 barChart([
   { l: 'Title Tags', b: 35, a: 95, bc: RED, ac: GREEN },
   { l: 'Meta Desc', b: 15, a: 95, bc: RED, ac: GREEN },
@@ -549,43 +532,43 @@ barChart([
   { l: 'Schema', b: 0.1, a: 95, bc: RED, ac: GREEN },
   { l: 'Links', b: 10, a: 80, bc: RED, ac: GREEN },
   { l: 'Keywords', b: 40, a: 90, bc: ORANGE, ac: GREEN },
-], 'Score SEO por Criterio: Actual vs Post-Optimizacion', 150);
+], 'Score SEO por Criterio: Actual vs Post-Optimizaci\u00F3n', 150);
 
-p('Proyeccion: Con SEO completo implementado, el trafico organico puede incrementarse un 60-120% en 6 meses. En un nicho con competencia SEO moderada-baja como comics y arte digital en Espana, las mejoras se notan rapido.');
+p('Proyecci\u00F3n: Con SEO completo implementado, el tr\u00E1fico org\u00E1nico puede incrementarse un 60-120% en 6 meses. En un nicho con competencia SEO moderada-baja como c\u00F3mics y arte digital en Espa\u00F1a, las mejoras se notan r\u00E1pido.');
 
 // ================================================================
-//  CAP 6 — ANALISIS DE IMAGENES
+//  CAP 6 — AN\u00C1LISIS DE IM\u00C1GENES
 // ================================================================
-S = '06 - Analisis de Imagenes';
+S = '06 \u00B7 An\u00E1lisis de Im\u00E1genes';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('06  Analisis de ', 50, Y, { continued: true }).fillColor(GOLD).text('Imagenes'); Y += 35;
+doc.fontSize(22).fillColor(WHITE).text('06  An\u00E1lisis de ', 50, Y, { continued: true }).fillColor(GOLD).text('Im\u00E1genes'); Y += 35;
 
 statRow([
-  { v: '36', l: 'Total Imagenes', color: RED },
+  { v: '36', l: 'Total Im\u00E1genes', color: RED },
   { v: '1.2', l: 'Imgs/Producto', color: RED },
-  { v: '232', l: 'Objetivo (29x8)', color: GREEN },
+  { v: '232', l: 'Objetivo (29\u00D78)', color: GREEN },
   { v: '-196', l: 'Faltan', color: ORANGE },
 ]);
 
-h3('Distribucion Actual');
+h3('Distribuci\u00F3n Actual');
 barChart([
   { l: '0 imgs', v: 1, c: '#C0392B' },
   { l: '1 img', v: 25, c: RED },
   { l: '2 imgs', v: 1, c: ORANGE },
   { l: '3 imgs', v: 1, c: ORANGE },
   { l: '14 imgs', v: 1, c: GREEN },
-], 'Imagenes por Producto (29 productos reales)', 130);
+], 'Im\u00E1genes por Producto (29 productos reales)', 130);
 
 h3('Los 8 Tipos de Imagen Necesarios');
-tbl(['Tipo', 'Descripcion', 'Actual', 'Impacto Conversion'],
-  [['Hero', 'Producto en fondo limpio', 'Si (mayoria)', 'Baseline'],
+tbl(['Tipo', 'Descripci\u00F3n', 'Actual', 'Impacto Conversi\u00F3n'],
+  [['Hero', 'Producto en fondo limpio', 'S\u00ED (mayor\u00EDa)', 'Baseline'],
    ['Lifestyle', 'En contexto de uso real', 'No (0/29)', '+15-25%'],
    ['Detalle', 'Close-up materiales/texturas', 'No (0/29)', '+8-12%'],
-   ['Packaging', 'Presentacion empaquetado', 'No (0/29)', '+5-10%'],
+   ['Packaging', 'Presentaci\u00F3n empaquetado', 'No (0/29)', '+5-10%'],
    ['UGC', 'Aspecto contenido usuario', 'No (0/29)', '+10-20%'],
-   ['Escala', 'Referencia de tamano', 'No (0/29)', '+5-8% (- devoluciones)'],
-   ['Bundle', 'Agrupacion productos', 'No (0/29)', '+10-15% cross-sell'],
-   ['Infografia', 'Specs en formato visual', 'No (0/29)', '+8-12%']],
+   ['Escala', 'Referencia de tama\u00F1o', 'No (0/29)', '+5-8% (-devoluciones)'],
+   ['Bundle', 'Agrupaci\u00F3n productos', 'No (0/29)', '+10-15% cross-sell'],
+   ['Infograf\u00EDa', 'Specs en formato visual', 'No (0/29)', '+8-12%']],
   [65, 195, 75, 160]);
 
 h3('Comparativa: Comic Crafter vs Mercado');
@@ -593,145 +576,145 @@ barChart([
   { l: 'Comic Crafter', b: 1.2, a: 8, bc: RED, ac: GREEN },
   { l: 'Competidor Medio', b: 5, a: 5, bc: ORANGE, ac: ORANGE },
   { l: 'Top Sellers', b: 10, a: 10, bc: GREEN, ac: GREEN },
-  { l: 'Estandar WC', b: 8, a: 8, bc: GOLD, ac: GOLD },
-], 'Imagenes/Producto: Comic Crafter vs Mercado', 140);
+  { l: 'Est\u00E1ndar WC', b: 8, a: 8, bc: GOLD, ac: GOLD },
+], 'Im\u00E1genes/Producto: Comic Crafter vs Mercado', 140);
 
-h3('Coste de Generacion IA vs Fotografia Tradicional');
-tbl(['Metodo', 'Coste/Producto', '29 Productos', 'Tiempo', 'Calidad'],
-  [['Fotografo profesional', 'EUR 50-200', 'EUR 1,450-5,800', '2-4 semanas', 'Variable'],
-   ['Estudio fotografico', 'EUR 100-500', 'EUR 2,900-14,500', '3-6 semanas', 'Alta'],
-   ['ShopyBrain (Flux 1.1 Pro)', '~EUR 0.25', '~EUR 7.25', '2-3 horas', 'Profesional IA'],
+h3('Coste de Generaci\u00F3n IA vs Fotograf\u00EDa Tradicional');
+tbl(['M\u00E9todo', 'Coste/Producto', '29 Productos', 'Tiempo', 'Calidad'],
+  [['Fot\u00F3grafo profesional', '\u20AC50-200', '\u20AC1,450-5,800', '2-4 semanas', 'Variable'],
+   ['Estudio fotogr\u00E1fico', '\u20AC100-500', '\u20AC2,900-14,500', '3-6 semanas', 'Alta'],
+   ['ShopyBrain (Flux 1.1 Pro)', '~\u20AC0.25', '~\u20AC7.25', '2-3 horas', 'Profesional IA'],
    ['Ahorro con ShopyBrain', '', 'Hasta 99.5%', '', '']],
   [140, 80, 95, 90, 90], { priceCol: 2 });
 
 // ================================================================
-//  CAP 7 — ANTES VS DESPUES
+//  CAP 7 — ANTES VS DESPU\u00C9S
 // ================================================================
-S = '07 - Antes vs Despues';
+S = '07 \u00B7 Antes vs Despu\u00E9s';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('07  Antes vs ', 50, Y, { continued: true }).fillColor(GOLD).text('Despues'); Y += 35;
-p('Impacto cuantificado de cada optimizacion aplicada al catalogo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('07  Antes vs ', 50, Y, { continued: true }).fillColor(GOLD).text('Despu\u00E9s'); Y += 35;
+p('Impacto cuantificado de cada optimizaci\u00F3n aplicada al cat\u00E1logo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.', { fontSize: 11 });
 
-h3('Score Global por Dimension');
+h3('Score Global por Dimensi\u00F3n');
 barChart([
   { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
-  { l: 'Titulos', b: 68, a: 96, bc: ORANGE, ac: GREEN },
+  { l: 'T\u00EDtulos', b: 68, a: 96, bc: ORANGE, ac: GREEN },
   { l: 'Desc.', b: 93, a: 100, bc: GREEN, ac: GREEN },
   { l: 'Pricing', b: 66, a: 97, bc: ORANGE, ac: GREEN },
-  { l: 'Imagenes', b: 24, a: 95, bc: RED, ac: GREEN },
+  { l: 'Im\u00E1genes', b: 24, a: 95, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
-], 'Score por Dimension: ANTES vs DESPUES', 160);
+], 'Score por Dimensi\u00F3n: ANTES vs DESPU\u00C9S', 160);
 
-h3('Impacto en Metricas de Negocio');
-tbl(['Metrica', 'Antes (Real)', 'Despues', 'Mejora', 'Fuente Benchmark'],
-  [['Score catalogo', '37/100 (D)', '93/100 (A)', '+151%', 'ShopyBrain Engine'],
+h3('Impacto en M\u00E9tricas de Negocio');
+tbl(['M\u00E9trica', 'Antes (Real)', 'Despu\u00E9s', 'Mejora', 'Fuente Benchmark'],
+  [['Score cat\u00E1logo', '37/100 (D)', '93/100 (A)', '+151%', 'ShopyBrain Engine'],
    ['Imgs/producto', '1.2', '8.0', '+567%', 'Flux 1.1 Pro'],
    ['Conversion Rate', '~1.0%', '~2.5%', '+150%', 'Baymard Institute'],
-   ['AOV', 'EUR 29', 'EUR 38-42', '+31-45%', 'Anchoring psicologico'],
+   ['AOV', '\u20AC29', '\u20AC38-42', '+31-45%', 'Anchoring psicol\u00F3gico'],
    ['SEO Visibility', 'Baja', '+60-120%', '+60-120%', 'Semrush benchmarks'],
-   ['CTR organico', '~2%', '~4-6%', '+100-200%', 'Schema optimization'],
-   ['Revenue potencial', 'Base', 'x2.8-3.5', '+180-250%', 'Efecto compuesto'],
-   ['Email revenue', 'EUR 0', '+15-25%', 'Nuevo canal', 'Klaviyo Report']],
+   ['CTR org\u00E1nico', '~2%', '~4-6%', '+100-200%', 'Schema optimization'],
+   ['Revenue potencial', 'Base', '\u00D72.8-3.5', '+180-250%', 'Efecto compuesto'],
+   ['Email revenue', '\u20AC0', '+15-25%', 'Nuevo canal', 'Klaviyo Report']],
   [90, 80, 80, 70, 175]);
 
-h3('Desglose del Efecto Compuesto (x2.8 - 3.5)');
-p('El multiplicador no es suma lineal sino multiplicacion de factores independientes:', { color: MUTED });
-tbl(['Optimizacion', 'Conversion', 'AOV', 'Trafico', 'Factor'],
-  [['Imagenes (1 a 8)', '+30-50%', '+5%', '--', 'x1.35-1.55'],
-   ['Compare_at_price (0 a 100%)', '+15-25%', '+20-35%', '--', 'x1.38-1.68'],
-   ['Pricing psicologico (.97)', '+8-12%', '--', '--', 'x1.08-1.12'],
-   ['SEO completo', '--', '--', '+60-120%', 'x1.60-2.20'],
-   ['Trust signals (FAQ+garantia)', '+10-20%', '+5%', '--', 'x1.15-1.25'],
-   ['Email marketing (5 flujos)', '--', '--', '+15-25% rev', 'x1.15-1.25'],
-   ['TOTAL COMPUESTO', '', '', '', 'x2.8 - 3.5']],
+h3('Desglose del Efecto Compuesto (\u00D72.8 \u2013 3.5)');
+p('El multiplicador no es suma lineal sino multiplicaci\u00F3n de factores independientes:', { color: MUTED });
+tbl(['Optimizaci\u00F3n', 'Conversi\u00F3n', 'AOV', 'Tr\u00E1fico', 'Factor'],
+  [['Im\u00E1genes (1 a 8)', '+30-50%', '+5%', '\u2014', '\u00D71.35-1.55'],
+   ['Compare_at_price (0 a 100%)', '+15-25%', '+20-35%', '\u2014', '\u00D71.38-1.68'],
+   ['Pricing psicol\u00F3gico (.97)', '+8-12%', '\u2014', '\u2014', '\u00D71.08-1.12'],
+   ['SEO completo', '\u2014', '\u2014', '+60-120%', '\u00D71.60-2.20'],
+   ['Trust signals (FAQ+garant\u00EDa)', '+10-20%', '+5%', '\u2014', '\u00D71.15-1.25'],
+   ['Email marketing (5 flujos)', '\u2014', '\u2014', '+15-25% rev', '\u00D71.15-1.25'],
+   ['TOTAL COMPUESTO', '', '', '', '\u00D72.8 \u2013 3.5']],
   [155, 70, 60, 75, 135]);
 
 // ================================================================
-//  CAP 8 — PLAN DE ACCION
+//  CAP 8 — PLAN DE ACCI\u00D3N
 // ================================================================
-S = '08 - Plan de Accion';
+S = '08 \u00B7 Plan de Acci\u00F3n';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('08  Plan de ', 50, Y, { continued: true }).fillColor(GOLD).text('Accion'); Y += 35;
-p('Roadmap priorizado por impacto en revenue con timeline de implementacion de 4 semanas.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('08  Plan de ', 50, Y, { continued: true }).fillColor(GOLD).text('Acci\u00F3n'); Y += 35;
+p('Roadmap priorizado por impacto en revenue con timeline de implementaci\u00F3n de 4 semanas.', { fontSize: 11 });
 
 h3('Semana 1: Impacto Inmediato (Quick Wins)');
-tbl(['Prior.', 'Accion', 'Prods', 'Impacto', 'Tiempo'],
-  [['P1', 'Corregir compare_at_price invertido (Impresion 3D)', '1', '+15-25% conv.', '5 min'],
-   ['P1', 'Anadir compare_at_price a 28 productos', '28', '+15-25% global', '1h'],
-   ['P1', 'Pricing psicologico (.97/.99) a precios redondos', '10', '+8-12% conv.', '30 min'],
-   ['P1', 'Eliminar emojis + keyword-first en titulos', '6', '+10-15% CTR', '1h'],
-   ['P2', 'Generar 232 imagenes IA (8x29)', '29', '+30-50% conv.', '2-3h'],
-   ['P2', 'Redisenar los 13 productos Grado D', '13', 'D a B/A', '3-4h']],
+tbl(['Prior.', 'Acci\u00F3n', 'Prods', 'Impacto', 'Tiempo'],
+  [['P1', 'Corregir compare_at_price invertido (Impresi\u00F3n 3D)', '1', '+15-25% conv.', '5 min'],
+   ['P1', 'A\u00F1adir compare_at_price a 28 productos', '28', '+15-25% global', '1h'],
+   ['P1', 'Pricing psicol\u00F3gico (.97/.99) a precios redondos', '10', '+8-12% conv.', '30 min'],
+   ['P1', 'Eliminar emojis + keyword-first en t\u00EDtulos', '6', '+10-15% CTR', '1h'],
+   ['P2', 'Generar 232 im\u00E1genes IA (8\u00D729)', '29', '+30-50% conv.', '2-3h'],
+   ['P2', 'Redise\u00F1ar los 13 productos Grado D', '13', 'D a B/A', '3-4h']],
   [35, 210, 35, 100, 55]);
 
 h3('Semana 2: SEO y Contenido');
-tbl(['Prior.', 'Accion', 'Prods', 'Impacto', 'Tiempo'],
+tbl(['Prior.', 'Acci\u00F3n', 'Prods', 'Impacto', 'Tiempo'],
   [['P2', 'Meta title + meta description para todo', '29', '+40-60% CTR', '2h'],
    ['P2', 'Schema JSON-LD (Product, FAQ, Breadcrumb)', '29', 'Rich Snippets', '2h'],
-   ['P2', 'Alt text descriptivo para imagenes', '232', '+20% Google Imgs', '1h'],
+   ['P2', 'Alt text descriptivo para im\u00E1genes', '232', '+20% Google Imgs', '1h'],
    ['P3', 'Ampliar descripciones a 800-1200 palabras', '29', '+30-50% ranking', '4-6h'],
    ['P3', 'FAQ (3-5 preguntas) en cada producto', '29', 'Featured Snippets', '2-3h'],
    ['P3', 'Incrementar tags a 22-28/producto', '29', '+20% discovery', '1-2h']],
   [35, 210, 35, 100, 55]);
 
-h3('Semana 3-4: Crecimiento y Automatizacion');
-tbl(['Prior.', 'Accion', 'Impacto', 'Tiempo'],
+h3('Semana 3-4: Crecimiento y Automatizaci\u00F3n');
+tbl(['Prior.', 'Acci\u00F3n', 'Impacto', 'Tiempo'],
   [['P3', 'Configurar 5 flujos email marketing', '+15-25% revenue', '3-4h'],
-   ['P3', 'Crear colecciones inteligentes automaticas', 'Navegacion + SEO', '1h'],
-   ['P3', 'Crear paginas (About, FAQ, Shipping, Returns)', 'Trust + SEO', '2-3h'],
-   ['P4', 'Activar A/B testing en 3 productos top', 'Optimizacion continua', '30 min'],
+   ['P3', 'Crear colecciones inteligentes autom\u00E1ticas', 'Navegaci\u00F3n + SEO', '1h'],
+   ['P3', 'Crear p\u00E1ginas (About, FAQ, Shipping, Returns)', 'Trust + SEO', '2-3h'],
+   ['P4', 'Activar A/B testing en 3 productos top', 'Optimizaci\u00F3n continua', '30 min'],
    ['P4', 'Activar Auto-Pilot 24/7 (12 cron jobs)', 'Mejora continua', 'Auto'],
    ['P4', 'Configurar alertas de inventario', 'Prevenir roturas', '15 min']],
   [35, 235, 145, 80]);
 
 // ================================================================
-//  CAP 9 — PROYECCION FINANCIERA
+//  CAP 9 — PROYECCI\u00D3N FINANCIERA
 // ================================================================
-S = '09 - Proyeccion Financiera';
+S = '09 \u00B7 Proyecci\u00F3n Financiera';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('09  Proyeccion ', 50, Y, { continued: true }).fillColor(GOLD).text('Financiera'); Y += 35;
-p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del catalogo y benchmarks verificados del sector Art/Crafts/Comics en Espana.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('09  Proyecci\u00F3n ', 50, Y, { continued: true }).fillColor(GOLD).text('Financiera'); Y += 35;
+p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del cat\u00E1logo y benchmarks verificados del sector Art/Crafts/Comics en Espa\u00F1a.', { fontSize: 11 });
 
 h3('Supuestos Base');
 tbl(['Supuesto', 'Valor', 'Fuente'],
-  [['AOV actual (mediana catalogo)', 'EUR 29.00', 'Datos reales Comic Crafter'],
-   ['AOV proyectado', 'EUR 38.00', '+31% por anchoring'],
-   ['Trafico mensual estimado', '500-1,500 visitas/mes', 'Nicho Espana estimado'],
+  [['AOV actual (mediana cat\u00E1logo)', '\u20AC29.00', 'Datos reales Comic Crafter'],
+   ['AOV proyectado', '\u20AC38.00', '+31% por anchoring'],
+   ['Tr\u00E1fico mensual estimado', '500-1,500 visitas/mes', 'Nicho Espa\u00F1a estimado'],
    ['Conv. rate actual', '~1.0%', 'Media sector sin optimizar'],
    ['Conv. rate objetivo', '~2.5%', 'Sector optimizado'],
    ['Margen bruto digitales', '70-85%', 'Benchmark digitales'],
    ['Email contribution', '15-25% del total', 'Klaviyo Industry 2025']],
   [175, 140, 180]);
 
-h3('Escenario Conservador (solo pricing + imagenes)');
+h3('Escenario Conservador (solo pricing + im\u00E1genes)');
 tbl(['Mes', 'Visitas', 'Conv.', 'AOV', 'Pedidos', 'Revenue', 'Acumulado'],
-  [['Mes 1', '600', '1.3%', 'EUR 35', '8', 'EUR 280', 'EUR 280'],
-   ['Mes 2', '650', '1.5%', 'EUR 36', '10', 'EUR 360', 'EUR 640'],
-   ['Mes 3', '700', '1.7%', 'EUR 37', '12', 'EUR 444', 'EUR 1,084'],
-   ['Mes 4', '750', '1.8%', 'EUR 37', '14', 'EUR 518', 'EUR 1,602'],
-   ['Mes 5', '800', '1.9%', 'EUR 38', '15', 'EUR 570', 'EUR 2,172'],
-   ['Mes 6', '850', '2.0%', 'EUR 38', '17', 'EUR 646', 'EUR 2,818']],
+  [['Mes 1', '600', '1.3%', '\u20AC35', '8', '\u20AC280', '\u20AC280'],
+   ['Mes 2', '650', '1.5%', '\u20AC36', '10', '\u20AC360', '\u20AC640'],
+   ['Mes 3', '700', '1.7%', '\u20AC37', '12', '\u20AC444', '\u20AC1,084'],
+   ['Mes 4', '750', '1.8%', '\u20AC37', '14', '\u20AC518', '\u20AC1,602'],
+   ['Mes 5', '800', '1.9%', '\u20AC38', '15', '\u20AC570', '\u20AC2,172'],
+   ['Mes 6', '850', '2.0%', '\u20AC38', '17', '\u20AC646', '\u20AC2,818']],
   [50, 60, 50, 60, 55, 85, 95], { priceCol: 5 });
 
-h3('Escenario Base (optimizacion completa)');
+h3('Escenario Base (optimizaci\u00F3n completa)');
 tbl(['Mes', 'Visitas', 'Conv.', 'AOV', 'Pedidos', 'Revenue', 'Acumulado'],
-  [['Mes 1', '700', '1.5%', 'EUR 36', '11', 'EUR 396', 'EUR 396'],
-   ['Mes 2', '850', '1.8%', 'EUR 37', '15', 'EUR 555', 'EUR 951'],
-   ['Mes 3', '1,050', '2.1%', 'EUR 38', '22', 'EUR 836', 'EUR 1,787'],
-   ['Mes 4', '1,300', '2.3%', 'EUR 39', '30', 'EUR 1,170', 'EUR 2,957'],
-   ['Mes 5', '1,550', '2.4%', 'EUR 40', '37', 'EUR 1,480', 'EUR 4,437'],
-   ['Mes 6', '1,800', '2.5%', 'EUR 41', '45', 'EUR 1,845', 'EUR 6,282']],
+  [['Mes 1', '700', '1.5%', '\u20AC36', '11', '\u20AC396', '\u20AC396'],
+   ['Mes 2', '850', '1.8%', '\u20AC37', '15', '\u20AC555', '\u20AC951'],
+   ['Mes 3', '1,050', '2.1%', '\u20AC38', '22', '\u20AC836', '\u20AC1,787'],
+   ['Mes 4', '1,300', '2.3%', '\u20AC39', '30', '\u20AC1,170', '\u20AC2,957'],
+   ['Mes 5', '1,550', '2.4%', '\u20AC40', '37', '\u20AC1,480', '\u20AC4,437'],
+   ['Mes 6', '1,800', '2.5%', '\u20AC41', '45', '\u20AC1,845', '\u20AC6,282']],
   [50, 60, 50, 60, 55, 85, 95], { priceCol: 5 });
 
-h3('Escenario Optimista (optimizacion + marketing activo)');
+h3('Escenario Optimista (optimizaci\u00F3n + marketing activo)');
 tbl(['Mes', 'Visitas', 'Conv.', 'AOV', 'Pedidos', 'Revenue', 'Acumulado'],
-  [['Mes 1', '1,000', '1.8%', 'EUR 37', '18', 'EUR 666', 'EUR 666'],
-   ['Mes 2', '1,400', '2.1%', 'EUR 38', '29', 'EUR 1,102', 'EUR 1,768'],
-   ['Mes 3', '1,800', '2.4%', 'EUR 39', '43', 'EUR 1,677', 'EUR 3,445'],
-   ['Mes 4', '2,300', '2.6%', 'EUR 40', '60', 'EUR 2,400', 'EUR 5,845'],
-   ['Mes 5', '2,900', '2.7%', 'EUR 41', '78', 'EUR 3,198', 'EUR 9,043'],
-   ['Mes 6', '3,500', '2.8%', 'EUR 42', '98', 'EUR 4,116', 'EUR 13,159']],
+  [['Mes 1', '1,000', '1.8%', '\u20AC37', '18', '\u20AC666', '\u20AC666'],
+   ['Mes 2', '1,400', '2.1%', '\u20AC38', '29', '\u20AC1,102', '\u20AC1,768'],
+   ['Mes 3', '1,800', '2.4%', '\u20AC39', '43', '\u20AC1,677', '\u20AC3,445'],
+   ['Mes 4', '2,300', '2.6%', '\u20AC40', '60', '\u20AC2,400', '\u20AC5,845'],
+   ['Mes 5', '2,900', '2.7%', '\u20AC41', '78', '\u20AC3,198', '\u20AC9,043'],
+   ['Mes 6', '3,500', '2.8%', '\u20AC42', '98', '\u20AC4,116', '\u20AC13,159']],
   [50, 60, 50, 60, 55, 85, 95], { priceCol: 5 });
 
 h3('Comparativa Revenue a 6 Meses');
@@ -740,86 +723,86 @@ barChart([
   { l: 'Conservador', b: 1200, a: 2818, bc: RED, ac: ORANGE },
   { l: 'Base', b: 1200, a: 6282, bc: RED, ac: GOLD },
   { l: 'Optimista', b: 1200, a: 13159, bc: RED, ac: GREEN },
-], 'Revenue Acumulado 6 Meses (EUR)', 150);
+], 'Revenue Acumulado 6 Meses (\u20AC)', 150);
 
 // ================================================================
-//  CAP 10 — INVERSION Y ROI
+//  CAP 10 — INVERSI\u00D3N Y ROI
 // ================================================================
-S = '10 - Inversion y ROI';
+S = '10 \u00B7 Inversi\u00F3n y ROI';
 chapterPage(S);
-doc.fontSize(22).fillColor(WHITE).text('10  Inversion y ', 50, Y, { continued: true }).fillColor(GOLD).text('ROI'); Y += 35;
-p('Analisis de la inversion necesaria y el retorno esperado con cifras reales y verificables.', { fontSize: 11 });
+doc.fontSize(22).fillColor(WHITE).text('10  Inversi\u00F3n y ', 50, Y, { continued: true }).fillColor(GOLD).text('ROI'); Y += 35;
+p('An\u00E1lisis de la inversi\u00F3n necesaria y el retorno esperado con cifras reales y verificables.', { fontSize: 11 });
 
-h3('Opcion A: Servicios Puntuales (One-Time)');
+h3('Opci\u00F3n A: Servicios Puntuales (One-Time)');
 tbl(['Servicio', 'Cantidad', 'Precio/U', 'Total'],
-  [['Auditoria Completa (ya realizada)', '1 tienda', 'EUR 197', 'EUR 197'],
-   ['Rediseno IA de productos', '29 prods', 'EUR 9/prod', 'EUR 261'],
-   ['Generacion imagenes IA', '232 imgs', 'EUR 3/img', 'EUR 696'],
-   ['Optimizacion SEO por producto', '29 prods', 'EUR 7/prod', 'EUR 203'],
-   ['Setup Email Marketing', '5 flujos', 'EUR 197', 'EUR 197'],
-   ['Informe Pricing y Margenes', '1 informe', 'EUR 97', 'EUR 97'],
-   ['TOTAL ONE-TIME', '', '', 'EUR 1,651']],
+  [['Auditor\u00EDa Completa (ya realizada)', '1 tienda', '\u20AC197', '\u20AC197'],
+   ['Redise\u00F1o IA de productos', '29 prods', '\u20AC9/prod', '\u20AC261'],
+   ['Generaci\u00F3n im\u00E1genes IA', '232 imgs', '\u20AC3/img', '\u20AC696'],
+   ['Optimizaci\u00F3n SEO por producto', '29 prods', '\u20AC7/prod', '\u20AC203'],
+   ['Setup Email Marketing', '5 flujos', '\u20AC197', '\u20AC197'],
+   ['Informe Pricing y M\u00E1rgenes', '1 informe', '\u20AC97', '\u20AC97'],
+   ['TOTAL ONE-TIME', '', '', '\u20AC1,651']],
   [180, 80, 85, 100], { priceCol: 3, hlRow: 6 });
 
-h3('Opcion B: Pack Premium Total (Mejor Valor)');
+h3('Opci\u00F3n B: Pack Premium Total (Mejor Valor)');
 tbl(['Concepto', 'Incluye', 'Precio'],
-  [['Pack Premium Total', 'Auditoria + 30 Redisenos + 30 SEO + 120 Imgs + Email + Competencia', 'EUR 1,258'],
-   ['Ahorro vs individual', '', 'EUR 393 (24%)']],
+  [['Pack Premium Total', 'Auditor\u00EDa + 30 Redise\u00F1os + 30 SEO + 120 Imgs + Email + Competencia', '\u20AC1,258'],
+   ['Ahorro vs individual', '', '\u20AC393 (24%)']],
   [130, 265, 100], { priceCol: 2, hlRow: 0 });
 
-h3('Opcion C: Plan Growth Studio (Mensual)');
+h3('Opci\u00F3n C: Plan Growth Studio (Mensual)');
 tbl(['Concepto', 'Precio', 'Incluye'],
-  [['Setup unico', 'EUR 197', 'Configuracion + conexion tienda'],
-   ['Mensualidad', 'EUR 297/mes', 'Imgs ilimitadas + A/B + SEO + Pricing + Dashboard'],
-   ['Coste 6 meses', 'EUR 1,979', 'Setup + 6 x EUR 297'],
-   ['Valor', '--', 'Los 6 motores trabajando 24/7 durante 6 meses']],
+  [['Setup \u00FAnico', '\u20AC197', 'Configuraci\u00F3n + conexi\u00F3n tienda'],
+   ['Mensualidad', '\u20AC297/mes', 'Imgs ilimitadas + A/B + SEO + Pricing + Dashboard'],
+   ['Coste 6 meses', '\u20AC1,979', 'Setup + 6 \u00D7 \u20AC297'],
+   ['Valor', '\u2014', 'Los 6 motores trabajando 24/7 durante 6 meses']],
   [130, 80, 285], { priceCol: 1 });
 
 h3('ROI por Escenario (6 Meses)');
-tbl(['Opcion', 'Inversion', 'Revenue 6M', 'Revenue Extra', 'ROI'],
-  [['Sin cambios', 'EUR 0', '~EUR 1,200', 'EUR 0', '--'],
-   ['Pack One-Time', 'EUR 1,651', '~EUR 2,818', '+EUR 1,618', '98%'],
-   ['Pack Premium', 'EUR 1,258', '~EUR 6,282', '+EUR 5,082', '404%'],
-   ['Growth 6M (base)', 'EUR 1,979', '~EUR 6,282', '+EUR 5,082', '257%'],
-   ['Growth 6M (optimista)', 'EUR 1,979', '~EUR 13,159', '+EUR 11,959', '604%']],
+tbl(['Opci\u00F3n', 'Inversi\u00F3n', 'Revenue 6M', 'Revenue Extra', 'ROI'],
+  [['Sin cambios', '\u20AC0', '~\u20AC1,200', '\u20AC0', '\u2014'],
+   ['Pack One-Time', '\u20AC1,651', '~\u20AC2,818', '+\u20AC1,618', '98%'],
+   ['Pack Premium', '\u20AC1,258', '~\u20AC6,282', '+\u20AC5,082', '404%'],
+   ['Growth 6M (base)', '\u20AC1,979', '~\u20AC6,282', '+\u20AC5,082', '257%'],
+   ['Growth 6M (optimista)', '\u20AC1,979', '~\u20AC13,159', '+\u20AC11,959', '604%']],
   [110, 70, 80, 85, 150], { priceCol: 4 });
 
-p('Recomendacion: El Pack Premium Total (EUR 1,258) ofrece el mejor ROI a 6 meses (404%). Por cada EUR 1 invertido, se recuperan EUR 4.04 en revenue adicional.', { color: GOLD, fontSize: 11 });
+p('Recomendaci\u00F3n: El Pack Premium Total (\u20AC1,258) ofrece el mejor ROI a 6 meses (404%). Por cada \u20AC1 invertido, se recuperan \u20AC4.04 en revenue adicional.', { color: GOLD, fontSize: 11 });
 
 // ================================================================
 //  CAP 11 — SIGUIENTE PASO
 // ================================================================
-S = '11 - Siguiente Paso';
+S = '11 \u00B7 Siguiente Paso';
 chapterPage(S);
 doc.fontSize(22).fillColor(WHITE).text('11  Siguiente ', 50, Y, { continued: true }).fillColor(GOLD).text('Paso'); Y += 35;
-p('Diagnostico completado. Problemas identificados, cuantificados y priorizados. Soluciones listas para implementar.', { fontSize: 12, color: MUTED });
+p('Diagn\u00F3stico completado. Problemas identificados, cuantificados y priorizados. Soluciones listas para implementar.', { fontSize: 12, color: MUTED });
 
-h3('Resumen del Diagnostico');
-tbl(['Area', 'Estado', 'Score', 'Accion Requerida'],
-  [['Score Global', 'CRITICO', '37/100', 'Optimizacion integral urgente'],
-   ['Imagenes', 'CRITICO', '24/100', 'Generar 232 imagenes IA'],
-   ['Trust Signals', 'CRITICO', '20/100', 'FAQ + garantia + reviews'],
-   ['SEO', 'DEBIL', '50/100', 'Meta tags + schemas + contenido'],
-   ['Pricing', 'DEBIL', '66/100', 'Compare_at + .97/.99 + COGS'],
-   ['Titulos', 'MEJORABLE', '68/100', 'Keyword-first + sin emojis'],
+h3('Resumen del Diagn\u00F3stico');
+tbl(['\u00C1rea', 'Estado', 'Score', 'Acci\u00F3n Requerida'],
+  [['Score Global', 'CR\u00CDTICO', '37/100', 'Optimizaci\u00F3n integral urgente'],
+   ['Im\u00E1genes', 'CR\u00CDTICO', '24/100', 'Generar 232 im\u00E1genes IA'],
+   ['Trust Signals', 'CR\u00CDTICO', '20/100', 'FAQ + garant\u00EDa + reviews'],
+   ['SEO', 'D\u00C9BIL', '50/100', 'Meta tags + schemas + contenido'],
+   ['Pricing', 'D\u00C9BIL', '66/100', 'Compare_at + .97/.99 + COGS'],
+   ['T\u00EDtulos', 'MEJORABLE', '68/100', 'Keyword-first + sin emojis'],
    ['Calidad Contenido', 'ACEPTABLE', '70/100', 'Estructura + CTAs + formateo'],
    ['Descripciones', 'ACEPTABLE', '93/100', 'Ampliar a 800-1200 palabras']],
   [100, 70, 55, 270]);
 
-h3('Proximos Pasos');
-p('1. Aprobacion: Revisa este informe y confirma que optimizaciones implementar.');
-p('2. Eleccion: Pack Premium Total (EUR 1,258 one-time) o Growth Studio (EUR 297/mes).');
-p('3. Implementacion: ShopyBrain ejecuta las 79 acciones segun el roadmap de 4 semanas.');
-p('4. Resultados: Pricing e imagenes visibles en 24-48h. SEO completo en 3-6 meses.');
+h3('Pr\u00F3ximos Pasos');
+p('1. Aprobaci\u00F3n: Revisa este informe y confirma qu\u00E9 optimizaciones implementar.');
+p('2. Elecci\u00F3n: Pack Premium Total (\u20AC1,258 one-time) o Growth Studio (\u20AC297/mes).');
+p('3. Implementaci\u00F3n: ShopyBrain ejecuta las 79 acciones seg\u00FAn el roadmap de 4 semanas.');
+p('4. Resultados: Pricing e im\u00E1genes visibles en 24-48h. SEO completo en 3-6 meses.');
 
-h3('Garantias de Servicio');
-checks(['Sin permanencia -- cancela en cualquier momento',
-  'Sin tarjeta de credito para empezar',
-  'Pagos exclusivamente via Shopify',
-  'RGPD compliant -- datos en la UE',
-  'Encriptacion AES-256 para tokens',
+h3('Garant\u00EDas de Servicio');
+checks(['Sin permanencia \u2014 cancela en cualquier momento',
+  'Sin tarjeta de cr\u00E9dito para empezar',
+  'Pagos exclusivamente v\u00EDa Shopify',
+  'RGPD compliant \u2014 datos en la UE',
+  'Encriptaci\u00F3n AES-256 para tokens',
   '99.9% de uptime garantizado',
-  'Soporte completo en espanol']);
+  'Soporte completo en espa\u00F1ol']);
 
 h3('Contacto');
 tbl(['', ''],
@@ -834,12 +817,12 @@ need(80);
 doc.moveTo(50, Y).lineTo(545, Y).strokeColor('#2A2A3A').lineWidth(0.5).stroke(); Y += 18;
 doc.fontSize(24).fillColor(GOLD).text('Shopy ', 0, Y, { continued: true, align: 'center', width: 595 }).fillColor(WHITE).text('Crafter'); Y += 35;
 doc.fontSize(12).fillColor(MUTED).text('La agencia Shopify que trabaja 24/7 por ti', 0, Y, { align: 'center', width: 595 }); Y += 22;
-doc.fontSize(9).fillColor(MUTED).text('(c) 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595 }); Y += 14;
-doc.fontSize(8).fillColor(MUTED).text('Generado por ShopyBrain (OmniCore AI) con datos reales de Comic Crafter -- Marzo 2026', 0, Y, { align: 'center', width: 595 });
+doc.fontSize(9).fillColor(MUTED).text('\u00A9 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595 }); Y += 14;
+doc.fontSize(8).fillColor(MUTED).text('Generado por ShopyBrain (OmniCore AI) con datos reales de Comic Crafter \u2014 Marzo 2026', 0, Y, { align: 'center', width: 595 });
 
 // ================================================================
 doc.end();
 stream.on('finish', () => {
   const size = fs.statSync('/home/runner/workspace/Informe-Servicios-ShopyCrafter-2026.pdf').size;
-  console.log(`PDF generado: ${(size / 1024).toFixed(0)} KB -- ${pageNum} paginas`);
+  console.log(`PDF generado: ${(size / 1024).toFixed(0)} KB \u2014 ${pageNum} p\u00E1ginas`);
 });
