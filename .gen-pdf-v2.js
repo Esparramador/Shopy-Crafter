@@ -5,7 +5,7 @@ const FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
 const FONT_B = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
 
 const outFile = '/home/runner/workspace/Informe-Final-ShopyCrafter-2026.pdf';
-const doc = new PDFDocument({ size: 'A4', margin: 50, autoFirstPage: false });
+const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: false });
 const stream = fs.createWriteStream(outFile);
 doc.pipe(stream);
 
@@ -34,27 +34,23 @@ const PT = 58;
 const PB = 770;
 const pageLog = [];
 
-function drawBg() { doc.save(); doc.rect(0, 0, 595, 842).fill(DARK); doc.restore(); }
+function drawBg() { doc.rect(0, 0, 595, 842).fill(DARK); }
 
 function drawHdr(s) {
-  doc.save();
   doc.font('SansBold').fontSize(9).fillColor(GOLD).text('SC', 50, 28, { lineBreak: false });
   doc.font('Sans').fontSize(8).fillColor(MUTED).text(s, 80, 30, { width: 465, align: 'right', lineBreak: false });
   doc.moveTo(50, 46).lineTo(545, 46).strokeColor(LINE).lineWidth(0.5).stroke();
-  doc.restore();
 }
 
 function drawFtr(pn) {
-  doc.save();
   doc.moveTo(50, 790).lineTo(545, 790).strokeColor(LINE).lineWidth(0.5).stroke();
   doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Shopy Crafter \u2014 Informe Ejecutivo 2026', 50, 796, { width: 200, lineBreak: false });
   doc.font('Sans').fontSize(7).fillColor(MUTED).text('Confidencial', 250, 796, { width: 95, align: 'center', lineBreak: false });
   doc.font('Sans').fontSize(7).fillColor(MUTED).text('P\u00e1gina ' + pn, 400, 796, { width: 145, align: 'right', lineBreak: false });
-  doc.restore();
 }
 
 function newPage(section) {
-  doc.addPage({ size: 'A4', margin: 50 });
+  doc.addPage({ size: 'A4', margin: 0 });
   pageNum++;
   drawBg();
   if (section) currentSection = section;
@@ -66,7 +62,7 @@ function newPage(section) {
 }
 
 function coverPage() {
-  doc.addPage({ size: 'A4', margin: 50 });
+  doc.addPage({ size: 'A4', margin: 0 });
   pageNum++;
   drawBg();
   Y = PT;
@@ -972,7 +968,13 @@ doc.moveTo(50, Y).lineTo(545, Y).strokeColor(LINE).lineWidth(0.5).stroke(); Y +=
 doc.roundedRect(247, Y, 60, 60, 14).fill(GOLD);
 doc.font('SansBold').fontSize(28).fillColor(DARK).text('SC', 247, Y + 18, { width: 60, align: 'center', lineBreak: false });
 Y += 75;
-doc.font('SansBold').fontSize(22).fillColor(GOLD).text('Shopy ', 0, Y, { continued: true, align: 'center', width: 595 }).fillColor(WHITE).text('Crafter', { lineBreak: false }); Y += 35;
+doc.font('SansBold').fontSize(22);
+const sw = doc.widthOfString('Shopy ');
+const cw = doc.widthOfString('Crafter');
+const sx = (595 - sw - cw) / 2;
+doc.fillColor(GOLD).text('Shopy ', sx, Y, { lineBreak: false });
+doc.fillColor(WHITE).text('Crafter', sx + sw, Y, { lineBreak: false });
+Y += 35;
 doc.font('Sans').fontSize(11).fillColor(MUTED).text('La agencia Shopify que trabaja 24/7 por ti', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 22;
 doc.font('Sans').fontSize(9).fillColor(MUTED).text('craftershopy@gmail.com  \u00b7  shopycrafter.com', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 22;
 doc.font('Sans').fontSize(8).fillColor(MUTED).text('\u00a9 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595, lineBreak: false }); Y += 14;
