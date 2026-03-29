@@ -15,7 +15,7 @@ export const DEFAULT_CMS_CONTENT = {
     contact: { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" },
   },
   site: {
-    name: "ShopyBrain",
+    name: "Shopy Crafter",
     tagline: "La plataforma de agencia Shopify más completa",
     logo: { type: "emoji", value: "⚡", imageUrl: null },
     favicon: "⚡",
@@ -38,7 +38,7 @@ export const DEFAULT_CMS_CONTENT = {
     pill: { text: "Nuevo · 6 motores de IA activos · Versión 2.0", visible: true },
     headline: "La agencia Shopify\nque trabaja 24/7\npor ti",
     headlineHighlight: "24/7",
-    subheadline: "ShopyBrain gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático. Un solo cerebro para toda tu agencia.",
+    subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático. Un solo cerebro para toda tu agencia.",
     ctaPrimary: { label: "Empezar gratis 14 días →", href: "#cta" },
     ctaSecondary: { label: "▶ Ver en acción", href: "#how" },
     ctaApk: { label: "📱 Descargar App Android", href: "#" },
@@ -396,13 +396,13 @@ export const DEFAULT_CMS_CONTENT = {
     ],
   },
   footer: {
-    tagline: "ShopyBrain — La plataforma de agencia Shopify con OmniCore Brain. Powered by Claude AI + Gemini + Replicate.",
+    tagline: "Shopy Crafter — La plataforma de agencia Shopify con OmniCore Brain. Powered by Claude AI + Gemini + Replicate.",
     columns: [
       { title: "Producto", links: [{ label: "Motores IA", href: "#features" }, { label: "Precios", href: "#pricing" }, { label: "Changelog", href: "#" }, { label: "Documentación", href: "#" }, { label: "API Reference", href: "#" }] },
       { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#" }, { label: "Blog", href: "#" }, { label: "Casos de éxito", href: "#" }, { label: "Afiliados", href: "#" }, { label: "Contacto", href: "#" }] },
       { title: "Legal", links: [{ label: "Privacidad", href: "#" }, { label: "Términos", href: "#" }, { label: "Cookies", href: "#" }, { label: "RGPD", href: "#" }, { label: "Seguridad", href: "#" }] },
     ],
-    copyright: "© 2026 ShopyBrain · OmniCore Agency Platform. Todos los derechos reservados.",
+    copyright: "© 2026 Shopy Crafter · OmniCore Agency Platform. Todos los derechos reservados.",
     badges: ["RGPD", "AES-256", "SOC2"],
   },
 };

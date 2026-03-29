@@ -215,7 +215,7 @@ router.post("/versions/:id/restore", async (req: Request, res: Response) => {
 router.post("/ai/improve", async (req: Request, res: Response) => {
   try {
     const { text, instruction, context } = req.body as { text: string; instruction: string; context?: string };
-    const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: ShopyBrain — plataforma de agencia Shopify con OmniCore Brain (IA acumulativa). Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
+    const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: Shopy Crafter — plataforma de agencia Shopify con OmniCore Brain (IA acumulativa). Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
     const userPrompt = `Texto original: "${text}"\n\nInstrucción: ${instruction}\n${context ? `\nContexto adicional: ${context}` : ""}\n\nDevuelve solo el texto mejorado:`;
     const message = await anthropic.messages.create({ model: "claude-sonnet-4-5", max_tokens: 1024, messages: [{ role: "user", content: userPrompt }], system: systemPrompt });
     const improved = message.content[0].type === "text" ? message.content[0].text.trim() : text;

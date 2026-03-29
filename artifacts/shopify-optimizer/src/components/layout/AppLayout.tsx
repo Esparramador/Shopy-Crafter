@@ -24,7 +24,7 @@ const DEFAULT_MODULE_NAV = [
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
-  { label: "Shopy Brain", icon: "🧠", href: "/admin/shopybrain" },
+  { label: "Centro IA", icon: "🧠", href: "/admin/shopybrain" },
   { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
   { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
   { label: "Knowledge Domains", icon: "🔬", href: "/admin/shopybrain/insights" },
@@ -199,7 +199,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Shopy Brain nav */}
         <div className="sidebar-nav">
           <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
-            🧠 Shopy Brain
+            🧠 Shopy Crafter
           </span>
           {shopybrainNav.map(item => (
             <Link key={item.href} href={item.href}>
