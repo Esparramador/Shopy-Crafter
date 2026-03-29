@@ -181,6 +181,86 @@ function statRow(stats) {
   logContent('statRow');
 }
 
+function gauge(x, y, score, label, size) {
+  size = size || 50;
+  const cx = x + size / 2, cy = y + size / 2;
+  const r = size / 2 - 4;
+  const col = score >= 80 ? GREEN : score >= 60 ? ORANGE : score >= 40 ? '#E67E22' : RED;
+  doc.save();
+  doc.circle(cx, cy, r).lineWidth(4).strokeColor(DARK3).stroke();
+  const startAngle = -Math.PI * 0.75;
+  const sweep = (score / 100) * Math.PI * 1.5;
+  const endAngle = startAngle + sweep;
+  const segments = Math.max(Math.ceil(sweep / 0.1), 2);
+  for (let i = 0; i < segments; i++) {
+    const a1 = startAngle + (sweep / segments) * i;
+    const a2 = startAngle + (sweep / segments) * (i + 1);
+    doc.moveTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r)
+       .lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r)
+       .lineWidth(4).strokeColor(col).stroke();
+  }
+  doc.restore();
+  doc.font('SansBold').fontSize(size > 40 ? 14 : 11).fillColor(col).text(String(score), x, cy - 8, { width: size, align: 'center', lineBreak: false });
+  if (label) doc.font('Sans').fontSize(6).fillColor(MUTED).text(label, x - 5, y + size + 2, { width: size + 10, align: 'center', lineBreak: false });
+}
+
+function gaugeRow(scores) {
+  const gw = 70;
+  const totalW = scores.length * gw;
+  const startX = 50 + (495 - totalW) / 2;
+  need(80);
+  scores.forEach((s, i) => {
+    gauge(startX + i * gw, Y, s.v, s.l, 50);
+  });
+  Y += 72;
+  logContent('gaugeRow');
+}
+
+function dualHorizBar(label, before, after, max) {
+  need(38);
+  doc.font('SansBold').fontSize(8).fillColor(WHITE).text(label, 50, Y, { width: 100, lineBreak: false });
+  const bw = 300; const x0 = 160;
+  const pct = after > before ? Math.round(((after - before) / Math.max(before, 1)) * 100) : 0;
+  const pctCol = pct > 100 ? GREEN : pct > 50 ? GOLD : ORANGE;
+  doc.roundedRect(x0, Y, bw, 10, 3).fill(DARK3);
+  const fw1 = Math.max((before / max) * bw, 2);
+  doc.roundedRect(x0, Y, fw1, 10, 3).fill('#3A3A4A');
+  doc.font('Sans').fontSize(6).fillColor(MUTED).text(String(before), x0 + fw1 + 4, Y + 1, { lineBreak: false });
+  doc.roundedRect(x0, Y + 14, bw, 10, 3).fill(DARK3);
+  const fw2 = Math.max((after / max) * bw, 2);
+  doc.roundedRect(x0, Y + 14, fw2, 10, 3).fill(pctCol);
+  doc.font('SansBold').fontSize(6).fillColor(WHITE).text(String(after), x0 + fw2 + 4, Y + 15, { lineBreak: false });
+  doc.font('SansBold').fontSize(9).fillColor(pctCol).text('+' + pct + '%', x0 + bw + 15, Y + 7, { lineBreak: false });
+  Y += 32;
+  logContent('dualBar');
+}
+
+function impactCards(items) {
+  const cw = 155; const ch = 52; const gap = 10;
+  const cols = 3;
+  for (let i = 0; i < items.length; i += cols) {
+    const row = items.slice(i, i + cols);
+    need(ch + 10);
+    row.forEach((item, j) => {
+      const x = 50 + j * (cw + gap);
+      doc.roundedRect(x, Y, cw, ch, 5).fill(DARK2);
+      doc.roundedRect(x, Y, cw, 3, 3).fill(item.color || GOLD);
+      doc.font('SansBold').fontSize(16).fillColor(item.color || GOLD).text(item.value, x + 8, Y + 10, { width: cw - 16, lineBreak: false });
+      doc.font('Sans').fontSize(7).fillColor(MUTED).text(item.label, x + 8, Y + 30, { width: cw - 16, lineBreak: false });
+      doc.font('Sans').fontSize(6).fillColor(item.sub_color || TEXT).text(item.sub || '', x + 8, Y + 40, { width: cw - 16, lineBreak: false });
+    });
+    Y += ch + 8;
+    logContent('impactCards');
+  }
+}
+
+function miniBarInline(x, y, w, score, max) {
+  const col = score / max >= 0.7 ? GREEN : score / max >= 0.4 ? ORANGE : RED;
+  doc.roundedRect(x, y, w, 8, 3).fill(DARK3);
+  const fw = Math.max((score / max) * w, score > 0 ? 2 : 0);
+  doc.roundedRect(x, y, fw, 8, 3).fill(col);
+}
+
 function horizBar(label, cur, max, col) {
   need(26);
   doc.font('SansBold').fontSize(9).fillColor(WHITE).text(label, 50, Y + 2, { width: 135, height: 14, lineBreak: false });
@@ -327,23 +407,31 @@ tbl(['Dimensi\u00f3n', 'Score Actual', 'Objetivo', 'Gap', 'Impacto Revenue'],
    ['Trust Signals (8%)', '20/100', '90/100', '-70 pts', 'Conversi\u00f3n: +10-20%']],
   [110, 75, 70, 65, 175]);
 
-h3('Las 5 Debilidades M\u00e1s Cr\u00edticas');
-p('1. IM\u00c1GENES \u2014 Score: 24/100. 25 de 29 productos con SOLO 1 imagen. Est\u00e1ndar: 8 m\u00ednimo. Reduce conversi\u00f3n 30-50%.', { color: RED, fontSize: 9 });
-p('2. COMPARE AT PRICE \u2014 Solo 1 de 29 (3.4%) con precio tachado. El efecto \u00abantes \u20ac49.99, ahora \u20ac29.99\u00bb incrementa conversi\u00f3n 15-25%.', { color: RED, fontSize: 9 });
-p('3. PRICING \u2014 0 productos con terminaciones .97/.99. 10 con precios redondos. La terminaci\u00f3n .97/.99 convierte 8-12% m\u00e1s.', { color: ORANGE, fontSize: 9 });
-p('4. SEO \u2014 Score: 50/100. Sin Schema JSON-LD, sin meta descriptions, sin alt texts. Invisible para Google.', { color: ORANGE, fontSize: 9 });
-p('5. DESCRIPCIONES \u2014 Media de 531 chars vs 4.000-6.000 necesarios. Buena calidad pero profundidad insuficiente.', { color: ORANGE, fontSize: 9 });
+h3('Las 5 Debilidades Más Críticas');
+dualHorizBar('Imágenes', 24, 95, 100);
+dualHorizBar('Trust Signals', 20, 90, 100);
+dualHorizBar('SEO Técnico', 50, 95, 100);
+dualHorizBar('Pricing', 66, 97, 100);
+dualHorizBar('Títulos', 68, 96, 100);
 
 h3('Oportunidad Cuantificada');
-tbl(['M\u00e9trica', 'Actual (Real)', 'Proyectado', 'Mejora'],
-  [['Score cat\u00e1logo', '37/100 (Grado D)', '93/100 (Grado A)', '+151%'],
-   ['Conversion Rate', '~1.0% (sector bajo)', '~2.5% (sector alto)', '+150%'],
-   ['AOV', '\u20ac29 (mediana real)', '\u20ac38-42 (anchoring)', '+31-45%'],
-   ['Tr\u00e1fico org\u00e1nico (6M)', 'Base actual', '+60-120% vs actual', '+60-120%'],
-   ['Revenue mensual', 'Base', '\u00d72.8 \u2013 3.5', '+180-250%'],
-   ['Im\u00e1genes/producto', '1.2 media real', '8.0 m\u00ednimo', '+567%'],
-   ['Pricing psicol\u00f3gico', '0% del cat\u00e1logo', '100% del cat\u00e1logo', '+100pp']],
-  [120, 130, 130, 115]);
+impactCards([
+  { value: '+151%', label: 'Score Catálogo', sub: '37 → 93/100', color: GREEN, sub_color: GREEN },
+  { value: '+150%', label: 'Conversion Rate', sub: '1.0% → 2.5%', color: GREEN, sub_color: GREEN },
+  { value: '+45%', label: 'AOV (Ticket Medio)', sub: '€29 → €42', color: GOLD, sub_color: GOLD },
+  { value: '+120%', label: 'Tráfico Orgánico', sub: 'SEO completo en 6M', color: BLUE, sub_color: BLUE },
+  { value: '×3.5', label: 'Revenue Potencial', sub: 'Efecto compuesto', color: GREEN, sub_color: GREEN },
+  { value: '+567%', label: 'Imágenes/Producto', sub: '1.2 → 8.0 por prod.', color: ORANGE, sub_color: ORANGE },
+]);
+
+barChart([
+  { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
+  { l: 'Conv. %', b: 10, a: 25, bc: RED, ac: GREEN },
+  { l: 'AOV €', b: 29, a: 42, bc: ORANGE, ac: GREEN },
+  { l: 'Imgs', b: 1.2, a: 8, bc: RED, ac: GREEN },
+  { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
+  { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
+], 'KPIs Clave: Estado Actual vs Post-Optimización', 130);
 
 // ================================================================
 //  CAP 2
@@ -402,10 +490,21 @@ barChart([
 // ================================================================
 S = '03 \u00b7 Diagn\u00f3stico por Dimensiones';
 chapter(S);
-h2g('03  Diagn\u00f3stico ', 'por Dimensiones');
-p('Diagn\u00f3stico detallado de cada una de las 7 dimensiones de auditor\u00eda con datos reales extra\u00eddos del cat\u00e1logo.', { fontSize: 10 });
+h2g('03  Diagnóstico ', 'por Dimensiones');
+p('Diagnóstico detallado de cada una de las 7 dimensiones de auditoría con datos reales extraídos del catálogo.', { fontSize: 10 });
 
-h3('Dimensi\u00f3n 1: T\u00edtulos (12%) \u2014 Score: 68/100');
+h3('Vista General: 7 Dimensiones');
+gaugeRow([
+  { v: 68, l: 'Títulos' },
+  { v: 93, l: 'Descripc.' },
+  { v: 24, l: 'Imágenes' },
+  { v: 66, l: 'Pricing' },
+  { v: 50, l: 'SEO' },
+  { v: 70, l: 'Calidad' },
+  { v: 20, l: 'Trust' },
+]);
+
+h3('Dimensión 1: Títulos (12%) — Score: 68/100');
 horizBar('Score t\u00edtulos', 68, 100);
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [['Longitud media', '55 caracteres', '45-65 chars', '\u26a0 Variable'],
@@ -493,9 +592,15 @@ tbl(['Trust Signal', 'Presente', 'Impacto Conversi\u00f3n'],
 S = '04 \u00b7 Precios y Competencia';
 chapter(S);
 h2g('04  Precios y ', 'Competencia');
-p('An\u00e1lisis de pricing del cat\u00e1logo real con plan de correcci\u00f3n por producto y comparativa con competidores directos del sector.', { fontSize: 10 });
+p('Análisis de pricing del catálogo real con plan de corrección por producto y comparativa con competidores directos del sector.', { fontSize: 10 });
 
-h3('Distribuci\u00f3n de Precios Actual');
+impactCards([
+  { value: '€58', label: 'Precio Medio', sub: 'Catálogo actual', color: GOLD, sub_color: MUTED },
+  { value: '0%', label: 'Pricing .97/.99', sub: '0 de 29 productos', color: RED, sub_color: RED },
+  { value: '3.4%', label: 'Con Compare At', sub: 'Solo 1 de 29 prods', color: RED, sub_color: RED },
+]);
+
+h3('Distribución de Precios Actual');
 barChart([
   { l: '\u20ac3-10', v: 5, c: BLUE },
   { l: '\u20ac10-20', v: 6, c: BLUE },
@@ -632,7 +737,13 @@ barChart([
   { l: 'Est\u00e1ndar WC', b: 8, a: 8, bc: GOLD, ac: GOLD },
 ], 'Im\u00e1genes/Producto: Comic Crafter vs Mercado', 140);
 
-h3('Coste de Generaci\u00f3n IA vs Fotograf\u00eda Tradicional');
+impactCards([
+  { value: '99.5%', label: 'Ahorro vs Fotógrafo', sub: '€7 vs €1.450-5.800', color: GREEN, sub_color: GREEN },
+  { value: '2-3h', label: 'Tiempo Generación', sub: '232 imágenes con IA', color: GOLD, sub_color: GOLD },
+  { value: '+50%', label: 'Boost Conversión', sub: 'Con 8 imgs/producto', color: GREEN, sub_color: GREEN },
+]);
+
+h3('Coste de Generación IA vs Fotografía Tradicional');
 tbl(['M\u00e9todo', 'Coste/Prod', '29 Productos', 'Tiempo', 'Calidad'],
   [['Fot\u00f3grafo profesional', '\u20ac50-200', '\u20ac1.450-5.800', '2-4 semanas', 'Variable'],
    ['Estudio fotogr\u00e1fico', '\u20ac100-500', '\u20ac2.900-14.500', '3-6 semanas', 'Alta'],
@@ -645,10 +756,17 @@ tbl(['M\u00e9todo', 'Coste/Prod', '29 Productos', 'Tiempo', 'Calidad'],
 // ================================================================
 S = '07 \u00b7 Antes vs Despu\u00e9s';
 chapter(S);
-h2g('07  Antes vs ', 'Despu\u00e9s');
-p('Impacto cuantificado de cada optimizaci\u00f3n aplicada al cat\u00e1logo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.', { fontSize: 10 });
+h2g('07  Antes vs ', 'Después');
+p('Impacto cuantificado de cada optimización aplicada al catálogo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.', { fontSize: 10 });
 
-h3('Score Global por Dimensi\u00f3n');
+statRow([
+  { v: '37→93', l: 'Score Global', color: GREEN },
+  { v: '×3.5', l: 'Revenue', color: GOLD },
+  { v: '+567%', l: 'Imágenes', color: ORANGE },
+  { v: '+150%', l: 'Conversión', color: GREEN },
+]);
+
+h3('Score Global por Dimensión');
 barChart([
   { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
   { l: 'T\u00edtulos', b: 68, a: 96, bc: ORANGE, ac: GREEN },
@@ -688,8 +806,15 @@ tbl(['Optimizaci\u00f3n', 'Conv.', 'AOV', 'Tr\u00e1fico', 'Factor'],
 // ================================================================
 S = '08 \u00b7 Plan de Acci\u00f3n';
 chapter(S);
-h2g('08  Plan de ', 'Acci\u00f3n');
-p('Roadmap priorizado por impacto en revenue con timeline de implementaci\u00f3n de 4 semanas.', { fontSize: 10 });
+h2g('08  Plan de ', 'Acción');
+p('Roadmap priorizado por impacto en revenue con timeline de implementación de 4 semanas.', { fontSize: 10 });
+
+statRow([
+  { v: '4', l: 'Semanas Total', color: GOLD },
+  { v: '79', l: 'Acciones a Ejecutar', color: BLUE },
+  { v: '24-48h', l: 'Primeros Resultados', color: GREEN },
+  { v: '6 meses', l: 'SEO Pleno Efecto', color: ORANGE },
+]);
 
 h3('Semana 1: Impacto Inmediato (Quick Wins)');
 tbl(['Prior.', 'Acci\u00f3n', 'Prods', 'Impacto', 'Tiempo'],
@@ -726,8 +851,15 @@ tbl(['Prior.', 'Acci\u00f3n', 'Impacto', 'Tiempo'],
 // ================================================================
 S = '09 \u00b7 Proyecci\u00f3n Financiera';
 chapter(S);
-h2g('09  Proyecci\u00f3n ', 'Financiera');
-p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del cat\u00e1logo y benchmarks del sector Art/Crafts/Comics en Espa\u00f1a.', { fontSize: 10 });
+h2g('09  Proyección ', 'Financiera');
+p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del catálogo y benchmarks del sector Art/Crafts/Comics en España.', { fontSize: 10 });
+
+statRow([
+  { v: '€6.3K', l: 'Revenue Base 6M', color: GOLD },
+  { v: '€13.2K', l: 'Revenue Optimista', color: GREEN },
+  { v: '2.5%', l: 'Conv. Rate Obj.', color: BLUE },
+  { v: '€38', l: 'AOV Proyectado', color: GOLD },
+]);
 
 h3('Supuestos Base');
 tbl(['Supuesto', 'Valor', 'Fuente'],
@@ -803,7 +935,19 @@ tbl(['Opci\u00f3n', 'Inversi\u00f3n', 'Revenue 6M', 'Revenue Extra', 'ROI'],
    ['Growth 6M (optimista)', '\u20ac1.979', '~\u20ac13.159', '+\u20ac11.959', '604%']],
   [110, 70, 80, 85, 150], { priceCol: 4 });
 
-p('Recomendaci\u00f3n: El Pack Premium Total (\u20ac1.258) ofrece el mejor ROI a 6 meses (404%). Por cada \u20ac1 invertido, se recuperan \u20ac4.04 en revenue adicional.', { color: GOLD, fontSize: 11, bold: true });
+barChart([
+  { l: 'Sin cambios', v: 0, c: '#3A3A4A' },
+  { l: 'One-Time', v: 98, c: ORANGE },
+  { l: 'Pack Premium', v: 404, c: GREEN },
+  { l: 'Growth 6M', v: 257, c: GOLD },
+  { l: 'Growth Opt.', v: 604, c: GREEN },
+], 'ROI Comparativo por Opción de Inversión (%)', 120);
+
+impactCards([
+  { value: '404%', label: 'ROI Pack Premium', sub: '€1 invertido → €4.04', color: GREEN, sub_color: GREEN },
+  { value: '€1.258', label: 'Inversión Pack Premium', sub: 'Mejor relación calidad-precio', color: GOLD, sub_color: GOLD },
+  { value: '€5.082', label: 'Revenue Extra (6M)', sub: 'Escenario Base realista', color: GREEN, sub_color: GREEN },
+]);
 
 // ================================================================
 //  CAP 11
@@ -813,17 +957,15 @@ chapter(S);
 h2g('11  Siguiente ', 'Paso');
 p('Diagn\u00f3stico completado. Problemas identificados, cuantificados y priorizados. Soluciones listas para implementar.', { fontSize: 11, color: MUTED });
 
-h3('Resumen del Diagn\u00f3stico');
-tbl(['\u00c1rea', 'Estado', 'Score', 'Acci\u00f3n Requerida'],
-  [['Score Global', '\u2717 CR\u00cdTICO', '37/100', 'Optimizaci\u00f3n integral urgente'],
-   ['Im\u00e1genes', '\u2717 CR\u00cdTICO', '24/100', 'Generar 232 im\u00e1genes IA'],
-   ['Trust Signals', '\u2717 CR\u00cdTICO', '20/100', 'FAQ + garant\u00eda + reviews'],
-   ['SEO', '\u26a0 D\u00c9BIL', '50/100', 'Meta tags + schemas + contenido'],
-   ['Pricing', '\u26a0 D\u00c9BIL', '66/100', 'Compare_at + .97/.99 + COGS'],
-   ['T\u00edtulos', '\u26a0 MEJORABLE', '68/100', 'Keyword-first + sin emojis'],
-   ['Calidad Contenido', '\u2713 ACEPTABLE', '70/100', 'Estructura + CTAs + formateo'],
-   ['Descripciones', '\u2713 ACEPTABLE', '93/100', 'Ampliar a 800-1.200 palabras']],
-  [100, 75, 50, 270]);
+h3('Resumen del Diagnóstico');
+dualHorizBar('Score Global', 37, 93, 100);
+dualHorizBar('Imágenes', 24, 95, 100);
+dualHorizBar('Trust Signals', 20, 90, 100);
+dualHorizBar('SEO', 50, 95, 100);
+dualHorizBar('Pricing', 66, 97, 100);
+dualHorizBar('Títulos', 68, 96, 100);
+dualHorizBar('Calidad', 70, 95, 100);
+dualHorizBar('Descripciones', 93, 100, 100);
 
 h3('Pr\u00f3ximos Pasos');
 p('1. Aprobaci\u00f3n: Revisa este informe y confirma qu\u00e9 optimizaciones implementar.');
