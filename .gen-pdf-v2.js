@@ -5,7 +5,9 @@ const FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
 const FONT_B = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
 
 const doc = new PDFDocument({ size: 'A4', margin: 50, autoFirstPage: false });
-const stream = fs.createWriteStream('/home/runner/workspace/Informe-Servicios-ShopyCrafter-2026.pdf');
+const ts = Date.now();
+const fname = `/home/runner/workspace/Informe-ShopyCrafter-Auditoria-2026-v${ts}.pdf`;
+const stream = fs.createWriteStream(fname);
 doc.pipe(stream);
 
 doc.registerFont('Sans', FONT);
@@ -243,7 +245,7 @@ const my = 475; const c1 = 100, c2 = 310;
 [['TIENDA', 'Comic Crafter', 'NICHO', 'Cómics y Arte Digital', 0],
  ['DOMINIO', 'comic-crafter.myshopify.com', 'MERCADO', 'España (EUR)', 38],
  ['PRODUCTOS', '29 productos en catálogo', 'SCORE ACTUAL', '37/100 (Grado D)', 76],
- ['PREPARADO POR', 'ShopyBrain (OmniCore AI)', 'FECHA', 'Marzo 2026', 114],
+ ['PREPARADO POR', 'Shopy Crafter (OmniCore AI)', 'FECHA', 'Marzo 2026', 114],
  ['CONTACTO', 'craftershopy@gmail.com', 'WEB', 'shopycrafter.com', 152],
 ].forEach(([l1, v1, l2, v2, dy]) => {
   doc.font('SansBold').fontSize(7).fillColor(GOLD).text(l1, c1, my + dy);
@@ -286,7 +288,7 @@ Y += 4;
 S = '01 · Resumen Ejecutivo';
 chapter(S);
 h2g('01  Resumen ', 'Ejecutivo');
-p('Este informe presenta el diagnóstico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el análisis real de los 29 productos del catálogo. Cada métrica, porcentaje y puntuación proviene de datos reales extraídos de la API de Shopify y procesados por el motor de auditoría de ShopyBrain.', { fontSize: 10 });
+p('Este informe presenta el diagnóstico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el análisis real de los 29 productos del catálogo. Cada métrica, porcentaje y puntuación proviene de datos reales extraídos de la API de Shopify y procesados por el motor de auditoría de Shopy Crafter.', { fontSize: 10 });
 
 statRow([
   { v: '37', l: 'Score Global', color: RED },
@@ -307,11 +309,11 @@ tbl(['Dimensión', 'Score Actual', 'Objetivo', 'Gap', 'Impacto Revenue'],
   [110, 75, 70, 65, 175]);
 
 h3('Las 5 Debilidades Más Críticas');
-p('1. IMÁGENES — Score: 24/100 — 25 de 29 productos tienen SOLO 1 imagen. El estándar world-class requiere 8 mínimo. Solo 1 producto (Logo Profesional) tiene suficientes imágenes (14). Esto reduce la conversión entre un 30-50% respecto al potencial máximo.', { color: RED });
-p('2. COMPARE AT PRICE — Solo 1 de 29 productos (3.4%) tiene precio tachado. El efecto «antes €49.99, ahora €29.99» incrementa la conversión un 15-25%. El 96.6% del catálogo no aplica el anclaje psicológico más efectivo del eCommerce.', { color: RED });
-p('3. PSICOLOGÍA DE PRECIOS — 0 productos usan terminaciones .97/.99. Tienes 10 productos con precios redondos (€49, €79, €89). Los precios con terminación .97 o .99 convierten un 8-12% más que los redondos.', { color: ORANGE });
-p('4. SEO — Score medio: 50/100. Ningún producto tiene Schema JSON-LD, meta descriptions optimizadas ni alt texts descriptivos. Invisible para Google en búsquedas de tu nicho.', { color: ORANGE });
-p('5. DESCRIPCIONES — Longitud media de 531 caracteres. Para SEO competitivo se necesitan 4.000-6.000 caracteres (800-1.200 palabras). Las descripciones son buenas en calidad pero insuficientes en profundidad.', { color: ORANGE });
+p('1. IMÁGENES — Score: 24/100 — 25 de 29 productos tienen SOLO 1 imagen. El estándar requiere 8 mínimo. Reduce la conversión un 30-50%.', { color: RED, fontSize: 9 });
+p('2. COMPARE AT PRICE — Solo 1 de 29 (3.4%) tiene precio tachado. El «antes €49.99, ahora €29.99» incrementa conversión un 15-25%. El 96.6% no aplica anclaje psicológico.', { color: RED, fontSize: 9 });
+p('3. PRICING — 0 productos usan terminaciones .97/.99. 10 productos con precios redondos (€49, €79, €89). La terminación .97/.99 convierte un 8-12% más.', { color: ORANGE, fontSize: 9 });
+p('4. SEO — Score: 50/100. Sin Schema JSON-LD, sin meta descriptions, sin alt texts. Invisible para Google.', { color: ORANGE, fontSize: 9 });
+p('5. DESCRIPCIONES — Media de 531 chars, se necesitan 4.000-6.000. Buena calidad pero insuficiente profundidad.', { color: ORANGE, fontSize: 9 });
 
 h3('Oportunidad Cuantificada');
 tbl(['Métrica', 'Actual (Real)', 'Proyectado (Optimizado)', 'Mejora'],
@@ -330,7 +332,7 @@ tbl(['Métrica', 'Actual (Real)', 'Proyectado (Optimizado)', 'Mejora'],
 S = '02 · Auditoría de Catálogo';
 chapter(S);
 h2g('02  Auditoría de ', 'Catálogo');
-p('Análisis producto por producto de los 29 items del catálogo de Comic Crafter. Scores calculados con el sistema de 7 dimensiones ponderadas de ShopyBrain, alineado con estándares Semrush y Google Search Quality Guidelines.', { fontSize: 10 });
+p('Análisis producto por producto de los 29 items del catálogo de Comic Crafter. Scores calculados con el sistema de 7 dimensiones ponderadas de Shopy Crafter, alineado con estándares Semrush y Google Search Quality Guidelines.', { fontSize: 10 });
 
 h3('Distribución de Calificaciones');
 barChart([
@@ -368,7 +370,7 @@ tbl(['Producto', 'Score', 'Grado', 'Título', 'Desc', 'Precio', 'Imgs', 'SEO'],
 
 h3('Análisis por Categorías de Producto');
 p('Categoría 1: Productos Creativos (Comic Crafter) — 10 productos\nScore medio: 66/100 (C). Mejor contenido, más tags, pero fallan en imágenes (1.2/producto media) y SEO técnico.', { color: MUTED });
-p('Categoría 2: Servicios SaaS/Packs (ShopyBrain) — 19 productos\nScore medio: 56/100 (D). Títulos cortos con emojis, descripciones mínimas (402-531 chars), 1 imagen cada uno, 5-6 tags. Intervención URGENTE.', { color: RED });
+p('Categoría 2: Servicios SaaS/Packs — 19 productos\nScore medio: 56/100 (D). Títulos cortos con emojis, descripciones mínimas (402-531 chars), 1 imagen cada uno, 5-6 tags. Intervención URGENTE.', { color: RED });
 
 barChart([
   { l: 'Creativos', b: 66, a: 95, bc: ORANGE, ac: GREEN },
@@ -614,8 +616,8 @@ h3('Coste de Generación IA vs Fotografía Tradicional');
 tbl(['Método', 'Coste/Producto', '29 Productos', 'Tiempo', 'Calidad'],
   [['Fotógrafo profesional', '€50-200', '€1.450-5.800', '2-4 semanas', 'Variable'],
    ['Estudio fotográfico', '€100-500', '€2.900-14.500', '3-6 semanas', 'Alta'],
-   ['ShopyBrain (Flux 1.1 Pro)', '~€0.25', '~€7.25', '2-3 horas', 'Profesional IA'],
-   ['Ahorro con ShopyBrain', '', 'Hasta 99.5%', '', '']],
+   ['Shopy Crafter (Flux 1.1 Pro)', '~€0.25', '~€7.25', '2-3 horas', 'Profesional IA'],
+   ['Ahorro con Shopy Crafter', '', 'Hasta 99.5%', '', '']],
   [140, 80, 95, 90, 90], { priceCol: 2 });
 
 // ================================================================
@@ -639,7 +641,7 @@ barChart([
 
 h3('Impacto en Métricas de Negocio');
 tbl(['Métrica', 'Antes (Real)', 'Después', 'Mejora', 'Fuente Benchmark'],
-  [['Score catálogo', '37/100 (D)', '93/100 (A)', '+151%', 'ShopyBrain Engine'],
+  [['Score catálogo', '37/100 (D)', '93/100 (A)', '+151%', 'Shopy Crafter Engine'],
    ['Imgs/producto', '1.2', '8.0', '+567%', 'Flux 1.1 Pro'],
    ['Conversion Rate', '~1.0%', '~2.5%', '+150%', 'Baymard Institute'],
    ['AOV', '€29', '€38-42', '+31-45%', 'Anchoring psicológico'],
@@ -823,7 +825,7 @@ tbl(['Área', 'Estado', 'Score', 'Acción Requerida'],
 h3('Próximos Pasos');
 p('1. Aprobación: Revisa este informe y confirma qué optimizaciones implementar.');
 p('2. Elección: Pack Premium Total (€1.258 one-time) o Growth Studio (€297/mes).');
-p('3. Implementación: ShopyBrain ejecuta las 79 acciones según el roadmap de 4 semanas.');
+p('3. Implementación: Shopy Crafter ejecuta las 79 acciones según el roadmap de 4 semanas.');
 p('4. Resultados: Pricing e imágenes visibles en 24-48h. SEO completo en 3-6 meses.');
 
 h3('Garantías de Servicio');
@@ -840,7 +842,7 @@ tbl(['', ''],
   [['Web', 'shopycrafter.com'],
    ['Email', 'craftershopy@gmail.com'],
    ['Empresa', 'Shopy Crafter'],
-   ['Motor IA', 'ShopyBrain (OmniCore AI)']],
+   ['Motor IA', 'Shopy Crafter (OmniCore AI)']],
   [120, 375]);
 
 Y += 15;
@@ -849,10 +851,14 @@ doc.moveTo(50, Y).lineTo(545, Y).strokeColor(LINE).lineWidth(0.5).stroke(); Y +=
 doc.font('SansBold').fontSize(22).fillColor(GOLD).text('Shopy ', 0, Y, { continued: true, align: 'center', width: 595 }).fillColor(WHITE).text('Crafter'); Y += 35;
 doc.font('Sans').fontSize(11).fillColor(MUTED).text('La agencia Shopify que trabaja 24/7 por ti', 0, Y, { align: 'center', width: 595 }); Y += 22;
 doc.font('Sans').fontSize(8).fillColor(MUTED).text('© 2026 Shopy Crafter. Todos los derechos reservados.', 0, Y, { align: 'center', width: 595 }); Y += 14;
-doc.font('Sans').fontSize(7).fillColor(MUTED).text('Generado por ShopyBrain (OmniCore AI) con datos reales de Comic Crafter — Marzo 2026', 0, Y, { align: 'center', width: 595 });
+doc.font('Sans').fontSize(7).fillColor(MUTED).text('Generado por Shopy Crafter (OmniCore AI) con datos reales de Comic Crafter — Marzo 2026', 0, Y, { align: 'center', width: 595 });
 
 doc.end();
 stream.on('finish', () => {
-  const s = fs.statSync('/home/runner/workspace/Informe-Servicios-ShopyCrafter-2026.pdf').size;
-  console.log(`PDF generado: ${(s / 1024).toFixed(0)} KB — ${pageNum} páginas`);
+  const s = fs.statSync(fname).size;
+  console.log(`PDF generado: ${fname}`);
+  console.log(`${(s / 1024).toFixed(0)} KB — ${pageNum} páginas`);
+  const pubDest = '/home/runner/workspace/artifacts/shopify-optimizer/public/Informe-Servicios-ShopyCrafter-2026.pdf';
+  fs.copyFileSync(fname, pubDest);
+  console.log('Copiado a:', pubDest);
 });

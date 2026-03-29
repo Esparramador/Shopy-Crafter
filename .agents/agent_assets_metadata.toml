@@ -30,3 +30,9 @@ id = "SOPW50suSr1kJKfvL1aCs"
 uri = "file://Informe-Servicios-ShopyCrafter-2026.pdf"
 type = "pdf"
 title = "Informe Auditoría Comic Crafter — v3 (DejaVu Sans, ✓✗€©áéíóúñ, 20 págs, 124 KB)"
+
+[[outputs]]
+id = "O85o2XGeHUXDGQMlBF6pB"
+uri = "file://Informe-ShopyCrafter-Auditoria-2026-v1774818596816.pdf"
+type = "pdf"
+title = "Informe Auditoría Comic Crafter v4 — NUEVO (Shopy Crafter corregido, 19 págs, sin páginas vacías)"
