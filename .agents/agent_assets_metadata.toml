@@ -24,3 +24,9 @@ id = "UQum0MgCY1SOySXAAvOo2"
 uri = "file://artifacts/shopify-optimizer/public/informe-shopycrafter-servicios.md"
 type = "text"
 title = "Informe Ejecutivo Shopy Crafter — Servicios y Capacidades Completas"
+
+[[outputs]]
+id = "SOPW50suSr1kJKfvL1aCs"
+uri = "file://Informe-Servicios-ShopyCrafter-2026.pdf"
+type = "pdf"
+title = "Informe Profesional de Servicios — Shopy Crafter 2026"
