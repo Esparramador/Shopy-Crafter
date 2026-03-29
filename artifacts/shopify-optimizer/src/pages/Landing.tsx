@@ -277,9 +277,9 @@ export default function Landing() {
     return () => window.removeEventListener("message", handler);
   }, [isPreview, goToSection]);
 
-  // Lock body scroll ONLY on desktop — mobile uses native scroll
+  // Lock body scroll ONLY on desktop — mobile/landscape uses native scroll
   useEffect(() => {
-    const isMobile = () => window.innerWidth <= 900;
+    const isMobile = () => window.innerWidth <= 900 || (window.innerHeight <= 500 && window.matchMedia("(orientation: landscape)").matches);
     if (isMobile()) return;
     const prev = document.body.style.overflow;
     const prevHtml = document.documentElement.style.overflow;
@@ -311,7 +311,8 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    if (window.innerWidth <= 900) return;
+    const isScrollJackDisabled = () => window.innerWidth <= 900 || (window.innerHeight <= 500 && window.matchMedia("(orientation: landscape)").matches);
+    if (isScrollJackDisabled()) return;
     const container = fpRef.current;
     if (!container) return;
 

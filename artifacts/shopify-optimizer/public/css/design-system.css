@@ -895,11 +895,58 @@ code {
   .main-area { min-width: 0; overflow-x: hidden; }
 }
 
-/* ── LANDSCAPE MOBILE (≤ 900px height, landscape) ──────────────────────────── */
+/* ── LANDSCAPE MOBILE (short viewport, landscape) ──────────────────────────── */
 @media (max-height: 500px) and (orientation: landscape) {
-  .sidebar { overflow-y: auto; }
-  .main-content { padding: 10px; }
+  .app-shell {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+  }
+  .main-area {
+    overflow: visible !important;
+    min-height: 0;
+  }
+  .main-content {
+    overflow-y: visible !important;
+    padding: 10px;
+    min-height: calc(100vh - 52px);
+  }
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    width: 100% !important; height: 44px !important; min-width: 100% !important;
+    flex-direction: row;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-right: none;
+    border-bottom: 1px solid var(--bdr);
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar-logo { padding: 0 10px; flex-shrink: 0; height: 44px; border-bottom: none; }
+  .sidebar-logo .logo-badge { display: none; }
+  .sidebar-clients, .sidebar-bottom, .sidebar-promo { display: none; }
+  .sidebar-nav {
+    display: flex; flex-direction: row;
+    padding: 0 4px; overflow-x: auto; gap: 0; flex: 1;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+  .sidebar-label { display: none; }
+  .nav-item {
+    flex-direction: column; min-width: 44px;
+    font-size: 8px; padding: 3px 5px; gap: 1px;
+    white-space: nowrap; height: 44px; border-radius: 0;
+    justify-content: center; align-items: center;
+  }
+  .nav-item .nav-icon { font-size: 14px; line-height: 1; }
+  .topbar { height: 36px; padding: 0 10px; margin-top: 44px; }
+  .module-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .module-tabs::-webkit-scrollbar { display: none; }
   .glass-card { padding: 12px; }
+  .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr 1fr !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

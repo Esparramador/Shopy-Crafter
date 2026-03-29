@@ -819,6 +819,73 @@
 .fp-footer-col .l-footer-links { gap: 7px; }
 
 /* ════════════════════════════════════════════════════
+   LANDSCAPE MOBILE — content taller than viewport
+   (phones in landscape: width > 900px but height < 500px)
+════════════════════════════════════════════════════ */
+@media (max-height: 500px) and (orientation: landscape) {
+  .l-root {
+    overflow: visible !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+  .fp-container {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+  .fp-wrapper {
+    transform: none !important;
+    transition: none !important;
+  }
+  .fp-section {
+    height: auto !important;
+    min-height: auto !important;
+    padding-top: 40px !important;
+    padding-bottom: 40px !important;
+    overflow: visible !important;
+    justify-content: flex-start !important;
+  }
+  .fp-section:first-child {
+    padding-top: 70px !important;
+  }
+  .fp-sidenav,
+  .fp-progress,
+  .fp-counter,
+  .fp-scroll-hint { display: none !important; }
+  .fp-animate,
+  .fp-animated {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .fp-hero-layout { grid-template-columns: 1fr; }
+  .fp-hero-right { display: none; }
+  .fp-pricing-layout { overflow: visible !important; }
+  .fp-pricing-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x !important;
+    gap: 14px;
+    padding: 14px 16px 20px;
+    scrollbar-width: none;
+  }
+  .fp-pricing-row::-webkit-scrollbar { display: none; }
+  .fp-pricing-row > * {
+    flex: 0 0 80% !important;
+    min-width: 260px;
+    max-width: 340px;
+    scroll-snap-align: center;
+  }
+  .fp-testi-carousel { height: auto !important; min-height: 280px; }
+  .fp-footer-inner { grid-template-columns: 1fr 1fr; }
+  .fp-calc-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ════════════════════════════════════════════════════
    RESPONSIVE — TABLET (≤900px)
 ════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
