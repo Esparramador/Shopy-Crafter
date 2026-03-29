@@ -30,7 +30,6 @@ let pageNum = 0;
 let Y = 65;
 let currentSection = '';
 let pageHasContent = false;
-let isCover = false;
 const PT = 58;
 const PB = 770;
 const pageLog = [];
@@ -94,16 +93,16 @@ function chapter(s) {
 }
 
 function h2g(a, b) {
-  need(42);
+  need(38);
   doc.font('SansBold').fontSize(18).fillColor(WHITE).text(a, 50, Y, { continued: true }).fillColor(GOLD).text(b, { lineBreak: false });
-  Y += 30;
+  Y += 28;
   logContent('h2: ' + a + b);
 }
 
 function h3(t) {
-  need(36);
+  need(32);
   doc.font('SansBold').fontSize(13).fillColor(GOLD).text(t, 50, Y, { width: 495, lineBreak: false });
-  Y += 22;
+  Y += 20;
   logContent('h3: ' + t.substring(0, 40));
 }
 
@@ -113,42 +112,39 @@ function p(text, opts) {
   const fn = (opts && opts.bold) ? 'SansBold' : 'Sans';
   doc.font(fn).fontSize(sz).fillColor(col);
   const h = doc.heightOfString(text, { width: 495, lineGap: 3 });
-  need(h + 12);
+  need(h + 8);
   doc.text(text, 50, Y, { width: 495, lineGap: 3, height: h + 4 });
-  Y += h + 10;
+  Y += h + 6;
   logContent('p');
 }
 
-function checks(items) {
-  items.forEach(item => {
-    doc.font('Sans').fontSize(10);
-    const h = doc.heightOfString(item, { width: 465 }) + 2;
-    need(h + 6);
-    doc.font('Sans').fontSize(10).fillColor(GREEN).text('\u2713 ', 55, Y, { continued: true }).fillColor(TEXT).text(item, { width: 465, lineGap: 2, height: h + 2 });
-    Y += h + 4;
-    logContent('check');
-  });
-  Y += 4;
+function bullet(icon, text, iconCol) {
+  doc.font('Sans').fontSize(10);
+  const h = doc.heightOfString(text, { width: 465 }) + 2;
+  need(h + 4);
+  doc.font('Sans').fontSize(10).fillColor(iconCol || GREEN).text(icon + ' ', 55, Y, { continued: true }).fillColor(TEXT).text(text, { width: 465, lineGap: 2, height: h + 2 });
+  Y += h + 3;
+  logContent('bullet');
 }
 
 function tbl(headers, rows, cw, opts) {
   const x0 = 50; const tw = cw.reduce((a, b) => a + b, 0); const pd = 5;
-  need(24);
-  doc.rect(x0, Y, tw, 18).fill(DARK3);
+  need(22);
+  doc.rect(x0, Y, tw, 17).fill(DARK3);
   let cx = x0;
   headers.forEach((hd, i) => {
-    doc.font('SansBold').fontSize(6.5).fillColor(GOLD).text(hd.toUpperCase(), cx + pd, Y + 5, { width: cw[i] - pd * 2, height: 12, lineBreak: false });
+    doc.font('SansBold').fontSize(6.5).fillColor(GOLD).text(hd.toUpperCase(), cx + pd, Y + 5, { width: cw[i] - pd * 2, height: 11, lineBreak: false });
     cx += cw[i];
   });
-  Y += 18;
+  Y += 17;
   logContent('tbl-hdr');
 
   rows.forEach((row, ri) => {
     const hs = row.map((c, ci) => {
       doc.font('Sans').fontSize(7.5);
-      return doc.heightOfString(String(c), { width: cw[ci] - pd * 2 }) + 6;
+      return doc.heightOfString(String(c), { width: cw[ci] - pd * 2 }) + 5;
     });
-    const rh = Math.max(...hs, 16);
+    const rh = Math.max(...hs, 15);
     need(rh + 1);
     if (ri % 2 === 0) doc.rect(x0, Y, tw, rh).fill('#0F0F18');
     if (opts && opts.hlRow === ri) doc.rect(x0, Y, tw, rh).fill('#1E1510');
@@ -164,105 +160,25 @@ function tbl(headers, rows, cw, opts) {
     Y += rh;
     logContent('tbl-row');
   });
-  Y += 8;
+  Y += 6;
 }
 
 function statRow(stats) {
-  need(70);
+  need(66);
   const w = 115;
   stats.forEach((s, i) => {
     const x = 50 + i * (w + 8);
-    doc.roundedRect(x, Y, w, 60, 6).fill(DARK2);
+    doc.roundedRect(x, Y, w, 56, 6).fill(DARK2);
     doc.roundedRect(x, Y, w, 3, 3).fill(s.color || GOLD);
-    doc.font('SansBold').fontSize(22).fillColor(s.color || GOLD).text(s.v, x, Y + 12, { width: w, align: 'center', height: 26, lineBreak: false });
-    doc.font('Sans').fontSize(6.5).fillColor(MUTED).text(s.l.toUpperCase(), x, Y + 40, { width: w, align: 'center', height: 14, lineBreak: false });
+    doc.font('SansBold').fontSize(20).fillColor(s.color || GOLD).text(s.v, x, Y + 10, { width: w, align: 'center', height: 24, lineBreak: false });
+    doc.font('Sans').fontSize(6.5).fillColor(MUTED).text(s.l.toUpperCase(), x, Y + 38, { width: w, align: 'center', height: 14, lineBreak: false });
   });
-  Y += 70;
+  Y += 62;
   logContent('statRow');
 }
 
-function gauge(x, y, score, label, size) {
-  size = size || 50;
-  const cx = x + size / 2, cy = y + size / 2;
-  const r = size / 2 - 4;
-  const col = score >= 80 ? GREEN : score >= 60 ? ORANGE : score >= 40 ? '#E67E22' : RED;
-  doc.save();
-  doc.circle(cx, cy, r).lineWidth(4).strokeColor(DARK3).stroke();
-  const startAngle = -Math.PI * 0.75;
-  const sweep = (score / 100) * Math.PI * 1.5;
-  const endAngle = startAngle + sweep;
-  const segments = Math.max(Math.ceil(sweep / 0.1), 2);
-  for (let i = 0; i < segments; i++) {
-    const a1 = startAngle + (sweep / segments) * i;
-    const a2 = startAngle + (sweep / segments) * (i + 1);
-    doc.moveTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r)
-       .lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r)
-       .lineWidth(4).strokeColor(col).stroke();
-  }
-  doc.restore();
-  doc.font('SansBold').fontSize(size > 40 ? 14 : 11).fillColor(col).text(String(score), x, cy - 8, { width: size, align: 'center', lineBreak: false });
-  if (label) doc.font('Sans').fontSize(6).fillColor(MUTED).text(label, x - 5, y + size + 2, { width: size + 10, align: 'center', lineBreak: false });
-}
-
-function gaugeRow(scores) {
-  const gw = 70;
-  const totalW = scores.length * gw;
-  const startX = 50 + (495 - totalW) / 2;
-  need(80);
-  scores.forEach((s, i) => {
-    gauge(startX + i * gw, Y, s.v, s.l, 50);
-  });
-  Y += 72;
-  logContent('gaugeRow');
-}
-
-function dualHorizBar(label, before, after, max) {
-  need(38);
-  doc.font('SansBold').fontSize(8).fillColor(WHITE).text(label, 50, Y, { width: 100, lineBreak: false });
-  const bw = 300; const x0 = 160;
-  const pct = after > before ? Math.round(((after - before) / Math.max(before, 1)) * 100) : 0;
-  const pctCol = pct > 100 ? GREEN : pct > 50 ? GOLD : ORANGE;
-  doc.roundedRect(x0, Y, bw, 10, 3).fill(DARK3);
-  const fw1 = Math.max((before / max) * bw, 2);
-  doc.roundedRect(x0, Y, fw1, 10, 3).fill('#3A3A4A');
-  doc.font('Sans').fontSize(6).fillColor(MUTED).text(String(before), x0 + fw1 + 4, Y + 1, { lineBreak: false });
-  doc.roundedRect(x0, Y + 14, bw, 10, 3).fill(DARK3);
-  const fw2 = Math.max((after / max) * bw, 2);
-  doc.roundedRect(x0, Y + 14, fw2, 10, 3).fill(pctCol);
-  doc.font('SansBold').fontSize(6).fillColor(WHITE).text(String(after), x0 + fw2 + 4, Y + 15, { lineBreak: false });
-  doc.font('SansBold').fontSize(9).fillColor(pctCol).text('+' + pct + '%', x0 + bw + 15, Y + 7, { lineBreak: false });
-  Y += 32;
-  logContent('dualBar');
-}
-
-function impactCards(items) {
-  const cw = 155; const ch = 52; const gap = 10;
-  const cols = 3;
-  for (let i = 0; i < items.length; i += cols) {
-    const row = items.slice(i, i + cols);
-    need(ch + 10);
-    row.forEach((item, j) => {
-      const x = 50 + j * (cw + gap);
-      doc.roundedRect(x, Y, cw, ch, 5).fill(DARK2);
-      doc.roundedRect(x, Y, cw, 3, 3).fill(item.color || GOLD);
-      doc.font('SansBold').fontSize(16).fillColor(item.color || GOLD).text(item.value, x + 8, Y + 10, { width: cw - 16, lineBreak: false });
-      doc.font('Sans').fontSize(7).fillColor(MUTED).text(item.label, x + 8, Y + 30, { width: cw - 16, lineBreak: false });
-      doc.font('Sans').fontSize(6).fillColor(item.sub_color || TEXT).text(item.sub || '', x + 8, Y + 40, { width: cw - 16, lineBreak: false });
-    });
-    Y += ch + 8;
-    logContent('impactCards');
-  }
-}
-
-function miniBarInline(x, y, w, score, max) {
-  const col = score / max >= 0.7 ? GREEN : score / max >= 0.4 ? ORANGE : RED;
-  doc.roundedRect(x, y, w, 8, 3).fill(DARK3);
-  const fw = Math.max((score / max) * w, score > 0 ? 2 : 0);
-  doc.roundedRect(x, y, fw, 8, 3).fill(col);
-}
-
 function horizBar(label, cur, max, col) {
-  need(26);
+  need(22);
   doc.font('SansBold').fontSize(9).fillColor(WHITE).text(label, 50, Y + 2, { width: 135, height: 14, lineBreak: false });
   const bw = 270; const x0 = 195;
   doc.roundedRect(x0, Y, bw, 14, 4).fill(DARK3);
@@ -270,15 +186,55 @@ function horizBar(label, cur, max, col) {
   const c = col || (cur / max > 0.7 ? GREEN : cur / max > 0.4 ? ORANGE : RED);
   doc.roundedRect(x0, Y, fw, 14, 4).fill(c);
   doc.font('SansBold').fontSize(8).fillColor(WHITE).text(cur + '/100', x0 + bw + 10, Y + 2, { lineBreak: false });
-  Y += 24;
+  Y += 20;
   logContent('bar');
 }
 
+function dualHorizBar(label, before, after, max) {
+  need(22);
+  const pct = after > before ? Math.round(((after - before) / Math.max(before, 1)) * 100) : 0;
+  const pctCol = pct > 100 ? GREEN : pct > 50 ? GOLD : ORANGE;
+  const bw = 180; const x0 = 145; const x1 = x0 + bw + 6;
+  doc.font('SansBold').fontSize(7.5).fillColor(WHITE).text(label, 50, Y + 2, { width: 90, lineBreak: false });
+  doc.roundedRect(x0, Y + 1, bw, 10, 3).fill(DARK3);
+  const fw1 = Math.max((before / max) * bw, 2);
+  doc.roundedRect(x0, Y + 1, fw1, 10, 3).fill('#4A4A5A');
+  doc.font('Sans').fontSize(6).fillColor(MUTED).text(String(before), x0 + fw1 + 3, Y + 2, { lineBreak: false });
+  doc.font('Sans').fontSize(7).fillColor(MUTED).text('\u2192', x1, Y + 1, { lineBreak: false });
+  const x2 = x1 + 14;
+  doc.roundedRect(x2, Y + 1, bw, 10, 3).fill(DARK3);
+  const fw2 = Math.max((after / max) * bw, 2);
+  doc.roundedRect(x2, Y + 1, fw2, 10, 3).fill(pctCol);
+  doc.font('SansBold').fontSize(6).fillColor(WHITE).text(String(after), x2 + fw2 + 3, Y + 2, { lineBreak: false });
+  doc.font('SansBold').fontSize(8).fillColor(pctCol).text('+' + pct + '%', x2 + bw + 8, Y + 1, { lineBreak: false });
+  Y += 18;
+  logContent('dualBar');
+}
+
+function impactCards(items) {
+  const cw = 155; const ch = 48; const gap = 10;
+  const cols = 3;
+  for (let i = 0; i < items.length; i += cols) {
+    const row = items.slice(i, i + cols);
+    need(ch + 8);
+    row.forEach((item, j) => {
+      const x = 50 + j * (cw + gap);
+      doc.roundedRect(x, Y, cw, ch, 5).fill(DARK2);
+      doc.roundedRect(x, Y, cw, 3, 3).fill(item.color || GOLD);
+      doc.font('SansBold').fontSize(15).fillColor(item.color || GOLD).text(item.value, x + 8, Y + 8, { width: cw - 16, lineBreak: false });
+      doc.font('Sans').fontSize(7).fillColor(MUTED).text(item.label, x + 8, Y + 27, { width: cw - 16, lineBreak: false });
+      doc.font('Sans').fontSize(6).fillColor(item.sub_color || TEXT).text(item.sub || '', x + 8, Y + 37, { width: cw - 16, lineBreak: false });
+    });
+    Y += ch + 6;
+    logContent('impactCards');
+  }
+}
+
 function barChart(data, title, ch) {
-  ch = ch || 150;
-  const total = ch + 55;
+  ch = ch || 140;
+  const total = ch + 50;
   need(total);
-  if (title) { doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(title, 50, Y, { width: 495, align: 'center', lineBreak: false }); Y += 14; }
+  if (title) { doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(title, 50, Y, { width: 495, align: 'center', lineBreak: false }); Y += 13; }
   const sy = Y;
   const barH = ch - 15;
   const maxV = Math.max(...data.map(d => Math.max(d.b || 0, d.a || 0, d.v || 0)));
@@ -312,14 +268,14 @@ function barChart(data, title, ch) {
   });
 
   if (dual) {
-    const ly = sy + ch + 18;
+    const ly = sy + ch + 14;
     doc.roundedRect(200, ly, 8, 8, 2).fill('#3A3A4A');
     doc.font('Sans').fontSize(7).fillColor(MUTED).text('Actual', 212, ly + 1, { lineBreak: false });
     doc.roundedRect(280, ly, 8, 8, 2).fill(GOLD);
     doc.font('SansBold').fontSize(7).fillColor(GOLD).text('Optimizado', 292, ly + 1, { lineBreak: false });
-    Y = ly + 16;
+    Y = ly + 14;
   } else {
-    Y = sy + ch + 18;
+    Y = sy + ch + 14;
   }
   logContent('chart');
 }
@@ -358,8 +314,8 @@ let S = '\u00cdndice';
 newPage(S);
 pageHasContent = true;
 h2g('\u00cdndice de ', 'Contenidos');
-p('Cada cap\u00edtulo se desarrolla con el detalle necesario para su correcta comprensi\u00f3n, utilizando datos reales del cat\u00e1logo de Comic Crafter.', { fontSize: 10, color: MUTED });
-Y += 4;
+p('Cada cap\u00edtulo se desarrolla con datos reales del cat\u00e1logo de Comic Crafter, incluyendo gr\u00e1ficos comparativos, tablas de datos y estad\u00edsticas visuales.', { fontSize: 10, color: MUTED });
+Y += 2;
 [['01', 'Resumen Ejecutivo', 'Diagn\u00f3stico global, KPIs y oportunidades cuantificadas'],
  ['02', 'Auditor\u00eda de Cat\u00e1logo', 'An\u00e1lisis de los 29 productos por las 7 dimensiones'],
  ['03', 'Diagn\u00f3stico por Dimensiones', 'T\u00edtulos, descripciones, im\u00e1genes, pricing, SEO, calidad, trust'],
@@ -372,22 +328,22 @@ Y += 4;
  ['10', 'Inversi\u00f3n y ROI', 'Costes de optimizaci\u00f3n vs retorno esperado'],
  ['11', 'Siguiente Paso', 'Proceso, garant\u00edas y contacto'],
 ].forEach(([num, title, desc]) => {
-  need(42);
-  doc.moveTo(50, Y + 36).lineTo(545, Y + 36).strokeColor(LINE2).lineWidth(0.3).stroke();
-  doc.font('SansBold').fontSize(12).fillColor(GOLD).text(num, 55, Y + 4, { lineBreak: false });
-  doc.font('SansBold').fontSize(11).fillColor(WHITE).text(title, 82, Y + 5, { lineBreak: false });
-  doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(desc, 82, Y + 22, { width: 440, lineBreak: false });
-  Y += 42;
+  need(38);
+  doc.moveTo(50, Y + 34).lineTo(545, Y + 34).strokeColor(LINE2).lineWidth(0.3).stroke();
+  doc.font('SansBold').fontSize(12).fillColor(GOLD).text(num, 55, Y + 3, { lineBreak: false });
+  doc.font('SansBold').fontSize(11).fillColor(WHITE).text(title, 82, Y + 4, { lineBreak: false });
+  doc.font('Sans').fontSize(8.5).fillColor(MUTED).text(desc, 82, Y + 20, { width: 440, lineBreak: false });
+  Y += 38;
   logContent('idx-' + num);
 });
 
 // ================================================================
-//  CAP 1
+//  CAP 1 \u2014 RESUMEN EJECUTIVO
 // ================================================================
 S = '01 \u00b7 Resumen Ejecutivo';
 chapter(S);
 h2g('01  Resumen ', 'Ejecutivo');
-p('Este informe presenta el diagn\u00f3stico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el an\u00e1lisis real de los 29 productos del cat\u00e1logo. Cada m\u00e9trica proviene de datos reales extra\u00eddos de la API de Shopify y procesados por el motor de auditor\u00eda de Shopy Crafter.', { fontSize: 10 });
+p('Este informe presenta el diagn\u00f3stico completo de la tienda Comic Crafter (comic-crafter.myshopify.com) basado en el an\u00e1lisis real de los 29 productos del cat\u00e1logo. Cada m\u00e9trica proviene de datos reales extra\u00eddos de la API de Shopify y procesados por el motor de auditor\u00eda de Shopy Crafter.');
 
 statRow([
   { v: '37', l: 'Score Global', color: RED },
@@ -396,50 +352,57 @@ statRow([
   { v: '1.2', l: 'Imgs/Producto', color: ORANGE },
 ]);
 
-h3('Diagn\u00f3stico R\u00e1pido: Estado Cr\u00edtico');
-tbl(['Dimensi\u00f3n', 'Score Actual', 'Objetivo', 'Gap', 'Impacto Revenue'],
-  [['T\u00edtulos (12%)', '68/100', '95/100', '-27 pts', 'CTR: +15-25%'],
-   ['Descripciones (22%)', '93/100', '100/100', '-7 pts', 'Conversi\u00f3n: +5-10%'],
-   ['Pricing (10%)', '66/100', '95/100', '-29 pts', 'AOV: +20-35%'],
-   ['Im\u00e1genes (18%)', '24/100', '95/100', '-71 pts', 'Conversi\u00f3n: +30-50%'],
-   ['SEO (18%)', '50/100', '95/100', '-45 pts', 'Tr\u00e1fico: +40-80%'],
-   ['Calidad (12%)', '70/100', '95/100', '-25 pts', 'Engagement: +20-30%'],
-   ['Trust Signals (8%)', '20/100', '90/100', '-70 pts', 'Conversi\u00f3n: +10-20%']],
+h3('Diagn\u00f3stico R\u00e1pido: 7 Dimensiones');
+tbl(['Dimensi\u00f3n', 'Score', 'Objetivo', 'Gap', 'Impacto Revenue'],
+  [['\u25b8 T\u00edtulos (12%)', '68/100', '95/100', '-27 pts', 'CTR: +15-25%'],
+   ['\u25b8 Descripciones (22%)', '93/100', '100/100', '-7 pts', 'Conversi\u00f3n: +5-10%'],
+   ['\u25b8 Pricing (10%)', '66/100', '95/100', '-29 pts', 'AOV: +20-35%'],
+   ['\u26a0 Im\u00e1genes (18%)', '24/100', '95/100', '-71 pts', 'Conversi\u00f3n: +30-50%'],
+   ['\u26a0 SEO (18%)', '50/100', '95/100', '-45 pts', 'Tr\u00e1fico: +40-80%'],
+   ['\u25b8 Calidad (12%)', '70/100', '95/100', '-25 pts', 'Engagement: +20-30%'],
+   ['\u26a0 Trust Signals (8%)', '20/100', '90/100', '-70 pts', 'Conversi\u00f3n: +10-20%']],
   [110, 75, 70, 65, 175]);
 
-h3('Las 5 Debilidades Más Críticas');
-dualHorizBar('Imágenes', 24, 95, 100);
+h3('Las 5 Debilidades M\u00e1s Cr\u00edticas');
+dualHorizBar('Im\u00e1genes', 24, 95, 100);
+p('\u26a0 IM\u00c1GENES \u2014 Score: 24/100. 25 de 29 productos con SOLO 1 imagen. Est\u00e1ndar Shopify: 8 m\u00ednimo. Reduce conversi\u00f3n 30-50%.', { color: RED, fontSize: 9 });
 dualHorizBar('Trust Signals', 20, 90, 100);
-dualHorizBar('SEO Técnico', 50, 95, 100);
+p('\u26a0 TRUST SIGNALS \u2014 Score: 20/100. 0 productos con FAQ, 0 con garant\u00eda visible, 0 con reviews. El cliente no conf\u00eda sin estos elementos.', { color: RED, fontSize: 9 });
+dualHorizBar('SEO T\u00e9cnico', 50, 95, 100);
+p('\u26a0 SEO \u2014 Score: 50/100. Sin Schema JSON-LD, sin meta descriptions, sin alt texts optimizados. Invisible para Google.', { color: ORANGE, fontSize: 9 });
 dualHorizBar('Pricing', 66, 97, 100);
-dualHorizBar('Títulos', 68, 96, 100);
+p('\u26a0 PRICING \u2014 0 productos con terminaciones .97/.99. Solo 1 de 29 con compare_at_price (y est\u00e1 INVERTIDO). El efecto \u00abantes/ahora\u00bb incrementa conversi\u00f3n 15-25%.', { color: ORANGE, fontSize: 9 });
+dualHorizBar('T\u00edtulos', 68, 96, 100);
+p('\u26a0 T\u00cdTULOS \u2014 6 productos con emojis al inicio (anti-SEO). Solo 3 de 29 con keyword-first. 15 t\u00edtulos se truncan en Google (>65 chars).', { color: ORANGE, fontSize: 9 });
 
 h3('Oportunidad Cuantificada');
 impactCards([
-  { value: '+151%', label: 'Score Catálogo', sub: '37 → 93/100', color: GREEN, sub_color: GREEN },
-  { value: '+150%', label: 'Conversion Rate', sub: '1.0% → 2.5%', color: GREEN, sub_color: GREEN },
-  { value: '+45%', label: 'AOV (Ticket Medio)', sub: '€29 → €42', color: GOLD, sub_color: GOLD },
-  { value: '+120%', label: 'Tráfico Orgánico', sub: 'SEO completo en 6M', color: BLUE, sub_color: BLUE },
-  { value: '×3.5', label: 'Revenue Potencial', sub: 'Efecto compuesto', color: GREEN, sub_color: GREEN },
-  { value: '+567%', label: 'Imágenes/Producto', sub: '1.2 → 8.0 por prod.', color: ORANGE, sub_color: ORANGE },
+  { value: '+151%', label: 'Score Cat\u00e1logo', sub: '37 \u2192 93/100 (D \u2192 A)', color: GREEN, sub_color: GREEN },
+  { value: '+150%', label: 'Conversion Rate', sub: '1.0% \u2192 2.5%', color: GREEN, sub_color: GREEN },
+  { value: '+45%', label: 'AOV (Ticket Medio)', sub: '\u20ac29 \u2192 \u20ac42', color: GOLD, sub_color: GOLD },
+  { value: '+120%', label: 'Tr\u00e1fico Org\u00e1nico', sub: 'SEO completo en 6M', color: BLUE, sub_color: BLUE },
+  { value: '\u00d73.5', label: 'Revenue Potencial', sub: 'Efecto compuesto', color: GREEN, sub_color: GREEN },
+  { value: '+567%', label: 'Im\u00e1genes/Producto', sub: '1.2 \u2192 8.0 por prod.', color: ORANGE, sub_color: ORANGE },
 ]);
 
 barChart([
   { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
-  { l: 'Conv. %', b: 10, a: 25, bc: RED, ac: GREEN },
-  { l: 'AOV €', b: 29, a: 42, bc: ORANGE, ac: GREEN },
+  { l: 'Conv.', b: 10, a: 25, bc: RED, ac: GREEN },
+  { l: 'AOV', b: 29, a: 42, bc: ORANGE, ac: GREEN },
   { l: 'Imgs', b: 1.2, a: 8, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
-], 'KPIs Clave: Estado Actual vs Post-Optimización', 130);
+], 'KPIs Clave: Estado Actual vs Post-Optimizaci\u00f3n', 100);
+p('El multiplicador \u00d72.8\u20133.5 en revenue resulta de la combinaci\u00f3n de mejoras en conversi\u00f3n (+150%), AOV (+45%), tr\u00e1fico org\u00e1nico (+120%) y trust (+20%). No es suma lineal sino multiplicaci\u00f3n de factores independientes.', { fontSize: 9, color: MUTED });
+p('Conclusi\u00f3n del Resumen Ejecutivo: La tienda Comic Crafter tiene un potencial masivo de mejora. Los 29 productos requieren intervenci\u00f3n en 5 \u00e1reas clave. Con la optimizaci\u00f3n completa, el score pasar\u00eda de 37 (D) a 93 (A), multiplicando el revenue por 2.8\u20133.5x.', { fontSize: 9, color: MUTED });
 
 // ================================================================
-//  CAP 2
+//  CAP 2 \u2014 AUDITOR\u00cdA DE CAT\u00c1LOGO
 // ================================================================
 S = '02 \u00b7 Auditor\u00eda de Cat\u00e1logo';
 chapter(S);
 h2g('02  Auditor\u00eda de ', 'Cat\u00e1logo');
-p('An\u00e1lisis producto por producto de los 29 items del cat\u00e1logo. Scores calculados con el sistema de 7 dimensiones ponderadas de Shopy Crafter, alineado con est\u00e1ndares Semrush y Google Search Quality Guidelines.', { fontSize: 10 });
+p('An\u00e1lisis producto por producto de los 29 items del cat\u00e1logo. Scores calculados con el sistema de 7 dimensiones ponderadas de Shopy Crafter, alineado con est\u00e1ndares Semrush y Google Search Quality Guidelines.');
 
 h3('Distribuci\u00f3n de Calificaciones');
 barChart([
@@ -448,12 +411,11 @@ barChart([
   { l: 'C (60-74)', v: 15, c: ORANGE },
   { l: 'D (40-59)', v: 13, c: RED },
   { l: 'F (0-39)', v: 0.2, c: '#C0392B' },
-], 'Distribuci\u00f3n de Calificaciones \u2014 29 Productos Reales', 140);
-
+], 'Distribuci\u00f3n de Calificaciones \u2014 29 Productos Reales', 130);
 p('0 productos con calificaci\u00f3n A. Solo 1 producto (Logo Profesional, score 85) alcanza B. El 97% del cat\u00e1logo (28 de 29) est\u00e1 entre C y D. Media global: 37/100.', { color: MUTED });
 
 h3('Ranking Completo de Productos por Score');
-tbl(['Producto', 'Score', 'Grado', 'T\u00edtulo', 'Desc', 'Precio', 'Imgs', 'SEO'],
+tbl(['Producto', 'Score', 'Grado', 'T\u00edt.', 'Desc', 'Prec.', 'Imgs', 'SEO'],
   [['Logo Profesional \u2014 Identidad Visual', '85', 'B', '100', '100', '75', '100', '50'],
    ['Impresi\u00f3n 3D de Figuras y Modelos', '72', 'C', '70', '100', '75', '65', '50'],
    ['Funko Pop Personalizado 3D', '67', 'C', '70', '100', '75', '40', '50'],
@@ -473,38 +435,27 @@ tbl(['Producto', 'Score', 'Grado', 'T\u00edtulo', 'Desc', 'Precio', 'Imgs', 'SEO
    ['Sesi\u00f3n Estrat\u00e9gica 1:1', '55', 'D', '60', '90', '60', '20', '45'],
    ['ShopyBrain Agency Pro', '54', 'D', '60', '85', '60', '20', '45'],
    ['ShopyBrain Starter', '49', 'D', '60', '85', '60', '20', '20']],
-  [155, 35, 38, 38, 35, 42, 35, 35]);
+  [155, 35, 38, 35, 35, 38, 35, 35]);
 
 h3('An\u00e1lisis por Categor\u00edas de Producto');
-p('Categor\u00eda 1: Productos Creativos (Comic Crafter) \u2014 10 productos\nScore medio: 66/100 (C). Mejor contenido, m\u00e1s tags, pero fallan en im\u00e1genes (1.2/prod media) y SEO t\u00e9cnico.', { color: MUTED });
-p('Categor\u00eda 2: Servicios SaaS/Packs \u2014 19 productos\nScore medio: 56/100 (D). T\u00edtulos cortos con emojis, descripciones m\u00ednimas (402-531 chars), 1 imagen cada uno, 5-6 tags. Intervenci\u00f3n URGENTE.', { color: RED });
-
+p('Categor\u00eda 1: Productos Creativos (Comic Crafter) \u2014 10 productos. Score medio: 66/100 (C). Mejor contenido, m\u00e1s tags, pero fallan en im\u00e1genes (1.2/prod media) y SEO t\u00e9cnico.', { color: MUTED });
+p('Categor\u00eda 2: Servicios SaaS/Packs \u2014 19 productos. Score medio: 56/100 (D). T\u00edtulos cortos con emojis, descripciones m\u00ednimas (402-531 chars), 1 imagen cada uno. Intervenci\u00f3n URGENTE.', { color: RED });
 barChart([
   { l: 'Creativos', b: 66, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'SaaS/Packs', b: 56, a: 92, bc: RED, ac: GREEN },
   { l: 'Media Total', b: 37, a: 93, bc: RED, ac: GREEN },
-], 'Score por Categor\u00eda: Antes vs Despu\u00e9s de Optimizaci\u00f3n', 140);
+], 'Score por Categor\u00eda: Antes vs Despu\u00e9s de Optimizaci\u00f3n', 100);
+p('Conclusi\u00f3n: Los productos creativos (Comic Crafter) tienen mejor base (66 vs 56) pero ambas categor\u00edas necesitan optimizaci\u00f3n integral. La categor\u00eda SaaS/Packs requiere intervenci\u00f3n prioritaria: descripciones m\u00ednimas, 1 imagen por producto, sin trust signals ni SEO t\u00e9cnico.', { fontSize: 9, color: MUTED });
 
 // ================================================================
 //  CAP 3 \u2014 7 DIMENSIONES
 // ================================================================
 S = '03 \u00b7 Diagn\u00f3stico por Dimensiones';
 chapter(S);
-h2g('03  Diagnóstico ', 'por Dimensiones');
-p('Diagnóstico detallado de cada una de las 7 dimensiones de auditoría con datos reales extraídos del catálogo.', { fontSize: 10 });
+h2g('03  Diagn\u00f3stico ', 'por Dimensiones');
+p('Diagn\u00f3stico detallado de cada una de las 7 dimensiones de auditor\u00eda con datos reales extra\u00eddos del cat\u00e1logo.');
 
-h3('Vista General: 7 Dimensiones');
-gaugeRow([
-  { v: 68, l: 'Títulos' },
-  { v: 93, l: 'Descripc.' },
-  { v: 24, l: 'Imágenes' },
-  { v: 66, l: 'Pricing' },
-  { v: 50, l: 'SEO' },
-  { v: 70, l: 'Calidad' },
-  { v: 20, l: 'Trust' },
-]);
-
-h3('Dimensión 1: Títulos (12%) — Score: 68/100');
+h3('\u25b8 Dimensi\u00f3n 1: T\u00edtulos (12%) \u2014 Score: 68/100');
 horizBar('Score t\u00edtulos', 68, 100);
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [['Longitud media', '55 caracteres', '45-65 chars', '\u26a0 Variable'],
@@ -516,7 +467,7 @@ tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [145, 120, 100, 130]);
 p('Ejemplo: ANTES: \u00abPack 20 Productos \u2014 Cat\u00e1logo Premium\u00bb \u2192 DESPU\u00c9S: \u00abPack 20 Productos Shopify IA \u2014 Cat\u00e1logo Premium | Comic Crafter\u00bb', { fontSize: 9, color: MUTED });
 
-h3('Dimensi\u00f3n 2: Descripciones (22%) \u2014 Score: 93/100');
+h3('\u25b8 Dimensi\u00f3n 2: Descripciones (22%) \u2014 Score: 93/100');
 horizBar('Score descripciones', 93, 100);
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [['Longitud media', '531 chars (~100 pal.)', '4.000-6.000 chars', '\u2717 8\u00d7 menos'],
@@ -528,9 +479,9 @@ tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
    ['Estructura 8 secciones', '0 (0%)', '100%', '\u2717 Incompleta']],
   [140, 145, 130, 80]);
 
-h3('Dimensi\u00f3n 3: Im\u00e1genes (18%) \u2014 Score: 24/100');
+h3('\u26a0 Dimensi\u00f3n 3: Im\u00e1genes (18%) \u2014 Score: 24/100');
 horizBar('Score im\u00e1genes', 24, 100);
-p('La debilidad M\u00c1S CR\u00cdTICA. 25 de 29 productos tienen solo 1 imagen. El est\u00e1ndar exige 8 tipos diferentes.', { color: RED });
+p('La debilidad M\u00c1S CR\u00cdTICA. 25 de 29 productos tienen solo 1 imagen. El est\u00e1ndar exige 8 tipos diferentes de imagen por producto.', { color: RED });
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Gap'],
   [['Media imgs/producto', '1.2', '8 m\u00ednimo', '-85%'],
    ['Total im\u00e1genes cat\u00e1logo', '36', '232 m\u00edn. (29\u00d78)', '-84%'],
@@ -540,7 +491,7 @@ tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Gap'],
    ['Tipos de imagen', '1 (hero)', '8 tipos', '-7 tipos']],
   [140, 100, 120, 135]);
 
-h3('Dimensi\u00f3n 4: Pricing (10%) \u2014 Score: 66/100');
+h3('\u25b8 Dimensi\u00f3n 4: Pricing (10%) \u2014 Score: 66/100');
 horizBar('Score pricing', 66, 100);
 tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
   [['Precio medio', '\u20ac58.17', 'Seg\u00fan producto', '\u2014'],
@@ -551,9 +502,9 @@ tbl(['M\u00e9trica', 'Valor Actual', 'Est\u00e1ndar', 'Estado'],
    ['Terminaci\u00f3n .97/.99', '0 productos (0%)', '100%', '\u2717 Sin psicolog\u00eda'],
    ['Precios redondos', '10 productos (34%)', '0%', '\u2717 Anti-conversi\u00f3n']],
   [140, 155, 100, 100]);
-p('Error cr\u00edtico: El \u00fanico producto con compare_at_price tiene el valor INVERTIDO (\u20ac19.95 < precio \u20ac29.99). Muestra al cliente que el precio ha SUBIDO.', { color: RED, fontSize: 9 });
+p('\u26a0 Error cr\u00edtico: El \u00fanico producto con compare_at_price tiene el valor INVERTIDO (\u20ac19.95 < precio \u20ac29.99). Muestra al cliente que el precio ha SUBIDO en vez de bajado.', { color: RED, fontSize: 9 });
 
-h3('Dimensi\u00f3n 5: SEO Meta (18%) \u2014 Score: 50/100');
+h3('\u26a0 Dimensi\u00f3n 5: SEO Meta (18%) \u2014 Score: 50/100');
 horizBar('Score SEO', 50, 100);
 tbl(['Criterio', 'Estado', 'Impacto'],
   [['Meta Title optimizado', 'No configurado en la mayor\u00eda', 'Alto \u2014 CTR en Google'],
@@ -564,7 +515,7 @@ tbl(['Criterio', 'Estado', 'Impacto'],
    ['Internal linking', 'M\u00ednimo', 'Medio \u2014 Link equity']],
   [155, 185, 155]);
 
-h3('Dimensi\u00f3n 6: Calidad de Contenido (12%) \u2014 Score: 70/100');
+h3('\u25b8 Dimensi\u00f3n 6: Calidad de Contenido (12%) \u2014 Score: 70/100');
 horizBar('Score calidad', 70, 100);
 tbl(['Criterio', 'Estado Actual', 'Est\u00e1ndar', 'Estado'],
   [['Legibilidad Flesch-Kincaid', 'Buena (nativo ES)', 'Score > 60', '\u2713 OK'],
@@ -575,7 +526,7 @@ tbl(['Criterio', 'Estado Actual', 'Est\u00e1ndar', 'Estado'],
    ['Llamada a la acci\u00f3n (CTA)', 'No presente', '1-2 CTAs por producto', '\u2717 Cr\u00edtico']],
   [145, 140, 120, 90]);
 
-h3('Dimensi\u00f3n 7: Trust Signals (8%) \u2014 Score: 20/100');
+h3('\u26a0 Dimensi\u00f3n 7: Trust Signals (8%) \u2014 Score: 20/100');
 horizBar('Score trust', 20, 100);
 tbl(['Trust Signal', 'Presente', 'Impacto Conversi\u00f3n'],
   [['FAQ en productos', 'No (0/29)', '+5-15%'],
@@ -587,20 +538,20 @@ tbl(['Trust Signal', 'Presente', 'Impacto Conversi\u00f3n'],
   [175, 110, 210]);
 
 // ================================================================
-//  CAP 4
+//  CAP 4 \u2014 PRECIOS Y COMPETENCIA
 // ================================================================
 S = '04 \u00b7 Precios y Competencia';
 chapter(S);
 h2g('04  Precios y ', 'Competencia');
-p('Análisis de pricing del catálogo real con plan de corrección por producto y comparativa con competidores directos del sector.', { fontSize: 10 });
+p('An\u00e1lisis de pricing del cat\u00e1logo real con plan de correcci\u00f3n por producto y comparativa con competidores directos del sector.');
 
 impactCards([
-  { value: '€58', label: 'Precio Medio', sub: 'Catálogo actual', color: GOLD, sub_color: MUTED },
+  { value: '\u20ac58', label: 'Precio Medio', sub: 'Cat\u00e1logo actual (29 prods)', color: GOLD, sub_color: MUTED },
   { value: '0%', label: 'Pricing .97/.99', sub: '0 de 29 productos', color: RED, sub_color: RED },
-  { value: '3.4%', label: 'Con Compare At', sub: 'Solo 1 de 29 prods', color: RED, sub_color: RED },
+  { value: '3.4%', label: 'Con Compare At', sub: 'Solo 1 de 29 (invertido)', color: RED, sub_color: RED },
 ]);
 
-h3('Distribución de Precios Actual');
+h3('Distribuci\u00f3n de Precios Actual');
 barChart([
   { l: '\u20ac3-10', v: 5, c: BLUE },
   { l: '\u20ac10-20', v: 6, c: BLUE },
@@ -609,7 +560,7 @@ barChart([
   { l: '\u20ac50-90', v: 3, c: ORANGE },
   { l: '\u20ac90-200', v: 4, c: ORANGE },
   { l: '\u20ac200+', v: 2, c: RED },
-], 'Distribuci\u00f3n de Precios \u2014 29 Productos (datos reales)', 130);
+], 'Distribuci\u00f3n de Precios \u2014 29 Productos (datos reales)', 120);
 
 h3('Plan de Pricing Psicol\u00f3gico por Producto');
 tbl(['Producto', 'Actual', '\u00d3ptimo', 'Compare At', 'Ahorro Visible'],
@@ -644,12 +595,12 @@ tbl(['M\u00e9trica', 'Mercado Espa\u00f1a', 'Comic Crafter', 'Oportunidad'],
   [120, 110, 110, 155]);
 
 // ================================================================
-//  CAP 5
+//  CAP 5 \u2014 SEO T\u00c9CNICO
 // ================================================================
 S = '05 \u00b7 SEO T\u00e9cnico';
 chapter(S);
 h2g('05  An\u00e1lisis ', 'SEO T\u00e9cnico');
-p('Evaluaci\u00f3n de los 16 criterios de auditor\u00eda SEO nivel Semrush aplicados a los 29 productos reales de Comic Crafter.', { fontSize: 10 });
+p('Evaluaci\u00f3n de los 16 criterios de auditor\u00eda SEO nivel Semrush aplicados a los 29 productos reales de Comic Crafter.');
 
 h3('Score SEO por Criterio (16 Criterios)');
 [['Title Tag', 35, 'T\u00edtulos default de Shopify, sin optimizar'],
@@ -669,17 +620,17 @@ h3('Score SEO por Criterio (16 Criterios)');
  ['Core Web Vitals', 60, 'Estimado, necesita auditor\u00eda'],
  ['Content Quality', 65, 'Decente pero sin estructura SEO']
 ].forEach(([name, score, note]) => {
-  need(20);
+  need(18);
   doc.font('SansBold').fontSize(7.5).fillColor(WHITE).text(name, 50, Y + 1, { width: 100, lineBreak: false });
-  doc.roundedRect(155, Y, 195, 13, 4).fill(DARK3);
+  doc.roundedRect(155, Y, 195, 12, 4).fill(DARK3);
   const fw = Math.max((score / 100) * 195, score > 0 ? 4 : 0);
-  doc.roundedRect(155, Y, fw, 13, 4).fill(score >= 70 ? GREEN : score >= 40 ? ORANGE : RED);
-  doc.font('SansBold').fontSize(7).fillColor(WHITE).text(score + '%', 355, Y + 2, { lineBreak: false });
+  doc.roundedRect(155, Y, fw, 12, 4).fill(score >= 70 ? GREEN : score >= 40 ? ORANGE : RED);
+  doc.font('SansBold').fontSize(7).fillColor(WHITE).text(score + '%', 355, Y + 1, { lineBreak: false });
   doc.font('Sans').fontSize(7).fillColor(MUTED).text(note, 380, Y + 1, { width: 165, lineBreak: false });
-  Y += 18;
+  Y += 16;
   logContent('seo-bar');
 });
-Y += 8;
+Y += 4;
 
 h3('Impacto SEO: Antes vs Despu\u00e9s');
 barChart([
@@ -690,12 +641,11 @@ barChart([
   { l: 'Schema', b: 0.5, a: 95, bc: RED, ac: GREEN },
   { l: 'Links', b: 10, a: 80, bc: RED, ac: GREEN },
   { l: 'Keywords', b: 40, a: 90, bc: ORANGE, ac: GREEN },
-], 'Score SEO por Criterio: Actual vs Post-Optimizaci\u00f3n', 150);
-
-p('Proyecci\u00f3n: Con SEO completo implementado, el tr\u00e1fico org\u00e1nico puede incrementarse un 60-120% en 6 meses en un nicho con competencia moderada-baja como c\u00f3mics y arte digital en Espa\u00f1a.');
+], 'Score SEO por Criterio: Actual vs Post-Optimizaci\u00f3n', 120);
+p('Proyecci\u00f3n: Con SEO completo implementado, el tr\u00e1fico org\u00e1nico puede incrementarse un 60-120% en 6 meses. Nicho de c\u00f3mics y arte digital en Espa\u00f1a: competencia moderada-baja, alta oportunidad.', { fontSize: 9, color: MUTED });
 
 // ================================================================
-//  CAP 6
+//  CAP 6 \u2014 AN\u00c1LISIS DE IM\u00c1GENES
 // ================================================================
 S = '06 \u00b7 An\u00e1lisis de Im\u00e1genes';
 chapter(S);
@@ -708,14 +658,15 @@ statRow([
   { v: '-196', l: 'Faltan', color: ORANGE },
 ]);
 
-h3('Distribuci\u00f3n Actual');
+h3('Distribuci\u00f3n Actual por Producto');
 barChart([
   { l: '0 imgs', v: 1, c: '#C0392B' },
   { l: '1 img', v: 25, c: RED },
   { l: '2 imgs', v: 1, c: ORANGE },
   { l: '3 imgs', v: 1, c: ORANGE },
   { l: '14 imgs', v: 1, c: GREEN },
-], 'Im\u00e1genes por Producto (29 productos reales)', 130);
+], 'Im\u00e1genes por Producto (29 productos reales)', 120);
+p('El 86% del cat\u00e1logo (25 de 29 productos) tiene una sola imagen. Solo 1 producto (Logo Profesional) tiene m\u00e1s de 3 im\u00e1genes. Esto reduce la conversi\u00f3n entre un 30% y un 50% seg\u00fan Baymard Institute.', { color: MUTED, fontSize: 9 });
 
 h3('Los 8 Tipos de Imagen Necesarios');
 tbl(['Tipo', 'Descripci\u00f3n', 'Actual', 'Impacto Conversi\u00f3n'],
@@ -735,38 +686,38 @@ barChart([
   { l: 'Competidor Medio', b: 5, a: 5, bc: ORANGE, ac: ORANGE },
   { l: 'Top Sellers', b: 10, a: 10, bc: GREEN, ac: GREEN },
   { l: 'Est\u00e1ndar WC', b: 8, a: 8, bc: GOLD, ac: GOLD },
-], 'Im\u00e1genes/Producto: Comic Crafter vs Mercado', 140);
+], 'Im\u00e1genes/Producto: Comic Crafter vs Mercado', 100);
 
-impactCards([
-  { value: '99.5%', label: 'Ahorro vs Fotógrafo', sub: '€7 vs €1.450-5.800', color: GREEN, sub_color: GREEN },
-  { value: '2-3h', label: 'Tiempo Generación', sub: '232 imágenes con IA', color: GOLD, sub_color: GOLD },
-  { value: '+50%', label: 'Boost Conversión', sub: 'Con 8 imgs/producto', color: GREEN, sub_color: GREEN },
-]);
-
-h3('Coste de Generación IA vs Fotografía Tradicional');
+h3('Coste de Generaci\u00f3n IA vs Fotograf\u00eda Tradicional');
 tbl(['M\u00e9todo', 'Coste/Prod', '29 Productos', 'Tiempo', 'Calidad'],
   [['Fot\u00f3grafo profesional', '\u20ac50-200', '\u20ac1.450-5.800', '2-4 semanas', 'Variable'],
    ['Estudio fotogr\u00e1fico', '\u20ac100-500', '\u20ac2.900-14.500', '3-6 semanas', 'Alta'],
    ['Shopy Crafter (Flux 1.1 Pro)', '~\u20ac0.25', '~\u20ac7.25', '2-3 horas', 'Profesional IA'],
    ['Ahorro con Shopy Crafter', '', 'Hasta 99.5%', '', '']],
   [140, 80, 95, 90, 90], { priceCol: 2 });
+impactCards([
+  { value: '99.5%', label: 'Ahorro vs Fot\u00f3grafo', sub: '\u20ac7 vs \u20ac1.450-5.800', color: GREEN, sub_color: GREEN },
+  { value: '2-3h', label: 'Tiempo Generaci\u00f3n', sub: '232 im\u00e1genes con IA', color: GOLD, sub_color: GOLD },
+  { value: '+50%', label: 'Boost Conversi\u00f3n', sub: 'Con 8 imgs/producto', color: GREEN, sub_color: GREEN },
+]);
+p('Conclusi\u00f3n: Las im\u00e1genes son la debilidad m\u00e1s cr\u00edtica y la oportunidad m\u00e1s grande. Pasar de 1.2 a 8 im\u00e1genes por producto con generaci\u00f3n IA (Flux 1.1 Pro) cuesta solo \u20ac7.25 para todo el cat\u00e1logo vs \u20ac1.450-5.800 con fotograf\u00eda tradicional, con un impacto directo del +30-50% en conversi\u00f3n.', { fontSize: 9, color: MUTED });
 
 // ================================================================
-//  CAP 7
+//  CAP 7 \u2014 ANTES VS DESPU\u00c9S
 // ================================================================
 S = '07 \u00b7 Antes vs Despu\u00e9s';
 chapter(S);
-h2g('07  Antes vs ', 'Después');
-p('Impacto cuantificado de cada optimización aplicada al catálogo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.', { fontSize: 10 });
+h2g('07  Antes vs ', 'Despu\u00e9s');
+p('Impacto cuantificado de cada optimizaci\u00f3n aplicada al cat\u00e1logo real. Proyecciones basadas en benchmarks de Shopify Plus Research, Baymard Institute y Google.');
 
 statRow([
-  { v: '37→93', l: 'Score Global', color: GREEN },
-  { v: '×3.5', l: 'Revenue', color: GOLD },
-  { v: '+567%', l: 'Imágenes', color: ORANGE },
-  { v: '+150%', l: 'Conversión', color: GREEN },
+  { v: '37\u219393', l: 'Score Global', color: GREEN },
+  { v: '\u00d73.5', l: 'Revenue', color: GOLD },
+  { v: '+567%', l: 'Im\u00e1genes', color: ORANGE },
+  { v: '+150%', l: 'Conversi\u00f3n', color: GREEN },
 ]);
 
-h3('Score Global por Dimensión');
+h3('Score Global por Dimensi\u00f3n');
 barChart([
   { l: 'Score', b: 37, a: 93, bc: RED, ac: GREEN },
   { l: 'T\u00edtulos', b: 68, a: 96, bc: ORANGE, ac: GREEN },
@@ -775,7 +726,7 @@ barChart([
   { l: 'Im\u00e1genes', b: 24, a: 95, bc: RED, ac: GREEN },
   { l: 'SEO', b: 50, a: 95, bc: ORANGE, ac: GREEN },
   { l: 'Trust', b: 20, a: 90, bc: RED, ac: GREEN },
-], 'Score por Dimensi\u00f3n: ANTES vs DESPU\u00c9S', 160);
+], 'Score por Dimensi\u00f3n: ANTES vs DESPU\u00c9S', 130);
 
 h3('Impacto en M\u00e9tricas de Negocio');
 tbl(['M\u00e9trica', 'Antes (Real)', 'Despu\u00e9s', 'Mejora', 'Fuente'],
@@ -802,21 +753,21 @@ tbl(['Optimizaci\u00f3n', 'Conv.', 'AOV', 'Tr\u00e1fico', 'Factor'],
   [155, 70, 60, 75, 135]);
 
 // ================================================================
-//  CAP 8
+//  CAP 8 \u2014 PLAN DE ACCI\u00d3N
 // ================================================================
 S = '08 \u00b7 Plan de Acci\u00f3n';
 chapter(S);
-h2g('08  Plan de ', 'Acción');
-p('Roadmap priorizado por impacto en revenue con timeline de implementación de 4 semanas.', { fontSize: 10 });
+h2g('08  Plan de ', 'Acci\u00f3n');
+p('Roadmap priorizado por impacto en revenue con timeline de implementaci\u00f3n de 4 semanas.');
 
 statRow([
   { v: '4', l: 'Semanas Total', color: GOLD },
-  { v: '79', l: 'Acciones a Ejecutar', color: BLUE },
+  { v: '79', l: 'Acciones', color: BLUE },
   { v: '24-48h', l: 'Primeros Resultados', color: GREEN },
   { v: '6 meses', l: 'SEO Pleno Efecto', color: ORANGE },
 ]);
 
-h3('Semana 1: Impacto Inmediato (Quick Wins)');
+h3('\u25cf Semana 1: Impacto Inmediato (Quick Wins)');
 tbl(['Prior.', 'Acci\u00f3n', 'Prods', 'Impacto', 'Tiempo'],
   [['\u25cf P1', 'Corregir compare_at_price invertido', '1', '+15-25% conv.', '5 min'],
    ['\u25cf P1', 'A\u00f1adir compare_at_price a 28 productos', '28', '+15-25% global', '1h'],
@@ -826,7 +777,7 @@ tbl(['Prior.', 'Acci\u00f3n', 'Prods', 'Impacto', 'Tiempo'],
    ['\u25cf P2', 'Redise\u00f1ar los 13 productos Grado D', '13', 'D\u2192B/A', '3-4h']],
   [35, 210, 35, 100, 55]);
 
-h3('Semana 2: SEO y Contenido');
+h3('\u25cf Semana 2: SEO y Contenido');
 tbl(['Prior.', 'Acci\u00f3n', 'Prods', 'Impacto', 'Tiempo'],
   [['\u25cf P2', 'Meta title + meta description para todo', '29', '+40-60% CTR', '2h'],
    ['\u25cf P2', 'Schema JSON-LD (Product, FAQ, Breadcrumb)', '29', 'Rich Snippets', '2h'],
@@ -836,7 +787,7 @@ tbl(['Prior.', 'Acci\u00f3n', 'Prods', 'Impacto', 'Tiempo'],
    ['\u25cf P3', 'Incrementar tags a 22-28/producto', '29', '+20% discovery', '1-2h']],
   [35, 210, 35, 100, 55]);
 
-h3('Semana 3-4: Crecimiento y Automatizaci\u00f3n');
+h3('\u25cf Semana 3-4: Crecimiento y Automatizaci\u00f3n');
 tbl(['Prior.', 'Acci\u00f3n', 'Impacto', 'Tiempo'],
   [['\u25cf P3', 'Configurar 5 flujos email marketing', '+15-25% revenue', '3-4h'],
    ['\u25cf P3', 'Crear colecciones inteligentes autom\u00e1ticas', 'Navegaci\u00f3n + SEO', '1h'],
@@ -847,18 +798,18 @@ tbl(['Prior.', 'Acci\u00f3n', 'Impacto', 'Tiempo'],
   [35, 235, 145, 80]);
 
 // ================================================================
-//  CAP 9
+//  CAP 9 \u2014 PROYECCI\u00d3N FINANCIERA
 // ================================================================
 S = '09 \u00b7 Proyecci\u00f3n Financiera';
 chapter(S);
-h2g('09  Proyección ', 'Financiera');
-p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del catálogo y benchmarks del sector Art/Crafts/Comics en España.', { fontSize: 10 });
+h2g('09  Proyecci\u00f3n ', 'Financiera');
+p('Forecast a 6 meses con 3 escenarios calibrados con datos reales del cat\u00e1logo y benchmarks del sector Art/Crafts/Comics en Espa\u00f1a.');
 
 statRow([
-  { v: '€6.3K', l: 'Revenue Base 6M', color: GOLD },
-  { v: '€13.2K', l: 'Revenue Optimista', color: GREEN },
+  { v: '\u20ac6.3K', l: 'Revenue Base 6M', color: GOLD },
+  { v: '\u20ac13.2K', l: 'Revenue Optimista', color: GREEN },
   { v: '2.5%', l: 'Conv. Rate Obj.', color: BLUE },
-  { v: '€38', l: 'AOV Proyectado', color: GOLD },
+  { v: '\u20ac38', l: 'AOV Proyectado', color: GOLD },
 ]);
 
 h3('Supuestos Base');
@@ -891,15 +842,16 @@ barChart([
   { l: 'Conservador', b: 1200, a: 2818, bc: RED, ac: ORANGE },
   { l: 'Base', b: 1200, a: 6282, bc: RED, ac: GOLD },
   { l: 'Optimista', b: 1200, a: 13159, bc: RED, ac: GREEN },
-], 'Revenue Acumulado 6 Meses (\u20ac)', 115);
+], 'Revenue Acumulado 6 Meses (\u20ac)', 95);
+p('El escenario BASE proyecta un crecimiento de \u20ac1.200 actuales a \u20ac6.282 en revenue acumulado a 6 meses. En el escenario OPTIMISTA, el revenue acumulado alcanza \u20ac13.159.', { fontSize: 9, color: MUTED });
 
 // ================================================================
-//  CAP 10
+//  CAP 10 \u2014 INVERSI\u00d3N Y ROI
 // ================================================================
 S = '10 \u00b7 Inversi\u00f3n y ROI';
 chapter(S);
 h2g('10  Inversi\u00f3n y ', 'ROI');
-p('An\u00e1lisis de la inversi\u00f3n necesaria y el retorno esperado con cifras reales y verificables.', { fontSize: 10 });
+p('An\u00e1lisis de la inversi\u00f3n necesaria y el retorno esperado con cifras reales y verificables.');
 
 h3('Opci\u00f3n A: Servicios Puntuales (One-Time)');
 tbl(['Servicio', 'Cantidad', 'Precio/U', 'Total'],
@@ -936,36 +888,48 @@ tbl(['Opci\u00f3n', 'Inversi\u00f3n', 'Revenue 6M', 'Revenue Extra', 'ROI'],
   [110, 70, 80, 85, 150], { priceCol: 4 });
 
 barChart([
-  { l: 'Sin cambios', v: 0, c: '#3A3A4A' },
+  { l: 'Sin cambios', v: 0.5, c: '#3A3A4A' },
   { l: 'One-Time', v: 98, c: ORANGE },
   { l: 'Pack Premium', v: 404, c: GREEN },
   { l: 'Growth 6M', v: 257, c: GOLD },
   { l: 'Growth Opt.', v: 604, c: GREEN },
-], 'ROI Comparativo por Opción de Inversión (%)', 120);
+], 'ROI Comparativo por Opci\u00f3n de Inversi\u00f3n (%)', 95);
 
 impactCards([
-  { value: '404%', label: 'ROI Pack Premium', sub: '€1 invertido → €4.04', color: GREEN, sub_color: GREEN },
-  { value: '€1.258', label: 'Inversión Pack Premium', sub: 'Mejor relación calidad-precio', color: GOLD, sub_color: GOLD },
-  { value: '€5.082', label: 'Revenue Extra (6M)', sub: 'Escenario Base realista', color: GREEN, sub_color: GREEN },
+  { value: '404%', label: 'ROI Pack Premium', sub: '\u20ac1 invertido \u2192 \u20ac4.04 retorno', color: GREEN, sub_color: GREEN },
+  { value: '\u20ac1.258', label: 'Inversi\u00f3n Pack Premium', sub: 'Mejor relaci\u00f3n calidad-precio', color: GOLD, sub_color: GOLD },
+  { value: '\u20ac5.082', label: 'Revenue Extra (6M)', sub: 'Escenario Base realista', color: GREEN, sub_color: GREEN },
 ]);
+p('Recomendaci\u00f3n: El Pack Premium Total (\u20ac1.258) ofrece el mejor ROI a 6 meses (404%). Por cada \u20ac1 invertido, se recuperan \u20ac4.04 en revenue adicional.', { color: GOLD, fontSize: 10, bold: true });
 
 // ================================================================
-//  CAP 11
+//  CAP 11 \u2014 SIGUIENTE PASO
 // ================================================================
 S = '11 \u00b7 Siguiente Paso';
 chapter(S);
 h2g('11  Siguiente ', 'Paso');
 p('Diagn\u00f3stico completado. Problemas identificados, cuantificados y priorizados. Soluciones listas para implementar.', { fontSize: 11, color: MUTED });
 
-h3('Resumen del Diagnóstico');
+h3('Resumen del Diagn\u00f3stico');
 dualHorizBar('Score Global', 37, 93, 100);
-dualHorizBar('Imágenes', 24, 95, 100);
+dualHorizBar('Im\u00e1genes', 24, 95, 100);
 dualHorizBar('Trust Signals', 20, 90, 100);
 dualHorizBar('SEO', 50, 95, 100);
 dualHorizBar('Pricing', 66, 97, 100);
-dualHorizBar('Títulos', 68, 96, 100);
+dualHorizBar('T\u00edtulos', 68, 96, 100);
 dualHorizBar('Calidad', 70, 95, 100);
 dualHorizBar('Descripciones', 93, 100, 100);
+
+tbl(['\u00c1rea', 'Estado', 'Score', 'Acci\u00f3n Requerida'],
+  [['Score Global', '\u2717 CR\u00cdTICO', '37/100', 'Optimizaci\u00f3n integral urgente'],
+   ['Im\u00e1genes', '\u2717 CR\u00cdTICO', '24/100', 'Generar 232 im\u00e1genes IA'],
+   ['Trust Signals', '\u2717 CR\u00cdTICO', '20/100', 'FAQ + garant\u00eda + reviews'],
+   ['SEO', '\u26a0 D\u00c9BIL', '50/100', 'Meta tags + schemas + contenido'],
+   ['Pricing', '\u26a0 D\u00c9BIL', '66/100', 'Compare_at + .97/.99 + COGS'],
+   ['T\u00edtulos', '\u26a0 MEJORABLE', '68/100', 'Keyword-first + sin emojis'],
+   ['Calidad Contenido', '\u2713 ACEPTABLE', '70/100', 'Estructura + CTAs + formateo'],
+   ['Descripciones', '\u2713 ACEPTABLE', '93/100', 'Ampliar a 800-1.200 palabras']],
+  [100, 75, 50, 270]);
 
 h3('Pr\u00f3ximos Pasos');
 p('1. Aprobaci\u00f3n: Revisa este informe y confirma qu\u00e9 optimizaciones implementar.');
@@ -974,13 +938,13 @@ p('3. Implementaci\u00f3n: Shopy Crafter ejecuta las 79 acciones seg\u00fan el r
 p('4. Resultados: Pricing e im\u00e1genes visibles en 24-48h. SEO completo en 3-6 meses.');
 
 h3('Garant\u00edas de Servicio');
-checks(['Sin permanencia \u2014 cancela en cualquier momento',
-  'Sin tarjeta de cr\u00e9dito para empezar',
-  'Pagos exclusivamente v\u00eda Shopify',
-  'RGPD compliant \u2014 datos en la UE',
-  'Encriptaci\u00f3n AES-256 para tokens',
-  '99.9% de uptime garantizado',
-  'Soporte completo en espa\u00f1ol']);
+bullet('\u2713', 'Sin permanencia \u2014 cancela en cualquier momento');
+bullet('\u2713', 'Sin tarjeta de cr\u00e9dito para empezar');
+bullet('\u2713', 'Pagos exclusivamente v\u00eda Shopify');
+bullet('\u2713', 'RGPD compliant \u2014 datos en la UE');
+bullet('\u2713', 'Encriptaci\u00f3n AES-256 para tokens');
+bullet('\u2713', '99.9% de uptime garantizado');
+bullet('\u2713', 'Soporte completo en espa\u00f1ol');
 
 h3('Contacto');
 tbl(['', ''],
@@ -990,7 +954,10 @@ tbl(['', ''],
    ['Motor IA', 'Shopy Crafter (OmniCore AI)']],
   [120, 375]);
 
-Y += 15;
+// ================================================================
+//  CONTRAPORTADA
+// ================================================================
+Y += 12;
 const closingH = 110;
 if (Y + closingH > PB) {
   newPage('Contraportada');
