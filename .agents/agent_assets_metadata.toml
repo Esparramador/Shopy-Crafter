@@ -18,3 +18,9 @@ id = "1c38DRC9ULgblKY6KtZ9b"
 uri = "file://CMS_DOCUMENTATION.md"
 type = "text"
 title = "CMS ShopyBrain — Documentación Completa"
+
+[[outputs]]
+id = "UQum0MgCY1SOySXAAvOo2"
+uri = "file://artifacts/shopify-optimizer/public/informe-shopycrafter-servicios.md"
+type = "text"
+title = "Informe Ejecutivo Shopy Crafter — Servicios y Capacidades Completas"
