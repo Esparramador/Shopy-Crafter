@@ -107,9 +107,18 @@ async function ensureAdminUser() {
       });
       logger.info({ email: ADMIN_EMAIL }, "✅ Admin user created on startup");
     } else {
-      if (!existing[0].name) {
-        await db.update(usersTable).set({ name: ADMIN_NAME }).where(eq(usersTable.email, ADMIN_EMAIL));
-        logger.info({ email: ADMIN_EMAIL }, "✅ Admin name patched");
+      const needsNamePatch = !existing[0].name;
+      const updates: Record<string, unknown> = {};
+      if (needsNamePatch) updates.name = ADMIN_NAME;
+      if (process.env.NODE_ENV !== "production") {
+        const pwMatch = existing[0].password ? await bcrypt.compare(ADMIN_PASS, existing[0].password) : false;
+        if (!pwMatch) {
+          updates.password = await bcrypt.hash(ADMIN_PASS, 12);
+          logger.info({ email: ADMIN_EMAIL }, "🔑 Admin password synced (dev only)");
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.update(usersTable).set(updates).where(eq(usersTable.email, ADMIN_EMAIL));
       }
       logger.info({ email: ADMIN_EMAIL, role: existing[0].role }, "✅ Admin user present");
     }

@@ -49,12 +49,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+    } catch {
+      throw new Error("No se puede conectar con el servidor. Intenta de nuevo en unos segundos.");
+    }
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      throw new Error("El servidor no responde correctamente. Espera unos segundos e intenta de nuevo.");
+    }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Error al iniciar sesión");
     const u = await fetchMe();
