@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Servicios — Shopy Crafter</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #C9A84C;
+  --gold-light: #E8D48B;
+  --dark: #0A0A0F;
+  --dark-card: #111118;
+  --dark-border: #1E1E2A;
+  --text: #E0E0E6;
+  --text-muted: #8A8A9A;
+  --accent-green: #2ECC71;
+  --accent-blue: #3498DB;
+  --accent-red: #E74C3C;
+  --accent-purple: #9B59B6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@media screen {
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.7;
+    padding: 0;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+  .page { page-break-after: always; box-shadow: none !important; border: none !important; padding: 40px !important; max-width: 100% !important; margin: 0 !important; }
+  .page:last-child { page-break-after: avoid; }
+  .no-print { display: none !important; }
+  .cover-bg { background: #0A0A0F !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table { font-size: 10pt; }
+  h2 { color: #0A0A0F !important; }
+  .section-number { background: #C9A84C !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+.page {
+  max-width: 900px;
+  margin: 0 auto 40px;
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 12px;
+  padding: 60px;
+  min-height: 100vh;
+  position: relative;
+}
+
+.cover-bg {
+  background: linear-gradient(135deg, #0A0A0F 0%, #12121F 50%, #0A0A0F 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 100vh;
+}
+
+.cover-logo {
+  width: 80px;
+  height: 80px;
+  background: var(--gold);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 40px;
+  font-family: 'Playfair Display', serif;
+}
+
+.cover-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.cover-title em {
+  color: var(--gold);
+  font-style: italic;
+}
+
+.cover-subtitle {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-bottom: 60px;
+  max-width: 500px;
+  line-height: 1.6;
+}
+
+.cover-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 60px;
+  text-align: left;
+  margin-top: 20px;
+}
+
+.cover-meta-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.cover-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.cover-meta-value {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.cover-line {
+  width: 60px;
+  height: 2px;
+  background: var(--gold);
+  margin: 40px auto;
+}
+
+.cover-badge {
+  display: inline-block;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 6px 20px;
+  border-radius: 20px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 30px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--dark-border);
+  margin-bottom: 40px;
+}
+
+.page-header-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.page-header-right {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  color: #fff;
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+h2 em {
+  color: var(--gold);
+  font-style: italic;
+}
+
+.section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--gold);
+  color: var(--dark);
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  color: var(--gold-light);
+  margin: 30px 0 16px;
+}
+
+h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 20px 0 10px;
+}
+
+p {
+  margin-bottom: 16px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.lead {
+  font-size: 17px;
+  color: var(--text-muted);
+  line-height: 1.8;
+  margin-bottom: 30px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0 30px;
+  font-size: 14px;
+}
+
+thead th {
+  background: rgba(201, 168, 76, 0.12);
+  color: var(--gold);
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--gold);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+tbody td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--dark-border);
+  vertical-align: top;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover {
+  background: rgba(201, 168, 76, 0.04);
+}
+
+.highlight-row td {
+  background: rgba(201, 168, 76, 0.08);
+  font-weight: 500;
+}
+
+.price {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tag-gold { background: rgba(201,168,76,0.15); color: var(--gold); }
+.tag-green { background: rgba(46,204,113,0.15); color: var(--accent-green); }
+.tag-blue { background: rgba(52,152,219,0.15); color: var(--accent-blue); }
+.tag-purple { background: rgba(155,89,182,0.15); color: var(--accent-purple); }
+.tag-red { background: rgba(231,76,60,0.15); color: var(--accent-red); }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 24px 0 30px;
+}
+
+.stat-card {
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid var(--dark-border);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin: 24px 0;
+}
+
+.plan-card {
+  border: 1px solid var(--dark-border);
+  border-radius: 12px;
+  padding: 28px;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.plan-card:hover {
+  border-color: var(--gold);
+}
+
+.plan-card.popular {
+  border-color: var(--gold);
+  background: rgba(201, 168, 76, 0.04);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -10px;
+  right: 20px;
+  background: var(--gold);
+  color: var(--dark);
+  padding: 3px 14px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.plan-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.plan-price {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.plan-price span {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.plan-setup {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+}
+
+.plan-features li {
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-features li::before {
+  content: "✓";
+  color: var(--accent-green);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.plan-features li.excluded {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.plan-features li.excluded::before {
+  content: "✕";
+  color: var(--accent-red);
+}
+
+.motor-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--dark-border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.motor-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.motor-icon.m1 { background: rgba(52,152,219,0.15); }
+.motor-icon.m2 { background: rgba(155,89,182,0.15); }
+.motor-icon.m3 { background: rgba(46,204,113,0.15); }
+.motor-icon.m4 { background: rgba(231,76,60,0.15); }
+.motor-icon.m5 { background: rgba(201,168,76,0.15); }
+.motor-icon.m6 { background: rgba(52,152,219,0.15); }
+
+.motor-info h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.motor-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.comparison-better {
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.comparison-worse {
+  color: var(--text-muted);
+}
+
+.footer-bar {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dark-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.footer-bar .logo-text {
+  color: var(--gold);
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+}
+
+.download-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--dark-border);
+  padding: 14px 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+
+.download-bar button {
+  background: var(--gold);
+  color: var(--dark);
+  border: none;
+  padding: 10px 28px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: opacity 0.2s;
+}
+
+.download-bar button:hover { opacity: 0.9; }
+
+.download-bar span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+
+.toc-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dark-border);
+  font-size: 15px;
+}
+
+.toc-list li:hover { background: rgba(201,168,76,0.04); }
+
+.toc-num {
+  color: var(--gold);
+  font-weight: 600;
+  margin-right: 12px;
+  font-size: 13px;
+}
+
+.toc-page {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.flow-steps {
+  position: relative;
+  padding-left: 30px;
+  margin: 20px 0;
+}
+
+.flow-steps::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--dark-border);
+}
+
+.flow-step {
+  position: relative;
+  padding: 12px 0 12px 20px;
+}
+
+.flow-step::before {
+  content: attr(data-step);
+  position: absolute;
+  left: -23px;
+  width: 24px;
+  height: 24px;
+  background: var(--gold);
+  color: var(--dark);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.flow-step-title {
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.flow-step-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.action-item {
+  background: rgba(201,168,76,0.04);
+  border: 1px solid var(--dark-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="page cover-bg">
+  <div class="cover-badge">Documento Confidencial</div>
+  <div class="cover-logo">SC</div>
+  <div class="cover-title">Informe Ejecutivo de<br><em>Servicios y Capacidades</em></div>
+  <div class="cover-line"></div>
+  <div class="cover-subtitle">
+    Catálogo completo de servicios, tecnología, precios y capacidades de la plataforma de agencia Shopify con IA más avanzada del mercado.
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Empresa</span>
+      <span class="cover-meta-value">Shopy Crafter</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Motor IA</span>
+      <span class="cover-meta-value">ShopyBrain (OmniCore AI)</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Fecha</span>
+      <span class="cover-meta-value">Marzo 2026</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Web</span>
+      <span class="cover-meta-value">shopycrafter.com</span>
+    </div>
+  </div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">Informe de Servicios — Marzo 2026</span>
+  </div>
+  <h2>Índice de <em>Contenidos</em></h2>
+  <ol class="toc-list">
+    <li><span><span class="toc-num">01</span> Resumen Ejecutivo</span> <span class="toc-page">Pág. 3</span></li>
+    <li><span><span class="toc-num">02</span> Arquitectura Tecnológica</span> <span class="toc-page">Pág. 4</span></li>
+    <li><span><span class="toc-num">03</span> Los 6 Motores de Optimización</span> <span class="toc-page">Pág. 5</span></li>
+    <li><span><span class="toc-num">04</span> Catálogo de 79 Acciones Automatizadas</span> <span class="toc-page">Pág. 6-7</span></li>
+    <li><span><span class="toc-num">05</span> Planes de Suscripción</span> <span class="toc-page">Pág. 8</span></li>
+    <li><span><span class="toc-num">06</span> Servicios Puntuales y Packs</span> <span class="toc-page">Pág. 9</span></li>
+    <li><span><span class="toc-num">07</span> Estándar de Calidad 100/100</span> <span class="toc-page">Pág. 10</span></li>
+    <li><span><span class="toc-num">08</span> Ventajas Competitivas</span> <span class="toc-page">Pág. 11</span></li>
+    <li><span><span class="toc-num">09</span> Flujo de Trabajo del Cliente</span> <span class="toc-page">Pág. 12</span></li>
+    <li><span><span class="toc-num">10</span> Benchmarks por Industria</span> <span class="toc-page">Pág. 13</span></li>
+    <li><span><span class="toc-num">11</span> Contacto y Siguiente Paso</span> <span class="toc-page">Pág. 14</span></li>
+  </ol>
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>shopycrafter.com · craftershopy@gmail.com</span>
+  </div>
+</div>
+
+<!-- PÁGINA 3: RESUMEN EJECUTIVO -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">01 · Resumen Ejecutivo</span>
+  </div>
+  <h2><span class="section-number">01</span> Resumen <em>Ejecutivo</em></h2>
+  <p class="lead">
+    <strong>Shopy Crafter</strong> es una agencia Shopify 100% potenciada por inteligencia artificial que crea, gestiona, optimiza y escala tiendas Shopify de manera completamente autónoma. La plataforma opera 24/7 a través de <strong>ShopyBrain</strong>, un motor de IA dual que combina la potencia de Claude (Anthropic) y Gemini (Google).
+  </p>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">79</div>
+      <div class="stat-label">Acciones IA</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">46K+</div>
+      <div class="stat-label">Insights</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">6</div>
+      <div class="stat-label">Motores</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">24/7</div>
+      <div class="stat-label">Operativo</div>
+    </div>
+  </div>
+
+  <h3>Propuesta de Valor</h3>
+  <p>Donde una agencia tradicional necesita 5-10 personas y semanas de trabajo, Shopy Crafter entrega los mismos resultados — o superiores — en minutos, con calidad verificable y precios transparentes.</p>
+
+  <h3>Modelo de Negocio</h3>
+  <p>Servicios puntuales (one-time) + retainers mensuales (recurring). Pagos procesados exclusivamente por Shopify. <strong>Sin permanencia, sin tarjeta de crédito para empezar, cancelación inmediata.</strong></p>
+
+  <h3>Garantías</h3>
+  <table>
+    <tbody>
+      <tr><td>✓ Sin tarjeta de crédito</td><td>✓ Setup en 5 minutos</td></tr>
+      <tr><td>✓ Cancela cuando quieras</td><td>✓ RGPD compliant</td></tr>
+      <tr><td>✓ Encriptación AES-256</td><td>✓ 99.9% Uptime</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 3 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 4: ARQUITECTURA TECNOLÓGICA -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">02 · Arquitectura Tecnológica</span>
+  </div>
+  <h2><span class="section-number">02</span> Arquitectura <em>Tecnológica</em></h2>
+  <p class="lead">ShopyBrain utiliza un motor de IA dual que combina múltiples modelos especializados para ofrecer capacidades sin precedentes en el mercado de agencias Shopify.</p>
+
+  <h3>Motor Dual de IA — ShopyBrain</h3>
+  <table>
+    <thead>
+      <tr><th>Componente</th><th>Tecnología</th><th>Función</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Claude Sonnet 4.5</strong></td><td>Anthropic</td><td>Razonamiento complejo, análisis financiero, generación de contenido profesional, auditorías SEO</td></tr>
+      <tr><td><strong>Gemini 2.0 Flash</strong></td><td>Google</td><td>Google Search Grounding en tiempo real, investigación de mercado, precios de competidores</td></tr>
+      <tr><td><strong>Flux 1.1 Pro</strong></td><td>Replicate</td><td>Generación de imágenes profesionales de producto (8 tipos distintos)</td></tr>
+      <tr><td><strong>Recraft v3</strong></td><td>Replicate</td><td>Consistencia visual y aplicación de guía de marca automática</td></tr>
+      <tr><td><strong>OmniCore Brain</strong></td><td>Propio</td><td>46.199 insights acumulados, 311 memorias consolidadas, aprendizaje continuo 24/7</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Seguridad y Compliance</h3>
+  <table>
+    <tbody>
+      <tr><td><strong>Encriptación</strong></td><td>AES-256 para todos los tokens de acceso Shopify</td></tr>
+      <tr><td><strong>RGPD</strong></td><td>Totalmente compliant — datos procesados en la UE</td></tr>
+      <tr><td><strong>Tokens</strong></td><td>Renovación automática cada 20 horas con 4h de margen de seguridad</td></tr>
+      <tr><td><strong>Pagos</strong></td><td>Sin almacenamiento de datos de tarjeta — pagos vía Shopify</td></tr>
+      <tr><td><strong>Sesiones</strong></td><td>Autenticación segura con express-session y roles (admin/client)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Integraciones Nativas</h3>
+  <table>
+    <thead><tr><th>Servicio</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td>🛍️ Shopify Admin API</td><td>Productos, colecciones, pedidos, themes, metafields</td></tr>
+      <tr><td>🔍 Google Search (Gemini)</td><td>Investigación de mercado y precios en tiempo real</td></tr>
+      <tr><td>⚡ Google PageSpeed API</td><td>Core Web Vitals y rendimiento</td></tr>
+      <tr><td>🎨 Replicate</td><td>Generación de imágenes IA (Flux + Recraft)</td></tr>
+      <tr><td>📧 Klaviyo</td><td>Email marketing: flujos automatizados + campañas</td></tr>
+      <tr><td>📬 Gmail API</td><td>Comunicaciones de la agencia</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 4 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 5: LOS 6 MOTORES -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">03 · Los 6 Motores</span>
+  </div>
+  <h2><span class="section-number">03</span> Los 6 Motores de <em>Optimización</em></h2>
+  <p class="lead">Cada motor es un sistema especializado que trabaja de forma autónoma y coordinada para optimizar cada aspecto de tu tienda Shopify.</p>
+
+  <div class="motor-card">
+    <div class="motor-icon m1">🖼️</div>
+    <div class="motor-info">
+      <h4>M1 — Generación de Imágenes</h4>
+      <p>8 tipos de imagen profesional por producto: Hero, Lifestyle, Detalle, Packaging, UGC, Escala, Bundle e Infografía. Tecnología Replicate Flux 1.1 Pro + Recraft v3. Coste: ~€0.25/producto. Precisión: 94%.</p>
+    </div>
+  </div>
+
+  <div class="motor-card">
+    <div class="motor-icon m2">🎨</div>
+    <div class="motor-info">
+      <h4>M2 — Consistencia Visual</h4>
+      <p>Aplica automáticamente la guía de marca: paleta de colores, tipografía, estilo fotográfico coherente, iluminación cinematográfica (ratio Rembrandt 5:1). Cada imagen mantiene la identidad de tu marca.</p>
+    </div>
+  </div>
+
+  <div class="motor-card">
+    <div class="motor-icon m3">⚗️</div>
+    <div class="motor-info">
+      <h4>M3 — A/B Testing Automático</h4>
+      <p>Tests automáticos con pixel tracking real: títulos, precios, imágenes, descripciones. Declaración automática de ganadores por confianza estadística. La variante ganadora se aplica automáticamente.</p>
+    </div>
+  </div>
+
+  <div class="motor-card">
+    <div class="motor-icon m4">⚡</div>
+    <div class="motor-info">
+      <h4>M4 — Auto-Pilot 24/7</h4>
+      <p>12 cron jobs activos: renovación de tokens (20h), micro-learning (3h), consolidación de insights (6h), cross-synthesis (12h), deep study (1am), revenue snapshots (2am), datos reales (3am), competidores (6am), inventario (7am), mega-synthesis (dom), retroanálisis (dom), auto-evaluación (1º/mes).</p>
+    </div>
+  </div>
+
+  <div class="motor-card">
+    <div class="motor-icon m5">💰</div>
+    <div class="motor-info">
+      <h4>M5 — Pricing Financiero</h4>
+      <p>P&L completo, COGS real, unit economics, elasticidad precio-demanda, simulador de escenarios, forecast financiero a 3-6 meses con 3 escenarios. Psicología de precios aplicada (.97/.99, anchoring, decoy effect).</p>
+    </div>
+  </div>
+
+  <div class="motor-card">
+    <div class="motor-icon m6">🔍</div>
+    <div class="motor-info">
+      <h4>M6 — SEO Técnico</h4>
+      <p>Auditoría Semrush-level con 16 criterios ponderados. Schema JSON-LD (Product, BreadcrumbList, Organization, FAQ). Meta tags, keywords, alt texts, sitemap. Investigación de keywords con Google Search real.</p>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 5 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 6: ACCIONES AUTOMATIZADAS (Parte 1) -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">04 · Acciones Automatizadas (I)</span>
+  </div>
+  <h2><span class="section-number">04</span> Catálogo de <em>79 Acciones</em> IA</h2>
+  <p class="lead">ShopyBrain ejecuta 79 acciones automatizadas que cubren el 100% de las operaciones necesarias para gestionar una tienda Shopify profesional.</p>
+
+  <h3>Gestión de Productos <span class="tag tag-gold">14 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Crear producto</strong></td><td>Con investigación de mercado real, pricing psicológico, descripción 800-1200 palabras, 22-28 tags SEO</td></tr>
+      <tr><td><strong>Editar / Eliminar producto</strong></td><td>Edita cualquier campo o elimina productos del catálogo</td></tr>
+      <tr><td><strong>Buscar / Listar productos</strong></td><td>Búsqueda por título/vendor/type, listado paginado o completo</td></tr>
+      <tr><td><strong>Publicar / Cambiar estado</strong></td><td>Publica borradores o cambia estado (active/draft/archived)</td></tr>
+      <tr><td><strong>Cambiar precio</strong></td><td>Con psicología de pricing aplicada automáticamente</td></tr>
+      <tr><td><strong>Optimizar producto(s)</strong></td><td>Optimización integral o masiva de todo el catálogo</td></tr>
+      <tr><td><strong>Rediseño IA</strong></td><td>Rediseño completo con metodología Semrush (individual o masivo)</td></tr>
+      <tr><td><strong>Aplicar rediseño</strong></td><td>Aplica campos específicos de un rediseño aprobado</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Imágenes IA <span class="tag tag-blue">3 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th><th>Coste</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Generar imágenes</strong></td><td>8 tipos de imagen profesional para un producto</td><td class="price">~€0.25</td></tr>
+      <tr><td><strong>Generación masiva</strong></td><td>Genera imágenes para múltiples productos a la vez</td><td class="price">~€0.25/prod</td></tr>
+      <tr><td><strong>Optimizar imágenes</strong></td><td>Compresión, alt text, lazy loading</td><td class="price">Incluido</td></tr>
+    </tbody>
+  </table>
+
+  <h3>SEO Técnico <span class="tag tag-green">10 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Auditoría SEO completa</strong></td><td>16 criterios ponderados nivel Semrush (título 12%, descripción 22%, precio 10%, imágenes 18%, SEO 18%, calidad 12%, trust 8%)</td></tr>
+      <tr><td><strong>Keyword Intelligence</strong></td><td>Investigación de keywords con Google Search real (buyer intent, long-tail, LSI)</td></tr>
+      <tr><td><strong>Estrategia de blog</strong></td><td>Calendario editorial, topics, keyword clusters</td></tr>
+      <tr><td><strong>Generar artículo</strong></td><td>Artículo optimizado 1500+ palabras con schema FAQ</td></tr>
+      <tr><td><strong>Schemas JSON-LD</strong></td><td>Product, BreadcrumbList, Organization, FAQ, WebSite</td></tr>
+      <tr><td><strong>Meta tags / Alt texts</strong></td><td>Generación y corrección masiva</td></tr>
+      <tr><td><strong>Sitemap / PageSpeed</strong></td><td>Optimización de sitemap y auditoría Core Web Vitals</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 6 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 7: ACCIONES AUTOMATIZADAS (Parte 2) -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">04 · Acciones Automatizadas (II)</span>
+  </div>
+
+  <h3>Pricing e Inteligencia Financiera <span class="tag tag-gold">6 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Precio óptimo</strong></td><td>Calcula precio basado en competidores reales + elasticidad demanda</td></tr>
+      <tr><td><strong>Estimación COGS</strong></td><td>Materiales + producción + packaging + envío + comisiones</td></tr>
+      <tr><td><strong>Simulador de precios</strong></td><td>"Si cambio a X€, ¿qué pasa con margen y volumen?"</td></tr>
+      <tr><td><strong>Forecast financiero</strong></td><td>Proyección a 3-6 meses con escenarios optimista/base/pesimista</td></tr>
+      <tr><td><strong>Dashboard financiero</strong></td><td>Revenue, márgenes, AOV, CLV, CAC, ROAS en tiempo real</td></tr>
+      <tr><td><strong>Pricing competitivo</strong></td><td>Investiga precios de competidores en tiempo real con Google Search</td></tr>
+    </tbody>
+  </table>
+
+  <h3>A/B Testing <span class="tag tag-purple">3 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Crear test</strong></td><td>A/B test con pixel tracking (título, precio, imagen, descripción)</td></tr>
+      <tr><td><strong>Listar tests</strong></td><td>Tests activos con métricas: visitas, conversiones, confianza</td></tr>
+      <tr><td><strong>Declarar ganador</strong></td><td>Aplica variante ganadora automáticamente</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Email Marketing <span class="tag tag-red">2 acciones</span></h3>
+  <table>
+    <thead><tr><th>Acción</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Generar flujo</strong></td><td>Welcome Series (5 emails), Abandoned Cart (3), Post-Purchase (4), Win-Back, Browse Abandonment</td></tr>
+      <tr><td><strong>Generar email</strong></td><td>Email individual con copy profesional, CTA optimizado, HTML responsive</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Competencia, Inventario, Agencia y Más <span class="tag tag-blue">21 acciones</span></h3>
+  <table>
+    <thead><tr><th>Categoría</th><th>Acciones</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Competencia</strong></td><td>Escaneo de competidores, análisis de productos específicos</td></tr>
+      <tr><td><strong>Inventario</strong></td><td>Sincronización Shopify, alertas de stock bajo y restock</td></tr>
+      <tr><td><strong>Colecciones</strong></td><td>Crear, listar, auto-generar colecciones inteligentes</td></tr>
+      <tr><td><strong>Páginas</strong></td><td>Crear/listar páginas (About, FAQ, Shipping, Returns, Contact)</td></tr>
+      <tr><td><strong>Theme Shopify</strong></td><td>Listar, leer, editar archivos del theme (Liquid, CSS, JSON), crear secciones, auditar, analizar componentes, corregir código</td></tr>
+      <tr><td><strong>CMS / Landing</strong></td><td>Leer, actualizar campos individuales o batch, resetear CMS</td></tr>
+      <tr><td><strong>Agencia</strong></td><td>Generar presupuestos, propuestas comerciales, investigar proveedores</td></tr>
+      <tr><td><strong>OmniCore Brain</strong></td><td>Estadísticas, sincronización, exportación, diagnóstico</td></tr>
+      <tr><td><strong>Setup completo</strong></td><td>Configura tienda desde cero en 9 pasos automáticos</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 7 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 8: PLANES DE SUSCRIPCIÓN -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">05 · Planes de Suscripción</span>
+  </div>
+  <h2><span class="section-number">05</span> Planes de <em>Suscripción</em></h2>
+  <p class="lead">Transparente. Sin sorpresas. Sin permanencia. Cancela cuando quieras.</p>
+
+  <div class="plan-grid">
+    <div class="plan-card">
+      <div class="plan-name">Photoshoot Pro</div>
+      <div class="plan-price">€497 <span>pago único</span></div>
+      <div class="plan-setup">Sin retainer mensual</div>
+      <ul class="plan-features">
+        <li>120 imágenes IA (4 variantes × 30 SKUs)</li>
+        <li>Consistencia visual con guía de marca</li>
+        <li>Iluminación cinematográfica (Rembrandt 5:1)</li>
+        <li>Audit SEO de 30 fichas de producto</li>
+        <li>1 sesión estratégica de pricing</li>
+        <li>Entrega en 7 días laborables</li>
+        <li>Soporte email 30 días post-entrega</li>
+        <li class="excluded">A/B testing automático</li>
+        <li class="excluded">Auto-pilot continuo</li>
+      </ul>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-name">Growth Studio</div>
+      <div class="plan-price">€297<span>/mes</span></div>
+      <div class="plan-setup">+ €197 setup único</div>
+      <ul class="plan-features">
+        <li>Imágenes IA ilimitadas</li>
+        <li>A/B testing (3 productos simultáneos)</li>
+        <li>Pricing financiero (elasticidad)</li>
+        <li>SEO técnico (100 URLs/mes)</li>
+        <li>Auto-pilot básico</li>
+        <li>Dashboard analytics</li>
+        <li>Soporte email+chat &lt;24h</li>
+        <li class="excluded">A/B testing ilimitado</li>
+        <li class="excluded">Custom AI model training</li>
+      </ul>
+    </div>
+
+    <div class="plan-card popular">
+      <div class="plan-badge">Más Popular</div>
+      <div class="plan-name">Performance Lab</div>
+      <div class="plan-price">€797<span>/mes</span></div>
+      <div class="plan-setup">+ €397 setup único</div>
+      <ul class="plan-features">
+        <li>Todo de Growth Studio +</li>
+        <li>A/B testing ilimitado</li>
+        <li>Auto-pilot avanzado 24/7</li>
+        <li>Pricing predictivo con simulación</li>
+        <li>SEO ilimitado (crawling + fixes auto)</li>
+        <li>Schema Augmentation a escala</li>
+        <li>Custom AI fine-tuning</li>
+        <li>Soporte prioritario &lt;4h</li>
+        <li>Sesión mensual estrategia 60 min</li>
+        <li>Acceso anticipado nuevos motores</li>
+      </ul>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-name">Enterprise Omnicore</div>
+      <div class="plan-price">€2.497+<span>/mes</span></div>
+      <div class="plan-setup">Setup incluido</div>
+      <ul class="plan-features">
+        <li>Todo de Performance Lab +</li>
+        <li>Account manager dedicado + SLA</li>
+        <li>Motores IA custom</li>
+        <li>Infraestructura dedicada</li>
+        <li>API privada + webhooks</li>
+        <li>White-label completo</li>
+        <li>SSO enterprise (SAML/OAuth/AD)</li>
+        <li>Compliance GDPR, SOC2, ISO 27001</li>
+        <li>Soporte 24/7 &lt;1h critical</li>
+        <li>QBRs + training equipo</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 8 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 9: SERVICIOS PUNTUALES -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">06 · Servicios Puntuales</span>
+  </div>
+  <h2><span class="section-number">06</span> Servicios Puntuales <em>y Packs</em></h2>
+  <p class="lead">Servicios one-time para necesidades específicas. Sin compromiso mensual.</p>
+
+  <h3>Catálogo de Servicios</h3>
+  <table>
+    <thead><tr><th>Servicio</th><th>Precio</th><th>Descripción</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Auditoría Completa</strong></td><td class="price">€197/tienda</td><td>Análisis integral: productos, SEO (16 criterios), COGS, pricing, imágenes, competencia + plan de acción</td></tr>
+      <tr><td><strong>Rediseño IA por producto</strong></td><td class="price">€9/producto</td><td>Título SEO, descripción 400+ palabras, tags optimizados, meta description</td></tr>
+      <tr><td><strong>Imagen IA Profesional</strong></td><td class="price">€3/imagen</td><td>Hero, Lifestyle, Detalle, Packaging, UGC, Escala, Bundle, Infografía</td></tr>
+      <tr><td><strong>Informe Pricing</strong></td><td class="price">€97/informe</td><td>COGS real, unit economics, márgenes, análisis competitivo, estrategia pricing</td></tr>
+      <tr><td><strong>SEO por producto</strong></td><td class="price">€7/producto</td><td>Meta tags, keywords, Schema JSON-LD, alt texts, internal linking</td></tr>
+      <tr><td><strong>Informe Competencia</strong></td><td class="price">€97/informe</td><td>Competidores directos: productos, precios, gaps, oportunidades</td></tr>
+      <tr><td><strong>Proveedores</strong></td><td class="price">€97/invest.</td><td>Búsqueda global (Alibaba, 1688, Global Sources), comparativa, negociación</td></tr>
+      <tr><td><strong>Setup Email Marketing</strong></td><td class="price">€197</td><td>5 flujos automatizados (Welcome, Cart, Post-Purchase, Win-Back, Browse)</td></tr>
+      <tr><td><strong>Proyección de Ventas</strong></td><td class="price">€127/informe</td><td>Forecast 3-6 meses, 3 escenarios, estacionalidad, recomendaciones</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Packs Recomendados</h3>
+  <table>
+    <thead><tr><th>Pack</th><th>Contenido</th><th>Precio</th></tr></thead>
+    <tbody>
+      <tr class="highlight-row"><td><strong>Pack Rediseño 30</strong></td><td>30 productos × rediseño completo IA</td><td class="price">€270</td></tr>
+      <tr><td><strong>Pack Imágenes 30</strong></td><td>30 productos × imagen profesional IA</td><td class="price">€90</td></tr>
+      <tr><td><strong>Pack SEO 30</strong></td><td>30 productos × optimización SEO completa</td><td class="price">€210</td></tr>
+      <tr class="highlight-row"><td><strong>Pack Tienda Completa</strong></td><td>Auditoría + 30 Rediseños + 30 SEO + Pricing</td><td class="price">€774</td></tr>
+      <tr class="highlight-row"><td><strong>Pack Premium Total</strong></td><td>Todo lo anterior + 120 Imágenes + Email + Competencia</td><td class="price">€1.258</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Servicios Recurrentes</h3>
+  <table>
+    <thead><tr><th>Servicio</th><th>Precio</th><th>Incluye</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Mantenimiento Básico</strong></td><td class="price">€49/mes</td><td>Monitorización + actualizaciones + soporte email</td></tr>
+      <tr><td><strong>Gestión Activa</strong></td><td class="price">€149/mes</td><td>Optimización continua + informes semanales + A/B testing</td></tr>
+      <tr><td><strong>Premium Ilimitado</strong></td><td class="price">€399/mes</td><td>Todo incluido + prioridad + SLA 99.9% + account manager</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 9 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 10: ESTÁNDAR DE CALIDAD -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">07 · Estándar de Calidad</span>
+  </div>
+  <h2><span class="section-number">07</span> Estándar de Calidad <em>100/100</em></h2>
+  <p class="lead">Cada producto creado o optimizado por ShopyBrain cumple con el estándar de calidad más exigente del mercado, verificable y medible.</p>
+
+  <h3>7 Dimensiones de Auditoría (Ponderadas)</h3>
+  <table>
+    <thead><tr><th>Dimensión</th><th>Peso</th><th>Criterios Clave</th></tr></thead>
+    <tbody>
+      <tr><td><strong>📝 Título</strong></td><td class="price">12%</td><td>45-65 caracteres, keyword principal primero, formato SEO optimizado</td></tr>
+      <tr><td><strong>📄 Descripción</strong></td><td class="price">22%</td><td>800-1200 palabras, 8 secciones (storytelling, beneficios, specs, FAQ, trust), Flesch-Kincaid, keyword density 1-3%</td></tr>
+      <tr><td><strong>💰 Precio</strong></td><td class="price">10%</td><td>Precio + compare_at_price 30-40% superior, pricing psicológico (.97/.99), margen mínimo 40%</td></tr>
+      <tr><td><strong>🖼️ Imágenes</strong></td><td class="price">18%</td><td>8+ imágenes (hero, lifestyle, detalle, packaging, UGC, escala, bundle, infografía), alt text descriptivo</td></tr>
+      <tr><td><strong>🔍 SEO Meta</strong></td><td class="price">18%</td><td>Title 60 chars, description 130-155 chars, Schema JSON-LD Product, canonical URL, Open Graph</td></tr>
+      <tr><td><strong>✍️ Calidad Contenido</strong></td><td class="price">12%</td><td>Keywords consistentes, headings H1-H3, links internos, readability score</td></tr>
+      <tr><td><strong>🛡️ Trust Signals</strong></td><td class="price">8%</td><td>Sección FAQ, garantía, política devoluciones, badges de seguridad</td></tr>
+    </tbody>
+  </table>
+
+  <h3>16 Criterios SEO (Nivel Semrush)</h3>
+  <div class="action-grid">
+    <div class="action-item">1. Title Tag</div>
+    <div class="action-item">2. Meta Description</div>
+    <div class="action-item">3. URL Slug</div>
+    <div class="action-item">4. H1 Heading</div>
+    <div class="action-item">5. Content Length</div>
+    <div class="action-item">6. Keyword Density</div>
+    <div class="action-item">7. Internal Linking</div>
+    <div class="action-item">8. Image Alt Text</div>
+    <div class="action-item">9. Schema Product</div>
+    <div class="action-item">10. BreadcrumbList</div>
+    <div class="action-item">11. Open Graph</div>
+    <div class="action-item">12. Twitter Cards</div>
+    <div class="action-item">13. Canonical URL</div>
+    <div class="action-item">14. Mobile Responsive</div>
+    <div class="action-item">15. Core Web Vitals</div>
+    <div class="action-item">16. Content Quality</div>
+  </div>
+
+  <h3>Especificaciones de Producto World-Class</h3>
+  <table>
+    <thead><tr><th>Elemento</th><th>Requisito</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Título</strong></td><td>45-65 caracteres, keyword principal PRIMERO, sin caracteres especiales innecesarios</td></tr>
+      <tr><td><strong>Descripción</strong></td><td>800-1200 palabras con 8 secciones: storytelling, beneficios, especificaciones técnicas, cómo usar, FAQ (3-5 preguntas), trust signals, CTA, garantía</td></tr>
+      <tr><td><strong>Tags</strong></td><td>22-28 tags optimizados para búsqueda y colecciones automáticas</td></tr>
+      <tr><td><strong>Precio</strong></td><td>Investigado vs competidores reales, con compare_at_price y pricing psicológico</td></tr>
+      <tr><td><strong>Imágenes</strong></td><td>8 mínimo (hero, lifestyle, detalle, packaging, UGC, escala, bundle, infografía)</td></tr>
+      <tr><td><strong>Meta Description</strong></td><td>130-155 caracteres con keyword + CTA</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 10 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 11: VENTAJAS COMPETITIVAS -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">08 · Ventajas Competitivas</span>
+  </div>
+  <h2><span class="section-number">08</span> Ventajas <em>Competitivas</em></h2>
+
+  <h3>Shopy Crafter vs Agencia Tradicional</h3>
+  <table>
+    <thead><tr><th>Aspecto</th><th>Agencia Tradicional</th><th>Shopy Crafter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Equipo</strong></td><td class="comparison-worse">5-10 personas</td><td class="comparison-better">1 plataforma IA</td></tr>
+      <tr><td><strong>Entrega</strong></td><td class="comparison-worse">2-8 semanas</td><td class="comparison-better">Minutos a horas</td></tr>
+      <tr><td><strong>Coste mensual</strong></td><td class="comparison-worse">€2.000-10.000/mes</td><td class="comparison-better">€297-797/mes</td></tr>
+      <tr><td><strong>Disponibilidad</strong></td><td class="comparison-worse">9-18h laborables</td><td class="comparison-better">24/7/365</td></tr>
+      <tr><td><strong>Consistencia</strong></td><td class="comparison-worse">Variable</td><td class="comparison-better">100% consistente</td></tr>
+      <tr><td><strong>Escalabilidad</strong></td><td class="comparison-worse">Contratar más gente</td><td class="comparison-better">Ilimitada</td></tr>
+      <tr><td><strong>Aprendizaje</strong></td><td class="comparison-worse">Manual, individual</td><td class="comparison-better">46.000+ insights acumulativos</td></tr>
+      <tr><td><strong>SEO</strong></td><td class="comparison-worse">Manual, parcial</td><td class="comparison-better">16 criterios automáticos</td></tr>
+      <tr><td><strong>Imágenes</strong></td><td class="comparison-worse">Fotógrafo + estudio</td><td class="comparison-better">IA generativa en segundos</td></tr>
+      <tr><td><strong>A/B Testing</strong></td><td class="comparison-worse">Herramientas externas</td><td class="comparison-better">Integrado con auto-winners</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Shopy Crafter vs Apps Shopify Individuales</h3>
+  <table>
+    <thead><tr><th>Aspecto</th><th>Apps Individuales</th><th>Shopy Crafter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Coste combinado</strong></td><td class="comparison-worse">€150-500/mes en 5-8 apps</td><td class="comparison-better">Todo desde €297/mes</td></tr>
+      <tr><td><strong>Integración</strong></td><td class="comparison-worse">Fragmentada, silos</td><td class="comparison-better">Unificada, 6 motores coordinados</td></tr>
+      <tr><td><strong>Estrategia</strong></td><td class="comparison-worse">Sin visión global</td><td class="comparison-better">IA con visión global del negocio</td></tr>
+      <tr><td><strong>Soporte</strong></td><td class="comparison-worse">Múltiples vendors</td><td class="comparison-better">Un solo punto de contacto</td></tr>
+      <tr><td><strong>Datos</strong></td><td class="comparison-worse">Silos de datos separados</td><td class="comparison-better">OmniCore Brain unifica todo</td></tr>
+    </tbody>
+  </table>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">99.9%</div>
+      <div class="stat-label">Uptime</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">94%</div>
+      <div class="stat-label">Precisión IA</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">&lt;2s</div>
+      <div class="stat-label">Velocidad</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">12</div>
+      <div class="stat-label">Cron Jobs 24/7</div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 11 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 12: FLUJO DE TRABAJO -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">09 · Flujo de Trabajo</span>
+  </div>
+  <h2><span class="section-number">09</span> Flujo de Trabajo <em>del Cliente</em></h2>
+  <p class="lead">De zero a tienda optimizada en minutos. Así funciona el proceso de onboarding y optimización continua.</p>
+
+  <h3>Fase 1 — Onboarding (Día 1)</h3>
+  <div class="flow-steps">
+    <div class="flow-step" data-step="1">
+      <div class="flow-step-title">Conecta tu tienda Shopify</div>
+      <div class="flow-step-desc">Introduce tu dominio y Access Token. La plataforma se conecta al instante con la API de Shopify y escanea todo tu catálogo, configuración y métricas actuales.</div>
+    </div>
+    <div class="flow-step" data-step="2">
+      <div class="flow-step-title">La IA audita cada producto</div>
+      <div class="flow-step-desc">ShopyBrain analiza título, descripción, precio, imágenes y SEO de cada producto. Asigna una nota A–F y genera una lista priorizada de mejoras con impacto estimado en revenue.</div>
+    </div>
+  </div>
+
+  <h3>Fase 2 — Optimización (Semana 1)</h3>
+  <div class="flow-steps">
+    <div class="flow-step" data-step="3">
+      <div class="flow-step-title">Rediseño masivo del catálogo</div>
+      <div class="flow-step-desc">Títulos, descripciones y tags optimizados con calidad 100/100. Cada producto recibe una descripción de 800-1200 palabras con 8 secciones profesionales.</div>
+    </div>
+    <div class="flow-step" data-step="4">
+      <div class="flow-step-title">Generación de imágenes IA</div>
+      <div class="flow-step-desc">8 tipos de imagen profesional por producto generados automáticamente. Consistencia visual con la guía de marca de tu tienda.</div>
+    </div>
+    <div class="flow-step" data-step="5">
+      <div class="flow-step-title">SEO + Pricing + Email</div>
+      <div class="flow-step-desc">Meta tags, schemas JSON-LD, alt texts, sitemap optimizado. Análisis competitivo de precios. Setup de 5 flujos de email marketing automatizados.</div>
+    </div>
+  </div>
+
+  <h3>Fase 3 — Crecimiento Continuo (Semana 2+)</h3>
+  <div class="flow-steps">
+    <div class="flow-step" data-step="6">
+      <div class="flow-step-title">A/B Testing automático</div>
+      <div class="flow-step-desc">Tests en títulos, precios, imágenes y descripciones con pixel tracking real. Los ganadores se aplican automáticamente cuando alcanzan confianza estadística.</div>
+    </div>
+    <div class="flow-step" data-step="7">
+      <div class="flow-step-title">Auto-Pilot 24/7</div>
+      <div class="flow-step-desc">12 cron jobs de aprendizaje continuo: análisis de competidores (6am), inventario (7am), revenue (2am), deep learning (1am), síntesis semanal (domingos), y más.</div>
+    </div>
+    <div class="flow-step" data-step="8">
+      <div class="flow-step-title">Reporting y dashboard</div>
+      <div class="flow-step-desc">Dashboard con revenue, conversión, márgenes, SEO scores. Informes semanales con recomendaciones accionables. Forecast financiero actualizado.</div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 12 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 13: BENCHMARKS -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">10 · Benchmarks por Industria</span>
+  </div>
+  <h2><span class="section-number">10</span> Benchmarks por <em>Industria</em></h2>
+  <p class="lead">Datos de referencia del sector eCommerce que ShopyBrain utiliza para calibrar estrategias de pricing, márgenes y objetivos de conversión.</p>
+
+  <table>
+    <thead><tr><th>Industria</th><th>Margen Bruto</th><th>AOV Típico</th><th>Conversión</th></tr></thead>
+    <tbody>
+      <tr><td><strong>🧥 Fashion / Apparel</strong></td><td>50-70%</td><td>€60-120</td><td>1-3%</td></tr>
+      <tr><td><strong>📱 Electronics</strong></td><td>15-30%</td><td>€150-400</td><td>0.5-2%</td></tr>
+      <tr><td><strong>💄 Beauty / Cosmetics</strong></td><td>60-80%</td><td>€40-80</td><td>2-4%</td></tr>
+      <tr><td><strong>🏠 Home & Garden</strong></td><td>40-60%</td><td>€80-200</td><td>1-3%</td></tr>
+      <tr><td><strong>🍕 Food & Beverage</strong></td><td>30-50%</td><td>€30-60</td><td>2-4%</td></tr>
+      <tr><td><strong>💎 Jewelry</strong></td><td>60-80%</td><td>€100-500</td><td>0.5-2%</td></tr>
+      <tr><td><strong>🏋️ Sports / Fitness</strong></td><td>40-60%</td><td>€60-150</td><td>1-3%</td></tr>
+      <tr><td><strong>🐾 Pet Supplies</strong></td><td>40-55%</td><td>€35-70</td><td>2-4%</td></tr>
+      <tr><td><strong>🎨 Art / Crafts / Comics</strong></td><td>50-75%</td><td>€20-80</td><td>1-3%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Métricas Clave que ShopyBrain Monitoriza</h3>
+  <table>
+    <thead><tr><th>Métrica</th><th>Definición</th><th>Objetivo</th></tr></thead>
+    <tbody>
+      <tr><td><strong>AOV</strong></td><td>Average Order Value — Ingreso total / Nº pedidos</td><td>Según industria</td></tr>
+      <tr><td><strong>CLV</strong></td><td>Customer Lifetime Value — AOV × Frecuencia × Vida media</td><td>3-5x CAC</td></tr>
+      <tr><td><strong>CAC</strong></td><td>Customer Acquisition Cost — Gasto marketing / Nuevos clientes</td><td>Menor que CLV/3</td></tr>
+      <tr><td><strong>ROAS</strong></td><td>Return on Ad Spend — Ingresos ads / Gasto ads</td><td>&gt;4x</td></tr>
+      <tr><td><strong>Conversion Rate</strong></td><td>% de visitantes que compran</td><td>&gt;2% (bueno), &gt;5% (excelente)</td></tr>
+      <tr><td><strong>Margen Bruto</strong></td><td>(Ingresos - COGS) / Ingresos × 100</td><td>&gt;40%</td></tr>
+      <tr><td><strong>Email Open Rate</strong></td><td>% de emails abiertos</td><td>&gt;25%</td></tr>
+      <tr><td><strong>Email Click Rate</strong></td><td>% de clicks en emails</td><td>&gt;3%</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-bar">
+    <span class="logo-text">Shopy Crafter</span>
+    <span>Página 13 de 14</span>
+  </div>
+</div>
+
+<!-- PÁGINA 14: CONTACTO -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-logo">Shopy Crafter</span>
+    <span class="page-header-right">11 · Contacto</span>
+  </div>
+  <h2><span class="section-number">11</span> Siguiente <em>Paso</em></h2>
+  <p class="lead">Estamos listos para potenciar tu tienda Shopify. Contacta con nosotros y te responderemos en menos de 24 horas.</p>
+
+  <div style="background: rgba(201,168,76,0.06); border: 1px solid var(--dark-border); border-radius: 12px; padding: 40px; margin: 30px 0; text-align: center;">
+    <div style="font-family: 'Playfair Display', serif; font-size: 24px; color: #fff; margin-bottom: 20px;">¿Listo para empezar?</div>
+
+    <table style="max-width: 400px; margin: 0 auto;">
+      <tbody>
+        <tr><td style="text-align: right; padding-right: 16px; color: var(--gold); font-weight: 600;">Web</td><td>shopycrafter.com</td></tr>
+        <tr><td style="text-align: right; padding-right: 16px; color: var(--gold); font-weight: 600;">Email</td><td>craftershopy@gmail.com</td></tr>
+        <tr><td style="text-align: right; padding-right: 16px; color: var(--gold); font-weight: 600;">Empresa</td><td>Shopy Crafter</td></tr>
+        <tr><td style="text-align: right; padding-right: 16px; color: var(--gold); font-weight: 600;">Motor IA</td><td>ShopyBrain (OmniCore AI)</td></tr>
+        <tr><td style="text-align: right; padding-right: 16px; color: var(--gold); font-weight: 600;">Pagos</td><td>Vía Shopify (sin tarjeta)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Garantías de Servicio</h3>
+  <table>
+    <tbody>
+      <tr><td>✓ Sin permanencia — cancela en cualquier momento</td></tr>
+      <tr><td>✓ Sin tarjeta de crédito para comenzar</td></tr>
+      <tr><td>✓ Setup en menos de 5 minutos</td></tr>
+      <tr><td>✓ RGPD compliant — datos protegidos en la UE</td></tr>
+      <tr><td>✓ Encriptación AES-256 para todos los tokens</td></tr>
+      <tr><td>✓ 99.9% de uptime garantizado</td></tr>
+      <tr><td>✓ Soporte en español</td></tr>
+    </tbody>
+  </table>
+
+  <div style="text-align: center; margin-top: 40px; padding: 30px; border-top: 1px solid var(--dark-border);">
+    <div style="font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 8px;">
+      <span style="color: var(--gold);">Shopy</span> <span style="color: #fff;">Crafter</span>
+    </div>
+    <div style="color: var(--text-muted); font-size: 14px;">La agencia Shopify que trabaja 24/7 por ti</div>
+    <div style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">
+      © 2026 Shopy Crafter. Todos los derechos reservados.<br>
+      Documento generado por ShopyBrain (OmniCore AI) — Marzo 2026
+    </div>
+  </div>
+</div>
+
+<!-- BARRA DE DESCARGA -->
+<div class="download-bar no-print">
+  <span>Para descargar como PDF:</span>
+  <button onclick="window.print()">⬇ Imprimir / Guardar como PDF</button>
+  <span style="font-size: 12px; color: var(--text-muted);">En el diálogo de impresión, selecciona "Guardar como PDF" como destino</span>
+</div>
+
+<div style="height: 60px;" class="no-print"></div>
+
+</body>
+</html>
