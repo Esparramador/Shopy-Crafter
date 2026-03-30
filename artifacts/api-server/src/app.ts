@@ -6,6 +6,8 @@ import session from "express-session";
 import ConnectPg from "connect-pg-simple";
 import pinoHttp from "pino-http";
 import compression from "compression";
+import path from "path";
+import { fileURLToPath } from "url";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
@@ -126,6 +128,19 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Expires", "0");
   next();
 });
+
+// ── Static reports (auth-protected) ──────────────────────────────────────────
+const __filename2 = fileURLToPath(import.meta.url);
+const __dirname2 = path.dirname(__filename2);
+const reportsDir = path.join(__dirname2, "..", "public", "reports");
+const reportAuth = (req: Request, res: Response, next: NextFunction) => {
+  if (!(req.session as any)?.userId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+};
+app.use("/api/reports", reportAuth, express.static(reportsDir));
+app.use("/reports", reportAuth, express.static(reportsDir));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
