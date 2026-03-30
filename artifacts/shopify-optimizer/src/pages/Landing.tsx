@@ -147,6 +147,8 @@ export default function Landing() {
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
+  const [refImageFile, setRefImageFile] = useState<File | null>(null);
+  const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
   const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
   const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
@@ -163,11 +165,20 @@ export default function Landing() {
     setContactStatus("sending");
     setContactError("");
     try {
-      const res = await fetch(`${BASE_URL}/api/contact`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...contactForm, services: contactServices }),
-      });
+      let res: Response;
+      if (refImageFile) {
+        const fd = new FormData();
+        Object.entries(contactForm).forEach(([k, v]) => fd.append(k, v));
+        fd.append("services", JSON.stringify(contactServices));
+        fd.append("referenceImage", refImageFile);
+        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", body: fd });
+      } else {
+        res = await fetch(`${BASE_URL}/api/contact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...contactForm, services: contactServices }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
       setContactStatus("sent");
@@ -311,7 +322,7 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    const isScrollJackDisabled = () => window.innerWidth <= 900 || (window.innerHeight <= 500 && window.matchMedia("(orientation: landscape)").matches);
+    const isScrollJackDisabled = () => window.innerWidth <= 900 || window.innerHeight <= 500;
     if (isScrollJackDisabled()) return;
     const container = fpRef.current;
     if (!container) return;
@@ -1077,7 +1088,7 @@ export default function Landing() {
 
                   {/* Extra info */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Informacion extra sobre tu negocio"}</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Información extra sobre tu negocio"}</label>
                     <textarea
                       rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
                       placeholder={"Numero de productos, tipos (tallas, colores, materiales...), proveedores, plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
@@ -1087,17 +1098,50 @@ export default function Landing() {
                     />
                   </div>
 
-                  {/* Product image URL */}
+                  {/* Product image: URL or file upload */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"URL de imagen de un producto (para muestra gratuita)"}</label>
-                    <input
-                      type="url" value={contactForm.productImageUrl} onChange={CF("productImageUrl")}
-                      placeholder={"https://tu-tienda.com/imagen-producto.jpg"}
-                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
-                    />
-                    <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 6 }}>Sube la URL de 1 imagen y te mostramos como quedaria tu producto optimizado por nuestra IA (SEO, descripciones, metas, titulo...)</p>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Imagen de referencia de tu producto (para muestra gratuita)"}</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 12 }}>
+                      <div>
+                        <input
+                          type="url" value={contactForm.productImageUrl} onChange={CF("productImageUrl")}
+                          placeholder={"https://tu-tienda.com/imagen-producto.jpg"}
+                          style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                          onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                          onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                        />
+                        <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Pega la URL de una imagen</p>
+                      </div>
+                      <div>
+                        <label style={{
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          width: "100%", padding: "11px 14px", background: "var(--ink)", border: `1px solid ${refImageFile ? "rgba(200,168,75,0.5)" : "var(--ink3)"}`,
+                          borderRadius: 10, color: refImageFile ? "#e6c668" : "var(--t3)", fontSize: 14, cursor: "pointer", boxSizing: "border-box", transition: "all 0.15s",
+                        }}>
+                          {refImageFile ? `📎 ${refImageFile.name.slice(0, 25)}${refImageFile.name.length > 25 ? "..." : ""}` : "📷 O sube una imagen"}
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setRefImageFile(file);
+                              const reader = new FileReader();
+                              reader.onload = () => setRefImagePreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }} />
+                        </label>
+                        <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>JPG, PNG, WebP (máx. 5MB)</p>
+                      </div>
+                    </div>
+                    {refImagePreview && (
+                      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                        <img src={refImagePreview} alt="Referencia" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--ink3)" }} />
+                        <button type="button" onClick={() => { setRefImageFile(null); setRefImagePreview(null); }}
+                          style={{ background: "transparent", border: "none", color: "var(--t4)", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}>
+                          Quitar imagen
+                        </button>
+                      </div>
+                    )}
+                    <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 6 }}>Sube o pega la URL de 1 imagen y te mostramos cómo quedaría tu producto optimizado por nuestra IA (SEO, descripciones, metas, título...)</p>
                   </div>
 
                   {/* Servicios */}
@@ -1140,6 +1184,13 @@ export default function Landing() {
                     </div>
                   )}
 
+                  <div style={{ padding: "12px 16px", background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
+                    <p style={{ margin: 0, fontSize: 12, color: "var(--t3)", lineHeight: 1.5 }}>
+                      Tus datos se usan exclusivamente para contactarte sobre tu proyecto. No compartimos información con terceros. Si subes una imagen de producto, nuestro equipo la analizará manualmente para preparar tu muestra gratuita personalizada.
+                    </p>
+                  </div>
+
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                     <p style={{ fontSize: 12, color: "var(--t4)", flex: 1 }}>{content.contact?.finePrint ?? "Sin spam. Solo te contactamos para hablar de tu proyecto."}</p>
                     <button
@@ -1147,7 +1198,7 @@ export default function Landing() {
                       className="l-btn-gold"
                       style={{ opacity: contactStatus === "sending" ? 0.7 : 1, minWidth: 200, padding: "13px 28px", fontSize: 14 }}
                     >
-                      {contactStatus === "sending" ? "Enviando…" : (content.contact?.buttonLabel ?? "Solicitar acceso gratuito →")}
+                      {contactStatus === "sending" ? "Enviando…" : (content.contact?.buttonLabel ?? "Enviar solicitud →")}
                     </button>
                   </div>
                 </form>

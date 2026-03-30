@@ -27,7 +27,7 @@ const ALL_STEPS: Record<GenerationStepId, Step> = {
   connecting:         { id: "connecting",         label: "Conectando con Shopify",       detail: "Autenticando acceso a la tienda..." },
   loading_products:   { id: "loading_products",   label: "Cargando catálogo",            detail: "Leyendo productos, precios e inventario..." },
   loading_history:    { id: "loading_history",    label: "Analizando historial",         detail: "Revisando datos históricos y tendencias..." },
-  building_context:   { id: "building_context",   label: "Construyendo contexto",        detail: "ShopyBrain carga memorias y aprendizajes previos..." },
+  building_context:   { id: "building_context",   label: "Construyendo contexto",        detail: "Cargando memorias y aprendizajes previos..." },
   analyzing:          { id: "analyzing",          label: "Analizando con IA",            detail: "Claude procesa y extrae insights estratégicos..." },
   generating_content: { id: "generating_content", label: "Generando contenido",          detail: "Claude redacta contenido optimizado para tu nicho..." },
   generating_images:  { id: "generating_images",  label: "Generando imagen",             detail: "Flux IA renderiza la imagen con tus especificaciones..." },
@@ -35,9 +35,9 @@ const ALL_STEPS: Record<GenerationStepId, Step> = {
   generating_seo:     { id: "generating_seo",     label: "Optimizando SEO",              detail: "Generando títulos, meta, schema y contenido orgánico..." },
   generating_pricing: { id: "generating_pricing", label: "Calculando precios",           detail: "Analizando COGS, competencia y elasticidad de demanda..." },
   generating_forecast:{ id: "generating_forecast",label: "Procesando ML",               detail: "Modelo de predicción analiza patrones históricos..." },
-  studying:           { id: "studying",           label: "Estudiando dominio",           detail: "ShopyBrain profundiza en conocimiento especializado..." },
+  studying:           { id: "studying",           label: "Estudiando dominio",           detail: "Profundizando en conocimiento especializado..." },
   saving:             { id: "saving",             label: "Guardando resultados",         detail: "Almacenando insights y actualizando memorias..." },
-  finalizing:         { id: "finalizing",         label: "Finalizando",                  detail: "ShopyBrain aprende de esta operación para mejorar..." },
+  finalizing:         { id: "finalizing",         label: "Finalizando",                  detail: "Aprendiendo de esta operación para mejorar..." },
 };
 
 type OperationType =
@@ -176,7 +176,7 @@ export default function GenerationProgress({
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>
-            {title ?? "ShopyBrain generando..."}
+            {title ?? "Shopy Crafter generando..."}
           </div>
           {subtitle && (
             <div style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>{subtitle}</div>

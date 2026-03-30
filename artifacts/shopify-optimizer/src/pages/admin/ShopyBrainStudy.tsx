@@ -165,7 +165,7 @@ export default function ShopyBrainStudy() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800 }}>🧠 Aprendizaje Continuo 24/7</h1>
         <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>
-          OmniCore aprende de forma autónoma los 365 días del año — sin interrupciones
+          Shopy Crafter aprende de forma autónoma los 365 días del año — sin interrupciones
         </p>
       </div>
 
@@ -212,7 +212,7 @@ export default function ShopyBrainStudy() {
           <div>
             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "var(--gold)" }}>Extractor Universal de Inteligencia</h3>
             <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>
-              Pega cualquier URL, dominio, nombre de empresa o texto — ShopyBrain extraerá todo el conocimiento posible
+              Pega cualquier URL, dominio, nombre de empresa o texto — Shopy Crafter extraerá todo el conocimiento posible
             </p>
           </div>
         </div>

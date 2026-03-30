@@ -19,7 +19,7 @@ function StatBubble({ icon, label, value, color = "var(--gold)" }: { icon: React
 }
 
 const QUICK_ACTIONS = [
-  { icon: "🧠", label: "Shopy Brain", desc: "IA central · memorias activas", href: "/admin/shopybrain", color: "var(--gold)" },
+  { icon: "🧠", label: "Shopy Crafter", desc: "IA central · memorias activas", href: "/admin/shopybrain", color: "var(--gold)" },
   { icon: "📊", label: "Revenue", desc: "Métricas de ingresos y KPIs", href: "/admin/revenue", color: "var(--jade)" },
   { icon: "📧", label: "Email Marketing", desc: "Flujos y campañas automatizadas", href: "/admin/emails", color: "#8b5cf6" },
   { icon: "🔍", label: "Competitors", desc: "Análisis de competencia", href: "/admin/competitors", color: "#f59e0b" },

@@ -24,7 +24,7 @@ const DEFAULT_MODULE_NAV = [
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
-  { label: "Centro IA", icon: "🧠", href: "/admin/shopybrain" },
+  { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
   { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
   { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
   { label: "Knowledge Domains", icon: "🔬", href: "/admin/shopybrain/insights" },

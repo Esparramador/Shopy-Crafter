@@ -1,7 +1,7 @@
-# ShopyBrain Agency Platform
+# Shopy Crafter Agency Platform
 
 ## Overview
-ShopyBrain is a multi-user Shopify AI optimization agency platform for `admin` and `client` roles. It utilizes advanced AI models (Gemini, Claude, OmniCore) for market research, competitor analysis, product trend identification, and content generation. The platform integrates with Shopify to provide comprehensive business intelligence and automation, aiming to maximize ROI for Shopify stores through AI-driven insights and actions.
+Shopy Crafter (shopycrafter.com) is a multi-user Shopify AI optimization agency platform for `admin` and `client` roles. Public name: "Shopy Crafter"; internal AI engine: "ShopyBrain". It utilizes a Dual AI Engine (Gemini + Claude) for market research, competitor analysis, product trend identification, and content generation. The platform integrates with Shopify to provide comprehensive business intelligence and automation, aiming to maximize ROI for Shopify stores through AI-driven insights and actions.
 
 ## User Preferences
 - Admin email: `sadiagiljoan@gmail.com` (password stored in DB, bcrypt-hashed)
@@ -31,10 +31,10 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 ### Database
 PostgreSQL with Drizzle ORM, utilizing over 44 tables for user management, project data, product information, deep inventory tracking, sales analytics, and extensive AI-related memory and insight storage.
 
-### AI Stack and OmniCore
+### AI Stack (Single Brain Architecture)
 A **Dual AI Engine** architecture integrates Claude and Gemini for superior output and also integrates with Replicate for image generation.
 - **Dual AI Engine**: Supports `parallel_synthesis`, `gemini_research_claude_redact`, `claude_only`, `gemini_only` modes with graceful fallback.
-- **OmniCore (SINGLE BRAIN)**: The central AI "brain" for all AI calls, utilizing 46,000+ knowledge insights and 79 chatbot actions for Shopify CRUD, product redesign, A/B testing, SEO intelligence, pricing intelligence, image generation, email marketing, competitor analysis, and full store setup. Every operation passes through ShopyBrain context, executes, then learns via `learnFromOperation`.
+- **ShopyBrain (SINGLE BRAIN)**: The central AI "brain" for all AI calls, utilizing 46,000+ knowledge insights and 79+ chatbot actions for Shopify CRUD, product redesign, A/B testing, SEO intelligence, pricing intelligence, image generation, email marketing, competitor analysis, copyright audit, and full store setup. Every operation passes through ShopyBrain context (`askClaudeWithBrain`/`askClaudeJsonWithBrain`), executes, then learns via `learnFromOperation`. NEVER use `askClaude()` directly.
 - **Knowledge Search Engine**: Smart keyword-based relevance search across insights, used to build AI contexts.
 - **Brain Sync System**: Infrastructure for full brain import/export/sync, including self-knowledge injection and Shopify service product creation.
 - **Retroactive Learning (Deep)**: Chatbot actions trigger `learnFromOperation()` to categorize results and extract structured data. Conversations feed the brain via `learnFromConversation()`, detecting explicit instructions and insights. Includes `learn_from_url`, `learn_from_content`, `recall_knowledge`, and `brain_status` actions.
@@ -63,8 +63,14 @@ A **Dual AI Engine** architecture integrates Claude and Gemini for superior outp
 - **Partial Redesign**: Allows users to select specific product attributes for AI-driven redesign.
 - **Automated Cron Jobs**: Twelve tasks for continuous learning and intelligence.
 
+### Copyright Audit System
+The `copyright_audit` brain action fetches all products via Shopify GraphQL API, then uses `askClaudeJsonWithBrain` to detect trademark/IP risks (registered brands like Funko, Disney, Marvel, etc.), suggest alternative safe names, and classify risks by severity (alta/media/baja). Available via quick action button in OmniChatbot and natural language triggers.
+
+### Pricing Plans
+Four subscription plans: Emprendedor (€19/mes, 5 products/month, 10 images), Growth Studio (€297/mes), Performance Lab (€597/mes), Enterprise (€997/mes). Plus one-time plans: Photoshoot Pro (€497), Auditoría Completa (€297), Rediseño IA (€397), Pack Imágenes (€197), SEO Completa (€347), Informe Precios (€197), Email Marketing (€297).
+
 ### Service Delivery Audit
-All 9 Shopify service products are fully deliverable via the chatbot's 79 actions, including Photoshoot Pro, Growth Studio, Performance Lab, Auditoría Completa, Rediseño IA 30 Productos, Pack 30 Imágenes IA, SEO Completa, Informe Precios, and Email Marketing.
+All Shopify service products are fully deliverable via the chatbot's 79+ actions, including Photoshoot Pro, Growth Studio, Performance Lab, Auditoría Completa, Rediseño IA 30 Productos, Pack 30 Imágenes IA, SEO Completa, Informe Precios, and Email Marketing.
 
 ### Security
 - AES-256-GCM encryption for credentials.

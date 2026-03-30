@@ -20,7 +20,7 @@ const STEPS: CoachStep[] = [
   {
     selector: ".sidebar-nav",
     title: "Navegación principal",
-    description: "Accede rápidamente a los motores IA, ShopyBrain, competidores y más herramientas de optimización.",
+    description: "Accede rápidamente a los motores IA, Shopy Crafter, competidores y más herramientas de optimización.",
     position: "right",
   },
   {

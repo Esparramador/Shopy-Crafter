@@ -76,9 +76,9 @@ export default function ShopyBrain() {
           </div>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, fontFamily: "var(--fh)" }}>
-              Shopy <span style={{ color: "var(--gold)" }}>Brain</span>
+              Shopy <span style={{ color: "var(--gold)" }}>Crafter</span>
             </h1>
-            <p style={{ fontSize: 13, color: "var(--t2)" }}>OmniCore Memory Engine — Megacerebro de la plataforma</p>
+            <p style={{ fontSize: 13, color: "var(--t2)" }}>Motor de Inteligencia — Centro de conocimiento de la plataforma</p>
           </div>
         </div>
         <button
@@ -241,7 +241,7 @@ export default function ShopyBrain() {
             {[
               { label: "Explorar Memorias", desc: "Navega y gestiona el conocimiento acumulado", icon: <Database size={20} />, path: "/admin/shopybrain/memories", color: "var(--gold)" },
               { label: "Knowledge Domains", desc: "10 dominios de expertise en profundidad", icon: <Brain size={20} />, path: "/admin/shopybrain/insights", color: "#5b4eff" },
-              { label: "Mi Pricing CFO", desc: "OmniCore como tu director financiero", icon: <TrendingUp size={20} />, path: "/admin/my-pricing", color: "var(--jade)" },
+              { label: "Mi Pricing CFO", desc: "Tu director financiero inteligente", icon: <TrendingUp size={20} />, path: "/admin/my-pricing", color: "var(--jade)" },
             ].map((item, i) => (
               <button
                 key={i}

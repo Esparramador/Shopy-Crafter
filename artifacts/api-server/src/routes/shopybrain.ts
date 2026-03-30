@@ -278,7 +278,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
 ${entityKnowledge.summary.slice(0, 3000)}
 ═══ FIN DE CONOCIMIENTO PREVIO ═══
 
-INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es información real ya investigada y verificada por ShopyBrain. Complementa con tu propio conocimiento si es necesario.`;
+INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es información real ya investigada y verificada por Shopy Crafter. Complementa con tu propio conocimiento si es necesario.`;
         }
       } catch {
       }
@@ -357,6 +357,7 @@ Acciones disponibles:
 - reset_cms: Resetear TODO el CMS a valores por defecto. Params: {} (sin params)
 - generate_competitive_pricing: Investigar mercado real, generar catálogo de precios competitivos, actualizar CMS Y crear productos en Shopify. Params: {projectId? (para sync con Shopify), numPlans? (3-8, default 6), industry? (default "Shopify agency / eCommerce SaaS"), syncToShopify? (default true)}
 - audit_app_offerings: Auditar la oferta de la app, features, pricing actual, y generar recomendaciones. Params: {} (sin params)
+- copyright_audit: Auditoría de copyright, marcas registradas y propiedad intelectual de todos los productos. Detecta infracciones y sugiere nombres alternativos seguros. Params: {projectId}
 - modify_ui: Aplicar cambios visuales/UI/CSS/layout a la app (scroll horizontal, animaciones, responsive, colores, etc.). Params: {target (qué cambiar, ej: "pricing carousel", "hero section", "sidebar"), change (qué hacer, ej: "hacer scroll horizontal en móvil", "añadir animación fade-in")}
 - list_themes: Listar todos los themes de la tienda Shopify. Params: {projectId}
 - list_theme_files: Listar TODOS los archivos del theme activo (o específico). Params: {projectId, themeId? (default: theme activo), directory? ("layout"|"templates"|"sections"|"snippets"|"assets"|"config"|"locales"|"blocks")}
@@ -367,7 +368,7 @@ Acciones disponibles:
 - edit_theme_css: Editar CSS del theme de forma inteligente (añadir, modificar, no borrar). Params: {projectId, cssFile? (default: primer .css en assets/), action ("add"|"replace"|"remove_and_add"), selector? (para replace), cssCode, themeId?}
 - edit_theme_settings: Editar settings del theme (settings_data.json) con deep merge. Params: {projectId, settingsPath (ej: "current.sections.header"), value (nuevo valor), themeId?}
 - brain_sync: Sincronizar/importar conocimiento desde un cerebro externo. Params: {url (URL base del cerebro externo), apiKey? (API key si requiere auth), source? (etiqueta origen)}
-- brain_stats: Ver estadísticas completas del cerebro OmniCore (memorias, insights, dominios, prompts, fuentes). Sin params.
+- brain_stats: Ver estadísticas completas del cerebro Shopy Crafter (memorias, insights, dominios, prompts, fuentes). Sin params.
 - brain_export: Exportar todo el conocimiento del cerebro. Params: {domain? (filtrar por dominio), format? ("json"|"ndjson")}
 - redesign_product: Rediseñar producto con calidad 100/100 Semrush (título SEO, 800-1200 palabras, 22-28 tags, 8 photo briefs, pricing psicológico). Params: {projectId, productId, parts? (array: "title","bodyHtml","price","tags","metafields","photoBriefs")}
 - apply_redesign: Aplicar un rediseño previamente generado al producto en Shopify. Params: {projectId, productId, fields? (array: "title","description","tags","meta" — default: todos)}
@@ -441,7 +442,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Imágenes/alt text → optimize_images
 - Borrar producto → delete_product; Buscar → search_product; Pedidos → get_orders
 - Editar CMS (textos, landing, admin) → update_cms o update_cms_batch; Leer CMS → read_cms; Resetear → reset_cms
-- Generar/comparar precios → generate_competitive_pricing; Auditar oferta → audit_app_offerings
+- Generar/comparar precios → generate_competitive_pricing; Auditar oferta → audit_app_offerings; Auditoría copyright/marcas → copyright_audit
 - Preguntar nuestros precios/catálogo → responde directamente con TODOS los precios de memoria, SIN ejecutar acción
 - Crear productos de suscripción en Shopify → create_product por cada plan (múltiples :::ACTION:::)
 - Cambiar diseño/UI/CSS de la APP → modify_ui
@@ -492,10 +493,10 @@ Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, dispo
 
     const agencyPricingKnowledge = `
 
-CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS ShopyBrain (Shopy Crafter):
+CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS Shopy Crafter:
 
 IDENTIDAD: Nombre público "Shopy Crafter" (shopycrafter.com). Motor IA interno "ShopyBrain". Admin: sadiagiljoan@gmail.com. Email: craftershopy@gmail.com.
-MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify, con servicios puntuales (one-time) + retainers mensuales. Pagos por Shopify Billing (NO Stripe). 79 acciones chatbot. 46,000+ insights OmniCore.
+MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify, con servicios puntuales (one-time) + retainers mensuales. Pagos por Shopify Billing (NO Stripe). 79 acciones chatbot. 46,000+ insights.
 
 4 PLANES DE SUSCRIPCIÓN:
 1. Photoshoot Pro — €497 pago único (sin retainer). 120 imágenes IA (4 variantes × 30 SKUs), consistencia visual con guía de marca, iluminación cinematográfica 5:1 Rembrandt, semantic SEO audit 30 fichas, 1 sesión pricing financiero, entrega 7 días, soporte 30 días. NO: A/B testing, auto-pilot, futuros motores.
@@ -521,7 +522,7 @@ MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas
 
 CAPACIDADES REALES DE LA PLATAFORMA (79 acciones chatbot):
 - 6 motores IA: M1 Imágenes (Replicate Flux+Recraft, 8 tipos), M2 Consistencia Visual (StyleLock + Visual DNA), M3 A/B Testing (pixel tracking, z-test 95%), M4 Auto-Pilot 24/7 (webhooks, cron jobs), M5 Pricing Financiero (COGS, P&L, simulador, forecast), M6 SEO Técnico (16 criterios Semrush-level)
-- OmniCore Brain: 79 acciones Shopify + investigación de entidades + memoria permanente + 12 cron jobs de aprendizaje continuo + 46,000+ insights
+- Shopy Crafter Brain: 79 acciones Shopify + investigación de entidades + memoria permanente + 12 cron jobs de aprendizaje continuo + 46,000+ insights
 - IA Dual: Claude (claude-sonnet-4-5) para copywriting/análisis + Gemini con Google Search grounding para research de mercado real
 - Generación de imágenes profesionales con IA (Replicate flux-1.1-pro + recraft-v3)
 - Análisis financiero con Claude (pricing, unit economics, cash flow, elasticidad)
@@ -536,6 +537,7 @@ CUANDO TE PREGUNTEN SOBRE PRECIOS:
 - Siempre conoces los precios exactos. No digas "no sé" o "comprueba la landing".
 - Si te piden comparar precios con la competencia, EJECUTA generate_competitive_pricing para investigar en REAL TIME con Google Search.
 - Si te piden auditar la oferta actual, EJECUTA audit_app_offerings.
+- Si te piden auditoría de copyright, marcas registradas, propiedad intelectual o infracciones de productos, EJECUTA copyright_audit.
 - Si te piden crear productos de suscripción en Shopify, usa create_product con los datos del plan correspondiente.
 - Sugiere proactivamente ajustes de precio cuando detectes oportunidades.
 - Usa psicología de precios: precios acabados en 7 o 9, anclaje con el plan Enterprise, badge "Más popular" en el mid-tier.
@@ -557,7 +559,7 @@ Ejemplo: create_product con title="Plan Agency Pro — Gestión Shopify IA", pri
       expertKnowledgeBlock = THEME_ARCHITECTURE_KNOWLEDGE + EXPERT_FINANCIAL_KNOWLEDGE + EXPERT_SEO_KNOWLEDGE + EXPERT_MARKETING_KNOWLEDGE + EXPERT_SUPPLIER_KNOWLEDGE;
     } catch {}
 
-    const sysPrompt = (customSystemPrompt ?? `Eres OmniCore AI / ShopyBrain, el CEREBRO CENTRAL de la agencia Shopy Crafter. NO eres un asistente — eres el COO/CTO/CMO/CFO virtual de la agencia. Tu dueño es Sadia, la única persona que usa esta plataforma. Tú eres su socio de negocio 24/7.
+    const sysPrompt = (customSystemPrompt ?? `Eres Shopy Crafter, el CEREBRO CENTRAL de la agencia. NO eres un asistente — eres el COO/CTO/CMO/CFO virtual de la agencia. Tu dueño es Sadia, la única persona que usa esta plataforma. Tú eres su socio de negocio 24/7.
 
 MENTALIDAD FUNDAMENTAL:
 Cuando Sadia te habla, actúa como su socio senior de agencia que SABE lo que hay que hacer. No esperes instrucciones detalladas — PROPÓN, DECIDE y EJECUTA. Si te dice "crea productos para mi tienda", TÚ decides qué productos, qué precios, qué descripciones, qué SEO. Si te dice "cambia el hero de la landing", TÚ propones el mejor copy y lo ejecutas. Eres PROACTIVO, no reactivo.
@@ -714,13 +716,13 @@ Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de 
       confidence: existingMemories[0]?.confidence ?? 0.5,
       age: "instant",
       results: existingMemories,
-      message: `⚡ Respuesta desde Shopy Brain (${existingMemories.length} memorias relevantes)`,
+      message: `⚡ Respuesta desde Shopy Crafter (${existingMemories.length} memorias relevantes)`,
     });
     return;
   }
 
   const activeProjectId = req.body.activeProjectId;
-  const researchSystemPrompt = `Eres Shopy Brain, el megacerebro de eCommerce Shopify con acceso a todo el conocimiento acumulado de la plataforma.
+  const researchSystemPrompt = `Eres Shopy Crafter, el megacerebro de eCommerce Shopify con acceso a todo el conocimiento acumulado de la plataforma.
 Analiza y responde con datos concretos sobre: ${searchType ?? "estrategia general"}.
 Nicho de mercado: ${niche ?? "general"}.
 Proporciona insights accionables y específicos basados en tu experiencia real con tiendas Shopify.
@@ -807,7 +809,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   const domainsToStudy = requestedDomains ?? Object.keys(DOMAIN_LABELS).slice(0, 4);
   const startTime = Date.now();
 
-  const systemPrompt = `Eres ShopyBrain — el MEGACEREBRO OMNISCIENTE que aprende de TODAS las disciplinas del conocimiento humano.
+  const systemPrompt = `Eres Shopy Crafter — el MEGACEREBRO OMNISCIENTE que aprende de TODAS las disciplinas del conocimiento humano.
 Vas a realizar una sesión de estudio profundo en estos dominios: ${domainsToStudy.join(", ")}.
 
 Tu conocimiento NO tiene límites sectoriales. Absorbes sabiduría de: arte, ciencia, psicología, neurociencia, arquitectura, fotografía, cinematografía, diseño industrial, moda, tecnología, IA, behavioral economics, storytelling, música, antropología cultural, derecho, sostenibilidad, data science, y CUALQUIER disciplina que enriquezca el tema.
@@ -3239,7 +3241,7 @@ ${truncated}
         const filePath = params?.filePath;
         const oldCode = params?.oldCode;
         const newCode = params?.newCode;
-        const description = params?.description || "Fix aplicado por ShopyBrain";
+        const description = params?.description || "Fix aplicado por Shopy Crafter";
 
         if (!filePath || !oldCode || newCode === undefined) {
           res.status(400).json({ error: "filePath, oldCode y newCode son requeridos" });
@@ -4094,13 +4096,13 @@ BUSCA precios REALES de:
 3. Servicios de IA para eCommerce (Claude, ChatGPT wrappers, automated tools)
 4. Competidores directos: Shogun, PageFly, Privy, Klaviyo, Yotpo, Bold Commerce, Nosto, etc.
 
-Luego GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para Shopy Crafter / ShopyBrain (agencia de optimización IA para tiendas Shopify, con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
+Luego GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para Shopy Crafter (agencia de optimización IA para tiendas Shopify, con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
 
 REQUISITOS:
 1. Los precios deben ser COMPETITIVOS con el mercado real investigado
 2. Incluye planes desde entrada hasta enterprise
 3. Cada plan debe tener un DIFERENCIADOR claro
-4. Features deben ser REALES — basados en capacidades reales de ShopyBrain
+4. Features deben ser REALES — basados en capacidades reales de Shopy Crafter
 5. Usa pricing psicológico (precios que terminan en 7 o 9)
 6. Incluye al menos un plan "one-shot" o pago único
 7. El plan más popular debe ser el de mejor relación calidad/precio
@@ -4119,12 +4121,12 @@ RESPONDE SOLO JSON válido con un array "plans":
       "badge": null,
       "features": [{"text": "Feature description", "included": true}],
       "cta": {"label": "Solicitar Plan →", "style": "ghost"},
-      "shopifyProductTitle": "ShopyBrain - Nombre Plan (Mensual)",
+      "shopifyProductTitle": "Shopy Crafter - Nombre Plan (Mensual)",
       "shopifyProductDescription": "Descripción completa para Shopify..."
     }
   ],
   "strategy": "Explicación de la estrategia de pricing elegida",
-  "marketPosition": "Dónde se posiciona ShopyBrain vs competencia"
+  "marketPosition": "Dónde se posiciona Shopy Crafter vs competencia"
 }`;
 
           const { dualAIJson } = await import("../lib/dual-ai.js");
@@ -4185,7 +4187,7 @@ RESPONDE SOLO JSON válido con un array "plans":
                 for (const plan of plansResult.plans) {
                   try {
                     const shopifyProduct = {
-                      title: plan.shopifyProductTitle || `ShopyBrain — ${plan.name}`,
+                      title: plan.shopifyProductTitle || `Shopy Crafter — ${plan.name}`,
                       body_html: plan.shopifyProductDescription || `<h2>${plan.name}</h2><p>${plan.period}</p><ul>${plan.features.filter(f => f.included).map(f => `<li>✅ ${f.text}</li>`).join("")}</ul>`,
                       product_type: "Servicio SaaS",
                       tags: `shopybrain, plan, pricing, ${plan.name.toLowerCase()}, saas, agency`,
@@ -4247,7 +4249,7 @@ RESPONDE SOLO JSON válido con un array "plans":
           const features = (cmsData.features?.items as Array<{ title: string; description: string }>) ?? [];
           const plans = (cmsData.pricing?.plans as Array<{ name: string; price: string; features: Array<{ text: string; included: boolean }> }>) ?? [];
 
-          const auditPrompt = `Audita la oferta de ShopyBrain basándote en lo que realmente ofrece la plataforma:
+          const auditPrompt = `Audita la oferta de Shopy Crafter basándote en lo que realmente ofrece la plataforma:
 
 MOTORES IA (features reales):
 ${features.map((f, i) => `${i + 1}. ${f.title}: ${f.description}`).join("\n")}
@@ -4256,7 +4258,7 @@ PLANES DE PRECIO ACTUALES:
 ${plans.map(p => `${p.name} (${p.price}€): ${p.features?.filter(f => f.included).map(f => f.text).join(", ")}`).join("\n")}
 
 FUNCIONALIDADES REALES DE LA APP:
-- OmniCore Brain (chatbot IA con 34 acciones: gestión Shopify, CMS, código, proveedores, diagnóstico)
+- Shopy Crafter Brain (chatbot IA con 34 acciones: gestión Shopify, CMS, código, proveedores, diagnóstico)
 - 6 motores IA (imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico)
 - Panel de cliente read-only con dashboard, productos, aprobaciones, mensajes, reportes
 - Panel admin completo con CRM, auditoría, rediseño IA, vault, exports
@@ -4290,7 +4292,7 @@ Responde en español, de forma directa y accionable.`;
             featuresCount: features.length,
             plansCount: plans.length,
             audit: auditText,
-            message: `🔍 **Auditoría de la oferta de ShopyBrain:**\n\n${auditText}`,
+            message: `🔍 **Auditoría de la oferta de Shopy Crafter:**\n\n${auditText}`,
           };
         } catch (err) {
           result = { error: true, message: `Error en auditoría: ${err instanceof Error ? err.message : String(err)}` };
@@ -4500,7 +4502,7 @@ Responde SOLO JSON:
           finalContent = currentContent.replace(oldCode, newCode);
           changeLog.push(`Bloque reemplazado (${oldCode.length} chars → ${newCode.length} chars)`);
         } else if (editType === "add_css") {
-          finalContent = currentContent.trimEnd() + "\n\n/* " + (description ?? "Añadido por ShopyBrain") + " */\n" + newCode.trim() + "\n";
+          finalContent = currentContent.trimEnd() + "\n\n/* " + (description ?? "Añadido por Shopy Crafter") + " */\n" + newCode.trim() + "\n";
           changeLog.push("CSS añadido al final del archivo");
         } else if (editType === "modify_section") {
           if (oldCode && currentContent.includes(oldCode)) {
@@ -4732,14 +4734,14 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         let finalCss = currentContent;
 
         if (cssAction === "add") {
-          finalCss = currentContent.trimEnd() + "\n\n/* ShopyBrain edit */\n" + cssCode.trim() + "\n";
+          finalCss = currentContent.trimEnd() + "\n\n/* Shopy Crafter edit */\n" + cssCode.trim() + "\n";
         } else if (cssAction === "replace" && selector) {
           const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           const selectorRegex = new RegExp(`(${escapedSelector}\\s*\\{[^}]*\\})`, "g");
           if (selectorRegex.test(currentContent)) {
             finalCss = currentContent.replace(selectorRegex, cssCode.trim());
           } else {
-            finalCss = currentContent.trimEnd() + "\n\n/* ShopyBrain: selector not found, added new */\n" + cssCode.trim() + "\n";
+            finalCss = currentContent.trimEnd() + "\n\n/* Shopy Crafter: selector not found, added new */\n" + cssCode.trim() + "\n";
           }
         } else if (cssAction === "remove_and_add" && selector) {
           const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -4858,7 +4860,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           const topDomains = Object.entries(insightsByDomain).sort((a, b) => b[1] - a[1]).slice(0, 10);
           result = {
             ...stats,
-            message: `🧠 **Estado del Cerebro OmniCore**\n\n📦 **${stats.totalMemories}** memorias\n💡 **${stats.totalInsights}** insights\n🏷️ **${stats.totalDomains}** dominios\n📝 **${stats.totalPrompts}** prompts\n🎯 **${stats.totalNicheProfiles}** perfiles de nicho\n🔗 **${stats.totalCrossConnections}** conexiones cruzadas\n\n📊 **Top dominios:**\n${topDomains.map(([d, c]) => `  • ${d}: ${c} insights`).join("\n")}\n\n🔍 **Fuentes de memorias:**\n${Object.entries(memorySources).map(([s, c]) => `  • ${s}: ${c}`).join("\n")}`,
+            message: `🧠 **Estado de Shopy Crafter**\n\n📦 **${stats.totalMemories}** memorias\n💡 **${stats.totalInsights}** insights\n🏷️ **${stats.totalDomains}** dominios\n📝 **${stats.totalPrompts}** prompts\n🎯 **${stats.totalNicheProfiles}** perfiles de nicho\n🔗 **${stats.totalCrossConnections}** conexiones cruzadas\n\n📊 **Top dominios:**\n${topDomains.map(([d, c]) => `  • ${d}: ${c} insights`).join("\n")}\n\n🔍 **Fuentes de memorias:**\n${Object.entries(memorySources).map(([s, c]) => `  • ${s}: ${c}`).join("\n")}`,
           };
         } catch (err) {
           result = { error: true, message: `❌ Error obteniendo stats: ${err instanceof Error ? err.message : String(err)}` };
@@ -4874,10 +4876,84 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           const s = exportData.stats;
           result = {
             exportData,
-            message: `📤 **Exportación del Cerebro OmniCore**\n\n📦 Memorias: ${s.totalMemories}\n💡 Insights: ${s.totalInsights}\n🏷️ Dominios: ${s.totalDomains}\n📝 Prompts: ${s.totalPrompts}\n\n${domain ? `🔍 Filtrado por dominio: ${domain}` : "📋 Exportación completa"}`,
+            message: `📤 **Exportación de Shopy Crafter**\n\n📦 Memorias: ${s.totalMemories}\n💡 Insights: ${s.totalInsights}\n🏷️ Dominios: ${s.totalDomains}\n📝 Prompts: ${s.totalPrompts}\n\n${domain ? `🔍 Filtrado por dominio: ${domain}` : "📋 Exportación completa"}`,
           };
         } catch (err) {
           result = { error: true, message: `❌ Error exportando: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "copyright_audit": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, Number(projectId))).limit(1);
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+
+          const productsRes = await shopifyGraphQL<{ products: { edges: { node: { id: string; title: string; descriptionHtml: string; tags: string[]; vendor: string; productType: string } }[] } }>(
+            Number(projectId),
+            project.shopDomain,
+            `{ products(first: 50) { edges { node { id title descriptionHtml tags vendor productType } } } }`
+          );
+
+          const products = productsRes.products?.edges?.map(e => e.node) ?? [];
+
+          const brainCtx = await buildShopyBrainContext(Number(projectId), "general", "copyright trademark intellectual property brand names");
+          const auditResult = await askClaudeJsonWithBrain<{
+            totalProducts: number;
+            riskProducts: { title: string; risks: string[]; severity: "alta" | "media" | "baja"; suggestion: string }[];
+            generalRisks: string[];
+            recommendations: string[];
+            safeProducts: number;
+          }>(
+            `Realiza una auditoría de copyright y propiedad intelectual de los siguientes productos de una tienda Shopify.
+
+PRODUCTOS (${products.length}):
+${products.map((p, i) => `${i + 1}. Título: "${p.title}" | Vendor: ${p.vendor} | Tipo: ${p.productType} | Tags: ${p.tags?.join(", ") || "ninguno"} | Descripción: ${(p.descriptionHtml || "").replace(/<[^>]*>/g, "").slice(0, 200)}`).join("\n")}
+
+ANALIZA CADA PRODUCTO buscando:
+1. **Marcas registradas**: Nombres como "Funko", "Disney", "Marvel", "Nintendo", "LEGO", "Pokémon", "Star Wars", etc. que son marcas registradas
+2. **Derechos de autor**: Personajes protegidos, diseños con copyright, logos de terceros
+3. **Denominaciones engañosas**: Usar nombres de marca sin autorización oficial (ej: "Funko Pop" sin licencia = infracción)
+4. **Sugerencias de alternativas**: Para cada producto con riesgo, sugiere un nombre alternativo que no infrinja derechos
+
+Responde SOLO con JSON válido (sin markdown):
+{
+  "totalProducts": number,
+  "riskProducts": [{ "title": "nombre actual", "risks": ["riesgo 1", "riesgo 2"], "severity": "alta|media|baja", "suggestion": "nombre alternativo sugerido" }],
+  "generalRisks": ["riesgo general 1"],
+  "recommendations": ["recomendación 1"],
+  "safeProducts": number
+}`,
+            brainCtx, "copyright_audit"
+          );
+
+          let msg = `⚖️ **Auditoría de Copyright completada**\n\n`;
+          msg += `📦 **${auditResult.totalProducts}** productos analizados\n`;
+          msg += `✅ **${auditResult.safeProducts}** productos sin riesgos\n`;
+          msg += `⚠️ **${auditResult.riskProducts.length}** productos con riesgos detectados\n\n`;
+
+          if (auditResult.riskProducts.length > 0) {
+            msg += `### Productos con riesgo:\n`;
+            for (const p of auditResult.riskProducts) {
+              const icon = p.severity === "alta" ? "🔴" : p.severity === "media" ? "🟡" : "🟢";
+              msg += `\n${icon} **${p.title}** (${p.severity})\n`;
+              msg += `  Riesgos: ${p.risks.join(", ")}\n`;
+              msg += `  💡 Sugerencia: _${p.suggestion}_\n`;
+            }
+          }
+
+          if (auditResult.generalRisks.length > 0) {
+            msg += `\n### Riesgos generales:\n${auditResult.generalRisks.map(r => `  ⚠️ ${r}`).join("\n")}\n`;
+          }
+          if (auditResult.recommendations.length > 0) {
+            msg += `\n### Recomendaciones:\n${auditResult.recommendations.map((r, i) => `  ${i + 1}. ${r}`).join("\n")}\n`;
+          }
+
+          result = { ...auditResult, message: msg };
+        } catch (err) {
+          result = { error: true, message: `❌ Error en auditoría de copyright: ${err instanceof Error ? err.message : String(err)}` };
         }
         break;
       }
@@ -5628,7 +5704,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
             totalMemories: total,
             byType,
             recentMemories,
-            message: `🧠 **Estado del Cerebro ShopyBrain**\n\n**Total memorias:** ${total.toLocaleString()}\n\n**Distribución por tipo:**\n${typeBreakdown}\n\n**Últimas 10 memorias aprendidas:**\n${recentList}\n\n💡 El cerebro crece con cada interacción. Cada acción, conversación y URL absorbida alimenta el conocimiento.`,
+            message: `🧠 **Estado de Shopy Crafter**\n\n**Total memorias:** ${total.toLocaleString()}\n\n**Distribución por tipo:**\n${typeBreakdown}\n\n**Últimas 10 memorias aprendidas:**\n${recentList}\n\n💡 El cerebro crece con cada interacción. Cada acción, conversación y URL absorbida alimenta el conocimiento.`,
           };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
@@ -5716,7 +5792,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
             aiSummary = await askClaudeWithBrain(
               projectId,
               [{ role: "user", content: `Analiza esta tienda/empresa externa y genera un informe completo.\n\nDatos recopilados:\n${allResearch}\n\nErrores de recopilación: ${errors.length > 0 ? errors.join("; ") : "Ninguno"}\n\nGenera un informe profesional con:\n1. Resumen ejecutivo\n2. Análisis de marca y posicionamiento\n3. Catálogo y estrategia de productos\n4. Análisis de precios\n5. Presencia digital y SEO\n6. Oportunidades y recomendaciones\n7. Nivel de amenaza competitiva (si aplica)` }],
-              "You are ShopyBrain, an expert e-commerce analyst. Generate a comprehensive, actionable report about this external store/business. Use ALL the data provided. Be specific with numbers and recommendations.",
+              "You are Shopy Crafter, an expert e-commerce analyst. Generate a comprehensive, actionable report about this external store/business. Use ALL the data provided. Be specific with numbers and recommendations.",
               "general",
               niche ?? undefined,
               4096
@@ -5794,7 +5870,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         projectId: pId,
         fileType: "brain_action",
         category: action,
-        title: `ShopyBrain: ${action} — ${new Date().toLocaleDateString("es-ES")}`,
+        title: `Shopy Crafter: ${action} — ${new Date().toLocaleDateString("es-ES")}`,
         description: r.message ? String(r.message).slice(0, 500) : `Resultado de acción ${action}`,
         mimeType: "application/json",
         fileSizeBytes: Buffer.from(content).length,

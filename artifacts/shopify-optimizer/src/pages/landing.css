@@ -819,6 +819,25 @@
 .fp-footer-col .l-footer-links { gap: 7px; }
 
 /* ════════════════════════════════════════════════════
+   DESKTOP SHORT VIEWPORT — wide screen, short height
+   (landscape monitors, split-screen, ultra-wide)
+════════════════════════════════════════════════════ */
+@media (min-width: 901px) and (max-height: 700px) {
+  .fp-section {
+    overflow-y: auto !important;
+    justify-content: flex-start !important;
+    padding-top: 30px !important;
+    padding-bottom: 30px !important;
+  }
+  .fp-section::-webkit-scrollbar { width: 4px; }
+  .fp-section::-webkit-scrollbar-track { background: transparent; }
+  .fp-section::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.2); border-radius: 2px; }
+  .fp-pricing-row { flex-wrap: wrap !important; justify-content: center !important; }
+  .fp-pricing-row > * { flex: 0 0 auto !important; min-width: 260px; max-width: 320px; }
+  .fp-contact-form { max-height: none !important; overflow: visible !important; }
+}
+
+/* ════════════════════════════════════════════════════
    LANDSCAPE MOBILE — content taller than viewport
    (phones in landscape: width > 900px but height < 500px)
 ════════════════════════════════════════════════════ */

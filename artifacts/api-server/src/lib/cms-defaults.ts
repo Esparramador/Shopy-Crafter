@@ -103,6 +103,22 @@ export const DEFAULT_CMS_CONTENT = {
     subheadline: "Retainer mensual + setup único. Sin permanencia. Cancela cuando quieras.",
     plans: [
       {
+        id: "plan-emprendedor", name: "Emprendedor", price: "19", currency: "€", period: "por mes · sin setup",
+        featured: false, badge: "NUEVO",
+        features: [
+          { text: "Optimización de hasta 5 productos/mes con IA", included: true },
+          { text: "Generación de 10 imágenes de producto con IA", included: true },
+          { text: "Auditoría SEO básica con recomendaciones", included: true },
+          { text: "Análisis de precios y márgenes (COGS)", included: true },
+          { text: "Dashboard de métricas esencial", included: true },
+          { text: "Soporte por email (respuesta <48h)", included: true },
+          { text: "A/B testing", included: false },
+          { text: "Auto-pilot", included: false },
+          { text: "Imágenes ilimitadas", included: false },
+        ],
+        cta: { label: "Empezar por €19/mes →", href: "#fp-contact", style: "ghost" },
+      },
+      {
         id: "plan-photoshoot", name: "Photoshoot Pro", price: "497", currency: "€", period: "pago único · sin retainer",
         featured: false, badge: "SIN RETAINER",
         features: [
@@ -158,7 +174,7 @@ export const DEFAULT_CMS_CONTENT = {
         cta: { label: "Solicitar demo personalizada →", href: "https://comic-crafter.myshopify.com/cart/57686492709209:1", style: "gold" },
       },
       {
-        id: "plan-enterprise", name: "Enterprise Omnicore", price: "Personalizado", currency: "€", period: "desde €2,497/mes · setup incluido",
+        id: "plan-enterprise", name: "Enterprise", price: "Personalizado", currency: "€", period: "desde €2,497/mes · setup incluido",
         featured: false, badge: "ENTERPRISE",
         features: [
           { text: "Todo lo incluido en Performance Lab +", included: true },
@@ -167,7 +183,7 @@ export const DEFAULT_CMS_CONTENT = {
           { text: "Infraestructura dedicada (no multi-tenant)", included: true },
           { text: "API privada con webhooks personalizados", included: true },
           { text: "Integración con ERPs, PIMs y custom stacks", included: true },
-          { text: "White-label completo (remoción de branding ShopyBrain)", included: true },
+          { text: "White-label completo (remoción de branding Shopy Crafter)", included: true },
           { text: "SSO enterprise (SAML, OAuth, AD integration)", included: true },
           { text: "Compliance GDPR, SOC2, ISO 27001 certificado", included: true },
           { text: "Soporte 24/7 con respuesta garantizada <1h (critical issues)", included: true },

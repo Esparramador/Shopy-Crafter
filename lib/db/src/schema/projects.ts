@@ -31,7 +31,7 @@ export const projectsTable = pgTable("projects", {
   aiReportJson: text("ai_report_json"),
   aiReportGeneratedAt: timestamp("ai_report_generated_at", { withTimezone: true }),
   // Plan & limits
-  plan: text("plan").notNull().default("starter").$type<"admin" | "starter" | "agency_pro" | "enterprise" | "trial">(),
+  plan: text("plan").notNull().default("starter").$type<"admin" | "emprendedor" | "starter" | "agency_pro" | "enterprise" | "trial">(),
   productsUsedThisMonth: integer("products_used_this_month").notNull().default(0),
   imagesUsedThisMonth: integer("images_used_this_month").notNull().default(0),
   creditsProducts: integer("credits_products").notNull().default(0),
@@ -59,4 +59,4 @@ export const insertProjectSchema = createInsertSchema(projectsTable).omit({
 });
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projectsTable.$inferSelect;
-export type PlanType = "admin" | "starter" | "agency_pro" | "enterprise" | "trial";
+export type PlanType = "admin" | "emprendedor" | "starter" | "agency_pro" | "enterprise" | "trial";

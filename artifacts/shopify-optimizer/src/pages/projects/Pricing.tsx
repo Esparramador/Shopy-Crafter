@@ -386,7 +386,7 @@ function CogsModal({
               </div>
             )}
             {!aiEstimate && !aiEstimating && (
-              <p className="text-[11px] text-muted-foreground">ShopyBrain analiza el producto, materiales, logística, y estima todos los costes automáticamente. Proporciona 2 escenarios: equipo propio vs servicio externo.</p>
+              <p className="text-[11px] text-muted-foreground">Shopy Crafter analiza el producto, materiales, logística, y estima todos los costes automáticamente. Proporciona 2 escenarios: equipo propio vs servicio externo.</p>
             )}
           </div>
           {COST_CATEGORIES.map(cat => {

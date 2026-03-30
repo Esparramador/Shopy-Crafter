@@ -167,8 +167,8 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
     },
     {
       id: "shopybrain",
-      title: "Inteligencia ShopyBrain",
-      description: "Estado completo del cerebro IA: dominios de conocimiento, memorias, insights, confianza y inteligencia de proveedores.",
+      title: "Inteligencia Shopy Crafter",
+      description: "Estado completo del motor inteligente: dominios de conocimiento, memorias, insights, confianza y análisis de proveedores.",
       icon: <Brain className="w-6 h-6" />,
       endpoint: `/api/projects/${projectId}/exports/shopybrain`,
       format: "HTML",
@@ -480,7 +480,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
 
       {aiDone && (
         <div className="p-3 rounded-xl flex items-center gap-2 text-sm" style={{ background: "rgba(46,204,113,.08)", border: "1px solid rgba(46,204,113,.2)", color: "#2ecc71" }}>
-          <CheckCircle className="w-4 h-4 shrink-0" /> Análisis IA completado. Los informes HTML ahora incluyen secciones de análisis profundo de ShopyBrain AI en cada apartado.
+          <CheckCircle className="w-4 h-4 shrink-0" /> Análisis completado. Los informes HTML ahora incluyen secciones de análisis profundo en cada apartado.
         </div>
       )}
 
@@ -491,7 +491,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
             <Sparkles className="w-3 h-3 absolute -top-1 -right-1" style={{ color: "#c8a84b" }} />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">ShopyBrain AI está analizando tu tienda...</p>
+            <p className="text-sm font-medium text-foreground">Shopy Crafter está analizando tu tienda...</p>
             <p className="text-xs text-muted-foreground mt-0.5">Análisis exhaustivo: SEO, precios, marca, mix de productos, competencia, plan de acción 30 días. Esto puede tomar 30-60 segundos.</p>
           </div>
         </div>

@@ -63,7 +63,7 @@ export default function ShopyBrainInsights() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800 }}>⚡ Knowledge Domains</h1>
         <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>
-          14 áreas de expertise donde Shopy Brain acumula conocimiento profundo
+          14 áreas de expertise donde Shopy Crafter acumula conocimiento profundo
         </p>
       </div>
 
@@ -109,7 +109,7 @@ export default function ShopyBrainInsights() {
             <Brain size={40} style={{ opacity: 0.3, marginBottom: 12, display: "block", margin: "0 auto 12px" }} />
             <p style={{ color: "var(--t3)", fontSize: 13 }}>
               Sin insights para este dominio aún.<br />
-              Lanza una sesión de estudio desde el dashboard de Shopy Brain.
+              Lanza una sesión de estudio desde el dashboard de Shopy Crafter.
             </p>
           </div>
         ) : (

@@ -35,6 +35,12 @@ export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
     maxImagesPerMonth: 45,
     label: "Starter €49/mes",
   },
+  emprendedor: {
+    productsPerMonth: 5,
+    imagesPerProduct: 2,
+    maxImagesPerMonth: 10,
+    label: "Emprendedor €19/mes",
+  },
   trial: {
     productsPerMonth: 3,
     imagesPerProduct: 2,

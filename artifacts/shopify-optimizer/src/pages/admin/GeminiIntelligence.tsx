@@ -89,7 +89,7 @@ function BusinessResult({ data }: { data: { profile: ReturnType<typeof Object>; 
         </Section>
       </div>
 
-      <Section title="🧠 Plan estratégico (Claude + OmniCore)">
+      <Section title="🧠 Plan estratégico">
         <pre style={{ fontSize: 12, color: "var(--t2)", whiteSpace: "pre-wrap", lineHeight: 1.7, margin: 0, fontFamily: "inherit" }}>{data.strategicPlan}</pre>
       </Section>
     </div>
@@ -241,8 +241,8 @@ function FullAuditResult({ data }: { data: { businessProfile: Record<string, unk
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <span style={{ fontSize: 24 }}>🧠</span>
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--gold)" }}>OmniCore Intelligence Brief</h3>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--t3)" }}>Generado por Gemini + Claude + OmniCore · Guardado en brain</p>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--gold)" }}>Shopy Crafter Intelligence Brief</h3>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--t3)" }}>Generado por Shopy Crafter · Guardado en la plataforma</p>
           </div>
         </div>
         <pre style={{ fontSize: 12, color: "var(--t2)", whiteSpace: "pre-wrap", lineHeight: 1.8, margin: 0, fontFamily: "inherit" }}>{data.synthesis}</pre>
@@ -307,7 +307,7 @@ export default function GeminiIntelligence() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--t)" }}>Gemini Intelligence</h1>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--t3)" }}>Gemini Research → Claude Analysis → OmniCore Learning</p>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--t3)" }}>Investigación → Análisis → Aprendizaje Continuo</p>
           </div>
           <div style={{ marginLeft: "auto", fontSize: 10, padding: "4px 10px", borderRadius: 20, background: "rgba(66,133,244,0.15)", color: "#4285f4", fontWeight: 700 }}>ONLINE</div>
         </div>
@@ -476,7 +476,7 @@ export default function GeminiIntelligence() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <CheckCircle2 size={14} style={{ color: "var(--jade)" }} />
-                <span style={{ fontSize: 12, color: "var(--jade)", fontWeight: 600 }}>Análisis completado · Guardado en OmniCore Brain</span>
+                <span style={{ fontSize: 12, color: "var(--jade)", fontWeight: 600 }}>Análisis completado · Guardado en Shopy Crafter</span>
               </div>
               {activeTab === "business" && <BusinessResult data={state.data as { profile: Record<string, unknown>; strategicPlan: string }} />}
               {activeTab === "market" && <MarketResult data={state.data as { market: Record<string, unknown> }} />}

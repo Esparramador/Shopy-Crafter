@@ -1,7 +1,6 @@
 /**
- * OmniCore AI — Chatbot Universal ShopyBrain
- * ONE brain. Absorbs EVERYTHING: images, videos, URLs, Instagram, Facebook, X, YouTube...
- * Gemini + Claude + ShopyBrain Memory
+ * Shopy Crafter — Asistente Inteligente
+ * Absorbe TODO: imágenes, vídeos, URLs, Instagram, Facebook, X, YouTube...
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -253,7 +252,7 @@ function AbsorbResultCard({ data }: { data: AbsorbResult }) {
       <div style={{ background: "rgba(45,212,159,0.06)", padding: "10px 13px", borderBottom: "1px solid rgba(45,212,159,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--jade)" }}>
-            🧠 Absorbido al ShopyBrain
+            🧠 Absorbido a Shopy Crafter
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 9, color: "var(--t3)" }}>{data.title} · {data.sourceType}</p>
         </div>
@@ -536,7 +535,7 @@ function EntityResearchCard({ data }: { data: EntityResearchResult }) {
 
       {/* Footer */}
       <div style={{ padding: "6px 12px", background: "rgba(200,168,75,0.04)", borderTop: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 9, color: "var(--t4)" }}>💾 {data.memoriesSaved} memorias guardadas en ShopyBrain</span>
+        <span style={{ fontSize: 9, color: "var(--t4)" }}>💾 {data.memoriesSaved} memorias guardadas en Shopy Crafter</span>
         <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700 }}>#{data.researchId.slice(0, 8)}</span>
       </div>
     </div>
@@ -679,14 +678,16 @@ const QUICK_ACTIONS = [
   { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
   { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
   { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
-  { icon: "🧠", label: "Estado del Brain", prompt: "¿Qué conocimiento ha absorbido el ShopyBrain? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
+  { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
+  { icon: "⚖️", label: "Auditoría Copyright", prompt: "Realiza una auditoría de copyright y marcas registradas de todos los productos de la tienda. Identifica posibles infracciones y sugiere nombres alternativos seguros." },
 ];
 
-const SYSTEM_PROMPT = `Eres OmniCore AI — la inteligencia central de ShopyBrain para agencias Shopify.
-Tienes acceso a tres motores: 🔬 Gemini (investigación), 🧠 Claude (análisis), 💾 ShopyBrain (memoria permanente).
+const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización Shopify.
+Tienes acceso a tres motores de análisis: investigación de mercado, análisis estratégico y memoria permanente.
 Eres experto en: Shopify, Klaviyo, email marketing, SEO, pricing, eCommerce, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
-Cuando el usuario comparte una imagen o URL, puedes absorberla al ShopyBrain y extraer TODA la inteligencia posible.
+Cuando el usuario comparte una imagen o URL, puedes absorberla y extraer TODA la inteligencia posible.
 También eres el ASISTENTE DE NAVEGACIÓN de la app: conoces TODAS las páginas, botones y funciones. Cuando te pregunten cómo hacer algo, guía paso a paso con nombres EXACTOS de botones y secciones.
+IMPORTANTE: Siempre refiérete a la plataforma como "Shopy Crafter". Nunca uses nombres internos.
 Responde siempre en español. Sé directo, técnico y accionable.`;
 
 // ─── MAIN CHATBOT ─────────────────────────────────────────────────────────────
@@ -698,7 +699,7 @@ export default function OmniChatbot() {
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
     id: "welcome", role: "assistant", timestamp: new Date(), model: "omnicore",
-    content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy **OmniCore AI** — el cerebro central ShopyBrain.
+    content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy el asistente inteligente de **Shopy Crafter**.
 
 🚀 **Ahora puedo EJECUTAR acciones en Shopify directamente:**
 · ➕ "Crea un producto llamado X" — lo creo en tu tienda
@@ -983,7 +984,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (risks?.length) msg += `\n⚠️ **Riesgos:** ${risks.join(" · ")}\n`;
         const steps = result.nextSteps as string[];
         if (steps?.length) msg += `\n📋 **Próximos pasos:**\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`;
-        msg += `\n💾 Guardado en ShopyBrain (ID: ${(result.memoryId as string)?.slice(0, 8) || "N/A"})`;
+        msg += `\n💾 Guardado en Shopy Crafter (ID: ${(result.memoryId as string)?.slice(0, 8) || "N/A"})`;
         msg += `\n\n📥 _Puedes descargar el informe completo con el botón de abajo._`;
         return msg;
       }
@@ -1122,8 +1123,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `📸 **Imágenes desde referencia:**\n${result.message || `${result.imagesGenerated || "?"} fotos profesionales generadas desde imagen de referencia.`}`;
       case "setup_full_store":
         return `🏪 **Setup completo de tienda:**\n${result.message || "Configuración completa aplicada."}`;
+      case "copyright_audit":
+        return result.message || `⚖️ **Auditoría de copyright:**\n${result.totalProducts || "?"} productos analizados · ${result.riskProducts?.length || 0} con riesgos`;
       case "brain_stats":
-        return `🧠 **ShopyBrain stats:**\n${result.message || `${result.totalMemories || "?"} memorias · ${result.totalInsights || "?"} insights`}`;
+        return `🧠 **Shopy Crafter stats:**\n${result.message || `${result.totalMemories || "?"} memorias · ${result.totalInsights || "?"} insights`}`;
       case "brain_sync":
         return `🧠 **Brain sincronizado:**\n${result.message || "Conocimiento actualizado."}`;
       case "inventory_sync":
@@ -1336,9 +1339,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
         } else {
           const absorbingMsg = attachType === "image"
-            ? `🔬 Absorbiendo imagen **${attachName}** al ShopyBrain...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
+            ? `🔬 Absorbiendo imagen **${attachName}**...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
             : attachType === "video"
-            ? `🎬 Absorbiendo vídeo **${attachName}** al ShopyBrain...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
+            ? `🎬 Absorbiendo vídeo **${attachName}**...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
             : (() => {
                 const urlInfo = classifyUrl(attachUrl);
                 return `${urlInfo.icon} Absorbiendo **${urlInfo.label}**: ${attachUrl}\n\nExtrayendo: contenido, marca, productos, audiencia, estrategia, señales eCommerce...\n\n_Analizando con Gemini + Claude..._`;
@@ -1357,7 +1360,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           const a = result.analysis as Record<string, Record<string, string[]>>;
           const angles = a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
 
-          assistantContent = `✅ **Absorbido al ShopyBrain**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
+          assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
           if (isImage && a.visual_composition) {
             assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
           }
@@ -1388,7 +1391,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const kInfo = detectKlaviyo(content)!;
         setMessages(m => [...m, {
           id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
-          content: `🔄 Generando workflow Klaviyo para **${kInfo.storeName}**...\n\n**Paso 1** — Gemini investiga el nicho ${kInfo.niche} en España\n**Paso 2** — Claude diseña 6 flujos con emails HTML completos\n**Paso 3** — ShopyBrain guarda el conocimiento permanentemente\n\n_30-60 segundos..._`
+          content: `🔄 Generando workflow Klaviyo para **${kInfo.storeName}**...\n\n**Paso 1** — Investigación del nicho ${kInfo.niche} en España\n**Paso 2** — Diseño de 6 flujos con emails HTML completos\n**Paso 3** — Guardado permanente del conocimiento\n\n_30-60 segundos..._`
         }]);
 
         const wfRes = await fetch(`${API}/api/klaviyo-ai/generate-workflow`, {
@@ -1418,7 +1421,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
         setMessages(m => [...m, {
           id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
-          content: `🔬 **Investigación exhaustiva paralela iniciada**\n\n**Objetivo:** ${entityDisplay}\n\n**Ejecutando en paralelo:**\n· 🌐 8 búsquedas Google con IA (brand overview, productos, redes sociales, noticias, reviews, competidores, eCommerce, identidad visual)\n· 🔗 Descubrimiento y análisis de fuentes relacionadas\n· 🧠 Claude sintetiza todo el conocimiento\n· 💾 Guardado permanente en ShopyBrain\n\n_⏱️ Esto toma 30-90 segundos. Ejecutando todas las búsquedas simultáneamente..._`
+          content: `🔬 **Investigación exhaustiva paralela iniciada**\n\n**Objetivo:** ${entityDisplay}\n\n**Ejecutando en paralelo:**\n· 🌐 8 búsquedas Google (brand overview, productos, redes sociales, noticias, reviews, competidores, eCommerce, identidad visual)\n· 🔗 Descubrimiento y análisis de fuentes relacionadas\n· 🧠 Síntesis inteligente de todo el conocimiento\n· 💾 Guardado permanente en Shopy Crafter\n\n_⏱️ Esto toma 30-90 segundos. Ejecutando todas las búsquedas simultáneamente..._`
         }]);
 
         const researchResult = await researchEntity(entityInput);
@@ -1426,7 +1429,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         assistantContent = `✅ **Investigación completada: ${researchResult.entity}**\n\n`;
         assistantContent += `📊 **${researchResult.queriesExecuted} búsquedas Google** ejecutadas en paralelo\n`;
         assistantContent += `🔗 **${researchResult.sourcesFound} fuentes** descubiertas y analizadas\n`;
-        assistantContent += `💾 **${researchResult.memoriesSaved} memorias** guardadas en ShopyBrain\n`;
+        assistantContent += `💾 **${researchResult.memoriesSaved} memorias** guardadas en Shopy Crafter\n`;
         assistantContent += `⏱️ Completado en **${researchResult.elapsed}**\n\n`;
 
         const p = researchResult.profile;
@@ -1449,7 +1452,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       // ── CASE 4: Regular chat (with Shopify action detection) ──
       } else {
-        const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "OmniCore"}: ${m.content}`).join("\n\n");
+        const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "Shopy Crafter"}: ${m.content}`).join("\n\n");
         const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
         const res = await fetch(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
@@ -1462,7 +1465,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
           const longActions: Record<string, string> = {
             generate_competitive_pricing: "🔍 **Investigación de mercado en curso...**\n\n**Paso 1** — Buscando precios reales de competidores con Google Search\n**Paso 2** — Analizando posicionamiento del mercado\n**Paso 3** — Generando catálogo de precios competitivo\n**Paso 4** — Actualizando CMS y creando productos en Shopify\n\n_⏱️ Esto toma 30-90 segundos. Investigando datos reales del mercado..._",
-            audit_app_offerings: "🔍 **Auditando la oferta de ShopyBrain...**\n\n**Paso 1** — Leyendo planes y features actuales del CMS\n**Paso 2** — Comparando con capacidades reales de la plataforma\n**Paso 3** — Analizando pricing vs. valor entregado\n**Paso 4** — Generando recomendaciones estratégicas\n\n_⏱️ Analizando con Claude... 15-30 segundos._",
+            copyright_audit: "⚖️ **Auditoría de Copyright en curso...**\n\n**Paso 1** — Cargando catálogo completo de Shopify\n**Paso 2** — Analizando cada producto buscando marcas registradas y derechos de autor\n**Paso 3** — Generando sugerencias de nombres alternativos\n\n_⏱️ 15-30 segundos..._",
+            audit_app_offerings: "🔍 **Auditando la oferta de Shopy Crafter...**\n\n**Paso 1** — Leyendo planes y features actuales del CMS\n**Paso 2** — Comparando con capacidades reales de la plataforma\n**Paso 3** — Analizando pricing vs. valor entregado\n**Paso 4** — Generando recomendaciones estratégicas\n\n_⏱️ Analizando... 15-30 segundos._",
             scan_store: "📊 **Escaneando tienda Shopify...**\n\n**Paso 1** — Conectando con Shopify API\n**Paso 2** — Descargando catálogo completo\n**Paso 3** — Analizando calidad de cada producto\n\n_⏱️ Dependiendo del catálogo, 10-60 segundos..._",
             optimize_all_products: "🧠 **Optimización masiva con IA...**\n\n**Paso 1** — Cargando productos de Shopify\n**Paso 2** — Claude genera SEO + copywriting para cada producto\n**Paso 3** — Actualizando títulos, descripciones, tags y meta\n\n_⏱️ ~5 segundos por producto..._",
             design_all_pages: "📄 **Diseñando páginas de la tienda...**\n\n**Paso 1** — Analizando nicho y marca\n**Paso 2** — Claude genera contenido profesional para cada página\n**Paso 3** — Creando páginas en Shopify\n\n_⏱️ ~10 segundos por página..._",
@@ -1556,7 +1560,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       {/* Floating button */}
       {!open && (
-        <button onClick={() => setOpen(true)} aria-label="Abrir chat ShopyBrain" style={{
+        <button onClick={() => setOpen(true)} aria-label="Abrir asistente Shopy Crafter" style={{
           position: "fixed", bottom: isMobile ? 12 : 24, right: isMobile ? 12 : 24, width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
           borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
           border: "none", cursor: "pointer", zIndex: 1000,
@@ -1594,7 +1598,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               <Brain size={16} style={{ color: "#fff" }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>OmniCore AI · ShopyBrain</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>Shopy Crafter · Asistente</p>
               {!minimized && <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>🔬 Gemini · 🧠 Claude · 💾 Brain — Listo</p>}
             </div>
             <div style={{ display: "flex", gap: isMobile ? 8 : 4 }}>
@@ -1614,7 +1618,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 <div style={{ position: "absolute", inset: 52, background: "rgba(45,212,159,0.08)", border: "2px dashed var(--jade)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
                   <div style={{ textAlign: "center" }}>
                     <Upload size={28} style={{ color: "var(--jade)", marginBottom: 8 }} />
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--jade)" }}>Suelta para absorber al ShopyBrain</p>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--jade)" }}>Suelta para absorber a Shopy Crafter</p>
                   </div>
                 </div>
               )}
@@ -1633,7 +1637,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       {msg.role === "assistant" && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
                           <Brain size={10} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>ShopyBrain</span>
+                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Shopy Crafter</span>
                         </div>
                       )}
                       {msg.attachmentType && (
@@ -1669,7 +1673,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 {loading && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--ink2)", borderRadius: "12px 12px 12px 3px", border: "1px solid var(--ink3)", maxWidth: "60%", alignSelf: "flex-start" }}>
                     <Loader2 size={12} style={{ color: "var(--gold)", animation: "spin 1s linear infinite" }} />
-                    <span style={{ fontSize: 11, color: "var(--t3)" }}>ShopyBrain procesando...</span>
+                    <span style={{ fontSize: 11, color: "var(--t3)" }}>Shopy Crafter procesando...</span>
                   </div>
                 )}
                 <div ref={messagesEndRef} />

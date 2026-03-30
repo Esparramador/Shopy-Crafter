@@ -190,7 +190,7 @@ export default function Intelligence() {
       <GenerationProgress
         active={analyzing}
         operation="analysis"
-        title="ShopyBrain analizando tu tienda..."
+        title="Shopy Crafter analizando tu tienda..."
         subtitle="Procesando revenue, atribución y oportunidades de crecimiento"
       />
 
