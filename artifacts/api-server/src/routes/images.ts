@@ -139,23 +139,35 @@ export async function runImageGeneration(params: {
     const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
     const replicate = new Replicate({ auth: replicateToken });
 
-    let runPromise: Promise<unknown>;
-    if (model.includes("flux-1.1-pro")) {
-      runPromise = replicate.run(model as `${string}/${string}`, {
-        input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
-      });
-    } else if (model.includes("recraft")) {
-      runPromise = replicate.run(model as `${string}/${string}`, {
-        input: { prompt: finalPrompt, size: "1365x1365", style: "realistic_image" },
-      });
-    } else {
-      runPromise = replicate.run(model as `${string}/${string}`, {
-        input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
-      });
-    }
+    const runWithRetry = async (attempt = 1): Promise<unknown> => {
+      try {
+        let runPromise: Promise<unknown>;
+        if (model.includes("flux-1.1-pro")) {
+          runPromise = replicate.run(model as `${string}/${string}`, {
+            input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
+          });
+        } else if (model.includes("recraft")) {
+          runPromise = replicate.run(model as `${string}/${string}`, {
+            input: { prompt: finalPrompt, size: "1024x1024", style: "realistic_image" },
+          });
+        } else {
+          runPromise = replicate.run(model as `${string}/${string}`, {
+            input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
+          });
+        }
+        return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("429") && attempt <= 5) {
+          const delay = Math.min(15_000 * attempt, 60_000);
+          await new Promise(r => setTimeout(r, delay));
+          return runWithRetry(attempt + 1);
+        }
+        throw err;
+      }
+    };
 
-    // ── Replicate timeout (5 minutes) ───────────────────────────────────────
-    const output = await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model}`);
+    const output = await runWithRetry();
     const imageUrl = Array.isArray(output) ? (output[0] as string) : (output as string);
 
     const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
