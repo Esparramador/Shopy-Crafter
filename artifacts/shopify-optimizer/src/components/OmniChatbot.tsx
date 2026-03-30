@@ -1044,6 +1044,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `🔍 **Búsqueda en memoria:**\n${result.message || `${result.memories || 0} memorias encontradas.`}`;
       case "brain_status":
         return `🧠 **Estado del cerebro:**\n${result.message || `${result.totalMemories || "?"} memorias totales.`}`;
+      case "analyze_external_store":
+      case "external_pre_report":
+        return `🔍 **Análisis de tienda externa:**\n${result.message || "Análisis completado."}${result.savedToVault ? "\n\n💾 Informe guardado en el vault." : ""}`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }

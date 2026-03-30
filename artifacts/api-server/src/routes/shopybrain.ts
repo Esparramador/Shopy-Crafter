@@ -466,6 +466,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
 - Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
+- Analizar tienda externa / investigar tienda / analizar URL / pre-informe / estudio previo / analizar competencia (sin conexión) / analizar empresa / analizar negocio → analyze_external_store. Params: {url?, name?, instagram?, niche?, projectId}. NO necesita conexión Shopify — funciona solo con URL/nombre/Instagram.
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
 Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -5633,6 +5634,134 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         break;
       }
 
+      case "analyze_external_store":
+      case "external_pre_report": {
+        const storeUrl = params?.url || params?.storeUrl || params?.shopUrl;
+        const instagram = params?.instagram || params?.ig;
+        const niche = params?.niche || params?.nicho;
+        const storeName = params?.name || params?.storeName || params?.empresa;
+        const projectId = params?.projectId ? parseInt(params.projectId) : 0;
+
+        if (!storeUrl && !storeName && !instagram) {
+          result = { error: true, message: "❌ Necesito al menos una URL, nombre de empresa o Instagram para investigar." };
+          break;
+        }
+
+        let validatedUrl = storeUrl;
+        if (validatedUrl) {
+          try {
+            const parsed = new URL(validatedUrl.startsWith("http") ? validatedUrl : `https://${validatedUrl}`);
+            if (!["http:", "https:"].includes(parsed.protocol) || parsed.hostname === "localhost" || parsed.hostname.startsWith("127.") || parsed.hostname.startsWith("10.") || parsed.hostname.startsWith("192.168.") || parsed.hostname.startsWith("172.") || parsed.hostname === "0.0.0.0") {
+              result = { error: true, message: "❌ URL inválida — solo se permiten URLs públicas (http/https)." };
+              break;
+            }
+            validatedUrl = parsed.toString();
+          } catch {
+            result = { error: true, message: "❌ URL mal formada. Ejemplo: https://tienda.com" };
+            break;
+          }
+        }
+
+        const identifier = validatedUrl || storeName || instagram || "unknown";
+        const sections: Record<string, string> = {};
+        const errors: string[] = [];
+
+        try {
+          if (validatedUrl) {
+            try {
+              const { runDualPageSpeed } = await import("../lib/pagespeed.js");
+              const ps = await runDualPageSpeed(validatedUrl);
+              sections.pagespeed = `📊 PageSpeed: Mobile ${ps.mobile?.score ?? "N/A"}/100, Desktop ${ps.desktop?.score ?? "N/A"}/100\n` +
+                `FCP: ${ps.mobile?.metrics?.firstContentfulPaint ?? "?"}, LCP: ${ps.mobile?.metrics?.largestContentfulPaint ?? "?"}, CLS: ${ps.mobile?.metrics?.cumulativeLayoutShift ?? "?"}\n` +
+                `Speed Index: ${ps.mobile?.metrics?.speedIndex ?? "?"}`;
+            } catch (e) { errors.push(`PageSpeed: ${e instanceof Error ? e.message : String(e)}`); }
+          }
+
+          if (validatedUrl) {
+            try {
+              const resp = await fetch(validatedUrl, {
+                headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter-Analyzer/1.0)" },
+                signal: AbortSignal.timeout(20_000),
+              });
+              const raw = await resp.text();
+              const cleaned = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 8000);
+              const titleMatch = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+              const metaDescMatch = raw.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+              sections.webContent = `🌐 Web: ${titleMatch?.[1]?.trim() ?? "Sin título"}\nMeta: ${metaDescMatch?.[1]?.trim() ?? "Sin meta descripción"}\nContenido: ${cleaned.slice(0, 3000)}`;
+              const isShopify = raw.includes("cdn.shopify.com") || raw.includes("Shopify.theme") || raw.includes("myshopify");
+              sections.platform = isShopify ? "🛒 Plataforma: Shopify detectado" : "🛒 Plataforma: No-Shopify (posible WooCommerce/Wix/custom)";
+            } catch (e) { errors.push(`Scraping: ${e instanceof Error ? e.message : String(e)}`); }
+          }
+
+          const geminiInput = `${storeName || ""} ${storeUrl || ""} ${instagram ? `@${instagram}` : ""}`.trim();
+          if (geminiInput) {
+            try {
+              const { askGeminiWithSearch } = await import("../lib/gemini.js");
+              const [brandRes, productsRes, socialRes, pricingRes] = await Promise.allSettled([
+                askGeminiWithSearch(`Complete brand overview, history, founding, team, and mission of: ${geminiInput}. Niche: ${niche || "ecommerce"}`, "brand intelligence"),
+                askGeminiWithSearch(`All products, services, catalog, and pricing of: ${geminiInput}. Include real prices found online.`, "products catalog"),
+                askGeminiWithSearch(`Social media presence, followers, engagement, and content strategy of: ${geminiInput}. Check Instagram, TikTok, Facebook, YouTube, Twitter/X.`, "social media"),
+                askGeminiWithSearch(`Pricing strategy, price range, promotions, and offers of: ${geminiInput}. Include real prices.`, "pricing"),
+              ]);
+              if (brandRes.status === "fulfilled") sections.brand = `🏢 Marca:\n${brandRes.value.text.slice(0, 3000)}`;
+              if (productsRes.status === "fulfilled") sections.products = `📦 Productos:\n${productsRes.value.text.slice(0, 3000)}`;
+              if (socialRes.status === "fulfilled") sections.social = `📱 Redes Sociales:\n${socialRes.value.text.slice(0, 2000)}`;
+              if (pricingRes.status === "fulfilled") sections.pricing = `💰 Precios:\n${pricingRes.value.text.slice(0, 2000)}`;
+            } catch (e) { errors.push(`Gemini research: ${e instanceof Error ? e.message : String(e)}`); }
+          }
+
+          const allResearch = Object.entries(sections).map(([k, v]) => `=== ${k.toUpperCase()} ===\n${v}`).join("\n\n");
+          let aiSummary = "";
+          try {
+            aiSummary = await askClaudeWithBrain(
+              projectId,
+              [{ role: "user", content: `Analiza esta tienda/empresa externa y genera un informe completo.\n\nDatos recopilados:\n${allResearch}\n\nErrores de recopilación: ${errors.length > 0 ? errors.join("; ") : "Ninguno"}\n\nGenera un informe profesional con:\n1. Resumen ejecutivo\n2. Análisis de marca y posicionamiento\n3. Catálogo y estrategia de productos\n4. Análisis de precios\n5. Presencia digital y SEO\n6. Oportunidades y recomendaciones\n7. Nivel de amenaza competitiva (si aplica)` }],
+              "You are ShopyBrain, an expert e-commerce analyst. Generate a comprehensive, actionable report about this external store/business. Use ALL the data provided. Be specific with numbers and recommendations.",
+              "general",
+              niche ?? undefined,
+              4096
+            );
+          } catch { aiSummary = "⚠️ No se pudo generar análisis IA. Los datos recopilados están disponibles arriba."; }
+
+          const fullReport = {
+            identifier,
+            storeUrl: validatedUrl, instagram, niche, storeName,
+            sections, errors,
+            aiSummary,
+            analyzedAt: new Date().toISOString(),
+          };
+
+          if (projectId > 0) {
+            const reportContent = JSON.stringify(fullReport, null, 2);
+            saveToVault({
+              projectId,
+              fileType: "research",
+              category: "external_store_analysis",
+              title: `Análisis Externo: ${storeName || storeUrl || instagram}`,
+              description: `${Object.keys(sections).length} secciones analizadas, ${errors.length} errores`,
+              mimeType: "application/json",
+              fileSizeBytes: Buffer.from(reportContent).length,
+              generatedBy: "shopybrain_external",
+              content: reportContent,
+              metadata: { storeUrl: validatedUrl, instagram, niche, storeName, analyzedAt: new Date().toISOString() },
+            }).catch(() => {});
+          }
+
+          let msg = `🔍 **ANÁLISIS EXTERNO: ${storeName || validatedUrl || instagram}**\n\n`;
+          if (sections.platform) msg += `${sections.platform}\n`;
+          if (sections.pagespeed) msg += `\n${sections.pagespeed}\n`;
+          msg += `\n📊 **Secciones analizadas:** ${Object.keys(sections).length}\n`;
+          if (errors.length > 0) msg += `⚠️ **Errores menores:** ${errors.length}\n`;
+          msg += `\n${aiSummary}`;
+          if (projectId > 0) msg += `\n\n💾 Informe guardado en el vault del proyecto.`;
+
+          result = { ...fullReport, message: msg, savedToVault: projectId > 0 };
+        } catch (err) {
+          result = { error: true, message: `❌ Error en análisis externo: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
       default:
         res.status(400).json({ error: `Acción desconocida: ${action}` });
         return;
@@ -5648,6 +5777,31 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         confidence: enrichedContent.confidence,
         tags: ["chatbot", "action", action, ...(enrichedContent.extraTags || [])],
       });
+    }
+
+    const NON_SAVEABLE = new Set([
+      "delete_product", "regenerate_token", "get_scopes",
+      "read_cms", "update_cms", "update_cms_batch", "reset_cms",
+      "inspect_code", "fix_code", "list_source_files",
+      "edit_theme_file", "edit_theme_css", "edit_theme_settings",
+      "brain_sync", "brain_export",
+    ]);
+    const isSaveable = !NON_SAVEABLE.has(action);
+    const pId = params?.projectId ? parseInt(params.projectId) : null;
+    if (pId && isSaveable && !r.error) {
+      const content = JSON.stringify(result, null, 2);
+      saveToVault({
+        projectId: pId,
+        fileType: "brain_action",
+        category: action,
+        title: `ShopyBrain: ${action} — ${new Date().toLocaleDateString("es-ES")}`,
+        description: r.message ? String(r.message).slice(0, 500) : `Resultado de acción ${action}`,
+        mimeType: "application/json",
+        fileSizeBytes: Buffer.from(content).length,
+        generatedBy: "shopybrain",
+        content,
+        metadata: { action, params: { ...params, accessToken: undefined, clientSecret: undefined }, timestamp: new Date().toISOString() },
+      }).catch(() => {});
     }
 
     res.json({ success: true, action, ...result });

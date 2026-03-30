@@ -24,6 +24,7 @@ import { deepEntityResearch, askGeminiWithSearch, askGeminiJson } from "../lib/g
 import { getClaudeClient } from "../lib/claude.js";
 import { randomUUID } from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -254,7 +255,8 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
     input,
     niche,
     market = "es",
-  } = req.body as { input: string; niche?: string; market?: string };
+    projectId: rawProjectId,
+  } = req.body as { input: string; niche?: string; market?: string; projectId?: string | number };
 
   if (!input?.trim()) {
     res.status(400).json({ error: "input es requerido" });
@@ -605,6 +607,31 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       sourcesFound: research.allSources.length,
       elapsed,
     }, "✅ Entity research + memory enrichment complete");
+
+    const fullResearchContent = JSON.stringify({
+      entity: entityDisplay, entityUrl: entity.url, handles: entity.handles,
+      profile, research: {
+        overview: research.overview, products: research.products, social: research.social,
+        news: research.news, reviews: research.reviews, competitors: research.competitors,
+        ecommerce: research.ecommerce, pricing: research.pricing, paidAds: research.paidAds,
+        founders: research.founders, international: research.international, urlDeepDive: research.urlDeepDive,
+      },
+      sourcesFound: research.allSources.length, queriesExecuted: research.allQueries.length,
+      memoriesSaved: memoryIds.length, elapsed: `${elapsed}s`,
+    }, null, 2);
+    const vaultProjectId = rawProjectId ? parseInt(String(rawProjectId)) : 0;
+    if (vaultProjectId > 0) saveToVault({
+      projectId: vaultProjectId,
+      fileType: "research",
+      category: "entity_research",
+      title: `Investigación: ${entityDisplay}`,
+      description: `12 dimensiones, ${research.allSources.length} fuentes, ${memoryIds.length} memorias, ${elapsed}s`,
+      mimeType: "application/json",
+      fileSizeBytes: Buffer.from(fullResearchContent).length,
+      generatedBy: "entity_research_engine",
+      content: fullResearchContent,
+      metadata: { entity: entityDisplay, url: entity.url, niche, researchId, elapsed },
+    }).catch(() => {});
 
     res.json({
       success: true,

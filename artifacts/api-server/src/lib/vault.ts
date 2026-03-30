@@ -7,14 +7,15 @@ interface VaultFileParams {
   category?: string;
   title: string;
   description?: string;
-  originalUrl?: string;   // URL de origen (Replicate CDN, etc.)
-  objectPath?: string;    // Ruta GCS si ya fue subido a object storage
+  originalUrl?: string;
+  objectPath?: string;
   mimeType?: string;
   fileSizeBytes?: number;
   productId?: string;
   productTitle?: string;
   generatedBy?: string;
   metadata?: Record<string, unknown>;
+  content?: string;
 }
 
 // Registra un archivo generado en el vault del proyecto
@@ -35,6 +36,7 @@ export async function saveToVault(params: VaultFileParams): Promise<number | nul
       productTitle: params.productTitle ?? null,
       generatedBy: params.generatedBy ?? null,
       metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      content: params.content ?? null,
     }).returning({ id: projectFilesTable.id });
 
     logger.info({ fileId: file?.id, projectId: params.projectId, fileType: params.fileType }, "File saved to vault");

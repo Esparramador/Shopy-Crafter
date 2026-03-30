@@ -4,6 +4,7 @@ import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, proj
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -130,6 +131,19 @@ Analyze the competitor and return competitive intelligence. Extract real prices,
       niche: niche,
       category: "competitor_intel",
     });
+
+    saveToVault({
+      projectId: parseInt(projectId),
+      fileType: "analysis",
+      category: "competitor_scan",
+      title: `Análisis Competidor: ${competitor.name}`,
+      description: `Threat: ${data.overallThreatLevel ?? "?"}, ${data.productsFound ?? 0} productos, ${(data.insights ?? []).length} insights`,
+      mimeType: "application/json",
+      fileSizeBytes: Buffer.from(text).length,
+      generatedBy: "competitor_scanner",
+      content: JSON.stringify({ competitor: { name: competitor.name, url: competitor.url }, data, rawAnalysis: text }, null, 2),
+      metadata: { competitorId, competitorName: competitor.name, threatLevel: data.overallThreatLevel },
+    }).catch(() => {});
 
     res.json({ snapshot: snap, insights: data.insights ?? [], threatLevel: data.overallThreatLevel });
   } catch (e: any) {
