@@ -814,7 +814,7 @@ export default function Landing() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/login" className={`l-pricing-cta ${plan.cta.style}`}>{plan.cta.label}</Link>
+                  <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`}>{plan.cta.label}</Link>
                 </div>
               ))}
             </div>
