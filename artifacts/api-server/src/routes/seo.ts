@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable, bulkJobsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeJson, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
@@ -656,10 +656,10 @@ router.post("/projects/:projectId/seo/fix-alt-texts", async (req, res): Promise<
         for (const img of images) {
           if (img.alt && img.alt.trim()) continue;
           const imageType = img.position === 1 ? "hero" : "lifestyle";
-          const altText = await askClaude(projectId, [{
+          const altText = await askClaudeWithBrain(projectId, [{
             role: "user",
             content: `Alt text SEO en español (máx 125 chars) para imagen de ${imageType} del producto "${product.title}" en tienda de ${project?.storeNiche ?? "e-commerce"}. Solo devuelve el alt text.`,
-          }]);
+          }], undefined, "seo", project?.storeNiche ?? undefined, 200);
 
           if (project && img.id) {
             await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/images/${img.id}.json`, {

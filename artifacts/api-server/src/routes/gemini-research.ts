@@ -7,7 +7,7 @@ import {
   analyzeProductTrends,
   researchPersonOrBrand,
 } from "../lib/gemini.js";
-import { askClaude, askClaudeJson, learnFromOperation } from "../lib/claude.js";
+import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreNicheProfilesTable } from "@workspace/db/schema";
@@ -34,10 +34,12 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
 
     const profile = await researchBusiness(businessName, domain, niche, market);
 
-    const claudeEnhancement = await askClaude(
+    const claudeEnhancement = await askClaudeWithBrain(
       0,
-      [{ role: "user", content: `You are OmniCore, an elite Shopify optimization AI. Based on this Gemini intelligence report about ${businessName}:\n\n${JSON.stringify(profile, null, 2)}\n\nProvide a strategic action plan (3-5 specific recommendations) for how a Shopify optimization agency could:\n1. Identify their biggest conversion/revenue opportunities\n2. Position against their weaknesses\n3. The one most impactful optimization to apply first\n\nBe specific and actionable. 2-3 sentences per recommendation.` }],
+      [{ role: "user", content: `Based on this Gemini intelligence report about ${businessName}:\n\n${JSON.stringify(profile, null, 2)}\n\nProvide a strategic action plan (3-5 specific recommendations) for how a Shopify optimization agency could:\n1. Identify their biggest conversion/revenue opportunities\n2. Position against their weaknesses\n3. The one most impactful optimization to apply first\n\nBe specific and actionable. 2-3 sentences per recommendation.` }],
       undefined,
+      "general",
+      niche,
       1500
     );
 
@@ -63,9 +65,12 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
 
     const intel = await analyzeCompetitor(domain, niche, market);
 
-    const gaps = await askClaudeJson<{ quickWins: string[]; contentGaps: string[]; pricingOpportunity: string; seoGap: string }>(
+    const gaps = await askClaudeJsonWithBrain<{ quickWins: string[]; contentGaps: string[]; pricingOpportunity: string; seoGap: string }>(
       0,
-      `Based on this competitor intelligence for ${domain}:\n${JSON.stringify(intel, null, 2)}\n\nIdentify specific opportunities for a competing Shopify store to win:\nReturn JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`
+      `Based on this competitor intelligence for ${domain}:\n${JSON.stringify(intel, null, 2)}\n\nIdentify specific opportunities for a competing Shopify store to win:\nReturn JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`,
+      undefined,
+      "general",
+      niche
     );
 
     learnFromOperation({
@@ -202,13 +207,15 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
       gatherMarketIntelligence(niche, market),
     ]);
 
-    const synthesis = await askClaude(
+    const synthesis = await askClaudeWithBrain(
       0,
       [{
         role: "user",
-        content: `You are OmniCore, an elite Shopify eCommerce optimization AI.\nYou have performed a full intelligence audit of ${businessName} (${domain}) in the ${niche} niche for the ${market} market.\n\nBUSINESS PROFILE (from Gemini):\n${JSON.stringify(businessProfile, null, 2)}\n\nMARKET INTELLIGENCE (from Gemini):\n${JSON.stringify(marketIntel, null, 2)}\n\nCreate an executive intelligence brief with:\n1. SITUATIONAL ANALYSIS — where this business stands vs market\n2. TOP 3 REVENUE OPPORTUNITIES — highest-impact optimizations (with estimated % improvement)\n3. COMPETITIVE POSITIONING — how to differentiate from top competitors: ${marketIntel.topPlayers.slice(0, 3).join(", ")}\n4. PRICING STRATEGY — specific price point recommendations based on market data\n5. 90-DAY ACTION PLAN — prioritized by ROI\n\nBe specific, bold, and actionable. Format clearly with headers.`,
+        content: `Full intelligence audit of ${businessName} (${domain}) in the ${niche} niche for the ${market} market.\n\nBUSINESS PROFILE (from Gemini):\n${JSON.stringify(businessProfile, null, 2)}\n\nMARKET INTELLIGENCE (from Gemini):\n${JSON.stringify(marketIntel, null, 2)}\n\nCreate an executive intelligence brief with:\n1. SITUATIONAL ANALYSIS — where this business stands vs market\n2. TOP 3 REVENUE OPPORTUNITIES — highest-impact optimizations (with estimated % improvement)\n3. COMPETITIVE POSITIONING — how to differentiate from top competitors: ${marketIntel.topPlayers.slice(0, 3).join(", ")}\n4. PRICING STRATEGY — specific price point recommendations based on market data\n5. 90-DAY ACTION PLAN — prioritized by ROI\n\nBe specific, bold, and actionable. Format clearly with headers.`,
       }],
       undefined,
+      "general",
+      niche,
       2000
     );
 

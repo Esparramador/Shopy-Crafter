@@ -17,7 +17,7 @@ import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
-import { askClaude, buildShopyBrainContext } from "../lib/claude.js";
+import { askClaudeWithBrain } from "../lib/claude.js";
 
 const router = Router();
 
@@ -870,8 +870,6 @@ router.post("/projects/:projectId/exports/generate-ai-report", async (req, res):
 
     const competitorList = competitors.slice(0, 5).map(c => `- ${c.name} (${c.url || "sin URL"}) — tipo: ${c.type || "direct"}`).join("\n");
 
-    const brainContext = await buildShopyBrainContext(project.storeNiche || undefined, "general", `analisis exhaustivo tienda ${project.name}`);
-
     const dataBlock = `
 === DATOS DE LA TIENDA ===
 Nombre: ${project.name}
@@ -928,9 +926,7 @@ ${productSummary}
 
 Tu analisis debe ser EXTENSO, DETALLADO, ESPECIFICO al negocio del cliente. No uses frases genericas ni recomendaciones vagas. Cada parrafo debe contener datos concretos del cliente, numeros exactos, y recomendaciones accionables con estimaciones de impacto.
 
-Escribe SIEMPRE en español. Usa lenguaje profesional pero accesible. Se exhaustivo — cuanto mas largo y detallado, mejor. Minimo 3-4 parrafos por seccion.
-
-${brainContext}`;
+Escribe SIEMPRE en español. Usa lenguaje profesional pero accesible. Se exhaustivo — cuanto mas largo y detallado, mejor. Minimo 3-4 parrafos por seccion.`;
 
     const userPrompt = `Genera un analisis EXHAUSTIVO y PROFUNDO de esta tienda Shopify. Responde en formato JSON con las siguientes claves (cada valor es texto largo en HTML con parrafos <p>, negritas <strong>, listas <ul><li>, etc.):
 
@@ -951,7 +947,7 @@ FORMATO JSON REQUERIDO:
 
 IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nombrar productos concretos del catalogo), y con DATOS NUMERICOS del cliente. No uses placeholder ni contenido generico. El JSON debe ser valido.`;
 
-    const aiResponse = await askClaude(projectId, [{ role: "user", content: userPrompt }], systemPrompt, 8192);
+    const aiResponse = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "general", project.storeNiche ?? undefined, 8192);
 
     let aiReport: Record<string, string>;
     try {

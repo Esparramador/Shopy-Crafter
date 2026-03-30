@@ -21,7 +21,7 @@ import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, omnicoreNicheProfilesTable } from "@workspace/db/schema";
 import { deepEntityResearch, askGeminiWithSearch, askGeminiJson } from "../lib/gemini.js";
-import { askClaude, getClaudeClient } from "../lib/claude.js";
+import { getClaudeClient } from "../lib/claude.js";
 import { randomUUID } from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 

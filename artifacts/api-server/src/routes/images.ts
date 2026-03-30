@@ -4,7 +4,7 @@ import { projectsTable, productsTable, generationJobsTable } from "@workspace/db
 import { saveToVault } from "../lib/vault.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
-import { askClaude, askClaudeWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 
@@ -448,7 +448,7 @@ El SVG debe incluir:
 
 Devuelve SOLO el SVG completo, sin markdown, sin explicaciones. Empieza con <svg y termina con </svg>.`;
 
-  const svgContent = await askClaude(projectId, [{ role: "user", content: prompt }]);
+  const svgContent = await askClaudeWithBrain(projectId, [{ role: "user", content: prompt }], undefined, "general", project.storeNiche ?? undefined, 4000);
   const cleanSvg = svgContent.includes("<svg") ? svgContent.substring(svgContent.indexOf("<svg")) : svgContent;
 
   res.json({ svgContent: cleanSvg, pngBase64: null, uploaded: false });
