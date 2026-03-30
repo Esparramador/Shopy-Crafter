@@ -377,7 +377,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
     rows += `<tr><!-- nosemgrep -->
       <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
-      <td>${p.status === "active" ? '<span class="text-jade">Activo</span>' : '<span class="text-muted">Borrador</span>'}</td>
+      <td>${p.status === "active" ? '<span class="text-jade">Activo</span>' : p.status === "draft" ? '<span class="text-muted">Borrador</span>' : p.status === "archived" ? '<span style="color:#ff9800;">Archivado</span>' : `<span class="text-muted">${p.status || "?"}</span>`}</td>
       <td>${price > 0 ? price.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
       <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
       <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
@@ -503,6 +503,8 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
   const activeProducts = products.filter(p => p.status === "active").length;
+  const draftProducts = products.filter(p => p.status === "draft").length;
+  const archivedProducts = products.filter(p => p.status === "archived").length;
   const productTypes = [...new Set(products.map(p => p.productType).filter(Boolean))];
   const vendors = [...new Set(products.map(p => p.vendor).filter(Boolean))];
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
@@ -540,7 +542,10 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
     <div class="section">
       <div class="section-title">Panorama del Catálogo</div>
       <div class="metric-row">
-        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div><!-- nosemgrep -->
+        <div class="metric"><div class="value">${products.length}</div><div class="label">Total productos</div></div>
+        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Activos</div></div>
+        <div class="metric"><div class="value">${draftProducts}</div><div class="label">Borradores</div></div>
+        <div class="metric"><div class="value">${archivedProducts}</div><div class="label">Archivados</div></div><!-- nosemgrep -->
         <div class="metric"><div class="value">${productTypes.length}</div><div class="label">Categorías</div></div>
         <div class="metric"><div class="value">${avgPrice.toFixed(2)}€</div><div class="label">Precio medio</div></div><!-- nosemgrep -->
         <div class="metric"><div class="value">${priceRange.min.toFixed(0)}–${priceRange.max.toFixed(0)}€</div><div class="label">Rango de precios</div></div><!-- nosemgrep -->
@@ -832,6 +837,8 @@ router.post("/projects/:projectId/exports/generate-ai-report", async (req, res):
     const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
     const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
     const activeProducts = products.filter(p => p.status === "active");
+    const draftProducts = products.filter(p => p.status === "draft");
+    const archivedProducts = products.filter(p => p.status === "archived");
     const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
     const catalogPrices = products.map(p => parseFloat(p.price ?? "0"));
     const totalCatalogValue = catalogPrices.reduce((s, p) => s + p, 0);
@@ -880,7 +887,7 @@ Audiencia objetivo: ${project.targetAudience || "No definida"}
 Mercados: ${project.storeMarkets || "No definidos"}
 
 === CATALOGO ===
-Total productos: ${products.length} (${activeProducts.length} activos, ${products.length - activeProducts.length} borradores)
+Total productos: ${products.length} (${activeProducts.length} activos, ${draftProducts.length} borradores, ${archivedProducts.length} archivados)
 Precio medio: ${avgPrice.toFixed(2)}€
 Rango: ${priceRange.min.toFixed(2)}€ – ${priceRange.max.toFixed(2)}€
 Mediana: ${(() => { const sorted = [...catalogPrices].sort((a, b) => a - b); return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)].toFixed(2) : "0.00"; })()}€
@@ -1136,6 +1143,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
 
   const activeProducts = products.filter(p => p.status === "active").length;
   const draftProducts = products.filter(p => p.status === "draft").length;
+  const archivedProductsCount = products.filter(p => p.status === "archived").length;
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
 
   const liveAudit = products.map(p => {
@@ -1224,7 +1232,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     const audit = liveAudit.find(a => a.product.shopifyProductId === p.shopifyProductId);
     productRows += `<tr>
       <td style="font-weight:600;">${esc(p.title)}</td>
-      <td>${p.status === "active" ? '<span class="tag tag-jade">Activo</span>' : '<span class="tag">Borrador</span>'}</td>
+      <td>${p.status === "active" ? '<span class="tag tag-jade">Activo</span>' : p.status === "draft" ? '<span class="tag">Borrador</span>' : p.status === "archived" ? '<span class="tag" style="background:#ff9800;color:#fff;">Archivado</span>' : `<span class="tag">${p.status || "?"}</span>`}</td>
       <td style="font-weight:600;">${price > 0 ? price.toFixed(2) + "€" : "—"}</td>
       <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : '<span class="text-muted fs-sm">Sin datos</span>'}</td>
       <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
@@ -1470,7 +1478,10 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       </div>
       ${aiBlock("executiveSummary")}
       <div class="metric-row">
-        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Productos activos</div></div>
+        <div class="metric"><div class="value">${products.length}</div><div class="label">Total productos</div></div>
+        <div class="metric"><div class="value">${activeProducts}</div><div class="label">Activos</div></div>
+        <div class="metric"><div class="value">${draftProducts}</div><div class="label">Borradores</div></div>
+        <div class="metric"><div class="value">${archivedProductsCount}</div><div class="label">Archivados</div></div>
         <div class="metric"><div class="value">${avgPrice.toFixed(0)}€</div><div class="label">Precio medio</div></div>
         <div class="metric"><div class="value"><span class="grade ${gradeClass(storeGrade)}" style="font-size:24px;">${storeGrade}</span></div><div class="label">Grade SEO</div></div>
         <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">Score SEO</div></div>
@@ -2427,7 +2438,7 @@ router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promi
     const row = ws.addRow({
       title: p.title,
       handle: p.handle,
-      status: p.status === "active" ? "Activo" : "Borrador",
+      status: p.status === "active" ? "Activo" : p.status === "draft" ? "Borrador" : p.status === "archived" ? "Archivado" : (p.status || "Desconocido"),
       price: price || null,
       compareAt: p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
       cogs: cogs ? cogsVal : null,
@@ -2449,7 +2460,7 @@ router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promi
     }
 
     const statusCell = row.getCell("status");
-    statusCell.font = { color: { argb: p.status === "active" ? "FF2ECC71" : "FF8B8B9E" } };
+    statusCell.font = { color: { argb: p.status === "active" ? "FF2ECC71" : p.status === "archived" ? "FFFF9800" : "FF8B8B9E" } };
   }
 
   ws.autoFilter = { from: "A1", to: `P${products.length + 1}` };
@@ -2483,6 +2494,8 @@ router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promi
     ["", ""],
     ["Total productos", products.length],
     ["Productos activos", products.filter(p => p.status === "active").length],
+    ["Productos borrador", products.filter(p => p.status === "draft").length],
+    ["Productos archivados", products.filter(p => p.status === "archived").length],
     ["Precio medio", `${avgPrice.toFixed(2)}€`],
     ["Revenue potencial", `${totalRevenue.toFixed(2)}€`],
     ["COGS total", `${totalCosts.toFixed(2)}€`],

@@ -150,10 +150,15 @@ export async function runInventorySync() {
     for (const project of projects) {
       if (!project.accessToken) continue;
       try {
-        const productsData = await shopifyRequest<{ products: Array<{ id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> }> }>(
-          project.id, project.shopDomain, "/products.json?limit=250&fields=id,title,product_type,vendor,options,variants"
-        );
-        for (const product of productsData.products) {
+        type InventoryProduct = { id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> };
+        let allProducts: InventoryProduct[] = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: InventoryProduct[] }>(
+            project.id, project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,product_type,vendor,options,variants,status`
+          );
+          allProducts = allProducts.concat(d.products || []);
+        }
+        for (const product of allProducts) {
           const optionNames = product.options || [];
           for (const variant of product.variants) {
             const existing = await db.select().from(inventoryTrackingTable)

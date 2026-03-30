@@ -1206,7 +1206,12 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         const shop = await shopifyRequest<{ shop: Record<string, unknown> }>(parseInt(projectId), project.shopDomain, "/shop.json");
-        const productsCount = await shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json");
+        const [activeCount, draftCount, archivedCount] = await Promise.all([
+          shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=active"),
+          shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=draft"),
+          shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=archived"),
+        ]);
+        const totalProducts = activeCount.count + draftCount.count + archivedCount.count;
         const ordersCount = await shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/orders/count.json?status=any");
 
         const tokenExpiry = project.tokenExpiresAt;
@@ -1218,12 +1223,15 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           domain: project.shopDomain,
           plan: (shop.shop as Record<string, unknown>)?.plan_name,
           currency: (shop.shop as Record<string, unknown>)?.currency,
-          productsCount: productsCount.count,
+          productsCount: totalProducts,
+          activeProducts: activeCount.count,
+          draftProducts: draftCount.count,
+          archivedProducts: archivedCount.count,
           ordersCount: ordersCount.count,
           tokenStatus: tokenValid ? "valid" : "expired",
           tokenHoursLeft,
           tokenExpiresAt: tokenExpiry,
-          message: `Tienda: ${shop.shop?.name ?? project.name} | ${productsCount.count} productos | ${ordersCount.count} pedidos | Token: ${tokenValid ? `válido (${tokenHoursLeft}h restantes)` : "EXPIRADO"}`,
+          message: `Tienda: ${shop.shop?.name ?? project.name} | ${totalProducts} productos (${activeCount.count} activos, ${draftCount.count} borradores, ${archivedCount.count} archivados) | ${ordersCount.count} pedidos | Token: ${tokenValid ? `válido (${tokenHoursLeft}h restantes)` : "EXPIRADO"}`,
         };
         break;
       }
@@ -1235,12 +1243,25 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         const limit = Math.min(params?.limit ?? 10, 50);
-        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-          parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&fields=id,title,status,variants,images,tags`
-        );
+        const statusFilter = params?.statusFilter || "any";
+        let allProducts: Array<Record<string, unknown>> = [];
+
+        if (statusFilter === "any") {
+          for (const st of ["active", "draft", "archived"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,variants,images,tags`
+            );
+            allProducts = allProducts.concat(d.products || []);
+          }
+        } else {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${statusFilter}&published_status=any&fields=id,title,status,variants,images,tags`
+          );
+          allProducts = d.products || [];
+        }
 
         result = {
-          products: data.products.map((p: Record<string, unknown>) => ({
+          products: allProducts.map((p: Record<string, unknown>) => ({
             id: p.id,
             title: p.title,
             status: p.status,
@@ -1248,8 +1269,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             imageCount: (p.images as unknown[])?.length ?? 0,
             tags: p.tags,
           })),
-          total: data.products.length,
-          message: `${data.products.length} productos encontrados`,
+          total: allProducts.length,
+          message: `${allProducts.length} productos encontrados (${statusFilter === "any" ? "todos los estados" : statusFilter})`,
         };
         break;
       }
@@ -2022,9 +2043,14 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-        const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-          parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&fields=id,title,status,variants,images`
-        );
+        let allSearchResults: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&status=${st}&published_status=any&fields=id,title,status,variants,images`
+          );
+          allSearchResults = allSearchResults.concat(d.products || []);
+        }
+        const data = { products: allSearchResults };
 
         result = {
           products: data.products.map((p: Record<string, unknown>) => ({
@@ -3350,9 +3376,9 @@ SOLO HTML.` }],
           );
           productsToOptimize = [d.product];
         } else {
-          for (const st of ["active", "draft"]) {
+          for (const st of ["active", "draft", "archived"]) {
             const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-              parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&fields=id,title,images,product_type,vendor`
+              parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&published_status=any&fields=id,title,images,product_type,vendor`
             );
             productsToOptimize = productsToOptimize.concat(d.products || []);
           }

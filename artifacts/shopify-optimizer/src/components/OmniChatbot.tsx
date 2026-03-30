@@ -718,11 +718,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
     switch (action) {
       case "store_status":
-        return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos | 🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
+        return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos total (✅ ${result.activeProducts ?? "?"} activos | 📝 ${result.draftProducts ?? "?"} borradores | 📁 ${result.archivedProducts ?? "?"} archivados)\n🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
       case "list_products": {
         const prods = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
         if (!prods.length) return "📦 No se encontraron productos.";
-        return `📦 **${result.total} productos:**\n${prods.map((p, i) => `${i + 1}. **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
+        const statusIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
+        return `📦 **${result.total} productos (todos los estados):**\n${prods.map((p, i) => `${i + 1}. ${statusIcon(p.status)} **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
       }
       case "create_product":
         return `✅ **Producto creado en Shopify:**\n🆔 ID: ${result.productId}\n📝 "${result.title}"\n📊 Estado: ${result.status}`;
@@ -742,9 +743,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         }
         return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
       case "search_product": {
-        const prods = (result.products as Array<{ title: string; id: number; price: string }>) ?? [];
+        const prods = (result.products as Array<{ title: string; id: number; price: string; status: string }>) ?? [];
         if (!prods.length) return "🔍 No se encontraron productos.";
-        return `🔍 **${result.total} resultados:**\n${prods.map((p, i) => `${i + 1}. **${p.title}** (ID: ${p.id}) — ${p.price}€`).join("\n")}`;
+        const sIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
+        return `🔍 **${result.total} resultados (todos los estados):**\n${prods.map((p, i) => `${i + 1}. ${sIcon(p.status)} **${p.title}** (ID: ${p.id}) — ${p.price}€ [${p.status}]`).join("\n")}`;
       }
       case "publish_product":
         return `✅ Producto "${result.title}" publicado (active).`;
