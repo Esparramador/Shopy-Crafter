@@ -4,6 +4,7 @@ import { db, agencyCostStructureTable, serviceCatalogTable, pricingDecisionsTabl
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { safeDecrypt } from "../lib/crypto.js";
+import { learnFromOperation } from "../lib/claude.js";
 import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
@@ -138,6 +139,14 @@ Análisis el posicionamiento de precios, márgenes y oportunidades de mejora.`;
     }
   }
 
+  learnFromOperation({
+    operationType: "agency_pricing_analysis",
+    title: `Análisis pricing agencia: ${analysis.recommendations?.length ?? 0} recomendaciones`,
+    content: `Análisis de precios de servicios de agencia. Recomendaciones: ${JSON.stringify(analysis.recommendations ?? []).slice(0, 1800)}`,
+    confidence: 0.9,
+    tags: ["agency", "pricing", "analysis"],
+  });
+
   res.json(analysis);
 });
 
@@ -187,6 +196,14 @@ Catálogo servicios: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceNa
     const m = raw.match(/\{[\s\S]*\}/);
     quote = m ? JSON.parse(m[0]) : {};
   } catch {}
+
+  learnFromOperation({
+    operationType: "agency_quote",
+    title: `Presupuesto: ${clientType ?? "cliente"} — ${numStores ?? 1} tiendas`,
+    content: `Cotización generada. Tipo: ${clientType}, Tiendas: ${numStores}, Servicios: ${JSON.stringify(selectedServices).slice(0, 500)}. Quote: ${JSON.stringify(quote).slice(0, 1200)}`,
+    confidence: 0.88,
+    tags: ["agency", "quote", "pricing"],
+  });
 
   res.json(quote);
 });
@@ -289,6 +306,14 @@ ${(budgetItems ?? []).map((s: any) => `- ${s.name}: ${s.description || ""} (qty:
       budget = m ? JSON.parse(m[0]) : {};
     } catch { budget = { error: "Error parsing AI response", raw }; }
 
+    learnFromOperation({
+      operationType: "agency_budget",
+      title: `Presupuesto detallado: ${clientName ?? "cliente"} — ${storeName ?? "tienda"}`,
+      content: `Presupuesto/proforma generado. Cliente: ${clientName}, Tienda: ${storeName}, Nicho: ${storeNiche}, Items: ${JSON.stringify(budgetItems).slice(0, 600)}. Resultado: ${JSON.stringify(budget).slice(0, 1200)}`,
+      confidence: 0.9,
+      tags: ["agency", "budget", "proforma"],
+    });
+
     res.json(budget);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -317,6 +342,15 @@ ${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`
   });
 
   const proposal = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+
+  learnFromOperation({
+    operationType: "agency_proposal",
+    title: `Propuesta comercial: ${clientName ?? "cliente"} — ${storeName ?? "tienda"}`,
+    content: `Propuesta generada para ${clientName}. Servicios: ${JSON.stringify(selectedServices).slice(0, 400)}. Propuesta: ${proposal.slice(0, 1400)}`,
+    confidence: 0.9,
+    tags: ["agency", "proposal", "commercial"],
+  });
+
   res.json({ proposal, tokensUsed: aiRes.usage?.input_tokens + aiRes.usage?.output_tokens });
 });
 

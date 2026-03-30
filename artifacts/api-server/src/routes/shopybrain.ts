@@ -69,7 +69,7 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
     if (!jsonMatch) return defaultResult;
 
     const parsed = JSON.parse(jsonMatch[0]);
-    return {
+    const result = {
       marketPriceRange: parsed.marketPriceRange ?? defaultResult.marketPriceRange,
       competitorPrices: parsed.competitorPrices ?? [],
       suggestedPrice: parsed.suggestedPrice ?? (currentPrice ? parseFloat(currentPrice) : 0),
@@ -77,6 +77,16 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
       pricingStrategy: parsed.pricingStrategy ?? "",
       sources: geminiResult.sources || [],
     };
+
+    learnFromOperation({
+      operationType: "pricing",
+      title: `Investigación precios: ${productTitle.slice(0, 80)}`,
+      content: `Producto: "${productTitle}" (${productType}). Nicho: ${niche}. Rango mercado: ${result.marketPriceRange.min}-${result.marketPriceRange.max}€ (mediana ${result.marketPriceRange.median}€). Precio sugerido: ${result.suggestedPrice}€. Compare-at: ${result.suggestedCompareAtPrice}€. Competidores: ${JSON.stringify(result.competitorPrices).slice(0, 800)}. Estrategia: ${result.pricingStrategy.slice(0, 400)}`,
+      confidence: 0.88,
+      tags: ["pricing", "market_research", niche],
+    });
+
+    return result;
   } catch (err) {
     logger.warn(err, "Price research failed, using defaults");
     return defaultResult;

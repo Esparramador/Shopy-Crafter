@@ -17,7 +17,7 @@ import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain } from "../lib/claude.js";
+import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -964,6 +964,14 @@ IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nom
         aiReportGeneratedAt: new Date(),
       })
       .where(eq(projectsTable.id, projectId));
+
+    learnFromOperation({
+      operationType: "ai_strategic_report",
+      title: `Informe IA estratégico: ${project.storeName ?? "tienda"} — ${Object.keys(aiReport).length} secciones`,
+      content: `Informe IA generado. Secciones: ${Object.keys(aiReport).join(", ")}. Resumen: ${(aiReport.executiveSummary ?? "").slice(0, 600)}. Plan 30d: ${(aiReport.actionPlan30Days ?? "").slice(0, 600)}. Revenue: ${(aiReport.revenueProjection ?? "").slice(0, 400)}`,
+      confidence: 0.92,
+      tags: ["report", "strategic", "ai_analysis", project.storeNiche ?? "general"],
+    });
 
     res.json({
       ok: true,
