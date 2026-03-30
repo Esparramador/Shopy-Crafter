@@ -184,21 +184,63 @@ router.get("/reports/export", async (req, res): Promise<void> => {
     const avgScore = scored.length > 0
       ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
       : null;
+    const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+    const productRows = products.map(p => {
+      const score = p.auditScore ?? 0;
+      const scoreColor = score >= 80 ? "#34d399" : score >= 50 ? "#f59e0b" : "#f43f5e";
+      return `<tr style="border-bottom:1px solid #1a1a28;">
+        <td style="padding:10px 14px;color:#f0f0f5;font-size:13px;">${(p.title ?? "—").replace(/</g, "&lt;")}</td>
+        <td style="padding:10px 14px;text-align:center;"><span style="color:${scoreColor};font-weight:700;font-size:14px;">${p.auditScore ?? "—"}</span></td>
+        <td style="padding:10px 14px;text-align:right;color:#c8a84b;font-weight:600;font-size:13px;">${p.price ?? "—"}</td>
+      </tr>`;
+    }).join("");
 
-    const text = [
-      "=== REPORTE DE TIENDA ===",
-      `Fecha: ${new Date().toLocaleDateString("es-ES")}`,
-      `Total productos: ${products.length}`,
-      `Productos auditados: ${scored.length}`,
-      `Score promedio: ${avgScore ?? "N/A"}`,
-      "",
-      "--- DETALLE POR PRODUCTO ---",
-      ...products.map(p => `• ${p.title} — Score: ${p.auditScore ?? "N/A"} — Precio: ${p.price ?? "N/A"}`),
-    ].join("\n");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de Tienda — Shopy Crafter</title></head>
+<body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;"><tr><td align="center">
+<table width="720" cellpadding="0" cellspacing="0" style="background:#0c0c14;border-radius:16px;overflow:hidden;">
+<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f);padding:40px 48px 28px;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="44" valign="top"><div style="width:36px;height:36px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div></td>
+    <td style="padding-left:12px;" valign="middle"><span style="font-size:18px;font-weight:800;color:#c8a84b;">Shopy Crafter</span></td>
+  </tr></table>
+  <h1 style="font-size:22px;font-weight:900;color:#f0f0f5;margin:20px 0 0;">Reporte de Tienda</h1>
+  <p style="font-size:11px;color:#6b6b80;margin:8px 0 0;">${date} &middot; Shopy Crafter AI</p>
+</td></tr>
+<tr><td style="padding:28px 48px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+    <tr>
+      <td style="padding:14px;background:#101018;border:1px solid #1a1a28;border-radius:10px;text-align:center;width:33%;">
+        <div style="font-size:24px;font-weight:800;color:#c8a84b;">${products.length}</div>
+        <div style="font-size:11px;color:#6b6b80;margin-top:4px;">Productos</div>
+      </td>
+      <td width="12"></td>
+      <td style="padding:14px;background:#101018;border:1px solid #1a1a28;border-radius:10px;text-align:center;width:33%;">
+        <div style="font-size:24px;font-weight:800;color:#34d399;">${scored.length}</div>
+        <div style="font-size:11px;color:#6b6b80;margin-top:4px;">Auditados</div>
+      </td>
+      <td width="12"></td>
+      <td style="padding:14px;background:#101018;border:1px solid #1a1a28;border-radius:10px;text-align:center;width:33%;">
+        <div style="font-size:24px;font-weight:800;color:${(avgScore ?? 0) >= 80 ? "#34d399" : (avgScore ?? 0) >= 50 ? "#f59e0b" : "#f43f5e"};">${avgScore ?? "—"}</div>
+        <div style="font-size:11px;color:#6b6b80;margin-top:4px;">Score Promedio</div>
+      </td>
+    </tr>
+  </table>
+  <h2 style="font-size:15px;color:#c8a84b;margin:0 0 12px;">Detalle por Producto</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#101018;border:1px solid #1a1a28;border-radius:10px;overflow:hidden;">
+    <tr style="background:#16161f;"><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">Producto</th><th style="padding:10px 14px;text-align:center;font-size:11px;color:#c8a84b;font-weight:700;">Score</th><th style="padding:10px 14px;text-align:right;font-size:11px;color:#c8a84b;font-weight:700;">Precio</th></tr>
+    ${productRows}
+  </table>
+</td></tr>
+<tr><td style="text-align:center;padding:20px 48px;border-top:1px solid #1a1a28;">
+  <p style="color:#6b6b80;font-size:11px;margin:0;">Generado por <span style="color:#c8a84b;font-weight:600;">Shopy Crafter</span> &mdash; ShopyBrain AI</p>
+  <p style="color:#6b6b80;font-size:11px;margin:4px 0 0;">&copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
 
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=reporte-tienda.txt");
-    res.send(text);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=reporte-tienda.html");
+    res.send(html);
   }
 });
 

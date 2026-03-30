@@ -126,9 +126,18 @@ export default function ProjectVault() {
   const downloadFile = async (file: VaultFile) => {
     setDownloading(file.id);
     try {
-      const url = `${API_BASE}/api/projects/${pid}/vault/${file.id}/download`;
-      const a = document.createElement("a");
-      a.href = url; a.download = file.title; a.click();
+      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/${file.id}/download`, { credentials: "include" });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const disposition = res.headers.get("content-disposition") || "";
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        a.download = match?.[1] || file.title;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch {}
     setTimeout(() => setDownloading(null), 1500);
   };
@@ -136,9 +145,16 @@ export default function ProjectVault() {
   const downloadAll = async () => {
     setZipping(true);
     try {
-      const url = `${API_BASE}/api/projects/${pid}/vault/download-all`;
-      const a = document.createElement("a");
-      a.href = url; a.download = `${projectName || "tienda"}_vault_completo.zip`; a.click();
+      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-all`, { credentials: "include" });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${projectName || "tienda"}_vault_completo.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch {}
     setTimeout(() => setZipping(false), 3000);
   };

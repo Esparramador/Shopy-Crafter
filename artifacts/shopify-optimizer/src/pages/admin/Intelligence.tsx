@@ -105,17 +105,21 @@ export default function Intelligence() {
   };
 
   const exportCSV = () => {
+    const BOM = "\uFEFF";
     const rows = [["Fecha", "Tipo", "Producto", "Revenue Delta"]];
     events.forEach(e => rows.push([
-      new Date(e.createdAt).toLocaleDateString(),
+      new Date(e.createdAt).toLocaleDateString("es-ES"),
       e.eventType, e.productId || "-",
       e.revenueDelta ? `€${e.revenueDelta}` : "-",
     ]));
-    const csv = rows.map(r => r.join(",")).join("\n");
+    const csv = BOM + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = "intelligence-export.csv";
+    a.href = url;
+    a.download = `Revenue_Intelligence_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (

@@ -285,28 +285,31 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   }
 
   if (file.content) {
+    const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+    if (isJson) {
+      try {
+        const parsed = JSON.parse(file.content);
+        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+        const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
+        res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.send(htmlReport);
+        return;
+      } catch {}
+    }
     const buf = Buffer.from(file.content, "utf-8");
     res.setHeader("Content-Type", file.mimeType ?? "text/html");
     res.send(buf);
     return;
   }
 
-  // Para archivos solo-metadata (rediseños, reportes SEO, etc.) — servir metadata como JSON
   if (file.metadata) {
     try {
-      const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
-      const jsonFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.json`;
-      res.setHeader("Content-Disposition", `attachment; filename="${jsonFilename}"`);
-      res.setHeader("Content-Type", "application/json");
-      res.json({
-        title: file.title,
-        fileType: file.fileType,
-        category: file.category,
-        productTitle: file.productTitle,
-        generatedBy: file.generatedBy,
-        createdAt: file.createdAt,
-        data: meta,
-      });
+      const htmlReport = buildBrandedHtmlFromMetadata(file);
+      const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
+      res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(htmlReport);
       return;
     } catch {}
   }
@@ -359,23 +362,22 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
           added++;
         }
       } else if (file.content) {
-        const htmlName = `${folder}/${safeTitle}_${file.id}.html`;
-        archive.append(file.content, { name: htmlName });
+        const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+        if (isJsonContent) {
+          try {
+            const parsed = JSON.parse(file.content);
+            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+            archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          } catch {
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          }
+        } else {
+          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+        }
         added++;
       } else if (file.metadata) {
-        // Archivos solo-metadata (rediseños, reportes SEO): serializar como JSON
-        const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
-        const jsonContent = JSON.stringify({
-          title: file.title,
-          fileType: file.fileType,
-          category: file.category,
-          productTitle: file.productTitle,
-          generatedBy: file.generatedBy,
-          createdAt: file.createdAt,
-          data: meta,
-        }, null, 2);
-        const jsonName = `${file.fileType}/${safeTitle}_${file.id}.json`;
-        archive.append(jsonContent, { name: jsonName });
+        const htmlReport = buildBrandedHtmlFromMetadata(file);
+        archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
     } catch { /* skip failed file */ }
@@ -458,18 +460,22 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
           added++;
         }
       } else if (file.content) {
-        const htmlName = `${folder}/${safeTitle}_${file.id}.html`;
-        archive.append(file.content, { name: htmlName });
+        const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+        if (isJsonContent) {
+          try {
+            const parsed = JSON.parse(file.content);
+            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+            archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          } catch {
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          }
+        } else {
+          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+        }
         added++;
       } else if (file.metadata) {
-        const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
-        const jsonContent = JSON.stringify({
-          title: file.title, fileType: file.fileType, category: file.category,
-          productTitle: file.productTitle, generatedBy: file.generatedBy,
-          createdAt: file.createdAt, data: meta,
-        }, null, 2);
-        const jsonName = `${file.fileType}/${safeTitle}_${file.id}.json`;
-        archive.append(jsonContent, { name: jsonName });
+        const htmlReport = buildBrandedHtmlFromMetadata(file);
+        archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
     } catch { /* skip failed file */ }
@@ -717,8 +723,125 @@ function getExtension(mimeType: string): string {
     "text/plain": "txt", "application/pdf": "pdf",
     "application/octet-stream": "bin",
     "image/tiff": "tiff", "image/avif": "avif",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "text/csv": "csv",
   };
   return map[mimeType] ?? "bin";
+}
+
+const B = {
+  gold: "#c8a84b", goldDark: "#8b6914", dark: "#08080e", darkAlt: "#0c0c14",
+  card: "#101018", muted: "#6b6b80", white: "#f0f0f5", border: "#1a1a28",
+  jade: "#34d399", red: "#f43f5e", orange: "#f59e0b",
+};
+
+function buildBrandedHtmlFromMetadata(file: {
+  title: string; fileType: string | null; category: string | null;
+  productTitle: string | null; generatedBy: string | null;
+  createdAt: Date | string | null; metadata: unknown;
+}): string {
+  const date = new Date(file.createdAt ?? Date.now()).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const time = new Date(file.createdAt ?? Date.now()).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {});
+
+  function renderValue(val: unknown, depth = 0): string {
+    if (val === null || val === undefined) return `<span style="color:${B.muted};">—</span>`;
+    if (typeof val === "boolean") return val ? `<span style="color:${B.jade};">&#10003; Sí</span>` : `<span style="color:${B.red};">&#10007; No</span>`;
+    if (typeof val === "number") return `<span style="color:${B.gold};font-weight:600;">${val.toLocaleString("es-ES")}</span>`;
+    if (typeof val === "string") {
+      if (val.length > 300) return `<div style="white-space:pre-wrap;line-height:1.6;color:${B.white};">${sanitizeHtml(val)}</div>`;
+      if (val.startsWith("http")) return `<a href="${sanitizeHtml(val)}" style="color:${B.gold};text-decoration:underline;" target="_blank">${sanitizeHtml(val.length > 80 ? val.slice(0, 77) + "..." : val)}</a>`;
+      return `<span style="color:${B.white};">${sanitizeHtml(val)}</span>`;
+    }
+    if (Array.isArray(val)) {
+      if (val.length === 0) return `<span style="color:${B.muted};">vacío</span>`;
+      if (val.every(v => typeof v === "string" || typeof v === "number")) {
+        return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;">${val.map(v =>
+          `<span style="display:inline-block;padding:2px 8px;background:rgba(200,168,75,0.1);border:1px solid rgba(200,168,75,0.2);border-radius:12px;font-size:12px;color:${B.gold};">${sanitizeHtml(String(v))}</span>`
+        ).join("")}</div>`;
+      }
+      if (depth < 2) return val.map((item, i) => `<div style="margin:6px 0;padding:10px;background:${B.dark};border:1px solid ${B.border};border-radius:8px;"><span style="color:${B.gold};font-size:11px;font-weight:700;">#${i + 1}</span>${renderObject(item, depth + 1)}</div>`).join("");
+      return `<span style="color:${B.muted};">[${val.length} elementos]</span>`;
+    }
+    if (typeof val === "object" && depth < 3) return renderObject(val as Record<string, unknown>, depth + 1);
+    return `<span style="color:${B.muted};">[objeto]</span>`;
+  }
+
+  function renderObject(obj: Record<string, unknown>, depth = 0): string {
+    const entries = Object.entries(obj);
+    if (entries.length === 0) return "";
+    return `<table style="width:100%;border-collapse:collapse;margin:6px 0;" cellpadding="0" cellspacing="0">${entries.map(([k, v]) => {
+      const label = k.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()).trim();
+      return `<tr style="border-bottom:1px solid ${B.border};">
+        <td style="padding:8px 12px;color:${B.gold};font-size:12px;font-weight:600;white-space:nowrap;vertical-align:top;width:160px;">${sanitizeHtml(label)}</td>
+        <td style="padding:8px 12px;font-size:13px;color:${B.white};vertical-align:top;">${renderValue(v, depth)}</td>
+      </tr>`;
+    }).join("")}</table>`;
+  }
+
+  const bodyHtml = typeof meta === "object" && !Array.isArray(meta)
+    ? renderObject(meta as Record<string, unknown>)
+    : renderValue(meta);
+
+  const typeLabel = file.fileType === "report" ? "Informe" :
+    file.fileType === "data" ? "Datos" :
+    file.fileType === "optimization" ? "Optimización" :
+    file.fileType === "seo" ? "SEO" : (file.fileType ?? "Archivo");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${sanitizeHtml(file.title)} — Shopy Crafter</title>
+</head>
+<body style="margin:0;padding:0;background:${B.dark};font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:${B.dark};padding:24px 0;">
+<tr><td align="center">
+<table width="720" cellpadding="0" cellspacing="0" style="background:${B.darkAlt};border-radius:16px;overflow:hidden;">
+
+<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 28px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="44" valign="top">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,${B.gold},${B.goldDark});border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
+      </td>
+      <td style="padding-left:12px;" valign="middle">
+        <span style="font-size:18px;font-weight:800;color:${B.gold};letter-spacing:-0.3px;">Shopy Crafter</span>
+      </td>
+    </tr>
+  </table>
+  <h1 style="font-size:22px;font-weight:900;color:${B.white};letter-spacing:-0.5px;line-height:1.3;margin:20px 0 0;font-family:'Segoe UI',Arial,sans-serif;">${sanitizeHtml(file.title)}</h1>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+    <tr>
+      <td><span style="display:inline-block;padding:3px 10px;background:rgba(200,168,75,0.12);border-radius:10px;font-size:11px;color:${B.gold};font-weight:600;">${sanitizeHtml(typeLabel)}</span></td>
+      ${file.category ? `<td><span style="font-size:11px;color:${B.muted};">&#9679; ${sanitizeHtml(file.category)}</span></td>` : ""}
+      <td><span style="font-size:11px;color:${B.muted};">&#9679; ${date} &middot; ${time}</span></td>
+    </tr>
+  </table>
+  ${file.productTitle ? `<p style="font-size:13px;color:${B.muted};margin:10px 0 0;">Producto: <strong style="color:${B.white};">${sanitizeHtml(file.productTitle)}</strong></p>` : ""}
+</td></tr>
+
+<tr><td style="padding:28px 48px 36px;">
+  <div style="background:${B.card};border:1px solid ${B.border};border-radius:14px;padding:24px;overflow-x:auto;">
+    ${bodyHtml}
+  </div>
+</td></tr>
+
+<tr><td style="text-align:center;padding:20px 48px;border-top:1px solid ${B.border};">
+  <p style="color:${B.muted};font-size:11px;margin:0;">
+    Generado por <span style="color:${B.gold};font-weight:600;">Shopy Crafter</span> &mdash; ShopyBrain AI Engine
+  </p>
+  <p style="color:${B.muted};font-size:11px;margin:4px 0 0;">
+    &copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.
+  </p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 export default router;

@@ -74,12 +74,62 @@ export default function Competitors() {
     setAlerts(prev => prev.filter(a => a.id !== id));
   };
 
-  const exportPDF = () => {
-    const content = `COMPETITOR INTELLIGENCE REPORT\n\nCompetitors:\n${competitors.map(c => `- ${c.name}: ${c.url}`).join("\n")}\n\nAlerts:\n${alerts.map(a => `- [${a.severity?.toUpperCase()}] ${a.title}: ${a.description}`).join("\n")}`;
-    const a = document.createElement("a");
-    a.href = "data:text/plain;charset=utf-8," + encodeURIComponent(content);
-    a.download = "competitor-report.txt";
-    a.click();
+  const exportReport = () => {
+    const esc = (s: string) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const safeUrl = (u: string) => /^https?:\/\//i.test(u) ? esc(u) : "#";
+    const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+    const competitorRows = competitors.map(c =>
+      `<tr style="border-bottom:1px solid #1a1a28;">
+        <td style="padding:10px 14px;color:#f0f0f5;font-size:13px;font-weight:600;">${esc(c.name || "—")}</td>
+        <td style="padding:10px 14px;"><a href="${safeUrl(c.url || "")}" style="color:#c8a84b;text-decoration:underline;font-size:12px;" target="_blank" rel="noopener noreferrer">${esc(c.url || "—")}</a></td>
+      </tr>`
+    ).join("");
+    const alertRows = alerts.map(a => {
+      const sevColor = a.severity === "high" ? "#f43f5e" : a.severity === "medium" ? "#f59e0b" : "#34d399";
+      return `<tr style="border-bottom:1px solid #1a1a28;">
+        <td style="padding:8px 14px;"><span style="display:inline-block;padding:2px 8px;background:${sevColor}15;border:1px solid ${sevColor}40;border-radius:10px;font-size:11px;color:${sevColor};font-weight:600;">${esc((a.severity || "info").toUpperCase())}</span></td>
+        <td style="padding:8px 14px;color:#f0f0f5;font-size:13px;font-weight:600;">${esc(a.title || "")}</td>
+        <td style="padding:8px 14px;color:#6b6b80;font-size:12px;">${esc(a.description || "")}</td>
+      </tr>`;
+    }).join("");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Competitor Intelligence — Shopy Crafter</title></head>
+<body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;"><tr><td align="center">
+<table width="720" cellpadding="0" cellspacing="0" style="background:#0c0c14;border-radius:16px;overflow:hidden;">
+<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f);padding:40px 48px 28px;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="44" valign="top"><div style="width:36px;height:36px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div></td>
+    <td style="padding-left:12px;" valign="middle"><span style="font-size:18px;font-weight:800;color:#c8a84b;">Shopy Crafter</span></td>
+  </tr></table>
+  <h1 style="font-size:22px;font-weight:900;color:#f0f0f5;margin:20px 0 0;">Competitor Intelligence Report</h1>
+  <p style="font-size:11px;color:#6b6b80;margin:8px 0 0;">${date} &middot; Shopy Crafter AI</p>
+</td></tr>
+<tr><td style="padding:28px 48px;">
+  <h2 style="font-size:15px;color:#c8a84b;margin:0 0 12px;">Competidores Monitorizados (${competitors.length})</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#101018;border:1px solid #1a1a28;border-radius:10px;overflow:hidden;">
+    <tr style="background:#16161f;"><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">Nombre</th><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">URL</th></tr>
+    ${competitorRows || '<tr><td colspan="2" style="padding:14px;color:#6b6b80;font-size:13px;text-align:center;">Sin competidores registrados</td></tr>'}
+  </table>
+</td></tr>
+${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
+  <h2 style="font-size:15px;color:#c8a84b;margin:0 0 12px;">Alertas (${alerts.length})</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#101018;border:1px solid #1a1a28;border-radius:10px;overflow:hidden;">
+    <tr style="background:#16161f;"><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">Severidad</th><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">Título</th><th style="padding:10px 14px;text-align:left;font-size:11px;color:#c8a84b;font-weight:700;">Descripción</th></tr>
+    ${alertRows}
+  </table>
+</td></tr>` : ""}
+<tr><td style="text-align:center;padding:20px 48px;border-top:1px solid #1a1a28;">
+  <p style="color:#6b6b80;font-size:11px;margin:0;">Generado por <span style="color:#c8a84b;font-weight:600;">Shopy Crafter</span> &mdash; ShopyBrain AI</p>
+  <p style="color:#6b6b80;font-size:11px;margin:4px 0 0;">&copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Competitor_Intelligence_${new Date().toISOString().split("T")[0]}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
@@ -95,7 +145,7 @@ export default function Competitors() {
           <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: 180 }}>
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <button className="btn-secondary" onClick={exportPDF} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button className="btn-secondary" onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Download size={14} /> Exportar
           </button>
           <button className="btn-primary" onClick={() => setShowAdd(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>

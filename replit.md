@@ -103,3 +103,14 @@ All Shopify service products are fully deliverable via the chatbot's 79+ actions
 - **Image Generation**: 76 images (19 products × 4 types) via Replicate recraft-v3
 - **Async Batch System**: `optimize_all_products` action runs in background, returns immediate response, processes sequentially (~2min/product via Dual AI)
 - **Brain Learning**: Each optimization triggers `learnFromOperation` + vault save
+
+### Download System (March 30, 2026)
+- **All downloads are branded HTML**: No more raw JSON or plain text downloads
+- **Vault metadata-only files**: Converted to branded HTML with tables, tags, color-coded values
+- **Vault JSON-content files**: Parsed and rendered as professional branded HTML
+- **ZIP exports**: All files inside ZIPs also get HTML conversion
+- **ProjectVault.tsx**: Individual downloads use fetch+blob+credentials (no auth failures)
+- **Competitors export**: Full branded HTML report with severity badges
+- **Intelligence CSV**: BOM + semicolons + quoting for Excel compatibility
+- **Client TXT report**: Now generates branded HTML with KPI cards and product table
+- **XSS protection**: All user-interpolated data escaped in exported HTML

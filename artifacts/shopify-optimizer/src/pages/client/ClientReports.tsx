@@ -63,7 +63,7 @@ export default function ClientReports() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `reporte-tienda.${format === "txt" ? "txt" : "csv"}`;
+      a.download = `reporte-tienda.${format === "csv" ? "csv" : "html"}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
