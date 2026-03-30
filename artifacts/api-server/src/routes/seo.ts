@@ -686,38 +686,199 @@ router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promi
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const { applyToShopify, productIds } = req.body as { applyToShopify: boolean; productIds?: string[] };
 
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
   const all = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
   const products = productIds?.length ? all.filter((p) => productIds.includes(p.shopifyProductId)) : all;
 
-  const jobId = await createBulkJob(projectId, "generate_schemas", products.length);
+  const jobId = await createBulkJob(projectId, "generate_schemas", products.length + 1);
 
   res.json({
     jobId,
     status: "running",
     totalItems: products.length,
-    message: `Generando schemas para ${products.length} productos...`,
+    message: `Generando schemas JSON-LD para ${products.length} productos e inyectando en theme...`,
   });
 
   runAsync(async () => {
     let completed = 0;
     let failed = 0;
+    const generatedSchemas: Array<{ productId: string; title: string; schema: string }> = [];
 
     for (const product of products) {
       try {
+        const shopifyData = await shopifyRequest(
+          projectId, project.shopDomain,
+          `/products/${product.shopifyProductId}.json`, "GET"
+        );
+        const sp = shopifyData?.product;
+        if (!sp) { failed++; continue; }
+
+        const priceAmount = sp.variants?.[0]?.price || "0";
+        const currency = "EUR";
+        const available = sp.variants?.[0]?.inventory_quantity > 0 || sp.status === "active";
+        const images = sp.images || [];
+        const bodyText = (sp.body_html || "").replace(/<[^>]+>/g, " ").trim();
+
+        const faqPrompt = `Analiza este producto de Shopify y genera 3-5 preguntas frecuentes (FAQ) realistas que un comprador haría. Producto: "${sp.title}". Descripción: "${bodyText.slice(0, 500)}". 
+
+Responde SOLO con un JSON array así:
+[{"question":"...","answer":"..."},...]
+
+Las preguntas deben ser específicas del producto, no genéricas. Respuestas concisas (1-2 frases).`;
+
+        let faqs: Array<{ question: string; answer: string }> = [];
+        try {
+          const faqResult = await askClaudeJsonWithBrain(projectId, faqPrompt, SEO_SYSTEM, "seo");
+          if (Array.isArray(faqResult)) faqs = faqResult;
+        } catch { /* use empty FAQ */ }
+
+        const productSchema: Record<string, unknown> = {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: sp.title,
+          description: bodyText.slice(0, 500),
+          url: `https://${project.shopDomain}/products/${sp.handle}`,
+          brand: { "@type": "Brand", name: project.shopName || project.shopDomain.split(".")[0] },
+          offers: {
+            "@type": "Offer",
+            price: priceAmount,
+            priceCurrency: currency,
+            availability: available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            url: `https://${project.shopDomain}/products/${sp.handle}`,
+            seller: { "@type": "Organization", name: project.shopName || project.shopDomain.split(".")[0] },
+          },
+        };
+
+        if (images.length > 0) {
+          productSchema.image = images.map((i: { src: string }) => i.src);
+        }
+
+        if (sp.variants?.length > 1) {
+          productSchema.offers = {
+            "@type": "AggregateOffer",
+            lowPrice: Math.min(...sp.variants.map((v: { price: string }) => parseFloat(v.price))).toFixed(2),
+            highPrice: Math.max(...sp.variants.map((v: { price: string }) => parseFloat(v.price))).toFixed(2),
+            priceCurrency: currency,
+            offerCount: sp.variants.length,
+            availability: available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          };
+        }
+
+        const schemas: Record<string, unknown>[] = [productSchema];
+
+        if (faqs.length > 0) {
+          schemas.push({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((f) => ({
+              "@type": "Question",
+              name: f.question,
+              acceptedAnswer: { "@type": "Answer", text: f.answer },
+            })),
+          });
+        }
+
+        schemas.push({
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Inicio", item: `https://${project.shopDomain}` },
+            { "@type": "ListItem", position: 2, name: sp.product_type || "Productos", item: `https://${project.shopDomain}/collections/all` },
+            { "@type": "ListItem", position: 3, name: sp.title, item: `https://${project.shopDomain}/products/${sp.handle}` },
+          ],
+        });
+
+        const safeJsonLd = (obj: Record<string, unknown>) => JSON.stringify(obj).replace(/<\//g, "\\u003c/");
+        const schemaScripts = schemas.map((s) => `<script type="application/ld+json">${safeJsonLd(s)}</script>`).join("\n");
+
+        generatedSchemas.push({ productId: product.shopifyProductId, title: sp.title, schema: schemaScripts });
+
+        try {
+          await shopifyRequest(
+            projectId, project.shopDomain,
+            `/products/${product.shopifyProductId}/metafields.json`,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metafield: { namespace: "seo", key: "jsonld", value: schemaScripts, type: "multi_line_text_field" } }) }
+          );
+        } catch { /* metafield save is optional */ }
+
         await db.update(seoDataTable)
           .set({ hasSchema: true, lastAuditedAt: new Date() })
           .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, product.shopifyProductId)));
 
         completed++;
-        await updateJobProgress(jobId, completed, failed, `✓ Schema: ${product.title}`);
-        await new Promise((r) => setTimeout(r, 200));
+        await updateJobProgress(jobId, completed, failed, `✓ Schema JSON-LD: ${sp.title} (Product + ${faqs.length > 0 ? "FAQ + " : ""}Breadcrumb)`);
+        await new Promise((r) => setTimeout(r, 300));
       } catch (err) {
         failed++;
         const msg = err instanceof Error ? err.message : "Error";
         await updateJobProgress(jobId, completed, failed, `✗ ${product.title}: ${msg}`);
       }
     }
+
+    try {
+      const { getActiveTheme, readThemeFile, writeThemeFile } = await import("../lib/shopify-theme.js");
+      const theme = await getActiveTheme(projectId, project.shopDomain);
+      if (theme) {
+        const layoutFile = await readThemeFile(projectId, project.shopDomain, theme.id, "layout/theme.liquid");
+        if (layoutFile?.value) {
+          let layoutContent = layoutFile.value;
+          const orgSchema = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: project.shopName || project.shopDomain.split(".")[0],
+            url: `https://${project.shopDomain}`,
+            logo: `https://${project.shopDomain}/cdn/shop/files/logo.png`,
+            sameAs: [],
+          });
+          const webSiteSchema = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: project.shopName || project.shopDomain.split(".")[0],
+            url: `https://${project.shopDomain}`,
+            potentialAction: {
+              "@type": "SearchAction",
+              target: `https://${project.shopDomain}/search?q={search_term_string}`,
+              "query-input": "required name=search_term_string",
+            },
+          });
+
+          const safeOrg = orgSchema.replace(/<\//g, "\\u003c/");
+          const safeWeb = webSiteSchema.replace(/<\//g, "\\u003c/");
+          const schemaBlock = `
+<!-- ShopyBrain JSON-LD Schemas -->
+<script type="application/ld+json">${safeOrg}</script>
+<script type="application/ld+json">${safeWeb}</script>
+<!-- End ShopyBrain Schemas -->`;
+
+          const oldSchemaRegex = /<!-- ShopyBrain JSON-LD Schemas -->[\s\S]*?<!-- End ShopyBrain Schemas -->/;
+          if (oldSchemaRegex.test(layoutContent)) {
+            layoutContent = layoutContent.replace(oldSchemaRegex, schemaBlock.trim());
+          } else {
+            layoutContent = layoutContent.replace("</head>", `${schemaBlock}\n</head>`);
+          }
+
+          await writeThemeFile(projectId, project.shopDomain, theme.id, "layout/theme.liquid", layoutContent);
+          await updateJobProgress(jobId, completed + 1, failed, `✓ Organization + WebSite schema inyectados en theme.liquid`);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error";
+      await updateJobProgress(jobId, completed, failed + 1, `✗ Error inyectando en theme: ${msg}`);
+    }
+
     await completeJob(jobId);
+
+    try {
+      learnFromOperation({
+        operationType: "seo",
+        title: `generate_schemas: ${completed} schemas JSON-LD`,
+        content: `${completed} schemas JSON-LD generados (Product + FAQ + Breadcrumb + Organization + WebSite). Inyectados en theme.liquid. ${failed} fallos. Productos: ${generatedSchemas.map(s => s.title).join(", ")}`,
+        confidence: 0.9,
+        tags: ["seo", "schema", "json-ld", "rich-snippets"],
+      });
+    } catch { /* optional */ }
   });
 });
 

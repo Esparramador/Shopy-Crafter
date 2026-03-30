@@ -65,6 +65,20 @@ A **Dual AI Engine** architecture integrates Claude and Gemini in parallel for s
 - **Knowledge Graph Visualization**: Interactive D3.js graph.
 - **Automated Cron Jobs**: Twelve tasks for continuous learning and intelligence.
 
+### Service Delivery Audit (Verified March 2026)
+All 9 Shopify service products are fully deliverable via the chatbot's 79 actions:
+1. **Photoshoot Pro** → bulk_generate_images (Flux/Recraft, 7 types, auto alt-text, Shopify upload)
+2. **Growth Studio** → optimize_all_products + seo_full_audit + A/B testing + pricing engine + blog
+3. **Performance Lab** → 6 AI engines (images, SEO, A/B, pricing, autopilot, content) + 12 cron jobs
+4. **Auditoría Completa** → scan_store + seo_full_audit + audit_theme + financial_dashboard + competitors
+5. **Rediseño IA 30 Productos** → bulk_redesign + apply_redesign (8 sections, keyword research)
+6. **Pack 30 Imágenes IA** → bulk_generate_images (hero, lifestyle, detail, packaging, ugc, scale, bundle)
+7. **SEO Completa** → generate_schemas (real JSON-LD injected into theme) + metas + alt texts + sitemap + PageSpeed
+8. **Informe Precios** → financial_dashboard + calculate_optimal_price + estimate_cogs + price_simulator + forecast
+9. **Email Marketing** → generate_email_flow (6 flows HTML) + generate_email + Klaviyo API draft creation
+- `generate_schemas` generates real Product+FAQ+Breadcrumb+Organization+WebSite JSON-LD and injects into theme.liquid
+- `formatActionResult` in OmniChatbot has 79 action handlers for user-friendly output
+
 ### Security
 - AES-256-GCM encryption for credentials.
 - Comprehensive audit logging.

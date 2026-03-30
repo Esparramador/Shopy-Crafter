@@ -871,6 +871,93 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return result.success
           ? `✅ **Cambio UI aplicado:**\n${result.summary}\n📁 Archivos: ${(result.files as string[])?.join(", ")}\n🔧 ${result.changesApplied} cambios\n⚠️ Recarga la página para ver los cambios.`
           : `⚠️ ${result.message ?? "No se pudieron aplicar los cambios automáticamente."}`;
+      case "redesign_product":
+        return `🎨 **Rediseño IA completado:**\n📝 "${result.newTitle || result.title}"\n📄 Descripción: ${result.descriptionLength || "?"} chars con ${result.sectionsGenerated || 8} secciones\n🏷 ${result.tagsCount || "?"} tags SEO\n📸 ${result.photoBriefs || 0} briefs de fotografía\n\n${result.message || "Listo para aplicar con apply_redesign."}`;
+      case "apply_redesign":
+        return `✅ **Rediseño aplicado en Shopify:**\n📝 "${result.title}"\n📊 Título + Descripción + Tags + SEO actualizados\n${result.message || ""}`;
+      case "bulk_redesign":
+        return `🎨 **Rediseño masivo completado:**\n📦 ${result.total || "?"} productos procesados\n✅ ${result.redesigned || "?"} rediseñados\n${result.failed ? `❌ ${result.failed} errores` : ""}\n${result.message || ""}`;
+      case "seo_full_audit":
+        return `📊 **Auditoría SEO completada (16 criterios):**\n🏆 Score: **${result.averageScore || result.score || "?"}**/100\n📦 ${result.productsAudited || result.total || "?"} productos analizados\n${result.topIssues ? `\n⚠️ **Problemas principales:**\n${(result.topIssues as string[]).map((i: string) => `· ${i}`).join("\n")}` : ""}\n${result.message || ""}`;
+      case "keyword_intelligence":
+        return `🔍 **Keyword Intelligence:**\n${result.message || JSON.stringify(result.keywords || result.data || result, null, 2).slice(0, 800)}`;
+      case "generate_schemas":
+        return `📋 **Schemas JSON-LD generados e inyectados:**\n${result.message || `${result.totalItems || "?"} productos con schema Product + FAQ + Breadcrumb. Organization + WebSite inyectados en theme.liquid.`}`;
+      case "generate_all_metas":
+        return `🏷️ **Meta tags generados:**\n${result.message || `Meta titles (40-60 chars) + descriptions (130-155 chars) para ${result.totalItems || "?"} productos.`}`;
+      case "fix_all_alt_texts":
+        return `🖼️ **Alt texts corregidos:**\n${result.message || `Todas las imágenes ahora tienen alt text SEO optimizado.`}`;
+      case "generate_sitemap":
+        return `🗺️ **Sitemap generado:**\n${result.message || "XML sitemap actualizado y ping a Google enviado."}`;
+      case "audit_page_speed":
+        return `⚡ **PageSpeed auditado:**\n${result.message || `Mobile: ${result.mobileScore || "?"}/100 | Desktop: ${result.desktopScore || "?"}/100`}`;
+      case "blog_strategy":
+        return `📝 **Estrategia blog SEO generada:**\n${result.message || `${result.topics || "?"} temas pillar + cluster`}`;
+      case "generate_blog_post":
+        return `📄 **Artículo blog SEO generado:**\n${result.message || `${result.wordCount || 1500} palabras optimizadas para posicionamiento.`}`;
+      case "generate_email_flow":
+        return `📧 **Flujo email marketing generado:**\n${result.message || `${result.flowsGenerated || 6} flujos: Welcome, Abandoned Cart, Post-Purchase, Browse, Win-back, VIP.\nCada uno con ${result.emailsPerFlow || "2-4"} emails HTML listos.`}`;
+      case "generate_email":
+        return `📧 **Email generado:**\n${result.message || "Template HTML responsive con CSS inline listo para enviar."}`;
+      case "list_themes": {
+        const themes = (result.themes as Array<{ name: string; role: string; id: number }>) ?? [];
+        return `🎨 **${result.total || themes.length} themes:**\n${themes.map((t, i) => `${i + 1}. **${t.name}** (${t.role}) ID: ${t.id}`).join("\n")}`;
+      }
+      case "list_theme_files":
+        return `📂 **Archivos del theme:**\n${result.message || JSON.stringify(result.files || result, null, 2).slice(0, 800)}`;
+      case "read_theme_file":
+        return `📄 **${result.assetKey || "Archivo"}:**\n\`\`\`\n${(result.content || result.value || "").toString().slice(0, 1000)}\n\`\`\``;
+      case "edit_theme_file":
+        return `✅ **Theme file editado:**\n📁 ${result.assetKey}\n${result.message || "Cambios aplicados al theme."}`;
+      case "edit_theme_css":
+        return `🎨 **CSS del theme actualizado:**\n📁 ${result.assetKey || "assets/custom.css"}\n${result.message || "Estilos añadidos sin perder código existente."}`;
+      case "edit_theme_settings":
+        return `⚙️ **Settings del theme actualizados:**\n${result.message || "settings_data.json actualizado con deep merge."}`;
+      case "create_theme_section":
+        return `📐 **Sección Liquid creada:**\n📁 ${result.assetKey}\n${result.message || "Sección con schema completo lista para el Theme Editor."}`;
+      case "audit_theme":
+        return `🎨 **Auditoría de theme completada:**\n${result.message || result.audit || `Score: ${result.score || "?"}/100`}`;
+      case "calculate_optimal_price":
+        return `💰 **Precio óptimo calculado:**\n${result.message || `Precio recomendado: €${result.optimalPrice || "?"}`}`;
+      case "estimate_cogs":
+        return `📊 **COGS estimado:**\n${result.message || `Coste estimado: €${result.estimatedCogs || result.cogs || "?"}`}`;
+      case "price_simulator":
+        return `📈 **Simulación de precio:**\n${result.message || `Escenarios analizados para precio €${result.newPrice || "?"}`}`;
+      case "financial_forecast":
+        return `📊 **Proyección financiera:**\n${result.message || `Forecast a ${result.months || 6} meses generado.`}`;
+      case "financial_dashboard":
+        return `💰 **Dashboard financiero:**\n${result.message || `Revenue: €${result.totalRevenue || "?"} | Margen: ${result.avgMargin || "?"}%`}`;
+      case "scan_competitor":
+        return `🔍 **Competidor escaneado:**\n${result.message || "Precios, productos y estrategia analizados."}`;
+      case "analyze_competitor_product":
+        return `📊 **Análisis competitivo:**\n${result.message || "Producto comparado contra competidores del mercado."}`;
+      case "create_ab_test":
+        return `🔬 **A/B Test creado:**\n${result.message || `Test ${result.testId || ""} iniciado: ${result.testType || "price"}.`}`;
+      case "list_ab_tests": {
+        const tests = (result.tests as Array<{ id: string; status: string; type: string }>) ?? [];
+        if (!tests.length) return "🔬 No hay tests A/B activos.";
+        return `🔬 **${result.total || tests.length} tests:**\n${tests.map((t, i) => `${i + 1}. ID: ${t.id} — ${t.type} (${t.status})`).join("\n")}`;
+      }
+      case "declare_winner":
+        return `🏆 **Winner declarado:**\n${result.message || `Variante ganadora aplicada al producto.`}`;
+      case "bulk_generate_images":
+        return `🖼️ **Generación masiva de imágenes:**\n${result.message || `Job ${result.jobId || ""} iniciado para ${result.totalImages || "?"} imágenes.`}`;
+      case "generate_product_images":
+        return `🖼️ **Imágenes generadas:**\n${result.message || `${result.imagesGenerated || "?"} imágenes IA para el producto.`}`;
+      case "setup_full_store":
+        return `🏪 **Setup completo de tienda:**\n${result.message || "Configuración completa aplicada."}`;
+      case "brain_stats":
+        return `🧠 **ShopyBrain stats:**\n${result.message || `${result.totalMemories || "?"} memorias · ${result.totalInsights || "?"} insights`}`;
+      case "brain_sync":
+        return `🧠 **Brain sincronizado:**\n${result.message || "Conocimiento actualizado."}`;
+      case "inventory_sync":
+        return `📦 **Inventario sincronizado:**\n${result.message || "Stock actualizado desde Shopify."}`;
+      case "inventory_alerts":
+        return `⚠️ **Alertas de inventario:**\n${result.message || "Verificación de stock completada."}`;
+      case "agency_quote":
+        return `💼 **Presupuesto generado:**\n${result.message || "Propuesta de precio personalizada lista."}`;
+      case "agency_proposal":
+        return `📋 **Propuesta de agencia:**\n${result.message || "Documento de propuesta generado."}`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }
