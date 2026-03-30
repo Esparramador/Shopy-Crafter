@@ -150,14 +150,27 @@ function classifyUrl(url: string): "social_instagram" | "social_facebook" | "soc
   return "url";
 }
 
+// ─── HELPER: SSRF-safe URL validation ─────────────────────────────────────────
+function validateExternalUrl(url: string): void {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("URL inválida"); }
+  if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Solo se permiten URLs HTTP/HTTPS");
+  const host = parsed.hostname.toLowerCase();
+  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]", "metadata.google.internal", "169.254.169.254"];
+  if (blocked.includes(host)) throw new Error("URL bloqueada: no se permiten direcciones internas");
+  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.)/.test(host)) throw new Error("URL bloqueada: rango de IP privada");
+  if (host.endsWith(".internal") || host.endsWith(".local")) throw new Error("URL bloqueada: dominio interno");
+}
+
 // ─── HELPER: Fetch URL content ────────────────────────────────────────────────
 async function fetchUrlContent(url: string): Promise<{ text: string; title: string; description: string; imageUrls: string[] }> {
+  validateExternalUrl(url);
   const headers = {
     "User-Agent": "Mozilla/5.0 (compatible; ShopyBrainBot/1.0)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   };
   
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
+  const res = await fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
   const html = await res.text();
   
   // Extract title

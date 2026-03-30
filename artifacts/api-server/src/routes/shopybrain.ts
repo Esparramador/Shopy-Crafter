@@ -387,6 +387,10 @@ Acciones disponibles:
 - agency_quote: Generar presupuesto/cotización profesional para un cliente. Params: {projectId, services? (array), clientName?}
 - agency_proposal: Generar propuesta comercial completa con análisis y estrategia. Params: {projectId, clientName?, clientUrl?}
 - setup_full_store: CONFIGURACIÓN COMPLETA de tienda Shopify desde cero (páginas, colecciones, SEO, schemas, meta tags, alt texts). Params: {projectId}
+- learn_from_url: Absorber/aprender de una URL (página web, artículo, competidor, video YouTube). El cerebro extrae TODO el conocimiento. Params: {url, label? (descripción opcional)}
+- learn_from_content: Aprender de texto/contenido pegado directamente. Params: {content, label? (descripción), contentType? ("article"|"strategy"|"competitor"|"product"|"instruction")}
+- recall_knowledge: Buscar en la memoria del cerebro por tema/keyword. Params: {query, limit? (default 10)}
+- brain_status: Ver estado completo del cerebro (total memorias, por tipo, últimas aprendidas). Sin params.
 
 CMS PATHS (usa update_cms/update_cms_batch, N=índice):
   site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
@@ -643,6 +647,8 @@ Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de 
     }
 
     const cleanAnswer = answer.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
+
+    learnFromConversation(query, cleanAnswer, niche, detectedAction?.action);
 
     res.json({
       answer: cleanAnswer,
@@ -1046,6 +1052,119 @@ export async function getShopyBrainContext(niche: string | null, useCase: string
   } catch {
     return "";
   }
+}
+
+function learnFromConversation(userQuery: string, aiResponse: string, niche?: string, detectedActionName?: string): void {
+  try {
+    const q = userQuery.toLowerCase();
+    const isExplicitLearn = /aprende|recuerda|memoriza|guarda.*esto|anota|ten.*en.*cuenta|nota.*importante|no.*olvides/i.test(q);
+    const isStrategic = /estrategia|plan|objetivo|meta|prioridad|decidido|vamos.*a|necesito.*que|quiero.*que|a.*partir.*de.*ahora|siempre|nunca/i.test(q);
+    const isInsight = aiResponse.length > 300;
+
+    const confidence = isExplicitLearn ? 0.95 : isStrategic ? 0.88 : 0.6;
+    const tags = ["conversation", ...(niche ? [niche] : []), ...(detectedActionName ? [detectedActionName] : [])];
+
+    if (isExplicitLearn) {
+      tags.push("explicit_instruction");
+      learnFromOperation({
+        operationType: "explicit_instruction",
+        title: `Instrucción directa: ${userQuery.slice(0, 120)}`,
+        content: `INSTRUCCIÓN DEL USUARIO (alta prioridad): "${userQuery}". Respuesta: ${aiResponse.slice(0, 1500)}`,
+        confidence: 0.95,
+        tags,
+      });
+    } else if (isStrategic) {
+      tags.push("strategic_decision");
+      learnFromOperation({
+        operationType: "strategic_learning",
+        title: `Decisión estratégica: ${userQuery.slice(0, 120)}`,
+        content: `Contexto estratégico — Usuario: "${userQuery.slice(0, 500)}". Análisis IA: ${aiResponse.slice(0, 1200)}`,
+        confidence: 0.88,
+        tags,
+      });
+    } else if (isInsight && confidence >= 0.6) {
+      learnFromOperation({
+        operationType: "conversation_insight",
+        title: `Chat: ${userQuery.slice(0, 120)}`,
+        content: `Pregunta: "${userQuery.slice(0, 400)}". Respuesta clave: ${aiResponse.slice(0, 1400)}`,
+        confidence,
+        tags,
+      });
+    }
+  } catch {}
+}
+
+function buildEnrichedLearningContent(action: string, params: Record<string, unknown>, result: Record<string, unknown>): { title: string; content: string; confidence: number; extraTags: string[] } {
+  const msg = String(result.message ?? "");
+  const extraTags: string[] = [];
+  let title = "";
+  let content = "";
+  let confidence = 0.8;
+
+  const seoActions = ["seo_full_audit", "generate_all_metas", "generate_schemas", "fix_all_alt_texts", "audit_page_speed", "generate_sitemap", "keyword_intelligence", "blog_strategy", "generate_blog_post"];
+  const pricingActions = ["change_price", "calculate_optimal_price", "estimate_cogs", "price_simulator", "financial_forecast", "financial_dashboard", "generate_competitive_pricing"];
+  const productActions = ["create_product", "edit_product", "optimize_product", "redesign_product", "apply_redesign", "bulk_redesign", "optimize_all_products", "set_product_status", "publish_product", "delete_product"];
+  const imageActions = ["generate_product_images", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
+  const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
+  const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
+  const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
+  const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages"];
+
+  if (seoActions.includes(action)) {
+    extraTags.push("seo", "optimization");
+    confidence = 0.9;
+    title = `SEO: ${action} — ${msg.slice(0, 80)}`;
+    const score = result.overallScore ?? result.seoScore ?? result.score;
+    const products = result.products ?? result.results ?? result.total;
+    content = `Operación SEO '${action}'. ${score ? `Score: ${score}.` : ""} ${products ? `Productos afectados: ${JSON.stringify(products).slice(0, 200)}.` : ""} ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1500)}`;
+  } else if (pricingActions.includes(action)) {
+    extraTags.push("pricing", "financial");
+    confidence = 0.92;
+    title = `Pricing: ${action} — ${msg.slice(0, 80)}`;
+    const price = result.price ?? result.newPrice ?? result.optimalPrice ?? params?.price;
+    const margin = result.margin ?? result.marginPct ?? result.grossMargin;
+    content = `Operación pricing '${action}'. ${price ? `Precio: ${price} EUR.` : ""} ${margin ? `Margen: ${margin}%.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1500)}`;
+  } else if (productActions.includes(action)) {
+    extraTags.push("product", "catalog");
+    confidence = 0.88;
+    const productTitle = result.title ?? params?.title ?? "";
+    title = `Producto: ${action} — ${String(productTitle).slice(0, 60)}`;
+    const productId = result.productId ?? result.id ?? params?.productId;
+    const price = result.price ?? params?.price;
+    const tags = result.tags ?? params?.tags;
+    content = `Operación producto '${action}'. Producto: "${productTitle}" (ID: ${productId}). ${price ? `Precio: ${price} EUR.` : ""} ${tags ? `Tags: ${String(tags).slice(0, 200)}.` : ""} ${msg}. Resultado: ${JSON.stringify(result).slice(0, 1200)}`;
+  } else if (imageActions.includes(action)) {
+    extraTags.push("images", "visual");
+    confidence = 0.85;
+    title = `Imágenes: ${action} — ${msg.slice(0, 80)}`;
+    content = `Operación imágenes '${action}'. ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1500)}`;
+  } else if (competitorActions.includes(action)) {
+    extraTags.push("competitor", "market_research");
+    confidence = 0.9;
+    title = `Competencia: ${action} — ${msg.slice(0, 80)}`;
+    content = `Investigación competitiva '${action}'. ${msg}. Datos: ${JSON.stringify(result).slice(0, 1800)}`;
+  } else if (themeActions.includes(action)) {
+    extraTags.push("theme", "design");
+    confidence = 0.82;
+    title = `Theme: ${action} — ${msg.slice(0, 80)}`;
+    content = `Operación theme '${action}'. ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1200)}`;
+  } else if (marketingActions.includes(action)) {
+    extraTags.push("marketing", "email");
+    confidence = 0.88;
+    title = `Marketing: ${action} — ${msg.slice(0, 80)}`;
+    content = `Operación marketing '${action}'. ${msg}. Contenido generado: ${JSON.stringify(result).slice(0, 1500)}`;
+  } else if (catalogActions.includes(action)) {
+    extraTags.push("catalog", "data");
+    confidence = 0.75;
+    title = `Catálogo: ${action} — ${msg.slice(0, 80)}`;
+    const total = result.total ?? result.productsCount ?? result.ordersCount ?? result.count;
+    content = `Consulta catálogo '${action}'. ${total !== undefined ? `Total: ${total}.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1000)}`;
+  } else {
+    title = `Acción: ${action} — ${msg.slice(0, 80)}`;
+    content = `Acción '${action}'. Params: ${JSON.stringify(params).slice(0, 500)}. Resultado: ${msg}. Datos: ${JSON.stringify(result).slice(0, 1000)}`;
+  }
+
+  return { title: title.slice(0, 200), content: content.slice(0, 2000), confidence, extraTags };
 }
 
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
@@ -4406,18 +4525,125 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         break;
       }
 
+      case "learn_from_url": {
+        const url = params?.url as string;
+        if (!url) { result = { error: true, message: "❌ Falta url" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/shopybrain/absorb-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ url, label: params?.label }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) throw new Error(String(data.error ?? "Error absorbiendo URL"));
+          result = {
+            ...data,
+            message: `🧠 **URL absorbida con éxito**\n\nHe analizado y aprendido de: ${url}\n\n${data.title ? `**Título:** ${data.title}\n` : ""}${data.memoriesCreated ? `**Memorias creadas:** ${data.memoriesCreated}\n` : ""}Este conocimiento ya está integrado en mi cerebro y lo usaré en futuras respuestas.`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error absorbiendo URL: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "learn_from_content": {
+        const content = params?.content as string;
+        if (!content) { result = { error: true, message: "❌ Falta content" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/shopybrain/absorb-text`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ text: content, label: params?.label, contentType: params?.contentType }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) throw new Error(String(data.error ?? "Error absorbiendo contenido"));
+          result = {
+            ...data,
+            message: `🧠 **Contenido absorbido con éxito**\n\n${params?.label ? `**Tema:** ${params.label}\n` : ""}He procesado y memorizado ${String(content).length} caracteres de conocimiento.\nEsto ya forma parte de mi memoria permanente.`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "recall_knowledge": {
+        const query = params?.query as string;
+        if (!query) { result = { error: true, message: "❌ Falta query" }; break; }
+        try {
+          const limit = Math.min(Number(params?.limit) || 10, 30);
+          const memories = await db.select().from(omnicoreMemoriesTable)
+            .where(gte(omnicoreMemoriesTable.confidence, 0.3))
+            .orderBy(desc(omnicoreMemoriesTable.confidence))
+            .limit(200);
+
+          const queryLower = query.toLowerCase();
+          const queryTerms = queryLower.split(/\s+/).filter(t => t.length > 2);
+          const scored = memories.map(m => {
+            const text = `${m.title ?? ""} ${m.content ?? ""} ${m.memoryType ?? ""} ${m.tags ?? ""}`.toLowerCase();
+            let score = 0;
+            for (const term of queryTerms) {
+              if (text.includes(term)) score += 1;
+            }
+            if (text.includes(queryLower)) score += 3;
+            return { ...m, relevanceScore: score };
+          }).filter(m => m.relevanceScore > 0).sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, limit);
+
+          const formatted = scored.map((m, i) => `${i + 1}. **${m.title}** (${m.memoryType}, confianza: ${m.confidence})\n   ${String(m.content).slice(0, 300)}`).join("\n\n");
+
+          result = {
+            memories: scored.length,
+            results: scored,
+            message: `🔍 **${scored.length} memorias encontradas** para "${query}"\n\n${formatted || "No encontré memorias relevantes para esta búsqueda."}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "brain_status": {
+        try {
+          const totalMemories = await db.select({ count: sql<number>`count(*)` }).from(omnicoreMemoriesTable);
+          const byType = await db.select({
+            memoryType: omnicoreMemoriesTable.memoryType,
+            count: sql<number>`count(*)`,
+            avgConfidence: sql<number>`round(avg(${omnicoreMemoriesTable.confidence})::numeric, 2)`,
+          }).from(omnicoreMemoriesTable).groupBy(omnicoreMemoriesTable.memoryType).orderBy(desc(sql`count(*)`));
+
+          const recentMemories = await db.select({
+            title: omnicoreMemoriesTable.title,
+            memoryType: omnicoreMemoriesTable.memoryType,
+            confidence: omnicoreMemoriesTable.confidence,
+            createdAt: omnicoreMemoriesTable.createdAt,
+          }).from(omnicoreMemoriesTable).orderBy(desc(omnicoreMemoriesTable.createdAt)).limit(10);
+
+          const total = Number(totalMemories[0]?.count ?? 0);
+          const typeBreakdown = byType.map(t => `• **${t.memoryType}**: ${t.count} (confianza avg: ${t.avgConfidence})`).join("\n");
+          const recentList = recentMemories.map((m, i) => `${i + 1}. ${m.title?.slice(0, 80)} (${m.memoryType})`).join("\n");
+
+          result = {
+            totalMemories: total,
+            byType,
+            recentMemories,
+            message: `🧠 **Estado del Cerebro ShopyBrain**\n\n**Total memorias:** ${total.toLocaleString()}\n\n**Distribución por tipo:**\n${typeBreakdown}\n\n**Últimas 10 memorias aprendidas:**\n${recentList}\n\n💡 El cerebro crece con cada interacción. Cada acción, conversación y URL absorbida alimenta el conocimiento.`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
       default:
         res.status(400).json({ error: `Acción desconocida: ${action}` });
         return;
     }
 
-    learnFromOperation({
-      operationType: `chatbot_action_${action}`,
-      title: `Chatbot ejecutó: ${action}`,
-      content: `Acción: ${action}. Params: ${JSON.stringify(params).slice(0, 300)}. Resultado: ${(result as Record<string, unknown>).message ?? "OK"}`,
-      confidence: 0.8,
-      tags: ["chatbot", "action", action],
-    });
+    const r = result as Record<string, unknown>;
+    if (!r.error) {
+      const enrichedContent = buildEnrichedLearningContent(action, params, r);
+      learnFromOperation({
+        operationType: `chatbot_action_${action}`,
+        title: enrichedContent.title,
+        content: enrichedContent.content,
+        confidence: enrichedContent.confidence,
+        tags: ["chatbot", "action", action, ...(enrichedContent.extraTags || [])],
+      });
+    }
 
     res.json({ success: true, action, ...result });
   } catch (e: unknown) {

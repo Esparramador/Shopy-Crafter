@@ -958,6 +958,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `💼 **Presupuesto generado:**\n${result.message || "Propuesta de precio personalizada lista."}`;
       case "agency_proposal":
         return `📋 **Propuesta de agencia:**\n${result.message || "Documento de propuesta generado."}`;
+      case "learn_from_url":
+        return `🧠 **URL absorbida:**\n${result.message || "Contenido aprendido con éxito."}`;
+      case "learn_from_content":
+        return `🧠 **Contenido absorbido:**\n${result.message || "Conocimiento memorizado."}`;
+      case "recall_knowledge":
+        return `🔍 **Búsqueda en memoria:**\n${result.message || `${result.memories || 0} memorias encontradas.`}`;
+      case "brain_status":
+        return `🧠 **Estado del cerebro:**\n${result.message || `${result.totalMemories || "?"} memorias totales.`}`;
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }
@@ -1281,6 +1289,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             blog_strategy: "📝 **Generando estrategia de blog...**\n\n**Paso 1** — Analizando productos y nicho\n**Paso 2** — Creando pillar content + cluster topics\n**Paso 3** — Generando calendario editorial\n\n_⏱️ 20-40 segundos..._",
             generate_blog_post: "📄 **Escribiendo artículo SEO...**\n\n**Paso 1** — Investigando keyword objetivo\n**Paso 2** — Claude escribe artículo optimizado\n\n_⏱️ 15-30 segundos..._",
             setup_full_store: "🏗️ **Configuración completa de tienda...**\n\n**Paso 1** — Sincronizando productos\n**Paso 2** — Generando meta tags SEO\n**Paso 3** — Optimizando alt texts\n**Paso 4** — Generando schemas JSON-LD\n\n_⏱️ 30-60 segundos..._",
+            learn_from_url: "🧠 **Absorbiendo URL...**\n\n**Paso 1** — Descargando contenido\n**Paso 2** — Extrayendo conocimiento con IA\n**Paso 3** — Almacenando en memoria permanente\n\n_⏱️ 10-20 segundos..._",
+            learn_from_content: "🧠 **Procesando contenido...**\n\n**Paso 1** — Analizando texto\n**Paso 2** — Extrayendo insights\n**Paso 3** — Memorizando conocimiento\n\n_⏱️ 5-15 segundos..._",
+            recall_knowledge: "🔍 **Buscando en la memoria...**\n\n_⏱️ 2-5 segundos..._",
+            brain_status: "🧠 **Consultando estado del cerebro...**\n\n_⏱️ 2-5 segundos..._",
             generate_email_flow: "📧 **Creando flujo de email marketing...**\n\n**Paso 1** — Analizando tienda y nicho\n**Paso 2** — Generando secuencia de emails con IA\n**Paso 3** — Optimizando asuntos y contenido\n\n_⏱️ 20-40 segundos..._",
             financial_forecast: "📊 **Generando forecast financiero...**\n\n**Paso 1** — Analizando datos históricos\n**Paso 2** — Calculando escenarios\n**Paso 3** — Proyectando revenue a 6 meses\n\n_⏱️ 15-30 segundos..._",
             agency_proposal: "📋 **Generando propuesta comercial...**\n\n**Paso 1** — Analizando tienda del cliente\n**Paso 2** — Calculando servicios necesarios\n**Paso 3** — Creando propuesta profesional\n\n_⏱️ 20-40 segundos..._",
