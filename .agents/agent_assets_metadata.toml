@@ -42,3 +42,9 @@ id = "CQqnNn4WmZBqa37A9NJYU"
 uri = "file://Informe-Final-ShopyCrafter-2026.pdf"
 type = "pdf"
 title = "Informe Comic Crafter - 17 páginas, fondo oscuro corregido en TODAS las páginas"
+
+[[outputs]]
+id = "5_4uj5i3Z3VjRt2gXibVU"
+uri = "file://exports/Comic-Crafter-Auditoria-Completa-2026.pdf"
+type = "pdf"
+title = "Auditoría Completa Comic Crafter 2026 (101 páginas)"
