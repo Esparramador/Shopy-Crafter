@@ -85,7 +85,7 @@ router.post("/agency/analyze-pricing", requireAdmin, async (req, res): Promise<v
   const services = await db.select().from(serviceCatalogTable).where(eq(serviceCatalogTable.isActive, 1));
 
   const systemPrompt = `Eres Shopy Brain actuando como CFO y Director Comercial experto.
-Analiza la estructura de costes y precios de esta agencia Shopify AI.
+Analiza la estructura de costes y precios de Shopy Crafter, una agencia independiente de optimización IA para tiendas Shopify.
 Proporciona recomendaciones específicas de pricing con justificación completa.
 Responde en JSON:
 {
@@ -484,7 +484,7 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
     return {
       title: `${svc.serviceName}${typeLabel ? ` (${typeLabel})` : ""}`,
       body_html: `<p><strong>${svc.serviceName}</strong></p><!-- nosemgrep -->
-<p>${svc.omnicoreRecommendation ?? `Servicio de agencia Shopify AI — ${svc.serviceType}.`}</p>
+<p>${svc.omnicoreRecommendation ?? `Servicio de Shopy Crafter — ${svc.serviceType}.`}</p>
 <ul>
   <li>✓ Implementación por expertos ShopyBrain</li>
   <li>✓ Resultados medibles y reportados</li>

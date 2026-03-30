@@ -16,7 +16,7 @@ export const DEFAULT_CMS_CONTENT = {
   },
   site: {
     name: "Shopy Crafter",
-    tagline: "La plataforma de agencia Shopify más completa",
+    tagline: "Optimización IA para tu tienda Shopify",
     logo: { type: "emoji", value: "⚡", imageUrl: null },
     favicon: "⚡",
     primaryColor: "#c8a84b",
@@ -36,7 +36,7 @@ export const DEFAULT_CMS_CONTENT = {
   },
   hero: {
     pill: { text: "Nuevo · 6 motores de IA activos · Versión 2.0", visible: true },
-    headline: "La agencia Shopify\nque trabaja 24/7\npor ti",
+    headline: "Optimizamos tu tienda\nShopify con IA\n24/7 por ti",
     headlineHighlight: "24/7",
     subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático. Un solo cerebro para toda tu agencia.",
     ctaPrimary: { label: "Empezar gratis 14 días →", href: "#cta" },
@@ -186,7 +186,7 @@ export const DEFAULT_CMS_CONTENT = {
     items: [
       { id: "t1", stars: 5, text: "En 3 semanas pasamos de una tasa de conversión del 1.8% al 4.1%. Las imágenes generadas por IA parecen de sesión fotográfica profesional. Mis clientes no pueden creer el antes y el después.", metric: "↑ +128% conversión en 3 semanas", author: "Miguel Rodríguez", role: "Agencia eCommerce · Madrid", initials: "MR", avatarColor: "rgba(200,168,75,0.1)", avatarTextColor: "#e6c668", avatarUrl: null as string | null },
       { id: "t2", stars: 5, text: "El motor de pricing me descubrió que tenía 6 productos vendiendo por debajo del break-even. Después de aplicar el COGS real y la estrategia de precios, el margen medio subió del 28% al 54%.", metric: "↑ +26pts de margen medio", author: "Ana López", role: "Tienda de moda · Barcelona", initials: "AL", avatarColor: "rgba(45,212,159,0.1)", avatarTextColor: "#2dd49f", avatarUrl: null as string | null },
-      { id: "t3", stars: 5, text: "Gestiono 11 tiendas para clientes. Antes me llevaba días actualizar imágenes y precios manualmente. Ahora el sistema lo hace solo y yo solo superviso. Me ha triplicado la capacidad de la agencia.", metric: "↑ 3× capacidad de la agencia", author: "Jordi Martínez", role: "Agencia Shopify · Valencia", initials: "JM", avatarColor: "rgba(74,158,221,0.1)", avatarTextColor: "#4a9edd", avatarUrl: null as string | null },
+      { id: "t3", stars: 5, text: "Gestiono 11 tiendas para clientes. Antes me llevaba días actualizar imágenes y precios manualmente. Ahora el sistema lo hace solo y yo solo superviso. Me ha triplicado la capacidad de la agencia.", metric: "↑ 3× capacidad de la agencia", author: "Jordi Martínez", role: "Gestión de tiendas Shopify · Valencia", initials: "JM", avatarColor: "rgba(74,158,221,0.1)", avatarTextColor: "#4a9edd", avatarUrl: null as string | null },
     ],
   },
   calculator: {
@@ -411,7 +411,7 @@ export const DEFAULT_CMS_CONTENT = {
     ],
   },
   footer: {
-    tagline: "Shopy Crafter — La plataforma de agencia Shopify con OmniCore Brain. Powered by Claude AI + Gemini + Replicate.",
+    tagline: "Shopy Crafter — Optimización IA para tiendas Shopify con OmniCore Brain. Powered by Claude AI + Gemini + Replicate.",
     columns: [
       { title: "Producto", links: [{ label: "Motores IA", href: "#features" }, { label: "Precios", href: "#pricing" }, { label: "Changelog", href: "#" }, { label: "Documentación", href: "#" }, { label: "API Reference", href: "#" }] },
       { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#" }, { label: "Blog", href: "#" }, { label: "Casos de éxito", href: "#" }, { label: "Afiliados", href: "#" }, { label: "Contacto", href: "#" }] },

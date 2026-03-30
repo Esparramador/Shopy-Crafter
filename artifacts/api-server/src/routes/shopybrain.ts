@@ -404,7 +404,7 @@ Acciones disponibles:
 - inventory_customer_history: Historial completo de un cliente (que ha comprado, tallas preferidas, colores, gasto total, frecuencia). Params: {projectId, customerId?, customerEmail?}
 - agency_quote: Generar presupuesto/cotización profesional para un cliente. Params: {projectId, services? (array), clientName?}
 - agency_proposal: Generar propuesta comercial completa con análisis y estrategia. Params: {projectId, clientName?, clientUrl?}
-- setup_full_store: CONFIGURACIÓN COMPLETA de tienda Shopify desde cero (páginas, colecciones, SEO, schemas, meta tags, alt texts). Params: {projectId}
+- setup_full_store: CONFIGURACIÓN COMPLETA de una tienda en Shopify desde cero (páginas, colecciones, SEO, schemas, meta tags, alt texts). Params: {projectId}
 - learn_from_url: Absorber/aprender de una URL (página web, artículo, competidor, video YouTube). El cerebro extrae TODO el conocimiento. Params: {url, label? (descripción opcional)}
 - learn_from_content: Aprender de texto/contenido pegado directamente. Params: {content, label? (descripción), contentType? ("article"|"strategy"|"competitor"|"product"|"instruction")}
 - recall_knowledge: Buscar en la memoria del cerebro por tema/keyword. Params: {query, limit? (default 10)}
@@ -468,8 +468,8 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
-Somos una agencia Shopify IA completa 24/7. Nuestros servicios incluyen:
-• CREACIÓN desde 0: Montar tienda Shopify completa (productos, colecciones, páginas, SEO, schemas)
+Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
+• CREACIÓN desde 0: Montar tienda completa en Shopify (productos, colecciones, páginas, SEO, schemas)
 • PRODUCTOS: Crear, rediseñar, optimizar con calidad 100/100 (800-1200 palabras, 8 secciones, FAQ, trust badges)
 • IMÁGENES IA: 8 tipos de foto profesional por producto (hero, lifestyle, detalle, packaging, UGC, escala, proceso, variante)
 • SEO SEMRUSH-LEVEL: Auditoría 16 criterios, keywords intelligence, blog strategy, schemas JSON-LD, meta tags, alt texts, sitemap
@@ -494,7 +494,7 @@ Somos una agencia Shopify IA completa 24/7. Nuestros servicios incluyen:
 CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS ShopyBrain (Shopy Crafter):
 
 IDENTIDAD: Nombre público "Shopy Crafter" (shopycrafter.com). Motor IA interno "ShopyBrain". Admin: sadiagiljoan@gmail.com. Email: craftershopy@gmail.com.
-MODELO DE NEGOCIO: Agencia Shopify IA con servicios puntuales (one-time) + retainers mensuales. Pagos por Shopify (NO Stripe). 79 acciones chatbot. 46,000+ insights OmniCore.
+MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify, con servicios puntuales (one-time) + retainers mensuales. Pagos por Shopify Billing (NO Stripe). 79 acciones chatbot. 46,000+ insights OmniCore.
 
 4 PLANES DE SUSCRIPCIÓN:
 1. Photoshoot Pro — €497 pago único (sin retainer). 120 imágenes IA (4 variantes × 30 SKUs), consistencia visual con guía de marca, iluminación cinematográfica 5:1 Rembrandt, semantic SEO audit 30 fichas, 1 sesión pricing financiero, entrega 7 días, soporte 30 días. NO: A/B testing, auto-pilot, futuros motores.
@@ -3949,7 +3949,7 @@ BUSCA precios REALES de:
 3. Servicios de IA para eCommerce (Claude, ChatGPT wrappers, automated tools)
 4. Competidores directos: Shogun, PageFly, Privy, Klaviyo, Yotpo, Bold Commerce, Nosto, etc.
 
-Luego GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para ShopyBrain (plataforma de agencia Shopify con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
+Luego GENERA ${numPlans} PLANES DE PRECIO profesionales y competitivos para Shopy Crafter / ShopyBrain (agencia de optimización IA para tiendas Shopify, con 6 motores IA: imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero, SEO técnico).
 
 REQUISITOS:
 1. Los precios deben ser COMPETITIVOS con el mercado real investigado

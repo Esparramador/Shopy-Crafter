@@ -687,7 +687,7 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       id: "self-mem-identity",
       memoryType: "general",
       title: "Identidad de Shopy Crafter",
-      content: "Soy ShopyBrain, el motor de IA de Shopy Crafter (shopycrafter.com). Soy una agencia Shopify autónoma que optimiza tiendas 24/7. Mis 6 motores cubren imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero y SEO técnico. Tengo 79 acciones disponibles y 46,000+ insights acumulados. Mi propietario es sadiagiljoan@gmail.com y me comunico desde craftershopy@gmail.com.",
+      content: "Soy ShopyBrain, el motor de IA de Shopy Crafter (shopycrafter.com). Shopy Crafter es una agencia independiente de optimización IA para tiendas Shopify, que opera 24/7. Mis 6 motores cubren imágenes, consistencia visual, A/B testing, auto-pilot, pricing financiero y SEO técnico. Tengo 79 acciones disponibles y 46,000+ insights acumulados. Mi propietario es sadiagiljoan@gmail.com y me comunico desde craftershopy@gmail.com. NOTA: Shopy Crafter NO es Shopify Inc. ni está afiliada a Shopify. Somos un servicio independiente que optimiza tiendas en la plataforma Shopify.",
       confidence: 0.99,
       niche: null,
     },
@@ -730,7 +730,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Photoshoot Pro (Pago Único)",
         body_html: `<h2>Photoshoot Pro — €497</h2><p>Paquete completo de imágenes profesionales con IA para tu tienda Shopify.</p><ul><li>Generación de 120 imágenes de producto con IA (4 variantes x 30 SKUs)</li><li>Consistencia visual automática aplicando tu guía de marca</li><li>Motor de iluminación cinematográfica (5:1 Rembrandt ratio)</li><li>Semantic SEO audit de 30 fichas de producto</li><li>1 sesión estratégica de pricing financiero</li><li>Entrega en 7 días laborables</li><li>Soporte por email durante 30 días post-entrega</li></ul>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, photoshoot-pro, pago-unico, imagenes-ia",
         status: "active",
         variants: [{ title: "Photoshoot Pro", price: "497.00", requires_shipping: false, taxable: true, sku: "sc-photoshoot-pro" }],
@@ -738,7 +738,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Growth Studio (Mensual)",
         body_html: `<h2>Growth Studio — €297/mes</h2><p>Suscripción mensual de optimización Shopify con IA. Setup único €197.</p><ul><li>Generación ilimitada de imágenes de producto con IA</li><li>Consistencia visual automática (brand guidelines encoding)</li><li>A/B testing visual automático en 3 productos simultáneos</li><li>Motor de pricing financiero: elasticidad precio-demanda</li><li>SEO técnico automático para hasta 100 URLs/mes</li><li>Auto-pilot básico: ejecución automática de ganadores A/B</li><li>Dashboard analytics con atribución multicanal</li><li>Soporte por email y chat (respuesta &lt;24h)</li></ul>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, growth-studio, suscripcion, mensual",
         status: "active",
         options: [{ name: "Tipo" }],
@@ -750,7 +750,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Performance Lab (Mensual)",
         body_html: `<h2>Performance Lab — €797/mes (MÁS POPULAR)</h2><p>Optimización Shopify completa con IA avanzada. Setup único €397.</p><ul><li>Todo lo incluido en Growth Studio</li><li>A/B testing visual ilimitado</li><li>Auto-pilot avanzado: optimización 24/7 cross-producto</li><li>Pricing financiero predictivo con simulación de escenarios</li><li>SEO técnico automático ilimitado</li><li>Custom AI model fine-tuning con tus datos</li><li>Soporte prioritario por chat y videollamada (&lt;4h)</li><li>Sesión mensual de estrategia (60 min)</li></ul>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, performance-lab, suscripcion, mensual, popular",
         status: "active",
         options: [{ name: "Tipo" }],
@@ -762,7 +762,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Auditoría Completa",
         body_html: `<h2>Auditoría Completa — €197</h2><p>Análisis exhaustivo de tu tienda Shopify: productos, SEO, COGS y plan de acción personalizado.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, auditoria, pago-unico",
         status: "active",
         variants: [{ title: "Auditoría Completa", price: "197.00", requires_shipping: false, taxable: true, sku: "sc-audit" }],
@@ -770,7 +770,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Rediseño IA (30 Productos)",
         body_html: `<h2>Rediseño IA — €147</h2><p>Títulos, descripciones y SEO optimizados con IA profesional para hasta 30 productos.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, rediseno, ia, pago-unico",
         status: "active",
         variants: [{ title: "Rediseño IA 30 productos", price: "147.00", requires_shipping: false, taxable: true, sku: "sc-redesign-30" }],
@@ -778,7 +778,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Pack 30 Imágenes IA",
         body_html: `<h2>Pack 30 Imágenes IA — €89</h2><p>Fotos profesionales de producto generadas con IA (Hero, Lifestyle, Detalle) para 30 productos.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, imagenes, ia, pago-unico",
         status: "active",
         variants: [{ title: "Pack 30 Imágenes IA", price: "89.00", requires_shipping: false, taxable: true, sku: "sc-images-30" }],
@@ -786,7 +786,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Optimización SEO Completa",
         body_html: `<h2>Optimización SEO — €147</h2><p>Meta tags, keywords, Schema JSON-LD, plan de contenido para tu tienda.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, seo, pago-unico",
         status: "active",
         variants: [{ title: "Optimización SEO Completa", price: "147.00", requires_shipping: false, taxable: true, sku: "sc-seo" }],
@@ -794,7 +794,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Informe de Precios y Márgenes",
         body_html: `<h2>Informe Pricing — €97</h2><p>COGS real, márgenes, precios competitivos, estrategia de pricing para tu tienda.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, pricing, pago-unico",
         status: "active",
         variants: [{ title: "Informe Pricing", price: "97.00", requires_shipping: false, taxable: true, sku: "sc-pricing-report" }],
@@ -802,7 +802,7 @@ router.post("/admin/create-shopify-services", async (req, res) => {
       {
         title: "Shopy Crafter — Setup Email Marketing",
         body_html: `<h2>Setup Email Marketing — €197</h2><p>Plantillas profesionales, flujos automatizados y configuración completa.</p>`,
-        product_type: "Servicio Agencia Shopify",
+        product_type: "Servicio Shopy Crafter",
         tags: "shopycrafter, servicio, email, marketing, pago-unico",
         status: "active",
         variants: [{ title: "Setup Email Marketing", price: "197.00", requires_shipping: false, taxable: true, sku: "sc-email-setup" }],

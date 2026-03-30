@@ -1,5 +1,5 @@
 # INFORME EJECUTIVO DE SERVICIOS Y CAPACIDADES
-## Shopy Crafter (shopycrafter.com) — Plataforma de Agencia Shopify con IA
+## Shopy Crafter (shopycrafter.com) — Plataforma de Optimización IA para tiendas Shopify
 
 **Fecha:** Marzo 2026  
 **Versión:** 1.0  
@@ -10,7 +10,7 @@
 
 ## 1. RESUMEN EJECUTIVO
 
-**Shopy Crafter** es una agencia Shopify 100% potenciada por inteligencia artificial que crea, gestiona, optimiza y escala tiendas Shopify de manera completamente autónoma. La plataforma opera 24/7 a través de **ShopyBrain**, un motor de IA dual (Claude + Gemini) con 46.000+ insights acumulados, 79 acciones automatizadas y 12 trabajos cron de aprendizaje continuo.
+**Shopy Crafter** es una plataforma independiente de optimización 100% potenciada por inteligencia artificial que crea, gestiona, optimiza y escala tiendas Shopify de manera completamente autónoma. La plataforma opera 24/7 a través de **ShopyBrain**, un motor de IA dual (Claude + Gemini) con 46.000+ insights acumulados, 79 acciones automatizadas y 12 trabajos cron de aprendizaje continuo.
 
 **Propuesta de valor:** Donde una agencia tradicional necesita 5-10 personas y semanas de trabajo, Shopy Crafter entrega los mismos resultados (o superiores) en minutos, con calidad verificable y precios transparentes.
 
@@ -430,7 +430,7 @@ Cada producto creado o optimizado por ShopyBrain sigue el estandar de calidad 10
 | **Motor IA** | ShopyBrain (OmniCore AI) |
 | **Email comercial** | craftershopy@gmail.com |
 | **Nombre comercial** | "Shopy Crafter" (agencia) / "ShopyBrain" (motor IA) |
-| **Modelo** | Agencia Shopify con IA — Servicios one-time + retainers mensuales |
+| **Modelo** | Optimización IA para Shopify con IA — Servicios one-time + retainers mensuales |
 | **Pagos** | Exclusivamente por Shopify (NO Stripe) |
 | **Garantias** | Sin permanencia, sin tarjeta para empezar, cancelacion inmediata, RGPD compliant |
 

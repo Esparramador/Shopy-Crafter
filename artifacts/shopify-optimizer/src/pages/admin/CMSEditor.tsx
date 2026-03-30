@@ -42,7 +42,7 @@ const SECTIONS: SectionDef[] = [
     id: "site", icon: "🌐", label: "Sitio",
     fields: [
       { label: "Nombre", path: "site.name", type: "text", placeholder: "ShopyBrain" },
-      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "La plataforma de agencia Shopify más completa" },
+      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "Optimización IA para tu tienda Shopify" },
       { label: "Logo tipo", path: "site.logo.type", type: "text", placeholder: "emoji", hint: "emoji o image" },
       { label: "Emoji/Logo", path: "site.logo.value", type: "text", placeholder: "⚡" },
       { label: "Logo imagen", path: "site.logo.imageUrl", type: "image", hint: "Sube una imagen para reemplazar el emoji del logo" },
@@ -87,7 +87,7 @@ const SECTIONS: SectionDef[] = [
     fields: [
       { label: "Pill (texto)", path: "hero.pill.text", type: "text", placeholder: "Nuevo · 6 motores activos" },
       { label: "Pill visible", path: "hero.pill.visible", type: "boolean" },
-      { label: "Titular", path: "hero.headline", type: "textarea", placeholder: "La agencia Shopify\nque trabaja 24/7\npor ti" },
+      { label: "Titular", path: "hero.headline", type: "textarea", placeholder: "Optimizamos tu tienda\nShopify con IA\n24/7 por ti" },
       { label: "Highlight", path: "hero.headlineHighlight", type: "text", placeholder: "24/7", hint: "Texto que se muestra en dorado" },
       { label: "Subtítulo", path: "hero.subheadline", type: "textarea", placeholder: "Descripción..." },
       { label: "CTA primario", path: "hero.ctaPrimary.label", type: "text" },

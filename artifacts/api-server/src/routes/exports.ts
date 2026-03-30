@@ -230,7 +230,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">ShopyBrain AI</div>
-    <div class="footer-sub">Agencia Shopify con Inteligencia Artificial &middot; ${safeDate} &middot; Confidencial</div>
+    <div class="footer-sub">Shopy Crafter &mdash; Optimización IA para tiendas Shopify &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>
@@ -929,7 +929,7 @@ ${competitorList || "Sin competidores registrados"}
 ${productSummary}
 `;
 
-    const systemPrompt = `Eres ShopyBrain, el motor de inteligencia artificial de una agencia Shopify profesional de alto nivel. Generas informes exhaustivos, estrategicos y profundamente analiticos para clientes de e-commerce.
+    const systemPrompt = `Eres ShopyBrain, el motor de inteligencia artificial de Shopy Crafter, una agencia independiente de optimización IA para tiendas Shopify. Generas informes exhaustivos, estrategicos y profundamente analiticos para clientes de e-commerce. IMPORTANTE: Shopy Crafter NO es Shopify. Somos un servicio independiente que optimiza tiendas en la plataforma Shopify.
 
 Tu analisis debe ser EXTENSO, DETALLADO, ESPECIFICO al negocio del cliente. No uses frases genericas ni recomendaciones vagas. Cada parrafo debe contener datos concretos del cliente, numeros exactos, y recomendaciones accionables con estimaciones de impacto.
 
