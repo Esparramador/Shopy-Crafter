@@ -954,6 +954,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `📦 **Inventario sincronizado:**\n${result.message || "Stock actualizado desde Shopify."}`;
       case "inventory_alerts":
         return `⚠️ **Alertas de inventario:**\n${result.message || "Verificación de stock completada."}`;
+      case "inventory_deep_report":
+        return `📦 **Informe profundo de inventario:**\n${result.message || "Análisis completo de stock generado."}`;
+      case "inventory_sync_orders":
+        return `📋 **Pedidos sincronizados:**\n${result.message || "Datos de ventas importados de Shopify."}`;
+      case "inventory_sales_analytics":
+        return `📈 **Analytics de ventas:**\n${result.message || "Análisis de ventas por producto, variante y cliente."}`;
+      case "inventory_customer_history":
+        return `👤 **Historial de cliente:**\n${result.message || "Historial de compras del cliente."}`;
       case "agency_quote":
         return `💼 **Presupuesto generado:**\n${result.message || "Propuesta de precio personalizada lista."}`;
       case "agency_proposal":

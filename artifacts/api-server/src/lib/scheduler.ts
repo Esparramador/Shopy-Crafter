@@ -150,40 +150,69 @@ export async function runInventorySync() {
     for (const project of projects) {
       if (!project.accessToken) continue;
       try {
-        const data = await shopifyRequest<{ variants: Array<{ id: number; inventory_quantity: number; sku: string; product_id: number }> }>(
-          project.id, project.shopDomain, "/variants.json?limit=250"
+        const productsData = await shopifyRequest<{ products: Array<{ id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> }> }>(
+          project.id, project.shopDomain, "/products.json?limit=250&fields=id,title,product_type,vendor,options,variants"
         );
-        for (const variant of data.variants) {
-          const existing = await db.select().from(inventoryTrackingTable)
-            .where(eq(inventoryTrackingTable.variantId, String(variant.id))).limit(1);
-          const prev = existing[0];
-          const velocity = prev ? ((prev.currentStock ?? 0) - variant.inventory_quantity) : 0;
-          const daysRemaining = velocity > 0 ? Math.round(variant.inventory_quantity / velocity) : null;
-          if (prev) {
-            await db.update(inventoryTrackingTable).set({
+        for (const product of productsData.products) {
+          const optionNames = product.options || [];
+          for (const variant of product.variants) {
+            const existing = await db.select().from(inventoryTrackingTable)
+              .where(eq(inventoryTrackingTable.variantId, String(variant.id))).limit(1);
+            const prev = existing[0];
+            const velocity = prev ? Math.max(0, (prev.currentStock ?? 0) - variant.inventory_quantity) : 0;
+            const prevSold = prev?.totalUnitsSold ?? 0;
+            const newSold = prevSold + velocity;
+            const daysRemaining = velocity > 0 ? Math.round(variant.inventory_quantity / velocity) : null;
+            const updateFields = {
               currentStock: variant.inventory_quantity,
               avgDailySales: velocity,
+              totalUnitsSold: newSold,
               daysRemaining,
+              productTitle: product.title,
+              variantTitle: variant.title || "Default",
+              sku: variant.sku || null,
+              barcode: variant.barcode || null,
+              option1Name: optionNames[0]?.name || null,
+              option1Value: variant.option1 || null,
+              option2Name: optionNames[1]?.name || null,
+              option2Value: variant.option2 || null,
+              option3Name: optionNames[2]?.name || null,
+              option3Value: variant.option3 || null,
+              productType: product.product_type || null,
+              vendor: product.vendor || null,
+              price: variant.price ? parseFloat(variant.price) : null,
+              compareAtPrice: variant.compare_at_price ? parseFloat(variant.compare_at_price) : null,
+              weight: variant.weight,
+              weightUnit: variant.weight_unit || "kg",
+              inventoryPolicy: variant.inventory_policy || "deny",
+              requiresShipping: variant.requires_shipping ? 1 : 0,
               updatedAt: new Date(),
-            }).where(eq(inventoryTrackingTable.variantId, String(variant.id)));
-          } else {
-            await db.insert(inventoryTrackingTable).values({
-              id: randomBytes(8).toString("hex"),
-              projectId: String(project.id),
-              productId: String(variant.product_id),
-              variantId: String(variant.id),
-              currentStock: variant.inventory_quantity,
-              avgDailySales: 0,
-              daysRemaining,
-            }).onConflictDoNothing();
-          }
-          if (variant.inventory_quantity > 0 && variant.inventory_quantity <= 5) {
-            await db.insert(eventsTable).values({
-              id: randomBytes(8).toString("hex"),
-              projectId: String(project.id),
-              eventType: "stock_critical",
-              payload: `Stock crítico: SKU ${variant.sku ?? variant.id} — ${variant.inventory_quantity} uds`,
-            }).catch(() => {});
+            };
+            let status = "healthy";
+            if (daysRemaining !== null && daysRemaining <= 7) status = "critical";
+            else if (daysRemaining !== null && daysRemaining <= 14) status = "warning";
+            if (prev) {
+              await db.update(inventoryTrackingTable).set({ ...updateFields, status })
+                .where(eq(inventoryTrackingTable.variantId, String(variant.id)));
+            } else {
+              await db.insert(inventoryTrackingTable).values({
+                id: randomBytes(8).toString("hex"),
+                projectId: String(project.id),
+                productId: String(variant.product_id),
+                variantId: String(variant.id),
+                ...updateFields,
+                status,
+              }).onConflictDoNothing();
+            }
+            if (variant.inventory_quantity > 0 && variant.inventory_quantity <= 5) {
+              const optDesc = [variant.option1, variant.option2, variant.option3].filter(Boolean).join("/");
+              await db.insert(eventsTable).values({
+                id: randomBytes(8).toString("hex"),
+                projectId: String(project.id),
+                eventType: "stock_critical",
+                payload: `Stock critico: ${product.title} ${optDesc ? `(${optDesc})` : ""} SKU:${variant.sku ?? variant.id} — ${variant.inventory_quantity} uds`,
+              }).catch(() => {});
+            }
           }
         }
       } catch (err) {

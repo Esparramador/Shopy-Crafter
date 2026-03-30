@@ -392,8 +392,12 @@ Acciones disponibles:
 - bulk_generate_images: Generar imágenes para múltiples productos. Params: {projectId, productIds (array de IDs), imageTypes? (array: "hero","lifestyle","detail","packaging","ugc","scale" — default: ["hero","lifestyle","detail"])}
 - generate_email_flow: Crear flujo de email marketing completo con IA (welcome, abandoned cart, post-purchase). Params: {projectId, flowType ("welcome"|"abandoned_cart"|"post_purchase"|"win_back"|"custom"), customTopic?}
 - generate_email: Generar un email de marketing individual con IA. Params: {projectId, emailType ("promotional"|"newsletter"|"product_launch"|"sale"), subject?, products?}
-- inventory_sync: Sincronizar inventario con Shopify. Params: {projectId}
+- inventory_sync: Sincronizar inventario con Shopify (stock, variantes, opciones, precios). Params: {projectId}
 - inventory_alerts: Ver alertas de stock bajo. Params: {projectId}
+- inventory_deep_report: Informe profundo de inventario (por producto, por opcion/talla/color, por tipo, stock total, valor, margen, agotados). Params: {projectId}
+- inventory_sync_orders: Sincronizar pedidos de Shopify para analytics de ventas (que se vende, quien compra, que tallas/colores, cantidades). Params: {projectId}
+- inventory_sales_analytics: Analytics completo de ventas (top productos, top variantes por talla/color, top clientes, ventas por opcion, por pais). Params: {projectId}
+- inventory_customer_history: Historial completo de un cliente (que ha comprado, tallas preferidas, colores, gasto total, frecuencia). Params: {projectId, customerId?, customerEmail?}
 - agency_quote: Generar presupuesto/cotización profesional para un cliente. Params: {projectId, services? (array), clientName?}
 - agency_proposal: Generar propuesta comercial completa con análisis y estrategia. Params: {projectId, clientName?, clientUrl?}
 - setup_full_store: CONFIGURACIÓN COMPLETA de tienda Shopify desde cero (páginas, colecciones, SEO, schemas, meta tags, alt texts). Params: {projectId}
@@ -455,7 +459,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Dashboard financiero / márgenes → financial_dashboard
 - Generar imágenes / fotos producto → generate_product_images; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
-- Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts
+- Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
 - Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
 
@@ -1119,6 +1123,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
   const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages"];
+  const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history"];
 
   if (seoActions.includes(action)) {
     extraTags.push("seo", "optimization");
@@ -1163,6 +1168,14 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
     confidence = 0.88;
     title = `Marketing: ${action} — ${msg.slice(0, 80)}`;
     content = `Operación marketing '${action}'. ${msg}. Contenido generado: ${JSON.stringify(result).slice(0, 1500)}`;
+  } else if (inventoryActions.includes(action)) {
+    extraTags.push("inventory", "stock", "sales");
+    confidence = 0.88;
+    title = `Inventario: ${action} — ${msg.slice(0, 80)}`;
+    const stock = result.totalStock ?? result.stats;
+    const sold = result.totalSold ?? result.totalItems;
+    const variants = result.totalVariants ?? result.variantsCount;
+    content = `Operacion inventario '${action}'. ${stock ? `Stock: ${JSON.stringify(stock)}.` : ""} ${sold ? `Vendido: ${sold}.` : ""} ${variants ? `Variantes: ${variants}.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1500)}`;
   } else if (catalogActions.includes(action)) {
     extraTags.push("catalog", "data");
     confidence = 0.75;
@@ -1269,9 +1282,10 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           admin: ["hero", "lifestyle", "detail", "packaging", "ugc", "scale", "process", "variant"],
         };
 
+        let aiContent: Record<string, unknown> | null = null;
         if (params?.aiGenerate !== false) {
           try {
-            const [priceResearch, aiContent] = await Promise.all([
+            const [priceResearch, aiContentResult] = await Promise.all([
               (!params?.price || params?.price === "0.00")
                 ? researchRealPricing(title, params?.productType || "", storeNiche)
                 : Promise.resolve(null),
@@ -1284,6 +1298,19 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 suggestedPrice?: number;
                 suggestedCompareAtPrice?: number;
                 productType?: string;
+                variants?: Array<{
+                  optionValues: Record<string, string>;
+                  sku?: string;
+                  price?: number;
+                  compareAtPrice?: number;
+                  inventoryQuantity?: number;
+                  weight?: number;
+                  weightUnit?: string;
+                  barcode?: string;
+                  costPerItem?: number;
+                }>;
+                options?: Array<{ name: string; values: string[] }>;
+                inventoryPolicy?: string;
               }>(
                 parseInt(projectId),
                 `Genera contenido de CALIDAD ABSOLUTA 100/100 para un nuevo producto Shopify — al nivel de las mejores tiendas del mundo (Gymshark, Allbirds, Fenty Beauty, Skims).
@@ -1366,8 +1393,42 @@ OPTIMIZACIÓN SEO AVANZADA (Metodología Semrush):
    - SIEMPRE incluye suggestedCompareAtPrice (20-35% más alto que el precio)
    - Usa pricing psicológico: .99, .95, .90
 
+7. VARIANTES CON INVENTARIO COMPLETO (OBLIGATORIO — NUNCA crear producto sin variantes):
+   Analiza el tipo de producto y genera TODAS las variantes reales que tendría en una tienda profesional.
+   Cada variante DEBE tener inventoryQuantity (stock inicial realista: 10-50 unidades por variante).
+
+   REGLAS POR TIPO DE PRODUCTO (ejemplos, aplica para CUALQUIER producto/servicio):
+   - ROPA/MODA: options=[{name:"Talla",values:["XS","S","M","L","XL","XXL"]},{name:"Color",values:["Negro","Blanco","Azul",...]}]
+   - CALZADO: options=[{name:"Número",values:["36","37","38","39","40","41","42","43","44","45"]},{name:"Color",values:[...]}]
+   - JOYERÍA: options=[{name:"Material",values:["Plata 925","Oro 18k","Acero Quirúrgico"]},{name:"Medida",values:["15cm","17cm","19cm"]}]
+   - ALIMENTACIÓN: options=[{name:"Peso",values:["250g","500g","1kg"]},{name:"Sabor",values:[...]}]
+   - COSMÉTICA: options=[{name:"Tamaño",values:["30ml","50ml","100ml"]},{name:"Tono",values:[...]}]
+   - ELECTRÓNICA: options=[{name:"Capacidad",values:["64GB","128GB","256GB"]},{name:"Color",values:[...]}]
+   - HOGAR/DECORACIÓN: options=[{name:"Tamaño",values:["S","M","L"]},{name:"Color",values:[...]}]
+   - BEBIDAS: options=[{name:"Pack",values:["1 unidad","Pack 6","Pack 12","Pack 24"]},{name:"Sabor",values:[...]}]
+   - SERVICIOS DIGITALES: options=[{name:"Plan",values:["Básico","Pro","Enterprise"]},{name:"Duración",values:["1 mes","3 meses","12 meses"]}]
+   - ARTE/PRINTS: options=[{name:"Tamaño",values:["A4","A3","A2","A1"]},{name:"Acabado",values:["Mate","Brillante","Canvas"]}]
+   - MASCOTAS: options=[{name:"Talla",values:["XS","S","M","L","XL"]},{name:"Sabor/Tipo",values:[...]}]
+   - LIBROS/PAPELERÍA: options=[{name:"Formato",values:["Tapa Blanda","Tapa Dura","eBook"]},{name:"Idioma",values:["Español","Inglés"]}]
+   - SUPLEMENTOS: options=[{name:"Formato",values:["Cápsulas 60","Cápsulas 120","Polvo 500g"]},{name:"Sabor",values:[...]}]
+   - CUALQUIER OTRO: Detecta las opciones lógicas del producto y genera variantes coherentes.
+
+   Cada variante incluye:
+   - optionValues: {"Talla":"M","Color":"Negro"} (las opciones que aplican)
+   - sku: código único (formato: PREFIJO-OPT1-OPT2, ej: "CAM-M-NEG")
+   - price: precio (puede variar si hay opciones premium como XXL, oro, etc.)
+   - compareAtPrice: precio tachado
+   - inventoryQuantity: stock inicial (15-50 unidades, variantes populares como M/L más stock)
+   - weight: peso en kg
+   - weightUnit: "kg"
+   - costPerItem: coste estimado del producto (para calcular margen)
+   - barcode: EAN/GTIN ficticio realista (13 dígitos)
+
+   GENERA ENTRE 6-30 variantes según el tipo de producto.
+   inventoryPolicy: "deny" (no vender sin stock) o "continue" (permitir pedidos sin stock para servicios/digital)
+
 Responde SOLO JSON válido:
-{"title":"...","description":"<div class=\\"product-description\\">HTML completa 800+ palabras con las 8 secciones, keyword density 1.5-2.5%, FAQ schema-ready...</div>","tags":["tag1","tag2",...mínimo 22 tags incluyendo long-tail + LSI],"seoTitle":"...40-60 chars...","seoDescription":"...130-155 chars...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo"}`,
+{"title":"...","description":"...HTML...","tags":[...22+ tags...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo","inventoryPolicy":"deny","options":[{"name":"Talla","values":["S","M","L","XL"]},{"name":"Color","values":["Negro","Blanco"]}],"variants":[{"optionValues":{"Talla":"S","Color":"Negro"},"sku":"CAM-S-NEG","price":29.99,"compareAtPrice":39.99,"inventoryQuantity":25,"weight":0.3,"weightUnit":"kg","costPerItem":12.50,"barcode":"8400000000001"},...]}`,
                 `Eres el equipo de producto de las tiendas Shopify más exitosas del mundo combinado con la inteligencia SEO de Semrush. Has estudiado qué hace que Gymshark, Allbirds, Fenty Beauty, Skims, y las 100 mejores tiendas Shopify del mundo tengan fichas de producto PERFECTAS. Aplicas metodología Semrush: keyword density 1.5-2.5%, keyword prominence (keyword en primer párrafo), LSI keywords semánticas, readability optimizada (frases 15-25 palabras), FAQ schema-ready para Rich Snippets, y tags con intención transaccional. Tu misión: generar fichas que puntuarían 100/100 en Semrush On-Page SEO Checker y en cualquier auditoría de calidad Shopify. Responde SOLO JSON válido.`,
                 "seo",
                 storeNiche || undefined,
@@ -1375,14 +1436,16 @@ Responde SOLO JSON válido:
               ),
             ]);
 
-            finalTitle = aiContent.title || title;
-            finalBody = aiContent.description || finalBody;
-            finalTags = Array.isArray(aiContent.tags) ? aiContent.tags.join(", ") : finalTags;
-            seoTitle = aiContent.seoTitle || "";
-            seoDescription = aiContent.seoDescription || "";
+            aiContent = aiContentResult as Record<string, unknown>;
+
+            finalTitle = (aiContent.title as string) || title;
+            finalBody = (aiContent.description as string) || finalBody;
+            finalTags = Array.isArray(aiContent.tags) ? (aiContent.tags as string[]).join(", ") : finalTags;
+            seoTitle = (aiContent.seoTitle as string) || "";
+            seoDescription = (aiContent.seoDescription as string) || "";
 
             if (aiContent.productType && !params?.productType) {
-              params.productType = aiContent.productType;
+              params.productType = aiContent.productType as string;
             }
 
             if (!params?.price || params?.price === "0.00") {
@@ -1392,10 +1455,10 @@ Responde SOLO JSON válido:
                   ? priceResearch.suggestedCompareAtPrice.toFixed(2)
                   : null;
                 pricingInfo = `\n💰 Precio investigado: ${finalPrice}€ (rango mercado: ${priceResearch.marketPriceRange.min}€-${priceResearch.marketPriceRange.max}€, ${priceResearch.competitorPrices.length} competidores analizados)`;
-              } else if (aiContent.suggestedPrice && aiContent.suggestedPrice > 0) {
-                finalPrice = aiContent.suggestedPrice.toFixed(2);
+              } else if (aiContent.suggestedPrice && (aiContent.suggestedPrice as number) > 0) {
+                finalPrice = (aiContent.suggestedPrice as number).toFixed(2);
                 if (aiContent.suggestedCompareAtPrice) {
-                  finalCompareAt = aiContent.suggestedCompareAtPrice.toFixed(2);
+                  finalCompareAt = (aiContent.suggestedCompareAtPrice as number).toFixed(2);
                 }
                 pricingInfo = `\n💰 Precio sugerido por IA: ${finalPrice}€`;
               }
@@ -1417,15 +1480,53 @@ Responde SOLO JSON válido:
           vendor: params?.vendor || undefined,
           product_type: params?.productType || undefined,
           status: params?.status || "draft",
-          variants: [{
+        };
+
+        const aiVariants = (params?.aiGenerate !== false && aiContent?.variants?.length) ? aiContent.variants : null;
+        const aiOptions = (params?.aiGenerate !== false && aiContent?.options?.length) ? aiContent.options : null;
+
+        if (aiOptions && aiOptions.length > 0) {
+          shopifyProduct.options = aiOptions.map((o: { name: string; values: string[] }, i: number) => ({
+            name: o.name,
+            position: i + 1,
+            values: o.values,
+          }));
+        }
+
+        if (aiVariants && aiVariants.length > 0 && aiOptions && aiOptions.length > 0) {
+          shopifyProduct.variants = aiVariants.map((v: Record<string, unknown>) => {
+            const optVals = (v.optionValues || {}) as Record<string, string>;
+            const variant: Record<string, unknown> = {
+              price: String(v.price || finalPrice),
+              compare_at_price: v.compareAtPrice ? String(v.compareAtPrice) : finalCompareAt,
+              sku: v.sku || null,
+              inventory_management: "shopify",
+              inventory_quantity: v.inventoryQuantity ?? 25,
+              inventory_policy: aiContent?.inventoryPolicy || "deny",
+              weight: v.weight || null,
+              weight_unit: v.weightUnit || "kg",
+              barcode: v.barcode || null,
+              requires_shipping: true,
+              taxable: true,
+            };
+            if (aiOptions[0]) variant.option1 = optVals[aiOptions[0].name] || null;
+            if (aiOptions[1]) variant.option2 = optVals[aiOptions[1].name] || null;
+            if (aiOptions[2]) variant.option3 = optVals[aiOptions[2].name] || null;
+            return variant;
+          });
+        } else {
+          shopifyProduct.variants = [{
             title: "Default",
             price: finalPrice,
             compare_at_price: finalCompareAt,
             sku: params?.sku || null,
+            inventory_management: "shopify",
+            inventory_quantity: params?.quantity ?? 50,
+            inventory_policy: "deny",
             requires_shipping: true,
             taxable: true,
-          }],
-        };
+          }];
+        }
 
         if (seoTitle) shopifyProduct.metafields_global_title_tag = seoTitle;
         if (seoDescription) shopifyProduct.metafields_global_description_tag = seoDescription;
@@ -1434,6 +1535,42 @@ Responde SOLO JSON válido:
           parseInt(projectId), project.shopDomain, "/products.json",
           { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
         );
+
+        const createdVariants = (created.product.variants || []) as Array<Record<string, unknown>>;
+        const totalStock = createdVariants.reduce((sum: number, v: Record<string, unknown>) => sum + (Number(v.inventory_quantity) || 0), 0);
+        if (createdVariants.length > 0) {
+          const { inventoryTrackingTable: invTable } = await import("@workspace/db");
+          const { randomUUID } = await import("crypto");
+          const createdOptions = (created.product.options || []) as Array<{ name: string }>;
+          for (const cv of createdVariants) {
+            await db.insert(invTable).values({
+              id: randomUUID(),
+              projectId: String(projectId),
+              productId: String(created.product.id),
+              variantId: String(cv.id),
+              productTitle: String(created.product.title),
+              variantTitle: String(cv.title || "Default"),
+              sku: cv.sku ? String(cv.sku) : null,
+              barcode: cv.barcode ? String(cv.barcode) : null,
+              option1Name: createdOptions[0]?.name || null,
+              option1Value: cv.option1 ? String(cv.option1) : null,
+              option2Name: createdOptions[1]?.name || null,
+              option2Value: cv.option2 ? String(cv.option2) : null,
+              option3Name: createdOptions[2]?.name || null,
+              option3Value: cv.option3 ? String(cv.option3) : null,
+              productType: String(created.product.product_type || params?.productType || ""),
+              vendor: String(created.product.vendor || params?.vendor || ""),
+              price: parseFloat(String(cv.price || finalPrice)),
+              compareAtPrice: cv.compare_at_price ? parseFloat(String(cv.compare_at_price)) : null,
+              currentStock: Number(cv.inventory_quantity) || 0,
+              avgDailySales: 0,
+              totalUnitsSold: 0,
+              daysRemaining: 999,
+              inventoryPolicy: String(cv.inventory_policy || "deny"),
+              status: "healthy",
+            }).catch(() => {});
+          }
+        }
 
         await recProdUsage(parseInt(projectId), "product", 1);
 
@@ -1460,11 +1597,15 @@ Responde SOLO JSON válido:
           },
         }).catch(() => {});
 
+        const variantSummary = createdVariants.map((v: Record<string, unknown>) =>
+          `${v.option1 || ""}${v.option2 ? "/" + v.option2 : ""}${v.option3 ? "/" + v.option3 : ""}: ${v.inventory_quantity ?? 0} uds, ${v.price}€, SKU:${v.sku || "N/A"}`
+        ).slice(0, 15).join("; ");
+
         learnFromOperation({
           operationType: "product_creation",
           niche: project.storeNiche,
           productType: params?.productType || null,
-          title: `Producto creado: ${createdTitle}`,
+          title: `Producto creado: ${createdTitle} (${createdVariants.length} variantes, ${totalStock} uds stock total)`,
           content: JSON.stringify({
             title: createdTitle,
             description: finalBody ? String(finalBody).slice(0, 500) : "",
@@ -1473,8 +1614,13 @@ Responde SOLO JSON válido:
             handle: createdHandle,
             seoTitle,
             seoDescription,
+            variantsCount: createdVariants.length,
+            totalStock,
+            options: aiContent?.options || [],
+            inventoryPolicy: aiContent?.inventoryPolicy || "deny",
+            variantSummary,
           }),
-          confidence: 0.9,
+          confidence: 0.95,
         });
 
         const imageTypes = IMAGE_TYPES_BY_PLAN[plan] || IMAGE_TYPES_BY_PLAN.starter;
@@ -1609,6 +1755,14 @@ Responde SOLO JSON válido:
           seoSummary = `\n🔍 SEO: meta title y description configurados`;
         }
 
+        const optionNames = ((created.product.options || []) as Array<{ name: string; values?: string[] }>)
+          .map(o => `${o.name} (${(o.values || []).length} valores)`)
+          .join(", ");
+        const variantStockSummary = createdVariants.length > 1
+          ? `\n📊 Variantes: ${createdVariants.length} combinaciones | Stock total: ${totalStock} unidades`
+          : "";
+        const optionsSummary = optionNames ? `\n🎛️ Opciones: ${optionNames}` : "";
+
         result = {
           productId: created.product.id,
           title: createdTitle,
@@ -1618,15 +1772,18 @@ Responde SOLO JSON válido:
           compareAtPrice: finalCompareAt,
           seoTitle,
           seoDescription,
+          variantsCount: createdVariants.length,
+          totalStock,
+          options: (created.product.options || []) as Array<{ name: string; values?: string[] }>,
           imagesGenerated,
           imagesUploaded,
           imageTypes: (IMAGE_TYPES_BY_PLAN[plan] || []).slice(0, imagesGenerated),
           message: `✅ Producto "${createdTitle}" creado COMPLETO en Shopify (ID: ${created.product.id})
 
-📝 Contenido: Título SEO optimizado + descripción profesional (400+ palabras)
+📝 Contenido: Titulo SEO optimizado + descripcion profesional (400+ palabras)
 🏷️ Tags: ${finalTags ? finalTags.split(",").length : 0} tags SEO generados
-${pricingInfo || `💰 Precio: ${finalPrice}€`}${finalCompareAt ? ` (antes: ${finalCompareAt}€)` : ""}${seoSummary}${imagesSummary}
-📦 Estado: ${created.product.status}
+${pricingInfo || `💰 Precio: ${finalPrice}€`}${finalCompareAt ? ` (antes: ${finalCompareAt}€)` : ""}${optionsSummary}${variantStockSummary}${seoSummary}${imagesSummary}
+📦 Estado: ${created.product.status} | Inventario: gestionado por Shopify
 🔗 Handle: ${createdHandle}
 
 Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de imagen disponibles`,
@@ -4476,7 +4633,107 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           const resp = await fetch(`${baseUrl}/api/inventory/alerts?projectId=${projectId}`, { headers: { cookie: req.headers.cookie ?? "" } });
           if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo alertas de inventario" }; break; }
           const alerts = await resp.json() as Array<Record<string, unknown>>;
-          result = { alerts, message: `🚨 **Alertas de Inventario**\n\n${alerts.length > 0 ? `${alerts.length} productos con stock bajo (≤14 días de inventario restante).\n\n${alerts.slice(0, 5).map((a) => `• ${a.productTitle || a.shopifyProductId}: ${a.currentStock ?? "?"} uds — ${a.daysRemaining ?? "?"} días restantes`).join("\n")}` : "✅ Sin alertas — todo el stock está en niveles saludables."}` };
+          const alertLines = alerts.slice(0, 10).map((a) => {
+            const opts = [a.option1Value, a.option2Value, a.option3Value].filter(Boolean).join("/");
+            return `• ${a.productTitle || "?"} ${opts ? `(${opts})` : ""} SKU:${a.sku || "N/A"}: ${a.currentStock ?? "?"} uds — ${a.daysRemaining ?? "?"} dias`;
+          }).join("\n");
+          result = { alerts, message: `🚨 **Alertas de Inventario**\n\n${alerts.length > 0 ? `${alerts.length} variantes con stock bajo (≤14 dias).\n\n${alertLines}` : "✅ Sin alertas — todo el stock esta en niveles saludables."}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_deep_report": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/deep-report?projectId=${projectId}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo informe de inventario" }; break; }
+          const report = await resp.json() as Record<string, unknown>;
+          const summary = report.summary as Record<string, unknown>;
+          const byOption = report.byOption as Record<string, Record<string, { stock: number; sold: number }>>;
+          const outOfStock = (report.outOfStock || []) as Array<Record<string, unknown>>;
+          let optionBreakdown = "";
+          for (const [optName, values] of Object.entries(byOption || {})) {
+            const topValues = Object.entries(values).sort(([, a], [, b]) => b.sold - a.sold).slice(0, 5);
+            optionBreakdown += `\n**${optName}**: ${topValues.map(([v, d]) => `${v}(${d.stock} stock/${d.sold} vendidos)`).join(", ")}`;
+          }
+          const oosLines = outOfStock.slice(0, 5).map((o) => `• ${o.productTitle} ${[o.option1, o.option2, o.option3].filter(Boolean).join("/")}`).join("\n");
+          result = { ...report, message: `📦 **Informe Profundo de Inventario**\n\n📊 Resumen:\n• ${summary.uniqueProducts} productos, ${summary.totalVariants} variantes\n• Stock total: ${summary.totalStock} unidades\n• Vendido total: ${summary.totalSold} unidades\n• Valor stock: ${summary.totalStockValue}€\n• Margen estimado: ${summary.estimatedMargin}%\n• Agotados: ${summary.outOfStockCount} | Criticos: ${summary.criticalCount} | Alerta: ${summary.warningCount} | Sanos: ${summary.healthyCount}\n${optionBreakdown ? `\n📐 Desglose por opcion:${optionBreakdown}` : ""}${oosLines ? `\n\n🔴 Agotados:\n${oosLines}` : ""}` };
+
+          learnFromOperation({
+            operationType: "inventory_deep_report",
+            title: `Informe inventario: ${summary.uniqueProducts} productos, ${summary.totalVariants} variantes, ${summary.totalStock} uds stock, ${summary.totalSold} vendidos`,
+            content: JSON.stringify({ summary, optionBreakdown: Object.keys(byOption || {}), outOfStockCount: outOfStock.length }),
+            confidence: 0.85,
+          });
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_sync_orders": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/sync-orders`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error sincronizando pedidos"}` }; break; }
+          result = { ...data, message: `📋 **Pedidos sincronizados**\n\n• ${data.ordersProcessed} pedidos procesados\n• ${data.lineItemsInserted} lineas de venta importadas${(data.lineItemsFailed as number) > 0 ? `\n• ${data.lineItemsFailed} errores de insercion` : ""}\n\nAhora puedes ver analytics detallados con **inventory_sales_analytics** o el historial de un cliente con **inventory_customer_history**.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_sales_analytics": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/sales-analytics?projectId=${projectId}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo analytics de ventas" }; break; }
+          const analytics = await resp.json() as Record<string, unknown>;
+          const topProds = ((analytics.topProducts || []) as Array<Record<string, unknown>>).slice(0, 5).map((p) => `• ${p.title}: ${p.qty} uds — ${p.revenue}€`).join("\n");
+          const topVars = ((analytics.topVariants || []) as Array<Record<string, unknown>>).slice(0, 5).map((v) => `• ${v.title} (${[v.option1, v.option2, v.option3].filter(Boolean).join("/")}): ${v.qty} uds`).join("\n");
+          const topCusts = ((analytics.topCustomers || []) as Array<Record<string, unknown>>).slice(0, 5).map((c) => `• ${c.name || c.email}: ${c.orders} pedidos, ${c.items} items — ${c.revenue}€`).join("\n");
+          const salesByOpt = analytics.salesByOption as Record<string, Record<string, { qty: number; revenue: number }>> || {};
+          let optSales = "";
+          for (const [optName, values] of Object.entries(salesByOpt)) {
+            const sorted = Object.entries(values).sort(([, a], [, b]) => b.qty - a.qty).slice(0, 5);
+            optSales += `\n**${optName}**: ${sorted.map(([v, d]) => `${v}(${d.qty})`).join(", ")}`;
+          }
+          result = { ...analytics, message: `📈 **Analytics de Ventas**\n\n📊 General:\n• ${analytics.totalOrders} pedidos | ${analytics.totalItems} items\n• Revenue total: ${analytics.totalRevenue}€\n• Ticket medio: ${analytics.avgOrderValue}€\n\n🏆 Top Productos:\n${topProds || "Sin datos"}\n\n🎯 Top Variantes (talla/color/etc):\n${topVars || "Sin datos"}\n\n👥 Top Clientes:\n${topCusts || "Sin datos"}${optSales ? `\n\n📐 Ventas por opcion:${optSales}` : ""}` };
+
+          learnFromOperation({
+            operationType: "inventory_sales_analytics",
+            title: `Analytics ventas: ${analytics.totalOrders} pedidos, ${analytics.totalRevenue}€ revenue, ticket medio ${analytics.avgOrderValue}€`,
+            content: JSON.stringify({ totalOrders: analytics.totalOrders, totalRevenue: analytics.totalRevenue, topProducts: (analytics.topProducts as Array<Record<string, unknown>>)?.slice(0, 3) }),
+            confidence: 0.9,
+          });
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "inventory_customer_history": {
+        const projectId = params?.projectId;
+        const customerId = params?.customerId;
+        const customerEmail = params?.customerEmail;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        if (!customerId && !customerEmail) { result = { error: true, message: "❌ Falta customerId o customerEmail" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const qs = customerId ? `customerId=${customerId}` : `customerEmail=${encodeURIComponent(String(customerEmail))}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/customer-history?projectId=${projectId}&${qs}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error obteniendo historial de cliente" }; break; }
+          const history = await resp.json() as Record<string, unknown>;
+          const customer = history.customer as Record<string, unknown>;
+          const preferences = history.preferences as Record<string, string>;
+          const purchases = ((history.purchases || []) as Array<Record<string, unknown>>).slice(0, 10);
+          const prefLines = Object.entries(preferences || {}).map(([k, v]) => `• ${k}: ${v}`).join("\n");
+          const purchaseLines = purchases.map((p) => `• ${p.orderNumber}: ${p.productTitle} ${[p.option1, p.option2, p.option3].filter(Boolean).join(" ")} x${p.quantity} — ${p.totalPrice}€`).join("\n");
+          result = { ...history, message: `👤 **Historial de Cliente: ${customer.name || customer.email}**\n\n📊 Resumen:\n• ${history.totalOrders} pedidos | ${history.totalItems} items\n• Gasto total: ${history.totalSpent}€\n• Ticket medio: ${history.avgOrderValue}€\n\n🎯 Preferencias detectadas:\n${prefLines || "Sin datos suficientes"}\n\n🛒 Ultimas compras:\n${purchaseLines || "Sin compras registradas"}` };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
