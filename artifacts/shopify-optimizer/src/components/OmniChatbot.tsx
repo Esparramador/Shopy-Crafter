@@ -31,6 +31,8 @@ interface ChatAction {
   type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action" | "supplier-research";
   label: string;
   data: unknown;
+  actionName?: string;
+  formattedContent?: string;
 }
 
 interface EntityResearchResult {
@@ -123,6 +125,110 @@ function createSpeechRecognition(): any | null {
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
   return recognition;
+}
+
+// ─── ACTION BUTTONS (ENVIAR / GUARDAR / DESCARGAR) ───────────────────────────
+const FULL_AUDIT_ACTIONS = new Set([
+  "audit_store", "full_audit", "scan_store", "complete_audit",
+  "bulk_optimize", "setup_store", "analyze_external_store",
+]);
+
+function ActionButtons({ actionName, content, rawData, isMobile }: {
+  actionName: string; content: string; rawData: unknown; isMobile: boolean;
+}) {
+  const [sendState, setSendState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [dlState, setDlState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const projectId = 2;
+
+  const actionTitle = actionName.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const isFullAudit = FULL_AUDIT_ACTIONS.has(actionName);
+
+  const handleSend = async () => {
+    setSendState("loading");
+    try {
+      const res = await fetch(`${API}/api/projects/${projectId}/actions/send`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionName, title: actionTitle, content }),
+      });
+      if (res.ok) setSendState("done");
+      else setSendState("error");
+    } catch { setSendState("error"); }
+    setTimeout(() => setSendState("idle"), 3000);
+  };
+
+  const handleSave = async () => {
+    setSaveState("loading");
+    try {
+      const res = await fetch(`${API}/api/projects/${projectId}/actions/save`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionName, title: actionTitle, content, rawData }),
+      });
+      if (res.ok) setSaveState("done");
+      else setSaveState("error");
+    } catch { setSaveState("error"); }
+    setTimeout(() => setSaveState("idle"), 3000);
+  };
+
+  const handleDownload = async () => {
+    setDlState("loading");
+    try {
+      const downloadType = isFullAudit ? "zip" : undefined;
+      const res = await fetch(`${API}/api/projects/${projectId}/actions/download`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionName, title: actionTitle, content, rawData, downloadType }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const ext = isFullAudit ? "zip" : "html";
+        a.download = `${actionName}_${new Date().toISOString().split("T")[0]}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setDlState("done");
+      } else { setDlState("error"); }
+    } catch { setDlState("error"); }
+    setTimeout(() => setDlState("idle"), 3000);
+  };
+
+  const btnBase: React.CSSProperties = {
+    flex: 1, padding: isMobile ? "7px 8px" : "6px 10px",
+    borderRadius: 7, fontSize: isMobile ? 11 : 10, fontWeight: 600,
+    cursor: "pointer", display: "flex", alignItems: "center",
+    justifyContent: "center", gap: 4, transition: "all .15s",
+    border: "1px solid", minWidth: 0,
+  };
+
+  const stateIcon = (s: string) =>
+    s === "loading" ? "⏳" : s === "done" ? "✅" : s === "error" ? "❌" : null;
+
+  return (
+    <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
+      <button
+        onClick={handleSend} disabled={sendState === "loading"}
+        style={{ ...btnBase, background: "rgba(59,130,246,0.08)", borderColor: "rgba(59,130,246,0.25)", color: "#60a5fa" }}
+      >
+        {stateIcon(sendState) || "📧"} {sendState === "loading" ? "Enviando..." : sendState === "done" ? "Enviado" : "Enviar"}
+      </button>
+      <button
+        onClick={handleSave} disabled={saveState === "loading"}
+        style={{ ...btnBase, background: "rgba(52,211,153,0.08)", borderColor: "rgba(52,211,153,0.25)", color: "#34d399" }}
+      >
+        {stateIcon(saveState) || "💾"} {saveState === "loading" ? "Guardando..." : saveState === "done" ? "Guardado" : "Guardar"}
+      </button>
+      <button
+        onClick={handleDownload} disabled={dlState === "loading"}
+        style={{ ...btnBase, background: "rgba(200,168,75,0.08)", borderColor: "rgba(200,168,75,0.25)", color: "#c8a84b" }}
+      >
+        {stateIcon(dlState) || "📥"} {dlState === "loading" ? "Preparando..." : dlState === "done" ? "Descargado" : isFullAudit ? "Descargar ZIP" : "Descargar"}
+      </button>
+    </div>
+  );
 }
 
 // ─── ABSORB RESULT CARD ───────────────────────────────────────────────────────
@@ -1402,9 +1508,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             for (const act of allActions) {
               const actionResult = await executeShopifyAction(act.action, act.params);
               if (actionResult) {
-                results.push(formatActionResult(act.action, actionResult));
+                const formatted = formatActionResult(act.action, actionResult);
+                results.push(formatted);
                 const actionType = act.action === "search_suppliers" ? "supplier-research" : "shopify-action";
-                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult };
+                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult, actionName: act.action, formattedContent: formatted };
               }
             }
             if (results.length > 0) {
@@ -1545,43 +1652,13 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       {msg.action?.type === "entity-research" && (
                         <EntityResearchCard data={msg.action.data as EntityResearchResult} />
                       )}
-                      {msg.action?.type === "supplier-research" && (
-                        <button
-                          onClick={async () => {
-                            const d = msg.action!.data as Record<string, unknown>;
-                            const fd = d.fullData as Record<string, unknown>;
-                            try {
-                              const res = await fetch(`${API}/api/shopybrain/supplier-report`, {
-                                method: "POST", credentials: "include",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  productName: d.productName,
-                                  suppliers: fd?.suppliers,
-                                  costs: fd?.costs,
-                                  deals: fd?.deals,
-                                  synthesis: fd?.synthesis || d.synthesis,
-                                  sourcesAnalyzed: d.sourcesAnalyzed,
-                                }),
-                              });
-                              if (res.ok) {
-                                const blob = await res.blob();
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download = `informe-proveedores-${(d.productName as string || "producto").replace(/\s+/g, "-").toLowerCase()}.html`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                              }
-                            } catch { /* ignore */ }
-                          }}
-                          style={{
-                            marginTop: 8, padding: "8px 16px", background: "linear-gradient(135deg, rgba(200,168,75,0.15), rgba(45,212,159,0.1))",
-                            border: "1px solid rgba(200,168,75,0.3)", borderRadius: 8, color: "#c8a84b",
-                            fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 600,
-                          }}
-                        >
-                          📥 Descargar Informe Completo de Proveedores
-                        </button>
+                      {msg.action?.actionName && (
+                        <ActionButtons
+                          actionName={msg.action.actionName}
+                          content={msg.action.formattedContent || msg.content}
+                          rawData={msg.action.data}
+                          isMobile={isMobile}
+                        />
                       )}
                     </div>
                     <span style={{ fontSize: 9, color: "var(--t4)", marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>

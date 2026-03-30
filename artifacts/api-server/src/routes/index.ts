@@ -39,6 +39,7 @@ import scripttagRouter from "./scripttag.js";
 import automationsRouter from "./automations.js";
 import brainSyncRouter from "./brain-sync.js";
 import referenceImagesRouter from "./reference-images.js";
+import actionButtonsRouter from "./action-buttons.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -88,5 +89,6 @@ router.use(scripttagRouter);
 router.use(automationsRouter);
 router.use(brainSyncRouter);
 router.use(referenceImagesRouter);
+router.use(actionButtonsRouter);
 
 export default router;
