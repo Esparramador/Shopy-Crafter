@@ -718,17 +718,43 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
     switch (action) {
       case "store_status":
-        return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos total (✅ ${result.activeProducts ?? "?"} activos | 📝 ${result.draftProducts ?? "?"} borradores | 📁 ${result.archivedProducts ?? "?"} archivados)\n🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
+        return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos total (✅ ${result.activeProducts ?? "?"} activos | 📝 ${result.draftProducts ?? "?"} borradores | 📁 ${result.archivedProducts ?? "?"} archivados)\n📢 Publicados: ${result.publishedProducts ?? "?"} | 🔇 No publicados: ${result.unpublishedProducts ?? "0"}${(result.unpublishedProducts as number) > 0 ? " ⚠️" : ""}\n🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
       case "list_products": {
-        const prods = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
+        const prods = (result.products as Array<{ title: string; status: string; price: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; issues?: string[] }>) ?? [];
         if (!prods.length) return "📦 No se encontraron productos.";
         const statusIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
-        return `📦 **${result.total} productos (todos los estados):**\n${prods.map((p, i) => `${i + 1}. ${statusIcon(p.status)} **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
+        const gradeIcon = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
+        const auditW = result.auditWarnings as { unpublished?: number; noCompare?: number; lowImages?: number; shortDesc?: number } | undefined;
+        let msg = `📦 **${result.total} productos:**\n`;
+        msg += prods.map((p, i) => {
+          let line = `${i + 1}. ${statusIcon(p.status)} ${gradeIcon(p.auditGrade || "D")} **${p.title}** — ${p.price}€`;
+          if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
+          if (p.published === false) line += ` 🔇`;
+          if (p.imageCount !== undefined) line += ` | ${p.imageCount}img`;
+          if (p.issues?.length) line += ` ⚠️`;
+          return line;
+        }).join("\n");
+        if (auditW && (auditW.unpublished || auditW.noCompare || auditW.lowImages || auditW.shortDesc)) {
+          msg += "\n\n🔍 **Auditoría:**";
+          if (auditW.unpublished) msg += `\n⚠️ ${auditW.unpublished} no publicados`;
+          if (auditW.noCompare) msg += `\n⚠️ ${auditW.noCompare} sin precio tachado`;
+          if (auditW.lowImages) msg += `\n⚠️ ${auditW.lowImages} con pocas imágenes`;
+          if (auditW.shortDesc) msg += `\n⚠️ ${auditW.shortDesc} con descripción corta`;
+        }
+        return msg;
       }
       case "create_product":
         return `✅ **Producto creado en Shopify:**\n🆔 ID: ${result.productId}\n📝 "${result.title}"\n📊 Estado: ${result.status}`;
-      case "edit_product":
-        return `✅ **Producto actualizado:** "${result.title}"`;
+      case "edit_product": {
+        const preIss = (result.preAuditIssues as string[]) || [];
+        const postIss = (result.postAuditIssues as string[]) || [];
+        let editMsg = `✅ **Producto actualizado:** "${result.title}"`;
+        if (result.published !== undefined) editMsg += `\n📢 Publicado: ${result.published ? "SÍ" : "NO"}`;
+        if (preIss.length > 0) editMsg += `\n\n🔍 Pre-auditoría: ${preIss.join(" | ")}`;
+        if (postIss.length > 0) editMsg += `\n🔍 Post-auditoría: ${postIss.join(" | ")}`;
+        else editMsg += `\n✅ Auditoría post-edición OK`;
+        return editMsg;
+      }
       case "change_price":
         return `✅ **Precio actualizado:** ${result.oldPrice}€ → ${result.newPrice}€`;
       case "regenerate_token":
@@ -743,13 +769,53 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         }
         return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
       case "search_product": {
-        const prods = (result.products as Array<{ title: string; id: number; price: string; status: string }>) ?? [];
-        if (!prods.length) return "🔍 No se encontraron productos.";
+        const searchProds = (result.products as Array<{ title: string; id: number; price: string; status: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; issues?: string[] }>) ?? [];
+        if (!searchProds.length) return "🔍 No se encontraron productos.";
         const sIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
-        return `🔍 **${result.total} resultados (todos los estados):**\n${prods.map((p, i) => `${i + 1}. ${sIcon(p.status)} **${p.title}** (ID: ${p.id}) — ${p.price}€ [${p.status}]`).join("\n")}`;
+        const sGradeIcon = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
+        return `🔍 **${result.total} resultados:**\n${searchProds.map((p, i) => {
+          let line = `${i + 1}. ${sIcon(p.status)} ${sGradeIcon(p.auditGrade || "D")} **${p.title}** — ${p.price}€`;
+          if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
+          if (p.published === false) line += ` 🔇 NO PUBLICADO`;
+          if (p.imageCount !== undefined) line += ` | ${p.imageCount}img`;
+          if (p.issues?.length) line += `\n   ⚠️ ${p.issues.join(" | ")}`;
+          return line;
+        }).join("\n")}`;
       }
-      case "publish_product":
-        return `✅ Producto "${result.title}" publicado (active).`;
+      case "publish_product": {
+        const pubIssues = (result.auditIssues as string[]) || [];
+        let pubMsg = `✅ Producto "${result.title}" publicado correctamente\n📢 Estado: active | Publicado: SÍ | Alcance: global`;
+        if (result.previousStatus) pubMsg += `\n📋 Antes: ${result.previousStatus}, publicado=${result.wasPublished ? "sí" : "no"}`;
+        if (pubIssues.length > 0) pubMsg += `\n\n🔍 Auditoría post-publicación:\n${pubIssues.join("\n")}`;
+        else pubMsg += `\n\n✅ Auditoría OK — producto completo`;
+        return pubMsg;
+      }
+      case "audit_store": {
+        let auditMsg = `🔍 **AUDITORÍA PROFUNDA**\n\n`;
+        auditMsg += `📊 Puntuación media: ${result.averageScore}/100 (${result.overallGrade})\n`;
+        auditMsg += `📦 Total: ${result.totalProducts} productos\n`;
+        auditMsg += `📢 Publicados: ${result.publishedCount} | 🔇 No publicados: ${result.unpublishedCount}\n`;
+        const critIssues = (result.criticalIssues as string[]) || [];
+        const warnIssues = (result.warnings as string[]) || [];
+        if (critIssues.length > 0) auditMsg += `\n🚨 **PROBLEMAS CRÍTICOS:**\n${critIssues.join("\n")}`;
+        if (warnIssues.length > 0) auditMsg += `\n\n⚠️ **ADVERTENCIAS:**\n${warnIssues.join("\n")}`;
+        if (critIssues.length === 0 && warnIssues.length === 0) auditMsg += `\n✅ ¡Todos los productos están en perfecto estado!`;
+        const auditProds = (result.products as Array<{ title: string; grade: string; score: number; issues?: string[] }>) || [];
+        const withIssues = auditProds.filter(p => p.issues?.length);
+        if (withIssues.length > 0 && withIssues.length <= 10) {
+          auditMsg += `\n\n📋 **Productos con issues:**\n`;
+          auditMsg += withIssues.map(p => `• ${p.grade === "A" ? "🟢" : p.grade === "B" ? "🟡" : p.grade === "C" ? "🟠" : "🔴"} **${p.title}** (${p.score}/100): ${p.issues?.join(", ")}`).join("\n");
+        }
+        return auditMsg;
+      }
+      case "fix_unpublished":
+        return (result.fixed as number) > 0
+          ? `✅ **${result.fixed} producto(s) publicados correctamente** (status=active, published=true, scope=global)${(result.errors as number) > 0 ? `\n⚠️ ${result.errors} error(es)` : ""}`
+          : `✅ No hay productos sin publicar — todos están visibles`;
+      case "fix_missing_compare_prices":
+        return (result.fixed as number) > 0
+          ? `✅ **${result.fixed} variante(s) actualizadas con compare_at_price** (precio tachado visible)${(result.errors as number) > 0 ? `\n⚠️ ${result.errors} error(es)` : ""}`
+          : `✅ Todos los productos ya tienen compare_at_price configurado`;
       case "set_product_status":
         return `✅ Producto "${result.title}" → estado: **${result.status}**`;
       case "scan_store":

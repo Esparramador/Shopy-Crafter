@@ -326,6 +326,9 @@ Acciones disponibles:
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
 - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
 - scan_store: Escanear/auditar TODOS los productos de la tienda (incluye draft, archived). Params: {projectId, statusFilter? ("any","active","draft","archived")}
+- audit_store: Auditoría PROFUNDA de toda la tienda — scores, grades (A/B/C/D), problemas críticos, warnings, productos sin publicar, sin compare_at_price, pocas imágenes, descripción corta, pocos tags. Params: {projectId}
+- fix_unpublished: Publicar TODOS los productos que están sin publicar (draft/hidden→active+published+global). Params: {projectId}
+- fix_missing_compare_prices: Añadir compare_at_price automáticamente a todas las variantes que no lo tienen (precio tachado). Params: {projectId}
 - regenerate_token: Regenerar token Shopify. Params: {projectId}
 - get_scopes: Ver permisos/scopes. Params: {projectId}
 - delete_product: Eliminar producto. Params: {projectId, productId}
@@ -1206,10 +1209,12 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         const shop = await shopifyRequest<{ shop: Record<string, unknown> }>(parseInt(projectId), project.shopDomain, "/shop.json");
-        const [activeCount, draftCount, archivedCount] = await Promise.all([
+        const [activeCount, draftCount, archivedCount, publishedCount, unpublishedCount] = await Promise.all([
           shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=active"),
           shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=draft"),
           shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=any&status=archived"),
+          shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=published"),
+          shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/products/count.json?published_status=unpublished"),
         ]);
         const totalProducts = activeCount.count + draftCount.count + archivedCount.count;
         const ordersCount = await shopifyRequest<{ count: number }>(parseInt(projectId), project.shopDomain, "/orders/count.json?status=any");
@@ -1217,6 +1222,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         const tokenExpiry = project.tokenExpiresAt;
         const tokenValid = tokenExpiry ? new Date(tokenExpiry) > new Date() : false;
         const tokenHoursLeft = tokenExpiry ? Math.max(0, Math.round((new Date(tokenExpiry).getTime() - Date.now()) / 3600000 * 10) / 10) : 0;
+
+        const publishWarning = unpublishedCount.count > 0 ? `\n⚠️ ¡ATENCIÓN! ${unpublishedCount.count} producto(s) NO PUBLICADOS — invisibles para los clientes` : "";
 
         result = {
           storeName: shop.shop?.name ?? project.name,
@@ -1227,11 +1234,13 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           activeProducts: activeCount.count,
           draftProducts: draftCount.count,
           archivedProducts: archivedCount.count,
+          publishedProducts: publishedCount.count,
+          unpublishedProducts: unpublishedCount.count,
           ordersCount: ordersCount.count,
           tokenStatus: tokenValid ? "valid" : "expired",
           tokenHoursLeft,
           tokenExpiresAt: tokenExpiry,
-          message: `Tienda: ${shop.shop?.name ?? project.name} | ${totalProducts} productos (${activeCount.count} activos, ${draftCount.count} borradores, ${archivedCount.count} archivados) | ${ordersCount.count} pedidos | Token: ${tokenValid ? `válido (${tokenHoursLeft}h restantes)` : "EXPIRADO"}`,
+          message: `Tienda: ${shop.shop?.name ?? project.name} | ${totalProducts} productos (${activeCount.count} activos, ${draftCount.count} borradores, ${archivedCount.count} archivados) | 📢 Publicados: ${publishedCount.count} | 🔇 No publicados: ${unpublishedCount.count} | ${ordersCount.count} pedidos | Token: ${tokenValid ? `válido (${tokenHoursLeft}h restantes)` : "EXPIRADO"}${publishWarning}`,
         };
         break;
       }
@@ -1245,32 +1254,80 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         const limit = Math.min(params?.limit ?? 10, 50);
         const statusFilter = params?.statusFilter || "any";
         let allProducts: Array<Record<string, unknown>> = [];
+        const fieldsToFetch = "id,title,status,variants,images,tags,body_html,published_at,published_scope";
 
         if (statusFilter === "any") {
           for (const st of ["active", "draft", "archived"]) {
             const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-              parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,variants,images,tags`
+              parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=${fieldsToFetch}`
             );
             allProducts = allProducts.concat(d.products || []);
           }
         } else {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${statusFilter}&published_status=any&fields=id,title,status,variants,images,tags`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${statusFilter}&published_status=any&fields=${fieldsToFetch}`
           );
           allProducts = d.products || [];
         }
 
-        result = {
-          products: allProducts.map((p: Record<string, unknown>) => ({
+        let unpublishedWarnings = 0;
+        let noCompareWarnings = 0;
+        let lowImageWarnings = 0;
+        let shortDescWarnings = 0;
+
+        const mappedProducts = allProducts.map((p: Record<string, unknown>) => {
+          const variants = (p.variants as Array<Record<string, string>>) || [];
+          const images = (p.images as unknown[]) || [];
+          const bodyLen = (p.body_html as string || "").length;
+          const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
+          const hasCompare = !!variants[0]?.compare_at_price;
+          const isPublished = !!p.published_at;
+          const imgCount = images.length;
+
+          const issues: string[] = [];
+          if (!isPublished) { issues.push("NO PUBLICADO"); unpublishedWarnings++; }
+          if (!hasCompare) { issues.push("sin compare_at_price"); noCompareWarnings++; }
+          if (imgCount < 3) { issues.push(`pocas imágenes (${imgCount})`); lowImageWarnings++; }
+          if (bodyLen < 500) { issues.push(`descripción corta (${bodyLen}ch)`); shortDescWarnings++; }
+          if (tagsArr.length < 10) { issues.push(`pocos tags (${tagsArr.length})`); }
+
+          let score = 0;
+          if (imgCount >= 3) score += 25; else if (imgCount >= 1) score += 10;
+          if (bodyLen >= 1000) score += 25; else if (bodyLen >= 500) score += 15; else if (bodyLen >= 200) score += 8;
+          if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
+          if (hasCompare) score += 25;
+
+          const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+
+          return {
             id: p.id,
             title: p.title,
             status: p.status,
-            price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
-            imageCount: (p.images as unknown[])?.length ?? 0,
+            price: variants[0]?.price ?? "0.00",
+            compareAtPrice: variants[0]?.compare_at_price || null,
+            imageCount: imgCount,
             tags: p.tags,
-          })),
+            tagsCount: tagsArr.length,
+            descriptionLength: bodyLen,
+            published: isPublished,
+            publishedScope: p.published_scope || "unknown",
+            auditScore: score,
+            auditGrade: grade,
+            issues: issues.length > 0 ? issues : undefined,
+          };
+        });
+
+        let auditSummary = "";
+        if (unpublishedWarnings > 0) auditSummary += `\n⚠️ ${unpublishedWarnings} producto(s) NO PUBLICADOS (invisibles)`;
+        if (noCompareWarnings > 0) auditSummary += `\n⚠️ ${noCompareWarnings} producto(s) sin precio tachado (compare_at_price)`;
+        if (lowImageWarnings > 0) auditSummary += `\n⚠️ ${lowImageWarnings} producto(s) con menos de 3 imágenes`;
+        if (shortDescWarnings > 0) auditSummary += `\n⚠️ ${shortDescWarnings} producto(s) con descripción corta (<500ch)`;
+
+        result = {
+          products: mappedProducts,
           total: allProducts.length,
-          message: `${allProducts.length} productos encontrados (${statusFilter === "any" ? "todos los estados" : statusFilter})`,
+          auditWarnings: { unpublished: unpublishedWarnings, noCompare: noCompareWarnings, lowImages: lowImageWarnings, shortDesc: shortDescWarnings },
+          message: `${allProducts.length} productos encontrados (${statusFilter === "any" ? "todos los estados" : statusFilter})${auditSummary}`,
         };
         break;
       }
@@ -1501,7 +1558,9 @@ Responde SOLO JSON válido:
           tags: finalTags,
           vendor: params?.vendor || undefined,
           product_type: params?.productType || undefined,
-          status: params?.status || "draft",
+          status: "active",
+          published: true,
+          published_scope: "global",
         };
 
         const aiVariants = (params?.aiGenerate !== false && aiContent?.variants?.length) ? aiContent.variants : null;
@@ -1678,7 +1737,7 @@ Responde SOLO JSON válido:
                 bodyHtml: finalBody || null,
                 vendor: params?.vendor || null,
                 productType: params?.productType || null,
-                status: (params?.status || "draft") as "active" | "draft" | "archived",
+                status: "active" as "active" | "draft" | "archived",
                 tags: finalTags || null,
                 price: finalPrice,
                 compareAtPrice: finalCompareAt,
@@ -1753,7 +1812,7 @@ Responde SOLO JSON válido:
                 bodyHtml: finalBody || null,
                 vendor: params?.vendor || null,
                 productType: params?.productType || null,
-                status: (params?.status || "draft") as "active" | "draft" | "archived",
+                status: "active" as "active" | "draft" | "archived",
                 tags: finalTags || null,
                 price: finalPrice,
                 compareAtPrice: finalCompareAt,
@@ -1970,6 +2029,24 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+        const beforeEdit = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=id,title,status,variants,images,tags,body_html,published_at,published_scope,vendor,product_type`
+        );
+        const beforeProduct = beforeEdit.product;
+        const beforeVariants = (beforeProduct.variants as Array<Record<string, unknown>>) || [];
+        const beforeImages = (beforeProduct.images as unknown[]) || [];
+        const beforeBodyLen = (beforeProduct.body_html as string || "").length;
+        const beforeTags = ((beforeProduct.tags as string) || "").split(",").filter((t: string) => t.trim());
+        const beforePublished = !!beforeProduct.published_at;
+        const beforeCompare = beforeVariants[0]?.compare_at_price;
+
+        const preAuditIssues: string[] = [];
+        if (!beforePublished) preAuditIssues.push("NO PUBLICADO (invisible para clientes)");
+        if (!beforeCompare) preAuditIssues.push("Sin compare_at_price");
+        if (beforeImages.length < 3) preAuditIssues.push(`Pocas imágenes (${beforeImages.length})`);
+        if (beforeBodyLen < 500) preAuditIssues.push(`Descripción corta (${beforeBodyLen}ch)`);
+        if (beforeTags.length < 10) preAuditIssues.push(`Pocos tags (${beforeTags.length})`);
+
         const updates: Record<string, unknown> = { id: parseInt(productId) };
         if (params?.title) updates.title = params.title;
         if (params?.bodyHtml) updates.body_html = params.bodyHtml;
@@ -1977,19 +2054,26 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         if (params?.status) updates.status = params.status;
         if (params?.vendor) updates.vendor = params.vendor;
         if (params?.productType) updates.product_type = params.productType;
+        if (params?.seoTitle) updates.metafields_global_title_tag = params.seoTitle;
+        if (params?.seoDescription) updates.metafields_global_description_tag = params.seoDescription;
+        if (params?.publish === true) {
+          updates.status = "active";
+          updates.published = true;
+          updates.published_scope = "global";
+        }
 
         if (Object.keys(updates).length <= 1) {
-          res.status(400).json({ error: "Se requiere al menos un campo a actualizar (title, bodyHtml, tags, status, price, vendor, productType)" });
+          res.status(400).json({ error: "Se requiere al menos un campo a actualizar (title, bodyHtml, tags, status, price, vendor, productType, seoTitle, seoDescription, publish)" });
           return;
         }
 
-        if (params?.price) {
-          const current = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
-            parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=variants`
-          );
-          const varId = params.variantId || current.product.variants?.[0]?.id;
+        if (params?.price || params?.compareAtPrice) {
+          const varId = params.variantId || beforeVariants[0]?.id;
           if (varId) {
-            updates.variants = [{ id: varId, price: params.price }];
+            const variantUpdate: Record<string, unknown> = { id: varId };
+            if (params?.price) variantUpdate.price = params.price;
+            if (params?.compareAtPrice) variantUpdate.compare_at_price = params.compareAtPrice;
+            updates.variants = [variantUpdate];
           }
         }
 
@@ -1998,10 +2082,28 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           { method: "PUT", body: JSON.stringify({ product: updates }) }
         );
 
+        const afterVariants = (updated.product.variants as Array<Record<string, unknown>>) || [];
+        const afterImages = (updated.product.images as unknown[]) || [];
+        const afterBodyLen = (updated.product.body_html as string || "").length;
+        const afterPublished = !!updated.product.published_at;
+
+        const postAuditIssues: string[] = [];
+        if (!afterPublished) postAuditIssues.push("⚠️ Sigue SIN PUBLICAR");
+        if (!afterVariants[0]?.compare_at_price) postAuditIssues.push("⚠️ Sigue sin compare_at_price");
+        if (afterImages.length < 3) postAuditIssues.push(`⚠️ Pocas imágenes (${afterImages.length})`);
+        if (afterBodyLen < 500) postAuditIssues.push(`⚠️ Descripción corta (${afterBodyLen}ch)`);
+
+        const preAuditText = preAuditIssues.length > 0 ? `\n\n🔍 Pre-auditoría: ${preAuditIssues.join(" | ")}` : "";
+        const postAuditText = postAuditIssues.length > 0 ? `\n🔍 Post-auditoría: ${postAuditIssues.join(" | ")}` : "\n✅ Auditoría post-edición OK";
+
         result = {
           productId: updated.product.id,
           title: updated.product.title,
-          message: `Producto "${updated.product.title}" actualizado en Shopify`,
+          status: updated.product.status,
+          published: afterPublished,
+          preAuditIssues,
+          postAuditIssues,
+          message: `Producto "${updated.product.title}" actualizado en Shopify${preAuditText}${postAuditText}`,
         };
         break;
       }
@@ -2117,20 +2219,49 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let allSearchResults: Array<Record<string, unknown>> = [];
         for (const st of ["active", "draft", "archived"]) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&status=${st}&published_status=any&fields=id,title,status,variants,images`
+            parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
           );
           allSearchResults = allSearchResults.concat(d.products || []);
         }
-        const data = { products: allSearchResults };
 
         result = {
-          products: data.products.map((p: Record<string, unknown>) => ({
-            id: p.id, title: p.title, status: p.status,
-            price: (p.variants as Array<Record<string, string>>)?.[0]?.price,
-            imageCount: (p.images as unknown[])?.length ?? 0,
-          })),
-          total: data.products.length,
-          message: `${data.products.length} productos encontrados para "${query}"`,
+          products: allSearchResults.map((p: Record<string, unknown>) => {
+            const variants = (p.variants as Array<Record<string, string>>) || [];
+            const images = (p.images as unknown[]) || [];
+            const bodyLen = (p.body_html as string || "").length;
+            const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
+            const hasCompare = !!variants[0]?.compare_at_price;
+            const isPublished = !!p.published_at;
+            const imgCount = images.length;
+
+            const issues: string[] = [];
+            if (!isPublished) issues.push("NO PUBLICADO");
+            if (!hasCompare) issues.push("sin compare_at_price");
+            if (imgCount < 3) issues.push(`pocas imágenes (${imgCount})`);
+            if (bodyLen < 500) issues.push(`descripción corta (${bodyLen}ch)`);
+
+            let score = 0;
+            if (imgCount >= 3) score += 25; else if (imgCount >= 1) score += 10;
+            if (bodyLen >= 1000) score += 25; else if (bodyLen >= 500) score += 15; else if (bodyLen >= 200) score += 8;
+            if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
+            if (hasCompare) score += 25;
+
+            return {
+              id: p.id, title: p.title, status: p.status,
+              price: variants[0]?.price,
+              compareAtPrice: variants[0]?.compare_at_price || null,
+              imageCount: imgCount,
+              tagsCount: tagsArr.length,
+              descriptionLength: bodyLen,
+              published: isPublished,
+              publishedScope: p.published_scope || "unknown",
+              auditScore: score,
+              auditGrade: score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D",
+              issues: issues.length > 0 ? issues : undefined,
+            };
+          }),
+          total: allSearchResults.length,
+          message: `${allSearchResults.length} productos encontrados para "${query}"`,
         };
         break;
       }
@@ -2142,12 +2273,41 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+        const beforePub = await shopifyRequest<{ product: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=id,title,status,published_at,published_scope,variants,images,tags,body_html`
+        );
+        const prevStatus = beforePub.product.status;
+        const prevPublished = !!beforePub.product.published_at;
+        const prevScope = beforePub.product.published_scope;
+
         const updated = await shopifyRequest<{ product: Record<string, unknown> }>(
           parseInt(projectId), project.shopDomain, `/products/${productId}.json`,
-          { method: "PUT", body: JSON.stringify({ product: { id: productId, status: "active" } }) }
+          { method: "PUT", body: JSON.stringify({ product: { id: productId, status: "active", published: true, published_scope: "global" } }) }
         );
 
-        result = { productId, title: updated.product.title, status: "active", message: `Producto "${updated.product.title}" publicado (active)` };
+        const variants = (updated.product.variants as Array<Record<string, unknown>>) || [];
+        const images = (updated.product.images as unknown[]) || [];
+        const bodyLen = (updated.product.body_html as string || "").length;
+        const hasCompare = !!variants[0]?.compare_at_price;
+        const issues: string[] = [];
+        if (!hasCompare) issues.push("⚠️ Sin compare_at_price (precio tachado)");
+        if (images.length < 3) issues.push(`⚠️ Pocas imágenes (${images.length})`);
+        if (bodyLen < 500) issues.push(`⚠️ Descripción corta (${bodyLen}ch)`);
+
+        const auditNote = issues.length > 0 ? `\n\n🔍 Auditoría post-publicación:\n${issues.join("\n")}` : "\n\n✅ Auditoría OK — producto completo";
+
+        result = {
+          productId,
+          title: updated.product.title,
+          status: "active",
+          published: true,
+          publishedScope: "global",
+          previousStatus: prevStatus,
+          wasPublished: prevPublished,
+          previousScope: prevScope,
+          auditIssues: issues,
+          message: `✅ Producto "${updated.product.title}" publicado correctamente\n📢 Estado: active | Publicado: SÍ | Alcance: global\n📋 Antes: status=${prevStatus}, publicado=${prevPublished ? "sí" : "no"}, scope=${prevScope}${auditNote}`,
+        };
         break;
       }
 
@@ -2171,6 +2331,208 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           })),
           total: data.orders.length,
           message: `${data.orders.length} pedidos recientes`,
+        };
+        break;
+      }
+
+      case "audit_store": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        let allAuditProducts: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
+          );
+          allAuditProducts = allAuditProducts.concat(d.products || []);
+        }
+
+        let totalScore = 0;
+        const criticalIssues: string[] = [];
+        const warnings: string[] = [];
+        let unpublishedCount = 0;
+        let noCompareCount = 0;
+        let lowImageCount = 0;
+        let shortDescCount = 0;
+        let lowTagsCount = 0;
+        let draftCount = 0;
+
+        const productAudits = allAuditProducts.map((p: Record<string, unknown>) => {
+          const variants = (p.variants as Array<Record<string, unknown>>) || [];
+          const images = (p.images as unknown[]) || [];
+          const bodyLen = (p.body_html as string || "").length;
+          const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
+          const hasCompare = !!variants[0]?.compare_at_price;
+          const isPublished = !!p.published_at;
+          const imgCount = images.length;
+          const status = p.status as string;
+
+          const issues: string[] = [];
+          if (!isPublished) { issues.push("NO PUBLICADO"); unpublishedCount++; }
+          if (status === "draft") { issues.push("BORRADOR"); draftCount++; }
+          if (!hasCompare) { issues.push("sin compare_at_price"); noCompareCount++; }
+          if (imgCount < 3) { issues.push(`pocas imágenes (${imgCount})`); lowImageCount++; }
+          if (bodyLen < 500) { issues.push(`descripción corta (${bodyLen}ch)`); shortDescCount++; }
+          if (tagsArr.length < 10) { issues.push(`pocos tags (${tagsArr.length})`); lowTagsCount++; }
+
+          let score = 0;
+          if (imgCount >= 3) score += 20; else if (imgCount >= 1) score += 8;
+          if (bodyLen >= 1000) score += 20; else if (bodyLen >= 500) score += 12; else if (bodyLen >= 200) score += 5;
+          if (tagsArr.length >= 10) score += 20; else if (tagsArr.length >= 5) score += 10;
+          if (hasCompare) score += 20;
+          if (isPublished) score += 20;
+
+          totalScore += score;
+          const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+
+          return { id: p.id, title: p.title, status, published: isPublished, publishedScope: p.published_scope, score, grade, imageCount: imgCount, descLength: bodyLen, tagsCount: tagsArr.length, hasCompare, issues: issues.length > 0 ? issues : undefined };
+        });
+
+        if (unpublishedCount > 0) criticalIssues.push(`🚨 ${unpublishedCount} producto(s) NO PUBLICADOS — invisibles para clientes`);
+        if (draftCount > 0) criticalIssues.push(`📝 ${draftCount} producto(s) en BORRADOR — no visibles en la tienda`);
+        if (noCompareCount > 0) warnings.push(`💰 ${noCompareCount} producto(s) sin precio tachado (compare_at_price)`);
+        if (lowImageCount > 0) warnings.push(`🖼 ${lowImageCount} producto(s) con menos de 3 imágenes`);
+        if (shortDescCount > 0) warnings.push(`📝 ${shortDescCount} producto(s) con descripción corta (<500 caracteres)`);
+        if (lowTagsCount > 0) warnings.push(`🏷 ${lowTagsCount} producto(s) con menos de 10 tags SEO`);
+
+        const avgScore = allAuditProducts.length > 0 ? Math.round(totalScore / allAuditProducts.length) : 0;
+        const overallGrade = avgScore >= 85 ? "A" : avgScore >= 60 ? "B" : avgScore >= 40 ? "C" : "D";
+
+        let auditMessage = `🔍 AUDITORÍA PROFUNDA — ${project.shopDomain}\n\n`;
+        auditMessage += `📊 Puntuación media: ${avgScore}/100 (${overallGrade})\n`;
+        auditMessage += `📦 Total: ${allAuditProducts.length} productos\n`;
+        auditMessage += `📢 Publicados: ${allAuditProducts.length - unpublishedCount} | 🔇 No publicados: ${unpublishedCount}\n`;
+        if (criticalIssues.length > 0) auditMessage += `\n🚨 PROBLEMAS CRÍTICOS:\n${criticalIssues.join("\n")}`;
+        if (warnings.length > 0) auditMessage += `\n\n⚠️ ADVERTENCIAS:\n${warnings.join("\n")}`;
+        if (criticalIssues.length === 0 && warnings.length === 0) auditMessage += `\n✅ ¡Todos los productos están en perfecto estado!`;
+
+        result = {
+          totalProducts: allAuditProducts.length,
+          averageScore: avgScore,
+          overallGrade,
+          publishedCount: allAuditProducts.length - unpublishedCount,
+          unpublishedCount,
+          draftCount,
+          noCompareCount,
+          lowImageCount,
+          shortDescCount,
+          lowTagsCount,
+          criticalIssues,
+          warnings,
+          products: productAudits,
+          message: auditMessage,
+        };
+        break;
+      }
+
+      case "fix_unpublished": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        let unpublishedProducts: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=unpublished&fields=id,title,status,published_at,published_scope`
+          );
+          unpublishedProducts = unpublishedProducts.concat(d.products || []);
+        }
+        for (const st of ["draft"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,published_at,published_scope`
+          );
+          for (const p of (d.products || [])) {
+            if (!unpublishedProducts.find((u: Record<string, unknown>) => u.id === p.id)) {
+              unpublishedProducts.push(p);
+            }
+          }
+        }
+
+        if (unpublishedProducts.length === 0) {
+          result = { fixed: 0, message: "✅ No hay productos sin publicar — todos están visibles para los clientes" };
+          break;
+        }
+
+        const fixed: Array<{ id: unknown; title: string; previousStatus: string; previousPublished: boolean }> = [];
+        const errors: string[] = [];
+
+        for (const p of unpublishedProducts) {
+          try {
+            await shopifyRequest(
+              parseInt(projectId), project.shopDomain, `/products/${p.id}.json`,
+              { method: "PUT", body: JSON.stringify({ product: { id: p.id, status: "active", published: true, published_scope: "global" } }) }
+            );
+            fixed.push({
+              id: p.id,
+              title: String(p.title),
+              previousStatus: String(p.status),
+              previousPublished: !!p.published_at,
+            });
+          } catch (e) {
+            errors.push(`${p.title}: ${e instanceof Error ? e.message : "error"}`);
+          }
+        }
+
+        result = {
+          fixed: fixed.length,
+          errors: errors.length,
+          products: fixed,
+          errorDetails: errors.length > 0 ? errors : undefined,
+          message: `✅ ${fixed.length}/${unpublishedProducts.length} producto(s) publicados correctamente (status=active, published=true, scope=global)${errors.length > 0 ? `\n⚠️ ${errors.length} error(es): ${errors.join(", ")}` : ""}`,
+        };
+        break;
+      }
+
+      case "fix_missing_compare_prices": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        let allPriceProducts: Array<Record<string, unknown>> = [];
+        for (const st of ["active", "draft", "archived"]) {
+          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,variants`
+          );
+          allPriceProducts = allPriceProducts.concat(d.products || []);
+        }
+
+        const fixedVariants: Array<{ productTitle: string; variantId: unknown; price: string; compareAtPrice: string }> = [];
+        const priceErrors: string[] = [];
+
+        for (const p of allPriceProducts) {
+          const variants = (p.variants as Array<Record<string, unknown>>) || [];
+          for (const v of variants) {
+            const price = parseFloat(String(v.price || "0"));
+            const hasCompare = !!v.compare_at_price;
+            if (!hasCompare && price >= 1) {
+              const markup = price < 30 ? 1.30 : price < 100 ? 1.28 : price < 300 ? 1.25 : 1.22;
+              const rawCompare = Math.round(price * markup) - 0.01;
+              const comparePrice = (rawCompare > price ? rawCompare : price + 1).toFixed(2);
+              try {
+                await shopifyRequest(
+                  parseInt(projectId), project.shopDomain, `/variants/${v.id}.json`,
+                  { method: "PUT", body: JSON.stringify({ variant: { id: v.id, compare_at_price: comparePrice } }) }
+                );
+                fixedVariants.push({ productTitle: String(p.title), variantId: v.id, price: String(v.price), compareAtPrice: comparePrice });
+              } catch (e) {
+                priceErrors.push(`${p.title} (variant ${v.id}): ${e instanceof Error ? e.message : "error"}`);
+              }
+            }
+          }
+        }
+
+        result = {
+          fixed: fixedVariants.length,
+          errors: priceErrors.length,
+          variants: fixedVariants.slice(0, 30),
+          errorDetails: priceErrors.length > 0 ? priceErrors : undefined,
+          message: fixedVariants.length > 0
+            ? `✅ ${fixedVariants.length} variante(s) actualizadas con compare_at_price (precio tachado visible)${priceErrors.length > 0 ? `\n⚠️ ${priceErrors.length} error(es)` : ""}`
+            : "✅ Todos los productos ya tienen compare_at_price configurado",
         };
         break;
       }
