@@ -98,9 +98,12 @@ All Shopify service products are fully deliverable via the chatbot's 79+ actions
 - **Batch Optimization**: 50/50 products optimized 10/10 with ZERO errors
 - **Total Description Characters**: 409,478 (avg ~8,190 per product)
 - **Total SEO Tags**: 1,280 (avg ~25.6 per product)
-- **Total Variants Created**: 490 intelligent variants (avg ~9.8 per product)
+- **Total Variants Created**: 490 intelligent variants (49/50 products have multi-variants)
 - **Total Alt Texts**: 178 image alt texts generated
-- **Image Generation**: 76 images (19 products × 4 types) via Replicate recraft-v3
+- **Image Generation**: Bulk generation with auto-upload to Shopify. 30 products have images, 20 more in progress (3 types each: hero, lifestyle, detail). Uses Replicate flux-1.1-pro/flux-dev models. 12-second delay between calls for rate limiting.
+- **Image Auto-Upload Fix**: `generation_jobs.shopify_image_id` column migrated from integer to bigint to support Shopify's large image IDs. Images now auto-upload to Shopify during generation.
+- **Bulk Upload Endpoint**: `POST /projects/:id/bulk-upload-generated-images` uploads all unuploaded generated images to Shopify.
+- **`list_products` and `list_all_products` actions now include `variantCount` and `compareAtPrice`**.
 - **Async Batch System**: `optimize_all_products` action runs in background, returns immediate response, processes sequentially (~2min/product via Dual AI)
 - **Brain Learning**: Each optimization triggers `learnFromOperation` + vault save
 

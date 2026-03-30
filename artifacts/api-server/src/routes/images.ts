@@ -120,6 +120,8 @@ export async function runImageGeneration(params: {
   estimatedCost: number;
   product: { title: string; productType: string | null };
   project: { storeNiche: string | null; brandTone: string | null; replicateApiToken: string | null };
+  autoUploadToShopify?: boolean;
+  shopDomain?: string;
 }): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
   const { job, projectId, shopifyProductId, imageType, finalPrompt, model, estimatedCost, product, project } = params;
 
@@ -173,11 +175,12 @@ export async function runImageGeneration(params: {
     const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
     const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
 
+    const statusUpdate: Record<string, unknown> = { status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() };
+    if (params.autoUploadToShopify) statusUpdate.status = "uploading";
     await db.update(generationJobsTable)
-      .set({ status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() })
+      .set(statusUpdate)
       .where(eq(generationJobsTable.id, job.id));
 
-    // Auto-guardar en el vault del proyecto
     await saveToVault({
       projectId,
       fileType: "image",
@@ -202,6 +205,29 @@ export async function runImageGeneration(params: {
       confidence: 0.70,
       tags: [imageType, project.storeNiche ?? "ecommerce", product.productType ?? "producto"].filter(Boolean),
     });
+
+    if (params.autoUploadToShopify && params.shopDomain) {
+      try {
+        const uploadResult = await uploadGeneratedImageToShopify({
+          projectId,
+          shopDomain: params.shopDomain,
+          shopifyProductId,
+          jobId: job.id,
+          imageUrl,
+          altText: altText.slice(0, 125),
+          imageType,
+        });
+        if (uploadResult.success) {
+          await db.update(generationJobsTable).set({ status: "succeeded" }).where(eq(generationJobsTable.id, job.id));
+        } else {
+          await db.update(generationJobsTable).set({ status: "succeeded" }).where(eq(generationJobsTable.id, job.id));
+          console.warn(`Auto-upload to Shopify failed for ${product.title} (${imageType}): ${uploadResult.error}`);
+        }
+      } catch (uploadErr) {
+        await db.update(generationJobsTable).set({ status: "succeeded" }).where(eq(generationJobsTable.id, job.id));
+        console.warn(`Auto-upload error for ${product.title}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
+      }
+    }
 
     return { success: true, imageUrl };
   } catch (err) {
@@ -319,7 +345,6 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
     completedAt: null,
   });
 
-  // Run generation in background — fully async
   runAsync(() =>
     runImageGeneration({
       job,
@@ -331,6 +356,8 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
       estimatedCost,
       product: { title: product.title, productType: product.productType },
       project: { storeNiche: project.storeNiche, brandTone: project.brandTone, replicateApiToken: project.replicateApiToken },
+      autoUploadToShopify: true,
+      shopDomain: project.shopDomain,
     }).then(() => {})
   );
 });
@@ -553,7 +580,6 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
             estimatedCost,
           }).returning();
 
-          // Actually run Replicate generation
           const result = await runImageGeneration({
             job: genJob,
             projectId,
@@ -568,6 +594,8 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
               brandTone: project.brandTone,
               replicateApiToken: project.replicateApiToken,
             },
+            autoUploadToShopify: true,
+            shopDomain: project.shopDomain,
           });
 
           if (result.success) {
@@ -584,12 +612,66 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
           await updateJobProgress(jobId, completed, failed, `✗ ${product.title} — ${imageType}: ${msg}`);
         }
 
-        // Small delay between Replicate calls to avoid rate limiting
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 12_000));
       }
     }
 
     await completeJob(jobId, { completed, failed, total: totalItems });
+  });
+});
+
+router.post("/projects/:projectId/bulk-upload-generated-images", async (req, res): Promise<void> => {
+  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+  if (!project.shopDomain) { res.status(400).json({ error: "Proyecto sin dominio Shopify configurado" }); return; }
+  if (!project.accessToken) { res.status(400).json({ error: "Proyecto sin token Shopify configurado" }); return; }
+
+  const pendingJobs = await db.select().from(generationJobsTable)
+    .where(and(
+      eq(generationJobsTable.projectId, projectId),
+      eq(generationJobsTable.status, "succeeded"),
+    ));
+
+  const notUploaded = pendingJobs.filter(j => !j.shopifyImageId && j.imageUrl);
+
+  if (notUploaded.length === 0) {
+    res.json({ message: "No hay imágenes pendientes de subir a Shopify", uploaded: 0 });
+    return;
+  }
+
+  const jobId = await createBulkJob(projectId, "bulk_image_upload", notUploaded.length);
+  res.json({ jobId, message: `Subiendo ${notUploaded.length} imágenes a Shopify...`, total: notUploaded.length });
+
+  runAsync(async () => {
+    let uploaded = 0;
+    let failed = 0;
+    for (const job of notUploaded) {
+      try {
+        const uploadResult = await uploadGeneratedImageToShopify({
+          projectId,
+          shopDomain: project.shopDomain,
+          shopifyProductId: job.shopifyProductId,
+          jobId: job.id,
+          imageUrl: job.imageUrl!,
+          altText: job.altText,
+          imageType: job.imageType,
+        });
+        if (uploadResult.success) {
+          uploaded++;
+          await updateJobProgress(jobId, uploaded, failed, `✓ Subida imagen ${job.imageType} para producto ${job.shopifyProductId}`);
+        } else {
+          failed++;
+          await updateJobProgress(jobId, uploaded, failed, `✗ ${uploadResult.error}`);
+        }
+      } catch {
+        failed++;
+        await updateJobProgress(jobId, uploaded, failed, `✗ Error subiendo imagen`);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    await completeJob(jobId, { uploaded, failed, total: notUploaded.length });
   });
 });
 

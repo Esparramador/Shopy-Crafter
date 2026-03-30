@@ -4,6 +4,7 @@ import {
   serial,
   timestamp,
   integer,
+  bigint,
   real,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -21,7 +22,7 @@ export const generationJobsTable = pgTable("generation_jobs", {
   model: text("model"),
   replicatePredictionId: text("replicate_prediction_id"),
   imageUrl: text("image_url"),
-  shopifyImageId: integer("shopify_image_id"),
+  shopifyImageId: bigint("shopify_image_id", { mode: "number" }),
   altText: text("alt_text"),
   estimatedCost: real("estimated_cost"),
   errorMessage: text("error_message"),

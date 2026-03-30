@@ -1307,6 +1307,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             status: p.status,
             price: variants[0]?.price ?? "0.00",
             compareAtPrice: variants[0]?.compare_at_price || null,
+            variantCount: variants.length,
             imageCount: imgCount,
             tags: p.tags,
             tagsCount: tagsArr.length,
@@ -2788,14 +2789,19 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const unpublished = allProds.length - published;
 
         result = {
-          products: allProds.map((p: Record<string, unknown>) => ({
-            id: p.id, title: p.title, status: p.status,
-            published: !!p.published_at,
-            price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
-            imageCount: (p.images as unknown[])?.length ?? 0,
-            tags: p.tags,
-            product_type: p.product_type || null,
-          })),
+          products: allProds.map((p: Record<string, unknown>) => {
+            const variants = (p.variants as Array<Record<string, string>>) || [];
+            return {
+              id: p.id, title: p.title, status: p.status,
+              published: !!p.published_at,
+              price: variants[0]?.price ?? "0.00",
+              compareAtPrice: variants[0]?.compare_at_price || null,
+              variantCount: variants.length,
+              imageCount: (p.images as unknown[])?.length ?? 0,
+              tags: p.tags,
+              product_type: p.product_type || null,
+            };
+          }),
           total: allProds.length,
           byStatus,
           published,
