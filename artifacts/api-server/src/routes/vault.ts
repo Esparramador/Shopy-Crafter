@@ -184,7 +184,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
   <div class="header">
     <div class="header-left">
       <h1>${sanitizeHtml(title)}</h1><!-- nosemgrep -->
-      <p>${sanitizeHtml(project?.name || "Proyecto")} — Generado por ShopyBrain AI</p><!-- nosemgrep -->
+      <p>${sanitizeHtml(project?.name || "Proyecto")} — Generado por Shopy Crafter AI</p><!-- nosemgrep -->
     </div>
     <div class="header-right">
       <div class="brand">SHOPY CRAFTER</div>
@@ -196,7 +196,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
     ${content}
   </div>
   <div class="footer">
-    Shopy Crafter — ShopyBrain AI Intelligence · ${date} · Informe confidencial
+    Shopy Crafter AI Intelligence · ${date} · Informe confidencial
   </div>
 </div>
 </body>
@@ -386,6 +386,100 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
   archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files: indexFiles }, null, 2), {
     name: "vault_index.json",
   });
+
+  await archive.finalize();
+});
+
+// ─── DESCARGAR ARCHIVOS SELECCIONADOS COMO ZIP ────────────────────────────────
+router.post("/projects/:projectId/vault/download-selected", requireAuth, async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId));
+  if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
+
+  const session = req.session as any;
+  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    res.status(403).json({ error: "Sin acceso" }); return;
+  }
+
+  const { fileIds, folderTypes } = req.body as { fileIds?: number[]; folderTypes?: string[] };
+
+  if ((!fileIds || fileIds.length === 0) && (!folderTypes || folderTypes.length === 0)) {
+    res.status(400).json({ error: "Debe especificar fileIds o folderTypes" }); return;
+  }
+
+  const [project] = await db.select({ name: projectsTable.name }).from(projectsTable)
+    .where(eq(projectsTable.id, projectId)).limit(1);
+
+  let files;
+  if (folderTypes && folderTypes.length > 0) {
+    files = await db.select().from(projectFilesTable)
+      .where(and(
+        eq(projectFilesTable.projectId, projectId),
+        sql`${projectFilesTable.fileType} = ANY(${folderTypes})`
+      ))
+      .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
+  } else {
+    files = await db.select().from(projectFilesTable)
+      .where(and(
+        eq(projectFilesTable.projectId, projectId),
+        sql`${projectFilesTable.id} = ANY(${fileIds!.map(Number)})`
+      ))
+      .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
+  }
+
+  if (files.length === 0) { res.status(404).json({ error: "No se encontraron archivos" }); return; }
+
+  const label = folderTypes ? folderTypes.join("_") : `seleccion_${files.length}`;
+  const zipName = `${(project?.name ?? "tienda").replace(/[^a-zA-Z0-9]/g, "_")}_${label}.zip`;
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.pipe(res);
+
+  let added = 0;
+  for (const file of files) {
+    try {
+      const ext = getExtension(file.mimeType ?? "application/octet-stream");
+      const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
+      const folder = file.fileType === "image" ? `imagenes/${file.category ?? "general"}` : file.fileType;
+      const entryName = `${folder}/${safeTitle}_${file.id}.${ext}`;
+
+      if (file.objectPath) {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const response = await getStorage().downloadObject(gcsFile);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        archive.append(buffer, { name: entryName });
+        added++;
+      } else if (file.originalUrl) {
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(15000) });
+        if (response.ok && response.body) {
+          const buffer = Buffer.from(await response.arrayBuffer());
+          archive.append(buffer, { name: entryName });
+          added++;
+        }
+      } else if (file.content) {
+        const htmlName = `${folder}/${safeTitle}_${file.id}.html`;
+        archive.append(file.content, { name: htmlName });
+        added++;
+      } else if (file.metadata) {
+        const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+        const jsonContent = JSON.stringify({
+          title: file.title, fileType: file.fileType, category: file.category,
+          productTitle: file.productTitle, generatedBy: file.generatedBy,
+          createdAt: file.createdAt, data: meta,
+        }, null, 2);
+        const jsonName = `${file.fileType}/${safeTitle}_${file.id}.json`;
+        archive.append(jsonContent, { name: jsonName });
+        added++;
+      }
+    } catch { /* skip failed file */ }
+  }
+
+  archive.append(JSON.stringify({
+    project: project?.name, projectId, totalFiles: files.length,
+    exportedFiles: added, exportType: folderTypes ? "folder" : "selection",
+    files: files.map(({ content, ...rest }) => rest),
+  }, null, 2), { name: "vault_index.json" });
 
   await archive.finalize();
 });

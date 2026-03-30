@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
   FolderOpen, Download, Trash2, Image, FileText, RefreshCw,
@@ -6,6 +6,7 @@ import {
   Archive, ExternalLink, AlertTriangle, Grid, List,
   Folder, Eye, ChevronRight, DollarSign, Palette, Wand2,
   SplitSquareHorizontal, ShieldCheck, FileSpreadsheet,
+  CheckSquare, Square, XCircle, CheckCircle,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -79,6 +80,10 @@ export default function ProjectVault() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"folders" | "list">("folders");
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [zippingSelected, setZippingSelected] = useState(false);
+  const [zippingFolder, setZippingFolder] = useState<string | null>(null);
 
   const pid = parseInt(projectId ?? "0");
 
@@ -98,7 +103,7 @@ export default function ProjectVault() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: "200" });
+      const params = new URLSearchParams({ limit: "500" });
       if (filterType) params.set("fileType", filterType);
       if (filterCategory) params.set("category", filterCategory);
       const res = await fetch(`${API_BASE}/api/projects/${pid}/vault?${params}`, { credentials: "include" });
@@ -133,9 +138,56 @@ export default function ProjectVault() {
     try {
       const url = `${API_BASE}/api/projects/${pid}/vault/download-all`;
       const a = document.createElement("a");
-      a.href = url; a.download = `${projectName || "tienda"}_vault.zip`; a.click();
+      a.href = url; a.download = `${projectName || "tienda"}_vault_completo.zip`; a.click();
     } catch {}
     setTimeout(() => setZipping(false), 3000);
+  };
+
+  const downloadSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setZippingSelected(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-selected`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ fileIds: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${projectName || "tienda"}_seleccion_${selectedIds.size}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {}
+    setZippingSelected(false);
+  };
+
+  const downloadFolder = async (folderId: string) => {
+    const folder = FOLDER_CONFIG.find(f => f.id === folderId);
+    if (!folder) return;
+    setZippingFolder(folderId);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-selected`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ folderTypes: folder.matchTypes }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${projectName || "tienda"}_${folder.label.replace(/\s+/g, "_")}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {}
+    setZippingFolder(null);
   };
 
   const deleteFile = async (file: VaultFile) => {
@@ -146,6 +198,7 @@ export default function ProjectVault() {
         method: "DELETE", credentials: "include",
       });
       setFiles(prev => prev.filter(f => f.id !== file.id));
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(file.id); return n; });
       loadStats();
     } catch {}
     setDeleting(null);
@@ -170,9 +223,29 @@ export default function ProjectVault() {
     return files.filter(f => folder.matchTypes.includes(f.fileType));
   };
 
-  const getUncategorizedFiles = () => {
-    const allMatchTypes = FOLDER_CONFIG.flatMap(f => f.matchTypes);
-    return files.filter(f => !allMatchTypes.includes(f.fileType));
+  const getDisplayFiles = () => {
+    if (!activeFolder) return files;
+    const folder = FOLDER_CONFIG.find(f => f.id === activeFolder);
+    if (!folder) return files;
+    return files.filter(f => folder.matchTypes.includes(f.fileType));
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const visible = getDisplayFiles();
+    setSelectedIds(new Set(visible.map(f => f.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
   };
 
   const openFolder = (folderId: string) => {
@@ -187,13 +260,6 @@ export default function ProjectVault() {
     setFilterCategory("");
   };
 
-  const getDisplayFiles = () => {
-    if (!activeFolder) return files;
-    const folder = FOLDER_CONFIG.find(f => f.id === activeFolder);
-    if (!folder) return files;
-    return files.filter(f => folder.matchTypes.includes(f.fileType));
-  };
-
   if (error) return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 0", textAlign: "center" }}>
       <AlertTriangle size={40} color="var(--t3)" style={{ marginBottom: 12 }} />
@@ -202,9 +268,11 @@ export default function ProjectVault() {
     </div>
   );
 
+  const displayFiles = getDisplayFiles();
+  const visibleSelected = displayFiles.filter(f => selectedIds.has(f.id)).length;
+
   return (
     <div className="page-inner">
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
           <ArrowLeft size={14} /> Volver
@@ -214,10 +282,10 @@ export default function ProjectVault() {
             <FolderOpen size={22} color="var(--gold)" /> Repositorio — {projectName || `Proyecto #${pid}`}
           </h1>
           <p style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>
-            Todo el contenido generado para esta tienda · Solo accesible por admin + dueño de la tienda
+            Todo el contenido generado para esta tienda · Descarga individual, por carpeta o todo
           </p>
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", borderRadius: 8, border: "1px solid var(--bdr)", overflow: "hidden" }}>
             <button
               onClick={() => { setViewMode("folders"); closeFolder(); }}
@@ -241,6 +309,17 @@ export default function ProjectVault() {
             </button>
           </div>
           <button
+            onClick={() => { setSelectMode(!selectMode); if (selectMode) clearSelection(); }}
+            style={{
+              padding: "6px 12px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600,
+              border: selectMode ? "1px solid var(--jade)" : "1px solid var(--bdr)",
+              background: selectMode ? "rgba(45,212,159,0.12)" : "transparent",
+              color: selectMode ? "var(--jade)" : "var(--t3)",
+            }}
+          >
+            <CheckSquare size={12} /> Seleccionar
+          </button>
+          <button
             onClick={downloadAll}
             disabled={zipping || files.length === 0}
             className="btn-primary"
@@ -253,7 +332,43 @@ export default function ProjectVault() {
         </div>
       </div>
 
-      {/* Stats bar */}
+      {selectMode && selectedIds.size > 0 && (
+        <div style={{
+          position: "sticky", top: 0, zIndex: 50, marginBottom: 16,
+          padding: "12px 18px", borderRadius: 12,
+          background: "linear-gradient(135deg, rgba(45,212,159,0.12), rgba(91,78,255,0.08))",
+          border: "1px solid var(--jade)",
+          display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+        }}>
+          <CheckCircle size={18} color="var(--jade)" />
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>
+            {selectedIds.size} archivo{selectedIds.size !== 1 ? "s" : ""} seleccionado{selectedIds.size !== 1 ? "s" : ""}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={selectAllVisible}
+            style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid var(--bdr)", background: "rgba(200,168,75,0.08)", color: "var(--gold)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}
+          >
+            <CheckSquare size={12} /> Seleccionar todos ({displayFiles.length})
+          </button>
+          <button
+            onClick={downloadSelected}
+            disabled={zippingSelected}
+            style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid var(--jade)", background: "rgba(45,212,159,0.12)", color: "var(--jade)", cursor: "pointer", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}
+          >
+            {zippingSelected
+              ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Generando ZIP...</>
+              : <><Archive size={12} /> Descargar selección ({selectedIds.size})</>}
+          </button>
+          <button
+            onClick={clearSelection}
+            style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid rgba(255,75,75,0.3)", background: "rgba(255,75,75,0.06)", color: "#ff4b4b", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+          >
+            <XCircle size={12} /> Limpiar
+          </button>
+        </div>
+      )}
+
       {stats && (
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <div className="glass-card" style={{ padding: "12px 16px", minWidth: 120 }}>
@@ -278,18 +393,15 @@ export default function ProjectVault() {
           <p style={{ color: "var(--t2)", marginBottom: 6 }}>El repositorio está vacío</p>
           <p style={{ fontSize: 12, color: "var(--t3)" }}>
             Los archivos se guardan automáticamente cuando generas imágenes, optimizas SEO, o haces rediseños.
-            También puedes guardar informes desde cada página de análisis.
           </p>
         </div>
       ) : viewMode === "folders" && !activeFolder ? (
-        <FolderGrid files={files} onOpenFolder={openFolder} />
+        <FolderGrid files={files} onOpenFolder={openFolder} onDownloadFolder={downloadFolder} zippingFolder={zippingFolder} />
       ) : (() => {
-        const displayFiles = activeFolder ? getDisplayFiles() : files;
         const imageFiles = displayFiles.filter(f => f.fileType === "image" || f.mimeType?.startsWith("image/"));
         const nonImageFiles = displayFiles.filter(f => f.fileType !== "image" && !f.mimeType?.startsWith("image/"));
         return (
         <>
-          {/* Breadcrumb when inside a folder */}
           {activeFolder && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <button
@@ -305,10 +417,19 @@ export default function ProjectVault() {
               <span style={{ fontSize: 11, color: "var(--t3)", marginLeft: 4 }}>
                 ({displayFiles.length} archivos)
               </span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => downloadFolder(activeFolder)}
+                disabled={zippingFolder === activeFolder}
+                style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid var(--gold)", background: "rgba(200,168,75,0.08)", color: "var(--gold)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}
+              >
+                {zippingFolder === activeFolder
+                  ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> ZIP...</>
+                  : <><Archive size={12} /> Descargar carpeta ({displayFiles.length})</>}
+              </button>
             </div>
           )}
 
-          {/* Filters (in list view only) */}
           {viewMode === "list" && !activeFolder && (
             <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
               <select
@@ -344,7 +465,6 @@ export default function ProjectVault() {
             </div>
           )}
 
-          {/* Image files — grid */}
           {imageFiles.length > 0 && (
             <div style={{ marginBottom: 24 }}>
               {!activeFolder && (
@@ -354,17 +474,40 @@ export default function ProjectVault() {
               )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                 {imageFiles.map(file => (
-                  <div key={file.id} style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: "1px solid var(--bdr)", background: "var(--ink3)" }}>
+                  <div key={file.id} style={{
+                    position: "relative", borderRadius: 10, overflow: "hidden",
+                    border: selectedIds.has(file.id) ? "2px solid var(--jade)" : "1px solid var(--bdr)",
+                    background: "var(--ink3)",
+                    boxShadow: selectedIds.has(file.id) ? "0 0 12px rgba(45,212,159,0.15)" : "none",
+                  }}>
+                    {selectMode && (
+                      <button
+                        onClick={() => toggleSelect(file.id)}
+                        style={{
+                          position: "absolute", top: 8, left: 8, zIndex: 5,
+                          width: 28, height: 28, borderRadius: 6,
+                          border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                          background: selectedIds.has(file.id) ? "var(--jade)" : "rgba(0,0,0,0.6)",
+                          color: selectedIds.has(file.id) ? "#fff" : "var(--t3)",
+                        }}
+                      >
+                        {selectedIds.has(file.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                      </button>
+                    )}
                     {imageUrl(file) ? (
                       <img
                         src={imageUrl(file)!}
                         alt={file.title}
-                        style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }}
+                        style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block", cursor: selectMode ? "pointer" : "default" }}
                         loading="lazy"
+                        onClick={() => selectMode && toggleSelect(file.id)}
                         onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
                     ) : (
-                      <div style={{ width: "100%", aspectRatio: "1", background: "var(--ink4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div
+                        style={{ width: "100%", aspectRatio: "1", background: "var(--ink4)", display: "flex", alignItems: "center", justifyContent: "center", cursor: selectMode ? "pointer" : "default" }}
+                        onClick={() => selectMode && toggleSelect(file.id)}
+                      >
                         <Image size={32} style={{ opacity: 0.2 }} />
                       </div>
                     )}
@@ -401,7 +544,6 @@ export default function ProjectVault() {
             </div>
           )}
 
-          {/* Non-image files — list */}
           {nonImageFiles.length > 0 && (
             <div>
               {!activeFolder && (
@@ -414,11 +556,29 @@ export default function ProjectVault() {
                   const cfg = FILE_TYPE_CONFIG[file.fileType];
                   const Icon = cfg?.icon ?? FileText;
                   return (
-                    <div key={file.id} style={{ padding: "14px 16px", background: "var(--ink3)", borderRadius: 10, border: "1px solid var(--bdr)", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div key={file.id} style={{
+                      padding: "14px 16px", background: "var(--ink3)", borderRadius: 10,
+                      border: selectedIds.has(file.id) ? "2px solid var(--jade)" : "1px solid var(--bdr)",
+                      display: "flex", alignItems: "center", gap: 14,
+                      boxShadow: selectedIds.has(file.id) ? "0 0 12px rgba(45,212,159,0.15)" : "none",
+                    }}>
+                      {selectMode && (
+                        <button
+                          onClick={() => toggleSelect(file.id)}
+                          style={{
+                            width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                            border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            background: selectedIds.has(file.id) ? "var(--jade)" : "rgba(100,100,100,0.2)",
+                            color: selectedIds.has(file.id) ? "#fff" : "var(--t3)",
+                          }}
+                        >
+                          {selectedIds.has(file.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                        </button>
+                      )}
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: `${cfg?.color ?? "var(--t3)"}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Icon size={16} color={cfg?.color ?? "var(--t3)"} />
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0, cursor: selectMode ? "pointer" : "default" }} onClick={() => selectMode && toggleSelect(file.id)}>
                         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", marginBottom: 2 }}>{file.title}</p>
                         {file.description && <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 2 }}>{file.description}</p>}
                         <p style={{ fontSize: 10, color: "var(--t3)" }}>
@@ -449,7 +609,12 @@ export default function ProjectVault() {
   );
 }
 
-function FolderGrid({ files, onOpenFolder }: { files: VaultFile[]; onOpenFolder: (id: string) => void }) {
+function FolderGrid({ files, onOpenFolder, onDownloadFolder, zippingFolder }: {
+  files: VaultFile[];
+  onOpenFolder: (id: string) => void;
+  onDownloadFolder: (id: string) => void;
+  zippingFolder: string | null;
+}) {
   const getFolderCount = (folder: typeof FOLDER_CONFIG[0]) =>
     files.filter(f => folder.matchTypes.includes(f.fileType)).length;
 
@@ -460,7 +625,7 @@ function FolderGrid({ files, onOpenFolder }: { files: VaultFile[]; onOpenFolder:
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
         {nonEmptyFolders.map(folder => {
           const count = getFolderCount(folder);
           const Icon = folder.icon;
@@ -469,13 +634,11 @@ function FolderGrid({ files, onOpenFolder }: { files: VaultFile[]; onOpenFolder:
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
           return (
-            <button
+            <div
               key={folder.id}
-              onClick={() => onOpenFolder(folder.id)}
               style={{
-                padding: 0, border: "1px solid var(--bdr)", borderRadius: 14, background: "var(--ink3)",
-                cursor: "pointer", textAlign: "left", overflow: "hidden",
-                transition: "all 0.2s",
+                border: "1px solid var(--bdr)", borderRadius: 14, background: "var(--ink3)",
+                overflow: "hidden", transition: "all 0.2s",
               }}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLElement).style.borderColor = folder.color;
@@ -486,7 +649,13 @@ function FolderGrid({ files, onOpenFolder }: { files: VaultFile[]; onOpenFolder:
                 (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
               }}
             >
-              <div style={{ padding: "20px 18px 16px" }}>
+              <button
+                onClick={() => onOpenFolder(folder.id)}
+                style={{
+                  padding: "20px 18px 12px", border: "none", background: "transparent",
+                  cursor: "pointer", textAlign: "left", width: "100%", display: "block",
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
@@ -507,8 +676,23 @@ function FolderGrid({ files, onOpenFolder }: { files: VaultFile[]; onOpenFolder:
                     Último: {new Date(latestFile.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
                   </p>
                 )}
+              </button>
+              <div style={{ padding: "0 18px 16px", display: "flex", gap: 6 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDownloadFolder(folder.id); }}
+                  disabled={zippingFolder === folder.id}
+                  style={{
+                    flex: 1, padding: "7px 0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${folder.color}40`, background: `${folder.color}10`, color: folder.color,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  }}
+                >
+                  {zippingFolder === folder.id
+                    ? <><RefreshCw size={11} style={{ animation: "spin 1s linear infinite" }} /> ZIP...</>
+                    : <><Archive size={11} /> Descargar ZIP</>}
+                </button>
               </div>
-            </button>
+            </div>
           );
         })}
 
