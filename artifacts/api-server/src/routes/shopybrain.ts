@@ -321,7 +321,7 @@ Acciones disponibles:
 - store_status: Ver estado de la tienda. Params: {projectId}
 - list_products: Listar productos activos. Params: {projectId, limit?}
 - list_all_products: Listar TODOS los productos (active+draft+archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
-- create_product: Crear producto CALIDAD 100/100 con IA (título SEO 45-65 chars, descripción 800-1200 palabras con 8 secciones: storytelling, beneficios, specs, FAQ, trust badges; 22-28 tags; precio investigado del mercado; meta tags SEO optimizados; 8 imágenes generadas con IA). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?}
+- create_product: Crear producto CALIDAD 100/100 con IA (título SEO 45-65 chars, descripción 800-1200 palabras con 8 secciones: storytelling, beneficios, specs, FAQ, trust badges; 22-28 tags; precio investigado del mercado; meta tags SEO optimizados; imágenes generadas con IA). Si el usuario proporciona referenceImageUrl, las imágenes se generan desde esa referencia (modelo con producto, lifestyle, detalles, etc). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?, referenceImageUrl?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
 - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
 - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
@@ -389,6 +389,7 @@ Acciones disponibles:
 - financial_forecast: Forecast financiero a 3-6 meses con escenarios. Params: {projectId, months? (default 6)}
 - financial_dashboard: Ver dashboard financiero completo (márgenes, COGS, revenue). Params: {projectId}
 - generate_product_images: Generar imágenes IA para un producto (hero, lifestyle, detalle, etc). Params: {projectId, productId, imageTypes? (array)}
+- generate_images_from_reference: Generar imágenes profesionales a partir de una IMAGEN DE REFERENCIA del producto real. El usuario proporciona una foto de su producto y el sistema genera múltiples fotos profesionales desde diferentes ángulos, con modelos, lifestyle, detalles, flat-lay, etc., manteniendo la FIDELIDAD EXACTA al producto original. Se adapta al tipo de producto: ropa (modelo frontal/trasera/lateral/lifestyle), calzado (puesto/par/suela), joyería (modelo/elegante/macro), cosmética (textura/aplicación/ingredientes), comida (apetitoso/servir/mesa), electrónica (hero/uso/ángulos), y CUALQUIER otro tipo. Params: {projectId, productId, referenceImageUrl, productTitle?, productType?, scenes? (array de keys específicos), autoUpload? (default true)}
 - bulk_generate_images: Generar imágenes para múltiples productos. Params: {projectId, productIds (array de IDs), imageTypes? (array: "hero","lifestyle","detail","packaging","ugc","scale" — default: ["hero","lifestyle","detail"])}
 - generate_email_flow: Crear flujo de email marketing completo con IA (welcome, abandoned cart, post-purchase). Params: {projectId, flowType ("welcome"|"abandoned_cart"|"post_purchase"|"win_back"|"custom"), customTopic?}
 - generate_email: Generar un email de marketing individual con IA. Params: {projectId, emailType ("promotional"|"newsletter"|"product_launch"|"sale"), subject?, products?}
@@ -457,7 +458,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Precio óptimo / mejor precio → calculate_optimal_price; Estimar costos / COGS → estimate_cogs
 - Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
 - Dashboard financiero / márgenes → financial_dashboard
-- Generar imágenes / fotos producto → generate_product_images; Imágenes todos / bulk images → bulk_generate_images
+- Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
 - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
 - Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
@@ -1118,7 +1119,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const seoActions = ["seo_full_audit", "generate_all_metas", "generate_schemas", "fix_all_alt_texts", "audit_page_speed", "generate_sitemap", "keyword_intelligence", "blog_strategy", "generate_blog_post"];
   const pricingActions = ["change_price", "calculate_optimal_price", "estimate_cogs", "price_simulator", "financial_forecast", "financial_dashboard", "generate_competitive_pricing"];
   const productActions = ["create_product", "edit_product", "optimize_product", "redesign_product", "apply_redesign", "bulk_redesign", "optimize_all_products", "set_product_status", "publish_product", "delete_product"];
-  const imageActions = ["generate_product_images", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
+  const imageActions = ["generate_product_images", "generate_images_from_reference", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
   const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
@@ -1629,109 +1630,188 @@ Responde SOLO JSON válido:
         const imageErrors: string[] = [];
 
         if (params?.aiGenerate !== false && params?.skipImages !== true) {
-          try {
-            const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
-            const { buildImagePrompt: buildPrompt, runImageGeneration: runGeneration, MODEL_MAP: modelMap, COST_MAP: costMap, NEGATIVE_PROMPT: negPrompt, uploadGeneratedImageToShopify: uploadImg } = await import("./images.js");
-            
+          const hasReferenceImage = !!params?.referenceImageUrl;
 
-            await db.insert(pTable).values({
-              projectId: parseInt(projectId),
-              shopifyProductId: createdProductId,
-              title: createdTitle,
-              handle: createdHandle,
-              bodyHtml: finalBody || null,
-              vendor: params?.vendor || null,
-              productType: params?.productType || null,
-              status: (params?.status || "draft") as "active" | "draft" | "archived",
-              tags: finalTags || null,
-              price: finalPrice,
-              compareAtPrice: finalCompareAt,
-              imageCount: 0,
-              variantCount: 1,
-            }).onConflictDoNothing().catch(() => {});
+          if (hasReferenceImage) {
+            try {
+              const { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify } = await import("./reference-images.js");
+              const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
+              const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
 
-            const limitCheck = await checkProdLimit(parseInt(projectId), "image", imageTypes.length);
-            const allowedCount = limitCheck.allowed ? imageTypes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+              await db.insert(pTable).values({
+                projectId: parseInt(projectId),
+                shopifyProductId: createdProductId,
+                title: createdTitle,
+                handle: createdHandle,
+                bodyHtml: finalBody || null,
+                vendor: params?.vendor || null,
+                productType: params?.productType || null,
+                status: (params?.status || "draft") as "active" | "draft" | "archived",
+                tags: finalTags || null,
+                price: finalPrice,
+                compareAtPrice: finalCompareAt,
+                imageCount: 0,
+                variantCount: 1,
+              }).onConflictDoNothing().catch(() => {});
 
-            if (allowedCount > 0) {
-              const typesToGenerate = imageTypes.slice(0, allowedCount);
+              const referenceBuffer = await downloadImageToBuffer(String(params.referenceImageUrl));
+              const scenes = getScenesForProductType(params?.productType || "", storeNiche);
 
-              let imagePosition = 0;
-              const generateAndUpload = async (imageType: string): Promise<void> => {
-                const position = ++imagePosition;
-                try {
-                  const model = modelMap[imageType] ?? modelMap.hero;
-                  const estimatedCost = costMap[model] ?? 0.04;
-                  const prompt = await buildPrompt(
-                    parseInt(projectId), createdTitle, params?.productType || null,
-                    imageType, storeNiche, project.brandTone
-                  );
+              const limitCheck = await checkProdLimit(parseInt(projectId), "image", scenes.length);
+              const allowedCount = limitCheck.allowed ? scenes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
 
-                  const [job] = await db.insert(gjTable).values({
-                    projectId: parseInt(projectId),
-                    shopifyProductId: createdProductId,
-                    imageType,
-                    status: "pending",
-                    prompt,
-                    negativePrompt: negPrompt,
-                    model,
-                    estimatedCost,
-                  }).returning();
+              if (allowedCount > 0) {
+                const finalScenes = scenes.slice(0, allowedCount);
+                let position = 0;
 
-                  const genResult = await runGeneration({
-                    job: { id: job.id },
-                    projectId: parseInt(projectId),
-                    shopifyProductId: createdProductId,
-                    imageType,
-                    finalPrompt: prompt,
-                    model,
-                    estimatedCost,
-                    product: { title: createdTitle, productType: params?.productType || null },
-                    project: { storeNiche: project.storeNiche, brandTone: project.brandTone, replicateApiToken: project.replicateApiToken },
-                  });
+                for (const scene of finalScenes) {
+                  position++;
+                  try {
+                    const prompt = scene.promptTemplate(createdTitle, params?.productType || "", storeNiche);
+                    const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
 
-                  if (genResult.success && genResult.imageUrl) {
-                    imagesGenerated++;
-                    await recProdUsage(parseInt(projectId), "image", 1);
-
-                    const [updatedJob] = await db.select().from(gjTable).where(eq(gjTable.id, job.id));
-                    const uploadResult = await uploadImg({
+                    const altText = `${createdTitle} - ${scene.label}`;
+                    const uploadResult = await uploadBufferToShopify({
                       projectId: parseInt(projectId),
                       shopDomain: project.shopDomain,
                       shopifyProductId: createdProductId,
-                      jobId: job.id,
-                      imageUrl: genResult.imageUrl,
-                      altText: updatedJob?.altText || `${createdTitle} - ${imageType}`,
-                      imageType,
+                      imageBuffer: generatedBuffer,
+                      altText,
                       position,
                     });
-                    if (uploadResult.success) imagesUploaded++;
-                    else imageErrors.push(`${imageType}: upload failed`);
-                  } else {
-                    imageErrors.push(`${imageType}: ${genResult.error || "generation failed"}`);
+
+                    if (uploadResult.success) {
+                      imagesGenerated++;
+                      imagesUploaded++;
+                      await recProdUsage(parseInt(projectId), "image", 1);
+                    } else {
+                      imageErrors.push(`${scene.label}: upload failed`);
+                    }
+
+                    await db.insert(gjTable).values({
+                      projectId: parseInt(projectId),
+                      shopifyProductId: createdProductId,
+                      imageType: scene.key,
+                      status: uploadResult.success ? "succeeded" : "failed",
+                      prompt: prompt.slice(0, 2000),
+                      model: "gpt-image-1",
+                      estimatedCost: 0.04,
+                      altText,
+                      shopifyImageId: uploadResult.shopifyImageId ?? null,
+                      completedAt: new Date(),
+                    }).catch(() => {});
+                  } catch (e: unknown) {
+                    imageErrors.push(`${scene.label}: ${e instanceof Error ? e.message : "error"}`);
                   }
-                } catch (e: unknown) {
-                  imageErrors.push(`${imageType}: ${e instanceof Error ? e.message : "error"}`);
-                }
-              };
-
-              const heroType = typesToGenerate.find(t => t === "hero");
-              const otherTypes = typesToGenerate.filter(t => t !== "hero");
-
-              if (heroType) {
-                await generateAndUpload(heroType);
-              }
-
-              if (otherTypes.length > 0) {
-                const batchSize = 2;
-                for (let i = 0; i < otherTypes.length; i += batchSize) {
-                  const batch = otherTypes.slice(i, i + batchSize);
-                  await Promise.allSettled(batch.map(t => generateAndUpload(t)));
                 }
               }
+            } catch (imgErr: unknown) {
+              logger.error({ err: imgErr }, "Error en generación de imágenes desde referencia");
             }
-          } catch (imgErr: unknown) {
-            logger.error({ err: imgErr }, "Error en generación de imágenes para producto nuevo");
+          } else {
+            try {
+              const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
+              const { buildImagePrompt: buildPrompt, runImageGeneration: runGeneration, MODEL_MAP: modelMap, COST_MAP: costMap, NEGATIVE_PROMPT: negPrompt, uploadGeneratedImageToShopify: uploadImg } = await import("./images.js");
+
+              await db.insert(pTable).values({
+                projectId: parseInt(projectId),
+                shopifyProductId: createdProductId,
+                title: createdTitle,
+                handle: createdHandle,
+                bodyHtml: finalBody || null,
+                vendor: params?.vendor || null,
+                productType: params?.productType || null,
+                status: (params?.status || "draft") as "active" | "draft" | "archived",
+                tags: finalTags || null,
+                price: finalPrice,
+                compareAtPrice: finalCompareAt,
+                imageCount: 0,
+                variantCount: 1,
+              }).onConflictDoNothing().catch(() => {});
+
+              const limitCheck = await checkProdLimit(parseInt(projectId), "image", imageTypes.length);
+              const allowedCount = limitCheck.allowed ? imageTypes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+
+              if (allowedCount > 0) {
+                const typesToGenerate = imageTypes.slice(0, allowedCount);
+
+                let imagePosition = 0;
+                const generateAndUpload = async (imageType: string): Promise<void> => {
+                  const position = ++imagePosition;
+                  try {
+                    const model = modelMap[imageType] ?? modelMap.hero;
+                    const estimatedCost = costMap[model] ?? 0.04;
+                    const prompt = await buildPrompt(
+                      parseInt(projectId), createdTitle, params?.productType || null,
+                      imageType, storeNiche, project.brandTone
+                    );
+
+                    const [job] = await db.insert(gjTable).values({
+                      projectId: parseInt(projectId),
+                      shopifyProductId: createdProductId,
+                      imageType,
+                      status: "pending",
+                      prompt,
+                      negativePrompt: negPrompt,
+                      model,
+                      estimatedCost,
+                    }).returning();
+
+                    const genResult = await runGeneration({
+                      job: { id: job.id },
+                      projectId: parseInt(projectId),
+                      shopifyProductId: createdProductId,
+                      imageType,
+                      finalPrompt: prompt,
+                      model,
+                      estimatedCost,
+                      product: { title: createdTitle, productType: params?.productType || null },
+                      project: { storeNiche: project.storeNiche, brandTone: project.brandTone, replicateApiToken: project.replicateApiToken },
+                    });
+
+                    if (genResult.success && genResult.imageUrl) {
+                      imagesGenerated++;
+                      await recProdUsage(parseInt(projectId), "image", 1);
+
+                      const [updatedJob] = await db.select().from(gjTable).where(eq(gjTable.id, job.id));
+                      const uploadResult = await uploadImg({
+                        projectId: parseInt(projectId),
+                        shopDomain: project.shopDomain,
+                        shopifyProductId: createdProductId,
+                        jobId: job.id,
+                        imageUrl: genResult.imageUrl,
+                        altText: updatedJob?.altText || `${createdTitle} - ${imageType}`,
+                        imageType,
+                        position,
+                      });
+                      if (uploadResult.success) imagesUploaded++;
+                      else imageErrors.push(`${imageType}: upload failed`);
+                    } else {
+                      imageErrors.push(`${imageType}: ${genResult.error || "generation failed"}`);
+                    }
+                  } catch (e: unknown) {
+                    imageErrors.push(`${imageType}: ${e instanceof Error ? e.message : "error"}`);
+                  }
+                };
+
+                const heroType = typesToGenerate.find(t => t === "hero");
+                const otherTypes = typesToGenerate.filter(t => t !== "hero");
+
+                if (heroType) {
+                  await generateAndUpload(heroType);
+                }
+
+                if (otherTypes.length > 0) {
+                  const batchSize = 2;
+                  for (let i = 0; i < otherTypes.length; i += batchSize) {
+                    const batch = otherTypes.slice(i, i + batchSize);
+                    await Promise.allSettled(batch.map(t => generateAndUpload(t)));
+                  }
+                }
+              }
+            } catch (imgErr: unknown) {
+              logger.error({ err: imgErr }, "Error en generación de imágenes para producto nuevo");
+            }
           }
         }
 
@@ -4547,6 +4627,61 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           });
           const data = await resp.json() as Record<string, unknown>;
           result = { ...data, message: `🖼️ **Imágenes IA generándose**\n\n8 tipos de foto profesional: hero, lifestyle, detalle, packaging, UGC, escala, proceso, variante.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_images_from_reference": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const referenceImageUrl = params?.referenceImageUrl;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        if (!referenceImageUrl) { result = { error: true, message: "❌ Falta referenceImageUrl — necesito la URL de la imagen de referencia del producto" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const formData = new FormData();
+          formData.append("referenceImageUrl", String(referenceImageUrl));
+          if (params?.productTitle) formData.append("productTitle", String(params.productTitle));
+          if (params?.productType) formData.append("productType", String(params.productType));
+          if (params?.scenes) formData.append("scenes", JSON.stringify(params.scenes));
+          formData.append("autoUpload", String(params?.autoUpload ?? "true"));
+
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/images/generate-from-reference`, {
+            method: "POST",
+            headers: { cookie: req.headers.cookie ?? "" },
+            body: formData,
+          });
+
+          if (!resp.ok) {
+            const errData = await resp.json() as Record<string, unknown>;
+            result = { error: true, message: `❌ ${errData.error ?? "Error generando imágenes desde referencia"}` };
+            break;
+          }
+
+          const text = await resp.text();
+          const lines = text.split("\n").filter(l => l.startsWith("data: "));
+          let summary = { total: 0, success: 0, failed: 0 };
+          const sceneResults: string[] = [];
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
+              if (data.type === "done") {
+                summary = data.summary as typeof summary;
+              }
+              if (data.type === "completed" && data.success) {
+                sceneResults.push(`✅ ${data.label}`);
+              }
+              if (data.type === "error") {
+                sceneResults.push(`❌ ${data.label}: ${data.error}`);
+              }
+            } catch {}
+          }
+
+          result = {
+            message: `🖼️ **Imágenes generadas desde referencia**\n\n📸 ${summary.success}/${summary.total} fotos profesionales creadas:\n${sceneResults.join("\n")}\n\n${summary.success > 0 ? "✅ Imágenes subidas automáticamente a Shopify" : "⚠️ Algunas imágenes no se pudieron generar"}`,
+            imagesGenerated: summary.success,
+            imagesFailed: summary.failed,
+          };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }

@@ -1,0 +1,302 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { projectsTable, productsTable, generationJobsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { shopifyRequest } from "../lib/shopify";
+import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
+import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
+import { saveToVault } from "../lib/vault.js";
+import { Buffer } from "node:buffer";
+import multer from "multer";
+
+const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Solo se aceptan imágenes"));
+  },
+});
+
+interface SceneConfig {
+  key: string;
+  label: string;
+  promptTemplate: (productDesc: string, productType: string, niche: string) => string;
+}
+
+function getScenesForProductType(productType: string, niche: string): SceneConfig[] {
+  const lower = productType.toLowerCase();
+
+  if (/camis|camiseta|polo|sudadera|hoodie|jersey|blusa|top|vest|shirt|t-?shirt|ropa/i.test(lower)) {
+    return [
+      { key: "model_front", label: "Modelo frontal", promptTemplate: (desc, _pt, _n) => `Professional fashion photography: attractive model wearing this exact ${desc}. Front view, standing pose, clean studio background, editorial fashion magazine quality. The garment details, texture, color, and design must be EXACTLY preserved. Sharp focus on the clothing.` },
+      { key: "model_back", label: "Modelo trasera", promptTemplate: (desc, _pt, _n) => `Professional fashion photography: attractive model wearing this exact ${desc}. Back view, slightly turned, showing the back design and fit. Clean studio background, soft lighting. Every detail of the garment must be EXACTLY preserved.` },
+      { key: "model_side", label: "Modelo lateral", promptTemplate: (desc, _pt, _n) => `Professional fashion photography: attractive model wearing this exact ${desc}. Three-quarter side view, natural pose, showing the silhouette and drape of the fabric. Clean background, editorial quality lighting. Product details EXACTLY preserved.` },
+      { key: "model_lifestyle", label: "Modelo lifestyle", promptTemplate: (desc, _pt, n) => `Lifestyle fashion photography: model wearing this exact ${desc} in a real-world aspirational setting matching ${n} aesthetic. Urban environment, golden hour lighting, candid but styled pose. The garment must be EXACTLY the same as the reference — same color, design, details.` },
+      { key: "flat_lay", label: "Flat lay", promptTemplate: (desc, _pt, _n) => `Premium flat-lay product photography of this exact ${desc}. Overhead shot on marble or clean surface, styled with complementary accessories (watch, sunglasses, shoes). The garment is neatly folded/arranged. Every design detail, color, and texture EXACTLY preserved. Magazine-quality composition.` },
+      { key: "detail_closeup", label: "Detalle close-up", promptTemplate: (desc, _pt, _n) => `Extreme macro photography of this exact ${desc}. Close-up on fabric texture, stitching quality, label, or unique design detail. Shallow depth of field, studio lighting emphasizing material quality. Product details EXACTLY preserved.` },
+    ];
+  }
+
+  if (/zapato|zapatilla|bamba|sneaker|bota|sandalia|calzado|shoe|boot/i.test(lower)) {
+    return [
+      { key: "product_hero", label: "Hero producto", promptTemplate: (desc, _pt, _n) => `Professional studio product photography of this exact ${desc}. Three-quarter angle on white background, floating shadow, dramatic lighting. Every detail of the shoe — color, texture, sole, laces, logo — EXACTLY preserved. Commercial e-commerce quality.` },
+      { key: "model_worn", label: "Modelo calzado", promptTemplate: (desc, _pt, n) => `Professional fashion photography: person wearing this exact ${desc}. Shot from ankle down, walking on urban street matching ${n} aesthetic. The shoe details, color, and design must be EXACTLY preserved. Editorial quality, sharp focus on the footwear.` },
+      { key: "pair_angle", label: "Par ángulo", promptTemplate: (desc, _pt, _n) => `Studio photography of a pair of this exact ${desc}. One shoe facing forward, one at an angle, showing different perspectives. White background, soft shadows. Every detail EXACTLY preserved.` },
+      { key: "sole_detail", label: "Suela detalle", promptTemplate: (desc, _pt, _n) => `Product photography showing the sole/bottom of this exact ${desc}. Clean shot showing tread pattern, material quality, branding on sole. Studio white background. All details EXACTLY preserved.` },
+      { key: "lifestyle_context", label: "Lifestyle contexto", promptTemplate: (desc, _pt, n) => `Lifestyle photography: person wearing this exact ${desc} in an aspirational ${n} setting. Full outfit visible, natural environment, golden hour or dramatic lighting. Shoe details, color, design EXACTLY preserved.` },
+      { key: "detail_texture", label: "Textura detalle", promptTemplate: (desc, _pt, _n) => `Extreme close-up macro photography of this exact ${desc}. Focus on material texture, stitching, construction quality. Shallow depth of field, emphasizing premium craftsmanship. All details EXACTLY preserved.` },
+    ];
+  }
+
+  if (/joya|collar|anillo|pulsera|pendiente|arete|colgante|jewelry|ring|bracelet|necklace/i.test(lower)) {
+    return [
+      { key: "hero_elegant", label: "Hero elegante", promptTemplate: (desc, _pt, _n) => `Luxury jewelry photography of this exact ${desc}. On dark velvet or marble surface, dramatic side lighting creating sparkle and reflections. Every gem, metal finish, and design detail EXACTLY preserved. Commercial luxury quality.` },
+      { key: "model_worn", label: "Modelo puesto", promptTemplate: (desc, _pt, _n) => `Fashion photography: elegant person wearing this exact ${desc}. Close-up on the jewelry piece, soft skin tones, complementary styling. The jewelry design, color, gems, and metal finish must be EXACTLY preserved. Vogue editorial quality.` },
+      { key: "scale_hand", label: "Escala en mano", promptTemplate: (desc, _pt, _n) => `Product photography of this exact ${desc} held in or placed on a hand/wrist/neck, showing real size and proportions. Clean background, soft lighting. Every detail of the piece EXACTLY preserved.` },
+      { key: "macro_detail", label: "Macro detalle", promptTemplate: (desc, _pt, _n) => `Extreme macro photography of this exact ${desc}. Focus on gemstone facets, metal engravings, clasp mechanism, or texture details. Dramatic lighting creating sparkle. All details EXACTLY preserved.` },
+      { key: "gift_styled", label: "Estilo regalo", promptTemplate: (desc, _pt, _n) => `Styled product photography of this exact ${desc} in luxury gift box or on branded packaging. Complementary styling with roses or ribbons. The jewelry piece must be EXACTLY preserved in every detail.` },
+    ];
+  }
+
+  if (/cosmetica|maquillaje|crema|serum|perfume|beauty|skincare|makeup|locion/i.test(lower)) {
+    return [
+      { key: "hero_clean", label: "Hero minimalista", promptTemplate: (desc, _pt, _n) => `Premium beauty product photography of this exact ${desc}. Clean white/pastel background, soft diffused lighting, product centered with subtle shadow. Every label, color, shape, and packaging detail EXACTLY preserved.` },
+      { key: "texture_swatch", label: "Textura/swatch", promptTemplate: (desc, _pt, _n) => `Beauty product photography showing this exact ${desc} with a texture swatch — product spread/swatched next to the container. The product packaging must be EXACTLY preserved. Clean, bright, beauty editorial quality.` },
+      { key: "model_application", label: "Modelo aplicación", promptTemplate: (desc, _pt, _n) => `Beauty editorial photography: model applying or showcasing this exact ${desc}. Close-up on face/skin, dewy natural lighting, the product visible in frame. Product packaging EXACTLY preserved.` },
+      { key: "ingredients_styled", label: "Ingredientes", promptTemplate: (desc, _pt, _n) => `Styled product photography of this exact ${desc} surrounded by its key natural ingredients (botanicals, fruits, herbs). Clean background, editorial beauty magazine quality. Product EXACTLY preserved.` },
+      { key: "routine_flatlay", label: "Rutina flatlay", promptTemplate: (desc, _pt, _n) => `Overhead flat-lay beauty photography featuring this exact ${desc} as the star product, surrounded by complementary skincare items. Marble or clean surface, organized layout. Main product EXACTLY preserved.` },
+    ];
+  }
+
+  if (/comida|alimento|bebida|cafe|te|chocolate|snack|food|drink|wine|cerveza/i.test(lower)) {
+    return [
+      { key: "hero_appetite", label: "Hero apetitoso", promptTemplate: (desc, _pt, _n) => `Professional food/beverage photography of this exact ${desc}. Dramatic lighting, steam/condensation if applicable, styled with complementary elements. Product packaging/presentation EXACTLY preserved. Commercial food photography quality.` },
+      { key: "pouring_action", label: "Acción servir", promptTemplate: (desc, _pt, _n) => `Action shot food photography of this exact ${desc} being poured, served, or prepared. Dynamic composition with motion blur on liquid/steam. Product EXACTLY preserved. Professional culinary photography.` },
+      { key: "table_setting", label: "Mesa servida", promptTemplate: (desc, _pt, n) => `Lifestyle food photography of this exact ${desc} on a styled table setting matching ${n} aesthetic. Complementary dishes, cutlery, napkins. Natural window lighting. Product EXACTLY preserved.` },
+      { key: "ingredients_raw", label: "Ingredientes", promptTemplate: (desc, _pt, _n) => `Styled food photography of this exact ${desc} surrounded by its raw ingredients. Rustic surface, natural lighting, deconstructed recipe feel. Product EXACTLY preserved.` },
+      { key: "macro_texture", label: "Macro textura", promptTemplate: (desc, _pt, _n) => `Extreme close-up food photography of this exact ${desc}. Showing texture, color richness, freshness details. Shallow depth of field, dramatic side lighting. Product EXACTLY preserved.` },
+    ];
+  }
+
+  if (/electr|gadget|tech|phone|auricular|altavoz|cargador|cable|accesorio.*tech/i.test(lower)) {
+    return [
+      { key: "hero_tech", label: "Hero tecnológico", promptTemplate: (desc, _pt, _n) => `Premium tech product photography of this exact ${desc}. Dark gradient background, dramatic rim lighting, floating shadow effect. Every button, port, logo, color, and design detail EXACTLY preserved. Apple-style commercial quality.` },
+      { key: "in_use", label: "En uso", promptTemplate: (desc, _pt, _n) => `Lifestyle tech photography: person using this exact ${desc} in a modern workspace or lifestyle context. Natural lighting, clean environment. Product details EXACTLY preserved. Commercial tech brand quality.` },
+      { key: "angle_45", label: "Ángulo 45°", promptTemplate: (desc, _pt, _n) => `Studio product photography of this exact ${desc} at 45-degree angle. Dark background, edge lighting highlighting form factor. Every detail EXACTLY preserved. Premium tech catalog quality.` },
+      { key: "scale_context", label: "Escala contexto", promptTemplate: (desc, _pt, _n) => `Product photography of this exact ${desc} next to common objects (smartphone, coffee cup, hand) showing real scale. Clean background. All product details EXACTLY preserved.` },
+      { key: "detail_ports", label: "Detalle puertos", promptTemplate: (desc, _pt, _n) => `Macro product photography of this exact ${desc}. Close-up on key functional details — buttons, ports, connectors, screen, texture. Dramatic lighting. All details EXACTLY preserved.` },
+    ];
+  }
+
+  return [
+    { key: "hero_studio", label: "Hero estudio", promptTemplate: (desc, _pt, _n) => `Professional studio product photography of this exact ${desc}. Pure white background, 3-point lighting, centered composition, soft shadows. Every detail, color, texture, and design element EXACTLY preserved. Phase One commercial quality.` },
+    { key: "lifestyle_context", label: "Lifestyle contexto", promptTemplate: (desc, _pt, n) => `Lifestyle product photography of this exact ${desc} in an aspirational real-world setting matching ${n} aesthetic. Natural lighting, shallow depth of field. Product details EXACTLY preserved. Editorial magazine quality.` },
+    { key: "model_interaction", label: "Con modelo", promptTemplate: (desc, _pt, n) => `Professional photography: person interacting with or using this exact ${desc} in a natural ${n} context. Product prominently featured. Every product detail EXACTLY preserved. Commercial lifestyle quality.` },
+    { key: "detail_macro", label: "Detalle macro", promptTemplate: (desc, _pt, _n) => `Extreme macro close-up photography of this exact ${desc}. Focus on material quality, texture, craftsmanship details. Shallow depth of field, dramatic lighting. Every detail EXACTLY preserved.` },
+    { key: "scale_comparison", label: "Escala comparación", promptTemplate: (desc, _pt, _n) => `Product scale reference photography of this exact ${desc} next to a human hand or common everyday object. Clean background, clear size comparison. Product details EXACTLY preserved.` },
+    { key: "flat_lay_styled", label: "Flat lay estilizado", promptTemplate: (desc, _pt, _n) => `Premium styled flat-lay photography of this exact ${desc} with 2-3 complementary lifestyle items. Overhead shot, clean surface, curated composition. Product details EXACTLY preserved.` },
+  ];
+}
+
+function validateImageUrl(url: string): void {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("URL de imagen inválida"); }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Solo se aceptan URLs http/https");
+  const hostname = parsed.hostname.toLowerCase();
+  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal", "169.254.169.254"];
+  if (blocked.includes(hostname)) throw new Error("URL no permitida");
+  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname)) throw new Error("URL de red privada no permitida");
+}
+
+async function downloadImageToBuffer(url: string): Promise<Buffer> {
+  validateImageUrl(url);
+  const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!resp.ok) throw new Error(`No se pudo descargar imagen: ${resp.status}`);
+  return Buffer.from(await resp.arrayBuffer());
+}
+
+async function uploadBufferToShopify(opts: {
+  projectId: number;
+  shopDomain: string;
+  shopifyProductId: string;
+  imageBuffer: Buffer;
+  altText: string;
+  position: number;
+}): Promise<{ success: boolean; shopifyImageId?: number; error?: string }> {
+  try {
+    const base64 = opts.imageBuffer.toString("base64");
+    const uploadData = await shopifyRequest<{ image: { id: number } }>(
+      opts.projectId, opts.shopDomain,
+      `/products/${opts.shopifyProductId}/images.json`,
+      { method: "POST", body: JSON.stringify({ image: { attachment: base64, alt: opts.altText, position: opts.position } }) }
+    );
+    return { success: true, shopifyImageId: uploadData.image.id };
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Error subiendo imagen" };
+  }
+}
+
+router.post("/projects/:projectId/products/:productId/images/generate-from-reference",
+  upload.single("referenceImage"),
+  async (req, res): Promise<void> => {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+
+    const productTitle = product?.title || req.body.productTitle || "Producto";
+    const productType = product?.productType || req.body.productType || "";
+    const niche = project.storeNiche || "general";
+    const referenceImageUrl = req.body.referenceImageUrl;
+    let selectedScenes: string[] | null = null;
+    if (req.body.scenes) {
+      try { selectedScenes = JSON.parse(req.body.scenes) as string[]; } catch { /* ignore malformed */ }
+    }
+    const autoUpload = req.body.autoUpload !== "false";
+
+    let referenceBuffer: Buffer;
+    try {
+      if (req.file) {
+        referenceBuffer = req.file.buffer;
+      } else if (referenceImageUrl) {
+        referenceBuffer = await downloadImageToBuffer(referenceImageUrl);
+      } else {
+        res.status(400).json({ error: "Se requiere una imagen de referencia (archivo o URL)" });
+        return;
+      }
+    } catch (e: unknown) {
+      res.status(400).json({ error: `Error con imagen de referencia: ${e instanceof Error ? e.message : "desconocido"}` });
+      return;
+    }
+
+    const allScenes = getScenesForProductType(productType, niche);
+    const scenesToGenerate = selectedScenes
+      ? allScenes.filter(s => selectedScenes.includes(s.key))
+      : allScenes;
+
+    const limitCheck = await checkProductionLimit(projectId, "image", scenesToGenerate.length);
+    const allowedCount = limitCheck.allowed ? scenesToGenerate.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+    if (allowedCount === 0) {
+      res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true });
+      return;
+    }
+
+    const finalScenes = scenesToGenerate.slice(0, allowedCount);
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const sendEvent = (data: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    sendEvent({ type: "started", totalScenes: finalScenes.length, scenes: finalScenes.map(s => ({ key: s.key, label: s.label })) });
+
+    const results: Array<{ scene: string; label: string; success: boolean; shopifyImageId?: number; error?: string }> = [];
+
+    try {
+      const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
+      let position = 1;
+
+      for (const scene of finalScenes) {
+        sendEvent({ type: "generating", scene: scene.key, label: scene.label, progress: results.length + 1, total: finalScenes.length });
+
+        try {
+          const prompt = scene.promptTemplate(productTitle, productType, niche);
+
+          const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
+
+          const altTextPrompt = `Genera un alt text SEO conciso (max 125 chars) para una foto de producto Shopify. Producto: ${productTitle}. Escena: ${scene.label}. Nicho: ${niche}. Incluye keyword principal. En español.`;
+          const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", niche).catch(() => `${productTitle} - ${scene.label}`);
+
+          let shopifyImageId: number | undefined;
+          if (autoUpload) {
+            const uploadResult = await uploadBufferToShopify({
+              projectId,
+              shopDomain: project.shopDomain,
+              shopifyProductId,
+              imageBuffer: generatedBuffer,
+              altText: altText.slice(0, 125),
+              position: position++,
+            });
+            if (uploadResult.success) shopifyImageId = uploadResult.shopifyImageId;
+          }
+
+          await recordUsage(projectId, "image", 1);
+
+          const [job] = await db.insert(generationJobsTable).values({
+            projectId,
+            shopifyProductId,
+            imageType: scene.key,
+            status: "succeeded",
+            prompt: prompt.slice(0, 2000),
+            model: "gpt-image-1",
+            estimatedCost: 0.04,
+            altText: altText.slice(0, 125),
+            shopifyImageId: shopifyImageId ?? null,
+            completedAt: new Date(),
+          }).returning();
+
+          await saveToVault({
+            projectId,
+            fileType: "image",
+            category: scene.key,
+            title: `${scene.label} — ${productTitle} (desde referencia)`,
+            description: altText.slice(0, 125),
+            mimeType: "image/png",
+            productId: shopifyProductId,
+            productTitle: productTitle,
+            generatedBy: "reference_image_engine",
+            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id },
+          }).catch(() => {});
+
+          results.push({ scene: scene.key, label: scene.label, success: true, shopifyImageId });
+          sendEvent({ type: "completed", scene: scene.key, label: scene.label, success: true, shopifyImageId, progress: results.length, total: finalScenes.length });
+
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : "Error generando imagen";
+          results.push({ scene: scene.key, label: scene.label, success: false, error: errorMsg });
+          sendEvent({ type: "error", scene: scene.key, label: scene.label, error: errorMsg, progress: results.length, total: finalScenes.length });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+
+      learnFromOperation({
+        operationType: "images",
+        niche,
+        productType,
+        title: `Imágenes desde referencia: ${productTitle} (${successCount}/${results.length} exitosas)`,
+        content: `Tipo: reference_image\nProducto: ${productTitle}\nEscenas: ${results.map(r => `${r.label}(${r.success ? "ok" : "fail"})`).join(", ")}\nModelo: gpt-image-1`,
+        confidence: 0.85,
+        tags: ["reference_image", niche, productType].filter(Boolean),
+      });
+
+      sendEvent({ type: "done", results, summary: { total: results.length, success: successCount, failed: failedCount } });
+    } catch (fatalErr: unknown) {
+      const msg = fatalErr instanceof Error ? fatalErr.message : "Error fatal en generación";
+      sendEvent({ type: "error", scene: "system", label: "Sistema", error: msg, progress: 0, total: finalScenes.length });
+      sendEvent({ type: "done", results, summary: { total: finalScenes.length, success: 0, failed: finalScenes.length } });
+    }
+    res.end();
+  }
+);
+
+router.get("/reference-image-scenes", (req, res): void => {
+  const productType = (req.query.productType as string) || "";
+  const niche = (req.query.niche as string) || "general";
+  const scenes = getScenesForProductType(productType, niche);
+  res.json({ scenes: scenes.map(s => ({ key: s.key, label: s.label })), productType, niche });
+});
+
+export default router;
+export { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify };

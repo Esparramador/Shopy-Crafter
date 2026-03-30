@@ -46,7 +46,8 @@ A **Dual AI Engine** architecture integrates Claude and Gemini for superior outp
 - **AI-Powered Lead Pre-Report**: Generates detailed pre-reports for landing form submissions.
 - **Client Invite Flow**: Secure, token-based onboarding.
 - **Professional Budget/Invoice Generator**: AI-powered tool.
-- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants with inventory.
+- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants with inventory. Supports `referenceImageUrl` for generating images from a real product photo.
+- **Reference Image Generation System**: Uses OpenAI gpt-image-1 to generate professional product photos from a reference image. Adapts scenes by product type (ropa: modelo frontal/trasera/lateral/lifestyle/flat-lay/detalle; calzado: hero/modelo/par/suela/lifestyle/textura; joyería: elegante/modelo/escala/macro/regalo; cosmética/comida/electrónica/genérico). New chatbot action `generate_images_from_reference` + integrated into `create_product`. SSE streaming progress. Auto-uploads to Shopify.
 - **Deep Inventory & Sales Control System**: Professional-grade stock management with 6 chatbot actions for syncing, alerts, reporting, sales analytics, and customer history.
 - **Supplier Research System**: AI-driven intelligence.
 - **PDF Commercial Report**: 17-page A4 dark-theme PDFKit report with detailed analysis for Comic Crafter.
@@ -73,7 +74,8 @@ All 9 Shopify service products are fully deliverable via the chatbot's 79 action
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.
-- **Replicate**: For image generation.
+- **Replicate**: For image generation (text-to-image).
+- **OpenAI gpt-image-1 (Replit AI Integration)**: For reference-based product image generation/editing.
 - **Shopify**: Storefront API and Admin API.
 - **Klaviyo**: For email flow integration and lead form notifications.
 - **Gmail (Replit Integration)**: For sending all emails from `craftershopy@gmail.com`.

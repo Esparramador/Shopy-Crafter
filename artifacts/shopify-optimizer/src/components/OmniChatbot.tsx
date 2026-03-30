@@ -944,6 +944,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `🖼️ **Generación masiva de imágenes:**\n${result.message || `Job ${result.jobId || ""} iniciado para ${result.totalImages || "?"} imágenes.`}`;
       case "generate_product_images":
         return `🖼️ **Imágenes generadas:**\n${result.message || `${result.imagesGenerated || "?"} imágenes IA para el producto.`}`;
+      case "generate_images_from_reference":
+        return `📸 **Imágenes desde referencia:**\n${result.message || `${result.imagesGenerated || "?"} fotos profesionales generadas desde imagen de referencia.`}`;
       case "setup_full_store":
         return `🏪 **Setup completo de tienda:**\n${result.message || "Configuración completa aplicada."}`;
       case "brain_stats":
