@@ -3335,6 +3335,16 @@ ${truncated}
         const currentCompareAt = String(variants[0]?.compare_at_price || "");
         const storeNiche = project.storeNiche || "comics y cultura pop";
 
+        result = {
+          status: "optimizing",
+          productId,
+          currentTitle,
+          message: `⏳ Optimización 10/10 iniciada para "${currentTitle}".\n\nEl ShopyBrain Dual AI (Gemini + Claude) está generando:\n📝 Descripción 400+ palabras\n🏷 22+ tags SEO\n🔍 Meta title + description\n🎯 Variantes inteligentes\n💰 Análisis de precios\n\nTarda ~90s. El producto se actualizará automáticamente en Shopify.`,
+        };
+
+        (async () => {
+          try {
+
         const [priceResearch, _] = await Promise.all([
           researchRealPricing(currentTitle, productType, storeNiche, currentPrice),
           Promise.resolve(null),
@@ -3351,7 +3361,14 @@ Fuentes: ${priceResearch.sources.slice(0, 5).join(", ")}
 Estrategia sugerida: ${priceResearch.pricingStrategy}`
           : "";
 
-        const optimizePrompt = `Eres el mejor copywriter, experto SEO y estratega de pricing de Shopify del mundo. Optimiza este producto de manera PROFESIONAL y COMPLETA.
+        const existingOptions = (prod.options as Array<Record<string, unknown>>) || [];
+        const hasRealVariants = variants.length > 1 || (existingOptions.length > 0 && existingOptions.some((o: Record<string, unknown>) => o.name !== "Title" && (o.values as string[] || []).length > 1));
+
+        const variantsBlock = hasRealVariants
+          ? `\n- Variantes actuales: ${variants.length} (${existingOptions.map((o: Record<string, unknown>) => `${o.name}: ${(o.values as string[] || []).join(", ")}`).join("; ")})\n  → Las variantes ya existen, NO generes nuevas options/variants en tu respuesta.`
+          : `\n- Variantes: SOLO 1 variante por defecto (SIN opciones reales)\n  → DEBES generar variantes inteligentes según el tipo de producto (ver reglas abajo).`;
+
+        const optimizePrompt = `Eres el mejor copywriter, experto SEO, estratega de pricing y Product Manager de Shopify del mundo. Optimiza este producto a CALIDAD 10/10.
 
 PRODUCTO ACTUAL:
 - Título: "${currentTitle}"
@@ -3361,7 +3378,7 @@ PRODUCTO ACTUAL:
 - Tags actuales: "${currentTags}"
 - Precio actual: ${currentPrice}€
 ${currentCompareAt ? `- Precio de comparación: ${currentCompareAt}€` : ""}
-- Imágenes: ${images.length} fotos
+- Imágenes: ${images.length} fotos${variantsBlock}
 - Nicho de la tienda: ${storeNiche}
 - Tono de marca: ${project.brandTone || "profesional y apasionado"}
 ${priceContextBlock}
@@ -3370,10 +3387,10 @@ GENERA UN JSON COMPLETO con TODOS estos campos:
 {
   "title": "Título optimizado SEO (40-70 chars, incluye keywords relevantes)",
   "bodyHtml": "Descripción HTML COMPLETA y profesional. Mínimo 400 palabras. Incluye: <h2> subtítulos, <ul><li> bullet points con beneficios, especificaciones técnicas, storytelling emocional sobre el producto, llamada a la acción. Usa <strong> para enfatizar. NO uses placeholder ni lorem ipsum. Contenido REAL basado en el producto.",
-  "tags": ["tag1", "tag2", "..."],
+  "tags": ["tag1", "tag2", "...mínimo 22 tags..."],
   "seoTitle": "Meta title SEO optimizado (50-60 chars con keyword principal)",
   "seoDescription": "Meta description persuasiva (140-160 chars con CTA)",
-  "altTexts": ["alt text para imagen 1", "alt text para imagen 2", "..."],
+  "altTexts": ["alt text descriptivo imagen 1", "alt text descriptivo imagen 2", "..."],
   "handle": "url-handle-optimizado-seo",
   "pricingSuggestion": {
     "suggestedPrice": XX.XX,
@@ -3381,18 +3398,39 @@ GENERA UN JSON COMPLETO con TODOS estos campos:
     "reasoning": "Por qué este precio basado en datos reales del mercado",
     "marketPosition": "budget|mid-range|premium|luxury",
     "competitorsAnalyzed": N
-  }
+  },
+  "options": [{"name":"NombreOpcion","values":["val1","val2",...]}],
+  "variants": [{"optionValues":{"NombreOpcion":"val1"},"sku":"SKU-V1","price":XX.99,"compareAtPrice":XX.99,"inventoryQuantity":25,"weight":0.3,"weightUnit":"kg","costPerItem":XX.XX,"barcode":"8400000000001"}, ...],
+  "inventoryPolicy": "deny"
 }
+
+REGLAS DE VARIANTES (OBLIGATORIO si el producto NO tiene variantes reales):
+Analiza el tipo de producto y genera TODAS las variantes que tendría una tienda profesional 10/10:
+- ROPA/MODA: Talla (XS-XXL) × Color (3-5 colores)
+- CALZADO: Número (36-45) × Color
+- JOYERÍA: Material (Plata 925, Oro 18k, Acero) × Medida
+- IMPRESIÓN 3D: Material (PLA, ABS, Resina, PETG, Nylon) × Color/Acabado (Mate, Brillante, Transparente)
+- COMICS/LIBROS: Formato (Digital, Tapa Blanda, Tapa Dura, Edición Limitada) × Idioma
+- ARTE/PRINTS: Tamaño (A4, A3, A2, A1) × Acabado (Mate, Brillante, Canvas, Enmarcado)
+- ELECTRÓNICA: Capacidad × Color
+- COSMÉTICA: Tamaño (30ml, 50ml, 100ml) × Tono
+- SERVICIOS DIGITALES: Plan (Básico, Pro, Enterprise) × Duración (1 mes, 3 meses, 12 meses)
+- PACK CONTENIDO: Cantidad (Pack 10, Pack 25, Pack 50, Pack 100) × Formato
+- DISEÑO/TATUAJES: Tamaño (Pequeño, Mediano, Grande) × Estilo (B&N, Color, Acuarela)
+- NFT/COLECCIONABLES: Rareza (Común, Raro, Épico, Legendario) × Edición
+- CUALQUIER OTRO: Detecta opciones lógicas y genera variantes coherentes.
+
+Cada variante: SKU único (PREFIJO-OPT), precio (premium +10-30% para opciones superiores), compare_at_price, inventoryQuantity (15-50, más stock en tallas populares M/L), weight, costPerItem, barcode (13 dígitos).
+Genera 6-30 variantes según tipo. inventoryPolicy: "deny" (productos físicos) o "continue" (digitales/servicios).
+
+Si el producto YA TIENE variantes reales, NO incluyas options ni variants en tu respuesta.
 
 REGLAS CRÍTICAS:
 - TODO el contenido debe ser REAL, específico para este producto exacto
 - La descripción debe contar una historia, no solo listar características
-- Tags: mínimo 15, cubrir categoría, material, estilo, público, uso, colección, tendencia
+- Tags: mínimo 22, cubrir categoría, material, estilo, público, uso, colección, tendencia, long-tail keywords
 - Alt texts deben describir lo que se VE en cada imagen, no genéricos
-- PRICING: Usa los datos REALES del mercado para sugerir un precio COMPETITIVO y RENTABLE.
-  Si hay datos de competencia, el precio sugerido debe ser estratégicamente posicionado.
-  Usa precios psicológicos (.99, .95). Sugiere compare_at_price para percepción de valor.
-  Si NO hay datos de mercado, mantén el precio actual o sugiere ajuste basado en el nicho.
+- PRICING: Usa los datos REALES del mercado para sugerir un precio COMPETITIVO y RENTABLE
 - Responde SOLO el JSON, sin texto adicional`;
 
         const { dualAIJson } = await import("../lib/dual-ai.js");
@@ -3404,6 +3442,9 @@ REGLAS CRÍTICAS:
           seoDescription: string;
           altTexts?: string[];
           handle?: string;
+          options?: Array<{ name: string; values: string[] }>;
+          variants?: Array<Record<string, unknown>>;
+          inventoryPolicy?: string;
           pricingSuggestion?: {
             suggestedPrice?: number;
             suggestedCompareAtPrice?: number;
@@ -3438,7 +3479,40 @@ REGLAS CRÍTICAS:
 
         const priceSuggestion = optimized.pricingSuggestion;
         let priceUpdateMsg = "";
-        if (priceSuggestion?.suggestedPrice && priceSuggestion.suggestedPrice > 0) {
+        let variantsMsg = "";
+
+        if (!hasRealVariants && optimized.options && optimized.options.length > 0 && optimized.variants && optimized.variants.length > 0) {
+          shopifyUpdate.options = optimized.options.map((o, i) => ({
+            name: o.name,
+            position: i + 1,
+            values: o.values,
+          }));
+
+          shopifyUpdate.variants = optimized.variants.map((v: Record<string, unknown>) => {
+            const optVals = (v.optionValues || {}) as Record<string, string>;
+            const variant: Record<string, unknown> = {
+              price: String(v.price || currentPrice),
+              compare_at_price: v.compareAtPrice ? String(v.compareAtPrice) : currentCompareAt || null,
+              sku: v.sku || null,
+              inventory_management: "shopify",
+              inventory_quantity: v.inventoryQuantity ?? 25,
+              inventory_policy: optimized.inventoryPolicy || "deny",
+              weight: v.weight || null,
+              weight_unit: v.weightUnit || "kg",
+              cost: v.costPerItem ? String(v.costPerItem) : null,
+              barcode: v.barcode || null,
+              requires_shipping: optimized.inventoryPolicy !== "continue",
+              taxable: true,
+            };
+            const optNames = optimized.options!.map(o => o.name);
+            optNames.forEach((name, idx) => {
+              variant[`option${idx + 1}`] = optVals[name] || "";
+            });
+            return variant;
+          });
+
+          variantsMsg = `\n🎯 ${optimized.variants.length} variantes creadas (${optimized.options.map(o => `${o.name}: ${o.values.length}`).join(", ")})`;
+        } else if (priceSuggestion?.suggestedPrice && priceSuggestion.suggestedPrice > 0) {
           const newPrice = priceSuggestion.suggestedPrice.toFixed(2);
           const newCompareAt = priceSuggestion.suggestedCompareAtPrice
             ? priceSuggestion.suggestedCompareAtPrice.toFixed(2)
@@ -3464,24 +3538,45 @@ REGLAS CRÍTICAS:
           { method: "PUT", body: JSON.stringify({ product: shopifyUpdate }) }
         );
 
+        const updatedVariants = (updated.product.variants as Array<Record<string, unknown>>) || [];
+        const updatedOptions = (updated.product.options as Array<Record<string, unknown>>) || [];
+
         learnFromOperation({
           operationType: "product_optimization",
           niche: storeNiche,
           productType: productType || null,
-          title: `Optimización IA: ${updated.product.title}`,
+          title: `Optimización 10/10: ${updated.product.title}`,
           content: JSON.stringify({
             previousTitle: currentTitle,
             newTitle: updated.product.title,
             tagsCount: optimized.tags?.length || 0,
             seoTitle: optimized.seoTitle,
+            seoDescription: optimized.seoDescription,
             descLength: String(optimized.bodyHtml || "").length,
             priceBefore: currentPrice,
             priceAfter: priceSuggestion?.suggestedPrice || currentPrice,
             marketRange: priceResearch.marketPriceRange,
             competitorsFound: priceResearch.competitorPrices.length,
+            variantsCreated: !hasRealVariants ? (optimized.variants?.length || 0) : 0,
+            optionsCreated: !hasRealVariants ? (optimized.options?.map(o => `${o.name}(${o.values.length})`) || []) : [],
+            totalVariantsNow: updatedVariants.length,
+            handle: optimized.handle,
+            altTextsCount: optimized.altTexts?.length || 0,
+            imagesCount: images.length,
+            qualityScore: "10/10",
           }),
+          confidence: 0.95,
+          tags: ["optimization", "seo", "ai_content", "pricing", "variants", "10_10_quality"],
+        });
+
+        learnFromOperation({
+          operationType: "variant_strategy",
+          niche: storeNiche,
+          productType: productType || null,
+          title: `Estrategia variantes: ${productType || currentTitle}`,
+          content: `Producto "${updated.product.title}" (${productType}). ${!hasRealVariants && optimized.options ? `Opciones generadas: ${optimized.options.map(o => `${o.name}=[${o.values.join(",")}]`).join("; ")}. ${optimized.variants?.length || 0} variantes con SKUs, precios diferenciados, stock e inventario.` : `Ya tenía ${updatedVariants.length} variantes (${updatedOptions.map((o: Record<string, unknown>) => o.name).join(", ")}). No se modificaron.`} Inventario: ${optimized.inventoryPolicy || "deny"}. Nicho: ${storeNiche}.`,
           confidence: 0.9,
-          tags: ["optimization", "seo", "ai_content", "pricing"],
+          tags: ["variants", "product_strategy", productType || "general"],
         });
 
         result = {
@@ -3492,14 +3587,22 @@ REGLAS CRÍTICAS:
           descriptionLength: String(optimized.bodyHtml || "").length,
           seoTitle: optimized.seoTitle,
           altTextsGenerated: optimized.altTexts?.length || 0,
+          variantsCreated: !hasRealVariants ? (optimized.variants?.length || 0) : 0,
+          totalVariants: updatedVariants.length,
+          options: updatedOptions.map((o: Record<string, unknown>) => ({ name: o.name, values: o.values })),
           pricingSuggestion: priceSuggestion,
           marketData: {
             priceRange: priceResearch.marketPriceRange,
             competitorsFound: priceResearch.competitorPrices.length,
             sources: priceResearch.sources.slice(0, 5),
           },
-          message: `✅ Producto "${updated.product.title}" optimizado profesionalmente.\n📝 Descripción: ${String(optimized.bodyHtml || "").length} chars\n🏷 ${optimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${optimized.altTexts?.length || 0} alt texts de imágenes${priceUpdateMsg}`,
+          message: `✅ Producto "${updated.product.title}" optimizado 10/10.\n📝 Descripción: ${String(optimized.bodyHtml || "").length} chars\n🏷 ${optimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${optimized.altTexts?.length || 0} alt texts${variantsMsg}${priceUpdateMsg}`,
         };
+        logger.info({ productId, title: updated.product.title, variantsCreated: !hasRealVariants ? (optimized.variants?.length || 0) : 0 }, "✅ optimize_product background completed");
+          } catch (bgErr: unknown) {
+            logger.error({ productId, error: (bgErr as Error).message }, "❌ optimize_product background failed");
+          }
+        })();
         break;
       }
 
@@ -3510,78 +3613,179 @@ REGLAS CRÍTICAS:
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
         let allProds: Array<Record<string, unknown>> = [];
-        for (const st of ["active", "draft", "archived"]) {
+        for (const st of ["active", "draft"]) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=50&status=${st}&published_status=any&fields=id,title,body_html,vendor,product_type,tags,status,variants,images,handle`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,variants,status`
           );
           allProds = allProds.concat(d.products || []);
         }
 
-        const optimizeLimit = Math.min(params?.limit ?? 10, 25);
-        const toOptimize = allProds.slice(0, optimizeLimit);
-        const results: Array<{ id: unknown; title: string; status: string }> = [];
-        const errors: string[] = [];
-
-        for (const prod of toOptimize) {
-          try {
-            const images = (prod.images as Array<Record<string, unknown>>) || [];
-            const variants = (prod.variants as Array<Record<string, unknown>>) || [];
-
-            const optimizePrompt = `Optimiza este producto Shopify como experto profesional. Genera contenido REAL y COMPLETO.
-
-PRODUCTO:
-- Título: "${prod.title}"
-- Descripción: "${String(prod.body_html || "").slice(0, 300)}"
-- Vendor: "${prod.vendor || ""}"
-- Tipo: "${prod.product_type || ""}"
-- Tags: "${prod.tags || ""}"
-- Precio: ${variants[0]?.price || "N/A"}€
-- Imágenes: ${images.length}
-- Nicho: ${project.storeNiche || "general"}
-
-JSON RESPUESTA:
-{"title":"título SEO 40-70 chars","bodyHtml":"HTML completa mín 300 palabras con <h2>, <ul><li>, <strong>, storytelling, beneficios, especificaciones, CTA","tags":["15+ tags SEO"],"seoTitle":"meta title 50-60 chars","seoDescription":"meta desc 140-160 chars","altTexts":["alt para cada imagen"],"handle":"url-seo-handle"}
-
-SOLO JSON, contenido REAL para ESTE producto exacto.`;
-
-            const optimized = await askClaudeJsonWithBrain<{
-              title: string; bodyHtml: string; tags: string[];
-              seoTitle: string; seoDescription: string; altTexts?: string[]; handle?: string;
-            }>(parseInt(projectId), optimizePrompt, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || undefined, 6144);
-
-            const shopifyUpdate: Record<string, unknown> = { id: prod.id };
-            if (optimized.title) shopifyUpdate.title = optimized.title;
-            if (optimized.bodyHtml) shopifyUpdate.body_html = optimized.bodyHtml;
-            if (optimized.tags) shopifyUpdate.tags = optimized.tags.join(", ");
-            if (optimized.handle) shopifyUpdate.handle = optimized.handle;
-            if (optimized.seoTitle) shopifyUpdate.metafields_global_title_tag = optimized.seoTitle;
-            if (optimized.seoDescription) shopifyUpdate.metafields_global_description_tag = optimized.seoDescription;
-            if (optimized.altTexts && images.length > 0) {
-              shopifyUpdate.images = images.map((img, i) => ({
-                id: img.id, alt: optimized.altTexts?.[i] || String(img.alt || ""),
-              }));
-            }
-
-            await shopifyRequest(
-              parseInt(projectId), project.shopDomain, `/products/${prod.id}.json`,
-              { method: "PUT", body: JSON.stringify({ product: shopifyUpdate }) }
-            );
-
-            results.push({ id: prod.id, title: optimized.title || String(prod.title), status: "optimized" });
-            logger.info({ productId: prod.id, title: optimized.title }, "Product optimized by AI");
-          } catch (e) {
-            errors.push(`${prod.title}: ${e instanceof Error ? e.message : String(e)}`);
-          }
+        const skipAlreadyOptimized = params?.skipOptimized !== false;
+        const optimizeLimit = Math.min(params?.limit ?? 50, 100);
+        let toOptimize = allProds;
+        if (skipAlreadyOptimized) {
+          toOptimize = allProds.filter((p) => {
+            const vs = (p.variants as Array<Record<string, unknown>>) || [];
+            return vs.length <= 1;
+          });
         }
+        toOptimize = toOptimize.slice(0, optimizeLimit);
 
         result = {
-          optimized: results.length,
-          failed: errors.length,
-          total: toOptimize.length,
-          products: results,
-          errors: errors.length > 0 ? errors : undefined,
-          message: `✅ Optimización masiva completada: ${results.length}/${toOptimize.length} productos optimizados profesionalmente con IA.\n${errors.length > 0 ? `⚠️ ${errors.length} errores: ${errors[0]}` : ""}`,
+          status: "batch_started",
+          totalProducts: allProds.length,
+          toOptimize: toOptimize.length,
+          skipped: allProds.length - toOptimize.length,
+          products: toOptimize.map((p) => ({ id: p.id, title: p.title })),
+          message: `⏳ Optimización masiva 10/10 iniciada para ${toOptimize.length} productos (${allProds.length - toOptimize.length} ya optimizados).\n\nCada producto tarda ~90s (Dual AI: Gemini + Claude).\nTiempo estimado: ~${Math.ceil(toOptimize.length * 1.5)} minutos.\n\nProgreso visible en los logs del servidor.`,
         };
+
+        (async () => {
+          try {
+          const batchResults: Array<{ id: unknown; title: string; status: string }> = [];
+          const batchErrors: string[] = [];
+          for (let i = 0; i < toOptimize.length; i++) {
+            const prod = toOptimize[i];
+            try {
+              logger.info({ i: i + 1, total: toOptimize.length, productId: prod.id, title: prod.title }, "🔄 Batch optimize starting product");
+
+              const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
+                parseInt(projectId), project.shopDomain, `/products/${prod.id}.json`
+              );
+              const fullProd = pData.product;
+              const pImages = (fullProd.images as Array<Record<string, unknown>>) || [];
+              const pVariants = (fullProd.variants as Array<Record<string, unknown>>) || [];
+              const pTitle = String(fullProd.title || "");
+              const pDesc = String(fullProd.body_html || "");
+              const pVendor = String(fullProd.vendor || "");
+              const pType = String(fullProd.product_type || "");
+              const pTags = String(fullProd.tags || "");
+              const pPrice = String(pVariants[0]?.price || "0");
+              const pCompareAt = String(pVariants[0]?.compare_at_price || "");
+              const pNiche = project.storeNiche || "comics y cultura pop";
+
+              const [pPriceResearch] = await Promise.all([
+                researchRealPricing(pTitle, pType, pNiche, pPrice),
+                Promise.resolve(null),
+              ]);
+
+              const pPriceContext = pPriceResearch.competitorPrices.length > 0
+                ? `\n\nDATOS REALES DE MERCADO:
+Rango: ${pPriceResearch.marketPriceRange.min}€ - ${pPriceResearch.marketPriceRange.max}€ (mediana: ${pPriceResearch.marketPriceRange.median}€)
+Competidores: ${pPriceResearch.competitorPrices.map((c: { source: string; price: number }) => `${c.source}: ${c.price}€`).join(", ")}
+Recomendación: ${pPriceResearch.suggestedPrice}€`
+                : "";
+
+              const hasRealVars = pVariants.length > 1 || (pVariants.length === 1 && String(pVariants[0].title || "Default Title") !== "Default Title");
+
+              let variantInstructions = "";
+              if (!hasRealVars) {
+                variantInstructions = `\n\n🎯 VARIANTES INTELIGENTES:
+El producto NO tiene variantes. Genera opciones+variantes según tipo:
+- Ropa → Talla (XS,S,M,L,XL,XXL) × Color
+- Impresión 3D → Material (PLA,ABS,Resina) × Acabado
+- Arte/Prints → Tamaño (A4,A3,A2,A1) × Material
+- Servicios → Plan (Básico,Pro,Premium) × Duración
+- NFT/Digital → Edición (Standard,Limited,Collector) × Formato
+Genera "options" y "variants" con precios diferenciados.`;
+              }
+
+              const batchPrompt = `Optimiza este producto Shopify al MÁXIMO nivel profesional 10/10.
+
+PRODUCTO:
+- Título actual: "${pTitle}"
+- Descripción actual: "${pDesc.slice(0, 500)}"
+- Vendor: "${pVendor}"
+- Tipo: "${pType}"
+- Tags: "${pTags}"
+- Precio: ${pPrice}€ ${pCompareAt ? `(antes: ${pCompareAt}€)` : ""}
+- Imágenes: ${pImages.length}
+- Variantes actuales: ${pVariants.length}
+- Nicho: ${pNiche}${pPriceContext}${variantInstructions}
+
+JSON RESPUESTA (SOLO JSON):
+{
+  "title": "título SEO optimizado 40-70 chars",
+  "bodyHtml": "<div>HTML profesional mínimo 400 palabras con <h2>, <ul><li>, <strong>, storytelling, beneficios, specs, CTA. Contenido REAL para ESTE producto.</div>",
+  "tags": ["22+ tags SEO relevantes"],
+  "seoTitle": "meta title 50-60 chars",
+  "seoDescription": "meta description 140-160 chars con keywords y CTA",
+  "altTexts": ["alt text SEO para cada imagen"],
+  "handle": "url-seo-friendly-handle",
+  "suggestedPrice": "precio sugerido basado en mercado"${!hasRealVars ? `,
+  "options": [{"name":"NombreOpcion","values":["val1","val2","val3"]}],
+  "variants": [{"option1":"val1","option2":"val2","price":"X.XX","sku":"SKU-001","inventory_policy":"continue"}]` : ""}
+}`;
+
+              const { dualAIJson: batchDualAIJson } = await import("../lib/dual-ai.js");
+              const batchDualResult = await batchDualAIJson<{
+                title: string; bodyHtml: string; tags: string[];
+                seoTitle: string; seoDescription: string; altTexts?: string[];
+                handle?: string; suggestedPrice?: string;
+                options?: Array<{ name: string; values: string[] }>;
+                variants?: Array<Record<string, unknown>>;
+              }>(parseInt(projectId), batchPrompt, {
+                mode: "parallel_synthesis",
+                claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
+                useCase: "seo",
+                niche: pNiche,
+                maxTokens: 8192,
+              });
+              const batchOptimized = batchDualResult.data;
+
+              const batchUpdate: Record<string, unknown> = { id: fullProd.id };
+              if (batchOptimized.title) batchUpdate.title = batchOptimized.title;
+              if (batchOptimized.bodyHtml) batchUpdate.body_html = batchOptimized.bodyHtml;
+              if (batchOptimized.tags) batchUpdate.tags = batchOptimized.tags.join(", ");
+              if (batchOptimized.handle) batchUpdate.handle = batchOptimized.handle;
+              if (batchOptimized.seoTitle) batchUpdate.metafields_global_title_tag = batchOptimized.seoTitle;
+              if (batchOptimized.seoDescription) batchUpdate.metafields_global_description_tag = batchOptimized.seoDescription;
+              if (batchOptimized.altTexts && pImages.length > 0) {
+                batchUpdate.images = pImages.map((img, idx) => ({
+                  id: img.id, alt: batchOptimized.altTexts?.[idx] || String(img.alt || ""),
+                }));
+              }
+              if (!hasRealVars && batchOptimized.options && batchOptimized.variants) {
+                batchUpdate.options = batchOptimized.options;
+                batchUpdate.variants = batchOptimized.variants;
+              }
+
+              await shopifyRequest(
+                parseInt(projectId), project.shopDomain, `/products/${fullProd.id}.json`,
+                { method: "PUT", body: JSON.stringify({ product: batchUpdate }) }
+              );
+
+              await saveToVault({
+                projectId: parseInt(projectId),
+                title: `Shopy Crafter: optimize_product — ${new Date().toLocaleDateString("es-ES")}`,
+                content: JSON.stringify({ productId: fullProd.id, optimized: batchOptimized }),
+                fileType: "brain_action",
+                description: `✅ Producto "${batchOptimized.title || pTitle}" optimizado 10/10.\n📝 Descripción: ${String(batchOptimized.bodyHtml || "").length} chars\n🏷 ${batchOptimized.tags?.length || 0} tags SEO\n🔍 Meta title + description SEO\n🖼 ${batchOptimized.altTexts?.length || 0} alt texts\n🎯 ${!hasRealVars ? (batchOptimized.variants?.length || 0) : 0} variantes creadas`,
+                category: "optimization",
+              });
+
+              learnFromOperation({
+                operationType: "optimization",
+                title: pTitle,
+                content: `Optimización 10/10: ${batchOptimized.tags?.length || 0} tags, ${String(batchOptimized.bodyHtml || "").length} chars desc, ${!hasRealVars ? (batchOptimized.variants?.length || 0) : 0} variantes`,
+                niche: pNiche,
+                productType: pType,
+              });
+
+              batchResults.push({ id: fullProd.id, title: batchOptimized.title || pTitle, status: "optimized" });
+              logger.info({ i: i + 1, total: toOptimize.length, productId: fullProd.id, title: batchOptimized.title || pTitle, variants: !hasRealVars ? (batchOptimized.variants?.length || 0) : "kept" }, "✅ Batch optimize product completed");
+            } catch (e) {
+              const errMsg = e instanceof Error ? e.message : String(e);
+              batchErrors.push(`${prod.title}: ${errMsg}`);
+              logger.error({ productId: prod.id, title: prod.title, error: errMsg }, "❌ Batch optimize product failed");
+            }
+          }
+          logger.info({ optimized: batchResults.length, failed: batchErrors.length, total: toOptimize.length }, "🏁 Batch optimization complete");
+          } catch (outerErr: unknown) {
+            logger.error({ error: (outerErr as Error).message }, "❌ Batch optimization IIFE crashed");
+          }
+        })();
+
         break;
       }
 
