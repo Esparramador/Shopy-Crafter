@@ -210,44 +210,47 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   logger.info({ projectId: id, domain: project.shopDomain, statusesToFetch }, "Shopify sync: starting");
 
   if (requestedFilter === "any") {
-    let nextPageInfo: string | null = null;
-    let isFirst = true;
+    for (const status of ["active", "draft", "archived"]) {
+      let nextPageInfo: string | null = null;
+      let isFirst = true;
 
-    while (true) {
-      const path = isFirst
-        ? `/products.json?limit=${limit}&published_status=any`
-        : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
+      while (true) {
+        const path = isFirst
+          ? `/products.json?limit=${limit}&status=${status}&published_status=any`
+          : `/products.json?limit=${limit}&page_info=${nextPageInfo}`;
 
-      logger.info({ projectId: id, path, isFirst }, "Shopify sync: fetching page (all statuses)");
+        logger.info({ projectId: id, path, status, isFirst }, "Shopify sync: fetching page (all statuses)");
 
-      let pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null };
-      try {
-        pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
-          id,
-          project.shopDomain,
-          path
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.error({ projectId: id, error: msg }, "Shopify sync: API request failed");
-        res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
-        return;
+        let pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null };
+        try {
+          pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+            id,
+            project.shopDomain,
+            path
+          );
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
+          res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
+          return;
+        }
+
+        const { data, nextPageInfo: next } = pageResult;
+
+        logger.info({
+          projectId: id,
+          productsInPage: data.products?.length ?? 0,
+          hasNext: !!next,
+          status,
+        }, "Shopify sync: page received");
+
+        isFirst = false;
+        if (!data.products?.length) break;
+        allProducts = allProducts.concat(data.products);
+        nextPageInfo = next;
+        if (!nextPageInfo) break;
+        await new Promise((r) => setTimeout(r, 300));
       }
-
-      const { data, nextPageInfo: next } = pageResult;
-
-      logger.info({
-        projectId: id,
-        productsInPage: data.products?.length ?? 0,
-        hasNext: !!next,
-      }, "Shopify sync: page received");
-
-      isFirst = false;
-      if (!data.products?.length) break;
-      allProducts = allProducts.concat(data.products);
-      nextPageInfo = next;
-      if (!nextPageInfo) break;
-      await new Promise((r) => setTimeout(r, 300));
     }
   } else {
     for (const status of statusesToFetch) {

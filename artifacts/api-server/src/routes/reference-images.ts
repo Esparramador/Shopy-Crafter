@@ -176,10 +176,24 @@ router.post("/projects/:projectId/products/:productId/images/generate-from-refer
       return;
     }
 
+    const existingImages = await shopifyRequest<{ images: Array<{ id: number; alt: string }> }>(
+      projectId, project.shopDomain, `/products/${shopifyProductId}/images.json`
+    ).catch(() => ({ images: [] }));
+    const existingAlts = new Set((existingImages.images || []).map(img => (img.alt || "").toLowerCase().trim()));
+
     const allScenes = getScenesForProductType(productType, niche);
+    const filteredScenes = allScenes.filter(s => {
+      const altCheck = `${productTitle} - ${s.label}`.toLowerCase().trim();
+      return !existingAlts.has(altCheck);
+    });
     const scenesToGenerate = selectedScenes
-      ? allScenes.filter(s => selectedScenes.includes(s.key))
-      : allScenes;
+      ? filteredScenes.filter(s => selectedScenes.includes(s.key))
+      : filteredScenes;
+
+    if (scenesToGenerate.length === 0 && allScenes.length > 0) {
+      res.json({ message: "El producto ya tiene todas las escenas generadas. No hay imágenes nuevas que crear.", existingImages: existingImages.images?.length ?? 0 });
+      return;
+    }
 
     const limitCheck = await checkProductionLimit(projectId, "image", scenesToGenerate.length);
     const allowedCount = limitCheck.allowed ? scenesToGenerate.length : Math.max(0, limitCheck.remaining?.images ?? 0);

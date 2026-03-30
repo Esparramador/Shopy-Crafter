@@ -1651,9 +1651,20 @@ Responde SOLO JSON válido:
         const imageErrors: string[] = [];
 
         if (params?.aiGenerate !== false && params?.skipImages !== true) {
+          const existingImages = await shopifyRequest<{ images: Array<{ id: number; src: string; alt: string }> }>(
+            parseInt(projectId), project.shopDomain, `/products/${createdProductId}/images.json`
+          ).catch(() => ({ images: [] }));
+          const existingImageCount = existingImages.images?.length ?? 0;
+
+          if (existingImageCount > 0) {
+            logger.info({ productId: createdProductId, existingImages: existingImageCount }, "Producto ya tiene imágenes, omitiendo generación para evitar duplicados");
+          }
+
           const hasReferenceImage = !!params?.referenceImageUrl;
 
-          if (hasReferenceImage) {
+          if (existingImageCount > 0) {
+            /* skip — ya tiene imágenes */
+          } else if (hasReferenceImage) {
             try {
               const { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify } = await import("./reference-images.js");
               const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
@@ -1854,6 +1865,66 @@ Responde SOLO JSON válido:
         let seoSummary = "";
         if (seoTitle || seoDescription) {
           seoSummary = `\n🔍 SEO: meta title y description configurados`;
+        }
+
+        try {
+          const freshProduct = await shopifyRequest<{ product: Record<string, unknown> }>(
+            parseInt(projectId), project.shopDomain, `/products/${createdProductId}.json`
+          );
+          const sp = freshProduct.product;
+          const spImages = (sp.images as Array<Record<string, unknown>>) || [];
+          const spVariants = (sp.variants as Array<Record<string, unknown>>) || [];
+          const { productsTable: syncPT } = await import("@workspace/db");
+          const { auditProduct: auditProd } = await import("../lib/audit.js");
+          const audit = auditProd({
+            title: String(sp.title || ""),
+            body_html: String(sp.body_html || ""),
+            price: String((spVariants[0] as Record<string, unknown>)?.price || "0"),
+            compare_at_price: (spVariants[0] as Record<string, unknown>)?.compare_at_price ? String((spVariants[0] as Record<string, unknown>).compare_at_price) : null,
+            images: spImages.map(img => ({ id: img.id, src: img.src, alt: img.alt })),
+            tags: String(sp.tags || ""),
+          });
+          await db.insert(syncPT).values({
+            projectId: parseInt(projectId),
+            shopifyProductId: createdProductId,
+            title: String(sp.title),
+            handle: String(sp.handle || ""),
+            bodyHtml: String(sp.body_html || ""),
+            vendor: String(sp.vendor || ""),
+            productType: String(sp.product_type || ""),
+            status: String(sp.status || "draft") as "active" | "draft" | "archived",
+            publishedAt: sp.published_at ? String(sp.published_at) : null,
+            tags: String(sp.tags || ""),
+            price: String((spVariants[0] as Record<string, unknown>)?.price || "0"),
+            compareAtPrice: (spVariants[0] as Record<string, unknown>)?.compare_at_price ? String((spVariants[0] as Record<string, unknown>).compare_at_price) : null,
+            imageCount: spImages.length,
+            variantCount: spVariants.length,
+            imagesJson: spImages,
+            auditScore: audit.overallScore,
+            auditGrade: audit.grade,
+            titleScore: audit.titleScore,
+            descriptionScore: audit.descriptionScore,
+            priceScore: audit.priceScore,
+            imageScore: audit.imageScore,
+            seoScore: audit.seoScore,
+            auditProblems: audit.problems,
+            lastAuditedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: [syncPT.projectId, syncPT.shopifyProductId],
+            set: {
+              title: String(sp.title), handle: String(sp.handle || ""), bodyHtml: String(sp.body_html || ""),
+              status: String(sp.status || "draft") as "active" | "draft" | "archived",
+              price: String((spVariants[0] as Record<string, unknown>)?.price || "0"),
+              imageCount: spImages.length, variantCount: spVariants.length, imagesJson: spImages,
+              auditScore: audit.overallScore, auditGrade: audit.grade,
+              titleScore: audit.titleScore, descriptionScore: audit.descriptionScore,
+              priceScore: audit.priceScore, imageScore: audit.imageScore, seoScore: audit.seoScore,
+              auditProblems: audit.problems, lastAuditedAt: new Date(),
+            },
+          }).catch(() => {});
+          logger.info({ productId: createdProductId, auditScore: audit.overallScore, grade: audit.grade, images: spImages.length }, "Post-creation audit completed");
+        } catch (auditErr) {
+          logger.warn({ err: auditErr, productId: createdProductId }, "Post-creation audit failed (non-critical)");
         }
 
         const optionNames = ((created.product.options || []) as Array<{ name: string; values?: string[] }>)

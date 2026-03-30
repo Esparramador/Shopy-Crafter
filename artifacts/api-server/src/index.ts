@@ -154,23 +154,24 @@ async function warmupProdKnowledge() {
         logger.info({ projectId: project.id, domain: project.shopDomain }, "🔄 Warmup: syncing products from Shopify...");
         try {
           let allProducts: ShopifyProductRaw[] = [];
-          let nextPageInfo: string | null = null;
-          let isFirst = true;
+          for (const st of ["active", "draft", "archived"]) {
+            let nextPageInfo: string | null = null;
+            let isFirst = true;
+            while (true) {
+              const path = isFirst
+                ? `/products.json?limit=250&status=${st}&published_status=any`
+                : `/products.json?limit=250&page_info=${nextPageInfo}`;
 
-          while (true) {
-            const path = isFirst
-              ? `/products.json?limit=250&published_status=any`
-              : `/products.json?limit=250&page_info=${nextPageInfo}`;
-
-            const pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
-              project.id, project.shopDomain, path
-            );
-            isFirst = false;
-            if (!pageResult.data.products?.length) break;
-            allProducts = allProducts.concat(pageResult.data.products);
-            nextPageInfo = pageResult.nextPageInfo;
-            if (!nextPageInfo) break;
-            await new Promise(r => setTimeout(r, 300));
+              const pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+                project.id, project.shopDomain, path
+              );
+              isFirst = false;
+              if (!pageResult.data.products?.length) break;
+              allProducts = allProducts.concat(pageResult.data.products);
+              nextPageInfo = pageResult.nextPageInfo;
+              if (!nextPageInfo) break;
+              await new Promise(r => setTimeout(r, 300));
+            }
           }
 
           let totalScore = 0;
