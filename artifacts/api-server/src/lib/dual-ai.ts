@@ -196,8 +196,16 @@ INSTRUCCIONES DE SÍNTESIS:
 8. Responde en español, tono profesional de agencia premium`;
 
   const t0s = Date.now();
-  const synthesis = await callClaudeBrain(projectId, synthPrompt, opts.claudeSystemPrompt ?? opts.systemPrompt, useCase, niche, Math.min(Math.round(maxTokens * 1.5), 8192));
-  const synthTime = Date.now() - t0s;
+  let synthesis: string;
+  let synthTime: number;
+  try {
+    synthesis = await callClaudeBrain(projectId, synthPrompt, opts.claudeSystemPrompt ?? opts.systemPrompt, useCase, niche, Math.min(Math.round(maxTokens * 1.5), 8192));
+    synthTime = Date.now() - t0s;
+  } catch (synthErr) {
+    logger.warn({ err: String(synthErr) }, "Dual AI: Synthesis failed, falling back to Claude result");
+    synthesis = claudeResult!;
+    synthTime = Date.now() - t0s;
+  }
 
   return {
     final: synthesis,

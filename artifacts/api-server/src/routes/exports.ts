@@ -676,27 +676,10 @@ router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Pro
 
     let seoUpdated = 0;
     let seoCreated = 0;
+    let totalScore = 0;
     for (const p of products) {
       const seo = seoMap.get(p.shopifyProductId);
-      const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
-      const imgs = p.imagesJson as Array<{ alt: string | null }> | null;
-      const hasAltTexts = Array.isArray(imgs) && imgs.length > 0 && imgs.every((img: any) => img.alt && img.alt.trim() !== "");
-      const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
-      const hasMetaTitle = !!seo?.metaTitle;
-      const hasMetaDesc = !!seo?.metaDescription;
-      const hasSchema = seo?.hasSchema ?? false;
-
-      let score = 0;
-      if (hasMetaTitle) score += 20;
-      if (hasMetaDesc) score += 15;
-      if (hasSchema) score += 15;
-      if (hasAltTexts || p.imageCount === 0) score += 10;
-      if (cleanHandle) score += 5;
-      if (descLen >= 300) score += 10;
-      if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) score += 10;
-      score += 10;
-      if (descLen >= 100) score += 5;
-      const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
+      const { score, grade, hasAltTexts, cleanHandle, descLen } = calculateSeoScoreInline(p, seo);
 
       if (seo) {
         await db.update(seoDataTable)
@@ -719,28 +702,11 @@ router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Pro
         });
         seoCreated++;
       }
+      totalScore += score;
     }
     log.push(`SEO: ${seoUpdated} actualizados, ${seoCreated} nuevos — ${products.length} productos auditados`);
 
-    const avgScore = products.length > 0
-      ? Math.round(products.reduce((s, p) => {
-          const seo = seoMap.get(p.shopifyProductId);
-          const descLen = p.bodyHtml?.replace(/<[^>]+>/g, "").length ?? 0;
-          const imgsArr = p.imagesJson as Array<{ alt: string | null }> | null;
-          const hasAlt = Array.isArray(imgsArr) && imgsArr.length > 0 && imgsArr.every((img: any) => img.alt && img.alt.trim() !== "");
-          const ch = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
-          let sc = 10;
-          if (seo?.metaTitle) sc += 20;
-          if (seo?.metaDescription) sc += 15;
-          if (seo?.hasSchema) sc += 15;
-          if (hasAlt || p.imageCount === 0) sc += 10;
-          if (ch) sc += 5;
-          if (descLen >= 300) sc += 10;
-          if (descLen >= 100) sc += 5;
-          if (seo?.pageSpeedScore && seo.pageSpeedScore >= 70) sc += 10;
-          return s + sc;
-        }, 0) / products.length)
-      : 0;
+    const avgScore = products.length > 0 ? Math.round(totalScore / products.length) : 0;
 
     await db.update(projectsTable).set({ avgAuditScore: avgScore }).where(eq(projectsTable.id, projectId));
     log.push(`Avg audit score actualizado: ${avgScore}/100`);
@@ -1022,6 +988,7 @@ function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: stri
   const bodyText = p.bodyHtml?.replace(/<[^>]+>/g, "") ?? "";
   const descLen = bodyText.length;
   const wordCount = bodyText.split(/\s+/).filter((w: string) => w.length > 0).length;
+  const imgCount = p.imageCount ?? 0;
   const imgsInline = p.imagesJson as Array<{ alt: string | null }> | null;
   const hasAltTexts = imgCount === 0 || (Array.isArray(imgsInline) && imgsInline.length > 0 && imgsInline.every((img: any) => img.alt && img.alt.trim() !== ""));
   const cleanHandle = /^[a-z0-9-]+$/.test(p.handle) && p.handle.length <= 60;
@@ -1029,7 +996,6 @@ function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: stri
   const hasMetaDesc = !!seo?.metaDescription;
   const hasSchema = seo?.hasSchema ?? false;
   const tagCount = p.tags ? p.tags.split(",").filter((t: string) => t.trim()).length : 0;
-  const imgCount = p.imageCount ?? 0;
   const titleLen = (p.title ?? "").length;
   const hasStructuredContent = /<(h2|h3|ul|ol|table)[\s>]/i.test(p.bodyHtml ?? "");
   const hasFaqContent = /faq|pregunta|¿/i.test(p.bodyHtml ?? "");
@@ -1053,7 +1019,7 @@ function calculateSeoScoreInline(p: any, seo: any): { score: number; grade: stri
   addC("metaDescription", mdPts, 8);
 
   let schPts = 0;
-  if (hasSchema) { schPts = 85; if (hasFaqContent) schPts = 100; } else { if (hasFaqContent) schPts = 30; }
+  if (hasSchema) { schPts = 60; if (hasFaqContent) schPts = 100; } else { if (hasFaqContent) schPts = 30; }
   addC("structuredData", schPts, 10);
 
   addC("altTexts", hasAltTexts ? 100 : 0, 6);
