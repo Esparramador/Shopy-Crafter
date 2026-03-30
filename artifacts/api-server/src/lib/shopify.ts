@@ -265,6 +265,56 @@ export async function rotateToken(
 }
 
 /**
+ * Shopify Admin GraphQL API request.
+ * Uses the same token management as REST requests (auto-refresh on 401).
+ */
+export async function shopifyGraphQL<T = Record<string, unknown>>(
+  projectId: number,
+  shopDomain: string,
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<T> {
+  const domain = normalizeShopDomain(shopDomain);
+  const headers = await getShopifyHeaders(projectId);
+  const url = `https://${domain}/admin/api/2025-01/graphql.json`;
+
+  let retried401 = false;
+  const doFetch = async (hdrs: Record<string, string>): Promise<T> => {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: hdrs,
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(SHOPIFY_FETCH_TIMEOUT),
+    });
+
+    if (resp.status === 401 && !retried401) {
+      retried401 = true;
+      logger.warn({ projectId }, "Shopify GraphQL 401 — refreshing token (one retry)");
+      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!proj) throw new Error(`Project ${projectId} not found`);
+      const plainSecret = safeDecrypt(proj.clientSecret) || proj.clientSecret;
+      const newToken = await refreshToken(projectId, proj.shopDomain, proj.clientId, plainSecret);
+      return doFetch({ "X-Shopify-Access-Token": newToken, "Content-Type": "application/json" });
+    } else if (resp.status === 401) {
+      throw new Error("Shopify GraphQL 401 after token refresh — token may be invalid");
+    }
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Shopify GraphQL error ${resp.status}: ${text}`);
+    }
+
+    const result = await resp.json() as { data?: T; errors?: Array<{ message: string }> };
+    if (result.errors?.length) {
+      throw new Error(`Shopify GraphQL errors: ${result.errors.map(e => e.message).join(", ")}`);
+    }
+    return result.data as T;
+  };
+
+  return doFetch(headers);
+}
+
+/**
  * Validates a token with a lightweight API call. Returns true if valid.
  */
 export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {

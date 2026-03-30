@@ -6,7 +6,7 @@ import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
-import { shopifyRequest, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
+import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
@@ -2341,12 +2341,76 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+        const gqlAuditQuery = (cursor?: string) => `{
+          products(first: 250${cursor ? `, after: "${cursor}"` : ""}) {
+            edges {
+              node {
+                id
+                title
+                status
+                descriptionHtml
+                tags
+                publishedAt
+                onlineStoreUrl
+                totalInventory
+                images(first: 20) { edges { node { id } } }
+                variants(first: 100) {
+                  edges {
+                    node {
+                      id
+                      price
+                      compareAtPrice
+                    }
+                  }
+                }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`;
+
         let allAuditProducts: Array<Record<string, unknown>> = [];
-        for (const st of ["active", "draft", "archived"]) {
-          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
-          );
-          allAuditProducts = allAuditProducts.concat(d.products || []);
+        try {
+          let hasNext = true;
+          let cursor: string | undefined;
+          const allEdges: Array<{ node: Record<string, unknown> }> = [];
+          while (hasNext) {
+            const gqlData = await shopifyGraphQL<{ products: { edges: Array<{ node: Record<string, unknown> }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+              parseInt(projectId), project.shopDomain, gqlAuditQuery(cursor)
+            );
+            allEdges.push(...(gqlData.products?.edges || []));
+            hasNext = gqlData.products?.pageInfo?.hasNextPage || false;
+            cursor = gqlData.products?.pageInfo?.endCursor;
+          }
+          allAuditProducts = allEdges.map(({ node }) => {
+            const gid = String(node.id || "");
+            const numericId = gid.includes("/") ? gid.split("/").pop() : gid;
+            const variants = ((node.variants as Record<string, unknown>)?.edges as Array<{ node: Record<string, unknown> }>) || [];
+            const images = ((node.images as Record<string, unknown>)?.edges as Array<unknown>) || [];
+            return {
+              id: numericId,
+              title: node.title,
+              status: (node.status as string || "").toLowerCase(),
+              body_html: node.descriptionHtml,
+              tags: Array.isArray(node.tags) ? (node.tags as string[]).join(", ") : node.tags,
+              published_at: node.publishedAt,
+              published_scope: node.onlineStoreUrl ? "global" : "web",
+              images: images,
+              variants: variants.map(({ node: v }) => ({
+                id: v.id,
+                price: v.price,
+                compare_at_price: v.compareAtPrice,
+              })),
+            };
+          });
+        } catch (gqlErr) {
+          logger.warn({ err: gqlErr }, "GraphQL failed, falling back to REST API for audit");
+          for (const st of ["active", "draft", "archived"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
+            );
+            allAuditProducts = allAuditProducts.concat(d.products || []);
+          }
         }
 
         let totalScore = 0;
@@ -2433,20 +2497,58 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+        const gqlUnpubQuery = (cursor?: string) => `{
+          products(first: 250${cursor ? `, after: "${cursor}"` : ""}) {
+            edges {
+              node {
+                id
+                title
+                status
+                publishedAt
+                onlineStoreUrl
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`;
+
         let unpublishedProducts: Array<Record<string, unknown>> = [];
-        for (const st of ["active", "draft", "archived"]) {
-          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=unpublished&fields=id,title,status,published_at,published_scope`
-          );
-          unpublishedProducts = unpublishedProducts.concat(d.products || []);
-        }
-        for (const st of ["draft"]) {
-          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,published_at,published_scope`
-          );
-          for (const p of (d.products || [])) {
-            if (!unpublishedProducts.find((u: Record<string, unknown>) => u.id === p.id)) {
-              unpublishedProducts.push(p);
+        try {
+          let hasNext2 = true;
+          let cursor2: string | undefined;
+          const allUnpubEdges: Array<{ node: Record<string, unknown> }> = [];
+          while (hasNext2) {
+            const gqlUnpubData = await shopifyGraphQL<{ products: { edges: Array<{ node: Record<string, unknown> }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+              parseInt(projectId), project.shopDomain, gqlUnpubQuery(cursor2)
+            );
+            allUnpubEdges.push(...(gqlUnpubData.products?.edges || []));
+            hasNext2 = gqlUnpubData.products?.pageInfo?.hasNextPage || false;
+            cursor2 = gqlUnpubData.products?.pageInfo?.endCursor;
+          }
+          unpublishedProducts = allUnpubEdges
+            .map(({ node }) => ({
+              id: String(node.id || "").split("/").pop(),
+              title: node.title,
+              status: (node.status as string || "").toLowerCase(),
+              published_at: node.publishedAt,
+              published_scope: node.onlineStoreUrl ? "global" : null,
+            }))
+            .filter((p: Record<string, unknown>) => !p.published_at || p.status === "draft");
+        } catch {
+          for (const st of ["active", "draft", "archived"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=unpublished&fields=id,title,status,published_at,published_scope`
+            );
+            unpublishedProducts = unpublishedProducts.concat(d.products || []);
+          }
+          for (const st of ["draft"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,published_at,published_scope`
+            );
+            for (const p of (d.products || [])) {
+              if (!unpublishedProducts.find((u: Record<string, unknown>) => u.id === p.id)) {
+                unpublishedProducts.push(p);
+              }
             }
           }
         }
@@ -2492,12 +2594,54 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+        const gqlPriceQuery = (cursor?: string) => `{
+          products(first: 250${cursor ? `, after: "${cursor}"` : ""}) {
+            edges {
+              node {
+                id
+                title
+                variants(first: 100) {
+                  edges {
+                    node { id price compareAtPrice }
+                  }
+                }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`;
+
         let allPriceProducts: Array<Record<string, unknown>> = [];
-        for (const st of ["active", "draft", "archived"]) {
-          const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,variants`
-          );
-          allPriceProducts = allPriceProducts.concat(d.products || []);
+        try {
+          let hasNext3 = true;
+          let cursor3: string | undefined;
+          const allPriceEdges: Array<{ node: Record<string, unknown> }> = [];
+          while (hasNext3) {
+            const gqlPriceData = await shopifyGraphQL<{ products: { edges: Array<{ node: Record<string, unknown> }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+              parseInt(projectId), project.shopDomain, gqlPriceQuery(cursor3)
+            );
+            allPriceEdges.push(...(gqlPriceData.products?.edges || []));
+            hasNext3 = gqlPriceData.products?.pageInfo?.hasNextPage || false;
+            cursor3 = gqlPriceData.products?.pageInfo?.endCursor;
+          }
+          allPriceProducts = allPriceEdges.map(({ node }) => {
+            const variantEdges = ((node.variants as Record<string, unknown>)?.edges as Array<{ node: Record<string, unknown> }>) || [];
+            return {
+              id: String(node.id || "").split("/").pop(),
+              title: node.title,
+              variants: variantEdges.map(({ node: v }) => {
+                const varGid = String(v.id || "");
+                return { id: varGid.includes("/") ? varGid.split("/").pop() : varGid, price: v.price, compare_at_price: v.compareAtPrice };
+              }),
+            };
+          });
+        } catch {
+          for (const st of ["active", "draft", "archived"]) {
+            const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,variants`
+            );
+            allPriceProducts = allPriceProducts.concat(d.products || []);
+          }
         }
 
         const fixedVariants: Array<{ productTitle: string; variantId: unknown; price: string; compareAtPrice: string }> = [];
