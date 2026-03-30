@@ -251,7 +251,8 @@ router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise
 router.post("/projects/:projectId/products/:productId/images/generate", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-  const { imageType, customPrompt } = req.body as { imageType: string; customPrompt?: string };
+  const { imageType: rawImageType, imageTypes, customPrompt } = req.body as { imageType?: string; imageTypes?: string[]; customPrompt?: string };
+  const imageType = rawImageType || (Array.isArray(imageTypes) ? imageTypes[0] : null) || "hero";
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   const [product] = await db

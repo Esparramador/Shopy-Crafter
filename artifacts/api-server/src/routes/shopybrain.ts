@@ -5323,12 +5323,20 @@ Responde SOLO con JSON válido (sin markdown):
         if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
         try {
           const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
-          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/images/generate`, {
-            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
-            body: JSON.stringify({ imageTypes: params?.imageTypes }),
-          });
-          const data = await resp.json() as Record<string, unknown>;
-          result = { ...data, message: `🖼️ **Imágenes IA generándose**\n\n8 tipos de foto profesional: hero, lifestyle, detalle, packaging, UGC, escala, proceso, variante.` };
+          const imageTypesToGen = params?.imageTypes ?? ["hero", "lifestyle", "detail", "packaging"];
+          const results: Array<{ type: string; status: string }> = [];
+          for (const iType of imageTypesToGen) {
+            try {
+              const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/images/generate`, {
+                method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+                body: JSON.stringify({ imageType: iType }),
+              });
+              const data = await resp.json() as Record<string, unknown>;
+              results.push({ type: iType, status: data.error ? "error" : "pending" });
+            } catch { results.push({ type: iType, status: "error" }); }
+          }
+          const ok = results.filter(r => r.status === "pending").length;
+          result = { jobs: results, message: `🖼️ **${ok}/${imageTypesToGen.length} imágenes IA generándose**\n\nTipos: ${imageTypesToGen.join(", ")}.` };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
