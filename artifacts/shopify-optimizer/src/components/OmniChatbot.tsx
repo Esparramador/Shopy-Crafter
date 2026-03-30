@@ -735,6 +735,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.message) {
+        setOpen(true);
+        setMinimized(false);
+        setTimeout(() => setInput(detail.message), 300);
+      }
+    };
+    window.addEventListener("shopycrafter:chatbot", handler);
+    return () => window.removeEventListener("shopycrafter:chatbot", handler);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch { /* already stopped */ }

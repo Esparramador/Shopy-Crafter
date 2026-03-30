@@ -377,7 +377,7 @@ export default function EmailTemplates() {
               Email Template Studio
             </h1>
             <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--t2)" }}>
-              Diseña emails de nivel agencia con ShopyBrain AI — copy, diseño y marca integrados
+              Diseña emails de nivel agencia con Shopy Crafter — copy, diseño y marca integrados
             </p>
           </div>
           {projects.length > 1 && (
@@ -468,7 +468,7 @@ export default function EmailTemplates() {
 
         <div>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--t1)", marginBottom: 6 }}>Crear nueva plantilla</h2>
-          <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 16 }}>Selecciona un tipo y ShopyBrain generará copy y diseño profesional con tu marca</p>
+          <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 16 }}>Selecciona un tipo y Shopy Crafter generará copy y diseño profesional con tu marca</p>
           {Object.entries(groupedTypes).map(([catKey, types]) => {
             if (filterCategory && catKey !== filterCategory) return null;
             const cat = CATEGORIES.find(c => c.value === catKey);
@@ -562,7 +562,7 @@ export default function EmailTemplates() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t1)" }}>Identidad de Marca</h2>
-                  <p style={{ margin: 0, fontSize: 12, color: "var(--t2)" }}>ShopyBrain usará esta información para crear emails 100% on-brand</p>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--t2)" }}>Shopy Crafter usará esta información para crear emails 100% on-brand</p>
                 </div>
                 {(() => {
                   const project = projects.find(p => p.id === selectedProjectId);
@@ -714,8 +714,8 @@ export default function EmailTemplates() {
             <GenerationProgress
               active={generating}
               operation="email"
-              title="ShopyBrain diseñando tu email..."
-              subtitle="Combinando BrandDNA + OmniCore + copy profesional para crear una plantilla de nivel agencia"
+              title="Shopy Crafter diseñando tu email..."
+              subtitle="Combinando BrandDNA + IA Brain + copy profesional para crear una plantilla de nivel agencia"
             />
 
             <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.08), rgba(200,168,75,0.06))", border: "1px solid rgba(139,92,246,0.2)", borderRadius: 16, padding: 24 }}>
@@ -724,7 +724,7 @@ export default function EmailTemplates() {
                   <Sparkles size={22} color="#fff" />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t1)" }}>ShopyBrain Copywriter</h2>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t1)" }}>Shopy Crafter Copywriter</h2>
                   <p style={{ margin: 0, fontSize: 12, color: "var(--t2)" }}>
                     IA de nivel agencia: copy persuasivo + diseño visual + tu identidad de marca
                   </p>
@@ -753,7 +753,7 @@ export default function EmailTemplates() {
               </div>
 
               <div style={{ marginBottom: 16, padding: "12px 14px", background: "rgba(200,168,75,0.06)", borderRadius: 10, border: "1px solid rgba(200,168,75,0.12)" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>ShopyBrain incluirá automáticamente:</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>Shopy Crafter incluirá automáticamente:</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {[
                     form.brand_logo_url && "Logo de marca",
@@ -782,7 +782,7 @@ export default function EmailTemplates() {
                   transition: "all 0.2s",
                 }}>
                 {generating
-                  ? <><Loader2 size={16} style={{ animation: "spin 0.6s linear infinite" }} /> ShopyBrain generando...</>
+                  ? <><Loader2 size={16} style={{ animation: "spin 0.6s linear infinite" }} /> Shopy Crafter generando...</>
                   : <><Zap size={16} /> {form.html_content ? "Regenerar plantilla completa" : "Generar plantilla profesional"}</>}
               </button>
             </div>
@@ -812,7 +812,7 @@ export default function EmailTemplates() {
 
             {copywritingNotes && (
               <div style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)", borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", marginBottom: 6 }}>Notas del copywriter ShopyBrain</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", marginBottom: 6 }}>Notas del copywriter Shopy Crafter</div>
                 <p style={{ margin: 0, fontSize: 12, color: "var(--t2)", lineHeight: 1.6 }}>{copywritingNotes}</p>
               </div>
             )}
@@ -832,10 +832,10 @@ export default function EmailTemplates() {
               <div style={{ padding: "60px 24px", textAlign: "center", border: "2px dashed var(--bdr)", borderRadius: 16 }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>✉️</div>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--t1)", margin: "0 0 6px" }}>Aún no hay contenido</p>
-                <p style={{ fontSize: 12, color: "var(--t3)", margin: "0 0 16px" }}>Ve a la pestaña "Generar" para que ShopyBrain cree tu email</p>
+                <p style={{ fontSize: 12, color: "var(--t3)", margin: "0 0 16px" }}>Ve a la pestaña "Generar" para que Shopy Crafter cree tu email</p>
                 <button onClick={() => setEditorTab("generate")}
                   style={{ background: "linear-gradient(135deg, #c8a84b, #e8c87b)", border: "none", borderRadius: 10, padding: "10px 20px", cursor: "pointer", fontWeight: 700, color: "#000", fontSize: 13 }}>
-                  <Sparkles size={14} style={{ verticalAlign: "middle", marginRight: 6 }} /> Generar con ShopyBrain
+                  <Sparkles size={14} style={{ verticalAlign: "middle", marginRight: 6 }} /> Generar con Shopy Crafter
                 </button>
               </div>
             ) : (
@@ -974,7 +974,7 @@ export default function EmailTemplates() {
               </button>
 
               <p style={{ textAlign: "center", fontSize: 11, color: "var(--t3)", marginTop: 14, lineHeight: 1.5 }}>
-                ShopyBrain controla el contenido · Klaviyo solo entrega
+                Shopy Crafter controla el contenido · Klaviyo solo entrega
               </p>
             </div>
           </div>

@@ -313,7 +313,7 @@ export default function GeminiIntelligence() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 10, marginTop: 16 }}>
-          {[{ icon: "🔍", label: "Gemini Pro", desc: "Investigación profunda" }, { icon: "🧠", label: "Claude + OmniCore", desc: "Análisis estratégico" }, { icon: "💾", label: "Auto-aprendizaje", desc: "Guarda en brain" }].map((item, i) => (
+          {[{ icon: "🔍", label: "Gemini Pro", desc: "Investigación profunda" }, { icon: "🧠", label: "Claude + IA Brain", desc: "Análisis estratégico" }, { icon: "💾", label: "Auto-aprendizaje", desc: "Guarda en brain" }].map((item, i) => (
             <div key={i} className="glass-card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <div><p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--t)" }}>{item.label}</p><p style={{ margin: 0, fontSize: 10, color: "var(--t3)" }}>{item.desc}</p></div>
@@ -336,7 +336,7 @@ export default function GeminiIntelligence() {
           {activeTab === "full-audit" && (
             <form onSubmit={e => { e.preventDefault(); doResearch("research/full-audit", auditForm); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>🔎 Auditoría Completa</h3>
-              <p style={{ margin: 0, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>Gemini investiga el negocio + mercado. Claude sintetiza el brief estratégico. Se guarda en OmniCore Brain.</p>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>Gemini investiga el negocio + mercado. Claude sintetiza el brief estratégico. Se guarda en el cerebro IA.</p>
               <div><label style={labelStyle}>Nombre empresa / tienda</label><input style={inputStyle} value={auditForm.businessName} onChange={e => setAuditForm(f => ({ ...f, businessName: e.target.value }))} placeholder="Ej: Zara Home" required /></div>
               <div><label style={labelStyle}>Dominio</label><input style={inputStyle} value={auditForm.domain} onChange={e => setAuditForm(f => ({ ...f, domain: e.target.value }))} placeholder="zarahome.com" required /></div>
               <div><label style={labelStyle}>Nicho</label>
@@ -384,7 +384,7 @@ export default function GeminiIntelligence() {
           {activeTab === "market" && (
             <form onSubmit={e => { e.preventDefault(); doResearch("research/market", marketForm); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>📈 Inteligencia de Mercado</h3>
-              <p style={{ margin: 0, fontSize: 11, color: "var(--t3)" }}>Los resultados se guardan automáticamente en OmniCore Brain como niche profile.</p>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--t3)" }}>Los resultados se guardan automáticamente en el cerebro IA como niche profile.</p>
               <div><label style={labelStyle}>Nicho</label>
                 <select style={{ ...inputStyle, cursor: "pointer" }} value={marketForm.niche} onChange={e => setMarketForm(f => ({ ...f, niche: e.target.value }))} required>
                   <option value="">Selecciona nicho...</option>
@@ -457,12 +457,12 @@ export default function GeminiIntelligence() {
               <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, rgba(66,133,244,0.15), rgba(52,168,83,0.15))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                 <Brain size={24} style={{ color: "#4285f4" }} />
               </div>
-              <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "var(--t)" }}>Gemini + Claude + OmniCore listos</h3>
+              <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "var(--t)" }}>Gemini + Claude + IA Brain listos</h3>
               <p style={{ fontSize: 12, color: "var(--t3)", maxWidth: 280, margin: "0 auto" }}>
                 Usa los formularios para investigar empresas, mercados, competidores o tendencias de producto. Los resultados se aprenden automáticamente en el Brain.
               </p>
               <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 20 }}>
-                {[["🔎", "Gemini Pro investiga"], ["🧠", "Claude analiza"], ["💾", "OmniCore aprende"]].map(([icon, label], i) => (
+                {[["🔎", "Gemini Pro investiga"], ["🧠", "Claude analiza"], ["💾", "IA Brain aprende"]].map(([icon, label], i) => (
                   <div key={i} style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
                     <div style={{ fontSize: 10, color: "var(--t3)" }}>{label}</div>

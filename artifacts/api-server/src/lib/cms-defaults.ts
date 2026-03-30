@@ -397,7 +397,7 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "exports", label: "Exportar", icon: "📥" },
     ],
     shopybrain: [
-      { label: "Shopy Brain", icon: "🧠", href: "/admin/shopybrain" },
+      { label: "IA Brain", icon: "🧠", href: "/admin/shopybrain" },
       { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
       { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
       { label: "Knowledge Domains", icon: "🔬", href: "/admin/shopybrain/insights" },
@@ -427,13 +427,13 @@ export const DEFAULT_CMS_CONTENT = {
     ],
   },
   footer: {
-    tagline: "Shopy Crafter — Optimización IA para tiendas Shopify con OmniCore Brain. Powered by Claude AI + Gemini + Replicate.",
+    tagline: "Shopy Crafter — Optimización IA para tiendas Shopify. Powered by Claude AI + Gemini + Replicate.",
     columns: [
       { title: "Producto", links: [{ label: "Motores IA", href: "#features" }, { label: "Precios", href: "#pricing" }, { label: "Changelog", href: "#" }, { label: "Documentación", href: "#" }, { label: "API Reference", href: "#" }] },
       { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#" }, { label: "Blog", href: "#" }, { label: "Casos de éxito", href: "#" }, { label: "Afiliados", href: "#" }, { label: "Contacto", href: "#" }] },
       { title: "Legal", links: [{ label: "Privacidad", href: "#" }, { label: "Términos", href: "#" }, { label: "Cookies", href: "#" }, { label: "RGPD", href: "#" }, { label: "Seguridad", href: "#" }] },
     ],
-    copyright: "© 2026 Shopy Crafter · OmniCore Agency Platform. Todos los derechos reservados.",
+    copyright: "© 2026 Shopy Crafter · Agency Platform. Todos los derechos reservados.",
     badges: ["RGPD", "AES-256", "SOC2"],
   },
 };

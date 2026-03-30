@@ -202,7 +202,7 @@ function buildReportHtml(
 <tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 36px;position:relative;">
   <table width="100%" cellpadding="0" cellspacing="0"><tr>
     <td width="44" valign="top"><div style="width:40px;height:40px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:10px;text-align:center;line-height:40px;font-size:20px;font-weight:900;color:#0a0a0f;">S</div></td>
-    <td style="padding-left:12px;" valign="middle"><span style="font-size:20px;font-weight:800;color:#c8a84b;letter-spacing:-0.3px;">ShopyBrain</span></td>
+    <td style="padding-left:12px;" valign="middle"><span style="font-size:20px;font-weight:800;color:#c8a84b;letter-spacing:-0.3px;">Shopy Crafter</span></td>
     <td align="right" valign="top">
       <div style="background:#16161f;border:1px solid #24243a;border-radius:8px;padding:8px 16px;display:inline-block;">
         <div style="font-size:9px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;">Pre-Informe AI</div>
@@ -313,7 +313,7 @@ ${research.productSample ? `
 <tr><td style="padding:28px 48px 0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
     <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.3);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#10024;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">4. Producto Optimizado por ShopyBrain (Muestra)</span>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">4. Producto Optimizado por Shopy Crafter (Muestra)</span>
   </td></tr></table>
   <div style="background:linear-gradient(135deg,#101018,#14141f);border:1px solid rgba(200,168,75,.2);border-radius:12px;padding:28px;overflow:hidden;">
     <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
@@ -387,7 +387,7 @@ ${research.productSample ? `
 <tr><td style="padding:32px 48px;">
   <div style="background:rgba(200,168,75,0.04);border:1px solid rgba(200,168,75,0.15);border-radius:12px;padding:24px;text-align:center;">
     <div style="width:36px;height:36px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:8px;margin:0 auto 12px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
-    <p style="color:#c8a84b;font-size:14px;font-weight:700;margin:0 0 4px;">Pre-informe generado por ShopyBrain AI</p>
+    <p style="color:#c8a84b;font-size:14px;font-weight:700;margin:0 0 4px;">Pre-informe generado por Shopy Crafter AI</p>
     <p style="color:#6b6b80;font-size:11px;margin:0;">Dual AI Engine (Gemini + Claude) &middot; Datos reales verificados</p>
   </div>
 </td></tr>
@@ -395,7 +395,7 @@ ${research.productSample ? `
 <!-- FOOTER -->
 <tr><td style="background:#0c0c14;padding:24px 48px;border-top:1px solid #1a1a28;">
   <table width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td><span style="color:#c8a84b;font-size:12px;font-weight:700;">ShopyBrain</span></td>
+    <td><span style="color:#c8a84b;font-size:12px;font-weight:700;">Shopy Crafter</span></td>
     <td align="right"><span style="color:#6b6b80;font-size:10px;">&copy; ${new Date().getFullYear()} &middot; Confidencial</span></td>
   </tr></table>
 </td></tr>

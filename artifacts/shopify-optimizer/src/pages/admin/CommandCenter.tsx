@@ -181,7 +181,7 @@ export default function CommandCenter() {
         </div>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--t)" }}>Centro de Comando</h1>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--t4)" }}>Ejecuta acciones directas en Shopify con ShopyBrain</p>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--t4)" }}>Ejecuta acciones directas en Shopify con Shopy Crafter</p>
         </div>
       </div>
 

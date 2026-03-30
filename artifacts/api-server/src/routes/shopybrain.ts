@@ -740,14 +740,14 @@ Incluye datos de pricing, competencia, tendencias y estrategias probadas.`;
         1024
       );
     } else {
-      const brainCtx = await buildShopyBrainContext(niche || undefined, "general", query);
-      const aiRes = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        system: researchSystemPrompt + (brainCtx || ""),
-        messages: [{ role: "user", content: query }],
-      });
-      aiContent = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+      aiContent = await askClaudeWithBrain(
+        2,
+        [{ role: "user", content: query }],
+        researchSystemPrompt,
+        "general",
+        niche || undefined,
+        1024
+      );
     }
   } catch (aiErr) {
     const errStr = aiErr instanceof Error ? aiErr.message : String(aiErr);
@@ -841,15 +841,14 @@ Principios que guían el análisis:
 Responde SOLO con el JSON, sin texto adicional.`;
 
   const studyQuery = `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}`;
-  const brainCtx = await buildShopyBrainContext(undefined, "general", studyQuery);
-  const aiRes = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 4096,
-    messages: [{ role: "user", content: studyQuery }],
-    system: systemPrompt + (brainCtx || ""),
-  });
-
-  const rawText = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
+  const rawText = await askClaudeWithBrain(
+    2,
+    [{ role: "user", content: studyQuery }],
+    systemPrompt,
+    "general",
+    undefined,
+    4096
+  );
   let parsed: any = {};
   try {
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -3121,12 +3120,9 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
 
         if (params?.analyze !== false) {
           try {
-            const codeAnalysisBrain = await buildShopyBrainContext(undefined, "general", `code analysis shopify app bugs ${filePath}`);
-            const analyzeMsg = await anthropic.messages.create({
-              model: "claude-sonnet-4-5",
-              max_tokens: 2000,
-              system: codeAnalysisBrain || undefined,
-              messages: [{
+            analysis = await askClaudeWithBrain(
+              parseInt(params?.projectId) || 2,
+              [{
                 role: "user",
                 content: `Analiza este archivo de código fuente de una app Shopify (React+TypeScript frontend, Express+Node backend).
 Identifica: bugs, errores lógicos, problemas de UX, funciones rotas, imports faltantes, handlers sin error handling, y cualquier otro problema.
@@ -3137,8 +3133,18 @@ Archivo: ${filePath}
 ${truncated}
 \`\`\``,
               }],
+              undefined,
+              "general",
+              undefined,
+              2000
+            );
+            learnFromOperation({
+              operationType: "code_analysis",
+              title: `Análisis de código: ${filePath}`,
+              content: analysis.slice(0, 500),
+              confidence: 0.7,
+              tags: ["code_analysis", "inspect_code"],
             });
-            analysis = (analyzeMsg.content[0] as { text: string }).text;
           } catch {
             analysis = "No se pudo ejecutar el análisis con IA.";
           }
@@ -3190,12 +3196,9 @@ ${truncated}
         };
 
         try {
-          const focusedBrain = await buildShopyBrainContext(undefined, "general", `code audit ${focusOn} shopify ${filePath}`);
-          const analyzeMsg = await anthropic.messages.create({
-            model: "claude-sonnet-4-5",
-            max_tokens: 4000,
-            system: focusedBrain || undefined,
-            messages: [{
+          const componentAnalysis = await askClaudeWithBrain(
+            parseInt(params?.projectId) || 2,
+            [{
               role: "user",
               content: `Eres un senior developer auditando código de producción de una app Shopify (React+Vite frontend, Express+Node backend, PostgreSQL, Drizzle ORM).
 
@@ -3214,22 +3217,32 @@ Archivo: ${filePath}
 ${truncated}
 \`\`\``,
             }],
-          });
+            undefined,
+            "general",
+            undefined,
+            4000
+          );
 
-          const analysisText = (analyzeMsg.content[0] as { text: string }).text;
-
-          const criticalCount = (analysisText.match(/🔴/g) || []).length;
-          const highCount = (analysisText.match(/🟡/g) || []).length;
-          const mediumCount = (analysisText.match(/🟢/g) || []).length;
-          const lowCount = (analysisText.match(/⚪/g) || []).length;
+          const criticalCount = (componentAnalysis.match(/🔴/g) || []).length;
+          const highCount = (componentAnalysis.match(/🟡/g) || []).length;
+          const mediumCount = (componentAnalysis.match(/🟢/g) || []).length;
+          const lowCount = (componentAnalysis.match(/⚪/g) || []).length;
           const totalIssues = criticalCount + highCount + mediumCount + lowCount;
+
+          learnFromOperation({
+            operationType: "component_analysis",
+            title: `Análisis de componente: ${filePath} (${focusOn})`,
+            content: `${totalIssues} problemas encontrados: ${criticalCount} críticos, ${highCount} altos. ${componentAnalysis.slice(0, 300)}`,
+            confidence: 0.75,
+            tags: ["code_audit", "analyze_component", focusOn],
+          });
 
           result = {
             filePath,
             focusOn,
-            analysis: analysisText,
+            analysis: componentAnalysis,
             issueCount: { critical: criticalCount, high: highCount, medium: mediumCount, low: lowCount, total: totalIssues },
-            message: `🔍 **Análisis de ${filePath}** (enfoque: ${focusOn})\n📊 ${totalIssues} problemas: ${criticalCount} críticos, ${highCount} altos, ${mediumCount} medios, ${lowCount} bajos\n\n${analysisText}`,
+            message: `🔍 **Análisis de ${filePath}** (enfoque: ${focusOn})\n📊 ${totalIssues} problemas: ${criticalCount} críticos, ${highCount} altos, ${mediumCount} medios, ${lowCount} bajos\n\n${componentAnalysis}`,
           };
         } catch (e) {
           result = { error: true, message: `Error analizando: ${e instanceof Error ? e.message : String(e)}` };
@@ -4278,14 +4291,22 @@ ANALIZA:
 
 Responde en español, de forma directa y accionable.`;
 
-          const bizBrain = await buildShopyBrainContext(undefined, "general", "business audit SaaS shopify agency pricing features landing");
-          const auditResult = await anthropic.messages.create({
-            model: "claude-sonnet-4-5", max_tokens: 3000,
-            messages: [{ role: "user", content: auditPrompt }],
-            system: "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables." + (bizBrain || ""),
-          });
+          const auditText = await askClaudeWithBrain(
+            parseInt(params?.projectId) || 2,
+            [{ role: "user", content: auditPrompt }],
+            "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables.",
+            "general",
+            undefined,
+            3000
+          );
 
-          const auditText = auditResult.content[0].type === "text" ? auditResult.content[0].text : "";
+          learnFromOperation({
+            operationType: "app_offerings_audit",
+            title: "Auditoría de oferta comercial",
+            content: auditText.slice(0, 500),
+            confidence: 0.8,
+            tags: ["business_audit", "pricing", "features"],
+          });
 
           result = {
             success: true,
@@ -4336,14 +4357,14 @@ Responde SOLO JSON:
   "summary": "resumen del cambio"
 }`;
 
-          const uiBrain = await buildShopyBrainContext(undefined, "general", "frontend UI UX shopify design components react");
-          const uiAnalysis = await anthropic.messages.create({
-            model: "claude-sonnet-4-5", max_tokens: 3000,
-            messages: [{ role: "user", content: analyzePrompt }],
-            system: "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/." + (uiBrain || ""),
-          });
-
-          const uiText = uiAnalysis.content[0].type === "text" ? uiAnalysis.content[0].text : "";
+          const uiText = await askClaudeWithBrain(
+            parseInt(params?.projectId) || 2,
+            [{ role: "user", content: analyzePrompt }],
+            "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/.",
+            "general",
+            undefined,
+            3000
+          );
           const uiJson = JSON.parse(uiText.match(/\{[\s\S]*\}/)?.[0] || "{}");
 
           let changesApplied = 0;

@@ -174,7 +174,7 @@ export function VoiceButton() {
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 0.5 }}>
-              {listening ? "🔴 Escuchando" : "🎙 Voz ShopyBrain"}
+              {listening ? "🔴 Escuchando" : "🎙 Voz Shopy Crafter"}
             </span>
             <button
               onClick={() => setShowBubble(false)}

@@ -22,14 +22,14 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
   const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
   const contentHtml = content
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^#{1,3}\s+(.+)$/gm, '<h3 style="color:' + BRAND.gold + ';margin:18px 0 8px;font-size:16px;">$1</h3>')
-    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin:3px 0;color:' + BRAND.white + ';">$1</li>')
+    .replace(/\*\*(.+?)\*\*/g, `<strong style="color:${BRAND.gold};font-weight:700;">$1</strong>`)
+    .replace(/^#{1,3}\s+(.+)$/gm, `<h3 style="color:${BRAND.gold};margin:18px 0 8px;font-size:16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">$1</h3>`)
+    .replace(/^[-•]\s+(.+)$/gm, `<li style="margin:3px 0;color:${BRAND.white};font-size:14px;">$1</li>`)
     .replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul style="padding-left:20px;margin:8px 0;">$&</ul>')
-    .replace(/^(\d+)\.\s+(.+)$/gm, '<div style="margin:4px 0;color:' + BRAND.white + ';"><span style="color:' + BRAND.gold + ';font-weight:700;">$1.</span> $2</div>')
-    .replace(/✅/g, '<span style="color:#34d399;">✅</span>')
-    .replace(/❌/g, '<span style="color:#f43f5e;">❌</span>')
-    .replace(/⚠️/g, '<span style="color:#f59e0b;">⚠️</span>')
+    .replace(/^(\d+)\.\s+(.+)$/gm, `<div style="margin:4px 0;color:${BRAND.white};font-size:14px;"><span style="color:${BRAND.gold};font-weight:700;">$1.</span> $2</div>`)
+    .replace(/✅/g, '<span style="color:#34d399;">&#10003;</span>')
+    .replace(/❌/g, '<span style="color:#f43f5e;">&#10007;</span>')
+    .replace(/⚠️/g, '<span style="color:#f59e0b;">&#9888;</span>')
     .replace(/📦|📊|🏪|🔑|📝|📁|📢|🛒|🆔|💰|🎯|📈|🔍|🧠|⚡|🚀|💡|🎨|📋|🔗|📌|🏷️|💎|🌟|📉|🔄|📅|🗂️|🤖|🛡️|🎪|💼/g, (m) => `<span>${m}</span>`)
     .replace(/\n/g, '<br>');
 
@@ -38,54 +38,59 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${sanitizeHtml(title)} — ShopyBrain</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:${BRAND.dark};color:${BRAND.white};line-height:1.65;-webkit-font-smoothing:antialiased}
-  .page{max-width:720px;margin:0 auto;padding:0}
-  .cover{background:linear-gradient(160deg,#0e0e18 0%,#12121f 50%,#0a0a14 100%);padding:40px 48px 32px;border-bottom:1px solid ${BRAND.border};position:relative;overflow:hidden}
-  .cover::before{content:'';position:absolute;top:-120px;right:-80px;width:400px;height:400px;background:radial-gradient(circle,rgba(200,168,75,.06) 0%,transparent 70%);pointer-events:none}
-  .cover::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,${BRAND.gold}44,transparent)}
-  .logo{display:flex;align-items:center;gap:12px;margin-bottom:24px;position:relative;z-index:1}
-  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,${BRAND.gold},${BRAND.goldDark});border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#0a0a0f}
-  .logo-text{font-size:18px;font-weight:800;color:${BRAND.gold};letter-spacing:-0.3px}
-  h1{font-size:24px;font-weight:900;color:${BRAND.white};letter-spacing:-0.5px;line-height:1.2;position:relative;z-index:1}
-  h1 span{color:${BRAND.gold}}
-  .meta{display:flex;gap:20px;margin-top:16px;position:relative;z-index:1}
-  .meta-item{font-size:11px;color:${BRAND.muted};display:flex;align-items:center;gap:6px}
-  .meta-dot{width:5px;height:5px;border-radius:50%;background:${BRAND.gold}}
-  .body-content{padding:32px 48px 40px}
-  .content-card{background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:28px;line-height:1.7;font-size:14px}
-  .footer{text-align:center;padding:24px 48px;border-top:1px solid ${BRAND.border};color:${BRAND.muted};font-size:11px}
-  .footer a{color:${BRAND.gold};text-decoration:none}
-  strong{color:${BRAND.gold};font-weight:700}
-  h3{color:${BRAND.gold}}
-  @media print{body{background:#fff;color:#1a1a2e}.cover{background:#f8f6f0!important}.content-card{background:#fff;border-color:#e0e0e0}strong,h3{color:#8b6914}}
-</style>
+<title>${sanitizeHtml(title)} — Shopy Crafter</title>
 </head>
-<body>
-<div class="page">
-  <div class="cover">
-    <div class="logo">
-      <div class="logo-icon">S</div>
-      <div class="logo-text">Shopy Crafter</div>
-    </div>
-    <h1>${sanitizeHtml(title)}</h1>
-    <div class="meta">
-      <div class="meta-item"><div class="meta-dot"></div>${safeTag(actionName)}</div>
-      <div class="meta-item"><div class="meta-dot"></div>${safeTag(date)} · ${safeTag(time)}</div>
-      <div class="meta-item"><div class="meta-dot"></div>ShopyBrain AI</div>
-    </div>
+<body style="margin:0;padding:0;background:${BRAND.dark};font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.dark};padding:24px 0;">
+<tr><td align="center">
+<table width="680" cellpadding="0" cellspacing="0" style="background:${BRAND.darkAlt};border-radius:16px;overflow:hidden;">
+
+<!-- HEADER -->
+<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 32px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="44" valign="top">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,${BRAND.gold},${BRAND.goldDark});border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
+      </td>
+      <td style="padding-left:12px;" valign="middle">
+        <span style="font-size:18px;font-weight:800;color:${BRAND.gold};letter-spacing:-0.3px;">Shopy Crafter</span>
+      </td>
+    </tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+    <tr><td>
+      <h1 style="font-size:24px;font-weight:900;color:${BRAND.white};letter-spacing:-0.5px;line-height:1.2;margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">${sanitizeHtml(title)}</h1>
+    </td></tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+    <tr>
+      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; ${safeTag(actionName)}</span></td>
+      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; ${safeTag(date)} &middot; ${safeTag(time)}</span></td>
+      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; Shopy Crafter AI</span></td>
+    </tr>
+  </table>
+</td></tr>
+
+<!-- CONTENT -->
+<tr><td style="padding:32px 48px 40px;">
+  <div style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:28px;line-height:1.7;font-size:14px;color:${BRAND.white};">
+    ${contentHtml}
   </div>
-  <div class="body-content">
-    <div class="content-card">${contentHtml}</div>
-  </div>
-  <div class="footer">
-    Generado por <a href="https://shopycrafter.com">Shopy Crafter</a> — ShopyBrain AI Engine<br>
-    © ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.
-  </div>
-</div>
+</td></tr>
+
+<!-- FOOTER -->
+<tr><td style="text-align:center;padding:24px 48px;border-top:1px solid ${BRAND.border};">
+  <p style="color:${BRAND.muted};font-size:11px;margin:0;">
+    Generado por <a href="https://shopycrafter.com" style="color:${BRAND.gold};text-decoration:none;">Shopy Crafter</a> &mdash; Shopy Crafter AI Engine
+  </p>
+  <p style="color:${BRAND.muted};font-size:11px;margin:4px 0 0;">
+    &copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.
+  </p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
 </body>
 </html>`;
 }

@@ -451,6 +451,14 @@ Devuelve SOLO el SVG completo, sin markdown, sin explicaciones. Empieza con <svg
   const svgContent = await askClaudeWithBrain(projectId, [{ role: "user", content: prompt }], undefined, "general", project.storeNiche ?? undefined, 4000);
   const cleanSvg = svgContent.includes("<svg") ? svgContent.substring(svgContent.indexOf("<svg")) : svgContent;
 
+  learnFromOperation({
+    operationType: "svg_generation",
+    title: `SVG generado: ${req.body.type || "logo"} para ${project.name}`,
+    content: `Tipo: ${req.body.type}, Estilo: ${req.body.style || "brand"}, Nicho: ${project.storeNiche}`,
+    confidence: 0.7,
+    tags: ["svg", "brand_asset", "design"],
+  });
+
   res.json({ svgContent: cleanSvg, pngBase64: null, uploaded: false });
 });
 

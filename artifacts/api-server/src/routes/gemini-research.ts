@@ -240,6 +240,14 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
       logger.warn(dbErr, "Failed to save full audit to OmniCore");
     }
 
+    learnFromOperation({
+      operationType: "full_gemini_audit",
+      title: `Auditoría completa: ${businessName} (${domain}) en ${niche}`,
+      content: synthesis.slice(0, 500),
+      confidence: 0.85,
+      tags: ["gemini_research", "business_audit", niche, domain],
+    });
+
     res.json({ businessProfile, marketIntel, synthesis, source: "gemini+claude+omnicore" });
   } catch (err) {
     logger.error(err, "Full Gemini audit failed");

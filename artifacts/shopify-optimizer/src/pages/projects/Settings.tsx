@@ -284,7 +284,7 @@ export default function SettingsPage() {
               style={{ background: "rgba(212,160,23,0.15)", border: "1px solid rgba(212,160,23,0.35)", color: "var(--gold)" }}
             >
               {buildingProfile ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-              {buildingProfile ? "Analizando tienda..." : "ShopyBrain: Analizar tienda completa"}
+              {buildingProfile ? "Analizando tienda..." : "Shopy Crafter: Analizar tienda completa"}
             </button>
           </div>
 
@@ -336,7 +336,7 @@ export default function SettingsPage() {
             <div className="pt-4 border-t border-white/5">
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                 <p className="text-sm font-medium text-foreground">Contexto IA de la Tienda</p>
-                <span style={{ fontSize: 11, color: "var(--gold)" }}>— ShopyBrain extrae y aprende de cada campo</span>
+                <span style={{ fontSize: 11, color: "var(--gold)" }}>— Shopy Crafter extrae y aprende de cada campo</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">

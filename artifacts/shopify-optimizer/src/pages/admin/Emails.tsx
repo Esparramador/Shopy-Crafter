@@ -383,7 +383,7 @@ export default function Emails() {
 
         <div style={{ padding: "10px 14px", borderTop: "1px solid var(--bdr)", background: "rgba(200,168,75,0.04)" }}>
           <p style={{ fontSize: 10, color: "var(--t3)", margin: 0, lineHeight: 1.5 }}>
-            <strong style={{ color: "#c8a84b" }}>OmniCore</strong> escribe · Tu app controla · <strong style={{ color: "#c8a84b" }}>Klaviyo</strong> solo entrega
+            <strong style={{ color: "#c8a84b" }}>Shopy Crafter</strong> escribe · Tu app controla · <strong style={{ color: "#c8a84b" }}>Klaviyo</strong> solo entrega
           </p>
         </div>
       </div>
@@ -395,10 +395,10 @@ export default function Emails() {
             <div style={{ fontSize: 56 }}>🤖</div>
             <div style={{ textAlign: "center" }}>
               <p style={{ fontSize: 18, fontWeight: 700, color: "var(--t1)", margin: "0 0 6px" }}>Constructor de Email Flows</p>
-              <p style={{ fontSize: 13, color: "var(--t2)" }}>OmniCore genera el HTML · Tú defines la lógica · Klaviyo entrega</p>
+              <p style={{ fontSize: 13, color: "var(--t2)" }}>Shopy Crafter genera el HTML · Tú defines la lógica · Klaviyo entrega</p>
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-              {["Tu app en la app", "OmniCore escribe", "Klaviyo envía"].map((step, i) => (
+              {["Tu app en la app", "Shopy Crafter escribe", "Klaviyo envía"].map((step, i) => (
                 <div key={i} style={{ background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, padding: "12px 18px", textAlign: "center", fontSize: 12, color: "var(--t2)" }}>
                   <div style={{ fontSize: 20, marginBottom: 6 }}>{"🎯🤖📩"[i]}</div>
                   {step}
@@ -471,7 +471,7 @@ export default function Emails() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 11, color: "var(--t3)", fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Asuntos A/B (OmniCore los genera en el siguiente paso)</label>
+                    <label style={{ fontSize: 11, color: "var(--t3)", fontWeight: 700, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Asuntos A/B (se generan automáticamente en el siguiente paso)</label>
                     <input value={form.subject_a} onChange={e => setForm(p => ({ ...p, subject_a: e.target.value }))}
                       placeholder="A: Tu carrito te espera — solo por hoy"
                       style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 9, padding: "9px 12px", color: "var(--t1)", fontSize: 13, marginBottom: 7 }} />
@@ -539,13 +539,13 @@ export default function Emails() {
                   <GenerationProgress
                     active={generating}
                     operation="email"
-                    title="OmniCore escribiendo tu email..."
-                    subtitle="ShopyBrain genera copy persuasivo, subject lines A/B y HTML para Klaviyo"
+                    title="Shopy Crafter escribiendo tu email..."
+                    subtitle="Shopy Crafter genera copy persuasivo, subject lines A/B y HTML para Klaviyo"
                   />
                   <div style={{ background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 14, padding: 20 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--t1)" }}>Generador OmniCore</h3>
+                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--t1)" }}>Generador IA</h3>
                         <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t2)" }}>Genera el HTML completo del email — listo para Klaviyo</p>
                       </div>
                       <button onClick={generateEmail} disabled={generating}
@@ -594,7 +594,7 @@ export default function Emails() {
                     {!form.html_content ? (
                       <div style={{ padding: "40px 24px", textAlign: "center", border: "2px dashed var(--bdr)", borderRadius: 12 }}>
                         <div style={{ fontSize: 36, marginBottom: 10 }}>🤖</div>
-                        <p style={{ fontSize: 13, color: "var(--t2)", margin: 0 }}>Pulsa "Generar email completo" para que OmniCore escriba el HTML profesional</p>
+                        <p style={{ fontSize: 13, color: "var(--t2)", margin: 0 }}>Pulsa "Generar email completo" para que la IA escriba el HTML profesional</p>
                       </div>
                     ) : (
                       <div>
@@ -710,7 +710,7 @@ export default function Emails() {
                     </button>
 
                     <p style={{ textAlign: "center", fontSize: 11, color: "var(--t3)", marginTop: 12, lineHeight: 1.5 }}>
-                      Nunca necesitas abrir Klaviyo · ShopyBrain controla todo el contenido y la lógica
+                      Nunca necesitas abrir Klaviyo · Shopy Crafter controla todo el contenido y la lógica
                     </p>
                   </div>
                 </div>

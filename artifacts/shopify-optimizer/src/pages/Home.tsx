@@ -55,14 +55,14 @@ export default function Home() {
           Bienvenida, {firstName} 👋
         </h1>
         <p style={{ fontSize: 13, color: "var(--t2)" }}>
-          ShopyAI Pro · Panel de control · {new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+          Shopy Crafter · Panel de control · {new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
         </p>
       </div>
 
       {/* Stats row */}
       <div className="grid-r4" style={{ marginBottom: 28 }}>
         <StatBubble icon={<Users size={18} />} label="Tiendas activas" value={isLoading ? "—" : projectCount} />
-        <StatBubble icon={<Brain size={18} />} label="Memorias Shopy Brain" value={brainStatus?.memoriesCount ?? "—"} color="var(--gold)" />
+        <StatBubble icon={<Brain size={18} />} label="Memorias IA" value={brainStatus?.memoriesCount ?? "—"} color="var(--gold)" />
         <StatBubble icon={<ShieldCheck size={18} />} label="Estado del sistema" value="Operativo" color="var(--jade)" />
         <StatBubble icon={<Zap size={18} />} label="Motores IA activos" value="7" color="#8b5cf6" />
       </div>

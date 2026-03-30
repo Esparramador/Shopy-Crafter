@@ -174,7 +174,7 @@ export default function ShopyBrain() {
               {(status?.topMemories ?? []).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "30px 0", color: "var(--t3)" }}>
                   <Brain size={32} style={{ marginBottom: 8, opacity: 0.4 }} />
-                  <p style={{ fontSize: 13 }}>Shopy Brain aún está aprendiendo.</p>
+                  <p style={{ fontSize: 13 }}>El cerebro IA aún está aprendiendo.</p>
                   <p style={{ fontSize: 12, marginTop: 4 }}>Lanza una sesión de estudio para empezar.</p>
                 </div>
               ) : (

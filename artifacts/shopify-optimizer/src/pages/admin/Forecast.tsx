@@ -109,7 +109,7 @@ export default function Forecast() {
           confidencePct: null,
           reasoning: topInsights[2] ?? topInsights[0] ?? summary,
           insightText: topInsights.length > 2
-            ? `${topInsights.length} oportunidades detectadas por ShopyBrain`
+            ? `${topInsights.length} oportunidades detectadas por Shopy Crafter`
             : "Genera más análisis para acumular insights",
           attribution,
         },
@@ -141,7 +141,7 @@ export default function Forecast() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--t)" }}>ML Predictive Engine</h1>
           <p style={{ fontSize: 13, color: "var(--t3)", marginTop: 4 }}>
-            Análisis real con ShopyBrain — sin datos inventados
+            Análisis real con Shopy Crafter — sin datos inventados
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -151,7 +151,7 @@ export default function Forecast() {
           <button className="btn-primary" onClick={generateForecast} disabled={generating}
             style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Brain size={14} />
-            {generating ? "Analizando con IA..." : "Analizar con ShopyBrain"}
+            {generating ? "Analizando con IA..." : "Analizar con Shopy Crafter"}
           </button>
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function Forecast() {
           <Brain size={48} style={{ color: "var(--t4)", marginBottom: 16 }} />
           <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--t2)", marginBottom: 8 }}>Sin análisis generados</h3>
           <p style={{ fontSize: 13, color: "var(--t3)", marginBottom: 8, maxWidth: 400, margin: "0 auto 24px" }}>
-            ShopyBrain analizará tus productos reales, SEO, precios y A/B tests para darte insights accionables.
+            Shopy Crafter analizará tus productos reales, SEO, precios y A/B tests para darte insights accionables.
             Los valores monetarios se calculan solo cuando hay historial de ventas registrado.
           </p>
           <button className="btn-primary" onClick={generateForecast} disabled={generating} style={{ padding: "12px 28px" }}>
@@ -233,7 +233,7 @@ export default function Forecast() {
             </div>
             <div className="grid-r3">
               {[
-                { title: "Datos reales de Shopify", description: "ShopyBrain lee tus productos, precios, imágenes y resultados A/B directamente de la API de Shopify" },
+                { title: "Datos reales de Shopify", description: "Shopy Crafter lee tus productos, precios, imágenes y resultados A/B directamente de la API de Shopify" },
                 { title: "Análisis Claude IA", description: "Cada análisis pasa por Claude con contexto acumulado de memorias y aprendizajes anteriores de tu nicho" },
                 { title: "Sin inventar cifras", description: "Los valores monetarios solo aparecen cuando hay revenue real registrado. Sin datos históricos, se muestran insights cualitativos" },
               ].map(m => (

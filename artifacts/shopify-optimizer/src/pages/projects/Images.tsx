@@ -452,7 +452,7 @@ export default function ImagesPage() {
         active={bulkGenerate.isPending || (!!bulkJobId)}
         operation="images"
         title="Motor de Imágenes generando en masa..."
-        subtitle="Flux IA procesa cada producto del catálogo con prompts optimizados por ShopyBrain"
+        subtitle="Flux IA procesa cada producto del catálogo con prompts optimizados por Shopy Crafter"
       />
 
       {/* Legend */}

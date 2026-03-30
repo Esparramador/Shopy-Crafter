@@ -69,7 +69,7 @@ export default function ShopyBrainMemories() {
     <div className="page-inner">
       <div className="flex-header" style={{ marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800 }}>🧠 Memorias de Shopy Brain</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800 }}>🧠 Memorias del Cerebro IA</h1>
           <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>Conocimiento acumulado que hace más inteligente cada respuesta</p>
         </div>
         <button onClick={() => setShowAdd(!showAdd)} className="btn-primary">

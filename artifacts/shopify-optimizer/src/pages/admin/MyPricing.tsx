@@ -308,7 +308,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800 }}>💰 Mi Pricing CFO</h1>
           <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 3 }}>
-            Shopy Brain como tu Director Financiero y Comercial personal
+            Shopy Crafter como tu Director Financiero y Comercial personal
           </p>
         </div>
         {tab === "services" && (
@@ -361,7 +361,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
         <div className="glass-card" style={{ marginBottom: 20, borderColor: "var(--gold)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <DollarSign size={16} color="var(--gold)" />
-            <span style={{ fontWeight: 700, color: "var(--gold)" }}>Análisis OmniCore CFO</span>
+            <span style={{ fontWeight: 700, color: "var(--gold)" }}>Análisis Shopy Crafter CFO</span>
           </div>
           <p style={{ fontSize: 13, color: "var(--t)", marginBottom: 10 }}>{analysis.overallAssessment}</p>
           {analysis.totalRevenueOpportunity > 0 && (
@@ -406,7 +406,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                 <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "var(--ink3)", borderBottom: "1px solid var(--bdr)" }}>
-                      {["Servicio", "Tu coste", "Precio actual", "Margen", "Mercado avg", "OmniCore dice"].map(h => (
+                      {["Servicio", "Tu coste", "Precio actual", "Margen", "Mercado avg", "Shopy Crafter dice"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "var(--t3)", fontWeight: 600 }}>{h}</th>
                       ))}
                     </tr>
@@ -804,7 +804,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
               <div className="glass-card" style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                   <DollarSign size={16} color="var(--gold)" />
-                  <h3 style={{ fontSize: 14, fontWeight: 700 }}>Presupuesto OmniCore CFO</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 700 }}>Presupuesto Shopy Crafter CFO</h3>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 10, marginBottom: 16 }}>
                   {[

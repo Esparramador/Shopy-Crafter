@@ -552,7 +552,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
                 ["Estado", result.status as string],
                 ["Variantes", String(result.variants)],
                 ["Score", `${result.auditScore}/100 (${result.auditGrade})`],
-                ["IA", result.aiGenerated ? "Contenido generado por ShopyBrain" : "Contenido manual"],
+                ["IA", result.aiGenerated ? "Contenido generado por Shopy Crafter" : "Contenido manual"],
               ].map(([l, v]) => (
                 <div key={l} style={{ fontSize: 13, color: "var(--t2)" }}>
                   <span style={{ color: "var(--t3)" }}>{l}: </span><strong>{v}</strong>
@@ -588,7 +588,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
               <Sparkles size={18} style={{ color: form.aiGenerate ? "var(--gold)" : "var(--t4)" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: form.aiGenerate ? "var(--gold)" : "var(--t2)" }}>
-                  ShopyBrain genera el contenido
+                  Shopy Crafter genera el contenido
                 </div>
                 <div style={{ fontSize: 11, color: "var(--t3)" }}>
                   Título, descripción, tags y SEO optimizados por IA
@@ -748,7 +748,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
               }}>
               {creating ? (
                 <><Loader2 size={15} style={{ animation: "spin 0.6s linear infinite" }} />
-                  {form.aiGenerate ? "ShopyBrain generando contenido..." : "Creando en Shopify..."}</>
+                  {form.aiGenerate ? "Shopy Crafter generando contenido..." : "Creando en Shopify..."}</>
               ) : (
                 <><Plus size={15} /> Crear producto en Shopify</>
               )}
@@ -1239,7 +1239,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                           onClick={() => optimizeProduct(String(product.shopifyProductId || product.id))}
                           disabled={optimizingId === String(product.shopifyProductId || product.id) || bulkOptimizing}
                           className="p-2.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                          title="Optimizar con ShopyBrain IA"
+                          title="Optimizar con Shopy Crafter IA"
                           aria-label="Optimizar producto con IA"
                         >
                           {optimizingId === String(product.shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
@@ -1381,7 +1381,17 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                         <DollarSign className="w-4 h-4 text-green-400" />
                         <span className="text-sm font-semibold text-green-400">{opp.estimatedPriceMin}–{opp.estimatedPriceMax}€</span>
                       </div>
-                      <button className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent("shopycrafter:chatbot", {
+                            detail: {
+                              message: `Crea un producto nuevo basado en esta oportunidad: "${opp.productName}" - ${opp.whyItFits}. Rango de precio: ${opp.estimatedPriceMin}-${opp.estimatedPriceMax}€`,
+                              autoSend: false,
+                            },
+                          }));
+                        }}
+                        className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1"
+                      >
                         <CheckCircle2 className="w-3 h-3" />
                         Crear Ficha
                       </button>

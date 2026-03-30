@@ -210,7 +210,7 @@ export default function ReferenceMediaPanel({
       {open && (
         <div style={{ padding: 16, background: "var(--ink2)" }}>
           <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 14, lineHeight: 1.6 }}>
-            Sube imágenes o indica un vídeo de referencia. ShopyBrain extraerá estilo, colores, texturas, narrativa y todo el contexto visual para que la IA lo use al generar tu contenido.
+            Sube imágenes o indica un vídeo de referencia. Shopy Crafter extraerá estilo, colores, texturas, narrativa y todo el contexto visual para que la IA lo use al generar tu contenido.
           </p>
 
           <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
@@ -329,7 +329,7 @@ export default function ReferenceMediaPanel({
                 {analyzing ? (
                   <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Analizando imágenes...</>
                 ) : (
-                  <><Brain size={14} /> Analizar con ShopyBrain</>
+                  <><Brain size={14} /> Analizar con Shopy Crafter</>
                 )}
               </button>
             </>
@@ -406,7 +406,7 @@ export default function ReferenceMediaPanel({
                 marginBottom: 10, fontSize: 12, fontWeight: 700, color: "var(--jade)",
               }}>
                 <Sparkles size={13} />
-                Contexto extraído — ShopyBrain lo usará en la generación
+                Contexto extraído — Shopy Crafter lo usará en la generación
               </div>
               <div style={{
                 fontSize: 11, color: "var(--t3)", lineHeight: 1.7,

@@ -125,7 +125,7 @@ export default function BrainExtractor({ value, fieldContext, projectId, onAutof
           onMouseOut={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(212,160,23,0.15), rgba(33,197,94,0.1))"; }}
         >
           <Brain size={13} />
-          ShopyBrain: Analizar y extraer inteligencia
+          Shopy Crafter: Analizar y extraer inteligencia
         </button>
       )}
 
@@ -144,7 +144,7 @@ export default function BrainExtractor({ value, fieldContext, projectId, onAutof
             <Brain size={16} style={{ position: "absolute", top: 6, left: 6, color: "var(--gold)" }} />
           </div>
           <div>
-            <p style={{ fontSize: 12, color: "var(--gold)", fontFamily: "var(--fb)", margin: 0 }}>ShopyBrain procesando...</p>
+            <p style={{ fontSize: 12, color: "var(--gold)", fontFamily: "var(--fb)", margin: 0 }}>Shopy Crafter procesando...</p>
             <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>Extrayendo inteligencia de marca, SEO y mercado</p>
           </div>
           <Loader2 size={14} style={{ color: "var(--gold)", marginLeft: "auto", animation: "spin 1s linear infinite" }} />
@@ -291,7 +291,7 @@ export default function BrainExtractor({ value, fieldContext, projectId, onAutof
                 <div style={{ marginBottom: 12, padding: "9px 12px", background: "rgba(33,197,94,0.07)", borderRadius: 8, borderLeft: "3px solid #22c55e" }}>
                   <p style={{ fontSize: 11, color: "var(--t3)", margin: "0 0 3px", fontFamily: "var(--fb)" }}>
                     <Zap size={11} style={{ display: "inline", verticalAlign: "middle", marginRight: 4, color: "#22c55e" }} />
-                    Insight único de ShopyBrain
+                    Insight único de Shopy Crafter
                   </p>
                   <p style={{ fontSize: 12, color: "var(--t)", margin: 0, lineHeight: 1.5 }}>
                     {result.intelligence.intelligence.uniqueInsight}
