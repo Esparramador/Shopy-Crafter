@@ -119,6 +119,24 @@ export const DEFAULT_CMS_CONTENT = {
         cta: { label: "Empezar por €19/mes →", href: "#fp-contact", style: "ghost" },
       },
       {
+        id: "plan-pro", name: "Pro", price: "89", currency: "€", period: "por mes · sin setup",
+        featured: false, badge: "POPULAR",
+        features: [
+          { text: "Optimización de hasta 20 productos/mes con IA", included: true },
+          { text: "Generación de 50 imágenes de producto con IA", included: true },
+          { text: "Auditoría SEO completa con implementación automática", included: true },
+          { text: "Motor de pricing financiero (COGS + márgenes + competencia)", included: true },
+          { text: "A/B testing visual en 2 productos simultáneos", included: true },
+          { text: "Dashboard de analytics con métricas de conversión", included: true },
+          { text: "Informe mensual de rendimiento con recomendaciones IA", included: true },
+          { text: "Soporte por email y chat (respuesta <24h)", included: true },
+          { text: "Auto-pilot", included: false },
+          { text: "Imágenes ilimitadas", included: false },
+          { text: "Custom AI model training", included: false },
+        ],
+        cta: { label: "Empezar por €89/mes →", href: "#fp-contact", style: "ghost" },
+      },
+      {
         id: "plan-photoshoot", name: "Photoshoot Pro", price: "497", currency: "€", period: "pago único · sin retainer",
         featured: false, badge: "SIN RETAINER",
         features: [

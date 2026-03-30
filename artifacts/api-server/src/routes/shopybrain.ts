@@ -2772,7 +2772,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let allProds: Array<Record<string, unknown>> = [];
         for (const st of statusesToQuery) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags,product_type`
           );
           allProds = allProds.concat(d.products || []);
         }
@@ -2794,6 +2794,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             price: (p.variants as Array<Record<string, string>>)?.[0]?.price ?? "0.00",
             imageCount: (p.images as unknown[])?.length ?? 0,
             tags: p.tags,
+            product_type: p.product_type || null,
           })),
           total: allProds.length,
           byStatus,
