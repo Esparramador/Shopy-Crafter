@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 
 const router = Router();
 
@@ -122,6 +122,14 @@ Analyze the competitor and return competitive intelligence. Extract real prices,
         actionSuggestion: insight.action,
       });
     }
+
+    learnFromOperation({
+      projectId: parseInt(projectId),
+      operation: "competitor_scan",
+      result: `Competitor scan: ${data.productsFound ?? 0} products found, price range €${data.priceMin ?? "?"}-€${data.priceMax ?? "?"}, threat level: ${data.overallThreatLevel ?? "unknown"}. ${(data.insights ?? []).length} insights detected.`,
+      niche: niche,
+      category: "competitor_intel",
+    });
 
     res.json({ snapshot: snap, insights: data.insights ?? [], threatLevel: data.overallThreatLevel });
   } catch (e: any) {

@@ -7,7 +7,7 @@ import {
   analyzeProductTrends,
   researchPersonOrBrand,
 } from "../lib/gemini.js";
-import { askClaude, askClaudeJson } from "../lib/claude.js";
+import { askClaude, askClaudeJson, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreNicheProfilesTable } from "@workspace/db/schema";
@@ -41,6 +41,14 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
       1500
     );
 
+    learnFromOperation({
+      projectId: 0,
+      operation: "business_research",
+      result: `Business research: ${businessName} (${domain}) in ${niche}. Strategic plan generated with ${typeof claudeEnhancement === "string" ? claudeEnhancement.length : 0} chars.`,
+      niche,
+      category: "competitor_intel",
+    });
+
     res.json({ profile, strategicPlan: claudeEnhancement, source: "gemini+claude" });
   } catch (err) {
     logger.error(err, "Gemini business research failed");
@@ -59,6 +67,14 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
       0,
       `Based on this competitor intelligence for ${domain}:\n${JSON.stringify(intel, null, 2)}\n\nIdentify specific opportunities for a competing Shopify store to win:\nReturn JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`
     );
+
+    learnFromOperation({
+      projectId: 0,
+      operation: "competitor_analysis",
+      result: `Competitor analysis: ${domain} in ${niche}. Quick wins: ${(gaps as any)?.quickWins?.length ?? 0}, pricing opportunity: ${(gaps as any)?.pricingOpportunity ?? "none"}.`,
+      niche,
+      category: "competitor_intel",
+    });
 
     res.json({ competitor: intel, gaps, source: "gemini+claude" });
   } catch (err) {

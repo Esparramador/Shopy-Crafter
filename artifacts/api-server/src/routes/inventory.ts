@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { inventoryTrackingTable, restockOrdersTable, projectsTable } from "@workspace/db";
 import { eq, desc, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 
 const router = Router();
 
@@ -92,6 +92,14 @@ Return JSON: { "subject": "...", "body": "...", "urgency": "critical|high|medium
       urgency: email.urgency ?? "high",
       emailDraft: email.body,
     }).returning();
+
+    learnFromOperation({
+      projectId: parseInt(projectId),
+      operation: "inventory_restock",
+      result: `Restock order created for "${productTitle}": qty ${email.suggestedQuantity ?? 90}, urgency ${email.urgency ?? "high"}.`,
+      niche: niche,
+      category: "inventory_management",
+    });
 
     res.json({ ...email, orderId: order.id });
   } catch (e: any) {
