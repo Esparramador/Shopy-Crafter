@@ -3987,7 +3987,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         const syncApiKey = params?.apiKey as string | undefined;
         const syncSource = params?.source as string | undefined;
         if (!syncUrl) {
-          result = { error: true, message: "❌ URL requerida. Ejemplo: brain_sync {url: 'https://comiccrafter.es', apiKey: 'sck_...'}" };
+          result = { error: true, message: "URL requerida. Ejemplo: brain_sync {url: 'https://comic-crafter.myshopify.com', apiKey: 'sck_...'}" };
           break;
         }
         try {

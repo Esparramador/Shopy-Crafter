@@ -143,7 +143,7 @@ export default function Landing() {
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "" });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
@@ -1073,6 +1073,31 @@ export default function Landing() {
                       onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                       onBlur={e => e.target.style.borderColor = "var(--ink3)"}
                     />
+                  </div>
+
+                  {/* Extra info */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Informacion extra sobre tu negocio"}</label>
+                    <textarea
+                      rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
+                      placeholder={"Numero de productos, tipos (tallas, colores, materiales...), proveedores, plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
+                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                    />
+                  </div>
+
+                  {/* Product image URL */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"URL de imagen de un producto (para muestra gratuita)"}</label>
+                    <input
+                      type="url" value={contactForm.productImageUrl} onChange={CF("productImageUrl")}
+                      placeholder={"https://tu-tienda.com/imagen-producto.jpg"}
+                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                    />
+                    <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 6 }}>Sube la URL de 1 imagen y te mostramos como quedaria tu producto optimizado por nuestra IA (SEO, descripciones, metas, titulo...)</p>
                   </div>
 
                   {/* Servicios */}

@@ -4,6 +4,8 @@ import { randomBytes } from "crypto";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
+import { askClaudeJsonWithBrain } from "../lib/claude.js";
+import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -22,68 +24,135 @@ interface LeadData {
   services: string[];
   socialMedia: string | null;
   message: string | null;
+  extraInfo: string | null;
+  productImageUrl: string | null;
   submittedAt: string;
+  company?: string;
+}
+
+interface ProductSample {
+  title: string;
+  description: string;
+  seoTitle: string;
+  seoDescription: string;
+  tags: string[];
+  productType: string;
+  variants?: { option: string; values: string[] }[];
+  priceStrategy: string;
+  improvementNotes: string;
+}
+
+async function generateProductSample(lead: LeadData): Promise<ProductSample | null> {
+  if (!lead.productImageUrl && !lead.storeUrl) return null;
+  try {
+    const nicheInfo = lead.niche || "ecommerce general";
+    const extraContext = lead.extraInfo ? `\nInformacion extra del negocio: ${lead.extraInfo}` : "";
+    const imageContext = lead.productImageUrl
+      ? `El cliente ha proporcionado una imagen de producto: ${lead.productImageUrl}`
+      : `Analiza la tienda ${lead.storeUrl} y elige un producto representativo para optimizar.`;
+
+    const sample = await askClaudeJsonWithBrain(
+      2,
+      `${imageContext}
+Nicho: ${nicheInfo}. Facturacion: ${lead.revenue || "No especificada"}.${extraContext}
+
+Genera un producto de muestra COMPLETAMENTE OPTIMIZADO para esta tienda. Incluye:
+- title: Titulo SEO optimizado (60-70 chars, keywords naturales)
+- description: Descripcion de venta persuasiva (150-300 palabras con beneficios, caracteristicas tecnicas, materiales, casos de uso)
+- seoTitle: Meta title para Google (max 60 chars)
+- seoDescription: Meta description para Google (max 155 chars, con CTA)
+- tags: Array de 8-12 tags relevantes (incluir nicho, material, uso, estilo, temporada)
+- productType: Tipo de producto
+- variants: Array de variantes relevantes segun el nicho. Para ROPA incluir [{option:"Talla",values:["XS","S","M","L","XL","XXL"]},{option:"Color",values:["Negro","Blanco","Azul Marino"]},{option:"Material",values:["Algodon organico","Poliester reciclado"]}]. Para CALZADO incluir tallas de pie (36-46). Para JOYERIA incluir tallas de anillo, tipo de metal. Para ALIMENTACION incluir peso/formato. Adaptar 100% al nicho real.
+- priceStrategy: Estrategia de precio recomendada con margen estimado
+- improvementNotes: 3-5 mejoras concretas que aplicariamos con datos de impacto estimado en ventas
+
+Responde SOLO con JSON valido.`,
+      `Eres ShopyBrain, el motor de inteligencia artificial de Shopy Crafter. Generas productos Shopify optimizados profesionalmente. Cada campo debe ser de calidad profesional lista para publicar. Los variantes deben ser especificos del nicho (tallas para ropa, numeros de pie para calzado, colores reales, materiales reales, pesos para alimentacion, etc). Responde en espanol.`,
+      "general",
+      nicheInfo,
+    );
+    return sample as ProductSample;
+  } catch (err) {
+    logger.warn({ err }, "Product sample generation failed (non-critical)");
+    return null;
+  }
 }
 
 async function generateAIPreReport(lead: LeadData): Promise<string> {
-  const searchTerms: string[] = [];
-  if (lead.storeUrl) searchTerms.push(lead.storeUrl);
-  if (lead.niche) searchTerms.push(lead.niche);
-  if (lead.socialMedia) searchTerms.push(lead.socialMedia);
-
   const entityName = lead.storeUrl || lead.name;
   const nicheInfo = lead.niche || "ecommerce general";
+  const extraContext = lead.extraInfo ? `\nInformacion adicional del negocio: ${lead.extraInfo}` : "";
 
   const searches = await Promise.allSettled([
     askGeminiWithSearch(
       `Investiga a fondo esta empresa/tienda online: "${entityName}".
-Busca: qué vende, productos principales, precios, aspecto de la web, tecnología que usa, presencia en redes sociales, reputación online, reseñas de clientes, tráfico estimado, posición SEO.
+Busca: que vende, productos principales, precios, aspecto de la web, tecnologia que usa, presencia en redes sociales, reputacion online, resenas de clientes, trafico estimado, posicion SEO.
 ${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
-${lead.socialMedia ? `Redes: ${lead.socialMedia}` : ""}
+${lead.socialMedia ? `Redes: ${lead.socialMedia}` : ""}${extraContext}
+Si es una tienda de ropa/moda, investiga: tallas disponibles, colores, materiales, politica de devoluciones, tabla de tallas, shipping.
+Si es alimentacion: certificaciones, ingredientes, formatos, peso, alergenos.
+Si es joyeria: materiales, piedras, certificaciones, personalizacion.
 Proporciona datos reales, concretos y verificables.`,
-      "Eres un analista de inteligencia empresarial experto en eCommerce. Investiga usando Google Search real. Devuelve datos concretos, URLs verificables, cifras reales. Responde en español.",
+      "Eres un analista de inteligencia empresarial experto en eCommerce. Investiga usando Google Search real. Devuelve datos concretos, URLs verificables, cifras reales. Analiza los atributos de producto especificos del nicho (tallas, colores, materiales, pesos, etc). Responde en espanol.",
       lead.storeUrl ? [lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`] : undefined,
     ),
 
     askGeminiWithSearch(
-      `Análisis de competencia y mercado para el nicho "${nicheInfo}" en España.
-Busca: principales competidores en este nicho en Shopify y eCommerce, sus precios, estrategias, volumen de búsqueda de keywords principales, tendencias del mercado, oportunidades sin explotar, barreras de entrada, estacionalidad.
-${lead.storeUrl ? `La tienda del cliente es: ${lead.storeUrl}` : ""}
-Dame datos concretos con fuentes verificables.`,
-      "Eres un analista de mercado y competencia eCommerce. Usa Google Search real. Devuelve datos de mercado actuales, nombres de competidores reales, precios reales, tendencias verificables. Responde en español.",
+      `Analisis de competencia y mercado para el nicho "${nicheInfo}" en Espana.
+Busca: principales competidores en este nicho en Shopify y eCommerce, sus precios, estrategias, volumen de busqueda de keywords principales, tendencias del mercado, oportunidades sin explotar, barreras de entrada, estacionalidad.
+${lead.storeUrl ? `La tienda del cliente es: ${lead.storeUrl}` : ""}${extraContext}
+Dame datos concretos con fuentes verificables.
+Incluye analisis de: pricing medio del sector, margenes tipicos, coste de adquisicion de cliente (CAC), lifetime value (LTV), tasa de conversion media del sector.`,
+      "Eres un analista de mercado y competencia eCommerce. Usa Google Search real. Devuelve datos de mercado actuales, nombres de competidores reales, precios reales, tendencias verificables. Incluye metricas financieras del sector. Responde en espanol.",
     ),
 
     askGeminiWithSearch(
-      `Auditoría SEO y presencia digital del negocio "${entityName}" en el nicho "${nicheInfo}".
-Busca: keywords por las que posiciona, posiciones en Google, velocidad de carga, estado de indexación, presencia en directorios, backlinks relevantes, estrategia de contenidos, blog, landing pages.
+      `Auditoria SEO y presencia digital del negocio "${entityName}" en el nicho "${nicheInfo}".
+Busca: keywords por las que posiciona, posiciones en Google, velocidad de carga, estado de indexacion, presencia en directorios, backlinks relevantes, estrategia de contenidos, blog, landing pages.
 ${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
-Proporciona recomendaciones SEO concretas y prácticas.`,
-      "Eres un experto SEO técnico y de contenidos para eCommerce. Usa Google Search para investigar la presencia real de este negocio en internet. Responde en español.",
+Proporciona recomendaciones SEO concretas y practicas.
+Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de contenido, keywords de cola larga con volumen estimado.`,
+      "Eres un experto SEO tecnico y de contenidos para eCommerce. Usa Google Search para investigar la presencia real de este negocio en internet. Incluye datos tecnicos como schema markup, Core Web Vitals y oportunidades de keywords. Responde en espanol.",
       lead.storeUrl ? [lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`] : undefined,
     ),
+
+    generateProductSample(lead),
   ]);
 
   const businessResearch = searches[0].status === "fulfilled" ? searches[0].value : null;
   const marketResearch = searches[1].status === "fulfilled" ? searches[1].value : null;
   const seoResearch = searches[2].status === "fulfilled" ? searches[2].value : null;
+  const productSample = searches[3].status === "fulfilled" ? (searches[3].value as ProductSample | null) : null;
 
   const allSources = [
-    ...(businessResearch?.sources || []),
-    ...(marketResearch?.sources || []),
-    ...(seoResearch?.sources || []),
-  ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+    ...((businessResearch as any)?.sources || []),
+    ...((marketResearch as any)?.sources || []),
+    ...((seoResearch as any)?.sources || []),
+  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).slice(0, 20);
+
+  try {
+    learnFromOperation({
+      operationType: "lead_prereport",
+      title: `Pre-informe lead: ${lead.name} (${lead.niche || "general"}) - ${lead.storeUrl || "sin URL"}`,
+      content: `Lead: ${lead.name}, Email: ${lead.email}, Nicho: ${lead.niche}, Facturacion: ${lead.revenue}, Servicios: ${(lead.services || []).join(", ")}, URL: ${lead.storeUrl || "N/A"}, Redes: ${lead.socialMedia || "N/A"}, Info extra: ${lead.extraInfo || "N/A"}`,
+      confidence: 0.8,
+      tags: ["lead", "prereport", lead.niche || "general"],
+    });
+  } catch {};
 
   return buildReportHtml(lead, {
-    business: businessResearch?.text || "No se pudo investigar la empresa (Gemini no disponible).",
-    market: marketResearch?.text || "No se pudo analizar el mercado.",
-    seo: seoResearch?.text || "No se pudo realizar la auditoría SEO.",
+    business: (businessResearch as any)?.text || "No se pudo investigar la empresa (Gemini no disponible).",
+    market: (marketResearch as any)?.text || "No se pudo analizar el mercado.",
+    seo: (seoResearch as any)?.text || "No se pudo realizar la auditoria SEO.",
     sources: allSources,
+    productSample,
   });
 }
 
 function buildReportHtml(
   lead: LeadData,
-  research: { business: string; market: string; seo: string; sources: string[] },
+  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null },
 ): string {
   const esc = sanitizeHtml;
 
@@ -195,6 +264,14 @@ function buildReportHtml(
       <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;">Mensaje</td>
       <td style="color:#9494a8;font-size:14px;padding:14px 20px;line-height:1.6;font-style:italic;">"${esc(lead.message || "—")}"</td>
     </tr>
+    ${lead.extraInfo ? `<tr>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-top:1px solid #1a1a28;">Info Extra</td>
+      <td style="color:#d0d0dd;font-size:13px;padding:14px 20px;line-height:1.6;border-top:1px solid #1a1a28;">${esc(lead.extraInfo)}</td>
+    </tr>` : ""}
+    ${lead.productImageUrl ? `<tr>
+      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-top:1px solid #1a1a28;">Img Producto</td>
+      <td style="padding:14px 20px;border-top:1px solid #1a1a28;"><a href="${safeUrl(lead.productImageUrl)}" style="color:#3b82f6;font-size:12px;word-break:break-all;">${esc(lead.productImageUrl)}</a></td>
+    </tr>` : ""}
   </table>
 </td></tr>
 
@@ -230,6 +307,68 @@ function buildReportHtml(
     <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.seo)}</div>
   </div>
 </td></tr>
+
+${research.productSample ? `
+<!-- SECTION 4: Product Sample by ShopyBrain -->
+<tr><td style="padding:28px 48px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
+    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.3);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#10024;</div>
+    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">4. Producto Optimizado por ShopyBrain (Muestra)</span>
+  </td></tr></table>
+  <div style="background:linear-gradient(135deg,#101018,#14141f);border:1px solid rgba(200,168,75,.2);border-radius:12px;padding:28px;overflow:hidden;">
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Titulo optimizado</div>
+      <div style="font-size:18px;font-weight:700;color:#f0f0f5;line-height:1.3;">${esc(research.productSample.title)}</div>
+    </div>
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Descripcion de venta</div>
+      <div style="font-size:14px;color:#d0d0dd;line-height:1.7;">${esc(research.productSample.description)}</div>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid rgba(52,211,153,.1);">
+          <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1px;">SEO Title (Google)</div>
+          <div style="font-size:13px;color:#34d399;font-weight:600;margin-top:4px;">${esc(research.productSample.seoTitle)}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;">
+          <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1px;">SEO Description (Google)</div>
+          <div style="font-size:13px;color:#34d399;margin-top:4px;">${esc(research.productSample.seoDescription)}</div>
+        </td>
+      </tr>
+    </table>
+    ${research.productSample.variants && research.productSample.variants.length > 0 ? `
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Variantes configuradas</div>
+      ${research.productSample.variants.map(v => `
+        <div style="margin-bottom:8px;">
+          <span style="display:inline-block;background:rgba(200,168,75,.1);color:#e6c668;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:8px;border:1px solid rgba(200,168,75,.2);">${esc(v.option)}</span>
+          <span style="font-size:12px;color:#9494a8;">${v.values.map(val => esc(val)).join(" | ")}</span>
+        </div>
+      `).join("")}
+    </div>
+    ` : ""}
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Tags SEO</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${(research.productSample.tags || []).map(t => `<span style="display:inline-block;background:rgba(74,158,221,.08);color:#4a9eff;padding:3px 10px;border-radius:12px;font-size:11px;border:1px solid rgba(74,158,221,.15);">${esc(t)}</span>`).join("")}
+      </div>
+    </div>
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Estrategia de precio</div>
+      <div style="font-size:13px;color:#d0d0dd;line-height:1.6;">${esc(research.productSample.priceStrategy)}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Mejoras que aplicariamos (impacto estimado)</div>
+      <div style="font-size:13px;color:#d0d0dd;line-height:1.7;">${esc(research.productSample.improvementNotes)}</div>
+    </div>
+    <div style="margin-top:20px;background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.15);border-radius:8px;padding:14px;text-align:center;">
+      <div style="font-size:11px;color:#c8a84b;font-weight:600;">Este es solo 1 producto de muestra. Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente.</div>
+    </div>
+  </div>
+</td></tr>
+` : ""}
 
 <!-- SOURCES -->
 <tr><td style="padding:28px 48px 0;">
@@ -271,11 +410,12 @@ function buildReportHtml(
 router.post("/contact", async (req, res): Promise<void> => {
   const {
     name, email, phone, storeUrl, niche, revenue,
-    services, socialMedia, message,
+    services, socialMedia, message, extraInfo, productImageUrl,
   } = req.body as {
     name: string; email: string; phone?: string; storeUrl?: string;
     niche?: string; revenue?: string; services?: string[];
-    socialMedia?: string; message?: string;
+    socialMedia?: string; message?: string; extraInfo?: string;
+    productImageUrl?: string;
   };
 
   if (!name?.trim() || !email?.trim()) {
@@ -285,7 +425,7 @@ router.post("/contact", async (req, res): Promise<void> => {
 
   const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRx.test(email)) {
-    res.status(400).json({ error: "Email inválido" });
+    res.status(400).json({ error: "Email invalido" });
     return;
   }
 
@@ -298,6 +438,8 @@ router.post("/contact", async (req, res): Promise<void> => {
     services: services ?? [],
     socialMedia: socialMedia?.trim() ?? null,
     message: message?.trim() ?? null,
+    extraInfo: extraInfo?.trim() ?? null,
+    productImageUrl: productImageUrl?.trim() ?? null,
     submittedAt: new Date().toISOString(),
   };
 

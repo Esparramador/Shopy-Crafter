@@ -509,7 +509,7 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
       requiresManualImport: true,
       shopifyProducts,
       instructions: [
-        "Opción A: Conecta comiccrafter.es como proyecto en la app → el token se captura automáticamente → vuelve aquí y selecciona el proyecto",
+        "Opcion A: Conecta comic-crafter.myshopify.com como proyecto en la app → el token se captura automaticamente → vuelve aqui y selecciona el proyecto",
         "Opción B: Ve a Shopify Admin → Configuración → Apps → Desarrollar apps → crea un token con write_products y configúralo como SHOPIFY_ADMIN_ACCESS_TOKEN",
       ],
     });

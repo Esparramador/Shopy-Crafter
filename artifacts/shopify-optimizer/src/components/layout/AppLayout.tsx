@@ -34,6 +34,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Flujos de Email", icon: "🔄", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
+  { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
 ];
 
 const DEFAULT_ADMIN_NAV = [
@@ -75,7 +76,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   } | null>(null);
 
   const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
-  const shopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
+  const rawShopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
+  const firstProjectId = projects?.[0]?.id ?? 2;
+  const shopybrainNav = rawShopybrainNav.map(item =>
+    item.href.includes("/projects/2/") ? { ...item, href: item.href.replace("/projects/2/", `/projects/${firstProjectId}/`) } : item
+  );
   const adminNav = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
   const ap = cmsPanel ?? {};
 
@@ -319,10 +324,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
             {/* Comic Crafter App */}
             <a
-              href="https://comiccrafter.es/"
+              href="https://comic-crafter.myshopify.com/"
               target="_blank"
               rel="noopener noreferrer"
-              title="comiccrafter.es"
+              title="comic-crafter.myshopify.com"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 30, height: 30, borderRadius: 7,

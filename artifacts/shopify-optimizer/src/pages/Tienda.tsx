@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const STORE_URL = "https://comiccrafter.es/account/login?return_url=/collections/shopify-automatization";
+const STORE_URL = "https://comic-crafter.myshopify.com/account/login?return_url=/collections/shopify-automatization";
 
 export default function Tienda() {
   useEffect(() => {

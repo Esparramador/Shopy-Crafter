@@ -884,7 +884,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)", marginBottom: 4 }}>Sin tiendas conectadas</p>
                   <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.5 }}>
-                    Para crear los productos automáticamente, primero conecta <strong>comiccrafter.es</strong> como proyecto.<br />
+                    Para crear los productos automaticamente, primero conecta <strong>comic-crafter.myshopify.com</strong> como proyecto.<br />
                     Ve al botón <strong>"+ Nueva tienda"</strong> en el sidebar → escribe el dominio de tu tienda → conecta via Shopify.
                     Una vez conectada, el token OAuth se captura automáticamente y puedes hacer el push aquí.
                   </p>
