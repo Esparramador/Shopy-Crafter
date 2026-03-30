@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-import { safeDecrypt } from "./crypto.js";
+import { encrypt, safeDecrypt } from "./crypto.js";
 
 const SHOPIFY_FETCH_TIMEOUT = 30_000;
 const TOKEN_OP_TIMEOUT = 15_000;
@@ -51,7 +51,7 @@ export async function refreshToken(
 
   await db
     .update(projectsTable)
-    .set({ accessToken: token, tokenExpiresAt: expiresAtDate })
+    .set({ accessToken: encrypt(token), tokenExpiresAt: expiresAtDate })
     .where(eq(projectsTable.id, projectId));
 
   logger.info({ projectId, expiresAt: expiresAtDate }, "Token generated successfully");
@@ -66,23 +66,25 @@ export async function getShopifyHeaders(projectId: number): Promise<Record<strin
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) throw new Error(`Proyecto ${projectId} no encontrado`);
 
-  let token = project.accessToken;
+  const encryptedToken = project.accessToken;
   const expiresAt = project.tokenExpiresAt;
 
   // Refresh if: no token, no expiry date, or expiry within next 30 minutes
   const needsRefresh =
-    !token ||
+    !encryptedToken ||
     !expiresAt ||
     new Date(expiresAt) < new Date(Date.now() + 30 * 60 * 1000);
 
+  let plainToken: string;
   if (needsRefresh) {
-    // Always decrypt the stored secret before using it
     const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-    token = await refreshToken(projectId, project.shopDomain, project.clientId, plainSecret);
+    plainToken = await refreshToken(projectId, project.shopDomain, project.clientId, plainSecret);
+  } else {
+    plainToken = safeDecrypt(encryptedToken) || encryptedToken!;
   }
 
   return {
-    "X-Shopify-Access-Token": token!,
+    "X-Shopify-Access-Token": plainToken,
     "Content-Type": "application/json",
   };
 }
@@ -257,7 +259,7 @@ export async function rotateToken(
 
   await db
     .update(projectsTable)
-    .set({ accessToken: token, tokenExpiresAt: expiresAtDate })
+    .set({ accessToken: encrypt(token), tokenExpiresAt: expiresAtDate })
     .where(eq(projectsTable.id, projectId));
 
   logger.info({ projectId, expiresAt: expiresAtDate }, "Token rotated successfully");
@@ -319,9 +321,10 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
  */
 export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
   const domain = normalizeShopDomain(shopDomain);
+  const plainToken = safeDecrypt(accessToken) || accessToken;
   try {
     const resp = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
-      headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+      headers: { "X-Shopify-Access-Token": plainToken, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
     });
     return resp.status !== 401 && resp.status !== 403;

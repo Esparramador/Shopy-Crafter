@@ -74,7 +74,10 @@ Four subscription plans: Emprendedor (€19/mes, 5 products/month, 10 images), G
 All Shopify service products are fully deliverable via the chatbot's 79+ actions, including Photoshoot Pro, Growth Studio, Performance Lab, Auditoría Completa, Rediseño IA 30 Productos, Pack 30 Imágenes IA, SEO Completa, Informe Precios, and Email Marketing.
 
 ### Security
-- AES-256-GCM encryption for credentials.
+- AES-256-GCM encryption for ALL credentials in DB: `accessToken`, `clientSecret`, `replicateApiToken`, `anthropicApiKey` — all encrypted at rest via `encrypt()` from `lib/crypto.ts`. Uses `ENCRYPTION_KEY` env secret (64-char hex = 32 bytes).
+- Startup migration (`migrateTokenEncryption()` in `index.ts`) auto-detects and encrypts any plaintext tokens.
+- API responses NEVER expose raw tokens: `accessToken: undefined` in project responses, reveal-token endpoint shows only first 8 + last 4 chars masked.
+- `safeDecrypt()` used in all read paths to handle both encrypted and legacy plaintext values.
 - Comprehensive audit logging.
 - Database-backed rate limiting for all endpoints.
 - AI API concurrency queues and exponential backoff.

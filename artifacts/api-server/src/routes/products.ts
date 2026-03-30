@@ -193,8 +193,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
     return;
   }
 
-  const token = project.accessToken;
-  if (!token) {
+  if (!project.accessToken) {
     res.status(400).json({ error: "No hay token de acceso. Regenera el token primero." });
     return;
   }

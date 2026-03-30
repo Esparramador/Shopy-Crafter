@@ -154,7 +154,7 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
 
   if (existingProjects.length > 0) {
     const [updated] = await db.update(projectsTable)
-      .set({ accessToken: access_token, tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000) })
+      .set({ accessToken: encrypt(access_token), tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000) })
       .where(eq(projectsTable.shopDomain, shopDomain))
       .returning();
     projectId = updated.id;
@@ -164,7 +164,7 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
       shopDomain,
       clientId,
       clientSecret: encrypt(clientSecret),
-      accessToken: access_token,
+      accessToken: encrypt(access_token),
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
       storeNiche: saved.storeNiche || null,
       brandTone: saved.brandTone || null,
@@ -382,7 +382,7 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
     const token = await refreshToken(id, domain, clientId, clientSecret);
 
     req.log.info({ projectId: id, domain }, "Store reconnected with new credentials");
-    res.json({ success: true, message: "Tienda reconectada correctamente.", tokenPreview: token.slice(0, 12) + "••••••••" });
+    res.json({ success: true, message: "Tienda reconectada correctamente.", tokenUpdated: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
     res.status(400).json({ error: `No se pudo reconectar: ${message}` });
@@ -427,10 +427,13 @@ router.get("/projects/:projectId/reveal-token", async (req, res): Promise<void> 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
   if (!project.accessToken) { res.status(404).json({ error: "Sin token de acceso" }); return; }
+  const plainToken = safeDecrypt(project.accessToken) || project.accessToken;
+  const masked = plainToken.slice(0, 8) + "••••••••••••" + plainToken.slice(-4);
   res.json({
-    accessToken: project.accessToken,
+    accessToken: masked,
     shopDomain: project.shopDomain,
-    note: "Guarda este token de forma segura. Es el Admin API access token de la tienda.",
+    tokenValid: true,
+    note: "Token enmascarado por seguridad. Usa el panel de Shopify Partners para ver el token completo.",
   });
 });
 
@@ -448,7 +451,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
       res.status(400).json({ error: "El nuevo token no es válido para esta tienda." });
       return;
     }
-    await db.update(projectsTable).set({ accessToken: newAccessToken }).where(eq(projectsTable.id, id));
+    await db.update(projectsTable).set({ accessToken: encrypt(newAccessToken) }).where(eq(projectsTable.id, id));
     await recordAudit({
       userId: req.session.userId!,
       action: "shopify_token_manual_update",
@@ -474,7 +477,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
     res.json({
       success: true,
       message: "Token regenerado correctamente.",
-      tokenPreview: newToken.slice(0, 12) + "••••••••",
+      tokenUpdated: true,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";

@@ -141,10 +141,6 @@ const reportAuth = (req: Request, res: Response, next: NextFunction) => {
 };
 app.use("/api/reports", reportAuth, express.static(reportsDir));
 app.use("/reports", reportAuth, express.static(reportsDir));
-if (process.env.NODE_ENV !== "production") {
-  app.use("/api/public-reports", express.static(reportsDir));
-  app.use("/public-reports", express.static(reportsDir));
-}
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);

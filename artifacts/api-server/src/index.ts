@@ -1,4 +1,4 @@
-import { validateEncryptionKey } from "./lib/crypto.js";
+import { validateEncryptionKey, encrypt, safeDecrypt } from "./lib/crypto.js";
 validateEncryptionKey();
 
 import app from "./app";
@@ -124,6 +124,28 @@ async function ensureAdminUser() {
     }
   } catch (err) {
     logger.error({ err }, "⚠️  ensureAdminUser failed — continuing startup");
+  }
+}
+
+async function migrateTokenEncryption() {
+  try {
+    const projects = await db.select().from(projectsTable);
+    let migrated = 0;
+    for (const project of projects) {
+      if (!project.accessToken) continue;
+      const decrypted = safeDecrypt(project.accessToken);
+      if (decrypted) continue;
+      await db
+        .update(projectsTable)
+        .set({ accessToken: encrypt(project.accessToken) })
+        .where(eq(projectsTable.id, project.id));
+      migrated++;
+    }
+    if (migrated > 0) {
+      logger.info({ migrated }, "🔐 Migrated plaintext access tokens to AES-256-GCM encryption");
+    }
+  } catch (err) {
+    logger.error({ err }, "⚠️  Token encryption migration failed — continuing startup");
   }
 }
 
@@ -289,6 +311,7 @@ const server = app.listen(port, (err?: Error) => {
 
   deduplicateProducts()
     .then(() => ensureAdminUser())
+    .then(() => migrateTokenEncryption())
     .then(() => ensureProjectConfig())
     .then(() => ensureAllKnowledgeDomains())
     .then((created) => {
