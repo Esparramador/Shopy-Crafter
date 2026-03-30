@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
-import { cogsTable } from "@workspace/db/schema";
+import { cogsTable, projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { priceHistoryTable, brandDnaTable } from "@workspace/db/schema";
 import { abTestsTable } from "@workspace/db/schema";
@@ -18,8 +18,39 @@ import { sanitizeHtml } from "../lib/html-escape.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
+
+async function autoSaveReport(projectId: number, title: string, htmlContent: string, category: string): Promise<number | null> {
+  try {
+    const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+    const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    const htmlBuffer = Buffer.from(htmlContent, "utf-8");
+    const [saved] = await db.insert(projectFilesTable).values({
+      projectId,
+      fileType: "report",
+      category,
+      title,
+      description: `Informe generado automáticamente el ${date} a las ${time}`,
+      objectPath: null,
+      originalUrl: null,
+      mimeType: "text/html",
+      fileSizeBytes: htmlBuffer.length,
+      productId: null,
+      productTitle: null,
+      generatedBy: "auto_save",
+      metadata: JSON.stringify({ generatedAt: new Date().toISOString(), category }),
+      content: htmlContent,
+      isPublic: 0,
+    }).returning();
+    logger.info({ projectId, fileId: saved.id, title, category, sizeKB: Math.round(htmlBuffer.length / 1024) }, "Report auto-saved to vault");
+    return saved.id;
+  } catch (err) {
+    logger.error({ err, projectId, title, category }, "Failed to auto-save report to vault");
+    return null;
+  }
+}
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "").replace(/\s+/g, "_").slice(0, 100);
@@ -345,6 +376,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
     </div>`;
 
   const html = reportShell("Informe SEO Técnico", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  autoSaveReport(projectId, "Informe SEO Técnico", html, "seo_audit").catch(() => {});
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="SEO_Audit_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   res.send(html);
@@ -409,6 +441,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
   const html = reportShell("Informe de Catálogo de Productos", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Product_Catalog_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Catálogo de Productos", html, "product_catalog").catch(() => {});
   res.send(html);
 });
 
@@ -490,6 +523,7 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
   const html = reportShell("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Financial_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe Financiero y COGS", html, "financial").catch(() => {});
   res.send(html);
 });
 
@@ -569,6 +603,7 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
   const html = reportShell("Brand Brief & Estrategia", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Brand_Brief_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Brand Brief & Estrategia", html, "brand_brief").catch(() => {});
   res.send(html);
 });
 
@@ -615,6 +650,7 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
   const html = reportShell("Informe A/B Testing", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="AB_Tests_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe A/B Testing", html, "ab_testing").catch(() => {});
   res.send(html);
 });
 
@@ -660,6 +696,7 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
   const html = reportShell("Galería de Imágenes IA", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Images_Gallery_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Galería de Imágenes IA", html, "images_gallery").catch(() => {});
   res.send(html);
 });
 
@@ -980,11 +1017,36 @@ IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nom
       tags: ["report", "strategic", "ai_analysis", project.storeNiche ?? "general"],
     });
 
+    const sectionLabels: Record<string, string> = {
+      executiveSummary: "Resumen Ejecutivo",
+      brandAnalysis: "Análisis de Marca",
+      seoDeepAnalysis: "Análisis SEO Profundo",
+      pricingStrategy: "Estrategia de Precios",
+      financialAnalysis: "Análisis Financiero",
+      productMixStrategy: "Estrategia de Mix de Productos",
+      competitivePosition: "Posición Competitiva",
+      actionPlan30Days: "Plan de Acción 30 Días",
+      revenueProjection: "Proyección de Revenue",
+    };
+    const sectionsHtml = Object.entries(aiReport)
+      .filter(([k]) => k !== "raw")
+      .map(([k, v]) => `<h2>${sanitizeHtml(sectionLabels[k] || k)}</h2>\n<div>${v}</div>`)
+      .join("\n\n");
+    const aiHtmlReport = reportShell(
+      `Informe Estratégico IA — ${project.name}`,
+      `${project.shopDomain || "Sin dominio"} — Análisis completo con IA`,
+      sectionsHtml,
+      new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
+    );
+    const savedId = await autoSaveReport(projectId, `Informe Estratégico IA — ${project.name}`, aiHtmlReport, "ai_strategic_report");
+
     res.json({
       ok: true,
       projectId,
       sections: Object.keys(aiReport).length,
       generatedAt: new Date().toISOString(),
+      savedToVault: savedId !== null,
+      savedFileId: savedId,
       preview: Object.fromEntries(
         Object.entries(aiReport).map(([k, v]) => [k, typeof v === "string" ? v.substring(0, 200) + "..." : v])
       ),
@@ -1771,6 +1833,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   if (req.query.view !== "true") {
     res.setHeader("Content-Disposition", `attachment; filename="Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.html"`);
   }
+  autoSaveReport(projectId, `Auditoría Completa — ${project.name}`, html, "complete_audit").catch(() => {});
   res.send(html);
   } catch (err: any) {
     console.error("complete-report error:", err);
@@ -1882,6 +1945,7 @@ router.get("/projects/:projectId/exports/competitors", async (req, res): Promise
   const html = reportShell("Informe de Competencia", `${project.name} — Análisis Competitivo`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Competitor_Analysis_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Competencia", html, "competitors").catch(() => {});
   res.send(html);
 });
 
@@ -1946,6 +2010,7 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
   const html = reportShell("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Consistency_BrandDNA_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Consistencia y ADN de Marca", html, "brand_consistency").catch(() => {});
   res.send(html);
 });
 
@@ -2016,6 +2081,7 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
   const html = reportShell("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Inventory_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Inventario", html, "inventory").catch(() => {});
   res.send(html);
 });
 
@@ -2071,6 +2137,7 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
   const html = reportShell("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Redesigns_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Rediseños IA", html, "redesigns").catch(() => {});
   res.send(html);
 });
 
@@ -2143,6 +2210,7 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
   const html = reportShell("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Revenue_Forecast_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe de Revenue y Forecast", html, "revenue_forecast").catch(() => {});
   res.send(html);
 });
 
@@ -2221,6 +2289,7 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
   const html = reportShell("Informe ShopyBrain — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="ShopyBrain_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe ShopyBrain — Inteligencia Artificial", html, "shopybrain_intelligence").catch(() => {});
   res.send(html);
 });
 
