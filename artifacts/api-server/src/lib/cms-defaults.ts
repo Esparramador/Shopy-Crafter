@@ -117,7 +117,7 @@ export const DEFAULT_CMS_CONTENT = {
           { text: "Auto-pilot continuo", included: false },
           { text: "Acceso a futuros motores IA", included: false },
         ],
-        cta: { label: "Pagar una vez →", href: "https://comic-crafter.myshopify.com/cart/57686488940889:1", style: "ghost" },
+        cta: { label: "Pagar una vez →", href: "https://comic-crafter.myshopify.com/cart/57686488711513:1", style: "ghost" },
       },
       {
         id: "plan-growth", name: "Growth Studio", price: "297", currency: "€", period: "por mes · €197 setup único",
