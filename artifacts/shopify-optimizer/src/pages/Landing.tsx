@@ -1198,7 +1198,7 @@ export default function Landing() {
                       className="l-btn-gold"
                       style={{ opacity: contactStatus === "sending" ? 0.7 : 1, minWidth: 200, padding: "13px 28px", fontSize: 14 }}
                     >
-                      {contactStatus === "sending" ? "Enviando…" : (content.contact?.buttonLabel ?? "Enviar solicitud →")}
+                      {contactStatus === "sending" ? "Enviando…" : "CONTACTANOS"}
                     </button>
                   </div>
                 </form>
