@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Zap, BarChart3, DollarSign, RefreshCw, Downlo
 import { useListProjects } from "@workspace/api-client-react";
 import GenerationProgress from "@/components/GenerationProgress";
 import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
+import SaveToVaultButton from "@/components/SaveToVaultButton";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -138,6 +139,15 @@ export default function Intelligence() {
           >
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <SaveToVaultButton
+            title={`Revenue Intelligence 360° — ${new Date().toLocaleDateString("es-ES")}`}
+            content={`<h2>Revenue Intelligence</h2><p>Resumen de inteligencia de ingresos generado el ${new Date().toLocaleDateString("es-ES")}</p>`}
+            fileType="financial"
+            projectId={selectedProject || undefined}
+            generatedBy="revenue_intel"
+            variant="small"
+            label="Guardar"
+          />
           <button className="btn-secondary" onClick={exportCSV} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Download size={14} /> CSV
           </button>

@@ -38,6 +38,13 @@ The platform supports multiple e-commerce platforms via a connector abstraction 
 - **WooCommerceConnector**: Full implementation with HTTP Basic Auth (consumer key/secret), WC REST API v3, product CRUD, variations, orders, SEO (Yoast), inventory. Pagination via X-WP-Total/X-WP-TotalPages headers.
 - **UniversalAuditConnector**: Read-only connector for auditing any website. Uses PageSpeed Insights API + HTML scraping + Claude AI analysis. No product CRUD. supportsFeature("audit") returns true.
 - **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, woocommerce.ts, universal.ts, index.ts)
+
+### Global Vault (Bóveda Global)
+- **Purpose**: Centralized repository for reports, images, and research from ANY company — registered projects AND external entities
+- **DB**: `project_files` table with `project_id` (nullable), `entity_name`, `entity_url` columns. External research files have null project_id.
+- **API routes**: `GET /api/vault/global/entities` (list all entities), `GET /api/vault/global` (list files with filters), `POST /api/vault/global/save` (save report), `GET /api/vault/global/:fileId/download`, `POST /api/vault/global/download-selected` (ZIP), `DELETE /api/vault/global/:fileId`
+- **Frontend**: `/admin/vault` page (GlobalVault.tsx) with entity cards → folder drill-in → file list. Navigation in sidebar under "Bóveda Global".
+- **SaveToVaultButton**: Reusable component (`components/SaveToVaultButton.tsx`) with variants: button, icon, small. Added to Competitors, Intelligence, GeminiIntelligence pages. Existing SaveReportButton already covers Audit, SEO, Redesign, Pricing, ABTesting, Consistency.
 - **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
 - **PrestaShop API Key**: Stored in `clientSecret` (encrypted), `clientId` left empty. Auth via HTTP Basic (key as username, empty password)
 

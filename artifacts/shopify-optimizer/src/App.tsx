@@ -32,6 +32,7 @@ import CommandCenter from "@/pages/admin/CommandCenter";
 import Emails from "@/pages/admin/Emails";
 import EmailTemplates from "@/pages/admin/EmailTemplates";
 import ProjectVault from "@/pages/admin/ProjectVault";
+import GlobalVault from "@/pages/admin/GlobalVault";
 import ExportCenter from "@/pages/projects/ExportCenter";
 import ForgotPassword from "@/pages/ForgotPassword";
 import OAuthSuccess from "@/pages/OAuthSuccess";
@@ -293,6 +294,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><SystemHealth /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/vault">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><GlobalVault /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

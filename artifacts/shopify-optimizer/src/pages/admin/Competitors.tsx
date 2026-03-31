@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Scan, Trash2, AlertTriangle, X, Download } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
+import SaveToVaultButton from "@/components/SaveToVaultButton";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -145,6 +146,15 @@ ${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
           <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: 180 }}>
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <SaveToVaultButton
+            title={`Competitor Intelligence — ${new Date().toLocaleDateString("es-ES")}`}
+            content={`<h2>Competidores Monitoreados</h2><p>${competitors.length} competidores, ${alerts.filter(a => !a.dismissed).length} alertas activas</p><ul>${competitors.map(c => `<li><strong>${c.name}</strong> — ${c.url} (${c.type})</li>`).join("")}</ul>`}
+            fileType="competitor"
+            projectId={selectedProject || undefined}
+            generatedBy="competitor_intel"
+            variant="small"
+            label="Guardar"
+          />
           <button className="btn-secondary" onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Download size={14} /> Exportar
           </button>

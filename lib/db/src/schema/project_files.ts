@@ -2,20 +2,22 @@ import { pgTable, text, integer, real, timestamp, serial } from "drizzle-orm/pg-
 
 export const projectFilesTable = pgTable("project_files", {
   id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull(),
-  fileType: text("file_type").notNull(), // "image", "seo_report", "redesign", "ab_test", "email", "pricing_report"
-  category: text("category"),           // "hero", "lifestyle", "detail", "bundle", "ugc" para imágenes
+  projectId: integer("project_id"),
+  fileType: text("file_type").notNull(),
+  category: text("category"),
   title: text("title").notNull(),
   description: text("description"),
-  objectPath: text("object_path"),      // ruta en GCS: /objects/projects/123/images/xxx
-  originalUrl: text("original_url"),    // URL origen (Replicate, etc.) — backup
-  mimeType: text("mime_type"),          // "image/webp", "application/json", "text/html"
+  objectPath: text("object_path"),
+  originalUrl: text("original_url"),
+  mimeType: text("mime_type"),
   fileSizeBytes: integer("file_size_bytes"),
-  productId: text("product_id"),        // Shopify product ID asociado
+  productId: text("product_id"),
   productTitle: text("product_title"),
-  generatedBy: text("generated_by"),   // "images_motor", "seo_motor", "redesign_motor", etc.
-  metadata: text("metadata"),           // JSON con datos adicionales (prompt, score, etc.)
-  content: text("content"),              // HTML/text content fallback when Object Storage unavailable
+  generatedBy: text("generated_by"),
+  metadata: text("metadata"),
+  content: text("content"),
   isPublic: integer("is_public").default(0),
+  entityName: text("entity_name"),
+  entityUrl: text("entity_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });

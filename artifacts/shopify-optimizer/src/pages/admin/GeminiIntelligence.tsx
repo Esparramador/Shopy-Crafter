@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Brain, Search, TrendingUp, Users, Building2, Package, Zap, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import SaveToVaultButton from "@/components/SaveToVaultButton";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -309,7 +310,21 @@ export default function GeminiIntelligence() {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--t)" }}>Gemini Intelligence</h1>
             <p style={{ margin: 0, fontSize: 12, color: "var(--t3)" }}>Investigación → Análisis → Aprendizaje Continuo</p>
           </div>
-          <div style={{ marginLeft: "auto", fontSize: 10, padding: "4px 10px", borderRadius: 20, background: "rgba(66,133,244,0.15)", color: "#4285f4", fontWeight: 700 }}>ONLINE</div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            {state.data && (
+              <SaveToVaultButton
+                title={`Gemini Research: ${activeTab} — ${auditForm.businessName || auditForm.domain || bizForm.businessName || "General"}`}
+                content={typeof state.data === "string" ? state.data : JSON.stringify(state.data, null, 2)}
+                fileType="research"
+                entityName={auditForm.businessName || bizForm.businessName || auditForm.domain || "General"}
+                entityUrl={auditForm.domain || bizForm.domain || compForm.domain || undefined}
+                generatedBy="gemini_research"
+                variant="small"
+                label="Guardar"
+              />
+            )}
+            <div style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, background: "rgba(66,133,244,0.15)", color: "#4285f4", fontWeight: 700 }}>ONLINE</div>
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 10, marginTop: 16 }}>

@@ -36,6 +36,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
   { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
+  { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
 ];
 
 const DEFAULT_ADMIN_NAV = [

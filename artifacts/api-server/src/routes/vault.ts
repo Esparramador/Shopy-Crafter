@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createRequire } from "module";
 import { db, projectFilesTable, projectsTable } from "@workspace/db";
 import { generationJobsTable } from "@workspace/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
@@ -879,6 +879,355 @@ function buildBrandedHtmlFromMetadata(file: {
     <div class="footer-sub">ShopyBrain AI Engine &mdash; shopycrafter.com</div>
     <div class="footer-sub">&copy; ${year} Shopy Crafter. Todos los derechos reservados.</div>
     <div class="footer-sub" style="margin-top:4px;">DOCUMENTO CONFIDENCIAL</div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BÓVEDA GLOBAL — Archivos de CUALQUIER empresa (con o sin proyecto registrado)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get("/vault/global/entities", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const projectEntities = await db.select({
+    entityName: projectsTable.name,
+    entityUrl: projectsTable.shopDomain,
+    projectId: projectsTable.id,
+    fileCount: sql<number>`count(${projectFilesTable.id})`,
+  })
+    .from(projectsTable)
+    .leftJoin(projectFilesTable, eq(projectFilesTable.projectId, projectsTable.id))
+    .groupBy(projectsTable.id, projectsTable.name, projectsTable.shopDomain);
+
+  const externalEntities = await db.select({
+    entityName: projectFilesTable.entityName,
+    entityUrl: projectFilesTable.entityUrl,
+    fileCount: sql<number>`count(*)`,
+    latestDate: sql<string>`max(${projectFilesTable.createdAt})`,
+  })
+    .from(projectFilesTable)
+    .where(and(isNull(projectFilesTable.projectId), isNotNull(projectFilesTable.entityName)))
+    .groupBy(projectFilesTable.entityName, projectFilesTable.entityUrl);
+
+  const entities = [
+    ...projectEntities.map(e => ({
+      name: e.entityName,
+      url: e.entityUrl,
+      projectId: e.projectId,
+      fileCount: Number(e.fileCount),
+      source: "project" as const,
+    })),
+    ...externalEntities.map(e => ({
+      name: e.entityName ?? "Sin nombre",
+      url: e.entityUrl,
+      projectId: null,
+      fileCount: Number(e.fileCount),
+      source: "external" as const,
+      latestDate: e.latestDate,
+    })),
+  ].sort((a, b) => b.fileCount - a.fileCount);
+
+  res.json({ entities, total: entities.length });
+});
+
+router.get("/vault/global", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const { entityName, fileType, category, projectId, limit: rawLimit = "100", offset: rawOffset = "0" } = req.query as Record<string, string>;
+
+  const parsedLimit = Math.min(Math.max(parseInt(rawLimit) || 100, 1), 500);
+  const parsedOffset = Math.max(parseInt(rawOffset) || 0, 0);
+
+  const conditions: any[] = [];
+  if (entityName) {
+    const parsedPid = projectId ? parseInt(projectId) : NaN;
+    if (!isNaN(parsedPid)) {
+      conditions.push(eq(projectFilesTable.projectId, parsedPid));
+    } else {
+      conditions.push(and(isNull(projectFilesTable.projectId), eq(projectFilesTable.entityName, entityName)));
+    }
+  }
+  if (fileType) conditions.push(eq(projectFilesTable.fileType, fileType));
+  if (category) conditions.push(eq(projectFilesTable.category, category));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const files = await db.select({
+    id: projectFilesTable.id,
+    projectId: projectFilesTable.projectId,
+    fileType: projectFilesTable.fileType,
+    category: projectFilesTable.category,
+    title: projectFilesTable.title,
+    description: projectFilesTable.description,
+    objectPath: projectFilesTable.objectPath,
+    originalUrl: projectFilesTable.originalUrl,
+    mimeType: projectFilesTable.mimeType,
+    fileSizeBytes: projectFilesTable.fileSizeBytes,
+    productId: projectFilesTable.productId,
+    productTitle: projectFilesTable.productTitle,
+    generatedBy: projectFilesTable.generatedBy,
+    metadata: projectFilesTable.metadata,
+    entityName: projectFilesTable.entityName,
+    entityUrl: projectFilesTable.entityUrl,
+    hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`.as("has_content"),
+    createdAt: projectFilesTable.createdAt,
+  }).from(projectFilesTable)
+    .where(whereClause)
+    .orderBy(desc(projectFilesTable.createdAt))
+    .limit(parsedLimit)
+    .offset(parsedOffset);
+
+  const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(projectFilesTable).where(whereClause);
+
+  const filesWithUrls = files.map(f => ({
+    ...f,
+    hasContent: undefined,
+    downloadUrl: (f.objectPath || f.hasContent)
+      ? (f.projectId
+          ? `/api/projects/${f.projectId}/vault/${f.id}/download`
+          : `/api/vault/global/${f.id}/download`)
+      : f.originalUrl ?? null,
+  }));
+
+  res.json({ files: filesWithUrls, total: Number(count) });
+});
+
+router.post("/vault/global/save", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const { title, content, fileType, category, entityName, entityUrl, projectId, productId, productTitle, metadata, generatedBy } = req.body;
+  if (!title || !content || !fileType) {
+    res.status(400).json({ error: "title, content y fileType son requeridos" }); return;
+  }
+  if (!entityName && !projectId) {
+    res.status(400).json({ error: "entityName o projectId es requerido" }); return;
+  }
+
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const displayName = entityName || "Entidad";
+
+  const htmlReport = generateProfessionalReport({
+    title: sanitizeHtml(title), content, entityName: sanitizeHtml(displayName), date, time,
+  });
+
+  const htmlBuffer = Buffer.from(htmlReport, "utf-8");
+  const safeName = title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
+  const safeEntity = (entityName || "external").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
+  const objectPath = projectId
+    ? `projects/${projectId}/${fileType}/${safeName}_${Date.now()}.html`
+    : `global/${safeEntity}/${fileType}/${safeName}_${Date.now()}.html`;
+
+  let savedPath: string | null = null;
+  try {
+    const gcsFile = await getStorage().getObjectEntityFile(objectPath);
+    await getStorage().uploadObject(gcsFile, htmlBuffer, "text/html");
+    savedPath = objectPath;
+  } catch (uploadErr: any) {
+    logger.warn({ err: uploadErr }, "Object storage upload failed for global vault report");
+  }
+
+  const validProjectId = projectId ? parseInt(String(projectId)) : null;
+  if (projectId && (isNaN(validProjectId!) || validProjectId! <= 0)) {
+    res.status(400).json({ error: "projectId inválido" }); return;
+  }
+
+  const [saved] = await db.insert(projectFilesTable).values({
+    projectId: validProjectId,
+    fileType,
+    category: category || null,
+    title,
+    description: `Informe guardado el ${date} a las ${time}`,
+    objectPath: savedPath,
+    mimeType: "text/html",
+    fileSizeBytes: htmlBuffer.length,
+    productId: productId || null,
+    productTitle: productTitle || null,
+    generatedBy: generatedBy || "manual_save",
+    metadata: metadata ? JSON.stringify(metadata) : null,
+    content: savedPath ? null : htmlReport,
+    entityName: entityName || null,
+    entityUrl: entityUrl || null,
+    isPublic: 0,
+  }).returning();
+
+  res.json({ success: true, fileId: saved.id, title, fileType, entityName });
+});
+
+router.get("/vault/global/:fileId/download", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const fileId = parseInt(String(req.params.fileId));
+  if (isNaN(fileId)) { res.status(400).json({ error: "fileId inválido" }); return; }
+
+  const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, fileId)).limit(1);
+  if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+  const filename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.${getExtension(file.mimeType ?? "application/octet-stream")}`;
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Type", file.mimeType ?? "application/octet-stream");
+
+  if (file.objectPath) {
+    try {
+      const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+      const response = await getStorage().downloadObject(gcsFile);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
+      return;
+    } catch { /* fallback */ }
+  }
+
+  if (file.content) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(file.content);
+    return;
+  }
+
+  if (file.metadata) {
+    const reportHtml = metadataToReportHtml(file);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(reportHtml);
+    return;
+  }
+
+  res.status(404).json({ error: "No se pudo recuperar el archivo" });
+});
+
+router.post("/vault/global/download-selected", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const { fileIds, entityName } = req.body;
+  if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 500) {
+    res.status(400).json({ error: "fileIds (array 1-500) es requerido" }); return;
+  }
+  const numericIds = fileIds.map((id: unknown) => parseInt(String(id))).filter((n: number) => !isNaN(n));
+  if (numericIds.length === 0) { res.status(400).json({ error: "fileIds inválidos" }); return; }
+
+  const files = await db.select().from(projectFilesTable)
+    .where(sql`${projectFilesTable.id} IN (${sql.join(numericIds.map((id: number) => sql`${id}`), sql`, `)})`);
+
+  if (files.length === 0) { res.status(404).json({ error: "No se encontraron archivos" }); return; }
+
+  const zipName = entityName
+    ? `${entityName.replace(/[^a-zA-Z0-9._-]/g, "_")}_vault.zip`
+    : `global_vault_${Date.now()}.zip`;
+
+  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+  res.setHeader("Content-Type", "application/zip");
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.pipe(res);
+
+  for (const file of files) {
+    const ext = getExtension(file.mimeType ?? "text/html");
+    const safeName = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60)}.${ext}`;
+    const folder = file.fileType || "otros";
+
+    if (file.objectPath) {
+      try {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const response = await getStorage().downloadObject(gcsFile);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        archive.append(buffer, { name: `${folder}/${safeName}` });
+        continue;
+      } catch { /* fallback */ }
+    }
+    if (file.content) {
+      archive.append(file.content, { name: `${folder}/${safeName}` });
+    } else if (file.metadata) {
+      const html = metadataToReportHtml(file);
+      archive.append(html, { name: `${folder}/${safeName}` });
+    }
+  }
+
+  await archive.finalize();
+});
+
+router.delete("/vault/global/:fileId", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
+  if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+  const fileId = parseInt(String(req.params.fileId));
+  if (isNaN(fileId)) { res.status(400).json({ error: "fileId inválido" }); return; }
+
+  const [file] = await db.select({ id: projectFilesTable.id, objectPath: projectFilesTable.objectPath })
+    .from(projectFilesTable).where(eq(projectFilesTable.id, fileId)).limit(1);
+  if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+  if (file.objectPath) {
+    try {
+      const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+      await getStorage().deleteObject(gcsFile);
+    } catch { /* best effort */ }
+  }
+
+  await db.delete(projectFilesTable).where(eq(projectFilesTable.id, fileId));
+  res.json({ success: true });
+});
+
+function generateProfessionalReport(opts: { title: string; content: string; entityName: string; date: string; time: string }): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${sanitizeHtml(opts.title)} — ${sanitizeHtml(opts.entityName)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #0a0a0f; color: #f5f5f7; line-height: 1.7; }
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 48px; }
+  .header { border-bottom: 2px solid #c8a84b; padding-bottom: 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .header-left h1 { font-size: 24px; font-weight: 800; color: #c8a84b; }
+  .header-left p { font-size: 13px; color: #8b8b9e; margin-top: 4px; }
+  .header-right { text-align: right; font-size: 12px; color: #8b8b9e; }
+  .header-right .brand { font-size: 11px; color: #c8a84b; font-weight: 700; margin-bottom: 2px; }
+  .content { font-size: 14px; color: #d0d0d8; }
+  .content h2 { font-size: 18px; font-weight: 700; color: #c8a84b; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #1e1e2e; }
+  .content h3 { font-size: 15px; font-weight: 700; color: #f5f5f7; margin: 20px 0 8px; }
+  .content p { margin: 8px 0; }
+  .content ul, .content ol { margin: 8px 0 8px 20px; }
+  .content li { margin: 4px 0; }
+  .content table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  .content th { background: #111118; color: #c8a84b; padding: 10px 12px; text-align: left; font-weight: 700; border-bottom: 2px solid #c8a84b; }
+  .content td { padding: 8px 12px; border-bottom: 1px solid #1e1e2e; }
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+  .metric-card { background: #111118; border: 1px solid #1e1e2e; border-radius: 10px; padding: 16px; }
+  .metric-card .label { font-size: 11px; color: #8b8b9e; text-transform: uppercase; }
+  .metric-card .value { font-size: 22px; font-weight: 800; color: #f5f5f7; margin-top: 4px; }
+  .section { background: #111118; border: 1px solid #1e1e2e; border-radius: 12px; padding: 20px; margin: 16px 0; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #1e1e2e; font-size: 11px; color: #8b8b9e; text-align: center; }
+  @media print { body { background: white; color: #111; } .page { padding: 20px; } .header { border-color: #c8a84b; } .content th { background: #f5f5f5; color: #111; } .content td { border-color: #ddd; } .section { background: #f9f9f9; border-color: #ddd; } .metric-card { background: #f5f5f5; border-color: #ddd; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-left">
+      <h1>${sanitizeHtml(opts.title)}</h1>
+      <p>${sanitizeHtml(opts.entityName)} — Generado por Shopy Crafter AI</p>
+    </div>
+    <div class="header-right">
+      <div class="brand">SHOPY CRAFTER</div>
+      <div>${opts.date}</div>
+      <div>${opts.time}</div>
+    </div>
+  </div>
+  <div class="content">
+    ${opts.content}
+  </div>
+  <div class="footer">
+    Shopy Crafter AI Intelligence &middot; ${opts.date} &middot; Informe confidencial<br>
+    &copy; ${year} Shopy Crafter. Todos los derechos reservados.
   </div>
 </div>
 </body>
