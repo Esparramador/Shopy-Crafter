@@ -221,6 +221,7 @@ router.post("/projects", async (req, res): Promise<void> => {
 
   const isShopify = platformType === "shopify";
   const isUniversal = platformType === "universal";
+  const isPrestaShop = platformType === "prestashop";
 
   if (!name || !shopDomain) {
     res.status(400).json({ error: "name y shopDomain (URL de la tienda) son obligatorios" });
@@ -232,7 +233,14 @@ router.post("/projects", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!isUniversal && !isShopify && !clientSecret) {
+  if (isPrestaShop) {
+    if (!clientSecret || clientSecret.length !== 32) {
+      res.status(400).json({ error: "La clave API de PrestaShop debe tener exactamente 32 caracteres." });
+      return;
+    }
+  }
+
+  if (!isUniversal && !isShopify && !isPrestaShop && !clientSecret) {
     res.status(400).json({ error: "name, shopDomain y las credenciales de la plataforma son obligatorios" });
     return;
   }
@@ -246,7 +254,7 @@ router.post("/projects", async (req, res): Promise<void> => {
     name,
     platformType,
     shopDomain: normalizedDomain,
-    clientId: clientId ?? "",
+    clientId: isPrestaShop ? "" : (clientId ?? ""),
     clientSecret: clientSecret ? encrypt(clientSecret) : "",
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
@@ -272,14 +280,16 @@ router.post("/projects", async (req, res): Promise<void> => {
   } else if (!isUniversal) {
     try {
       const connector = getConnector(project);
-      await connector.testConnection();
+      const testResult = await connector.testConnection();
+      if (!testResult.connected) {
+        req.log.warn({ projectId: project.id, platformType, error: testResult.error, errorCode: testResult.errorCode }, "Connection test failed for non-Shopify platform");
+      }
     } catch (err) {
       if (err instanceof PlatformNotSupportedError) {
         req.log.info({ projectId: project.id, platformType }, "Platform not yet implemented — project saved without connection test");
       } else {
         req.log.warn({ projectId: project.id, err }, "Connection test failed for non-Shopify platform — project saved for retry");
       }
-      await db.update(projectsTable).set({ accessToken: null }).where(eq(projectsTable.id, project.id));
     }
   }
 

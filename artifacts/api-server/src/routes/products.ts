@@ -7,6 +7,8 @@ import { auditProduct, scoreToGrade } from "../lib/audit";
 import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 import { logger } from "../lib/logger";
+import { saveToVault } from "../lib/vault";
+import { getConnector } from "../lib/connectors/index";
 
 const router = Router();
 
@@ -191,6 +193,142 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   if (!project) {
     res.status(404).json({ error: "Proyecto no encontrado" });
     return;
+  }
+
+  const platformType = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+
+  if (platformType === "prestashop") {
+    try {
+      const connector = getConnector(project);
+      const requestedFilter = req.body?.statusFilter || req.query?.statusFilter || "any";
+      const statusParam = requestedFilter === "any" ? undefined : requestedFilter;
+
+      logger.info({ projectId: id, domain: project.shopDomain, platform: "prestashop" }, "PrestaShop sync: starting");
+
+      let platformProducts: Awaited<ReturnType<typeof connector.getProducts>> = [];
+      let page = 1;
+      const pageSize = 100;
+      while (true) {
+        const batch = await connector.getProducts({ status: statusParam, page, limit: pageSize });
+        if (batch.length === 0) break;
+        platformProducts = platformProducts.concat(batch);
+        if (batch.length < pageSize) break;
+        page++;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      logger.info({ projectId: id, totalProducts: platformProducts.length }, "PrestaShop sync: all pages fetched");
+
+      let auditedCount = 0;
+      let totalScore = 0;
+
+      for (const pp of platformProducts) {
+        const audit = auditProduct({
+          title: pp.title,
+          body_html: pp.bodyHtml,
+          price: pp.price,
+          compare_at_price: pp.compareAtPrice,
+          images: pp.images.map((img, i) => ({ id: i, src: img.src, alt: img.alt ?? null, position: img.position ?? i })),
+          tags: pp.tags,
+        });
+
+        await db
+          .insert(productsTable)
+          .values({
+            projectId: id,
+            shopifyProductId: pp.platformId,
+            title: pp.title,
+            handle: pp.handle,
+            bodyHtml: pp.bodyHtml,
+            vendor: pp.vendor,
+            productType: pp.productType,
+            status: pp.status,
+            publishedAt: pp.status === "active" ? new Date().toISOString() : null,
+            tags: pp.tags,
+            price: pp.price ?? null,
+            compareAtPrice: pp.compareAtPrice ?? null,
+            imageCount: pp.images?.length ?? 0,
+            variantCount: pp.variants?.length ?? 1,
+            imagesJson: pp.images ?? [],
+            auditScore: audit.overallScore,
+            auditGrade: audit.grade,
+            titleScore: audit.titleScore,
+            descriptionScore: audit.descriptionScore,
+            priceScore: audit.priceScore,
+            imageScore: audit.imageScore,
+            seoScore: audit.seoScore,
+            auditProblems: audit.problems,
+            lastAuditedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [productsTable.projectId, productsTable.shopifyProductId],
+            set: {
+              title: pp.title,
+              handle: pp.handle,
+              bodyHtml: pp.bodyHtml,
+              vendor: pp.vendor,
+              productType: pp.productType,
+              status: pp.status,
+              publishedAt: pp.status === "active" ? new Date().toISOString() : null,
+              tags: pp.tags,
+              price: pp.price ?? null,
+              compareAtPrice: pp.compareAtPrice ?? null,
+              imageCount: pp.images?.length ?? 0,
+              variantCount: pp.variants?.length ?? 1,
+              imagesJson: pp.images ?? [],
+              auditScore: audit.overallScore,
+              auditGrade: audit.grade,
+              titleScore: audit.titleScore,
+              descriptionScore: audit.descriptionScore,
+              priceScore: audit.priceScore,
+              imageScore: audit.imageScore,
+              seoScore: audit.seoScore,
+              auditProblems: audit.problems,
+              lastAuditedAt: new Date(),
+            },
+          });
+
+        auditedCount++;
+        totalScore += audit.overallScore;
+      }
+
+      const psIds = platformProducts.map((p) => p.platformId);
+      const localProducts = await db
+        .select({ shopifyProductId: productsTable.shopifyProductId })
+        .from(productsTable)
+        .where(eq(productsTable.projectId, id));
+      const orphanIds = localProducts.filter((lp) => !psIds.includes(lp.shopifyProductId)).map((lp) => lp.shopifyProductId);
+      let removedCount = 0;
+      if (orphanIds.length > 0) {
+        for (const orphanId of orphanIds) {
+          await db.delete(productsTable).where(and(eq(productsTable.projectId, id), eq(productsTable.shopifyProductId, orphanId)));
+        }
+        removedCount = orphanIds.length;
+      }
+
+      const avgScore = auditedCount > 0 ? totalScore / auditedCount : null;
+      await db.update(projectsTable).set({ productCount: platformProducts.length, avgAuditScore: avgScore }).where(eq(projectsTable.id, id));
+
+      logger.info({ projectId: id, synced: platformProducts.length, removed: removedCount }, "PrestaShop sync: complete");
+
+      res.json({
+        synced: platformProducts.length,
+        auditedCount,
+        removed: removedCount,
+        avgScore,
+        statusBreakdown: {
+          active: platformProducts.filter((p) => p.status === "active").length,
+          draft: platformProducts.filter((p) => p.status === "draft").length,
+        },
+        message: `${platformProducts.length} productos PrestaShop sincronizados, ${removedCount} eliminados de BD`,
+      });
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ projectId: id, error: msg }, "PrestaShop sync: failed");
+      res.status(502).json({ error: `Error al sincronizar con PrestaShop: ${msg}` });
+      return;
+    }
   }
 
   if (!project.accessToken) {
@@ -432,7 +570,35 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
   let liveOptions: ShopifyProductRaw["options"] = [];
   let liveImages: ShopifyProductRaw["images"] = [];
 
-  if (project) {
+  const projectPlatform = (project as typeof project & { platformType?: string })?.platformType ?? "shopify";
+
+  if (project && projectPlatform === "prestashop") {
+    try {
+      const connector = getConnector(project);
+      const liveProduct = await connector.getProduct(shopifyProductId);
+      liveImages = liveProduct.images.map((img, i) => ({
+        id: i,
+        src: img.src,
+        alt: img.alt ?? null,
+        position: img.position ?? i,
+      }));
+      liveVariants = liveProduct.variants.map((v) => ({
+        id: parseInt(v.platformId, 10) || 0,
+        title: v.title,
+        price: v.price,
+        compare_at_price: v.compareAtPrice ?? null,
+        sku: v.sku ?? null,
+        option1: v.option1 ?? null,
+        option2: v.option2 ?? null,
+        option3: v.option3 ?? null,
+        inventory_quantity: v.inventoryQuantity ?? null,
+        weight: null,
+        weight_unit: null,
+      }));
+    } catch {
+      liveVariants = [];
+    }
+  } else if (project) {
     try {
       const shopifyData = await shopifyRequest<{ product: ShopifyProductRaw }>(
         projectId,
@@ -517,6 +683,129 @@ router.put("/projects/:projectId/products/:productId", async (req, res): Promise
   if (!updates || Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No hay campos para actualizar" });
     return;
+  }
+
+  const updatePlatform = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+
+  if (updatePlatform === "prestashop") {
+    try {
+      const connector = getConnector(project);
+      const productData: Partial<import("../lib/connectors/types").PlatformProduct> = {};
+      if (updates.title !== undefined) productData.title = updates.title;
+      if (updates.bodyHtml !== undefined) productData.bodyHtml = updates.bodyHtml;
+      if (updates.vendor !== undefined) productData.vendor = updates.vendor;
+      if (updates.productType !== undefined) productData.productType = updates.productType;
+      if (updates.tags !== undefined) productData.tags = updates.tags;
+      if (updates.status !== undefined) productData.status = updates.status;
+      if (updates.handle !== undefined) productData.handle = updates.handle;
+      if (updates.price !== undefined) productData.price = updates.price;
+      if (updates.compareAtPrice !== undefined) productData.compareAtPrice = updates.compareAtPrice;
+      if (updates.seoTitle || updates.seoDescription) {
+        productData.seo = {
+          metaTitle: updates.seoTitle,
+          metaDescription: updates.seoDescription,
+        };
+      }
+
+      if (updates.variants && Array.isArray(updates.variants)) {
+        productData.variants = updates.variants.map((v: { id?: string; price?: string; sku?: string; inventoryQuantity?: number }) => ({
+          id: v.id,
+          title: "",
+          price: v.price ?? "",
+          sku: v.sku,
+          inventoryQuantity: v.inventoryQuantity,
+        }));
+      }
+
+      const updated = await connector.updateProduct(shopifyProductId, productData);
+
+      const audit = auditProduct({
+        title: updated.title,
+        body_html: updated.bodyHtml,
+        price: updated.price,
+        compare_at_price: updated.compareAtPrice,
+        images: updated.images.map((img, i) => ({ id: i, src: img.src, alt: img.alt ?? null, position: img.position ?? i })),
+        tags: updated.tags,
+      });
+
+      await db
+        .update(productsTable)
+        .set({
+          title: updated.title,
+          handle: updated.handle,
+          bodyHtml: updated.bodyHtml,
+          vendor: updated.vendor,
+          productType: updated.productType,
+          status: updated.status,
+          tags: updated.tags,
+          price: updated.price ?? null,
+          compareAtPrice: updated.compareAtPrice ?? null,
+          imageCount: updated.images?.length ?? 0,
+          variantCount: updated.variants?.length ?? 1,
+          imagesJson: updated.images ?? [],
+          auditScore: audit.overallScore,
+          auditGrade: audit.grade,
+          titleScore: audit.titleScore,
+          descriptionScore: audit.descriptionScore,
+          priceScore: audit.priceScore,
+          imageScore: audit.imageScore,
+          seoScore: audit.seoScore,
+          auditProblems: audit.problems,
+          lastAuditedAt: new Date(),
+        })
+        .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+
+      learnFromOperation({
+        operationType: "product_optimization",
+        niche: project.storeNiche,
+        productType: updated.productType ?? null,
+        title: `PrestaShop product updated: ${updated.title}`,
+        content: `Producto "${updated.title}" actualizado en PrestaShop ${project.shopDomain}. SEO: ${updated.seo?.metaTitle ?? "N/A"}. Price: ${updated.price ?? "N/A"}. Variants: ${updated.variants?.length ?? 0}. Score: ${audit.overallScore}/100.`,
+        confidence: 0.95,
+        tags: ["prestashop", "product_optimization"],
+      });
+
+      saveToVault({
+        projectId,
+        fileType: "product_data",
+        category: "product_optimization",
+        title: `Product updated: ${updated.title}`,
+        content: JSON.stringify({
+          platformId: updated.platformId,
+          title: updated.title,
+          seo: updated.seo,
+          price: updated.price,
+          auditScore: audit.overallScore,
+        }),
+        productId: updated.platformId,
+        productTitle: updated.title,
+        generatedBy: "prestashop_connector",
+      });
+
+      res.json({
+        product: {
+          id: updated.platformId,
+          title: updated.title,
+          handle: updated.handle,
+          vendor: updated.vendor,
+          productType: updated.productType,
+          status: updated.status,
+          tags: updated.tags,
+          price: updated.price,
+          imageCount: updated.images?.length ?? 0,
+          variantCount: updated.variants?.length ?? 1,
+          auditScore: audit.overallScore,
+          auditGrade: audit.grade,
+        },
+        message: "Producto actualizado en PrestaShop y re-auditado",
+      });
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ projectId, shopifyProductId, error: msg }, "Failed to update PrestaShop product");
+      res.status(502).json({ error: `Error al actualizar en PrestaShop: ${msg}` });
+      return;
+    }
   }
 
   const shopifyPayload: Record<string, unknown> = { id: parseInt(shopifyProductId) };
@@ -804,6 +1093,8 @@ router.post("/projects/:projectId/products/create", async (req, res): Promise<vo
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
+  const createPlatform = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+
   const {
     title, bodyHtml, vendor, productType, tags, status,
     variants, options, images, aiGenerate,
@@ -892,6 +1183,144 @@ Responde SOLO JSON válido.`,
       }
     } catch (e) {
       console.error("AI generation for product failed, using original data:", e);
+    }
+  }
+
+  if (createPlatform === "prestashop") {
+    try {
+      const connector = getConnector(project);
+      const productData: Partial<import("../lib/connectors/types").PlatformProduct> = {
+        title: finalTitle,
+        bodyHtml: finalBody,
+        vendor: vendor || "",
+        productType: productType || "",
+        tags: finalTags,
+        status: status || "draft",
+        price: req.body.price || variants?.[0]?.price || "0.00",
+        seo: (seoTitle || seoDescription) ? { metaTitle: seoTitle, metaDescription: seoDescription } : undefined,
+      };
+
+      if (variants?.length) {
+        productData.variants = variants.map((v: Record<string, unknown>) => ({
+          platformId: "0",
+          title: (v.title as string) || "Default",
+          price: (v.price as string) || "0.00",
+          compareAtPrice: (v.compareAtPrice as string) || null,
+          sku: (v.sku as string) || "",
+        }));
+      }
+
+      const created = await connector.createProduct(productData);
+
+      if (images?.length) {
+        for (const img of images as Array<{ src: string; alt?: string }>) {
+          try {
+            await connector.uploadImage(created.platformId, img.src, img.alt || finalTitle);
+          } catch (imgErr) {
+            logger.warn({ productId: created.platformId, error: imgErr instanceof Error ? imgErr.message : String(imgErr) }, "PrestaShop image upload failed (continuing)");
+          }
+        }
+      }
+
+      const finalProduct = await connector.getProduct(created.platformId);
+
+      const audit = auditProduct({
+        title: finalProduct.title,
+        body_html: finalProduct.bodyHtml,
+        price: finalProduct.price,
+        compare_at_price: finalProduct.compareAtPrice,
+        images: finalProduct.images.map((img, i) => ({ id: i, src: img.src, alt: img.alt ?? null, position: img.position ?? i })),
+        tags: finalProduct.tags,
+      });
+
+      await db.insert(productsTable).values({
+        projectId,
+        shopifyProductId: finalProduct.platformId,
+        title: finalProduct.title,
+        handle: finalProduct.handle,
+        bodyHtml: finalProduct.bodyHtml,
+        vendor: finalProduct.vendor,
+        productType: finalProduct.productType,
+        status: finalProduct.status,
+        tags: finalProduct.tags,
+        price: finalProduct.price ?? null,
+        compareAtPrice: finalProduct.compareAtPrice ?? null,
+        imageCount: finalProduct.images?.length ?? 0,
+        variantCount: finalProduct.variants?.length ?? 1,
+        imagesJson: finalProduct.images ?? [],
+        auditScore: audit.overallScore,
+        auditGrade: scoreToGrade(audit.overallScore),
+        auditProblems: audit.problems,
+        titleScore: audit.titleScore,
+        descriptionScore: audit.descriptionScore,
+        priceScore: audit.priceScore,
+        imageScore: audit.imageScore,
+        seoScore: audit.seoScore,
+      }).onConflictDoUpdate({
+        target: [productsTable.projectId, productsTable.shopifyProductId],
+        set: {
+          title: finalProduct.title,
+          handle: finalProduct.handle,
+          bodyHtml: finalProduct.bodyHtml,
+          status: finalProduct.status,
+          tags: finalProduct.tags,
+          price: finalProduct.price ?? null,
+          imageCount: finalProduct.images?.length ?? 0,
+          variantCount: finalProduct.variants?.length ?? 1,
+          imagesJson: finalProduct.images ?? [],
+          auditScore: audit.overallScore,
+          auditGrade: scoreToGrade(audit.overallScore),
+        },
+      });
+
+      learnFromOperation({
+        operationType: "product_creation",
+        niche: project.storeNiche,
+        productType: productType ?? null,
+        title: `PrestaShop product created: ${finalProduct.title}`,
+        content: `Producto "${finalProduct.title}" creado en PrestaShop ${project.shopDomain}. SEO: meta_title="${seoTitle}", meta_description="${seoDescription}". Tags: ${finalTags}. Score: ${audit.overallScore}/100 (${scoreToGrade(audit.overallScore)}). ${aiGenerate ? "Contenido generado con IA." : "Contenido manual."}`,
+        confidence: 0.9,
+        tags: ["prestashop", "product_creation", productType ?? "general"].filter(Boolean),
+      });
+
+      saveToVault({
+        projectId,
+        fileType: "product_data",
+        category: "product_creation",
+        title: `Product created: ${finalProduct.title}`,
+        content: JSON.stringify({
+          platformId: finalProduct.platformId,
+          title: finalProduct.title,
+          seo: { metaTitle: seoTitle, metaDescription: seoDescription },
+          tags: finalTags,
+          auditScore: audit.overallScore,
+          aiGenerated: !!aiGenerate,
+        }),
+        productId: finalProduct.platformId,
+        productTitle: finalProduct.title,
+        generatedBy: "prestashop_connector",
+      });
+
+      res.json({
+        success: true,
+        product: {
+          shopifyId: parseInt(finalProduct.platformId, 10),
+          title: finalProduct.title,
+          handle: finalProduct.handle,
+          status: finalProduct.status,
+          url: `https://${project.shopDomain}/admin/catalog/products/${finalProduct.platformId}/edit`,
+          variants: finalProduct.variants?.length ?? 1,
+          images: finalProduct.images?.length ?? 0,
+          auditScore: audit.overallScore,
+          auditGrade: scoreToGrade(audit.overallScore),
+          aiGenerated: !!aiGenerate,
+        },
+      });
+      return;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: `Error creando producto en PrestaShop: ${msg}` });
+      return;
     }
   }
 

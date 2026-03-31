@@ -2,6 +2,7 @@ import type { Project } from "@workspace/db";
 import type { IPlatformConnector } from "./types";
 import { PlatformNotSupportedError } from "./types";
 import { ShopifyConnector } from "./shopify";
+import { PrestaShopConnector } from "./prestashop";
 
 export function getConnector(project: Project): IPlatformConnector {
   const platformType = (project as Project & { platformType?: string }).platformType ?? "shopify";
@@ -10,11 +11,11 @@ export function getConnector(project: Project): IPlatformConnector {
     case "shopify":
       return new ShopifyConnector(project);
 
+    case "prestashop":
+      return new PrestaShopConnector(project);
+
     case "woocommerce":
       throw new PlatformNotSupportedError("woocommerce");
-
-    case "prestashop":
-      throw new PlatformNotSupportedError("prestashop");
 
     case "wordpress":
       throw new PlatformNotSupportedError("wordpress");
@@ -28,6 +29,7 @@ export function getConnector(project: Project): IPlatformConnector {
 }
 
 export { ShopifyConnector } from "./shopify";
+export { PrestaShopConnector } from "./prestashop";
 export { PlatformNotSupportedError, FeatureNotSupportedError } from "./types";
 export type {
   IPlatformConnector,

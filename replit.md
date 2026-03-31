@@ -30,12 +30,14 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 
 ### Multi-Platform Connector Architecture
 The platform supports multiple e-commerce platforms via a connector abstraction layer:
-- **Supported Platforms**: Shopify (fully implemented), WooCommerce, PrestaShop, WordPress, Universal (planned)
+- **Supported Platforms**: Shopify (fully implemented), PrestaShop (fully implemented), WooCommerce, WordPress, Universal (planned)
 - **IPlatformConnector Interface**: Standard interface for testConnection, getProducts, createProduct, updateProduct, deleteProduct, getProductCount, getSEO, updateSEO, uploadImage
 - **ConnectorFactory**: `getConnector(project)` returns the appropriate connector based on `platformType` field
 - **ShopifyConnector**: Wraps existing `shopify.ts` functions without modifying them (13 files depend on shopify.ts)
-- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, index.ts)
+- **PrestaShopConnector**: Full implementation with XML writes / JSON reads, HTTP Basic Auth, multipart image upload, native SEO fields (meta_title, meta_description, link_rewrite, meta_keywords), stock management via stock_availables, combinations support
+- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, index.ts)
 - **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
+- **PrestaShop API Key**: Stored in `clientSecret` (encrypted), `clientId` left empty. Auth via HTTP Basic (key as username, empty password)
 
 ### Database
 PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data. The `projects` table includes a `platform_type` column (text, not-null, default "shopify") supporting: shopify, woocommerce, prestashop, wordpress, universal.

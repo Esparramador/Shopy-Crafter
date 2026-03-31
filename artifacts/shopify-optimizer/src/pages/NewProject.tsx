@@ -8,6 +8,13 @@ import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+type PlatformType = "shopify" | "prestashop";
+
+const PLATFORM_OPTIONS: Array<{ key: PlatformType; label: string; icon: string }> = [
+  { key: "shopify", label: "Shopify", icon: "🟢" },
+  { key: "prestashop", label: "PrestaShop", icon: "🔵" },
+];
+
 export default function NewProject() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -15,6 +22,7 @@ export default function NewProject() {
   const [error, setError] = useState<string | null>(null);
   const [showBrand, setShowBrand] = useState(false);
   const [extractField, setExtractField] = useState<"name" | "domain" | null>(null);
+  const [platformType, setPlatformType] = useState<PlatformType>("shopify");
   const [formData, setFormData] = useState({
     name: "",
     shopDomain: "",
@@ -35,6 +43,8 @@ export default function NewProject() {
     { key: "enterprise", label: "Enterprise €399/mes", desc: "200 productos · 6 imgs", color: "#3db87a" },
     { key: "admin", label: "Admin (sin límites)", desc: "Tienda propia", color: "#a855f7" },
   ];
+
+  const isPrestaShop = platformType === "prestashop";
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -59,13 +69,14 @@ export default function NewProject() {
         body: JSON.stringify({
           name: formData.name || formData.shopDomain.split(".")[0],
           shopDomain: formData.shopDomain,
-          clientId: formData.clientId,
+          clientId: isPrestaShop ? "" : formData.clientId,
           clientSecret: formData.clientSecret,
           storeNiche: formData.storeNiche || undefined,
           brandTone: formData.brandTone || undefined,
           targetAudience: formData.targetAudience || undefined,
           storeMarkets: formData.storeMarkets || undefined,
           plan: formData.plan,
+          platformType,
         }),
       });
       const data = await r.json();
@@ -82,7 +93,9 @@ export default function NewProject() {
     }
   };
 
-  const isValid = formData.shopDomain && formData.clientId && formData.clientSecret;
+  const isValid = isPrestaShop
+    ? formData.shopDomain && formData.clientSecret && formData.clientSecret.length === 32
+    : formData.shopDomain && formData.clientId && formData.clientSecret;
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
@@ -103,6 +116,43 @@ export default function NewProject() {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Platform selector */}
+        <div className="card" style={{ padding: "16px 24px", marginBottom: 16 }}>
+          <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+            Plataforma
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {PLATFORM_OPTIONS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => {
+                  setPlatformType(p.key);
+                  if (p.key === "prestashop") {
+                    setFormData(prev => ({ ...prev, clientId: "" }));
+                  }
+                }}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${platformType === p.key ? "#c9a84c" : "var(--bdr)"}`,
+                  background: platformType === p.key ? "rgba(201,168,76,0.08)" : "transparent",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{p.icon}</span>
+                <span style={{ fontSize: 13, fontFamily: "var(--fb)", color: platformType === p.key ? "#c9a84c" : "var(--t2)" }}>
+                  {p.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Bloque principal */}
         <div className="card" style={{ padding: "24px 28px", marginBottom: 16 }}>
 
@@ -123,17 +173,19 @@ export default function NewProject() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">{t("shopDomain", "Dominio Shopify *")}</label>
+              <label className="form-label">
+                {isPrestaShop ? "URL de tu tienda PrestaShop *" : t("shopDomain", "Dominio Shopify *")}
+              </label>
               <input
                 required
                 className="form-input"
                 value={formData.shopDomain}
                 onChange={handleChange("shopDomain")}
                 onBlur={() => formData.shopDomain.length >= 3 && setExtractField("domain")}
-                placeholder="mi-tienda.myshopify.com"
+                placeholder={isPrestaShop ? "mitienda.com" : "mi-tienda.myshopify.com"}
               />
               {extractField === "domain" && formData.shopDomain && (
-                <BrainExtractor value={formData.shopDomain} fieldContext="shopify_domain" onAutofill={handleAutofill} />
+                <BrainExtractor value={formData.shopDomain} fieldContext={isPrestaShop ? "prestashop_domain" : "shopify_domain"} onAutofill={handleAutofill} />
               )}
             </div>
           </div>
@@ -141,40 +193,89 @@ export default function NewProject() {
           <div style={{ borderTop: "1px solid var(--bdr)", margin: "20px 0" }} />
 
           {/* Credenciales */}
-          <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-            {t("credentialsHint", "Credenciales — Shopify Admin → Apps → Desarrollar apps → tu app → Credenciales de la API")}
-          </p>
-
-          <div className="grid-2" style={{ marginBottom: 0 }}>
-            <div className="form-group">
-              <label className="form-label">{t("apiKey", "API Key (Client ID) *")}</label>
-              <input
-                required
-                className="form-input"
-                style={{ fontFamily: "var(--fm)" }}
-                value={formData.clientId}
-                onChange={handleChange("clientId")}
-                placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                autoComplete="off"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">{t("apiSecret", "Clave secreta de la API *")}</label>
-              <input
-                required
-                type="password"
-                className="form-input"
-                style={{ fontFamily: "var(--fm)" }}
-                value={formData.clientSecret}
-                onChange={handleChange("clientSecret")}
-                placeholder="shpss_••••••••••••••••••••••••••••••••"
-                autoComplete="new-password"
-              />
-            </div>
-          </div>
+          {isPrestaShop ? (
+            <>
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                Credenciales — Parámetros Avanzados → Webservice → Añadir clave
+              </p>
+              <div style={{ marginBottom: 0 }}>
+                <div className="form-group">
+                  <label className="form-label">Clave API (32 caracteres) *</label>
+                  <input
+                    required
+                    className="form-input"
+                    style={{ fontFamily: "var(--fm)" }}
+                    value={formData.clientSecret}
+                    onChange={handleChange("clientSecret")}
+                    placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                    autoComplete="off"
+                    maxLength={32}
+                  />
+                  {formData.clientSecret && formData.clientSecret.length !== 32 && (
+                    <span style={{ fontSize: 11, color: "#dc3c3c", marginTop: 4, display: "block" }}>
+                      {formData.clientSecret.length}/32 caracteres
+                    </span>
+                  )}
+                  {formData.clientSecret && formData.clientSecret.length === 32 && (
+                    <span style={{ fontSize: 11, color: "#3db87a", marginTop: 4, display: "block" }}>
+                      32/32 caracteres
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "12px 14px", marginTop: 12 }}>
+                <p style={{ fontSize: 12, fontFamily: "var(--fb)", color: "var(--t2)", marginBottom: 8 }}>
+                  Cómo generar la clave API de PrestaShop:
+                </p>
+                <ol style={{ fontSize: 11, color: "var(--t3)", margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+                  <li>Ve a <strong>Parámetros Avanzados → Webservice</strong> en tu panel PrestaShop</li>
+                  <li>Activa el webservice si no lo está</li>
+                  <li>Haz clic en <strong>Añadir nueva clave</strong></li>
+                  <li>Se genera una clave de 32 caracteres automáticamente</li>
+                  <li>Activa los permisos: <strong>products, categories, images, stock_availables, orders, combinations, configurations, languages</strong></li>
+                  <li>Guarda y copia la clave aquí</li>
+                </ol>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                {t("credentialsHint", "Credenciales — Shopify Admin → Apps → Desarrollar apps → tu app → Credenciales de la API")}
+              </p>
+              <div className="grid-2" style={{ marginBottom: 0 }}>
+                <div className="form-group">
+                  <label className="form-label">{t("apiKey", "API Key (Client ID) *")}</label>
+                  <input
+                    required
+                    className="form-input"
+                    style={{ fontFamily: "var(--fm)" }}
+                    value={formData.clientId}
+                    onChange={handleChange("clientId")}
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{t("apiSecret", "Clave secreta de la API *")}</label>
+                  <input
+                    required
+                    type="password"
+                    className="form-input"
+                    style={{ fontFamily: "var(--fm)" }}
+                    value={formData.clientSecret}
+                    onChange={handleChange("clientSecret")}
+                    placeholder="shpss_••••••••••••••••••••••••••••••••"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
-            🔒 Credenciales cifradas con AES-256. El token de acceso se genera automáticamente al guardar.
+            {isPrestaShop
+              ? "🔒 Clave cifrada con AES-256. PrestaShop no requiere OAuth — conexión directa con la API key."
+              : "🔒 Credenciales cifradas con AES-256. El token de acceso se genera automáticamente al guardar."}
           </p>
         </div>
 
@@ -264,7 +365,11 @@ export default function NewProject() {
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
           {!isValid && (
             <span style={{ fontSize: 12, color: "var(--t3)" }}>
-              {!formData.shopDomain ? "Dominio requerido" : !formData.clientId ? "API Key requerida" : "Clave secreta requerida"}
+              {!formData.shopDomain
+                ? "Dominio requerido"
+                : isPrestaShop
+                  ? formData.clientSecret.length !== 32 ? "Clave API: 32 caracteres requeridos" : ""
+                  : !formData.clientId ? "API Key requerida" : "Clave secreta requerida"}
             </span>
           )}
           <button
