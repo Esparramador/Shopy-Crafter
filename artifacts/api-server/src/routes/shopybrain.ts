@@ -1393,6 +1393,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 suggestedPrice?: number;
                 suggestedCompareAtPrice?: number;
                 productType?: string;
+                category?: string;
+                metafields?: Array<{ namespace: string; key: string; value: string; type: string }>;
                 variants?: Array<{
                   optionValues: Record<string, string>;
                   sku?: string;
@@ -1522,8 +1524,31 @@ OPTIMIZACIÓN SEO AVANZADA (Metodología Semrush):
    GENERA ENTRE 6-30 variantes según el tipo de producto.
    inventoryPolicy: "deny" (no vender sin stock) o "continue" (permitir pedidos sin stock para servicios/digital)
 
+8. CATEGORÍA SHOPIFY (OBLIGATORIO):
+   Asigna la categoría correcta del Standard Product Taxonomy de Shopify.
+   Ejemplos: "Apparel & Accessories > Clothing > Shirts & Tops", "Health & Beauty > Personal Care > Cosmetics",
+   "Home & Garden > Kitchen & Dining > Drinkware", "Sporting Goods > Exercise & Fitness".
+   USA la taxonomía oficial de Shopify — categorías en inglés separadas por " > ".
+
+9. METAFIELDS COMPLETOS (OBLIGATORIO — genera TODOS los que apliquen):
+   Genera un array de metafields con namespace "custom" y los siguientes keys según el tipo de producto:
+   - material: composición/material principal (type: "single_line_text_field")
+   - color: color principal del producto (type: "single_line_text_field")
+   - care_instructions: instrucciones de cuidado y mantenimiento (type: "multi_line_text_field")
+   - origin_country: país de origen/fabricación (type: "single_line_text_field")
+   - dimensions: dimensiones del producto (type: "single_line_text_field")
+   - weight_info: peso detallado con unidades (type: "single_line_text_field")
+   - ingredients: ingredientes/composición detallada si aplica (type: "multi_line_text_field")
+   - certifications: certificaciones/sellos de calidad (type: "single_line_text_field")
+   - warranty: información de garantía (type: "single_line_text_field")
+   - age_group: grupo de edad recomendado si aplica (type: "single_line_text_field")
+   - gender: género target si aplica (type: "single_line_text_field")
+   - season: temporada/estación si aplica (type: "single_line_text_field")
+   - style: estilo/colección si aplica (type: "single_line_text_field")
+   NO incluyas metafields vacíos — solo los relevantes para este producto específico.
+
 Responde SOLO JSON válido:
-{"title":"...","description":"...HTML...","tags":[...22+ tags...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo","inventoryPolicy":"deny","options":[{"name":"Talla","values":["S","M","L","XL"]},{"name":"Color","values":["Negro","Blanco"]}],"variants":[{"optionValues":{"Talla":"S","Color":"Negro"},"sku":"CAM-S-NEG","price":29.99,"compareAtPrice":39.99,"inventoryQuantity":25,"weight":0.3,"weightUnit":"kg","costPerItem":12.50,"barcode":"8400000000001"},...]}`,
+{"title":"...","description":"...HTML...","tags":[...22+ tags...],"seoTitle":"...","seoDescription":"...","suggestedPrice":XX.99,"suggestedCompareAtPrice":XX.99,"productType":"tipo","category":"Taxonomy > Path > Category","metafields":[{"namespace":"custom","key":"material","value":"Algodón orgánico 100%","type":"single_line_text_field"},...],"inventoryPolicy":"deny","options":[{"name":"Talla","values":["S","M","L","XL"]},{"name":"Color","values":["Negro","Blanco"]}],"variants":[{"optionValues":{"Talla":"S","Color":"Negro"},"sku":"CAM-S-NEG","price":29.99,"compareAtPrice":39.99,"inventoryQuantity":25,"weight":0.3,"weightUnit":"kg","costPerItem":12.50,"barcode":"8400000000001"},...]}`,
                 `Eres el equipo de producto de las tiendas Shopify más exitosas del mundo combinado con la inteligencia SEO de Semrush. Has estudiado qué hace que Gymshark, Allbirds, Fenty Beauty, Skims, y las 100 mejores tiendas Shopify del mundo tengan fichas de producto PERFECTAS. Aplicas metodología Semrush: keyword density 1.5-2.5%, keyword prominence (keyword en primer párrafo), LSI keywords semánticas, readability optimizada (frases 15-25 palabras), FAQ schema-ready para Rich Snippets, y tags con intención transaccional. Tu misión: generar fichas que puntuarían 100/100 en Semrush On-Page SEO Checker y en cualquier auditoría de calidad Shopify. Responde SOLO JSON válido.`,
                 "seo",
                 storeNiche || undefined,
@@ -1628,6 +1653,9 @@ Responde SOLO JSON válido:
         if (seoTitle) shopifyProduct.metafields_global_title_tag = seoTitle;
         if (seoDescription) shopifyProduct.metafields_global_description_tag = seoDescription;
 
+        const aiCategory = aiContent?.category as string | undefined;
+        const aiMetafields = (aiContent?.metafields || []) as Array<{ namespace: string; key: string; value: string; type: string }>;
+
         const created = await shopifyRequest<{ product: Record<string, unknown> }>(
           parseInt(projectId), project.shopDomain, "/products.json",
           { method: "POST", body: JSON.stringify({ product: shopifyProduct }) }
@@ -1674,6 +1702,31 @@ Responde SOLO JSON válido:
         const createdProductId = String(created.product.id);
         const createdTitle = String(created.product.title);
         const createdHandle = String(created.product.handle || "");
+
+        let metafieldsPushed = 0;
+        if (aiMetafields.length > 0) {
+          for (const mf of aiMetafields) {
+            if (!mf.value || !mf.key) continue;
+            try {
+              await shopifyRequest(parseInt(projectId), project.shopDomain, `/products/${createdProductId}/metafields.json`, {
+                method: "POST",
+                body: JSON.stringify({ metafield: { namespace: mf.namespace || "custom", key: mf.key, value: mf.value, type: mf.type || "single_line_text_field" } }),
+              });
+              metafieldsPushed++;
+            } catch {}
+            await new Promise(r => setTimeout(r, 150));
+          }
+        }
+
+        if (aiCategory) {
+          const categoryProductType = typeof aiCategory === "string" ? aiCategory : (params?.productType || (aiContent?.productType as string) || "");
+          try {
+            await shopifyRequest(parseInt(projectId), project.shopDomain, `/products/${createdProductId}.json`, {
+              method: "PUT",
+              body: JSON.stringify({ product: { id: createdProductId, product_type: categoryProductType } }),
+            });
+          } catch {}
+        }
 
         saveToVault({
           projectId: parseInt(projectId),

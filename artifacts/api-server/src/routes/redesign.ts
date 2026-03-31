@@ -235,7 +235,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
 router.post("/projects/:projectId/products/:productId/apply-redesign", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-  const { fields } = req.body as { fields: string[]; redesignId?: number };
+  const { fields: rawFields } = req.body as { fields?: string[]; redesignId?: number };
+  const fields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : ["title", "description", "tags", "meta", "price"];
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   const [redesign] = await db
@@ -251,16 +252,14 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
   }
 
   const updateData: Record<string, unknown> = {};
-  const metafields: Array<{ namespace: string; key: string; value: string; type: string }> = [];
+  const seoMetafields: Array<{ namespace: string; key: string; value: string; type: string }> = [];
 
   if (fields.includes("title")) updateData.title = redesign.newTitle;
   if (fields.includes("description")) updateData.body_html = redesign.newBodyHtml;
   if (fields.includes("tags")) updateData.tags = redesign.newTags;
   if (fields.includes("meta")) {
-    metafields.push(
-      { namespace: "seo", key: "title", value: redesign.metaTitle, type: "single_line_text_field" },
-      { namespace: "seo", key: "description", value: redesign.metaDescription, type: "single_line_text_field" }
-    );
+    if (redesign.metaTitle) seoMetafields.push({ namespace: "seo", key: "title", value: redesign.metaTitle, type: "single_line_text_field" });
+    if (redesign.metaDescription) seoMetafields.push({ namespace: "seo", key: "description", value: redesign.metaDescription, type: "single_line_text_field" });
   }
 
   if (fields.includes("price")) {
@@ -290,11 +289,11 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     });
   }
 
-  for (const mf of metafields) {
+  for (const mf of seoMetafields) {
     await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`, {
       method: "POST",
       body: JSON.stringify({ metafield: mf }),
-    });
+    }).catch(() => {});
     await new Promise((r) => setTimeout(r, 200));
   }
 
@@ -303,7 +302,78 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     .set({ appliedAt: new Date(), appliedFields: fields })
     .where(eq(redesignsTable.id, redesign.id));
 
-  res.json({ success: true, message: "Cambios aplicados correctamente en tu tienda" });
+  let imagesGenerated = 0;
+  let imageErrors: string[] = [];
+  const shouldGenerateImages = fields.includes("images") || fields.includes("photos");
+
+  if (shouldGenerateImages) {
+    try {
+      const existingImages = await shopifyRequest<{ images: Array<{ id: number; src: string; alt: string }> }>(
+        projectId, project.shopDomain, `/products/${shopifyProductId}/images.json`
+      ).catch(() => ({ images: [] }));
+
+      const referenceImageUrl = existingImages.images?.[0]?.src;
+
+      if (referenceImageUrl) {
+        const { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify, generateDynamicCreativeScenes } = await import("./reference-images.js");
+        const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
+        const { checkProductionLimit, recordUsage } = await import("../lib/plan-limits.js");
+
+        const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+        const productType = product?.productType || "";
+        const storeNiche = project.storeNiche || "general";
+
+        const standardScenes = getScenesForProductType(productType, storeNiche);
+        const dynamicScenes = await generateDynamicCreativeScenes(projectId, redesign.newTitle, productType, storeNiche, standardScenes.length);
+        const allScenes = [...standardScenes, ...dynamicScenes];
+
+        const limitCheck = await checkProductionLimit(projectId, "image", allScenes.length);
+        const allowedCount = limitCheck.allowed ? allScenes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+
+        if (allowedCount > 0) {
+          const referenceBuffer = await downloadImageToBuffer(referenceImageUrl);
+          const scenesToGenerate = allScenes.slice(0, allowedCount);
+          const existingImageCount = existingImages.images?.length ?? 0;
+
+          for (let i = 0; i < scenesToGenerate.length; i++) {
+            const scene = scenesToGenerate[i];
+            try {
+              const prompt = scene.promptTemplate(redesign.newTitle, productType, storeNiche);
+              const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
+              const altText = `${redesign.newTitle} - ${scene.label}`;
+              const uploadResult = await uploadBufferToShopify({
+                projectId,
+                shopDomain: project.shopDomain,
+                shopifyProductId,
+                imageBuffer: generatedBuffer,
+                altText,
+                position: existingImageCount + i + 1,
+              });
+              if (uploadResult.success) {
+                imagesGenerated++;
+                await recordUsage(projectId, "image", 1);
+              } else {
+                imageErrors.push(`${scene.label}: upload failed`);
+              }
+            } catch (e: unknown) {
+              imageErrors.push(`${scene.label}: ${e instanceof Error ? e.message : "error"}`);
+            }
+          }
+        }
+      }
+    } catch (imgErr: unknown) {
+      imageErrors.push(`Error general: ${imgErr instanceof Error ? imgErr.message : "error"}`);
+    }
+  }
+
+  res.json({
+    success: true,
+    message: shouldGenerateImages
+      ? `Cambios aplicados correctamente. ${imagesGenerated > 0 ? `${imagesGenerated} imágenes creativas generadas desde la foto de referencia.` : ""}${imageErrors.length > 0 ? ` ${imageErrors.length} errores en imágenes.` : ""}`
+      : "Cambios aplicados correctamente en tu tienda",
+    imagesGenerated,
+    imageErrors: imageErrors.length > 0 ? imageErrors : undefined,
+  });
 });
 
 router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void> => {

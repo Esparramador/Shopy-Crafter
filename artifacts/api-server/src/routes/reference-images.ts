@@ -37,6 +37,8 @@ function getScenesForProductType(productType: string, niche: string): SceneConfi
       { key: "model_lifestyle", label: "Modelo lifestyle", promptTemplate: (desc, _pt, n) => `Lifestyle fashion photography: model wearing this exact ${desc} in a real-world aspirational setting matching ${n} aesthetic. Urban environment, golden hour lighting, candid but styled pose. The garment must be EXACTLY the same as the reference — same color, design, details.` },
       { key: "flat_lay", label: "Flat lay", promptTemplate: (desc, _pt, _n) => `Premium flat-lay product photography of this exact ${desc}. Overhead shot on marble or clean surface, styled with complementary accessories (watch, sunglasses, shoes). The garment is neatly folded/arranged. Every design detail, color, and texture EXACTLY preserved. Magazine-quality composition.` },
       { key: "detail_closeup", label: "Detalle close-up", promptTemplate: (desc, _pt, _n) => `Extreme macro photography of this exact ${desc}. Close-up on fabric texture, stitching quality, label, or unique design detail. Shallow depth of field, studio lighting emphasizing material quality. Product details EXACTLY preserved.` },
+      { key: "action_urban", label: "Acción urbana", promptTemplate: (desc, _pt, n) => `Dynamic street style photography: model wearing this exact ${desc} walking confidently through a vibrant urban setting matching ${n} aesthetic. Motion in the environment, sharp focus on the outfit. Wind catching the fabric. Cinematic color grading. Product details EXACTLY preserved. Nike campaign quality.` },
+      { key: "artistic_editorial", label: "Editorial artístico", promptTemplate: (desc, _pt, _n) => `High-fashion editorial photography: model wearing this exact ${desc} in a dramatic, artistic pose. Dramatic studio lighting with color gels, smoke machine atmosphere, avant-garde composition. The garment is the star — every detail EXACTLY preserved. Vogue Italia editorial quality.` },
     ];
   }
 
@@ -48,6 +50,8 @@ function getScenesForProductType(productType: string, niche: string): SceneConfi
       { key: "sole_detail", label: "Suela detalle", promptTemplate: (desc, _pt, _n) => `Product photography showing the sole/bottom of this exact ${desc}. Clean shot showing tread pattern, material quality, branding on sole. Studio white background. All details EXACTLY preserved.` },
       { key: "lifestyle_context", label: "Lifestyle contexto", promptTemplate: (desc, _pt, n) => `Lifestyle photography: person wearing this exact ${desc} in an aspirational ${n} setting. Full outfit visible, natural environment, golden hour or dramatic lighting. Shoe details, color, design EXACTLY preserved.` },
       { key: "detail_texture", label: "Textura detalle", promptTemplate: (desc, _pt, _n) => `Extreme close-up macro photography of this exact ${desc}. Focus on material texture, stitching, construction quality. Shallow depth of field, emphasizing premium craftsmanship. All details EXACTLY preserved.` },
+      { key: "action_sport", label: "Acción deportiva", promptTemplate: (desc, _pt, n) => `Dynamic action photography: athlete/person wearing this exact ${desc} in mid-movement — running, jumping, skateboarding, dancing. Motion blur on background, razor-sharp focus on the footwear. Dramatic low angle, ${n} environment. Shoe details EXACTLY preserved. Nike/Adidas campaign quality.` },
+      { key: "artistic_display", label: "Display artístico", promptTemplate: (desc, _pt, _n) => `Artistic product photography: this exact ${desc} floating/levitating against a dramatic gradient background with dynamic color splashes and light rays. Energy and movement conveyed through the composition. Every shoe detail EXACTLY preserved. Sneaker culture art gallery quality.` },
     ];
   }
 
@@ -96,9 +100,61 @@ function getScenesForProductType(productType: string, niche: string): SceneConfi
     { key: "lifestyle_context", label: "Lifestyle contexto", promptTemplate: (desc, _pt, n) => `Lifestyle product photography of this exact ${desc} in an aspirational real-world setting matching ${n} aesthetic. Natural lighting, shallow depth of field. Product details EXACTLY preserved. Editorial magazine quality.` },
     { key: "model_interaction", label: "Con modelo", promptTemplate: (desc, _pt, n) => `Professional photography: person interacting with or using this exact ${desc} in a natural ${n} context. Product prominently featured. Every product detail EXACTLY preserved. Commercial lifestyle quality.` },
     { key: "detail_macro", label: "Detalle macro", promptTemplate: (desc, _pt, _n) => `Extreme macro close-up photography of this exact ${desc}. Focus on material quality, texture, craftsmanship details. Shallow depth of field, dramatic lighting. Every detail EXACTLY preserved.` },
+    { key: "action_scene", label: "Escena de acción", promptTemplate: (desc, _pt, n) => `Dynamic action photography: person actively using this exact ${desc} in an energetic, aspirational ${n} setting. Motion blur on background, sharp focus on product. Action/sport/movement context that shows the product in its ideal use case. Product details EXACTLY preserved. Nike/GoPro commercial quality.` },
+    { key: "artistic_render", label: "Render artístico", promptTemplate: (desc, _pt, _n) => `Artistic editorial photography of this exact ${desc}. Dramatic chiaroscuro lighting, smoke/mist atmosphere, dark moody background. The product as the hero element, almost sculptural. Every detail EXACTLY preserved. Gallery exhibition quality, Hasselblad medium format look.` },
     { key: "scale_comparison", label: "Escala comparación", promptTemplate: (desc, _pt, _n) => `Product scale reference photography of this exact ${desc} next to a human hand or common everyday object. Clean background, clear size comparison. Product details EXACTLY preserved.` },
     { key: "flat_lay_styled", label: "Flat lay estilizado", promptTemplate: (desc, _pt, _n) => `Premium styled flat-lay photography of this exact ${desc} with 2-3 complementary lifestyle items. Overhead shot, clean surface, curated composition. Product details EXACTLY preserved.` },
   ];
+}
+
+async function generateDynamicCreativeScenes(
+  projectId: number,
+  productTitle: string,
+  productType: string,
+  niche: string,
+  existingSceneCount: number
+): Promise<SceneConfig[]> {
+  try {
+    const result = await askClaudeWithBrain(
+      projectId,
+      [{ role: "user", content: `PRODUCT: "${productTitle}"
+CATEGORY: ${productType || "general"}
+NICHE: ${niche}
+EXISTING SCENES: ${existingSceneCount} standard scenes already generated.
+
+Generate 3-4 CREATIVE and UNIQUE additional scene ideas for this SPECIFIC product that go BEYOND standard product photography. Think like a world-class creative director — the kind of shots that make a product go viral on social media.
+
+CREATIVE DIRECTIONS to consider (pick what fits THIS product):
+- ACTION SCENES: Someone actively using the product in its ideal context (skateboarding, cooking, exercising, creating art, etc.)
+- ARTISTIC/EDITORIAL: Dramatic lighting, paint splashes, smoke, slow-motion freeze-frame effects
+- PERSPECTIVE PLAY: Extreme angles, bird's eye, worm's eye, through-glass, reflection shots
+- STORYTELLING: Before/after, unboxing sequence, making-of, behind-the-scenes
+- ENVIRONMENTAL: Product in unexpected but aspirational locations (rooftop sunset, beach, mountain peak, rain)
+- ANIMATION FEEL: Frozen motion, levitating product, dynamic energy lines, splash/explosion effects
+- 3D MODEL SHOWCASE: Someone painting/crafting/sculpting the product, artisan workshop feel
+- CULTURAL/LIFESTYLE: Product integrated into a specific lifestyle moment (morning routine, date night, adventure trip)
+
+For EACH scene return EXACTLY this JSON format (array):
+[{"key":"unique_key","label":"Short Spanish label","prompt":"Detailed English prompt for image editing. Must say 'this exact [product]' and end with 'Product details EXACTLY preserved.'"}]
+
+Output ONLY the JSON array — no markdown, no explanations.` }],
+      `You are the world's most creative commercial photography art director. You've directed campaigns for Apple, Nike, Zara, Dyson, and Glossier. You think beyond conventional product photography. Your scenes tell stories, evoke emotions, and make products feel alive. Every prompt must be technically precise for an AI image editor that will transform a reference photo. Output ONLY valid JSON.`,
+      "images",
+      niche
+    );
+
+    const cleaned = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned) as Array<{ key: string; label: string; prompt: string }>;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(s => s.key && s.label && s.prompt).map(s => ({
+      key: s.key,
+      label: s.label,
+      promptTemplate: (_desc: string, _pt: string, _n: string) => s.prompt,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 async function generateReferenceImagePrompt(
@@ -653,4 +709,4 @@ Write the specialized virtual try-on prompt for this product and scene.`;
 }
 
 export default router;
-export { getScenesForProductType, getTryOnScenes, downloadImageToBuffer, uploadBufferToShopify };
+export { getScenesForProductType, getTryOnScenes, downloadImageToBuffer, uploadBufferToShopify, generateDynamicCreativeScenes };
