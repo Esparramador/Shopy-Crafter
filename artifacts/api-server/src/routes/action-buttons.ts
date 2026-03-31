@@ -70,11 +70,11 @@ function extractProductCards(rawData: unknown): string {
     auditScore: (p.auditScore as number) ?? (p.score as number) ?? 0,
     auditGrade: String(p.auditGrade || p.grade || "D"),
     hasComparePrice: !!(p.hasComparePrice ?? p.hasCompare),
-    hasMetaTitle: !!p.hasMetaTitle,
-    hasMetaDesc: !!p.hasMetaDesc,
-    hasSchema: !!p.hasSchema,
-    hasAltTexts: !!p.hasAltTexts,
-    cleanHandle: !!p.cleanHandle,
+    hasMetaTitle: p.hasMetaTitle !== undefined ? !!p.hasMetaTitle : undefined,
+    hasMetaDesc: p.hasMetaDesc !== undefined ? !!p.hasMetaDesc : undefined,
+    hasSchema: p.hasSchema !== undefined ? !!p.hasSchema : undefined,
+    hasAltTexts: p.hasAltTexts !== undefined ? !!p.hasAltTexts : undefined,
+    cleanHandle: p.cleanHandle !== undefined ? !!p.cleanHandle : undefined,
     issues: (p.issues as string[]) || undefined,
   }));
 
