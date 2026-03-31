@@ -406,6 +406,17 @@ router.post("/projects", async (req, res): Promise<void> => {
     ipAddress: req.ip ?? "unknown",
   });
 
+  try {
+    learnFromOperation({
+      operationType: "project_creation",
+      niche: storeNiche ?? undefined,
+      title: `Proyecto creado: ${name} (${platformType}) — ${normalizedDomain}`,
+      content: `Plataforma: ${platformType}. Dominio: ${normalizedDomain}. Nombre: ${name}. Nicho: ${storeNiche ?? "N/A"}. Tono: ${brandTone ?? "N/A"}. Audiencia: ${targetAudience ?? "N/A"}. Mercados: ${storeMarkets ?? "N/A"}.`,
+      confidence: 0.85,
+      tags: ["project_creation", platformType, storeNiche ?? "general"],
+    });
+  } catch { /* learning is best-effort */ }
+
   res.status(201).json({
     ...refreshed,
     clientSecret: "••••••••",

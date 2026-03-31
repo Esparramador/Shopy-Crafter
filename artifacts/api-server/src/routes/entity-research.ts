@@ -21,7 +21,7 @@ import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, omnicoreNicheProfilesTable } from "@workspace/db/schema";
 import { deepEntityResearch, askGeminiWithSearch, askGeminiJson } from "../lib/gemini.js";
-import { getClaudeClient } from "../lib/claude.js";
+import { getClaudeClient, learnFromOperation } from "../lib/claude.js";
 import { randomUUID } from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
@@ -632,6 +632,15 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       content: fullResearchContent,
       metadata: { entity: entityDisplay, url: entity.url, niche, researchId, elapsed },
     }).catch(() => {});
+
+    learnFromOperation({
+      operationType: "entity_research",
+      niche: niche ?? undefined,
+      title: `Deep research: ${entityDisplay} (${research.allSources.length} fuentes, ${memoryIds.length} memorias)`,
+      content: `Entidad: ${entityDisplay}. URL: ${entity.url ?? "N/A"}. Handles: ${JSON.stringify(entity.handles)}. Dimensiones: overview, products, social, news, reviews, competitors, ecommerce, pricing, paidAds, founders, international, urlDeepDive. Fuentes: ${research.allSources.length}. Memorias: ${memoriesCreated} nuevas, ${memoriesUpdated} actualizadas. Nicho: ${niche ?? "general"}. Tiempo: ${elapsed}s.`,
+      confidence: 0.90,
+      tags: ["entity_research", "deep_research", entityDisplay.toLowerCase(), niche ?? "general"],
+    });
 
     res.json({
       success: true,

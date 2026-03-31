@@ -139,6 +139,50 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
       confidence: 0.8,
       tags: ["lead", "prereport", lead.niche || "general"],
     });
+
+    if (businessResearch && (businessResearch as any)?.text) {
+      learnFromOperation({
+        operationType: "lead_business_intel",
+        niche: lead.niche || undefined,
+        title: `Intel empresa: ${entityName} (${lead.niche || "general"})`,
+        content: ((businessResearch as any).text as string).slice(0, 2000),
+        confidence: 0.82,
+        tags: ["lead_research", "business_intel", lead.niche || "general", entityName],
+      });
+    }
+
+    if (marketResearch && (marketResearch as any)?.text) {
+      learnFromOperation({
+        operationType: "lead_market_intel",
+        niche: lead.niche || undefined,
+        title: `Intel mercado: nicho ${lead.niche || "general"} — fuentes lead ${lead.name}`,
+        content: ((marketResearch as any).text as string).slice(0, 2000),
+        confidence: 0.82,
+        tags: ["lead_research", "market_intel", lead.niche || "general"],
+      });
+    }
+
+    if (seoResearch && (seoResearch as any)?.text) {
+      learnFromOperation({
+        operationType: "seo",
+        niche: lead.niche || undefined,
+        title: `SEO audit lead: ${entityName} (${lead.storeUrl || "sin URL"})`,
+        content: ((seoResearch as any).text as string).slice(0, 2000),
+        confidence: 0.80,
+        tags: ["lead_research", "seo_audit", lead.niche || "general"],
+      });
+    }
+
+    if (lead.socialMedia?.trim()) {
+      learnFromOperation({
+        operationType: "lead_social_intel",
+        niche: lead.niche || undefined,
+        title: `Social media lead: ${lead.name} — ${lead.socialMedia.slice(0, 80)}`,
+        content: `Lead ${lead.name} proporcionó redes sociales: ${lead.socialMedia}. Nicho: ${lead.niche || "general"}. URL tienda: ${lead.storeUrl || "N/A"}. Facturación: ${lead.revenue || "N/A"}.`,
+        confidence: 0.75,
+        tags: ["lead", "social_media", lead.niche || "general"],
+      });
+    }
   } catch {};
 
   return buildReportHtml(lead, {

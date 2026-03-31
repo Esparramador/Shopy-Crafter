@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable } from "@workspace/db";
+import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable, omnicoreAbsorbedContentTable } from "@workspace/db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
@@ -178,7 +178,7 @@ export async function buildShopyBrainContext(
 
     const { searchRelevantKnowledge, searchDomainKnowledge, formatKnowledgeContext, getOmniCorePrompts } = await import("./knowledge-search.js");
 
-    const [memories, prompts, topInsights, visualInsights, omniQueryResults, omniDomainResults, omniPrompts] = await Promise.all([
+    const [memories, prompts, topInsights, visualInsights, omniQueryResults, omniDomainResults, omniPrompts, recentAbsorbed] = await Promise.all([
       db
         .select({
           memoryType: omnicoreMemoriesTable.memoryType,
@@ -237,9 +237,23 @@ export async function buildShopyBrainContext(
       searchDomainKnowledge(useCase || "general", 8, 0.7),
 
       getOmniCorePrompts(),
+
+      db
+        .select({
+          sourceType: omnicoreAbsorbedContentTable.sourceType,
+          sourceLabel: omnicoreAbsorbedContentTable.sourceLabel,
+          sourceUrl: omnicoreAbsorbedContentTable.sourceUrl,
+          mainThemes: omnicoreAbsorbedContentTable.mainThemes,
+          ecommerceInsights: omnicoreAbsorbedContentTable.ecommerceInsights,
+          niche: omnicoreAbsorbedContentTable.niche,
+        })
+        .from(omnicoreAbsorbedContentTable)
+        .where(gte(omnicoreAbsorbedContentTable.confidence, 0.7))
+        .orderBy(desc(omnicoreAbsorbedContentTable.createdAt))
+        .limit(8),
     ]);
 
-    const hasAnyData = memories.length > 0 || prompts.length > 0 || topInsights.length > 0 || visualInsights.length > 0 || omniQueryResults.length > 0 || omniDomainResults.length > 0;
+    const hasAnyData = memories.length > 0 || prompts.length > 0 || topInsights.length > 0 || visualInsights.length > 0 || omniQueryResults.length > 0 || omniDomainResults.length > 0 || recentAbsorbed.length > 0;
     if (!hasAnyData) return "";
 
     const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — INTELIGENCIA ACUMULADA (46,000+ insights) ━━━"];
@@ -296,6 +310,22 @@ export async function buildShopyBrainContext(
       lines.push(`\n🎬 Inteligencia visual absorbida de referencias${isVisualTask ? " (alta prioridad)" : ""}:`);
       for (const v of visualInsights) {
         lines.push(`  ${v.title}: ${(v.insight ?? "").slice(0, 200)} (conf: ${v.confidence})`);
+      }
+    }
+
+    if (recentAbsorbed.length > 0) {
+      const nicheAbsorbed = niche
+        ? recentAbsorbed.filter(a => a.niche && a.niche.toLowerCase().includes(niche.toLowerCase()))
+        : recentAbsorbed;
+      const absorbedToShow = (nicheAbsorbed.length > 0 ? nicheAbsorbed : recentAbsorbed).slice(0, 5);
+      lines.push("\n🔗 Contenido absorbido reciente (URLs, marcas, investigaciones):");
+      for (const a of absorbedToShow) {
+        let themes = "";
+        try {
+          const parsed = a.mainThemes ? JSON.parse(a.mainThemes as string) : [];
+          themes = Array.isArray(parsed) ? parsed.slice(0, 3).join(", ") : "";
+        } catch { /* malformed mainThemes — skip */ }
+        lines.push(`  [${a.sourceType}] ${a.sourceLabel ?? a.sourceUrl ?? "?"}: ${themes}`);
       }
     }
 

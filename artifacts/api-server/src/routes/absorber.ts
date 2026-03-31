@@ -14,7 +14,7 @@ import { sanitizeHtml } from "../lib/html-escape.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
-import { getClaudeClient } from "../lib/claude.js";
+import { getClaudeClient, learnFromOperation } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";
@@ -347,6 +347,15 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       .set({ absorbedToMemory: 1, memoryIds: memoryId })
       .where(eq(omnicoreAbsorbedContentTable.id, absorbId));
     
+    learnFromOperation({
+      operationType: "absorb_url",
+      niche: niche ?? undefined,
+      title: `Absorbido: [${urlType}] ${title.slice(0, 80)}`,
+      content: `URL: ${url}\nTipo: ${urlType}\nTemas: ${JSON.stringify(analysis.main_themes ?? analysis.content_themes ?? []).slice(0, 300)}\nInsights eCommerce: ${JSON.stringify(analysis.ecommerce_insights ?? analysis.ecommerceInsights ?? {}).slice(0, 500)}\nÁngulos marketing: ${JSON.stringify(analysis.marketing_angles ?? analysis.marketingAngles ?? []).slice(0, 400)}`,
+      confidence: 0.78,
+      tags: ["absorbed", urlType, "url_content", niche ?? "general"],
+    });
+
     res.json({
       success: true,
       absorbId,
@@ -464,6 +473,15 @@ router.post("/shopybrain/absorb-image",
         .set({ absorbedToMemory: 1, memoryIds: memoryId })
         .where(eq(omnicoreAbsorbedContentTable.id, absorbId));
       
+      learnFromOperation({
+        operationType: "absorb_visual",
+        niche: niche ?? undefined,
+        title: `Visual absorbido: ${title.slice(0, 80)}`,
+        content: `Tipo: ${sourceType}. Composición: ${JSON.stringify(a.visual_composition ?? {}).slice(0, 300)}. Colores: ${JSON.stringify(a.colors_palette ?? a.color_palette ?? {}).slice(0, 200)}. Insights Shopify: ${JSON.stringify(a.actionable_insights_for_shopify ?? {}).slice(0, 400)}`,
+        confidence: 0.82,
+        tags: ["absorbed", sourceType, "visual_intel", niche ?? "general"],
+      });
+
       res.json({
         success: true,
         absorbId,
