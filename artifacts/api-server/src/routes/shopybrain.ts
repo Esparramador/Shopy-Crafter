@@ -4806,7 +4806,7 @@ Responde SOLO JSON:
               const rawPath = String(file.filePath).replace(/^src\//, "");
               const fullPath = resolveFilePath(`src/${rawPath}`) || resolveFilePath(rawPath);
               if (!fullPath) {
-                failedFiles.push(file.filePath);
+                failedFiles.push(`${file.filePath} (intentado: src/${rawPath}, ${rawPath})`);
                 continue;
               }
               if (!fullPath.startsWith(FRONTEND_SRC)) {
