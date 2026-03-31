@@ -461,6 +461,29 @@ Acciones disponibles:
 - learn_from_content: Aprender de texto/contenido pegado directamente. Params: {content, label? (descripción), contentType? ("article"|"strategy"|"competitor"|"product"|"instruction")}
 - recall_knowledge: Buscar en la memoria del cerebro por tema/keyword. Params: {query, limit? (default 10)}
 - brain_status: Ver estado completo del cerebro (total memorias, por tipo, últimas aprendidas). Sin params.
+- list_users: Listar todos los usuarios/clientes registrados. Sin params.
+- create_user: Crear un nuevo usuario (siempre rol client). Params: {email, name?, password?}
+- invite_client: Invitar un cliente a un proyecto (genera link de invitación + envía email). Params: {projectId, email, name?}
+- deactivate_user: Desactivar un usuario (bloquear acceso). Params: {userId}
+- activate_user: Reactivar un usuario desactivado. Params: {userId}
+- reset_user_password: Resetear contraseña de un usuario. Params: {userId, password}
+- list_messages: Listar mensajes de un proyecto. Params: {projectId}
+- send_message: Enviar mensaje a un cliente en un proyecto. Params: {projectId, content}
+- unread_messages: Ver cuántos mensajes sin leer hay. Sin params.
+- list_approvals: Listar aprobaciones pendientes de un proyecto. Params: {projectId}
+- create_approval: Crear una aprobación para que el cliente apruebe un cambio. Params: {projectId, type?, title, description?, beforeValue?, afterValue?, reasoning?, estimatedImpact?}
+- audit_log: Ver el registro de auditoría (últimas 100 acciones admin). Sin params.
+- list_automations: Listar todas las automatizaciones/cron jobs y su estado. Sin params.
+- run_automation: Ejecutar una automatización manualmente. Params: {jobId (ej: "micro-learning", "revenue-snapshots", "inventory-sync", "competitor-scans", "daily-deep-study", "mega-synthesis", "token-refresh")}
+- list_email_flows: Listar flujos de email marketing guardados. Params: {projectId?}
+- create_email_flow: Crear un flujo de email (CRUD, no generar con IA). Params: {projectId, name, flowType?, triggerType?, sendDelay?, subjectA?, subjectB?, previewText?, tone?, language?}
+- delete_email_flow: Eliminar un flujo de email. Params: {flowId}
+- send_restock_email: Generar email de restock a proveedor con IA. Params: {projectId, productId, productTitle?, currentStock?, daysRemaining?, supplierEmail?}
+- restock_orders: Ver órdenes de restock pendientes/historial. Params: {projectId}
+- remove_from_collection: Quitar un producto de una colección. Params: {projectId, collectionId, productId}
+- generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
+- run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
+- generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
 
 CMS PATHS (usa update_cms/update_cms_batch, N=índice):
   site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
@@ -519,6 +542,16 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
 - Analizar tienda externa / investigar tienda / analizar URL / pre-informe / estudio previo / analizar competencia (sin conexión) / analizar empresa / analizar negocio → analyze_external_store. Params: {url?, name?, instagram?, niche?, projectId}. NO necesita conexión Shopify — funciona solo con URL/nombre/Instagram.
+- Usuarios / clientes / listar usuarios → list_users; Crear usuario / nuevo cliente → create_user; Invitar cliente / enviar invitación → invite_client
+- Desactivar usuario / bloquear acceso → deactivate_user; Activar usuario / restaurar acceso → activate_user; Resetear contraseña → reset_user_password
+- Mensajes / mensajes del proyecto → list_messages; Enviar mensaje / escribir al cliente → send_message; Mensajes sin leer → unread_messages
+- Aprobaciones / pendientes → list_approvals; Crear aprobación / solicitar aprobación → create_approval
+- Audit log / registro de auditoría / historial de acciones → audit_log
+- Automatizaciones / cron jobs / tareas programadas → list_automations; Ejecutar automatización / ejecutar job / run job → run_automation
+- Flujos de email / email flows / listar flujos → list_email_flows; Crear flujo email (CRUD) → create_email_flow; Eliminar flujo → delete_email_flow
+- Email restock / email proveedor / restock → send_restock_email; Órdenes restock / pedidos restock → restock_orders
+- Quitar de colección / eliminar de colección / sacar de colección → remove_from_collection
+- Generar informe / exportar reporte / report / export → generate_export; Auditoría completa / full audit report → run_full_audit_report; Informe IA / AI report → generate_ai_report
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
 Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -531,9 +564,13 @@ Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, dispo
 • DISEÑO DE THEME: Editar Liquid, CSS, secciones, settings del theme de Shopify
 • EMAIL MARKETING: Flujos automáticos (welcome, abandoned cart, post-purchase, win-back), newsletters, campañas
 • COMPETIDORES: Escaneo de competencia, precios, productos, amenazas, alertas
-• INVENTARIO: Sincronización, alertas de stock bajo, gestión
+• INVENTARIO: Sincronización, alertas de stock bajo, restock emails a proveedores, analytics de ventas
 • PROPUESTAS COMERCIALES: Presupuestos y propuestas para clientes
 • CMS COMPLETO: Editar toda la landing, precios, textos, colores de la app
+• ADMIN TOTAL: Gestión de usuarios/clientes, invitaciones, mensajes, aprobaciones, audit log
+• AUTOMATIZACIONES: Listar y ejecutar cron jobs manualmente (micro-learning, revenue, inventario, competidores)
+• INFORMES/EXPORTS: Generar informes completos (SEO, financiero, catálogo, competidores, inventario, brand brief, IA)
+• FLUJOS EMAIL CRUD: Crear, listar, eliminar flujos de email marketing (además de generar con IA)
 - IMPORTANTE: SIEMPRE leer el archivo ANTES de editarlo (read_theme_file → edit_theme_file). NUNCA sobrescribir a ciegas.
 - Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
 - USA projectId del contexto si hay proyecto activo
@@ -1250,6 +1287,8 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
   const { action, params } = req.body;
   if (!action) { res.status(400).json({ error: "action requerida" }); return; }
+
+  const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
 
   try {
     let result: Record<string, unknown> = {};
@@ -6429,14 +6468,443 @@ Responde SOLO con JSON válido (sin markdown):
         break;
       }
 
+      case "list_users": {
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/users`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const users = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al listar usuarios" }; break; }
+          const summary = (users as Array<Record<string, unknown>>).map((u: Record<string, unknown>) =>
+            `• ${u.name} (${u.email}) — rol: ${u.role}, activo: ${u.isActive ? "✅" : "❌"}, último login: ${u.lastLogin || "nunca"}`
+          ).join("\n");
+          result = { users, total: users.length, message: `👥 **${users.length} usuarios registrados**\n\n${summary}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "create_user": {
+        const email = params?.email;
+        const name = params?.name || "Cliente";
+        const password = params?.password;
+        if (!email) { result = { error: true, message: "❌ Falta email del usuario" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/users`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ email, name, role: "client", password }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error creando usuario"}` }; break; }
+          result = { ...data, message: `✅ **Usuario creado**\n\n📧 Email: ${email}\n👤 Nombre: ${name}\n🔑 Rol: client` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "invite_client": {
+        const projectId = params?.projectId;
+        const email = params?.email;
+        const name = params?.name || "Cliente";
+        if (!projectId || !email) { result = { error: true, message: "❌ Falta projectId o email" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/projects/${projectId}/invite`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ email, name }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error invitando cliente"}` }; break; }
+          result = { ...data, message: `📨 **Cliente invitado**\n\n📧 ${email}\n👤 ${name}\n🔗 Link: ${data.inviteLink}\n📩 Email enviado: ${data.emailSent ? "Sí" : "No (envía el link manualmente)"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "deactivate_user": {
+        const userId = params?.userId;
+        if (!userId) { result = { error: true, message: "❌ Falta userId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/users/${userId}/deactivate`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          if (!resp.ok) { result = { error: true, message: "❌ Error desactivando usuario" }; break; }
+          result = { message: `🚫 **Usuario ${userId} desactivado** — ya no puede acceder a la plataforma.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "activate_user": {
+        const userId = params?.userId;
+        if (!userId) { result = { error: true, message: "❌ Falta userId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/users/${userId}/activate`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          if (!resp.ok) { result = { error: true, message: "❌ Error activando usuario" }; break; }
+          result = { message: `✅ **Usuario ${userId} activado** — acceso restaurado.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "reset_user_password": {
+        const userId = params?.userId;
+        const password = params?.password;
+        if (!userId || !password) { result = { error: true, message: "❌ Falta userId o password" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/users/${userId}/reset-password`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ password }),
+          });
+          if (!resp.ok) { result = { error: true, message: "❌ Error reseteando contraseña" }; break; }
+          result = { message: `🔑 **Contraseña reseteada** para usuario ${userId}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_messages": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/projects/${projectId}/messages`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const msgs = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al listar mensajes" }; break; }
+          const summary = (msgs as Array<Record<string, unknown>>).slice(-10).map((m: Record<string, unknown>) =>
+            `[${m.fromRole}] ${m.fromName}: ${String(m.content).slice(0, 100)}`
+          ).join("\n");
+          result = { messages: msgs, total: msgs.length, message: `💬 **${msgs.length} mensajes** (últimos 10):\n\n${summary || "(sin mensajes)"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "send_message": {
+        const projectId = params?.projectId;
+        const content = params?.content;
+        if (!projectId || !content) { result = { error: true, message: "❌ Falta projectId o content" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/projects/${projectId}/messages`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ content }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error enviando mensaje" }; break; }
+          result = { ...data, message: `✅ **Mensaje enviado** al proyecto ${projectId}:\n\n"${String(content).slice(0, 200)}"` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "unread_messages": {
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/unread-messages`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al consultar mensajes" }; break; }
+          result = { ...data, message: `📬 **${data.total} mensajes sin leer**` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_approvals": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/projects/${projectId}/approvals`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const items = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al listar aprobaciones" }; break; }
+          const summary = (items as Array<Record<string, unknown>>).map((a: Record<string, unknown>) =>
+            `• [${a.status}] ${a.title} — ${a.type}`
+          ).join("\n");
+          result = { approvals: items, total: items.length, message: `📋 **${items.length} aprobaciones**\n\n${summary || "(vacío)"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "create_approval": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/projects/${projectId}/approvals`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({
+              type: params?.type || "change",
+              title: params?.title || "Cambio pendiente",
+              description: params?.description || "",
+              beforeValue: params?.beforeValue,
+              afterValue: params?.afterValue,
+              reasoning: params?.reasoning,
+              estimatedImpact: params?.estimatedImpact,
+            }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error creando aprobación" }; break; }
+          result = { ...data, message: `📋 **Aprobación creada**: ${params?.title}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "audit_log": {
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/admin/audit-log`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const logs = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al consultar audit log" }; break; }
+          const summary = (logs as Array<Record<string, unknown>>).slice(0, 15).map((l: Record<string, unknown>) =>
+            `• ${l.createdAt} — ${l.action}: ${String(l.details).slice(0, 80)}`
+          ).join("\n");
+          result = { logs, total: logs.length, message: `📜 **Audit Log** (últimos 15 de ${logs.length}):\n\n${summary}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_automations": {
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/automations/jobs`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const jobs = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al listar automatizaciones" }; break; }
+          const summary = (jobs as Array<Record<string, unknown>>).map((j: Record<string, unknown>) =>
+            `• **${j.name}** [${j.status}] — ${j.description}\n  ⏰ Schedule: ${j.schedule} | Próx: ${j.nextRunTime || "?"} | Última: ${j.lastRunTime || "nunca"} (${j.lastRunResult || "-"})`
+          ).join("\n");
+          result = { jobs, total: jobs.length, message: `⚙️ **${jobs.length} automatizaciones**\n\n${summary}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "run_automation": {
+        const jobId = params?.jobId;
+        if (!jobId) { result = { error: true, message: "❌ Falta jobId (ej: 'micro-learning', 'revenue-snapshots', 'inventory-sync')" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/automations/jobs/${jobId}/run`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error ejecutando automatización"}` }; break; }
+          result = { ...data, message: `🚀 **Automatización "${jobId}" ejecutada manualmente** — ejecutándose en segundo plano.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_email_flows": {
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const projectId = params?.projectId;
+          const url = projectId ? `${baseUrl}/api/emails/flows?projectId=${projectId}` : `${baseUrl}/api/emails/flows`;
+          const resp = await fetch(url, { headers: { cookie: req.headers.cookie ?? "" } });
+          const flows = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al listar flujos de email" }; break; }
+          const summary = (flows as Array<Record<string, unknown>>).map((f: Record<string, unknown>) =>
+            `• **${f.name}** — tipo: ${f.flow_type}, trigger: ${f.trigger_type}, estado: ${f.status || "draft"}`
+          ).join("\n");
+          result = { flows, total: flows.length, message: `📧 **${flows.length} flujos de email**\n\n${summary || "(sin flujos)"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "create_email_flow": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/emails/flows`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({
+              project_id: projectId,
+              name: params?.name || "Nuevo flujo",
+              flow_type: params?.flowType || "welcome",
+              trigger_type: params?.triggerType || "signup",
+              send_delay: params?.sendDelay || "1h",
+              subject_a: params?.subjectA || "",
+              subject_b: params?.subjectB || "",
+              preview_text: params?.previewText || "",
+              tone: params?.tone || "urgente",
+              language: params?.language || "es",
+            }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error creando flujo"}` }; break; }
+          result = { ...data, message: `✅ **Flujo de email creado**: ${params?.name || "Nuevo flujo"} (${params?.flowType || "welcome"})` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "delete_email_flow": {
+        const flowId = params?.flowId;
+        if (!flowId) { result = { error: true, message: "❌ Falta flowId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/emails/flows/${flowId}`, {
+            method: "DELETE", headers: { cookie: req.headers.cookie ?? "" },
+          });
+          if (!resp.ok) { result = { error: true, message: "❌ Error eliminando flujo" }; break; }
+          result = { message: `🗑️ **Flujo de email ${flowId} eliminado**` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "send_restock_email": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/restock-email`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({
+              projectId, productId,
+              productTitle: params?.productTitle || "",
+              currentStock: params?.currentStock || 0,
+              daysRemaining: params?.daysRemaining || 7,
+              supplierEmail: params?.supplierEmail || "",
+            }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando email de restock"}` }; break; }
+          result = { ...data, message: `📦 **Email de restock generado**\n\n📧 Asunto: ${data.subject}\n⚡ Urgencia: ${data.urgency}\n📊 Cantidad sugerida: ${data.suggestedQuantity} unidades\n\n${data.body}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "restock_orders": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/restock-orders?projectId=${projectId}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          const orders = await resp.json() as Array<Record<string, unknown>>;
+          if (!resp.ok) { result = { error: true, message: "❌ Error al consultar órdenes de restock" }; break; }
+          const summary = (orders as Array<Record<string, unknown>>).map((o: Record<string, unknown>) =>
+            `• ${o.productTitle} — ${o.quantitySuggested} uds, urgencia: ${o.urgency}, estado: ${o.status || "pending"}`
+          ).join("\n");
+          result = { orders, total: orders.length, message: `📦 **${orders.length} órdenes de restock**\n\n${summary || "(sin órdenes)"}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "remove_from_collection": {
+        const projectId = params?.projectId;
+        const collectionId = params?.collectionId;
+        const productId = params?.productId;
+        if (!projectId || !collectionId || !productId) {
+          result = { error: true, message: "❌ Falta projectId, collectionId o productId" }; break;
+        }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project?.accessToken) { result = { error: true, message: "❌ Proyecto sin token de acceso" }; break; }
+          const token = safeDecrypt(project.accessToken);
+          const domain = project.shopDomain;
+          const collectsResp = await fetch(`https://${domain}/admin/api/2024-01/collects.json?collection_id=${collectionId}&product_id=${productId}`, {
+            headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+          });
+          const collectsData = await collectsResp.json() as { collects: Array<{ id: number }> };
+          if (!collectsData.collects?.length) { result = { error: true, message: "❌ El producto no está en esa colección" }; break; }
+          for (const c of collectsData.collects) {
+            await fetch(`https://${domain}/admin/api/2024-01/collects/${c.id}.json`, {
+              method: "DELETE", headers: { "X-Shopify-Access-Token": token },
+            });
+          }
+          result = { message: `✅ **Producto ${productId} eliminado de la colección ${collectionId}**` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_export": {
+        const projectId = params?.projectId;
+        const reportType = params?.reportType || "complete-report";
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        const validTypes = ["seo-audit", "product-catalog", "financial", "brand-brief", "ab-tests", "images-gallery", "competitors", "consistency", "inventory", "redesigns", "revenue", "complete-report", "csv/products"];
+        if (!validTypes.includes(reportType)) {
+          result = { error: true, message: `❌ Tipo de reporte inválido. Tipos válidos: ${validTypes.join(", ")}` }; break;
+        }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/exports/${reportType}`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({})) as Record<string, unknown>;
+            result = { error: true, message: `❌ ${errData.error ?? "Error generando reporte"}` }; break;
+          }
+          const contentType = resp.headers.get("content-type") || "";
+          if (contentType.includes("text/html")) {
+            result = { message: `📊 **Reporte "${reportType}" generado correctamente** (HTML)\n\nEl reporte está disponible en:\n🔗 /api/projects/${projectId}/exports/${reportType}\n\nPuedes verlo desde el panel de admin → Exports.` };
+          } else if (contentType.includes("text/csv")) {
+            result = { message: `📊 **CSV "${reportType}" generado** — disponible en /api/projects/${projectId}/exports/${reportType}` };
+          } else {
+            const data = await resp.json() as Record<string, unknown>;
+            result = { ...data, message: `📊 **Reporte "${reportType}" generado correctamente**` };
+          }
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "run_full_audit_report": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/exports/run-full-audit`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({})) as Record<string, unknown>;
+            result = { error: true, message: `❌ ${errData.error ?? "Error ejecutando auditoría completa"}` }; break;
+          }
+          const text = await resp.text();
+          result = { message: `📊 **Auditoría completa ejecutada y guardada**\n\nEl informe completo está disponible en:\n🔗 /api/projects/${projectId}/exports/complete-report\n\nIncluye: SEO, productos, financiero, competidores, inventario, A/B tests, imágenes.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_ai_report": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/exports/generate-ai-report`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ sections: params?.sections }),
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({})) as Record<string, unknown>;
+            result = { error: true, message: `❌ ${errData.error ?? "Error generando informe IA"}` }; break;
+          }
+          const contentType = resp.headers.get("content-type") || "";
+          if (contentType.includes("text/html")) {
+            result = { message: `🤖 **Informe IA generado**\n\nDisponible en el panel de exports.` };
+          } else {
+            const data = await resp.json() as Record<string, unknown>;
+            result = { ...data, message: `🤖 **Informe IA generado correctamente**` };
+          }
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
       default:
         res.status(400).json({ error: `Acción desconocida: ${action}` });
         return;
     }
 
+    const redactParams = (p: Record<string, unknown> | undefined): Record<string, unknown> => {
+      if (!p) return {};
+      const safe: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p)) {
+        safe[k] = SENSITIVE_KEYS.has(k) ? "***REDACTED***" : v;
+      }
+      return safe;
+    };
+
+    const NON_LEARNABLE = new Set([
+      "reset_user_password", "create_user", "list_users", "deactivate_user",
+      "activate_user", "audit_log", "unread_messages",
+    ]);
+
     const r = result as Record<string, unknown>;
-    if (!r.error) {
-      const enrichedContent = buildEnrichedLearningContent(action, params, r);
+    if (!r.error && !NON_LEARNABLE.has(action)) {
+      const safeParams = redactParams(params);
+      const enrichedContent = buildEnrichedLearningContent(action, safeParams, r);
       learnFromOperation({
         operationType: `chatbot_action_${action}`,
         title: enrichedContent.title,
@@ -6452,6 +6920,8 @@ Responde SOLO con JSON válido (sin markdown):
       "inspect_code", "fix_code", "list_source_files",
       "edit_theme_file", "edit_theme_css", "edit_theme_settings",
       "brain_sync", "brain_export",
+      "list_users", "reset_user_password", "audit_log", "unread_messages",
+      "list_messages", "list_approvals", "list_automations", "list_email_flows",
     ]);
     const isSaveable = !NON_SAVEABLE.has(action);
     const pId = params?.projectId ? parseInt(params.projectId) : null;
@@ -6467,14 +6937,17 @@ Responde SOLO con JSON válido (sin markdown):
         fileSizeBytes: Buffer.from(content).length,
         generatedBy: "shopybrain",
         content,
-        metadata: { action, params: { ...params, accessToken: undefined, clientSecret: undefined }, timestamp: new Date().toISOString() },
+        metadata: { action, params: redactParams(params), timestamp: new Date().toISOString() },
       }).catch(() => {});
     }
 
     res.json({ success: true, action, ...result });
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e);
-    logger.error({ action, params, error: errMsg }, "Chatbot action failed");
+    const safeLogParams = params ? Object.fromEntries(
+      Object.entries(params).map(([k, v]) => [k, SENSITIVE_KEYS.has(k) ? "***" : v])
+    ) : {};
+    logger.error({ action, params: safeLogParams, error: errMsg }, "Chatbot action failed");
 
     let friendlyError = `Error ejecutando ${action}`;
     if (errMsg.includes("credit balance is too low") || errMsg.includes("insufficient_quota") || errMsg.includes("billing")) {
