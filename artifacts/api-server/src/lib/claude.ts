@@ -344,14 +344,14 @@ export async function buildShopyBrainContext(
     if (nicheMemories.length > 0) {
       lines.push(`\n📌 Conocimiento específico del nicho (${niche}):`);
       for (const m of nicheMemories.slice(0, 5)) {
-        lines.push(`  [${m.memoryType}] ${m.title ?? ""}: ${(m.content ?? "").slice(0, 160)}`);
+        lines.push(`  [${m.memoryType}] ${m.title ?? ""}: ${(m.content ?? "").slice(0, 800)}`);
       }
     }
 
     if (imagePatternMemories.length > 0) {
       lines.push("\n🖼 Patrones visuales de referencias analizadas:");
       for (const m of imagePatternMemories.slice(0, 4)) {
-        lines.push(`  ${m.title ?? ""}: ${(m.content ?? "").slice(0, 180)}`);
+        lines.push(`  ${m.title ?? ""}: ${(m.content ?? "").slice(0, 800)}`);
       }
     }
 
@@ -359,7 +359,7 @@ export async function buildShopyBrainContext(
       lines.push("\n💡 Memorias y patrones de la agencia:");
       for (const m of generalMemories.slice(0, 6)) {
         const nicheTag = m.niche ? ` [${m.niche}]` : "";
-        lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 160)}`);
+        lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 800)}`);
       }
     }
 
@@ -589,7 +589,7 @@ export function learnFromOperation(params: {
     productType: params.productType ?? null,
     market: "es",
     title: params.title.slice(0, 200),
-    content: params.content.slice(0, 2000),
+    content: params.content,
     confidence: params.confidence ?? 0.65,
     sourceType: `auto_${params.operationType}`,
     tags: params.tags ? JSON.stringify(params.tags) : null,

@@ -220,7 +220,7 @@ Devuelve SOLO este JSON (nada más):
     const message = await client.messages.create(
       {
         model: "claude-sonnet-4-5",
-        max_tokens: 4000,
+        max_tokens: 8192,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       },

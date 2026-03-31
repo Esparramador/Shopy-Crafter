@@ -81,7 +81,7 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
     learnFromOperation({
       operationType: "pricing",
       title: `Investigación precios: ${productTitle.slice(0, 80)}`,
-      content: `Producto: "${productTitle}" (${productType}). Nicho: ${niche}. Rango mercado: ${result.marketPriceRange.min}-${result.marketPriceRange.max}€ (mediana ${result.marketPriceRange.median}€). Precio sugerido: ${result.suggestedPrice}€. Compare-at: ${result.suggestedCompareAtPrice}€. Competidores: ${JSON.stringify(result.competitorPrices).slice(0, 800)}. Estrategia: ${result.pricingStrategy.slice(0, 400)}`,
+      content: `Producto: "${productTitle}" (${productType}). Nicho: ${niche}. Rango mercado: ${result.marketPriceRange.min}-${result.marketPriceRange.max}€ (mediana ${result.marketPriceRange.median}€). Precio sugerido: ${result.suggestedPrice}€. Compare-at: ${result.suggestedCompareAtPrice}€. Competidores: ${JSON.stringify(result.competitorPrices)}. Estrategia: ${result.pricingStrategy}`,
       confidence: 0.88,
       tags: ["pricing", "market_research", niche],
     });
@@ -275,7 +275,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
           entityKnowledgeContext = `\n\n═══ CONOCIMIENTO ACUMULADO EN SHOPYBRAIN SOBRE "${potentialEntity.toUpperCase()}" ═══
 [${entityKnowledge.memories.length} memorias · ${entityKnowledge.dimensions.join(", ")} · última actualización: ${entityKnowledge.knowledgeAge}]
 
-${entityKnowledge.summary.slice(0, 3000)}
+${entityKnowledge.summary}
 ═══ FIN DE CONOCIMIENTO PREVIO ═══
 
 INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es información real ya investigada y verificada por Shopy Crafter. Complementa con tu propio conocimiento si es necesario.`;
@@ -291,7 +291,7 @@ INSTRUCCIÓN: Usa este conocimiento guardado como base para tu respuesta. Es inf
       .limit(5);
 
     const memoriesContext = relevantMemories.length > 0
-      ? `\n\nCONOCIMIENTO RECIENTE EN SHOPYBRAIN:\n${relevantMemories.map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 200)}`).join("\n")}`
+      ? `\n\nCONOCIMIENTO RECIENTE EN SHOPYBRAIN:\n${relevantMemories.map(m => `• ${m.title}: ${(m.content ?? "").slice(0, 1000)}`).join("\n")}`
       : "";
 
     const isGuideRequest = detectGuideRequest(query);
@@ -1090,7 +1090,7 @@ function learnFromConversation(userQuery: string, aiResponse: string, niche?: st
       learnFromOperation({
         operationType: "explicit_instruction",
         title: `Instrucción directa: ${userQuery.slice(0, 120)}`,
-        content: `INSTRUCCIÓN DEL USUARIO (alta prioridad): "${userQuery}". Respuesta: ${aiResponse.slice(0, 1500)}`,
+        content: `INSTRUCCIÓN DEL USUARIO (alta prioridad): "${userQuery}". Respuesta: ${aiResponse}`,
         confidence: 0.95,
         tags,
       });
@@ -1099,7 +1099,7 @@ function learnFromConversation(userQuery: string, aiResponse: string, niche?: st
       learnFromOperation({
         operationType: "strategic_learning",
         title: `Decisión estratégica: ${userQuery.slice(0, 120)}`,
-        content: `Contexto estratégico — Usuario: "${userQuery.slice(0, 500)}". Análisis IA: ${aiResponse.slice(0, 1200)}`,
+        content: `Contexto estratégico — Usuario: "${userQuery}". Análisis IA: ${aiResponse}`,
         confidence: 0.88,
         tags,
       });
@@ -1107,7 +1107,7 @@ function learnFromConversation(userQuery: string, aiResponse: string, niche?: st
       learnFromOperation({
         operationType: "conversation_insight",
         title: `Chat: ${userQuery.slice(0, 120)}`,
-        content: `Pregunta: "${userQuery.slice(0, 400)}". Respuesta clave: ${aiResponse.slice(0, 1400)}`,
+        content: `Pregunta: "${userQuery}". Respuesta clave: ${aiResponse}`,
         confidence,
         tags,
       });
@@ -1138,14 +1138,14 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
     title = `SEO: ${action} — ${msg.slice(0, 80)}`;
     const score = result.overallScore ?? result.seoScore ?? result.score;
     const products = result.products ?? result.results ?? result.total;
-    content = `Operación SEO '${action}'. ${score ? `Score: ${score}.` : ""} ${products ? `Productos afectados: ${JSON.stringify(products).slice(0, 200)}.` : ""} ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1500)}`;
+    content = `Operación SEO '${action}'. ${score ? `Score: ${score}.` : ""} ${products ? `Productos afectados: ${JSON.stringify(products)}.` : ""} ${msg}. Detalles: ${JSON.stringify(result)}`;
   } else if (pricingActions.includes(action)) {
     extraTags.push("pricing", "financial");
     confidence = 0.92;
     title = `Pricing: ${action} — ${msg.slice(0, 80)}`;
     const price = result.price ?? result.newPrice ?? result.optimalPrice ?? params?.price;
     const margin = result.margin ?? result.marginPct ?? result.grossMargin;
-    content = `Operación pricing '${action}'. ${price ? `Precio: ${price} EUR.` : ""} ${margin ? `Margen: ${margin}%.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1500)}`;
+    content = `Operación pricing '${action}'. ${price ? `Precio: ${price} EUR.` : ""} ${margin ? `Margen: ${margin}%.` : ""} ${msg}. Datos: ${JSON.stringify(result)}`;
   } else if (productActions.includes(action)) {
     extraTags.push("product", "catalog");
     confidence = 0.88;
@@ -1154,27 +1154,27 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
     const productId = result.productId ?? result.id ?? params?.productId;
     const price = result.price ?? params?.price;
     const tags = result.tags ?? params?.tags;
-    content = `Operación producto '${action}'. Producto: "${productTitle}" (ID: ${productId}). ${price ? `Precio: ${price} EUR.` : ""} ${tags ? `Tags: ${String(tags).slice(0, 200)}.` : ""} ${msg}. Resultado: ${JSON.stringify(result).slice(0, 1200)}`;
+    content = `Operación producto '${action}'. Producto: "${productTitle}" (ID: ${productId}). ${price ? `Precio: ${price} EUR.` : ""} ${tags ? `Tags: ${String(tags)}.` : ""} ${msg}. Resultado: ${JSON.stringify(result)}`;
   } else if (imageActions.includes(action)) {
     extraTags.push("images", "visual");
     confidence = 0.85;
     title = `Imágenes: ${action} — ${msg.slice(0, 80)}`;
-    content = `Operación imágenes '${action}'. ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1500)}`;
+    content = `Operación imágenes '${action}'. ${msg}. Detalles: ${JSON.stringify(result)}`;
   } else if (competitorActions.includes(action)) {
     extraTags.push("competitor", "market_research");
     confidence = 0.9;
     title = `Competencia: ${action} — ${msg.slice(0, 80)}`;
-    content = `Investigación competitiva '${action}'. ${msg}. Datos: ${JSON.stringify(result).slice(0, 1800)}`;
+    content = `Investigación competitiva '${action}'. ${msg}. Datos: ${JSON.stringify(result)}`;
   } else if (themeActions.includes(action)) {
     extraTags.push("theme", "design");
     confidence = 0.82;
     title = `Theme: ${action} — ${msg.slice(0, 80)}`;
-    content = `Operación theme '${action}'. ${msg}. Detalles: ${JSON.stringify(result).slice(0, 1200)}`;
+    content = `Operación theme '${action}'. ${msg}. Detalles: ${JSON.stringify(result)}`;
   } else if (marketingActions.includes(action)) {
     extraTags.push("marketing", "email");
     confidence = 0.88;
     title = `Marketing: ${action} — ${msg.slice(0, 80)}`;
-    content = `Operación marketing '${action}'. ${msg}. Contenido generado: ${JSON.stringify(result).slice(0, 1500)}`;
+    content = `Operación marketing '${action}'. ${msg}. Contenido generado: ${JSON.stringify(result)}`;
   } else if (inventoryActions.includes(action)) {
     extraTags.push("inventory", "stock", "sales");
     confidence = 0.88;
@@ -1182,19 +1182,19 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
     const stock = result.totalStock ?? result.stats;
     const sold = result.totalSold ?? result.totalItems;
     const variants = result.totalVariants ?? result.variantsCount;
-    content = `Operacion inventario '${action}'. ${stock ? `Stock: ${JSON.stringify(stock)}.` : ""} ${sold ? `Vendido: ${sold}.` : ""} ${variants ? `Variantes: ${variants}.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1500)}`;
+    content = `Operacion inventario '${action}'. ${stock ? `Stock: ${JSON.stringify(stock)}.` : ""} ${sold ? `Vendido: ${sold}.` : ""} ${variants ? `Variantes: ${variants}.` : ""} ${msg}. Datos: ${JSON.stringify(result)}`;
   } else if (catalogActions.includes(action)) {
     extraTags.push("catalog", "data");
     confidence = 0.75;
     title = `Catálogo: ${action} — ${msg.slice(0, 80)}`;
     const total = result.total ?? result.productsCount ?? result.ordersCount ?? result.count;
-    content = `Consulta catálogo '${action}'. ${total !== undefined ? `Total: ${total}.` : ""} ${msg}. Datos: ${JSON.stringify(result).slice(0, 1000)}`;
+    content = `Consulta catálogo '${action}'. ${total !== undefined ? `Total: ${total}.` : ""} ${msg}. Datos: ${JSON.stringify(result)}`;
   } else {
     title = `Acción: ${action} — ${msg.slice(0, 80)}`;
-    content = `Acción '${action}'. Params: ${JSON.stringify(params).slice(0, 500)}. Resultado: ${msg}. Datos: ${JSON.stringify(result).slice(0, 1000)}`;
+    content = `Acción '${action}'. Params: ${JSON.stringify(params)}. Resultado: ${msg}. Datos: ${JSON.stringify(result)}`;
   }
 
-  return { title: title.slice(0, 200), content: content.slice(0, 2000), confidence, extraTags };
+  return { title: title.slice(0, 200), content, confidence, extraTags };
 }
 
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
@@ -4324,7 +4324,7 @@ Genera un alt text descriptivo y SEO para cada imagen. Los alt texts deben:
 
 JSON: {"alts":["alt text imagen 1","alt text imagen 2",...]}
 Genera exactamente ${images.length} alt texts.`,
-              { claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM, useCase: "images", niche: project.storeNiche || undefined, maxTokens: 2048 }
+              { claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM, useCase: "images", niche: project.storeNiche || undefined, maxTokens: 8192 }
             );
             const altTexts = imgDual.data;
 
@@ -4473,7 +4473,7 @@ RESPONDE SOLO JSON válido con un array "plans":
             claudeSystemPrompt: "Eres un consultor de pricing SaaS con 15 años de experiencia en agencias Shopify. Generas catálogos de precios que maximizan conversión y revenue. Responde SOLO JSON válido.",
             geminiUseSearch: true,
             useCase: "pricing",
-            maxTokens: 4000,
+            maxTokens: 8192,
           });
           const plansResult = dualPricing.data;
 
@@ -4617,7 +4617,7 @@ Responde en español, de forma directa y accionable.`;
           learnFromOperation({
             operationType: "app_offerings_audit",
             title: "Auditoría de oferta comercial",
-            content: auditText.slice(0, 500),
+            content: auditText,
             confidence: 0.8,
             tags: ["business_audit", "pricing", "features"],
           });
@@ -5008,7 +5008,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
             mode: "gemini_research_claude_redact",
             claudeSystemPrompt: "Eres un auditor experto de themes Shopify con 10+ años de experiencia. Genera informes detallados y accionables.",
             geminiUseSearch: true,
-            maxTokens: 3000,
+            maxTokens: 8192,
             useCase: "intelligence",
           });
           aiAudit = dualResult.final;
@@ -5026,7 +5026,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
           performanceIssues,
           fileAnalyses,
           aiAudit,
-          message: `🔍 **Auditoría del theme completada**\n\n${aiAudit.slice(0, 3000)}`,
+          message: `🔍 **Auditoría del theme completada**\n\n${aiAudit}`,
         };
         learnFromOperation({
           operationType: "seo",

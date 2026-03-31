@@ -353,7 +353,7 @@ export async function runOmniCoreMicroLearning() {
         const text = await aiGenerate({
           system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
           prompt,
-          maxTokens: 1200,
+          maxTokens: 4096,
         });
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
@@ -485,7 +485,7 @@ export async function runOmniCoreCrossConnections() {
     const text = await aiGenerate({
       system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
       prompt,
-      maxTokens: 1200,
+      maxTokens: 4096,
     });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
@@ -579,7 +579,7 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
         const text = await aiGenerate({
           system: `You are OmniCore Daily Deep Study Engine — the most advanced autonomous learning system ever built. You are an OMNISCIENT POLYMATH that accumulates knowledge from EVERY discipline: art, architecture, neuroscience, behavioral economics, photography, cinematography, fashion, industrial design, data science, AI/ML, psychology, sociology, law, finance, logistics, sustainability, copywriting, storytelling, music theory, color science, material science, cultural anthropology, and more. Your mission: generate the deepest, most actionable knowledge that elevates the quality of every output — from product descriptions to pricing strategies to visual content. NEVER limit yourself to a single industry. The BEST insights come from connecting knowledge across disciplines. ${brainCtxDaily}`,
           prompt,
-          maxTokens: 2500,
+          maxTokens: 8192,
         });
         consecutiveFails = 0;
         const match = text.match(/\{[\s\S]*\}/);
@@ -690,7 +690,7 @@ Return ONLY valid JSON:
     const text = await aiGenerate({
       system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
       prompt,
-      maxTokens: 4000,
+      maxTokens: 8192,
       timeoutMs: 180_000,
     });
     const match = text.match(/\{[\s\S]*\}/);
@@ -850,7 +850,7 @@ ${insightsSummary}
 
 Return ONLY valid JSON:
 {"evaluations":[{"index":1,"newConfidence":0.85,"stillValid":true,"notes":"Brief explanation of changes"}]}`,
-          maxTokens: 1500,
+          maxTokens: 4096,
         });
 
         const match = text.match(/\{[\s\S]*\}/);
@@ -963,7 +963,7 @@ The report should include:
 
 Return ONLY valid JSON:
 {"report":{"summary":"...","keyMetrics":["metric1","metric2"],"strengths":["..."],"weaknesses":["..."],"recommendations":["..."],"overallScore":85,"knowledgeGaps":["..."]}}`,
-      maxTokens: 2000,
+      maxTokens: 8192,
     });
 
     const match = text.match(/\{[\s\S]*\}/);

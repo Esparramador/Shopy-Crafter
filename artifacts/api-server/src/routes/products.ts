@@ -1343,7 +1343,7 @@ Devuelve SOLO un JSON array con estos campos por objeto. Sin texto adicional.`;
     operationType: "catalog_analysis",
     niche: project.storeNiche,
     title: `Catalog opportunities — ${project.storeName ?? project.shopDomain}`,
-    content: JSON.stringify(opportunities).slice(0, 1500),
+    content: JSON.stringify(opportunities),
     confidence: 0.7,
     tags: ["catalog", "opportunities", "trends"],
   });

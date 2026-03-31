@@ -192,7 +192,7 @@ async function fetchUrlContent(url: string): Promise<{ text: string; title: stri
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 8000); // Cap at 8000 chars
+    .slice(0, 30000);
   
   // Extract image URLs
   const imgMatches = html.matchAll(/<img[^>]+src="([^"]+)"/gi);
@@ -227,7 +227,7 @@ async function analyzeImageWithClaude(
   
   const res = await anthropic.messages.create({
     model: "claude-opus-4-5",
-    max_tokens: 4000,
+    max_tokens: 8192,
     messages: [{
       role: "user",
       content: [
@@ -314,7 +314,7 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       sourceType: urlType,
       sourceUrl: url,
       sourceLabel: title,
-      rawContent: rawContent.slice(0, 5000),
+      rawContent: rawContent.slice(0, 30000),
       mainThemes: JSON.stringify(analysis.main_themes ?? analysis.content_themes ?? []),
       ecommerceInsights: JSON.stringify(analysis.ecommerce_insights ?? analysis.ecommerceInsights ?? {}),
       marketingAngles: JSON.stringify(analysis.marketing_angles ?? analysis.marketingAngles ?? []),
@@ -333,7 +333,7 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
     const summaryContent = `SOURCE: ${url}\nTYPE: ${urlType}\n\n${JSON.stringify(analysis, null, 2)}`;
     memoryId = await saveToShopyBrain({
       title: `[${urlType.toUpperCase()}] ${title}`,
-      content: summaryContent.slice(0, 10000),
+      content: summaryContent,
       memoryType: "absorbed_content",
       niche,
       sourceType: urlType,
@@ -351,7 +351,7 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       operationType: "absorb_url",
       niche: niche ?? undefined,
       title: `Absorbido: [${urlType}] ${title.slice(0, 80)}`,
-      content: `URL: ${url}\nTipo: ${urlType}\nTemas: ${JSON.stringify(analysis.main_themes ?? analysis.content_themes ?? []).slice(0, 300)}\nInsights eCommerce: ${JSON.stringify(analysis.ecommerce_insights ?? analysis.ecommerceInsights ?? {}).slice(0, 500)}\nÁngulos marketing: ${JSON.stringify(analysis.marketing_angles ?? analysis.marketingAngles ?? []).slice(0, 400)}`,
+      content: `URL: ${url}\nTipo: ${urlType}\nTemas: ${JSON.stringify(analysis.main_themes ?? analysis.content_themes ?? [])}\nInsights eCommerce: ${JSON.stringify(analysis.ecommerce_insights ?? analysis.ecommerceInsights ?? {})}\nÁngulos marketing: ${JSON.stringify(analysis.marketing_angles ?? analysis.marketingAngles ?? [])}`,
       confidence: 0.78,
       tags: ["absorbed", urlType, "url_content", niche ?? "general"],
     });
@@ -461,7 +461,7 @@ router.post("/shopybrain/absorb-image",
       
       const memoryId = await saveToShopyBrain({
         title: `[VISION] ${title}`,
-        content: memoryContent.slice(0, 10000),
+        content: memoryContent,
         memoryType: "visual_intelligence",
         niche,
         sourceType,
@@ -477,7 +477,7 @@ router.post("/shopybrain/absorb-image",
         operationType: "absorb_visual",
         niche: niche ?? undefined,
         title: `Visual absorbido: ${title.slice(0, 80)}`,
-        content: `Tipo: ${sourceType}. Composición: ${JSON.stringify(a.visual_composition ?? {}).slice(0, 300)}. Colores: ${JSON.stringify(a.colors_palette ?? a.color_palette ?? {}).slice(0, 200)}. Insights Shopify: ${JSON.stringify(a.actionable_insights_for_shopify ?? {}).slice(0, 400)}`,
+        content: `Tipo: ${sourceType}. Composición: ${JSON.stringify(a.visual_composition ?? {})}. Colores: ${JSON.stringify(a.colors_palette ?? a.color_palette ?? {})}. Insights Shopify: ${JSON.stringify(a.actionable_insights_for_shopify ?? {})}`,
         confidence: 0.82,
         tags: ["absorbed", sourceType, "visual_intel", niche ?? "general"],
       });
@@ -522,7 +522,7 @@ router.post("/shopybrain/absorb-text", requireAdmin, async (req: Request, res: R
     
     const memoryId = await saveToShopyBrain({
       title: label ?? text.slice(0, 80),
-      content: `ANALYSIS:\n${JSON.stringify(analysis, null, 2)}\n\nORIGINAL:\n${text.slice(0, 3000)}`,
+      content: `ANALYSIS:\n${JSON.stringify(analysis, null, 2)}\n\nORIGINAL:\n${text}`,
       memoryType: "absorbed_content",
       niche,
       sourceType,
@@ -571,7 +571,7 @@ router.post("/shopybrain/create-product-from-image",
 
       const visionRes = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
-        max_tokens: 3000,
+        max_tokens: 8192,
         messages: [{
           role: "user",
           content: [
@@ -682,7 +682,7 @@ Responde en este formato JSON exacto:
 
       const copyRes = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
-        max_tokens: 2000,
+        max_tokens: 8192,
         system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
 Tienda: ${project.storeName || "Shopify Store"}
 Nicho: ${project.storeNiche || "general"}
@@ -759,7 +759,7 @@ Genera JSON con:
 
       const memoryId = await saveToShopyBrain({
         title: `[PRODUCT] ${created.product.title}`,
-        content: memoryContent.slice(0, 10000),
+        content: memoryContent,
         memoryType: "product_creation",
         niche: project.storeNiche || undefined,
         sourceType: "image_to_product",
@@ -986,7 +986,7 @@ Responde en JSON:
     const anthropic = await getClaudeClient(0);
     const synthesisRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 2000,
+      max_tokens: 8192,
       system: "Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.",
       messages: [{
         role: "user",
@@ -1045,14 +1045,14 @@ Genera JSON:
       `Cost Breakdown: ${JSON.stringify((synthesis as Record<string, unknown>).costBreakdown || {})}`,
       `Strategy: ${(synthesis as Record<string, unknown>).strategy || "N/A"}`,
       `Sources Analyzed: ${allSources.length}`,
-      `Full Suppliers: ${JSON.stringify(suppliersData).slice(0, 3000)}`,
-      `Costs: ${JSON.stringify(costsData).slice(0, 2000)}`,
-      `Deals: ${JSON.stringify(dealsData).slice(0, 1500)}`,
+      `Full Suppliers: ${JSON.stringify(suppliersData)}`,
+      `Costs: ${JSON.stringify(costsData)}`,
+      `Deals: ${JSON.stringify(dealsData)}`,
     ].join("\n\n");
 
     const memoryId = await saveToShopyBrain({
       title: `[SUPPLIERS] ${productName}`,
-      content: memoryContent.slice(0, 10000),
+      content: memoryContent,
       memoryType: "supplier_intelligence",
       sourceType: "supplier_research",
       confidence: 0.85,

@@ -104,7 +104,7 @@ async function saveMemory(params: {
     memoryType: params.memoryType,
     niche: params.niche ?? null,
     title: params.title.slice(0, 200),
-    content: params.content.slice(0, 12000),
+    content: params.content,
     confidence: params.confidence ?? 0.8,
     sourceType: params.sourceType ?? "entity_research",
     tags: params.tags ? JSON.stringify(params.tags) : null,
@@ -162,11 +162,11 @@ export async function loadExistingEntityKnowledge(entityName: string): Promise<{
   // Build a rich summary for Gemini context injection
   const memorySummary = memories
     .slice(0, 8)
-    .map(m => `[${m.memoryType ?? "memoria"}] ${m.title}:\n${(m.content ?? "").slice(0, 500)}`)
+    .map(m => `[${m.memoryType ?? "memoria"}] ${m.title}:\n${(m.content ?? "").slice(0, 2000)}`)
     .join("\n\n---\n\n");
 
   const absorbedSummary = absorbed
-    .map(a => `[absorbido: ${a.sourceType}] ${a.sourceLabel ?? a.sourceUrl}\n${JSON.stringify(a.fullAnalysis ?? {}).slice(0, 400)}`)
+    .map(a => `[absorbido: ${a.sourceType}] ${a.sourceLabel ?? a.sourceUrl}\n${JSON.stringify(a.fullAnalysis ?? {}).slice(0, 2000)}`)
     .join("\n\n");
 
   const summary = `ShopyBrain tiene ${memories.length} memorias y ${absorbed.length} registros absorbidos sobre "${entityName}".
@@ -199,7 +199,7 @@ async function upsertEntityMemory(params: {
     await db.update(omnicoreMemoriesTable)
       .set({
         title: params.title.slice(0, 200),
-        content: params.content.slice(0, 12000),
+        content: params.content,
         confidence: params.confidence ?? 0.85,
         updatedAt: new Date(),
         tags: params.tags ? JSON.stringify(params.tags) : null,
@@ -499,7 +499,7 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
     const mainResult = await upsertEntityMemory({
       entityName: entityDisplay,
       title: `[DEEP RESEARCH] ${entityDisplay}`,
-      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\n${researchIteration}\nFUENTES TOTALES: ${research.allSources.length}\nQUERIES: ${research.allQueries.length}\n\nPROFILE:\n${JSON.stringify(profile, null, 2).slice(0, 10000)}\n\nEXTRA (Instagram):\n${extraInsights.slice(0, 2000)}`,
+      content: `ENTITY: ${entityDisplay}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\n${researchIteration}\nFUENTES TOTALES: ${research.allSources.length}\nQUERIES: ${research.allQueries.length}\n\nPROFILE:\n${JSON.stringify(profile, null, 2)}\n\nEXTRA (Instagram):\n${extraInsights}`,
       memoryType: "brand_intelligence",
       niche,
       sourceType: "deep_entity_research",
@@ -721,7 +721,7 @@ router.get("/shopybrain/entity-knowledge/:name", requireAdmin, async (req: Reque
         id: m.id,
         type: m.memoryType,
         title: m.title,
-        content: (m.content ?? "").slice(0, 800),
+        content: m.content ?? "",
         confidence: m.confidence,
         updatedAt: m.updatedAt,
       })),
@@ -734,7 +734,7 @@ router.get("/shopybrain/entity-knowledge/:name", requireAdmin, async (req: Reque
         profile: a.fullAnalysis,
         createdAt: a.createdAt,
       })),
-      summary: knowledge.summary.slice(0, 2000),
+      summary: knowledge.summary,
     });
   } catch (err) {
     res.status(500).json({ error: String(err) });
