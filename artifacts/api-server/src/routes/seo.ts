@@ -357,14 +357,9 @@ Devuelve JSON con:
               });
             } catch { /* WooCommerce SEO write may not be available */ }
           } else {
-            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
-              method: "POST",
-              body: JSON.stringify({ metafield: { namespace: "seo", key: "title", value: result.metaTitle, type: "single_line_text_field" } }),
-            }).catch(() => {});
-
-            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
-              method: "POST",
-              body: JSON.stringify({ metafield: { namespace: "seo", key: "description", value: result.metaDescription, type: "single_line_text_field" } }),
+            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}.json`, {
+              method: "PUT",
+              body: JSON.stringify({ product: { id: product.shopifyProductId, metafields_global_title_tag: result.metaTitle, metafields_global_description_tag: result.metaDescription } }),
             }).catch(() => {});
           }
         }

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable } from "@workspace/db";
+import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -1278,6 +1278,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         let lowImageWarnings = 0;
         let shortDescWarnings = 0;
 
+        const seoDataRows = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, parseInt(projectId)));
+        const seoLookup = new Map(seoDataRows.map(s => [s.shopifyProductId, s]));
+
         const mappedProducts = allProducts.map((p: Record<string, unknown>) => {
           const variants = (p.variants as Array<Record<string, string>>) || [];
           const images = (p.images as Array<Record<string, unknown>>) || [];
@@ -1302,8 +1305,11 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
 
           const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
 
-          const hasMetaTitle = !!(p.metafields_global_title_tag || (typeof p.title === "string" && (p.title as string).length >= 30));
-          const hasMetaDesc = !!(p.metafields_global_description_tag || bodyLen >= 300);
+          const productSeo = seoLookup.get(String(p.id));
+          const hasMetaTitle = !!(productSeo?.metaTitle && productSeo.metaTitle.length > 10);
+          const hasMetaDesc = !!(productSeo?.metaDescription && productSeo.metaDescription.length > 10);
+          if (!hasMetaTitle) issues.push("Sin meta title SEO — Google usará el título del producto por defecto");
+          if (!hasMetaDesc) issues.push("Sin meta description — impacto crítico en CTR de Google (puede reducir clics un 30%)");
           const hasAltTexts = images.length > 0 && images.every((img: Record<string, unknown>) => !!img.alt);
           const handle = (p.handle as string) || "";
           const cleanHandleVal = !!handle && !handle.includes("_");
@@ -1726,6 +1732,15 @@ Responde SOLO JSON válido:
               body: JSON.stringify({ product: { id: createdProductId, product_type: categoryProductType } }),
             });
           } catch {}
+        }
+
+        if (seoTitle || seoDescription) {
+          await db.insert(seoDataTable).values({
+            projectId: parseInt(projectId),
+            shopifyProductId: createdProductId,
+            metaTitle: seoTitle || null,
+            metaDescription: seoDescription || null,
+          }).onConflictDoNothing().catch(() => {});
         }
 
         saveToVault({
@@ -2293,6 +2308,9 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           allSearchResults = allSearchResults.concat(d.products || []);
         }
 
+        const searchSeoRows = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, parseInt(projectId)));
+        const searchSeoLookup = new Map(searchSeoRows.map(s => [s.shopifyProductId, s]));
+
         result = {
           products: allSearchResults.map((p: Record<string, unknown>) => {
             const variants = (p.variants as Array<Record<string, string>>) || [];
@@ -2315,6 +2333,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
             if (hasCompare) score += 25;
 
+            const spSeo = searchSeoLookup.get(String(p.id));
             const searchImages = (p.images as Array<Record<string, unknown>>) || [];
             const spHasAltTexts = searchImages.length > 0 && searchImages.every((img: Record<string, unknown>) => !!img.alt);
             const spHandle = (p.handle as string) || "";
@@ -2332,8 +2351,8 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               auditScore: score,
               auditGrade: score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D",
               hasComparePrice: hasCompare,
-              hasMetaTitle: typeof p.title === "string" && (p.title as string).length >= 30,
-              hasMetaDesc: bodyLen >= 300,
+              hasMetaTitle: !!(spSeo?.metaTitle && spSeo.metaTitle.length > 10),
+              hasMetaDesc: !!(spSeo?.metaDescription && spSeo.metaDescription.length > 10),
               hasAltTexts: spHasAltTexts,
               cleanHandle: !!spHandle && !spHandle.includes("_"),
               issues: issues.length > 0 ? issues : undefined,
@@ -2806,10 +2825,13 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         }
 
         const scanProducts = await db.select().from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+        const scanSeoRows = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, parseInt(projectId)));
+        const scanSeoLookup = new Map(scanSeoRows.map(s => [s.shopifyProductId, s]));
         const scanCards = scanProducts.map((p: typeof productsTable.$inferSelect) => {
           const imgs = Array.isArray(p.imagesJson) ? p.imagesJson as Array<{ src?: string; alt?: string | null }> : [];
           const descLen = typeof p.bodyHtml === "string" ? p.bodyHtml.length : 0;
           const tagsList = typeof p.tags === "string" ? p.tags.split(",").filter((t: string) => t.trim()) : [];
+          const scanSeo = scanSeoLookup.get(p.shopifyProductId);
           return {
             title: p.title ?? "Sin título",
             status: p.status ?? "active",
@@ -2824,8 +2846,8 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             auditScore: p.auditScore ?? 0,
             auditGrade: p.auditGrade ?? "F",
             hasComparePrice: !!p.compareAtPrice,
-            hasMetaTitle: (p.seoScore ?? 0) >= 60,
-            hasMetaDesc: descLen >= 300,
+            hasMetaTitle: !!(scanSeo?.metaTitle && scanSeo.metaTitle.length > 10),
+            hasMetaDesc: !!(scanSeo?.metaDescription && scanSeo.metaDescription.length > 10),
             hasAltTexts: imgs.length > 0 && imgs.every((i: { alt?: string | null }) => !!i.alt),
             cleanHandle: !!p.handle && !p.handle.includes("_"),
           };
@@ -2883,6 +2905,9 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         }
         if (allProds.length > limit) allProds = allProds.slice(0, limit);
 
+        const lapSeoRows = await db.select().from(seoDataTable).where(eq(seoDataTable.projectId, parseInt(projectId)));
+        const lapSeoLookup = new Map(lapSeoRows.map(s => [s.shopifyProductId, s]));
+
         const byStatus: Record<string, number> = {};
         allProds.forEach((p: Record<string, unknown>) => {
           const s = String(p.status || "unknown");
@@ -2908,6 +2933,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             if (hasCompare) score += 25;
             const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
 
+            const lapSeo = lapSeoLookup.get(String(p.id));
             const lapHasAltTexts = images.length > 0 && images.every((img: Record<string, unknown>) => !!img.alt);
             const lapHandle = (p.handle as string) || "";
 
@@ -2926,8 +2952,8 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               auditScore: score,
               auditGrade: grade,
               hasComparePrice: hasCompare,
-              hasMetaTitle: typeof p.title === "string" && (p.title as string).length >= 30,
-              hasMetaDesc: bodyLen >= 300,
+              hasMetaTitle: !!(lapSeo?.metaTitle && lapSeo.metaTitle.length > 10),
+              hasMetaDesc: !!(lapSeo?.metaDescription && lapSeo.metaDescription.length > 10),
               hasAltTexts: lapHasAltTexts,
               cleanHandle: !!lapHandle && !lapHandle.includes("_"),
             };
@@ -5547,6 +5573,7 @@ Responde SOLO con JSON válido (sin markdown):
           const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
           const resp = await fetch(`${baseUrl}/api/projects/${projectId}/seo/generate-metas`, {
             method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ applyToShopify: true }),
           });
           const data = await resp.json() as Record<string, unknown>;
           result = { ...data, message: `🏷️ **Meta tags SEO generados**\n\nMeta titles (40-60 chars) + meta descriptions (130-155 chars) optimizados para todos los productos.` };

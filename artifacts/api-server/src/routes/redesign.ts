@@ -252,14 +252,26 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
   }
 
   const updateData: Record<string, unknown> = {};
-  const seoMetafields: Array<{ namespace: string; key: string; value: string; type: string }> = [];
 
   if (fields.includes("title")) updateData.title = redesign.newTitle;
   if (fields.includes("description")) updateData.body_html = redesign.newBodyHtml;
   if (fields.includes("tags")) updateData.tags = redesign.newTags;
   if (fields.includes("meta")) {
-    if (redesign.metaTitle) seoMetafields.push({ namespace: "seo", key: "title", value: redesign.metaTitle, type: "single_line_text_field" });
-    if (redesign.metaDescription) seoMetafields.push({ namespace: "seo", key: "description", value: redesign.metaDescription, type: "single_line_text_field" });
+    if (redesign.metaTitle) updateData.metafields_global_title_tag = redesign.metaTitle;
+    if (redesign.metaDescription) updateData.metafields_global_description_tag = redesign.metaDescription;
+    if (redesign.metaTitle || redesign.metaDescription) {
+      const { seoDataTable } = await import("@workspace/db");
+      await db.insert(seoDataTable).values({
+        projectId,
+        shopifyProductId,
+        metaTitle: redesign.metaTitle || null,
+        metaDescription: redesign.metaDescription || null,
+      }).onConflictDoNothing().catch(() => {});
+      await db.update(seoDataTable)
+        .set({ metaTitle: redesign.metaTitle || undefined, metaDescription: redesign.metaDescription || undefined, lastAuditedAt: new Date() })
+        .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, shopifyProductId)))
+        .catch(() => {});
+    }
   }
 
   if (fields.includes("price")) {
@@ -287,14 +299,6 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
       method: "PUT",
       body: JSON.stringify({ product: updateData }),
     });
-  }
-
-  for (const mf of seoMetafields) {
-    await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`, {
-      method: "POST",
-      body: JSON.stringify({ metafield: mf }),
-    }).catch(() => {});
-    await new Promise((r) => setTimeout(r, 200));
   }
 
   await db
