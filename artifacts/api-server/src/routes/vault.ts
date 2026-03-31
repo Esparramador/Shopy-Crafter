@@ -730,9 +730,14 @@ function getExtension(mimeType: string): string {
 }
 
 const B = {
-  gold: "#c8a84b", goldDark: "#8b6914", dark: "#08080e", darkAlt: "#0c0c14",
-  card: "#101018", muted: "#6b6b80", white: "#f0f0f5", border: "#1a1a28",
-  jade: "#34d399", red: "#f43f5e", orange: "#f59e0b",
+  gold: "#c8a84b", goldLight: "#e6d9a8", goldDark: "#8b6914",
+  dark: "#08080e", darkAlt: "#0c0c14", card: "#101018",
+  surface: "#16161f", muted: "#6b6b80", mutedLight: "#9494a8",
+  white: "#f0f0f5", border: "#1a1a28", borderLight: "#24243a",
+  jade: "#34d399", jadeBg: "rgba(52,211,153,.08)",
+  red: "#f43f5e", redBg: "rgba(244,63,94,.08)",
+  orange: "#f59e0b", orangeBg: "rgba(245,158,11,.08)",
+  blue: "#3b82f6", blueBg: "rgba(59,130,246,.08)",
 };
 
 function buildBrandedHtmlFromMetadata(file: {
@@ -742,25 +747,28 @@ function buildBrandedHtmlFromMetadata(file: {
 }): string {
   const date = new Date(file.createdAt ?? Date.now()).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date(file.createdAt ?? Date.now()).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const year = new Date().getFullYear();
   const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {});
 
   function renderValue(val: unknown, depth = 0): string {
     if (val === null || val === undefined) return `<span style="color:${B.muted};">—</span>`;
-    if (typeof val === "boolean") return val ? `<span style="color:${B.jade};">&#10003; Sí</span>` : `<span style="color:${B.red};">&#10007; No</span>`;
-    if (typeof val === "number") return `<span style="color:${B.gold};font-weight:600;">${val.toLocaleString("es-ES")}</span>`;
+    if (typeof val === "boolean") return val
+      ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:${B.jadeBg};border:1px solid rgba(52,211,153,.2);border-radius:6px;font-size:12px;color:${B.jade};font-weight:600;">&#10003; S&iacute;</span>`
+      : `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:${B.redBg};border:1px solid rgba(244,63,94,.2);border-radius:6px;font-size:12px;color:${B.red};font-weight:600;">&#10007; No</span>`;
+    if (typeof val === "number") return `<span style="color:${B.gold};font-weight:700;font-size:14px;">${val.toLocaleString("es-ES")}</span>`;
     if (typeof val === "string") {
-      if (val.length > 300) return `<div style="white-space:pre-wrap;line-height:1.6;color:${B.white};">${sanitizeHtml(val)}</div>`;
-      if (val.startsWith("http")) return `<a href="${sanitizeHtml(val)}" style="color:${B.gold};text-decoration:underline;" target="_blank">${sanitizeHtml(val.length > 80 ? val.slice(0, 77) + "..." : val)}</a>`;
+      if (val.length > 300) return `<div style="white-space:pre-wrap;line-height:1.8;color:${B.white};font-size:13px;padding:12px 16px;background:${B.surface};border:1px solid ${B.border};border-radius:10px;margin:6px 0;">${sanitizeHtml(val)}</div>`;
+      if (val.startsWith("http")) return `<a href="${sanitizeHtml(val)}" style="color:${B.gold};text-decoration:underline;font-weight:500;" target="_blank" rel="noopener">${sanitizeHtml(val.length > 80 ? val.slice(0, 77) + "..." : val)}</a>`;
       return `<span style="color:${B.white};">${sanitizeHtml(val)}</span>`;
     }
     if (Array.isArray(val)) {
-      if (val.length === 0) return `<span style="color:${B.muted};">vacío</span>`;
+      if (val.length === 0) return `<span style="color:${B.muted};font-style:italic;">vac&iacute;o</span>`;
       if (val.every(v => typeof v === "string" || typeof v === "number")) {
-        return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;">${val.map(v =>
-          `<span style="display:inline-block;padding:2px 8px;background:rgba(200,168,75,0.1);border:1px solid rgba(200,168,75,0.2);border-radius:12px;font-size:12px;color:${B.gold};">${sanitizeHtml(String(v))}</span>`
+        return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${val.map(v =>
+          `<span style="display:inline-block;padding:3px 10px;background:rgba(200,168,75,0.08);border:1px solid rgba(200,168,75,0.15);border-radius:6px;font-size:11px;color:${B.gold};font-weight:600;">${sanitizeHtml(String(v))}</span>`
         ).join("")}</div>`;
       }
-      if (depth < 2) return val.map((item, i) => `<div style="margin:6px 0;padding:10px;background:${B.dark};border:1px solid ${B.border};border-radius:8px;"><span style="color:${B.gold};font-size:11px;font-weight:700;">#${i + 1}</span>${renderObject(item, depth + 1)}</div>`).join("");
+      if (depth < 2) return val.map((item, i) => `<div style="margin:8px 0;padding:14px 16px;background:${B.surface};border:1px solid ${B.border};border-radius:10px;border-left:3px solid ${B.gold};"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="width:24px;height:24px;background:rgba(200,168,75,0.1);border:1px solid rgba(200,168,75,0.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${B.gold};">${i + 1}</span></div>${renderObject(item, depth + 1)}</div>`).join("");
       return `<span style="color:${B.muted};">[${val.length} elementos]</span>`;
     }
     if (typeof val === "object" && depth < 3) return renderObject(val as Record<string, unknown>, depth + 1);
@@ -770,13 +778,15 @@ function buildBrandedHtmlFromMetadata(file: {
   function renderObject(obj: Record<string, unknown>, depth = 0): string {
     const entries = Object.entries(obj);
     if (entries.length === 0) return "";
-    return `<table style="width:100%;border-collapse:collapse;margin:6px 0;" cellpadding="0" cellspacing="0">${entries.map(([k, v]) => {
+    return `<table style="width:100%;border-collapse:separate;border-spacing:0;margin:6px 0;font-size:13px;" cellpadding="0" cellspacing="0">
+      ${depth === 0 ? `<thead><tr><th style="background:${B.surface};color:${B.gold};font-weight:700;text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-radius:8px 0 0 0;">Campo</th><th style="background:${B.surface};color:${B.gold};font-weight:700;text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-radius:0 8px 0 0;">Valor</th></tr></thead>` : ""}
+      <tbody>${entries.map(([k, v]) => {
       const label = k.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()).trim();
-      return `<tr style="border-bottom:1px solid ${B.border};">
-        <td style="padding:8px 12px;color:${B.gold};font-size:12px;font-weight:600;white-space:nowrap;vertical-align:top;width:160px;">${sanitizeHtml(label)}</td>
-        <td style="padding:8px 12px;font-size:13px;color:${B.white};vertical-align:top;">${renderValue(v, depth)}</td>
+      return `<tr>
+        <td style="padding:10px 14px;color:${B.gold};font-size:12px;font-weight:600;white-space:nowrap;vertical-align:top;width:180px;border-bottom:1px solid ${B.border};">${sanitizeHtml(label)}</td>
+        <td style="padding:10px 14px;font-size:13px;color:${B.white};vertical-align:top;border-bottom:1px solid ${B.border};">${renderValue(v, depth)}</td>
       </tr>`;
-    }).join("")}</table>`;
+    }).join("")}</tbody></table>`;
   }
 
   const bodyHtml = typeof meta === "object" && !Array.isArray(meta)
@@ -785,8 +795,13 @@ function buildBrandedHtmlFromMetadata(file: {
 
   const typeLabel = file.fileType === "report" ? "Informe" :
     file.fileType === "data" ? "Datos" :
-    file.fileType === "optimization" ? "Optimización" :
+    file.fileType === "optimization" ? "Optimizaci\u00f3n" :
     file.fileType === "seo" ? "SEO" : (file.fileType ?? "Archivo");
+
+  const generatedByLabel = file.generatedBy === "chatbot_action_save" ? "Chatbot AI" :
+    file.generatedBy === "auto_save" ? "Auto-guardado" :
+    file.generatedBy === "bulk_operation" ? "Operaci\u00f3n masiva" :
+    file.generatedBy ?? "ShopyBrain AI";
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -794,52 +809,78 @@ function buildBrandedHtmlFromMetadata(file: {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${sanitizeHtml(file.title)} — Shopy Crafter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: ${B.dark}; color: ${B.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+  .cover { background: linear-gradient(160deg, #0e0e18 0%, #12121f 50%, #0a0a14 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${B.border}; position: relative; overflow: hidden; }
+  .cover::before { content: ''; position: absolute; top: -120px; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(200,168,75,.06) 0%, transparent 70%); pointer-events: none; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${B.gold}44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, ${B.gold}, ${B.goldDark}); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #0a0a0f; }
+  .cover-logo-text { font-size: 20px; font-weight: 800; color: ${B.gold}; letter-spacing: -0.3px; }
+  .cover-badge { background: ${B.surface}; border: 1px solid ${B.borderLight}; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: ${B.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: ${B.white}; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-size: 28px; font-weight: 900; color: ${B.white}; letter-spacing: -0.8px; line-height: 1.2; }
+  .cover-title .subtitle { font-size: 14px; color: ${B.mutedLight}; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; flex-wrap: wrap; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${B.muted}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${B.gold}; }
+  .body-content { padding: 40px 56px 48px; }
+  .data-section { background: ${B.card}; border: 1px solid ${B.border}; border-radius: 14px; padding: 24px; overflow-x: auto; }
+  .footer { padding: 32px 56px; border-top: 1px solid ${B.border}; background: ${B.darkAlt}; text-align: center; }
+  .footer-line { width: 40px; height: 2px; background: ${B.gold}; margin: 0 auto 12px; border-radius: 1px; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: ${B.gold}; }
+  .footer-sub { font-size: 11px; color: ${B.muted}; margin-top: 6px; }
+  @media print {
+    body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 100%; }
+    .cover { background: #f8f7f4; padding: 32px; }
+    .cover-title h1 { color: #1a1a1a; }
+    .data-section { background: #fafafa; border: 1px solid #e0e0e0; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:${B.dark};font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${B.dark};padding:24px 0;">
-<tr><td align="center">
-<table width="720" cellpadding="0" cellspacing="0" style="background:${B.darkAlt};border-radius:16px;overflow:hidden;">
-
-<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 28px;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td width="44" valign="top">
-        <div style="width:36px;height:36px;background:linear-gradient(135deg,${B.gold},${B.goldDark});border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
-      </td>
-      <td style="padding-left:12px;" valign="middle">
-        <span style="font-size:18px;font-weight:800;color:${B.gold};letter-spacing:-0.3px;">Shopy Crafter</span>
-      </td>
-    </tr>
-  </table>
-  <h1 style="font-size:22px;font-weight:900;color:${B.white};letter-spacing:-0.5px;line-height:1.3;margin:20px 0 0;font-family:'Segoe UI',Arial,sans-serif;">${sanitizeHtml(file.title)}</h1>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
-    <tr>
-      <td><span style="display:inline-block;padding:3px 10px;background:rgba(200,168,75,0.12);border-radius:10px;font-size:11px;color:${B.gold};font-weight:600;">${sanitizeHtml(typeLabel)}</span></td>
-      ${file.category ? `<td><span style="font-size:11px;color:${B.muted};">&#9679; ${sanitizeHtml(file.category)}</span></td>` : ""}
-      <td><span style="font-size:11px;color:${B.muted};">&#9679; ${date} &middot; ${time}</span></td>
-    </tr>
-  </table>
-  ${file.productTitle ? `<p style="font-size:13px;color:${B.muted};margin:10px 0 0;">Producto: <strong style="color:${B.white};">${sanitizeHtml(file.productTitle)}</strong></p>` : ""}
-</td></tr>
-
-<tr><td style="padding:28px 48px 36px;">
-  <div style="background:${B.card};border:1px solid ${B.border};border-radius:14px;padding:24px;overflow-x:auto;">
-    ${bodyHtml}
+<body>
+<div class="page">
+  <div class="cover">
+    <div class="cover-top">
+      <div class="cover-logo">
+        <div class="cover-logo-icon">SC</div>
+        <div class="cover-logo-text">Shopy Crafter</div>
+      </div>
+      <div class="cover-badge">
+        <div class="cover-badge-label">${sanitizeHtml(typeLabel)}</div>
+        <div class="cover-badge-value">${sanitizeHtml(file.category || "General")}</div>
+      </div>
+    </div>
+    <div class="cover-title">
+      <h1>${sanitizeHtml(file.title)}</h1>
+      ${file.productTitle ? `<div class="subtitle">Producto: ${sanitizeHtml(file.productTitle)}</div>` : `<div class="subtitle">Documento generado por ShopyBrain AI Engine</div>`}
+    </div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>${sanitizeHtml(typeLabel)}</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>${date} &middot; ${time}</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>${sanitizeHtml(generatedByLabel)}</div>
+    </div>
   </div>
-</td></tr>
-
-<tr><td style="text-align:center;padding:20px 48px;border-top:1px solid ${B.border};">
-  <p style="color:${B.muted};font-size:11px;margin:0;">
-    Generado por <span style="color:${B.gold};font-weight:600;">Shopy Crafter</span> &mdash; ShopyBrain AI Engine
-  </p>
-  <p style="color:${B.muted};font-size:11px;margin:4px 0 0;">
-    &copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.
-  </p>
-</td></tr>
-
-</table>
-</td></tr>
-</table>
+  <div class="body-content">
+    <div class="data-section">
+      ${bodyHtml}
+    </div>
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">Shopy Crafter</div>
+    <div class="footer-sub">ShopyBrain AI Engine &mdash; shopycrafter.com</div>
+    <div class="footer-sub">&copy; ${year} Shopy Crafter. Todos los derechos reservados.</div>
+    <div class="footer-sub" style="margin-top:4px;">DOCUMENTO CONFIDENCIAL</div>
+  </div>
+</div>
 </body>
 </html>`;
 }

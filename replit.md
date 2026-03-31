@@ -53,8 +53,9 @@ A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating
 - **Supplier Research System**: AI-driven intelligence.
 - **PDF Commercial Report**: 17-page A4 dark-theme PDFKit report.
 - **Universal Export System**: Generates a 9-page paginated comprehensive audit report with AI deep analysis. All 14 report types and chatbot brain action results are automatically saved to `projectFilesTable` vault. Includes "External Store Analysis" (`analyze_external_store`).
-- **Vault Professional Download System**: Multi-tier download system supporting individual, multi-select, per-folder, and full vault ZIP downloads. All exported content is branded HTML.
+- **Vault Professional Download System**: Multi-tier download system supporting individual, multi-select, per-folder, and full vault ZIP downloads. All exported content uses the unified professional branding system.
 - **Universal Action Buttons (Enviar/Guardar/Descargar)**: Three action buttons below every chatbot result to send as email, save to vault, or download as HTML/ZIP bundle.
+- **Unified Report Branding System**: ALL document outputs (14 export reports via `reportShell()`, chatbot action results via `buildProfessionalHtml()`, vault downloads via `buildBrandedHtmlFromMetadata()`) share identical SC branding: Inter font, gradient cover page with SC logo, metric cards, section icons, grade badges, professional tables, print media queries, and "DOCUMENTO CONFIDENCIAL" footer. Three rendering engines for three content types, one unified brand identity.
 - **100/100 Quality Standard + Semrush SEO Intelligence**: Integrates Semrush-inspired methodology for SEO scoring and product auditing.
 - **AI Economist with Market Research**: Calculates optimal prices using parallel Gemini searches and Claude analysis.
 - **A/B Testing (Image + Price)**: Supports image and price variant tests with AI-generated impact predictions.

@@ -12,26 +12,130 @@ const router = Router();
 
 const BRAND = {
   gold: "#c8a84b", goldLight: "#e6d9a8", goldDark: "#8b6914",
-  dark: "#08080e", darkAlt: "#0c0c14", card: "#101018",
+  dark: "#08080e", darkAlt: "#0c0c14", card: "#101018", cardHover: "#141420",
   surface: "#16161f", muted: "#6b6b80", mutedLight: "#9494a8",
-  jade: "#34d399", white: "#f0f0f5", border: "#1a1a28", borderLight: "#24243a",
+  jade: "#34d399", jadeBg: "rgba(52,211,153,.08)",
+  red: "#f43f5e", redBg: "rgba(244,63,94,.08)",
+  orange: "#f59e0b", orangeBg: "rgba(245,158,11,.08)",
+  blue: "#3b82f6", blueBg: "rgba(59,130,246,.08)",
+  white: "#f0f0f5", border: "#1a1a28", borderLight: "#24243a",
 };
+
+function extractMetricBlocks(text: string): { metrics: Array<{ value: string; label: string }>; cleanText: string } {
+  const metrics: Array<{ value: string; label: string }> = [];
+  const metricPatterns = [
+    /(\d+[\.,]?\d*)\s*(?:productos?|items?)/gi,
+    /(?:score|puntuaci[oó]n)[:\s]*(\d+)\/100/gi,
+    /(?:grade|grado)[:\s]*([A-F][+\-]?)/gi,
+    /(\d+[\.,]?\d*)\s*€/g,
+    /(\d+[\.,]?\d*)\s*%/g,
+  ];
+
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const scoreMatch = line.match(/(?:score|puntuaci[oó]n|nota)[:\s]*(\d+)(?:\/100)?/i);
+    if (scoreMatch) metrics.push({ value: scoreMatch[1] + "/100", label: "Score" });
+    const gradeMatch = line.match(/(?:grade|grado|calificaci[oó]n)[:\s]*([A-F][+\-]?)/i);
+    if (gradeMatch) metrics.push({ value: gradeMatch[1], label: "Grade" });
+    const prodMatch = line.match(/(\d+)\s*productos?\s*(?:activos?|totales?|analizados?|auditados?)/i);
+    if (prodMatch) metrics.push({ value: prodMatch[1], label: "Productos" });
+    const revenueMatch = line.match(/(?:revenue|ingresos?|facturaci[oó]n)[:\s]*(\d+[\.,]?\d*)\s*€/i);
+    if (revenueMatch) metrics.push({ value: revenueMatch[1] + "€", label: "Revenue" });
+    const marginMatch = line.match(/(?:margen|margin)[:\s]*(\d+[\.,]?\d*)\s*%/i);
+    if (marginMatch) metrics.push({ value: marginMatch[1] + "%", label: "Margen" });
+  }
+
+  const unique = metrics.filter((m, i, a) => a.findIndex(x => x.label === m.label) === i).slice(0, 6);
+  return { metrics: unique, cleanText: text };
+}
 
 function buildProfessionalHtml(title: string, content: string, actionName: string): string {
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const year = new Date().getFullYear();
 
-  const contentHtml = content
-    .replace(/\*\*(.+?)\*\*/g, `<strong style="color:${BRAND.gold};font-weight:700;">$1</strong>`)
-    .replace(/^#{1,3}\s+(.+)$/gm, `<h3 style="color:${BRAND.gold};margin:18px 0 8px;font-size:16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">$1</h3>`)
-    .replace(/^[-•]\s+(.+)$/gm, `<li style="margin:3px 0;color:${BRAND.white};font-size:14px;">$1</li>`)
-    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul style="padding-left:20px;margin:8px 0;">$&</ul>')
-    .replace(/^(\d+)\.\s+(.+)$/gm, `<div style="margin:4px 0;color:${BRAND.white};font-size:14px;"><span style="color:${BRAND.gold};font-weight:700;">$1.</span> $2</div>`)
-    .replace(/✅/g, '<span style="color:#34d399;">&#10003;</span>')
-    .replace(/❌/g, '<span style="color:#f43f5e;">&#10007;</span>')
-    .replace(/⚠️/g, '<span style="color:#f59e0b;">&#9888;</span>')
-    .replace(/📦|📊|🏪|🔑|📝|📁|📢|🛒|🆔|💰|🎯|📈|🔍|🧠|⚡|🚀|💡|🎨|📋|🔗|📌|🏷️|💎|🌟|📉|🔄|📅|🗂️|🤖|🛡️|🎪|💼/g, (m) => `<span>${m}</span>`)
-    .replace(/\n/g, '<br>');
+  const { metrics } = extractMetricBlocks(content);
+
+  const sections: Array<{ heading: string; body: string }> = [];
+  const lines = content.split('\n');
+  let currentHeading = "";
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const hMatch = line.match(/^#{1,3}\s+(.+)$/);
+    if (hMatch) {
+      if (currentHeading || currentBody.length > 0) {
+        sections.push({ heading: currentHeading, body: currentBody.join('\n') });
+      }
+      currentHeading = hMatch[1];
+      currentBody = [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  if (currentHeading || currentBody.length > 0) {
+    sections.push({ heading: currentHeading, body: currentBody.join('\n') });
+  }
+
+  function mdToHtml(text: string): string {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, `<strong style="color:${BRAND.gold};font-weight:700;">$1</strong>`)
+      .replace(/^[-•]\s+(.+)$/gm, (_, item) => `<div style="display:flex;align-items:flex-start;gap:10px;margin:6px 0;padding:8px 14px;background:${BRAND.surface};border-radius:8px;border:1px solid ${BRAND.border};"><span style="color:${BRAND.gold};font-size:16px;line-height:1;margin-top:1px;">&#8250;</span><span style="color:${BRAND.white};font-size:13px;line-height:1.7;">${item}</span></div>`)
+      .replace(/^(\d+)\.\s+(.+)$/gm, (_, num, item) => `<div style="display:flex;align-items:flex-start;gap:12px;margin:8px 0;padding:10px 16px;background:${BRAND.surface};border-radius:10px;border:1px solid ${BRAND.border};border-left:3px solid ${BRAND.gold};"><span style="width:28px;height:28px;flex-shrink:0;background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${BRAND.gold};">${num}</span><span style="color:${BRAND.white};font-size:13px;line-height:1.7;">${item}</span></div>`)
+      .replace(/✅/g, `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:${BRAND.jadeBg};border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:12px;color:${BRAND.jade};">&#10003;</span>`)
+      .replace(/❌/g, `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:${BRAND.redBg};border:1px solid rgba(244,63,94,.2);border-radius:5px;font-size:12px;color:${BRAND.red};">&#10007;</span>`)
+      .replace(/⚠️/g, `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:${BRAND.orangeBg};border:1px solid rgba(245,158,11,.2);border-radius:5px;font-size:12px;color:${BRAND.orange};">&#9888;</span>`)
+      .replace(/📦|📊|🏪|🔑|📝|📁|📢|🛒|🆔|💰|🎯|📈|🔍|🧠|⚡|🚀|💡|🎨|📋|🔗|📌|🏷️|💎|🌟|📉|🔄|📅|🗂️|🤖|🛡️|🎪|💼/g, (m) => `<span>${m}</span>`)
+      .replace(/\n{2,}/g, `</p><p style="margin:12px 0;color:${BRAND.white};font-size:14px;line-height:1.8;">`)
+      .replace(/\n/g, '<br>');
+  }
+
+  const sectionIcons = ["&#9733;", "&#128200;", "&#128270;", "&#128176;", "&#127912;", "&#9879;", "&#128202;", "&#128161;", "&#129504;", "&#128203;"];
+  const sectionColors = ["section-icon-gold", "section-icon-jade", "section-icon-blue", "section-icon-orange", "section-icon-gold", "section-icon-blue", "section-icon-jade", "section-icon-gold", "section-icon-blue", "section-icon-orange"];
+
+  let bodyHtml = "";
+
+  if (metrics.length > 0) {
+    let metricCards = "";
+    for (const m of metrics) {
+      const isGrade = /^[A-F][+\-]?$/.test(m.value);
+      const gradeClass = isGrade ? (m.value.startsWith("A") ? `color:${BRAND.jade}` : m.value.startsWith("B") ? `color:${BRAND.gold}` : m.value.startsWith("C") ? `color:${BRAND.orange}` : `color:${BRAND.red}`) : `color:${BRAND.gold}`;
+      metricCards += `<div style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:12px;padding:20px;text-align:center;position:relative;overflow:hidden;flex:1;min-width:120px;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${BRAND.gold}33,transparent);"></div>
+        <div style="font-size:28px;font-weight:900;${gradeClass};letter-spacing:-0.5px;line-height:1.1;">${sanitizeHtml(m.value)}</div>
+        <div style="font-size:10px;color:${BRAND.muted};text-transform:uppercase;letter-spacing:1px;margin-top:6px;font-weight:600;">${sanitizeHtml(m.label)}</div>
+      </div>`;
+    }
+    bodyHtml += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">${metricCards}</div>`;
+  }
+
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    const icon = sectionIcons[i % sectionIcons.length];
+    const colorClass = sectionColors[i % sectionColors.length];
+    const iconBg = colorClass === "section-icon-gold" ? "rgba(200,168,75,.1)" :
+      colorClass === "section-icon-jade" ? BRAND.jadeBg :
+      colorClass === "section-icon-blue" ? BRAND.blueBg : BRAND.orangeBg;
+    const iconBorder = colorClass === "section-icon-gold" ? "rgba(200,168,75,.2)" :
+      colorClass === "section-icon-jade" ? "rgba(52,211,153,.2)" :
+      colorClass === "section-icon-blue" ? "rgba(59,130,246,.2)" : "rgba(245,158,11,.2)";
+
+    if (s.heading) {
+      bodyHtml += `<div style="margin-bottom:32px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid ${BRAND.border};">
+          <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:${iconBg};border:1px solid ${iconBorder};">${icon}</div>
+          <div style="font-size:18px;font-weight:700;color:${BRAND.white};letter-spacing:-0.3px;">${sanitizeHtml(s.heading)}</div>
+        </div>
+        <div style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:24px;">
+          <p style="margin:0;color:${BRAND.white};font-size:14px;line-height:1.8;">${mdToHtml(s.body.trim())}</p>
+        </div>
+      </div>`;
+    } else if (s.body.trim()) {
+      bodyHtml += `<div style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:24px;margin-bottom:24px;">
+        <p style="margin:0;color:${BRAND.white};font-size:14px;line-height:1.8;">${mdToHtml(s.body.trim())}</p>
+      </div>`;
+    }
+  }
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -39,58 +143,75 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${sanitizeHtml(title)} — Shopy Crafter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: ${BRAND.dark}; color: ${BRAND.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+  .cover { background: linear-gradient(160deg, #0e0e18 0%, #12121f 50%, #0a0a14 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${BRAND.border}; position: relative; overflow: hidden; }
+  .cover::before { content: ''; position: absolute; top: -120px; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(200,168,75,.06) 0%, transparent 70%); pointer-events: none; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.gold}44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark}); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #0a0a0f; }
+  .cover-logo-text { font-size: 20px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: -0.3px; }
+  .cover-badge { background: ${BRAND.surface}; border: 1px solid ${BRAND.borderLight}; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: ${BRAND.white}; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-size: 32px; font-weight: 900; color: ${BRAND.white}; letter-spacing: -0.8px; line-height: 1.2; }
+  .cover-title h1 span { color: ${BRAND.gold}; }
+  .cover-title .subtitle { font-size: 15px; color: ${BRAND.mutedLight}; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${BRAND.muted}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${BRAND.gold}; }
+  .body-content { padding: 40px 56px 48px; }
+  .footer { padding: 32px 56px; border-top: 1px solid ${BRAND.border}; background: ${BRAND.darkAlt}; text-align: center; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: ${BRAND.gold}; }
+  .footer-sub { font-size: 11px; color: ${BRAND.muted}; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: ${BRAND.gold}; margin: 12px auto; border-radius: 1px; }
+  @media print {
+    body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 100%; }
+    .cover { background: #f8f7f4; padding: 32px; }
+    .cover-title h1 { color: #1a1a1a; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:${BRAND.dark};font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.dark};padding:24px 0;">
-<tr><td align="center">
-<table width="680" cellpadding="0" cellspacing="0" style="background:${BRAND.darkAlt};border-radius:16px;overflow:hidden;">
-
-<!-- HEADER -->
-<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 32px;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td width="44" valign="top">
-        <div style="width:36px;height:36px;background:linear-gradient(135deg,${BRAND.gold},${BRAND.goldDark});border-radius:9px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
-      </td>
-      <td style="padding-left:12px;" valign="middle">
-        <span style="font-size:18px;font-weight:800;color:${BRAND.gold};letter-spacing:-0.3px;">Shopy Crafter</span>
-      </td>
-    </tr>
-  </table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-    <tr><td>
-      <h1 style="font-size:24px;font-weight:900;color:${BRAND.white};letter-spacing:-0.5px;line-height:1.2;margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">${sanitizeHtml(title)}</h1>
-    </td></tr>
-  </table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
-    <tr>
-      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; ${safeTag(actionName)}</span></td>
-      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; ${safeTag(date)} &middot; ${safeTag(time)}</span></td>
-      <td><span style="font-size:11px;color:${BRAND.muted};">&#9679; Shopy Crafter AI</span></td>
-    </tr>
-  </table>
-</td></tr>
-
-<!-- CONTENT -->
-<tr><td style="padding:32px 48px 40px;">
-  <div style="background:${BRAND.card};border:1px solid ${BRAND.border};border-radius:14px;padding:28px;line-height:1.7;font-size:14px;color:${BRAND.white};">
-    ${contentHtml}
+<body>
+<div class="page">
+  <div class="cover">
+    <div class="cover-top">
+      <div class="cover-logo">
+        <div class="cover-logo-icon">SC</div>
+        <div class="cover-logo-text">Shopy Crafter</div>
+      </div>
+      <div class="cover-badge">
+        <div class="cover-badge-label">Documento</div>
+        <div class="cover-badge-value">${safeTag(actionName)}</div>
+      </div>
+    </div>
+    <div class="cover-title">
+      <h1>${sanitizeHtml(title)}</h1>
+      <div class="subtitle">Generado por ShopyBrain AI Engine</div>
+    </div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>${safeTag(actionName)}</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>${safeTag(date)} &middot; ${safeTag(time)}</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Shopy Crafter AI</div>
+    </div>
   </div>
-</td></tr>
-
-<!-- FOOTER -->
-<tr><td style="text-align:center;padding:24px 48px;border-top:1px solid ${BRAND.border};">
-  <p style="color:${BRAND.muted};font-size:11px;margin:0;">
-    Generado por <a href="https://shopycrafter.com" style="color:${BRAND.gold};text-decoration:none;">Shopy Crafter</a> &mdash; Shopy Crafter AI Engine
-  </p>
-  <p style="color:${BRAND.muted};font-size:11px;margin:4px 0 0;">
-    &copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.
-  </p>
-</td></tr>
-
-</table>
-</td></tr>
-</table>
+  <div class="body-content">
+    ${bodyHtml}
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">Shopy Crafter</div>
+    <div class="footer-sub">ShopyBrain AI Engine &mdash; shopycrafter.com</div>
+    <div class="footer-sub">&copy; ${year} Shopy Crafter. Todos los derechos reservados.</div>
+    <div class="footer-sub" style="margin-top:4px;">DOCUMENTO CONFIDENCIAL</div>
+  </div>
+</div>
 </body>
 </html>`;
 }
