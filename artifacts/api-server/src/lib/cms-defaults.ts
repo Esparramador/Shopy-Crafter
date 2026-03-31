@@ -17,8 +17,8 @@ export const DEFAULT_CMS_CONTENT = {
   site: {
     name: "Shopy Crafter",
     tagline: "Optimización IA para tu tienda Shopify",
-    logo: { type: "emoji", value: "⚡", imageUrl: null },
-    favicon: "⚡",
+    logo: { type: "image", value: "SC", imageUrl: "/images/logo-sc-default.png" },
+    favicon: "/favicon.png",
     primaryColor: "#c8a84b",
     accentColor: "#2dd49f",
     font_heading: "Instrument Serif",

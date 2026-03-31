@@ -22,6 +22,14 @@ interface ExportOption {
   category: "reports" | "data" | "bundle" | "images";
 }
 
+type ReportTemplate = "classic" | "elegance" | "prestige";
+
+const TEMPLATE_OPTIONS: { value: ReportTemplate; label: string; description: string; color: string }[] = [
+  { value: "prestige", label: "Prestige", description: "Cobre y oscuro cálido", color: "#c4956a" },
+  { value: "elegance", label: "Elegance", description: "Azul marino y plata", color: "#4a90d9" },
+  { value: "classic", label: "Clásico", description: "Tema original", color: "#c8a84b" },
+];
+
 export default function ExportCenter({ projectId }: { projectId: number }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
@@ -32,6 +40,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiDone, setAiDone] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate>("prestige");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const exports: ExportOption[] = [
@@ -277,11 +286,16 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
     },
   ];
 
+  const appendTemplate = (url: string) => {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}template=${selectedTemplate}`;
+  };
+
   const handleDownload = async (exp: ExportOption) => {
     setDownloading(exp.id);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}${exp.endpoint}`, { credentials: "include" });
+      const res = await fetch(`${API_BASE}${appendTemplate(exp.endpoint)}`, { credentials: "include" });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition");
@@ -312,10 +326,10 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   };
 
   const handleViewReport = useCallback((exp: ExportOption) => {
-    setViewerUrl(`${API_BASE}${exp.endpoint}${exp.endpoint.includes("?") ? "&" : "?"}view=true`);
+    setViewerUrl(`${API_BASE}${appendTemplate(exp.endpoint)}&view=true`);
     setViewerTitle(exp.title);
     setViewerOpen(true);
-  }, []);
+  }, [selectedTemplate]);
 
   const handlePrintReport = useCallback(() => {
     if (iframeRef.current?.contentWindow) {
@@ -434,6 +448,26 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Centro de Exportación Universal</h1>
           <p className="text-muted-foreground text-sm mt-1">Descarga informes profesionales, datos y contenidos en cualquier formato</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-card/50 border border-border rounded-xl p-1">
+            {TEMPLATE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedTemplate(opt.value)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                style={{
+                  background: selectedTemplate === opt.value ? `${opt.color}18` : "transparent",
+                  color: selectedTemplate === opt.value ? opt.color : "var(--muted-foreground)",
+                  border: selectedTemplate === opt.value ? `1px solid ${opt.color}44` : "1px solid transparent",
+                }}
+                title={opt.description}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button

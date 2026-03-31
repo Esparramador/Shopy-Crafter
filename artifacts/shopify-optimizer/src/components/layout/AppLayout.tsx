@@ -138,7 +138,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Logo */}
         <Link href="/home" style={{ textDecoration: "none" }}>
           <div className="sidebar-logo" style={{ cursor: "pointer" }}>
-            <div className="logo-gem">⚡</div>
+            <img src="/images/logo-sc-default.png" alt="Shopy Crafter" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
             <span className="logo-text">Shopy<em>Crafter</em></span>
             <span className="logo-badge">PRO</span>
           </div>

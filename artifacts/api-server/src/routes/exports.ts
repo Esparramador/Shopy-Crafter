@@ -20,6 +20,7 @@ import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
+import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
 
 const router = Router();
 
@@ -269,6 +270,402 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 </html>`;
 }
 
+type ReportTemplate = "classic" | "elegance" | "prestige";
+
+const ELEGANCE = {
+  navy: "#0b1628",
+  navyLight: "#0f1d35",
+  silver: "#c0c8d8",
+  silverLight: "#e8ecf2",
+  accent: "#4a90d9",
+  accentSoft: "#6ba8f0",
+  card: "#0f1930",
+  cardHover: "#132240",
+  surface: "#111e36",
+  border: "#1a2a4a",
+  borderLight: "#243a5e",
+  muted: "#6880a8",
+  white: "#f0f2f8",
+  jade: "#34d399",
+  red: "#f43f5e",
+  orange: "#f59e0b",
+  blue: "#4a90d9",
+};
+
+const PRESTIGE = {
+  charcoal: "#1a1410",
+  charcoalLight: "#211a14",
+  copper: "#c4956a",
+  copperLight: "#ddb896",
+  copperDark: "#8b6340",
+  card: "#1e1812",
+  cardHover: "#24201a",
+  surface: "#211c15",
+  border: "#2e2620",
+  borderLight: "#3d332a",
+  muted: "#7a6e60",
+  mutedLight: "#9a8e80",
+  white: "#f5f0eb",
+  jade: "#34d399",
+  red: "#f43f5e",
+  orange: "#f59e0b",
+  blue: "#6ba8f0",
+};
+
+function reportShellElegance(title: string, subtitle: string, body: string, date: string, targetCompany?: string): string {
+  const safeTitle = sanitizeHtml(title);
+  const safeSub = sanitizeHtml(subtitle);
+  const safeDate = sanitizeHtml(date);
+  const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${safeTitle} — Shopy Crafter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: ${ELEGANCE.navy}; color: ${ELEGANCE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+
+  .cover-full { position: relative; min-height: 600px; background: linear-gradient(155deg, #070e1c 0%, ${ELEGANCE.navy} 35%, #0d1a35 70%, #091428 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid ${ELEGANCE.border}; }
+  .cover-full::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(74,144,217,.02) 80px, rgba(74,144,217,.02) 81px); pointer-events: none; }
+  .cover-full::after { content: ''; position: absolute; top: -200px; right: -200px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(74,144,217,.06) 0%, transparent 65%); pointer-events: none; }
+  .cover-full .cover-corner { position: absolute; width: 80px; height: 80px; border-color: ${ELEGANCE.accent}33; border-style: solid; }
+  .cover-full .corner-tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
+  .cover-full .corner-tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
+  .cover-full .corner-bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
+  .cover-full .corner-br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
+
+  .cover-logo-img { width: 100px; height: 100px; border-radius: 16px; object-fit: cover; margin-bottom: 28px; box-shadow: 0 8px 40px rgba(74,144,217,.15), 0 0 0 1px ${ELEGANCE.border}; position: relative; z-index: 2; }
+  .cover-brand { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: ${ELEGANCE.accent}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 32px; position: relative; z-index: 2; }
+  .cover-divider { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}, transparent); margin: 0 auto 32px; position: relative; z-index: 2; }
+  .cover-title-main { font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 800; color: ${ELEGANCE.white}; letter-spacing: -0.5px; line-height: 1.2; max-width: 700px; margin-bottom: 16px; position: relative; z-index: 2; }
+  .cover-subtitle-main { font-size: 16px; color: ${ELEGANCE.silver}; font-weight: 400; max-width: 500px; margin: 0 auto 36px; position: relative; z-index: 2; line-height: 1.6; }
+  .cover-target { font-family: 'Playfair Display', serif; font-size: 20px; color: ${ELEGANCE.accentSoft}; font-weight: 600; margin-bottom: 12px; position: relative; z-index: 2; }
+  .cover-date { font-size: 12px; color: ${ELEGANCE.muted}; letter-spacing: 2px; text-transform: uppercase; position: relative; z-index: 2; }
+
+  .cover { background: linear-gradient(160deg, ${ELEGANCE.navy} 0%, ${ELEGANCE.navyLight} 50%, ${ELEGANCE.navy} 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${ELEGANCE.border}; position: relative; overflow: hidden; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; }
+  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-logo-text { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: ${ELEGANCE.accent}; letter-spacing: 0.5px; }
+  .cover-badge { background: ${ELEGANCE.surface}; border: 1px solid ${ELEGANCE.borderLight}; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: ${ELEGANCE.white}; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 800; color: ${ELEGANCE.white}; letter-spacing: -0.5px; line-height: 1.2; }
+  .cover-title h1 span { color: ${ELEGANCE.accent}; }
+  .cover-title .subtitle { font-size: 15px; color: ${ELEGANCE.silver}; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${ELEGANCE.muted}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${ELEGANCE.accent}; }
+
+  .body-content { padding: 40px 56px 48px; }
+
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${ELEGANCE.border}; }
+  .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-icon-gold { background: rgba(74,144,217,.1); border: 1px solid rgba(74,144,217,.2); }
+  .section-icon-jade { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); }
+  .section-icon-blue { background: rgba(74,144,217,.08); border: 1px solid rgba(74,144,217,.2); }
+  .section-icon-red { background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.2); }
+  .section-icon-orange { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: ${ELEGANCE.white}; letter-spacing: -0.3px; }
+  .section-count { font-size: 11px; color: ${ELEGANCE.muted}; background: ${ELEGANCE.surface}; padding: 2px 8px; border-radius: 4px; margin-left: auto; }
+
+  .card { background: ${ELEGANCE.card}; border: 1px solid ${ELEGANCE.border}; border-radius: 14px; padding: 24px; margin-bottom: 16px; transition: border-color .15s; }
+  .card:hover { border-color: ${ELEGANCE.borderLight}; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric { background: ${ELEGANCE.card}; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}33, transparent); }
+  .metric .value { font-size: 30px; font-weight: 900; color: ${ELEGANCE.accent}; letter-spacing: -0.5px; line-height: 1.1; }
+  .metric .label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
+  .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
+  .metric .delta-up { color: ${ELEGANCE.jade}; }
+  .metric .delta-down { color: ${ELEGANCE.red}; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th { background: ${ELEGANCE.surface}; color: ${ELEGANCE.accent}; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 12px 16px; border-bottom: 1px solid ${ELEGANCE.border}; color: ${ELEGANCE.white}; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(74,144,217,.02); }
+
+  .grade { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; }
+  .grade-a { background: rgba(52,211,153,.12); color: ${ELEGANCE.jade}; }
+  .grade-b { background: rgba(74,144,217,.12); color: ${ELEGANCE.accent}; }
+  .grade-c { background: rgba(245,158,11,.12); color: ${ELEGANCE.orange}; }
+  .grade-d { background: rgba(244,63,94,.12); color: ${ELEGANCE.red}; }
+  .grade-f { background: rgba(244,63,94,.18); color: ${ELEGANCE.red}; }
+
+  .tag { display: inline-block; background: rgba(74,144,217,.08); color: ${ELEGANCE.accent}; padding: 3px 10px; border-radius: 6px; font-size: 11px; margin: 2px 4px 2px 0; font-weight: 600; border: 1px solid rgba(74,144,217,.15); }
+  .tag-jade { background: rgba(52,211,153,.08); color: ${ELEGANCE.jade}; border-color: rgba(52,211,153,.15); }
+  .tag-red { background: rgba(244,63,94,.08); color: ${ELEGANCE.red}; border-color: rgba(244,63,94,.15); }
+  .tag-blue { background: rgba(74,144,217,.08); color: ${ELEGANCE.accent}; border-color: rgba(74,144,217,.15); }
+
+  .text-jade { color: ${ELEGANCE.jade}; } .text-red { color: ${ELEGANCE.red}; } .text-gold { color: ${ELEGANCE.accent}; } .text-blue { color: ${ELEGANCE.accent}; } .text-orange { color: ${ELEGANCE.orange}; } .text-muted { color: ${ELEGANCE.muted}; } .text-white { color: ${ELEGANCE.white}; }
+  .fw-600 { font-weight: 600; } .fw-700 { font-weight: 700; } .fw-800 { font-weight: 800; } .fs-sm { font-size: 12px; }
+
+  .score-bar { height: 6px; border-radius: 3px; background: ${ELEGANCE.border}; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; }
+
+  .recommendation { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid ${ELEGANCE.accent}; background: rgba(74,144,217,.03); font-size: 13px; line-height: 1.7; }
+  .recommendation-critical { border-left-color: ${ELEGANCE.red}; background: rgba(244,63,94,.03); }
+  .recommendation-success { border-left-color: ${ELEGANCE.jade}; background: rgba(52,211,153,.03); }
+  .recommendation-info { border-left-color: ${ELEGANCE.accent}; background: rgba(74,144,217,.03); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat-item { padding: 16px 20px; background: ${ELEGANCE.surface}; border-radius: 10px; border: 1px solid ${ELEGANCE.border}; }
+  .stat-item-label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  .stat-item-value { font-size: 16px; font-weight: 700; color: ${ELEGANCE.white}; margin-top: 4px; }
+
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.border}, transparent); margin: 32px 0; }
+  .report-page { page-break-before: always; padding-top: 12px; } .report-page:first-child { page-break-before: avoid; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; margin-bottom: 12px; border-bottom: 1px solid ${ELEGANCE.border}; }
+  .page-header-title { font-size: 11px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  .page-header-num { font-size: 11px; color: ${ELEGANCE.accent}; font-weight: 700; }
+
+  .toc { padding: 24px 0; }
+  .toc-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 6px; border-radius: 10px; background: ${ELEGANCE.card}; border: 1px solid ${ELEGANCE.border}; }
+  .toc-num { width: 32px; height: 32px; border-radius: 8px; background: rgba(74,144,217,.1); border: 1px solid rgba(74,144,217,.2); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: ${ELEGANCE.accent}; margin-right: 16px; flex-shrink: 0; }
+  .toc-label { font-size: 14px; font-weight: 600; color: ${ELEGANCE.white}; }
+  .toc-dot { flex: 1; border-bottom: 1px dotted ${ELEGANCE.border}; margin: 0 12px; min-width: 40px; }
+
+  .waterfall-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .waterfall-label { font-size: 12px; color: ${ELEGANCE.silver}; min-width: 120px; text-align: right; }
+  .waterfall-fill { height: 24px; border-radius: 6px; min-width: 2px; display: flex; align-items: center; padding: 0 8px; }
+  .waterfall-val { font-size: 11px; font-weight: 700; color: ${ELEGANCE.white}; }
+  .blog-content { font-size: 14px; line-height: 1.8; } .blog-content h1, .blog-content h2, .blog-content h3 { color: ${ELEGANCE.accent}; margin: 20px 0 10px; } .blog-content p { margin-bottom: 12px; }
+
+  .footer { padding: 32px 56px; border-top: 1px solid ${ELEGANCE.border}; background: ${ELEGANCE.navyLight}; text-align: center; }
+  .footer-brand { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: ${ELEGANCE.accent}; }
+  .footer-sub { font-size: 11px; color: ${ELEGANCE.muted}; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: ${ELEGANCE.accent}; margin: 12px auto; border-radius: 1px; }
+
+  @media print {
+    body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cover-full { background: #f0f4f8; min-height: 400px; } .cover-full::before, .cover-full::after { display: none; }
+    .cover-title-main, .cover-title h1 { color: #1a1a1a; }
+    .card, .metric { background: #fafafa; border: 1px solid #d8dce4; }
+    .metric .value { color: #2a6ab5; }
+    th { background: #eef2f6; color: #2a6ab5; }
+    td { border-color: #e4e8ec; color: #1a1a1a; }
+    .footer { background: #f6f8fa; border-color: #d8dce4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="cover-full">
+    <div class="cover-corner corner-tl"></div><div class="cover-corner corner-tr"></div><div class="cover-corner corner-bl"></div><div class="cover-corner corner-br"></div>
+    <img class="cover-logo-img" src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" />
+    <div class="cover-brand">Shopy Crafter</div>
+    <div class="cover-divider"></div>
+    <div class="cover-title-main">${safeTitle}</div>
+    <div class="cover-subtitle-main">${safeSub}</div>
+    ${safeCompany ? `<div class="cover-target">Preparado para: ${safeCompany}</div>` : ""}
+    <div class="cover-date">${safeDate}</div>
+  </div>
+  <div class="body-content">
+    ${body}
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">Shopy Crafter</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+function reportShellPrestige(title: string, subtitle: string, body: string, date: string, targetCompany?: string): string {
+  const safeTitle = sanitizeHtml(title);
+  const safeSub = sanitizeHtml(subtitle);
+  const safeDate = sanitizeHtml(date);
+  const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${safeTitle} — Shopy Crafter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: ${PRESTIGE.charcoal}; color: ${PRESTIGE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+
+  .cover-full { position: relative; min-height: 620px; background: linear-gradient(170deg, #120e0a 0%, ${PRESTIGE.charcoal} 30%, #1e1810 60%, #150f0a 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid ${PRESTIGE.border}; }
+  .cover-full::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(196,149,106,.06) 0%, transparent 60%); pointer-events: none; }
+  .cover-full::after { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 80px; background: linear-gradient(180deg, ${PRESTIGE.copper}44, transparent); pointer-events: none; }
+
+  .cover-ornament { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; }
+  .cover-ornament-line { width: 60px; height: 1px; background: ${PRESTIGE.copper}44; }
+  .cover-ornament-diamond { width: 6px; height: 6px; background: ${PRESTIGE.copper}; transform: rotate(45deg); }
+
+  .cover-logo-img { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin-bottom: 24px; box-shadow: 0 0 0 3px ${PRESTIGE.charcoal}, 0 0 0 4px ${PRESTIGE.copper}44, 0 12px 48px rgba(196,149,106,.12); position: relative; z-index: 2; }
+  .cover-brand { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 600; color: ${PRESTIGE.copper}; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 8px; position: relative; z-index: 2; }
+  .cover-separator { display: flex; align-items: center; gap: 16px; margin: 24px auto 28px; position: relative; z-index: 2; }
+  .cover-sep-line { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}88); }
+  .cover-sep-line-r { background: linear-gradient(90deg, ${PRESTIGE.copper}88, transparent); }
+  .cover-sep-icon { font-size: 10px; color: ${PRESTIGE.copper}; }
+  .cover-title-main { font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 700; color: ${PRESTIGE.white}; letter-spacing: -0.3px; line-height: 1.2; max-width: 700px; margin-bottom: 14px; position: relative; z-index: 2; }
+  .cover-subtitle-main { font-size: 15px; color: ${PRESTIGE.mutedLight}; font-weight: 400; max-width: 500px; margin: 0 auto 32px; position: relative; z-index: 2; line-height: 1.6; }
+  .cover-target { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: ${PRESTIGE.copperLight}; font-weight: 600; margin-bottom: 16px; position: relative; z-index: 2; font-style: italic; }
+  .cover-date { font-size: 11px; color: ${PRESTIGE.muted}; letter-spacing: 3px; text-transform: uppercase; position: relative; z-index: 2; }
+
+  .cover { background: linear-gradient(160deg, ${PRESTIGE.charcoal} 0%, ${PRESTIGE.charcoalLight} 50%, ${PRESTIGE.charcoal} 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${PRESTIGE.border}; position: relative; overflow: hidden; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; }
+  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 700; color: ${PRESTIGE.copper}; }
+  .cover-badge { background: ${PRESTIGE.surface}; border: 1px solid ${PRESTIGE.borderLight}; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: ${PRESTIGE.white}; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 700; color: ${PRESTIGE.white}; letter-spacing: -0.3px; line-height: 1.2; }
+  .cover-title h1 span { color: ${PRESTIGE.copper}; }
+  .cover-title .subtitle { font-size: 15px; color: ${PRESTIGE.mutedLight}; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${PRESTIGE.muted}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${PRESTIGE.copper}; }
+
+  .body-content { padding: 40px 56px 48px; }
+
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${PRESTIGE.border}; }
+  .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-icon-gold { background: rgba(196,149,106,.1); border: 1px solid rgba(196,149,106,.2); }
+  .section-icon-jade { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); }
+  .section-icon-blue { background: rgba(107,168,240,.08); border: 1px solid rgba(107,168,240,.2); }
+  .section-icon-red { background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.2); }
+  .section-icon-orange { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; color: ${PRESTIGE.white}; }
+  .section-count { font-size: 11px; color: ${PRESTIGE.muted}; background: ${PRESTIGE.surface}; padding: 2px 8px; border-radius: 4px; margin-left: auto; }
+
+  .card { background: ${PRESTIGE.card}; border: 1px solid ${PRESTIGE.border}; border-radius: 14px; padding: 24px; margin-bottom: 16px; transition: border-color .15s; }
+  .card:hover { border-color: ${PRESTIGE.borderLight}; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric { background: ${PRESTIGE.card}; border: 1px solid ${PRESTIGE.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}33, transparent); }
+  .metric .value { font-size: 30px; font-weight: 900; color: ${PRESTIGE.copper}; letter-spacing: -0.5px; line-height: 1.1; }
+  .metric .label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
+  .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
+  .metric .delta-up { color: ${PRESTIGE.jade}; }
+  .metric .delta-down { color: ${PRESTIGE.red}; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th { background: ${PRESTIGE.surface}; color: ${PRESTIGE.copper}; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 12px 16px; border-bottom: 1px solid ${PRESTIGE.border}; color: ${PRESTIGE.white}; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(196,149,106,.02); }
+
+  .grade { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; }
+  .grade-a { background: rgba(52,211,153,.12); color: ${PRESTIGE.jade}; }
+  .grade-b { background: rgba(196,149,106,.12); color: ${PRESTIGE.copper}; }
+  .grade-c { background: rgba(245,158,11,.12); color: ${PRESTIGE.orange}; }
+  .grade-d { background: rgba(244,63,94,.12); color: ${PRESTIGE.red}; }
+  .grade-f { background: rgba(244,63,94,.18); color: ${PRESTIGE.red}; }
+
+  .tag { display: inline-block; background: rgba(196,149,106,.08); color: ${PRESTIGE.copper}; padding: 3px 10px; border-radius: 6px; font-size: 11px; margin: 2px 4px 2px 0; font-weight: 600; border: 1px solid rgba(196,149,106,.15); }
+  .tag-jade { background: rgba(52,211,153,.08); color: ${PRESTIGE.jade}; border-color: rgba(52,211,153,.15); }
+  .tag-red { background: rgba(244,63,94,.08); color: ${PRESTIGE.red}; border-color: rgba(244,63,94,.15); }
+  .tag-blue { background: rgba(107,168,240,.08); color: ${PRESTIGE.blue}; border-color: rgba(107,168,240,.15); }
+
+  .text-jade { color: ${PRESTIGE.jade}; } .text-red { color: ${PRESTIGE.red}; } .text-gold { color: ${PRESTIGE.copper}; } .text-blue { color: ${PRESTIGE.blue}; } .text-orange { color: ${PRESTIGE.orange}; } .text-muted { color: ${PRESTIGE.muted}; } .text-white { color: ${PRESTIGE.white}; }
+  .fw-600 { font-weight: 600; } .fw-700 { font-weight: 700; } .fw-800 { font-weight: 800; } .fs-sm { font-size: 12px; }
+
+  .score-bar { height: 6px; border-radius: 3px; background: ${PRESTIGE.border}; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; }
+
+  .recommendation { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid ${PRESTIGE.copper}; background: rgba(196,149,106,.03); font-size: 13px; line-height: 1.7; }
+  .recommendation-critical { border-left-color: ${PRESTIGE.red}; background: rgba(244,63,94,.03); }
+  .recommendation-success { border-left-color: ${PRESTIGE.jade}; background: rgba(52,211,153,.03); }
+  .recommendation-info { border-left-color: ${PRESTIGE.blue}; background: rgba(107,168,240,.03); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat-item { padding: 16px 20px; background: ${PRESTIGE.surface}; border-radius: 10px; border: 1px solid ${PRESTIGE.border}; }
+  .stat-item-label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  .stat-item-value { font-size: 16px; font-weight: 700; color: ${PRESTIGE.white}; margin-top: 4px; }
+
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.border}, transparent); margin: 32px 0; }
+  .report-page { page-break-before: always; padding-top: 12px; } .report-page:first-child { page-break-before: avoid; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; margin-bottom: 12px; border-bottom: 1px solid ${PRESTIGE.border}; }
+  .page-header-title { font-size: 11px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  .page-header-num { font-size: 11px; color: ${PRESTIGE.copper}; font-weight: 700; }
+
+  .toc { padding: 24px 0; }
+  .toc-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 6px; border-radius: 10px; background: ${PRESTIGE.card}; border: 1px solid ${PRESTIGE.border}; }
+  .toc-num { width: 32px; height: 32px; border-radius: 8px; background: rgba(196,149,106,.1); border: 1px solid rgba(196,149,106,.2); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: ${PRESTIGE.copper}; margin-right: 16px; flex-shrink: 0; }
+  .toc-label { font-size: 14px; font-weight: 600; color: ${PRESTIGE.white}; }
+  .toc-dot { flex: 1; border-bottom: 1px dotted ${PRESTIGE.border}; margin: 0 12px; min-width: 40px; }
+
+  .waterfall-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .waterfall-label { font-size: 12px; color: ${PRESTIGE.mutedLight}; min-width: 120px; text-align: right; }
+  .waterfall-fill { height: 24px; border-radius: 6px; min-width: 2px; display: flex; align-items: center; padding: 0 8px; }
+  .waterfall-val { font-size: 11px; font-weight: 700; color: ${PRESTIGE.white}; }
+  .blog-content { font-size: 14px; line-height: 1.8; } .blog-content h1, .blog-content h2, .blog-content h3 { color: ${PRESTIGE.copper}; margin: 20px 0 10px; } .blog-content p { margin-bottom: 12px; }
+
+  .footer { padding: 32px 56px; border-top: 1px solid ${PRESTIGE.border}; background: ${PRESTIGE.charcoalLight}; text-align: center; }
+  .footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; color: ${PRESTIGE.copper}; letter-spacing: 2px; }
+  .footer-sub { font-size: 11px; color: ${PRESTIGE.muted}; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: linear-gradient(90deg, ${PRESTIGE.copperDark}, ${PRESTIGE.copper}); margin: 12px auto; border-radius: 1px; }
+
+  @media print {
+    body { background: #faf8f5; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cover-full { background: #f5f0eb; min-height: 400px; } .cover-full::before, .cover-full::after { display: none; }
+    .cover-title-main, .cover-title h1 { color: #1a1a1a; }
+    .card, .metric { background: #fafaf8; border: 1px solid #e0dcd6; }
+    .metric .value { color: #8b6340; }
+    th { background: #f0ece6; color: #8b6340; }
+    td { border-color: #e8e4de; color: #1a1a1a; }
+    .footer { background: #f8f5f0; border-color: #e0dcd6; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="cover-full">
+    <div class="cover-ornament"><div class="cover-ornament-line"></div><div class="cover-ornament-diamond"></div><div class="cover-ornament-line"></div></div>
+    <img class="cover-logo-img" src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="Shopy Crafter" />
+    <div class="cover-brand">Shopy Crafter</div>
+    <div class="cover-separator"><div class="cover-sep-line"></div><div class="cover-sep-icon">&#9830;</div><div class="cover-sep-line cover-sep-line-r"></div></div>
+    <div class="cover-title-main">${safeTitle}</div>
+    <div class="cover-subtitle-main">${safeSub}</div>
+    ${safeCompany ? `<div class="cover-target">Preparado para: ${safeCompany}</div>` : ""}
+    <div class="cover-date">${safeDate}</div>
+  </div>
+  <div class="body-content">
+    ${body}
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">Shopy Crafter</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+function getReportShell(template: ReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
+  if (template === "elegance") return reportShellElegance;
+  if (template === "prestige") return reportShellPrestige;
+  return (t, s, b, d, c) => reportShell(t, s, b, d);
+}
+
 function gradeClass(grade: string): string {
   const g = (grade || "F").toUpperCase()[0];
   if (g === "A") return "grade-a";
@@ -386,7 +783,8 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
       ${seoProductCardsHtml}
     </div>`;
 
-  const html = reportShell("Informe SEO Técnico", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe SEO Técnico", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   autoSaveReport(projectId, "Informe SEO Técnico", html, "seo_audit").catch(() => {});
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="SEO_Audit_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
@@ -459,7 +857,8 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
       ${catalogCardsHtmlCatalog || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
     </div>`;
 
-  const html = reportShell("Informe de Catálogo de Productos", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Catálogo de Productos", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Product_Catalog_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Catálogo de Productos", html, "product_catalog").catch(() => {});
@@ -541,7 +940,8 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
       </div>
     </div>` : ""}`;
 
-  const html = reportShell("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Financial_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe Financiero y COGS", html, "financial").catch(() => {});
@@ -621,7 +1021,8 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
       </div>
     </div>`;
 
-  const html = reportShell("Brand Brief & Estrategia", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Brand Brief & Estrategia", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Brand_Brief_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Brand Brief & Estrategia", html, "brand_brief").catch(() => {});
@@ -668,7 +1069,8 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
       </div>
     </div>`;
 
-  const html = reportShell("Informe A/B Testing", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe A/B Testing", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="AB_Tests_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe A/B Testing", html, "ab_testing").catch(() => {});
@@ -714,7 +1116,8 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
       </div>
     </div>`;
 
-  const html = reportShell("Galería de Imágenes IA", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Galería de Imágenes IA", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Images_Gallery_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Galería de Imágenes IA", html, "images_gallery").catch(() => {});
@@ -1859,7 +2262,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       </div>
     </div>`;
 
-  const html = reportShell(
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)(
     `Auditoria Completa — ${project.name}`,
     `${project.shopDomain || "Sin dominio"} — ${project.storeNiche || "eCommerce"}`,
     body, date
@@ -1977,7 +2381,8 @@ router.get("/projects/:projectId/exports/competitors", async (req, res): Promise
       </div>
     </div>` : ""}`;
 
-  const html = reportShell("Informe de Competencia", `${project.name} — Análisis Competitivo`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Competencia", `${project.name} — Análisis Competitivo`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Competitor_Analysis_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Competencia", html, "competitors").catch(() => {});
@@ -2042,7 +2447,8 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
       ${brandDetails || '<div class="card text-muted">Sin ADN de marca extraído. Usa la herramienta de Intelligence para extraer el ADN.</div>'}<!-- nosemgrep -->
     </div>`;
 
-  const html = reportShell("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Consistency_BrandDNA_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Consistencia y ADN de Marca", html, "brand_consistency").catch(() => {});
@@ -2113,7 +2519,8 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
       </div>
     </div>` : ""}`;
 
-  const html = reportShell("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Inventory_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Inventario", html, "inventory").catch(() => {});
@@ -2169,7 +2576,8 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
       </div>
     </div>` : ""}`;
 
-  const html = reportShell("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Redesigns_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Rediseños IA", html, "redesigns").catch(() => {});
@@ -2242,7 +2650,8 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
       </div>
     </div>` : ""}`;
 
-  const html = reportShell("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="Revenue_Forecast_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Revenue y Forecast", html, "revenue_forecast").catch(() => {});
@@ -2321,7 +2730,8 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
       ${topInsights || '<div class="card text-muted">Sin insights generados aún</div>'}
     </div>`;
 
-  const html = reportShell("Informe ShopyBrain — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
+  const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const html = getReportShell(tpl)("Informe ShopyBrain — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="ShopyBrain_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe ShopyBrain — Inteligencia Artificial", html, "shopybrain_intelligence").catch(() => {});
@@ -2425,11 +2835,12 @@ router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<voi
     { name: "ShopyBrain_Intel", path: "shopybrain" },
   ];
 
+  const zipTpl = (req.query.template as ReportTemplate) || "prestige";
   const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
 
   for (const rpt of reportEndpoints) {
     try {
-      const response = await fetch(`${baseUrl}/${rpt.path}`);
+      const response = await fetch(`${baseUrl}/${rpt.path}?template=${zipTpl}`);
       if (response.ok) {
         const html = await response.text();
         archive.append(html, { name: `informes/${rpt.name}_${dateStr}.html` });
