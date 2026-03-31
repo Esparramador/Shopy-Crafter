@@ -54,7 +54,17 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
     res.json({ profile, strategicPlan: claudeEnhancement, source: "gemini+claude" });
   } catch (err) {
     logger.error(err, "Gemini business research failed");
-    res.status(500).json({ error: "Research failed. Check Gemini integration." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "La investigación tardó demasiado. Intenta de nuevo en unos segundos."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos e intenta de nuevo."
+        : "Error en la investigación de negocio. Verifica la conexión con Gemini.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 
@@ -84,7 +94,17 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
     res.json({ competitor: intel, gaps, source: "gemini+claude" });
   } catch (err) {
     logger.error(err, "Gemini competitor analysis failed");
-    res.status(500).json({ error: "Competitor analysis failed." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "El análisis de competencia tardó demasiado. Intenta de nuevo."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : "Error en el análisis de competencia.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 
@@ -142,7 +162,17 @@ router.post("/research/market", async (req: Request, res: Response): Promise<voi
     res.json({ market: intel, savedToOmnicore: saveToOmnicore, source: "gemini" });
   } catch (err) {
     logger.error(err, "Gemini market intelligence failed");
-    res.status(500).json({ error: "Market intelligence gathering failed." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "La inteligencia de mercado tardó demasiado. Intenta de nuevo."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : "Error en la inteligencia de mercado.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 
@@ -177,7 +207,17 @@ router.post("/research/product-trends", async (req: Request, res: Response): Pro
     res.json({ trends, savedToOmnicore: saveToOmnicore, source: "gemini" });
   } catch (err) {
     logger.error(err, "Gemini product trend analysis failed");
-    res.status(500).json({ error: "Product trend analysis failed." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "El análisis de tendencias tardó demasiado. Intenta de nuevo."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : "Error en el análisis de tendencias.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 
@@ -191,7 +231,17 @@ router.post("/research/person-brand", async (req: Request, res: Response): Promi
     res.json({ profile, source: "gemini" });
   } catch (err) {
     logger.error(err, "Gemini person/brand research failed");
-    res.status(500).json({ error: "Person/brand research failed." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "La investigación tardó demasiado. Intenta de nuevo."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : "Error en la investigación de persona/marca.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 
@@ -251,7 +301,17 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
     res.json({ businessProfile, marketIntel, synthesis, source: "gemini+claude+omnicore" });
   } catch (err) {
     logger.error(err, "Full Gemini audit failed");
-    res.status(500).json({ error: "Full audit failed." });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+      error: isTimeout
+        ? "La auditoría completa tardó demasiado. Intenta de nuevo en unos segundos."
+        : isQuota
+        ? "Límite de uso de Gemini alcanzado. Espera unos minutos e intenta de nuevo."
+        : "Error en la auditoría completa.",
+      retryable: isTimeout || isQuota,
+    });
   }
 });
 

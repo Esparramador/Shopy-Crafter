@@ -95,7 +95,7 @@ function StepItem({ step, index, isOpen, onToggle }: { step: StepData; index: nu
       </button>
 
       {isOpen && (
-        <div style={{ padding: "0 14px 14px 50px" }}>
+        <div style={{ padding: "0 14px 14px 14px" }}>
           <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.7, margin: "0 0 8px 0" }}>
             {step.description}
           </p>

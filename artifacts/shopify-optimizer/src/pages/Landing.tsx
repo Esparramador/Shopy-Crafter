@@ -143,7 +143,7 @@ export default function Landing() {
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
@@ -1066,6 +1066,18 @@ export default function Landing() {
                           <option key={o}>{o}</option>
                         ))}
                       </select>
+                      {contactForm.niche === "Otro" && (
+                        <input
+                          type="text"
+                          value={contactForm.customNiche}
+                          onChange={CF("customNiche")}
+                          placeholder="Describe tu nicho de negocio..."
+                          style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box", marginTop: 8 }}
+                          onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                          onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                          autoFocus
+                        />
+                      )}
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>

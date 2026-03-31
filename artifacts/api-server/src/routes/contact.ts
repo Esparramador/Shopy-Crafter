@@ -409,11 +409,11 @@ ${research.productSample ? `
 
 router.post("/contact", async (req, res): Promise<void> => {
   const {
-    name, email, phone, storeUrl, niche, revenue,
+    name, email, phone, storeUrl, niche, customNiche, revenue,
     services, socialMedia, message, extraInfo, productImageUrl,
   } = req.body as {
     name: string; email: string; phone?: string; storeUrl?: string;
-    niche?: string; revenue?: string; services?: string[];
+    niche?: string; customNiche?: string; revenue?: string; services?: string[];
     socialMedia?: string; message?: string; extraInfo?: string;
     productImageUrl?: string;
   };
@@ -429,11 +429,13 @@ router.post("/contact", async (req, res): Promise<void> => {
     return;
   }
 
+  const resolvedNiche = (niche === "Otro" && customNiche?.trim()) ? customNiche.trim() : (niche?.trim() ?? null);
+
   const leadData: LeadData = {
     name: name.trim(), email: email.toLowerCase().trim(),
     phone: phone?.trim() ?? null,
     storeUrl: storeUrl?.trim() ?? null,
-    niche: niche?.trim() ?? null,
+    niche: resolvedNiche,
     revenue: revenue ?? null,
     services: services ?? [],
     socialMedia: socialMedia?.trim() ?? null,
