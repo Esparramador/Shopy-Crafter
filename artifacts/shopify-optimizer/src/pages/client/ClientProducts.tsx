@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
+import { useCmsSection } from "@/contexts/CmsContext";
 import { Loader2, Package } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -18,6 +19,7 @@ const GRADE_COLORS: Record<string, string> = {
 };
 
 export default function ClientProducts() {
+  const { t } = useCmsSection("labels.clientProducts");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,21 +43,20 @@ export default function ClientProducts() {
   return (
     <ClientLayout>
       <div style={{ maxWidth: 960 }}>
-        {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 4 }}>
-            Tus Productos
+            {t("title", "Tus Productos")}
           </h1>
           <p style={{ fontSize: 12, color: "var(--t3)" }}>
-            {products.length} productos en tu catálogo, ordenados por score de calidad.
+            {products.length} {t("subtitle", "productos en tu catálogo, ordenados por score de calidad.")}
           </p>
         </div>
 
         {products.length === 0 ? (
           <div className="card empty-state">
             <div className="empty-icon">📦</div>
-            <p className="empty-title">Sin productos todavía</p>
-            <p className="empty-desc">Tu agencia aún no ha sincronizado tu catálogo.</p>
+            <p className="empty-title">{t("emptyTitle", "Sin productos todavía")}</p>
+            <p className="empty-desc">{t("emptyDesc", "Tu agencia aún no ha sincronizado tu catálogo.")}</p>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
@@ -64,7 +65,6 @@ export default function ClientProducts() {
               const gradeColor = p.auditGrade ? GRADE_COLORS[p.auditGrade] ?? "var(--t3)" : "var(--t3)";
               return (
                 <div key={p.id} className="card" style={{ padding: 0, overflow: "hidden" }}>
-                  {/* Image */}
                   <div style={{ aspectRatio: "1/1", background: "var(--ink3)", position: "relative" }}>
                     {img ? (
                       <img src={img} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -86,7 +86,6 @@ export default function ClientProducts() {
                     )}
                   </div>
 
-                  {/* Info */}
                   <div style={{ padding: "12px 14px" }}>
                     <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.title}

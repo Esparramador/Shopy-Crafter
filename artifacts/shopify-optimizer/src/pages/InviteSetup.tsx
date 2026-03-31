@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Loader2, Eye, EyeOff, ShoppingBag, Key, CheckCircle, ExternalLink, Copy, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -29,11 +30,12 @@ function StepPassword({
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const { t } = useCmsSection("labels.inviteSetup");
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) { setError("Las contraseñas no coinciden"); return; }
-    if (password.length < 8) { setError("Mínimo 8 caracteres"); return; }
+    if (password !== confirm) { setError(t("errorMismatch", "Las contraseñas no coinciden")); return; }
+    if (password.length < 8) { setError(t("errorMinLength", "Mínimo 8 caracteres")); return; }
     setError("");
     setSubmitting(true);
     try {
@@ -47,7 +49,7 @@ function StepPassword({
       if (!res.ok) throw new Error(data.error);
       onSuccess();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error al configurar la cuenta");
+      setError(err instanceof Error ? err.message : t("errorSetup", "Error al configurar la cuenta"));
     } finally {
       setSubmitting(false);
     }

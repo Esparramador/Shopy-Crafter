@@ -3,6 +3,7 @@ import { Link, useRoute, useLocation } from "wouter";
 import { LogOut, Settings, Bell, Sun, Moon, Menu, X, WifiOff } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCms } from "@/contexts/CmsContext";
 import { useOnlineStatus } from "@/hooks/use-draft-persistence";
 
 interface AppLayoutProps {
@@ -66,14 +67,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [cmsNav, setCmsNav] = useState<{ modules: typeof DEFAULT_MODULE_NAV; shopybrain: typeof DEFAULT_SHOPYBRAIN_NAV; admin: typeof DEFAULT_ADMIN_NAV } | null>(null);
-  const [cmsPanel, setCmsPanel] = useState<{
-    sidebarLabels?: { yourStores?: string; noStores?: string; newStore?: string; admin?: string; config?: string; madeBy?: string };
-    header?: { offline?: string; search?: string; active?: string };
-    user?: { unlimited?: string; adminRole?: string };
-    tooltips?: { lightMode?: string; darkMode?: string; logout?: string };
-    notifications?: { title?: string; empty?: string; emptyHint?: string };
-  } | null>(null);
+  const { content: cmsContent } = useCms();
+  const cmsNav = cmsContent?.adminNav ?? null;
+  const cmsPanel = cmsContent?.adminPanel ?? null;
 
   const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
   const rawShopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
@@ -92,16 +88,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pageLabel = pageLabels[currentPage] ?? "Dashboard";
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
-
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/cms/content`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.adminNav) setCmsNav(d.adminNav);
-        if (d?.adminPanel) setCmsPanel(d.adminPanel);
-      })
-      .catch(() => {});
-  }, []);
 
   const API_BASE = BASE_URL;
   useEffect(() => {

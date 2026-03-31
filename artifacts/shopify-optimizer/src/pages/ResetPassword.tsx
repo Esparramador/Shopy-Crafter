@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearch } from "wouter";
 import { Lock, ArrowLeft, CheckCircle, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -16,6 +17,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useCmsSection("labels.resetPassword");
 
   const strengthScore = (() => {
     if (!password) return 0;
@@ -28,7 +30,8 @@ export default function ResetPassword() {
     return s;
   })();
 
-  const strengthLabel = ["", "Muy débil", "Débil", "Aceptable", "Fuerte", "Muy fuerte"][strengthScore];
+  const defaultStrength = ["", "Muy débil", "Débil", "Aceptable", "Fuerte", "Muy fuerte"];
+  const strengthLabel = defaultStrength[strengthScore];
   const strengthColor = ["", "#e84558", "#f0a030", "#c8a84b", "#2dd49f", "#2dd49f"][strengthScore];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,15 +39,15 @@ export default function ResetPassword() {
     setError("");
 
     if (!token) {
-      setError("Token de recuperación no encontrado en la URL.");
+      setError(t("errorNoToken", "Token de recuperación no encontrado en la URL."));
       return;
     }
     if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
+      setError(t("errorMinLength", "La contraseña debe tener al menos 8 caracteres."));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.");
+      setError(t("errorMismatch", "Las contraseñas no coinciden."));
       return;
     }
 

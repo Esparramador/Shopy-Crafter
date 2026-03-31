@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList } from "lucide-react";
+import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -33,12 +34,12 @@ interface Service {
   shopifyVariantId: string | null;
 }
 
-function timeSince(dateStr: string | null) {
-  if (!dateStr) return "Nunca";
+function timeSince(dateStr: string | null, labels?: { never?: string; today?: string; yesterday?: string }) {
+  if (!dateStr) return labels?.never ?? "Nunca";
   const diff = Date.now() - new Date(dateStr).getTime();
   const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Hoy";
-  if (days === 1) return "Ayer";
+  if (days === 0) return labels?.today ?? "Hoy";
+  if (days === 1) return labels?.yesterday ?? "Ayer";
   return `Hace ${days} días`;
 }
 

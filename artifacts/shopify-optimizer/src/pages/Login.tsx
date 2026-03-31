@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCmsSection } from "@/contexts/CmsContext";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { t } = useCmsSection("labels.login");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +22,7 @@ export default function LoginPage() {
       const { role } = await login(email, password);
       navigate(role === "admin" ? "/admin/clients" : "/client");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error al iniciar sesión");
+      setError(err instanceof Error ? err.message : t("loginError", "Error al iniciar sesión"));
     } finally {
       setLoading(false);
     }
@@ -29,21 +31,18 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div style={{ width: "100%", maxWidth: 400 }}>
-        {/* Logo */}
         <div className="login-logo">
           <div className="logo-gem">⚡</div>
           <h1>Shopy<em>Crafter</em></h1>
-          <p>Plataforma de agencia premium</p>
+          <p>{t("subtitle", "Plataforma de agencia premium")}</p>
         </div>
 
-        {/* Card */}
         <div className="login-card">
-          <p className="login-title">Iniciar sesión</p>
+          <p className="login-title">{t("heading", "Iniciar sesión")}</p>
 
           <form onSubmit={handleSubmit}>
-            {/* Email */}
             <div className="form-group">
-              <label className="form-label">Email</label>
+              <label className="form-label">{t("email", "Email")}</label>
               <input
                 type="email"
                 className="form-input"
@@ -51,13 +50,12 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="username"
-                placeholder="tu@email.com"
+                placeholder={t("emailPlaceholder", "tu@email.com")}
               />
             </div>
 
-            {/* Password */}
             <div className="form-group">
-              <label className="form-label">Contraseña</label>
+              <label className="form-label">{t("password", "Contraseña")}</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPw ? "text" : "password"}
@@ -85,7 +83,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <div
                 style={{
@@ -102,7 +99,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
@@ -110,21 +106,19 @@ export default function LoginPage() {
               style={{ width: "100%", justifyContent: "center", marginTop: 4, padding: "11px 16px" }}
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : null}
-              {loading ? "Iniciando sesión..." : "Entrar"}
+              {loading ? t("loggingIn", "Iniciando sesión...") : t("loginBtn", "Entrar")}
             </button>
           </form>
 
-          {/* Forgot password */}
           <div style={{ textAlign: "center", marginTop: 12 }}>
             <Link
               href="/forgot-password"
               style={{ fontSize: 12, color: "var(--t3)", textDecoration: "none" }}
             >
-              ¿Olvidaste tu contraseña?
+              {t("forgotPassword", "¿Olvidaste tu contraseña?")}
             </Link>
           </div>
 
-          {/* Footer hint */}
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
             <p style={{ fontSize: 10, color: "var(--t3)", opacity: 0.6 }}>
               Admin: sadiagiljoan@gmail.com

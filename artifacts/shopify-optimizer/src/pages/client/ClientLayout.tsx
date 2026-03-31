@@ -1,6 +1,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -25,15 +26,9 @@ interface ClientCmsPanel {
 export function ClientLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [location, navigate] = useLocation();
-  const [cp, setCp] = useState<ClientCmsPanel>({});
+  const { content: cmsContent } = useCms();
+  const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/cms/content`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.clientPanel) setCp(d.clientPanel); })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 

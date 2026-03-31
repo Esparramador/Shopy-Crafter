@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -9,6 +10,7 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useCmsSection("labels.forgotPassword");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,10 +26,10 @@ export default function ForgotPassword() {
       if (res.ok) {
         setSent(true);
       } else {
-        setError(data.error ?? "Error al procesar la solicitud");
+        setError(data.error ?? t("errorProcess", "Error al procesar la solicitud"));
       }
     } catch {
-      setError("Error de conexión. Inténtalo de nuevo.");
+      setError(t("errorConnection", "Error de conexión. Inténtalo de nuevo."));
     } finally {
       setLoading(false);
     }
@@ -40,9 +42,9 @@ export default function ForgotPassword() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center mx-auto mb-4">
             <Mail size={22} className="text-black" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Recuperar contraseña</h1>
+          <h1 className="text-2xl font-bold text-white">{t("title", "Recuperar contraseña")}</h1>
           <p className="text-gray-400 text-sm mt-2">
-            Introduce tu email y te enviaremos un enlace de recuperación
+            {t("subtitle", "Introduce tu email y te enviaremos un enlace de recuperación")}
           </p>
         </div>
 
@@ -50,24 +52,24 @@ export default function ForgotPassword() {
           {sent ? (
             <div className="text-center py-4">
               <CheckCircle size={40} className="text-emerald-400 mx-auto mb-4" />
-              <h2 className="text-white font-semibold text-lg mb-2">Email enviado</h2>
+              <h2 className="text-white font-semibold text-lg mb-2">{t("sentTitle", "Email enviado")}</h2>
               <p className="text-gray-400 text-sm mb-6">
-                Si el email está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también la carpeta de spam.
+                {t("sentDesc", "Si el email está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también la carpeta de spam.")}
               </p>
               <Link href="/login" className="text-amber-400 hover:text-amber-300 text-sm font-medium">
-                ← Volver al login
+                {t("backToLogin", "← Volver al login")}
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">{t("emailLabel", "Email")}</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
-                  placeholder="tu@email.com"
+                  placeholder={t("emailPlaceholder", "tu@email.com")}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors"
                 />
               </div>
@@ -83,13 +85,13 @@ export default function ForgotPassword() {
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 transition-all"
               >
-                {loading ? "Enviando…" : "Enviar enlace de recuperación"}
+                {loading ? t("sending", "Enviando…") : t("sendBtn", "Enviar enlace de recuperación")}
               </button>
 
               <div className="text-center pt-2">
                 <Link href="/login" className="text-gray-400 hover:text-white text-sm inline-flex items-center gap-1.5 transition-colors">
                   <ArrowLeft size={14} />
-                  Volver al login
+                  {t("backLink", "Volver al login")}
                 </Link>
               </div>
             </form>

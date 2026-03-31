@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
+import { useCmsSection } from "@/contexts/CmsContext";
 import { Download, FileText, TrendingUp, Package, Image, Search, Loader2, Calendar, ArrowUpRight, BarChart3 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -43,6 +44,7 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 }
 
 export default function ClientReports() {
+  const { t } = useCmsSection("labels.clientReports");
   const [data, setData] = useState<ReportsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -74,32 +76,32 @@ export default function ClientReports() {
 
   const kpis = [
     {
-      label: "Productos optimizados",
+      label: t("kpiProducts", "Productos optimizados"),
       value: data?.productsOptimized ?? 0,
       icon: <Package size={18} />,
       color: "var(--jade)",
-      sub: "por los motores IA",
+      sub: t("kpiProductsSub", "por los motores IA"),
     },
     {
-      label: "Imágenes generadas",
+      label: t("kpiImages", "Imágenes generadas"),
       value: data?.imagesGenerated ?? 0,
       icon: <Image size={18} />,
       color: "var(--sky)",
-      sub: "con IA generativa",
+      sub: t("kpiImagesSub", "con IA generativa"),
     },
     {
-      label: "Score SEO promedio",
+      label: t("kpiSeo", "Score SEO promedio"),
       value: data?.avgSeoScore != null ? `${data.avgSeoScore}` : "–",
       icon: <Search size={18} />,
       color: "var(--gold)",
-      sub: "de tu catálogo",
+      sub: t("kpiSeoSub", "de tu catálogo"),
     },
     {
-      label: "Impacto estimado",
+      label: t("kpiImpact", "Impacto estimado"),
       value: data?.revenueImpact ?? "–",
       icon: <TrendingUp size={18} />,
       color: "var(--jade)",
-      sub: "en conversiones",
+      sub: t("kpiImpactSub", "en conversiones"),
     },
   ];
 
@@ -112,11 +114,11 @@ export default function ClientReports() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <BarChart3 size={18} style={{ color: "var(--gold)" }} />
                 <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 28, fontWeight: 400, margin: 0 }}>
-                  Reportes
+                  {t("title", "Reportes")}
                 </h1>
               </div>
               <p style={{ fontSize: 13, color: "var(--t2)" }}>
-                Resumen de KPIs y actividad de optimización de tu tienda
+                {t("subtitle", "Resumen de KPIs y actividad de optimización de tu tienda")}
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -132,7 +134,7 @@ export default function ClientReports() {
                 }}
               >
                 <Download size={13} />
-                {exporting === "csv" ? "Exportando..." : "CSV"}
+                {exporting === "csv" ? t("exporting", "Exportando...") : t("exportCsv", "CSV")}
               </button>
               <button
                 onClick={() => handleExport("txt")}
@@ -146,7 +148,7 @@ export default function ClientReports() {
                 }}
               >
                 <FileText size={13} />
-                {exporting === "txt" ? "Generando..." : "TXT"}
+                {exporting === "txt" ? t("generating", "Generando...") : t("exportTxt", "TXT")}
               </button>
             </div>
           </div>
@@ -173,20 +175,20 @@ export default function ClientReports() {
               <div className="card">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--bdr)" }}>
                   <span style={{ fontSize: 15 }}>📊</span>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>Rendimiento SEO</span>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{t("seoTitle", "Rendimiento SEO")}</span>
                 </div>
                 {data?.avgSeoScore != null ? (
                   <>
-                    <ScoreBar score={data.avgSeoScore} label="Score general" />
-                    <ScoreBar score={Math.min(100, data.avgSeoScore + 8)} label="Títulos y descripciones" />
-                    <ScoreBar score={Math.max(0, data.avgSeoScore - 5)} label="Meta tags" />
-                    <ScoreBar score={Math.min(100, data.avgSeoScore + 3)} label="Imágenes ALT text" />
+                    <ScoreBar score={data.avgSeoScore} label={t("seoGeneral", "Score general")} />
+                    <ScoreBar score={Math.min(100, data.avgSeoScore + 8)} label={t("seoTitles", "Títulos y descripciones")} />
+                    <ScoreBar score={Math.max(0, data.avgSeoScore - 5)} label={t("seoMeta", "Meta tags")} />
+                    <ScoreBar score={Math.min(100, data.avgSeoScore + 3)} label={t("seoAlt", "Imágenes ALT text")} />
                   </>
                 ) : (
                   <div className="empty-state" style={{ padding: "32px 12px" }}>
                     <div className="empty-icon" style={{ fontSize: 28 }}>📊</div>
                     <p className="empty-desc" style={{ fontSize: 12 }}>
-                      Los datos SEO aparecerán cuando se ejecute la primera auditoría.
+                      {t("seoEmpty", "Los datos SEO aparecerán cuando se ejecute la primera auditoría.")}
                     </p>
                   </div>
                 )}
@@ -195,7 +197,7 @@ export default function ClientReports() {
               <div className="card">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--bdr)" }}>
                   <span style={{ fontSize: 15 }}>📈</span>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>Actividad reciente</span>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{t("activityTitle", "Actividad reciente")}</span>
                 </div>
                 {data?.timeline && data.timeline.length > 0 ? (
                   <div>
@@ -215,7 +217,7 @@ export default function ClientReports() {
                   <div className="empty-state" style={{ padding: "32px 12px" }}>
                     <div className="empty-icon" style={{ fontSize: 28 }}>📋</div>
                     <p className="empty-desc" style={{ fontSize: 12 }}>
-                      La actividad aparecerá aquí cuando se realicen optimizaciones.
+                      {t("activityEmpty", "La actividad aparecerá aquí cuando se realicen optimizaciones.")}
                     </p>
                   </div>
                 )}
@@ -225,7 +227,7 @@ export default function ClientReports() {
             <div className="card">
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <Calendar size={15} style={{ color: "var(--gold)" }} />
-                <span style={{ fontWeight: 700, fontSize: 14 }}>Resumen del período</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{t("periodTitle", "Resumen del período")}</span>
               </div>
               <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.7 }}>
                 Tu tienda ha sido optimizada con <strong style={{ color: "var(--jade)" }}>{data?.productsOptimized ?? 0} productos</strong> procesados
@@ -233,7 +235,7 @@ export default function ClientReports() {
                 {data?.avgSeoScore != null && (
                   <> El score SEO promedio es <strong style={{ color: "var(--gold)" }}>{data.avgSeoScore}/100</strong>.</>
                 )}
-                {" "}Usa los botones de exportar arriba para descargar un reporte completo.
+                {" "}{t("periodExportHint", "Usa los botones de exportar arriba para descargar un reporte completo.")}
               </p>
             </div>
           </>

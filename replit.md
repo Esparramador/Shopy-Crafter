@@ -42,6 +42,7 @@ A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating
 ### Key Features
 - **Client Portal**: KPI summaries and activity timelines.
 - **CMS Editor**: Visual click-to-edit editor with 35+ selectable elements, AI copywriting (askClaudeWithBrain), version history, iframe live preview with `data-cms-path` hover highlighting, and bidirectional postMessage communication.
+- **Global CMS Context**: `CmsProvider` wraps entire app in `App.tsx`. `useCms()` provides raw content; `useCmsSection("labels.home")` returns `{data, t}` where `t(key, fallback)` resolves CMS strings. All pages (Home, Login, ForgotPassword, ResetPassword, InviteSetup, NewProject, AdminClients, ClientDashboard, ClientProducts, ClientApprovals, ClientMessages, ClientReports) use `useCmsSection` for every user-visible string. Comprehensive `labels` section in `cms-defaults.ts` covers 300+ keys across all pages.
 - **Client Invite Flow**: Secure, token-based onboarding.
 - **Professional Budget/Invoice Generator**: AI-powered tool.
 - **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants. Includes a `referenceImageUrl` system for AI image generation from existing product photos.

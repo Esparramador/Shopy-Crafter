@@ -4,6 +4,7 @@ import { Loader2, ChevronDown, ChevronUp, ArrowLeft, CheckCircle, AlertCircle } 
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProjectsQueryKey } from "@workspace/api-client-react";
 import BrainExtractor from "../components/BrainExtractor";
+import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,6 +26,7 @@ export default function NewProject() {
     storeMarkets: "",
     plan: "starter",
   });
+  const { t } = useCmsSection("labels.newProject");
 
   const PLANS = [
     { key: "trial", label: "Trial", desc: "3 productos · 2 imgs", color: "#888" },
@@ -68,14 +70,14 @@ export default function NewProject() {
       });
       const data = await r.json();
       if (!r.ok) {
-        setError(data.error ?? "Error al guardar la tienda");
+        setError(data.error ?? t("errorSave", "Error al guardar la tienda"));
         setSaving(false);
         return;
       }
       await queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
       setLocation(`/projects/${data.id}/audit`);
     } catch {
-      setError("Error de conexión. Comprueba la red e inténtalo de nuevo.");
+      setError(t("errorConnection", "Error de conexión. Comprueba la red e inténtalo de nuevo."));
       setSaving(false);
     }
   };
@@ -90,12 +92,12 @@ export default function NewProject() {
           onClick={() => setLocation("/")}
           style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13, marginBottom: 16, padding: 0 }}
         >
-          <ArrowLeft size={14} /> Volver al dashboard
+          <ArrowLeft size={14} /> {t("backToDashboard", "Volver al dashboard")}
         </button>
         <div className="section-header">
-          <h1 className="section-title">Añadir Tienda</h1>
+          <h1 className="section-title">{t("title", "Añadir Tienda")}</h1>
           <p className="section-subtitle">
-            Con el Client ID y la Clave Secreta, el sistema genera el token de acceso automáticamente. Solo necesitas 2 credenciales.
+            {t("subtitle", "Con el Client ID y la Clave Secreta, el sistema genera el token de acceso automáticamente. Solo necesitas 2 credenciales.")}
           </p>
         </div>
       </div>
@@ -107,7 +109,7 @@ export default function NewProject() {
           {/* Fila 1 — Nombre + Dominio */}
           <div className="grid-2" style={{ marginBottom: 0 }}>
             <div className="form-group">
-              <label className="form-label">Nombre del proyecto</label>
+              <label className="form-label">{t("projectName", "Nombre del proyecto")}</label>
               <input
                 className="form-input"
                 value={formData.name}
@@ -121,7 +123,7 @@ export default function NewProject() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Dominio Shopify *</label>
+              <label className="form-label">{t("shopDomain", "Dominio Shopify *")}</label>
               <input
                 required
                 className="form-input"
@@ -140,12 +142,12 @@ export default function NewProject() {
 
           {/* Credenciales */}
           <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-            Credenciales — Shopify Admin → Apps → Desarrollar apps → tu app → Credenciales de la API
+            {t("credentialsHint", "Credenciales — Shopify Admin → Apps → Desarrollar apps → tu app → Credenciales de la API")}
           </p>
 
           <div className="grid-2" style={{ marginBottom: 0 }}>
             <div className="form-group">
-              <label className="form-label">API Key (Client ID) *</label>
+              <label className="form-label">{t("apiKey", "API Key (Client ID) *")}</label>
               <input
                 required
                 className="form-input"
@@ -157,7 +159,7 @@ export default function NewProject() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Clave secreta de la API *</label>
+              <label className="form-label">{t("apiSecret", "Clave secreta de la API *")}</label>
               <input
                 required
                 type="password"

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCmsSection } from "@/contexts/CmsContext";
 import { ClientLayout } from "./ClientLayout";
 import { Clock, Loader2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const ENGINE_NAMES: Record<string, string> = {
+const DEFAULT_ENGINE_NAMES: Record<string, string> = {
   M1: "Auditoría de Productos",
   M2: "Rediseño IA",
   M3: "Generación de Imágenes",
@@ -55,8 +56,10 @@ function ScoreCircle({ score }: { score: number }) {
 
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const { t, data: cmsData } = useCmsSection("labels.clientDashboard");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const ENGINE_NAMES = { ...DEFAULT_ENGINE_NAMES, ...((cmsData as any)?.engineNames ?? {}) };
 
   useEffect(() => {
     fetch(`${API_BASE}/api/client/dashboard`, { credentials: "include" })
@@ -66,10 +69,10 @@ export default function ClientDashboard() {
   }, []);
 
   const kpis = [
-    { label: "Productos", value: data?.totalProducts ?? 0, icon: "📦", color: "var(--sky)", sub: "en tu catálogo" },
-    { label: "Score promedio", value: data?.avgScore != null ? `${data.avgScore}` : "–", icon: "📊", color: "var(--jade)", sub: "calidad IA" },
-    { label: "Aprobaciones", value: data?.pendingApprovals ?? 0, icon: "✅", color: "var(--amber)", sub: "pendientes" },
-    { label: "Motores activos", value: data?.enginesActive ?? 7, icon: "⚡", color: "var(--gold)", sub: "optimizando" },
+    { label: t("products", "Productos"), value: data?.totalProducts ?? 0, icon: "📦", color: "var(--sky)", sub: t("inCatalog", "en tu catálogo") },
+    { label: t("avgScore", "Score promedio"), value: data?.avgScore != null ? `${data.avgScore}` : "–", icon: "📊", color: "var(--jade)", sub: t("aiQuality", "calidad IA") },
+    { label: t("approvals", "Aprobaciones"), value: data?.pendingApprovals ?? 0, icon: "✅", color: "var(--amber)", sub: t("pending", "pendientes") },
+    { label: t("enginesActive", "Motores activos"), value: data?.enginesActive ?? 7, icon: "⚡", color: "var(--gold)", sub: t("optimizing", "optimizando") },
   ];
 
   return (
@@ -80,11 +83,11 @@ export default function ClientDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <div className="status-pulse" style={{ width: 6, height: 6, background: "var(--jade)" }} />
             <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "1.2px", color: "var(--t3)" }}>
-              Tu tienda está siendo optimizada activamente
+              {t("optimizingNote", "Tu tienda está siendo optimizada activamente")}
             </p>
           </div>
           <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 28, fontWeight: 400 }}>
-            Bienvenido, <em style={{ color: "var(--gold2)" }}>{user?.name?.split(" ")[0]}</em>
+            {t("welcome", "Bienvenido,")} <em style={{ color: "var(--gold2)" }}>{user?.name?.split(" ")[0]}</em>
           </h1>
           {data?.lastOptimized && (
             <p style={{ fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
@@ -117,7 +120,7 @@ export default function ClientDashboard() {
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--bdr)" }}>
               <span style={{ fontSize: 15 }}>⚡</span>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Motores IA — Estado</span>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{t("engineStatus", "Motores IA — Estado")}</span>
             </div>
             <div>
               {Object.entries(ENGINE_NAMES).map(([key, name], i) => (
@@ -127,9 +130,9 @@ export default function ClientDashboard() {
                   </div>
                   <div className="feed-body">
                     <p className="feed-title">{name}</p>
-                    <p className="feed-desc">Optimizando tu tienda</p>
+                    <p className="feed-desc">{t("engineOptimizing", "Optimizando tu tienda")}</p>
                   </div>
-                  <div className="engine-pip engine-on">Activo</div>
+                  <div className="engine-pip engine-on">{t("engineActive", "Activo")}</div>
                 </div>
               ))}
             </div>
@@ -139,7 +142,7 @@ export default function ClientDashboard() {
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--bdr)" }}>
               <span style={{ fontSize: 15 }}>📈</span>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Actividad Reciente</span>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{t("recentActivity", "Actividad Reciente")}</span>
             </div>
             {data?.recentActivity && data.recentActivity.length > 0 ? (
               <div>
@@ -157,7 +160,7 @@ export default function ClientDashboard() {
               <div className="empty-state" style={{ padding: "32px 12px" }}>
                 <div className="empty-icon" style={{ fontSize: 28 }}>📋</div>
                 <p className="empty-desc" style={{ fontSize: 12 }}>
-                  La actividad aparecerá aquí cuando tu agencia realice optimizaciones.
+                  {t("emptyActivity", "La actividad aparecerá aquí cuando tu agencia realice optimizaciones.")}
                 </p>
               </div>
             )}
@@ -170,7 +173,7 @@ export default function ClientDashboard() {
             <ScoreCircle score={data.avgScore} />
             <div>
               <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: "var(--t3)", marginBottom: 5 }}>
-                Score promedio de tu catálogo
+                {t("catalogScore", "Score promedio de tu catálogo")}
               </p>
               <p style={{ fontFamily: "var(--fh)", fontSize: 26, fontStyle: "italic" }}>{data.avgScore}/100</p>
               <p style={{ fontSize: 13, color: "var(--t2)", marginTop: 4 }}>

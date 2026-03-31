@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { CmsProvider } from "@/contexts/CmsContext";
 import { Loader2 } from "lucide-react";
 import SCCursor from "@/components/ui/SCCursor";
 
@@ -477,12 +478,14 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AuthProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-              <OmniChatbot />
-            </WouterRouter>
-          </AuthProvider>
+          <CmsProvider>
+            <AuthProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+                <OmniChatbot />
+              </WouterRouter>
+            </AuthProvider>
+          </CmsProvider>
           <SCCursor />
           <Toaster />
         </TooltipProvider>
