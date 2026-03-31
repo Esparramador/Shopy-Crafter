@@ -390,6 +390,7 @@ Acciones disponibles:
 - optimize_product: Optimizar un producto con IA (título, descripción, tags, SEO, alt texts). Params: {projectId, productId}
 - optimize_all_products: Optimizar TODOS los productos con IA profesional. Params: {projectId, limit? (default 10, max 25)}
 - create_collection: Crear colección Shopify. Params: {projectId, title, type? ("custom"|"smart"), bodyHtml?, rules? (para smart), productIds? (para custom), sortOrder?, aiGenerate? (default true)}
+- add_to_collection: Añadir productos a colección existente. Params: {projectId, collectionId, productIds[]}
 - list_collections: Listar colecciones. Params: {projectId, limit?}
 - auto_collections: Analizar productos y crear colecciones inteligentes automáticamente. Params: {projectId}
 - create_page: Crear página Shopify con contenido IA. Params: {projectId, title?, pageType? ("about"|"contact"|"faq"|"shipping"|"returns"|"privacy"|"terms"|"size_guide")}
@@ -1178,7 +1179,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
-  const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages"];
+  const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "add_to_collection"];
   const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history"];
 
   if (seoActions.includes(action)) {
@@ -4106,6 +4107,37 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
           })),
           total: allCollections.length,
           message: `${allCollections.length} colecciones encontradas (${customData.custom_collections?.length || 0} manuales + ${smartData.smart_collections?.length || 0} inteligentes)`,
+        };
+        break;
+      }
+
+      case "add_to_collection": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+        const collectionId = params?.collectionId;
+        const productIds = params?.productIds;
+        if (!collectionId || !productIds || !Array.isArray(productIds)) {
+          res.status(400).json({ error: "collectionId y productIds[] requeridos" }); return;
+        }
+        const added: number[] = [];
+        const failed: number[] = [];
+        for (const pid of productIds) {
+          try {
+            await shopifyRequest(
+              parseInt(projectId), project.shopDomain, "/collects.json",
+              { method: "POST", body: JSON.stringify({ collect: { collection_id: parseInt(collectionId), product_id: parseInt(pid) } }) }
+            );
+            added.push(parseInt(pid));
+          } catch { failed.push(parseInt(pid)); }
+        }
+        result = {
+          collectionId: parseInt(collectionId),
+          added: added.length,
+          failed: failed.length,
+          failedIds: failed,
+          message: `✅ ${added.length} productos añadidos a la colección. ${failed.length > 0 ? `${failed.length} fallaron (posiblemente ya asignados).` : ""}`,
         };
         break;
       }
