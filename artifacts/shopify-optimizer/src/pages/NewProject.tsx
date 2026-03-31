@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Loader2, ChevronDown, ChevronUp, ArrowLeft, CheckCircle, AlertCircle, ShoppingBag, Globe, Store } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, ArrowLeft, CheckCircle, AlertCircle, ShoppingBag, Globe, Store, Wifi, WifiOff, HelpCircle, Info } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProjectsQueryKey } from "@workspace/api-client-react";
 import BrainExtractor from "../components/BrainExtractor";
+import ConnectionGuide from "../components/ConnectionGuide";
 import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -22,6 +23,17 @@ const PLATFORM_OPTIONS: Array<{
   { key: "prestashop", label: "PrestaShop", icon: Store, color: "#df0067", description: "Panel PrestaShop con Webservice" },
   { key: "universal", label: "Auditoría Universal", icon: Globe, color: "#5b9bd5", description: "Analiza cualquier web con IA" },
 ];
+
+const ERROR_TROUBLESHOOTING: Record<string, string> = {
+  AUTH_FAILED: "Verifica que las credenciales sean correctas y no hayan expirado.",
+  PERMISSIONS_INSUFFICIENT: "Revisa los permisos de tu clave API. Necesitas Lectura/Escritura.",
+  SSL_REQUIRED: "Instala un certificado SSL (HTTPS) en tu tienda.",
+  WEBSERVICE_DISABLED: "Activa el webservice en Parámetros Avanzados → Webservice.",
+  URL_UNREACHABLE: "Verifica que la URL sea correcta, esté online y no bloqueada por firewall.",
+  STORE_NOT_FOUND: "Comprueba que el dominio sea el correcto.",
+  TIMEOUT: "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
+  UNKNOWN: "Revisa las credenciales e inténtalo de nuevo.",
+};
 
 export default function NewProject() {
   const [, setLocation] = useLocation();
@@ -43,6 +55,15 @@ export default function NewProject() {
     plan: "starter",
   });
   const { t } = useCmsSection("labels.newProject");
+  const { t: tGuide } = useCmsSection("labels.connectionGuides");
+
+  const [connectionTest, setConnectionTest] = useState<{
+    status: "idle" | "testing" | "success" | "error";
+    storeName?: string | null;
+    productCount?: number | null;
+    error?: string | null;
+    errorCode?: string | null;
+  }>({ status: "idle" });
 
   const PLANS = [
     { key: "trial", label: "Trial", desc: "3 productos · 2 imgs", color: "#888" },
@@ -57,8 +78,12 @@ export default function NewProject() {
   const isWoo = platform === "woocommerce";
   const isShopify = platform === "shopify";
 
-  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    if (["shopDomain", "clientId", "clientSecret"].includes(field)) {
+      setConnectionTest({ status: "idle" });
+    }
+  };
 
   const handleAutofill = (data: Record<string, string>) => {
     setFormData(prev => ({
@@ -66,6 +91,44 @@ export default function NewProject() {
       ...data,
       name: data.name && !prev.name ? data.name : prev.name,
     }));
+  };
+
+  const handleTestConnection = async () => {
+    setConnectionTest({ status: "testing" });
+    try {
+      const r = await fetch(`${API_BASE}/api/projects/test-connection-presave`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platformType: platform,
+          shopDomain: formData.shopDomain,
+          clientId: isPrestaShop ? "" : formData.clientId,
+          clientSecret: formData.clientSecret,
+        }),
+      });
+      const data = await r.json();
+      if (data.connected) {
+        setConnectionTest({
+          status: "success",
+          storeName: data.storeName,
+          productCount: data.productCount,
+        });
+        setError(null);
+      } else {
+        setConnectionTest({
+          status: "error",
+          error: data.error,
+          errorCode: data.errorCode,
+        });
+      }
+    } catch {
+      setConnectionTest({
+        status: "error",
+        error: "Error de red. Comprueba tu conexión e inténtalo de nuevo.",
+        errorCode: "UNKNOWN",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,11 +182,14 @@ export default function NewProject() {
     }
   };
 
-  const isValid = isUniversal
-    ? !!formData.shopDomain
-    : isPrestaShop
+  const isValid = isPrestaShop
     ? formData.shopDomain && formData.clientSecret && formData.clientSecret.length === 32
+    : isUniversal
+    ? !!formData.shopDomain
     : formData.shopDomain && formData.clientId && formData.clientSecret;
+
+  const canTestConnection = !isUniversal && isValid;
+  const connectionTested = connectionTest.status === "success";
 
   const domainLabel = isWoo
     ? "URL de tu tienda WordPress *"
@@ -157,12 +223,20 @@ export default function NewProject() {
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
       <div style={{ marginBottom: 28 }}>
-        <button
-          onClick={() => setLocation("/")}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13, marginBottom: 16, padding: 0 }}
-        >
-          <ArrowLeft size={14} /> {t("backToDashboard", "Volver al dashboard")}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <button
+            onClick={() => setLocation("/")}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13, padding: 0 }}
+          >
+            <ArrowLeft size={14} /> {t("backToDashboard", "Volver al dashboard")}
+          </button>
+          <button
+            onClick={() => setLocation("/help/connections")}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 12, padding: 0 }}
+          >
+            <HelpCircle size={14} /> {tGuide("helpTitle", "Guías de Conexión")}
+          </button>
+        </div>
         <div className="section-header">
           <h1 className="section-title">{isUniversal ? "Auditoría Web Universal" : t("title", "Añadir Tienda")}</h1>
           <p className="section-subtitle">
@@ -188,6 +262,7 @@ export default function NewProject() {
                   onClick={() => {
                     setPlatform(p.key);
                     setFormData(prev => ({ ...prev, clientId: "", clientSecret: "" }));
+                    setConnectionTest({ status: "idle" });
                   }}
                   style={{
                     padding: "10px 16px",
@@ -294,19 +369,6 @@ export default function NewProject() {
                       )}
                     </div>
                   </div>
-                  <div style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 8, padding: "12px 14px", marginTop: 12 }}>
-                    <p style={{ fontSize: 12, fontFamily: "var(--fb)", color: "var(--t2)", marginBottom: 8 }}>
-                      Cómo generar la clave API de PrestaShop:
-                    </p>
-                    <ol style={{ fontSize: 11, color: "var(--t3)", margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-                      <li>Ve a <strong>Parámetros Avanzados → Webservice</strong> en tu panel PrestaShop</li>
-                      <li>Activa el webservice si no lo está</li>
-                      <li>Haz clic en <strong>Añadir nueva clave</strong></li>
-                      <li>Se genera una clave de 32 caracteres automáticamente</li>
-                      <li>Activa los permisos: <strong>products, categories, images, stock_availables, orders, combinations, configurations, languages</strong></li>
-                      <li>Guarda y copia la clave aquí</li>
-                    </ol>
-                  </div>
                   <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
                     🔒 Clave cifrada con AES-256. PrestaShop no requiere OAuth — conexión directa con la API key.
                   </p>
@@ -367,9 +429,88 @@ export default function NewProject() {
                   </p>
                 </>
               )}
+
+          <div style={{ borderTop: "1px solid var(--bdr)", margin: "16px 0" }} />
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              disabled={!canTestConnection || connectionTest.status === "testing"}
+              onClick={handleTestConnection}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: `1.5px solid ${connectionTest.status === "success" ? "#3db87a" : connectionTest.status === "error" ? "#dc3c3c" : "var(--bdr)"}`,
+                background: connectionTest.status === "success" ? "rgba(61,184,122,0.08)" : connectionTest.status === "error" ? "rgba(220,60,60,0.08)" : "transparent",
+                cursor: canTestConnection && connectionTest.status !== "testing" ? "pointer" : "not-allowed",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                fontFamily: "var(--fb)",
+                color: connectionTest.status === "success" ? "#3db87a" : connectionTest.status === "error" ? "#dc3c3c" : "var(--t2)",
+                opacity: !canTestConnection ? 0.5 : 1,
+                transition: "all 0.15s",
+              }}
+            >
+              {connectionTest.status === "testing" ? (
+                <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> {tGuide("testing", "Probando...")}</>
+              ) : connectionTest.status === "success" ? (
+                <><Wifi size={14} /> {tGuide("testSuccess", "Conexión exitosa")}</>
+              ) : connectionTest.status === "error" ? (
+                <><WifiOff size={14} /> {tGuide("testFailed", "Error de conexión")}</>
+              ) : (
+                <><Wifi size={14} /> {tGuide("testConnection", "Probar Conexión")}</>
+              )}
+            </button>
+
+            {connectionTest.status === "success" && connectionTest.storeName && (
+              <span style={{ fontSize: 11, color: "#3db87a", display: "flex", alignItems: "center", gap: 4 }}>
+                <CheckCircle size={12} />
+                {connectionTest.storeName}
+                {connectionTest.productCount != null && ` · ${connectionTest.productCount} productos`}
+              </span>
+            )}
+          </div>
+
+          {connectionTest.status === "error" && connectionTest.error && (
+            <div style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "rgba(220,60,60,0.06)",
+              border: "1px solid rgba(220,60,60,0.2)",
+              marginTop: 10,
+            }}>
+              <AlertCircle size={14} style={{ color: "#dc3c3c", flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <p style={{ fontSize: 12, color: "#dc3c3c", margin: "0 0 4px 0" }}>
+                  {connectionTest.error}
+                </p>
+                {connectionTest.errorCode && ERROR_TROUBLESHOOTING[connectionTest.errorCode] && (
+                  <p style={{ fontSize: 11, color: "var(--t3)", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Info size={11} />
+                    {ERROR_TROUBLESHOOTING[connectionTest.errorCode]}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
             </>
           )}
         </div>
+
+        {!isUniversal && (
+          <div style={{ marginBottom: 16 }}>
+            <ConnectionGuide
+              platform={platform}
+              defaultExpanded={!isShopify}
+              compact
+            />
+          </div>
+        )}
 
         <div className="card" style={{ padding: "20px 24px", marginBottom: 16 }}>
           <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>

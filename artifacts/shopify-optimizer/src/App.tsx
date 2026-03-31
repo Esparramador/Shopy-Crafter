@@ -58,6 +58,7 @@ import ClientMessages from "@/pages/client/ClientMessages";
 import ClientProducts from "@/pages/client/ClientProducts";
 import ClientReports from "@/pages/client/ClientReports";
 import ResetPassword from "@/pages/ResetPassword";
+import HelpConnections from "@/pages/HelpConnections";
 
 import { VoiceButton } from "@/components/VoiceButton";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -200,6 +201,14 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><NewProject /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+
+        <Route path="/help/connections">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><HelpConnections /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

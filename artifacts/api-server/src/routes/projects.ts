@@ -632,6 +632,132 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
   }
 });
 
+router.post("/projects/test-connection-presave", async (req, res): Promise<void> => {
+  const { platformType, shopDomain, clientId, clientSecret } = req.body as {
+    platformType?: string;
+    shopDomain?: string;
+    clientId?: string;
+    clientSecret?: string;
+  };
+
+  if (!platformType || !shopDomain) {
+    res.status(400).json({ connected: false, error: "Plataforma y URL son obligatorios", errorCode: "MISSING_FIELDS" });
+    return;
+  }
+
+  if (platformType === "universal") {
+    res.json({ connected: true, storeName: shopDomain, productCount: null, platformInfo: "Auditoría Universal" });
+    return;
+  }
+
+  const validPlatforms = ["shopify", "woocommerce", "prestashop"];
+  if (!validPlatforms.includes(platformType)) {
+    res.status(400).json({ connected: false, error: "Plataforma no válida", errorCode: "INVALID_PLATFORM" });
+    return;
+  }
+
+  if (platformType === "shopify") {
+    const normalized = normalizeShopDomain(shopDomain);
+    if (!normalized || !normalized.includes(".myshopify.com")) {
+      res.status(400).json({ connected: false, error: "El dominio debe ser un dominio .myshopify.com válido", errorCode: "STORE_NOT_FOUND" });
+      return;
+    }
+  } else {
+    try {
+      const storeUrl = new URL(shopDomain.startsWith("http") ? shopDomain : `https://${shopDomain}`);
+      const hostname = storeUrl.hostname.toLowerCase();
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" ||
+          hostname.startsWith("10.") || hostname.startsWith("172.") || hostname.startsWith("192.168.") ||
+          hostname === "::1" || hostname === "[::1]" || hostname.endsWith(".local") ||
+          hostname.startsWith("169.254.") || hostname === "metadata.google.internal") {
+        res.status(400).json({ connected: false, error: "No se permiten URLs de red local o privada", errorCode: "URL_UNREACHABLE" });
+        return;
+      }
+    } catch {
+      res.status(400).json({ connected: false, error: "URL no válida", errorCode: "URL_UNREACHABLE" });
+      return;
+    }
+  }
+
+  if (!clientSecret) {
+    res.status(400).json({ connected: false, error: "Credenciales requeridas", errorCode: "AUTH_FAILED" });
+    return;
+  }
+
+  const fakeProject = {
+    id: 0,
+    name: "test",
+    shopDomain: shopDomain.replace(/\/$/, ""),
+    clientId: platformType === "woocommerce" && clientId ? encrypt(clientId) : (clientId ?? ""),
+    clientSecret: clientSecret ? encrypt(clientSecret) : "",
+    platformType: platformType as any,
+    accessToken: null,
+    tokenExpiresAt: null,
+    plan: "starter" as const,
+    planRenewsAt: new Date(),
+    storeNiche: null,
+    brandTone: null,
+    targetAudience: null,
+    storeMarkets: null,
+    replicateApiToken: null,
+    anthropicApiKey: null,
+    autoPilotEnabled: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  try {
+    const connector = getConnector(fakeProject as any);
+    const result = await connector.testConnection();
+
+    res.json({
+      connected: result.connected,
+      storeName: result.storeName,
+      productCount: result.productCount,
+      platformInfo: result.platformInfo,
+      error: result.error,
+      errorCode: result.errorCode ?? null,
+    });
+  } catch (err) {
+    if (err instanceof PlatformNotSupportedError) {
+      res.json({ connected: false, error: err.message, errorCode: "PLATFORM_NOT_SUPPORTED" });
+      return;
+    }
+    const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+    let errorCode = "UNKNOWN";
+    const msgLower = rawMsg.toLowerCase();
+    if (msgLower.includes("401") || msgLower.includes("unauthorized") || msgLower.includes("invalid") || msgLower.includes("authentication")) {
+      errorCode = "AUTH_FAILED";
+    } else if (msgLower.includes("403") || msgLower.includes("forbidden") || msgLower.includes("permission")) {
+      errorCode = "PERMISSIONS_INSUFFICIENT";
+    } else if (msgLower.includes("ssl") || msgLower.includes("https") || msgLower.includes("certificate")) {
+      errorCode = "SSL_REQUIRED";
+    } else if (msgLower.includes("enotfound") || msgLower.includes("econnrefused") || msgLower.includes("unreachable") || msgLower.includes("getaddrinfo")) {
+      errorCode = "URL_UNREACHABLE";
+    } else if (msgLower.includes("timeout") || msgLower.includes("etimedout")) {
+      errorCode = "TIMEOUT";
+    } else if (msgLower.includes("webservice") || msgLower.includes("disabled")) {
+      errorCode = "WEBSERVICE_DISABLED";
+    }
+    const ERROR_MESSAGES: Record<string, string> = {
+      AUTH_FAILED: "Credenciales inválidas. Verifica tu API Key y Secret.",
+      PERMISSIONS_INSUFFICIENT: "La clave API no tiene permisos suficientes.",
+      SSL_REQUIRED: "Tu tienda necesita HTTPS para conectarse.",
+      URL_UNREACHABLE: "No podemos acceder a la URL. Verifica que sea correcta y esté online.",
+      TIMEOUT: "La conexión ha tardado demasiado. Inténtalo de nuevo.",
+      WEBSERVICE_DISABLED: "El webservice está desactivado.",
+      UNKNOWN: "Error de conexión. Verifica tus credenciales e inténtalo de nuevo.",
+    };
+    res.json({
+      connected: false,
+      storeName: null,
+      productCount: null,
+      error: ERROR_MESSAGES[errorCode] ?? ERROR_MESSAGES.UNKNOWN,
+      errorCode,
+    });
+  }
+});
+
 router.post("/projects/:projectId/test-connection", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
