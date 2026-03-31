@@ -134,7 +134,8 @@ const FULL_AUDIT_ACTIONS = new Set([
 
 const PRODUCT_LIST_ACTIONS = new Set([
   "list_products", "list_all_products", "search_product", "audit_store",
-  "scan_store", "full_audit", "complete_audit",
+  "scan_store", "full_audit", "complete_audit", "optimize_product",
+  "redesign_product", "bulk_optimize", "analyze_external_store",
 ]);
 
 interface ProductCardItem {
@@ -244,8 +245,11 @@ function extractProductsFromAction(actionName: string, data: unknown): ProductCa
   if (!PRODUCT_LIST_ACTIONS.has(actionName) || !data || typeof data !== "object") return null;
   const d = data as Record<string, unknown>;
   const products = d.products as ProductCardItem[] | undefined;
-  if (!products || !Array.isArray(products) || products.length === 0) return null;
-  return products;
+  if (products && Array.isArray(products) && products.length > 0) return products;
+  if (d.title && typeof d.title === "string" && (d.auditScore !== undefined || d.score !== undefined || d.auditGrade !== undefined || d.grade !== undefined)) {
+    return [d as unknown as ProductCardItem];
+  }
+  return null;
 }
 
 function ActionButtons({ actionName, content, rawData, isMobile }: {

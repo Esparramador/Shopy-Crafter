@@ -412,24 +412,40 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
   const avgScore = products.filter(p => p.auditScore != null).length > 0
     ? products.reduce((s, p) => s + (p.auditScore ?? 0), 0) / products.filter(p => p.auditScore != null).length : 0;
 
-  let rows = "";
-  for (const p of products) {
+  const catalogCards: ProductCardData[] = products.map(p => {
     const cogs = cogsMap.get(p.shopifyProductId);
     const seo = seoMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
-    rows += `<tr><!-- nosemgrep -->
-      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
-      <td>${p.status === "active" ? '<span class="text-jade">Activo</span>' : p.status === "draft" ? '<span class="text-muted">Borrador</span>' : p.status === "archived" ? '<span style="color:#ff9800;">Archivado</span>' : `<span class="text-muted">${p.status || "?"}</span>`}</td>
-      <td>${price > 0 ? price.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
-      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : "—"}</td><!-- nosemgrep -->
-      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade" : margin > 15 ? "text-gold" : "text-red"}">${margin.toFixed(1)}%</span>` : "—"}</td><!-- nosemgrep -->
-      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td><!-- nosemgrep -->
-      <td>${seo?.seoGrade ? `<span class="grade ${gradeClass(seo.seoGrade)}">${seo.seoGrade}</span>` : "—"}</td><!-- nosemgrep -->
-      <td>${p.imageCount ?? 0}</td><!-- nosemgrep -->
-      <td>${p.variantCount ?? 1}</td><!-- nosemgrep -->
-    </tr>`;
-  }
+    const imgs = (p.imagesJson as Array<{ src?: string }> | null) ?? [];
+    const tagsArr = (p.tags || "").split(",").filter(t => t.trim());
+    return {
+      title: p.title,
+      status: p.status,
+      price: p.price || "0",
+      compareAtPrice: p.compareAtPrice,
+      imageUrl: imgs[0]?.src || null,
+      imageCount: p.imageCount ?? 0,
+      descriptionLength: (p.bodyHtml || "").length,
+      tagsCount: tagsArr.length,
+      tags: p.tags || "",
+      variantCount: p.variantCount ?? 1,
+      published: !!p.publishedAt,
+      auditScore: p.auditScore ?? 0,
+      auditGrade: p.auditGrade ?? (seo?.seoGrade ?? "D"),
+      hasComparePrice: !!p.compareAtPrice,
+      hasMetaTitle: !!seo?.metaTitle && seo.metaTitle.length > 10,
+      hasMetaDesc: !!seo?.metaDescription && seo.metaDescription.length > 10,
+      hasSchema: !!seo?.hasSchema,
+      hasAltTexts: !!seo?.hasAltTexts,
+      cleanHandle: !!seo?.cleanHandle,
+      cogs: cogs ? cogs.totalCogs : null,
+      margin,
+      productType: p.productType,
+      vendor: p.vendor,
+    };
+  });
+  const catalogCardsHtmlCatalog = buildProductCardsSection(catalogCards, "Catalogo Completo");
 
   const body = ` // nosemgrep
     <div class="metric-row">
@@ -440,13 +456,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
     </div>
 
     <div class="section">
-      <div class="section-title">Catálogo Completo</div>
-      <div class="card" style="overflow-x:auto;">
-        <table>
-          <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>Audit</th><th>SEO</th><th>Imgs</th><th>Vars</th></tr></thead>
-          <tbody>${rows}</tbody><!-- nosemgrep -->
-        </table>
-      </div>
+      ${catalogCardsHtmlCatalog || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
     </div>`;
 
   const html = reportShell("Informe de Catálogo de Productos", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
