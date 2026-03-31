@@ -8,6 +8,7 @@ import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
+import { learnFromOperation } from "../lib/claude";
 
 const router = Router();
 
@@ -228,6 +229,8 @@ router.post("/projects", async (req, res): Promise<void> => {
     return;
   }
 
+  const isWooCommerce = platformType === "woocommerce";
+
   if (isShopify && (!clientId || !clientSecret)) {
     res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
     return;
@@ -240,7 +243,37 @@ router.post("/projects", async (req, res): Promise<void> => {
     }
   }
 
-  if (!isUniversal && !isShopify && !isPrestaShop && !clientSecret) {
+  if (isWooCommerce) {
+    if (!clientId || !clientSecret) {
+      res.status(400).json({ error: "Consumer Key y Consumer Secret son obligatorios para WooCommerce" });
+      return;
+    }
+    if (!clientId.startsWith("ck_")) {
+      res.status(400).json({ error: "El Consumer Key de WooCommerce debe empezar con 'ck_'" });
+      return;
+    }
+    if (!clientSecret.startsWith("cs_")) {
+      res.status(400).json({ error: "El Consumer Secret de WooCommerce debe empezar con 'cs_'" });
+      return;
+    }
+    try {
+      const storeUrl = new URL(shopDomain.startsWith("http") ? shopDomain : `https://${shopDomain}`);
+      if (storeUrl.protocol !== "https:") {
+        res.status(400).json({ error: "La URL de la tienda WooCommerce debe usar HTTPS para proteger las credenciales" });
+        return;
+      }
+      const hostname = storeUrl.hostname.toLowerCase();
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.startsWith("10.") || hostname.startsWith("172.") || hostname.startsWith("192.168.") || hostname === "::1") {
+        res.status(400).json({ error: "No se permiten URLs de red local o privada" });
+        return;
+      }
+    } catch {
+      res.status(400).json({ error: "La URL de la tienda WooCommerce no es válida" });
+      return;
+    }
+  }
+
+  if (!isUniversal && !isShopify && !isPrestaShop && !isWooCommerce && !clientSecret) {
     res.status(400).json({ error: "name, shopDomain y las credenciales de la plataforma son obligatorios" });
     return;
   }
@@ -254,7 +287,7 @@ router.post("/projects", async (req, res): Promise<void> => {
     name,
     platformType,
     shopDomain: normalizedDomain,
-    clientId: isPrestaShop ? "" : (clientId ?? ""),
+    clientId: isPrestaShop ? "" : (isWooCommerce && clientId) ? encrypt(clientId) : (clientId ?? ""),
     clientSecret: clientSecret ? encrypt(clientSecret) : "",
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
@@ -277,6 +310,66 @@ router.post("/projects", async (req, res): Promise<void> => {
       });
       return;
     }
+  } else if (isWooCommerce) {
+    let wcConnectionResult: { connected: boolean; error?: string | null; errorCode?: string; storeName?: string | null; productCount?: number | null } = { connected: false };
+    try {
+      const connector = getConnector(project);
+      const result = await connector.testConnection();
+      wcConnectionResult = result;
+      if (result.connected) {
+        req.log.info({ projectId: project.id, storeName: result.storeName, productCount: result.productCount }, "WooCommerce connection test passed");
+      } else {
+        req.log.warn({ projectId: project.id, error: result.error, errorCode: result.errorCode }, "WooCommerce connection test failed — project saved for retry");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      wcConnectionResult = { connected: false, error: msg };
+      req.log.warn({ projectId: project.id, err }, "WooCommerce connection test failed — project saved for retry");
+    }
+
+    const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
+
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "project_create",
+      projectId: String(refreshed.id),
+      details: `Created ${platformType} project "${name}" (${normalizedDomain}) — connection: ${wcConnectionResult.connected ? "OK" : "FAILED"}`,
+      ipAddress: req.ip ?? "unknown",
+    });
+
+    try {
+      if (wcConnectionResult.connected) {
+        learnFromOperation({
+          operationType: "connection_auth",
+          title: `WooCommerce connection success: ${normalizedDomain}`,
+          content: `Successfully connected to WooCommerce store "${wcConnectionResult.storeName}" at ${normalizedDomain}. Platform: WooCommerce. Product count: ${wcConnectionResult.productCount ?? "unknown"}. Authentication: HTTP Basic Auth with consumer key/secret. WooCommerce SEO requires Yoast plugin for meta title/description management.`,
+          confidence: 0.9,
+          tags: ["connection_success", "woocommerce", "auth"],
+        });
+      } else {
+        learnFromOperation({
+          operationType: "connection_auth",
+          title: `WooCommerce connection failed: ${normalizedDomain}`,
+          content: `Failed to connect to WooCommerce store at ${normalizedDomain}. Error: ${wcConnectionResult.error ?? "unknown"}. Error code: ${wcConnectionResult.errorCode ?? "unknown"}. Platform: WooCommerce. Common WooCommerce connection issues: incorrect consumer key/secret, REST API not enabled, permalink structure not set to "Post name", or SSL/HTTPS not configured. Project saved for retry.`,
+          confidence: 0.7,
+          tags: ["connection_failure", "woocommerce", "auth"],
+        });
+      }
+    } catch { /* learning is best-effort */ }
+
+    res.status(201).json({
+      ...refreshed,
+      clientSecret: "••••••••",
+      accessToken: undefined,
+      hasAccessToken: !!refreshed.accessToken,
+      tokenExpiresAt: refreshed.tokenExpiresAt?.toISOString() ?? null,
+      createdAt: refreshed.createdAt.toISOString(),
+      updatedAt: refreshed.updatedAt.toISOString(),
+      connectionTest: wcConnectionResult.connected
+        ? { connected: true, storeName: wcConnectionResult.storeName, productCount: wcConnectionResult.productCount }
+        : { connected: false, error: wcConnectionResult.error, errorCode: wcConnectionResult.errorCode },
+    });
+    return;
   } else if (!isUniversal) {
     try {
       const connector = getConnector(project);
@@ -346,7 +439,7 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
   if (shopDomain !== undefined) {
     updateData.shopDomain = platform === "shopify" ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
   }
-  if (clientId !== undefined) updateData.clientId = clientId;
+  if (clientId !== undefined) updateData.clientId = (platform === "woocommerce" && clientId) ? encrypt(clientId) : clientId;
   if (clientSecret !== undefined) updateData.clientSecret = encrypt(clientSecret);
   if (storeNiche !== undefined) updateData.storeNiche = storeNiche;
   if (brandTone !== undefined) updateData.brandTone = brandTone;

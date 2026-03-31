@@ -5,6 +5,7 @@ import { eq, desc, lte, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
+import { getConnector } from "../lib/connectors/index";
 
 const router = Router();
 
@@ -242,14 +243,17 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
 
   try {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
-    if (!project || !project.accessToken) { res.status(400).json({ error: "Project not found or no access" }); return; }
+    if (!project) { res.status(400).json({ error: "Project not found" }); return; }
+
+    const isWoo = project.platformType === "woocommerce";
+    if (!isWoo && !project.accessToken) { res.status(400).json({ error: "Project not found or no access" }); return; }
 
     const existingOrders = await db.select({ orderId: salesAnalyticsTable.orderId })
       .from(salesAnalyticsTable)
       .where(eq(salesAnalyticsTable.projectId, projectId));
     const existingOrderIds = new Set(existingOrders.map(o => o.orderId));
 
-    const ordersData = await shopifyRequest<{ orders: Array<{
+    type OrderShape = {
       id: number; name: string; created_at: string;
       customer?: { id: number; email: string; first_name: string; last_name: string };
       line_items: Array<{
@@ -260,14 +264,49 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
       financial_status: string; fulfillment_status: string | null;
       shipping_address?: { country: string; city: string };
       currency: string;
-    }> }>(
-      parseInt(projectId), project.shopDomain,
-      "/orders.json?status=any&limit=250&fields=id,name,created_at,customer,line_items,financial_status,fulfillment_status,shipping_address,currency"
-    );
+    };
+
+    let orders: OrderShape[];
+    if (isWoo) {
+      const connector = getConnector(project);
+      const wcOrders = await connector.getOrders();
+      orders = wcOrders.map((o) => ({
+        id: parseInt(o.platformId) || 0,
+        name: o.orderNumber,
+        created_at: o.createdAt,
+        customer: o.customerEmail ? {
+          id: 0,
+          email: o.customerEmail,
+          first_name: "",
+          last_name: "",
+        } : undefined,
+        line_items: o.lineItems.map((li) => ({
+          product_id: parseInt(li.productId ?? "0") || 0,
+          variant_id: 0,
+          title: li.title,
+          variant_title: "Default",
+          sku: "",
+          quantity: li.quantity,
+          price: li.price,
+          total_discount: "0",
+          fulfillment_status: null as string | null,
+        })),
+        financial_status: o.status,
+        fulfillment_status: null,
+        shipping_address: undefined,
+        currency: o.currency,
+      }));
+    } else {
+      const ordersData = await shopifyRequest<{ orders: OrderShape[] }>(
+        parseInt(projectId), project.shopDomain,
+        "/orders.json?status=any&limit=250&fields=id,name,created_at,customer,line_items,financial_status,fulfillment_status,shipping_address,currency"
+      );
+      orders = ordersData.orders;
+    }
 
     let inserted = 0;
     let failed = 0;
-    for (const order of ordersData.orders) {
+    for (const order of orders) {
       if (existingOrderIds.has(String(order.id))) continue;
 
       for (const item of order.line_items) {
@@ -315,12 +354,12 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
 
     learnFromOperation({
       operationType: "inventory_sync",
-      title: `Sync de pedidos: ${inserted} lineas de ${ordersData.orders.length} pedidos importados`,
-      content: `Synced ${ordersData.orders.length} orders with ${inserted} line items for project ${projectId}.`,
+      title: `Sync de pedidos: ${inserted} lineas de ${orders.length} pedidos importados`,
+      content: `Synced ${orders.length} orders with ${inserted} line items for project ${projectId}. Platform: ${isWoo ? "WooCommerce" : "Shopify"}.`,
       confidence: 0.8,
     });
 
-    res.json({ synced: true, ordersProcessed: ordersData.orders.length, lineItemsInserted: inserted, lineItemsFailed: failed });
+    res.json({ synced: true, ordersProcessed: orders.length, lineItemsInserted: inserted, lineItemsFailed: failed });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

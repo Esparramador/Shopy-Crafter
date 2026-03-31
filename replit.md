@@ -30,12 +30,13 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 
 ### Multi-Platform Connector Architecture
 The platform supports multiple e-commerce platforms via a connector abstraction layer:
-- **Supported Platforms**: Shopify (fully implemented), PrestaShop (fully implemented), WooCommerce, WordPress, Universal (planned)
+- **Supported Platforms**: Shopify (fully implemented), PrestaShop (fully implemented), WooCommerce (fully implemented), WordPress, Universal (planned)
 - **IPlatformConnector Interface**: Standard interface for testConnection, getProducts, createProduct, updateProduct, deleteProduct, getProductCount, getSEO, updateSEO, uploadImage
 - **ConnectorFactory**: `getConnector(project)` returns the appropriate connector based on `platformType` field
 - **ShopifyConnector**: Wraps existing `shopify.ts` functions without modifying them (13 files depend on shopify.ts)
 - **PrestaShopConnector**: Full implementation with XML writes / JSON reads, HTTP Basic Auth, multipart image upload, native SEO fields (meta_title, meta_description, link_rewrite, meta_keywords), stock management via stock_availables, combinations support
-- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, index.ts)
+- **WooCommerceConnector**: Full implementation with HTTP Basic Auth (consumer key/secret), WC REST API v3, product CRUD, variations, orders, SEO (Yoast), inventory. Pagination via X-WP-Total/X-WP-TotalPages headers.
+- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, woocommerce.ts, index.ts)
 - **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
 - **PrestaShop API Key**: Stored in `clientSecret` (encrypted), `clientId` left empty. Auth via HTTP Basic (key as username, empty password)
 

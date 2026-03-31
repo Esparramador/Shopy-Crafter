@@ -5,6 +5,21 @@ import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnic
 import { eq, desc, and, gte } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
+const platformTypeCache = new Map<number, { value: string; ts: number }>();
+
+async function resolvePlatformType(projectId: number): Promise<string | undefined> {
+  const cached = platformTypeCache.get(projectId);
+  if (cached && Date.now() - cached.ts < 300_000) return cached.value;
+  try {
+    const [row] = await db.select({ platformType: projectsTable.platformType }).from(projectsTable).where(eq(projectsTable.id, projectId));
+    const val = row?.platformType ?? "shopify";
+    platformTypeCache.set(projectId, { value: val, ts: Date.now() });
+    return val;
+  } catch {
+    return undefined;
+  }
+}
+
 let defaultClient: Anthropic | null = null;
 
 function getDefaultClient(): Anthropic {
@@ -154,7 +169,8 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
 export async function buildShopyBrainContext(
   niche?: string,
   useCase?: "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce",
-  userQuery?: string
+  userQuery?: string,
+  platformType?: string,
 ): Promise<string> {
   try {
     const minConfidence = 0.6;
@@ -228,6 +244,14 @@ export async function buildShopyBrainContext(
 
     const lines: string[] = ["", "━━━ SHOPYBRAIN OMNICORE — INTELIGENCIA ACUMULADA (46,000+ insights) ━━━"];
 
+    if (platformType && platformType !== "shopify") {
+      const platformNotes: Record<string, string> = {
+        woocommerce: "Platform: WooCommerce (WordPress). Uses WC REST API v3 with HTTP Basic Auth. SEO via Yoast SEO plugin (yoast_head_json). Product types: simple/variable/grouped/external. Status mapping: publish=active, draft=draft, private=archived. Images via src URLs. Variations require parent product attributes with variation:true.",
+        prestashop: "Platform: PrestaShop. Uses PrestaShop Webservice API with XML/JSON. SEO via native meta fields.",
+      };
+      lines.push(`🔧 Plataforma: ${platformType.toUpperCase()}`);
+      if (platformNotes[platformType]) lines.push(platformNotes[platformType]);
+    }
     if (niche) lines.push(`Nicho activo: ${niche}`);
     if (useCase) lines.push(`Contexto de tarea: ${useCase}`);
 
@@ -362,8 +386,9 @@ export async function askClaudeWithBrain(
   maxTokens = 4096
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
+  const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase, lastUserMsg),
+    buildShopyBrainContext(niche, useCase, lastUserMsg, platform),
     buildBrandDnaContext(projectId),
   ]);
   const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
@@ -379,8 +404,9 @@ export async function askClaudeJsonWithBrain<T>(
   niche?: string,
   maxTokens = 4096
 ): Promise<T> {
+  const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase, prompt),
+    buildShopyBrainContext(niche, useCase, prompt, platform),
     buildBrandDnaContext(projectId),
   ]);
   const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");
@@ -434,6 +460,8 @@ export function learnFromOperation(params: {
     chatbot_action_create_product: "prompt_template",
     chatbot_action_edit_product: "prompt_template",
     chatbot_action_change_price: "pricing_pattern",
+    connection_auth: "general",
+    inventory_sales_analytics: "pricing_pattern",
     chatbot_action_regenerate_token: "general",
     chatbot_action_get_scopes: "general",
     chatbot_action_delete_product: "general",

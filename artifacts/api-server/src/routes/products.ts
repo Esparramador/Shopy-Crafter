@@ -9,6 +9,8 @@ import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from
 import { logger } from "../lib/logger";
 import { saveToVault } from "../lib/vault";
 import { getConnector } from "../lib/connectors/index";
+import { WooCommerceConnector } from "../lib/connectors/woocommerce";
+import type { PlatformProduct } from "../lib/connectors/types";
 
 const router = Router();
 
@@ -331,6 +333,148 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
     }
   }
 
+  if (platformType === "woocommerce") {
+    try {
+      const connector = getConnector(project) as WooCommerceConnector;
+      const wcProducts = await connector.getAllProducts();
+
+      logger.info({ projectId: id, totalProducts: wcProducts.length }, "WooCommerce sync: all products fetched");
+
+      let auditedCount = 0;
+      let totalScore = 0;
+      const statusBreakdown: Record<string, number> = {};
+
+      for (const wp of wcProducts) {
+        const internalStatus = wp.status === "publish" ? "active" : wp.status === "private" ? "archived" : wp.status;
+        statusBreakdown[internalStatus] = (statusBreakdown[internalStatus] ?? 0) + 1;
+
+        const tags = (wp.tags ?? []).map((t: { name: string }) => t.name).join(", ");
+        const images = wp.images ?? [];
+        const price = wp.regular_price ?? wp.price ?? null;
+        const compareAtPrice = wp.sale_price || null;
+
+        let variantCount = 1;
+        if (wp.type === "variable" && wp.variations) {
+          variantCount = wp.variations.length || 1;
+        }
+
+        const audit = auditProduct({
+          title: wp.name,
+          body_html: wp.description,
+          price,
+          compare_at_price: compareAtPrice,
+          images: images.map((img: { src: string; alt?: string }, i: number) => ({ id: 0, src: img.src, alt: img.alt ?? null, position: i })),
+          tags,
+        });
+
+        await db
+          .insert(productsTable)
+          .values({
+            projectId: id,
+            shopifyProductId: String(wp.id),
+            title: wp.name,
+            handle: wp.slug,
+            bodyHtml: wp.description,
+            vendor: "",
+            productType: wp.type,
+            status: internalStatus,
+            publishedAt: wp.status === "publish" ? new Date().toISOString() : null,
+            tags,
+            price,
+            compareAtPrice,
+            imageCount: images.length,
+            variantCount,
+            imagesJson: images,
+            auditScore: audit.overallScore,
+            auditGrade: audit.grade,
+            titleScore: audit.titleScore,
+            descriptionScore: audit.descriptionScore,
+            priceScore: audit.priceScore,
+            imageScore: audit.imageScore,
+            seoScore: audit.seoScore,
+            auditProblems: audit.problems,
+            lastAuditedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [productsTable.projectId, productsTable.shopifyProductId],
+            set: {
+              title: wp.name,
+              handle: wp.slug,
+              bodyHtml: wp.description,
+              vendor: "",
+              productType: wp.type,
+              status: internalStatus,
+              tags,
+              price,
+              compareAtPrice,
+              imageCount: images.length,
+              variantCount,
+              imagesJson: images,
+              auditScore: audit.overallScore,
+              auditGrade: audit.grade,
+              titleScore: audit.titleScore,
+              descriptionScore: audit.descriptionScore,
+              priceScore: audit.priceScore,
+              imageScore: audit.imageScore,
+              seoScore: audit.seoScore,
+              auditProblems: audit.problems,
+              lastAuditedAt: new Date(),
+            },
+          });
+
+        auditedCount++;
+        totalScore += audit.overallScore;
+      }
+
+      const wcIds = wcProducts.map(p => String(p.id));
+      const localProducts = await db.select({ shopifyProductId: productsTable.shopifyProductId })
+        .from(productsTable)
+        .where(eq(productsTable.projectId, id));
+      const orphanIds = localProducts
+        .filter(lp => !wcIds.includes(lp.shopifyProductId))
+        .map(lp => lp.shopifyProductId);
+      let removedCount = 0;
+      if (orphanIds.length > 0) {
+        for (const orphanId of orphanIds) {
+          await db.delete(productsTable).where(
+            and(eq(productsTable.projectId, id), eq(productsTable.shopifyProductId, orphanId))
+          );
+        }
+        removedCount = orphanIds.length;
+      }
+
+      const avgScore = auditedCount > 0 ? totalScore / auditedCount : null;
+      await db.update(projectsTable).set({ productCount: wcProducts.length, avgAuditScore: avgScore }).where(eq(projectsTable.id, id));
+
+      const breakdownParts = Object.entries(statusBreakdown).map(([s, c]) => `${c} ${s}`);
+
+      try {
+        learnFromOperation({
+          operationType: "product_creation",
+          title: `WooCommerce sync: ${project.shopDomain}`,
+          content: `WooCommerce sync completed: ${wcProducts.length} products synced from ${project.shopDomain}. Platform: WooCommerce. Status breakdown: ${breakdownParts.join(", ")}. Average audit score: ${avgScore?.toFixed(1) ?? "N/A"}. Categories/price ranges: ${wcProducts.slice(0, 10).map(p => `${p.name}: ${p.regular_price ?? p.price ?? "N/A"}`).join("; ")}.`,
+          confidence: 0.9,
+          tags: ["product_sync", "woocommerce"],
+        });
+      } catch { /* learning is best-effort */ }
+
+      res.json({
+        synced: wcProducts.length,
+        auditedCount,
+        removed: removedCount,
+        avgScore,
+        statusBreakdown,
+        message: `${wcProducts.length} productos sincronizados desde WooCommerce (${breakdownParts.join(", ")}), ${removedCount > 0 ? `${removedCount} eliminados de BD` : "0 eliminados"}`,
+      });
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ projectId: id, error: msg }, "WooCommerce sync failed");
+      res.status(502).json({ error: `Error al sincronizar con WooCommerce: ${msg}` });
+      return;
+    }
+  }
+
   if (!project.accessToken) {
     res.status(400).json({ error: "No hay token de acceso. Regenera el token primero." });
     return;
@@ -570,48 +714,75 @@ router.get("/projects/:projectId/products/:productId", async (req, res): Promise
   let liveOptions: ShopifyProductRaw["options"] = [];
   let liveImages: ShopifyProductRaw["images"] = [];
 
-  const projectPlatform = (project as typeof project & { platformType?: string })?.platformType ?? "shopify";
-
-  if (project && projectPlatform === "prestashop") {
-    try {
-      const connector = getConnector(project);
-      const liveProduct = await connector.getProduct(shopifyProductId);
-      liveImages = liveProduct.images.map((img, i) => ({
-        id: i,
-        src: img.src,
-        alt: img.alt ?? null,
-        position: img.position ?? i,
-      }));
-      liveVariants = liveProduct.variants.map((v) => ({
-        id: parseInt(v.platformId, 10) || 0,
-        title: v.title,
-        price: v.price,
-        compare_at_price: v.compareAtPrice ?? null,
-        sku: v.sku ?? null,
-        option1: v.option1 ?? null,
-        option2: v.option2 ?? null,
-        option3: v.option3 ?? null,
-        inventory_quantity: v.inventoryQuantity ?? null,
-        weight: null,
-        weight_unit: null,
-      }));
-    } catch {
-      liveVariants = [];
-    }
-  } else if (project) {
-    try {
-      const shopifyData = await shopifyRequest<{ product: ShopifyProductRaw }>(
-        projectId,
-        project.shopDomain,
-        `/products/${shopifyProductId}.json`
-      );
-      if (shopifyData?.product) {
-        liveVariants = shopifyData.product.variants ?? [];
-        liveOptions = shopifyData.product.options ?? [];
-        liveImages = shopifyData.product.images ?? [];
+  if (project) {
+    const pType = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+    if (pType === "prestashop") {
+      try {
+        const connector = getConnector(project);
+        const liveProduct = await connector.getProduct(shopifyProductId);
+        liveImages = liveProduct.images.map((img, i) => ({
+          id: i,
+          src: img.src,
+          alt: img.alt ?? null,
+          position: img.position ?? i,
+        }));
+        liveVariants = liveProduct.variants.map((v) => ({
+          id: parseInt(v.platformId, 10) || 0,
+          title: v.title,
+          price: v.price,
+          compare_at_price: v.compareAtPrice ?? null,
+          sku: v.sku ?? null,
+          option1: v.option1 ?? null,
+          option2: v.option2 ?? null,
+          option3: v.option3 ?? null,
+          inventory_quantity: v.inventoryQuantity ?? null,
+          weight: null,
+          weight_unit: null,
+        }));
+      } catch {
+        liveVariants = [];
       }
-    } catch {
-      liveVariants = [];
+    } else if (pType === "woocommerce") {
+      try {
+        const connector = getConnector(project);
+        const wcProduct = await connector.getProduct(shopifyProductId);
+        liveVariants = wcProduct.variants.map(v => ({
+          id: parseInt(v.platformId, 10) || 0,
+          title: v.title,
+          price: v.price,
+          compare_at_price: v.compareAtPrice ?? null,
+          sku: v.sku ?? null,
+          option1: v.option1 ?? null,
+          option2: v.option2 ?? null,
+          option3: v.option3 ?? null,
+          inventory_quantity: v.inventoryQuantity ?? null,
+          weight: null,
+          weight_unit: null,
+        }));
+        liveImages = wcProduct.images.map((img, i) => ({
+          id: 0,
+          src: img.src,
+          alt: img.alt ?? null,
+          position: img.position ?? i,
+        }));
+      } catch {
+        liveVariants = [];
+      }
+    } else {
+      try {
+        const shopifyData = await shopifyRequest<{ product: ShopifyProductRaw }>(
+          projectId,
+          project.shopDomain,
+          `/products/${shopifyProductId}.json`
+        );
+        if (shopifyData?.product) {
+          liveVariants = shopifyData.product.variants ?? [];
+          liveOptions = shopifyData.product.options ?? [];
+          liveImages = shopifyData.product.images ?? [];
+        }
+      } catch {
+        liveVariants = [];
+      }
     }
   }
 
@@ -856,6 +1027,98 @@ router.put("/projects/:projectId/products/:productId", async (req, res): Promise
       if (v.barcode !== undefined) variant.barcode = v.barcode;
       return variant;
     });
+  }
+
+  const pType = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+
+  if (pType === "woocommerce") {
+    try {
+      const connector = getConnector(project);
+      const wcData: Record<string, unknown> = {};
+      if (updates.title !== undefined) wcData.title = updates.title;
+      if (updates.bodyHtml !== undefined) wcData.bodyHtml = updates.bodyHtml;
+      if (updates.tags !== undefined) wcData.tags = updates.tags;
+      if (updates.status !== undefined) wcData.status = updates.status;
+      if (updates.handle !== undefined) wcData.handle = updates.handle;
+      if (updates.price !== undefined) wcData.price = updates.price;
+      if (updates.compareAtPrice !== undefined) wcData.compareAtPrice = updates.compareAtPrice;
+      if (updates.images !== undefined) wcData.images = updates.images;
+
+      const updated = await connector.updateProduct(shopifyProductId, wcData as Partial<PlatformProduct>);
+
+      const audit = auditProduct({
+        title: updated.title,
+        body_html: updated.bodyHtml,
+        price: updated.price,
+        compare_at_price: updated.compareAtPrice,
+        images: updated.images.map((img, i) => ({ id: 0, src: img.src, alt: img.alt ?? null, position: img.position ?? i })),
+        tags: updated.tags,
+      });
+
+      await db
+        .update(productsTable)
+        .set({
+          title: updated.title,
+          handle: updated.handle,
+          bodyHtml: updated.bodyHtml,
+          vendor: updated.vendor,
+          productType: updated.productType,
+          status: updated.status,
+          tags: updated.tags,
+          price: updated.price,
+          compareAtPrice: updated.compareAtPrice,
+          imageCount: updated.images.length,
+          variantCount: updated.variants.length,
+          imagesJson: updated.images,
+          auditScore: audit.overallScore,
+          auditGrade: audit.grade,
+          titleScore: audit.titleScore,
+          descriptionScore: audit.descriptionScore,
+          priceScore: audit.priceScore,
+          imageScore: audit.imageScore,
+          seoScore: audit.seoScore,
+          auditProblems: audit.problems,
+          lastAuditedAt: new Date(),
+        })
+        .where(and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, shopifyProductId)
+        ));
+
+      learnFromOperation({
+        operationType: "product_optimization",
+        niche: project.storeNiche,
+        title: `WooCommerce product updated: ${updated.title}`,
+        content: `Product "${updated.title}" updated on WooCommerce store ${project.shopDomain}. Score: ${audit.overallScore}/100 (${audit.grade}).`,
+        confidence: 0.95,
+        tags: ["product_optimization", "woocommerce"],
+      });
+
+      res.json({
+        product: {
+          id: updated.platformId,
+          title: updated.title,
+          handle: updated.handle,
+          vendor: updated.vendor,
+          productType: updated.productType,
+          status: updated.status,
+          tags: updated.tags,
+          price: updated.price,
+          compareAtPrice: updated.compareAtPrice,
+          imageCount: updated.images.length,
+          variantCount: updated.variants.length,
+          auditScore: audit.overallScore,
+          auditGrade: audit.grade,
+        },
+        message: "Producto actualizado en WooCommerce y re-auditado",
+      });
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ projectId, shopifyProductId, error: msg }, "Failed to update WooCommerce product");
+      res.status(502).json({ error: `Error al actualizar en WooCommerce: ${msg}` });
+      return;
+    }
   }
 
   try {
@@ -1389,6 +1652,129 @@ Responde SOLO JSON válido.`,
   if (seoTitle || seoDescription) {
     shopifyProduct.metafields_global_title_tag = seoTitle;
     shopifyProduct.metafields_global_description_tag = seoDescription;
+  }
+
+  const createPlatformType = (project as typeof project & { platformType?: string }).platformType ?? "shopify";
+
+  if (createPlatformType === "woocommerce") {
+    try {
+      const connector = getConnector(project);
+      const wcProductData: Partial<PlatformProduct> = {
+        title: finalTitle,
+        bodyHtml: finalBody,
+        vendor: vendor || "",
+        productType: productType || "simple",
+        tags: finalTags,
+        status: status || "draft",
+      };
+
+      if (images?.length) {
+        wcProductData.images = images.map((img: Record<string, unknown>, i: number) => ({
+          src: img.src as string,
+          alt: (img.alt as string) || finalTitle,
+          position: i + 1,
+        }));
+      }
+
+      if (variants?.length) {
+        wcProductData.variants = variants.map((v: Record<string, unknown>) => ({
+          platformId: "",
+          title: (v.title as string) || "Default",
+          price: (v.price as string) || "0.00",
+          compareAtPrice: (v.compareAtPrice as string) || null,
+          sku: (v.sku as string) || "",
+          inventoryQuantity: (v.quantity as number) ?? 0,
+          option1: v.option1 as string | undefined,
+          option2: v.option2 as string | undefined,
+          option3: v.option3 as string | undefined,
+        }));
+      } else {
+        wcProductData.price = req.body.price || "0.00";
+        wcProductData.compareAtPrice = req.body.compareAtPrice || null;
+      }
+
+      const created = await connector.createProduct(wcProductData);
+
+      const audit = auditProduct({
+        title: created.title,
+        body_html: created.bodyHtml,
+        price: created.price,
+        compare_at_price: created.compareAtPrice,
+        images: created.images.map((img, i) => ({ id: 0, src: img.src, alt: img.alt ?? null, position: img.position ?? i })),
+        tags: created.tags,
+      });
+
+      await db.insert(productsTable).values({
+        projectId,
+        shopifyProductId: created.platformId,
+        title: created.title,
+        handle: created.handle,
+        bodyHtml: created.bodyHtml,
+        vendor: created.vendor,
+        productType: created.productType,
+        status: created.status,
+        tags: created.tags,
+        price: created.price,
+        compareAtPrice: created.compareAtPrice,
+        imageCount: created.images.length,
+        variantCount: created.variants.length,
+        imagesJson: created.images,
+        auditScore: audit.overallScore,
+        auditGrade: scoreToGrade(audit.overallScore),
+        auditProblems: audit.problems,
+        titleScore: audit.titleScore,
+        descriptionScore: audit.descriptionScore,
+        priceScore: audit.priceScore,
+        imageScore: audit.imageScore,
+        seoScore: audit.seoScore,
+      }).onConflictDoUpdate({
+        target: [productsTable.projectId, productsTable.shopifyProductId],
+        set: {
+          title: created.title,
+          handle: created.handle,
+          bodyHtml: created.bodyHtml,
+          status: created.status,
+          tags: created.tags,
+          price: created.price,
+          imageCount: created.images.length,
+          variantCount: created.variants.length,
+          imagesJson: created.images,
+          auditScore: audit.overallScore,
+          auditGrade: scoreToGrade(audit.overallScore),
+        },
+      });
+
+      learnFromOperation({
+        operationType: "product_creation",
+        niche: project.storeNiche,
+        productType: created.productType ?? null,
+        title: `WooCommerce product created: ${created.title}`,
+        content: `Product "${created.title}" created on WooCommerce store ${project.shopDomain}. Platform: WooCommerce. Type: ${created.productType}. Tags: ${created.tags}. Handle: ${created.handle}. Variants: ${created.variants.length}. Price: ${created.price ?? "N/A"}. Score: ${audit.overallScore}/100 (${scoreToGrade(audit.overallScore)}). ${aiGenerate ? "AI-generated content." : "Manual content."}`,
+        confidence: 0.9,
+        tags: ["product_creation", "woocommerce"],
+      });
+
+      res.json({
+        success: true,
+        product: {
+          shopifyId: parseInt(created.platformId, 10),
+          title: created.title,
+          handle: created.handle,
+          status: created.status,
+          url: `${project.shopDomain}/wp-admin/post.php?post=${created.platformId}&action=edit`,
+          variants: created.variants.length,
+          images: created.images.length,
+          auditScore: audit.overallScore,
+          auditGrade: scoreToGrade(audit.overallScore),
+          aiGenerated: !!aiGenerate,
+        },
+      });
+      return;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: `Error creando producto en WooCommerce: ${msg}` });
+      return;
+    }
   }
 
   try {

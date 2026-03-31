@@ -7,6 +7,7 @@ import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "
 import { askGeminiWithSearch } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
+import { getConnector } from "../lib/connectors/index";
 
 const router = Router();
 
@@ -346,15 +347,26 @@ Devuelve JSON con:
           .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, product.shopifyProductId)));
 
         if (applyToShopify && project) {
-          await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
-            method: "POST",
-            body: JSON.stringify({ metafield: { namespace: "seo", key: "title", value: result.metaTitle, type: "single_line_text_field" } }),
-          }).catch(() => {});
+          const isWoo = project.platformType === "woocommerce";
+          if (isWoo) {
+            try {
+              const connector = getConnector(project);
+              await connector.updateSeo(product.shopifyProductId, {
+                metaTitle: result.metaTitle,
+                metaDescription: result.metaDescription,
+              });
+            } catch { /* WooCommerce SEO write may not be available */ }
+          } else {
+            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
+              method: "POST",
+              body: JSON.stringify({ metafield: { namespace: "seo", key: "title", value: result.metaTitle, type: "single_line_text_field" } }),
+            }).catch(() => {});
 
-          await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
-            method: "POST",
-            body: JSON.stringify({ metafield: { namespace: "seo", key: "description", value: result.metaDescription, type: "single_line_text_field" } }),
-          }).catch(() => {});
+            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}/metafields.json`, {
+              method: "POST",
+              body: JSON.stringify({ metafield: { namespace: "seo", key: "description", value: result.metaDescription, type: "single_line_text_field" } }),
+            }).catch(() => {});
+          }
         }
 
         // ShopyBrain aprende del SEO generado (fire-and-forget)
