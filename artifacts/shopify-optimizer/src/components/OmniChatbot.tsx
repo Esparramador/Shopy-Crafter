@@ -132,6 +132,122 @@ const FULL_AUDIT_ACTIONS = new Set([
   "bulk_optimize", "setup_store", "analyze_external_store",
 ]);
 
+const PRODUCT_LIST_ACTIONS = new Set([
+  "list_products", "list_all_products", "search_product", "audit_store",
+  "scan_store", "full_audit", "complete_audit",
+]);
+
+interface ProductCardItem {
+  title: string;
+  status?: string;
+  price?: string;
+  compareAtPrice?: string | null;
+  imageUrl?: string | null;
+  imageCount?: number;
+  variantCount?: number;
+  descriptionLength?: number;
+  descLength?: number;
+  tagsCount?: number;
+  auditScore?: number;
+  score?: number;
+  auditGrade?: string;
+  grade?: string;
+  hasComparePrice?: boolean;
+  hasCompare?: boolean;
+  published?: boolean;
+  issues?: string[];
+}
+
+function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? products : products.slice(0, 4);
+
+  const gradeColor = (g: string) =>
+    g === "A" ? "#34d399" : g === "B" ? "#c8a84b" : g === "C" ? "#f59e0b" : "#f43f5e";
+  const gradeBg = (g: string) =>
+    g === "A" ? "rgba(52,211,153,.1)" : g === "B" ? "rgba(200,168,75,.1)" : g === "C" ? "rgba(245,158,11,.1)" : "rgba(244,63,94,.1)";
+  const checkOrWarn = (ok: boolean) =>
+    ok ? <span style={{ color: "#34d399", fontSize: 10 }}>&#10003;</span> : <span style={{ color: "#f59e0b", fontSize: 10 }}>&#9888;</span>;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {visible.map((p, i) => {
+          const grade = p.auditGrade || p.grade || "D";
+          const score = p.auditScore ?? p.score ?? 0;
+          const imgCount = p.imageCount ?? 0;
+          const descLen = p.descriptionLength ?? p.descLength ?? 0;
+          const tags = p.tagsCount ?? 0;
+          const variants = p.variantCount ?? 1;
+          const hasCompare = p.hasComparePrice ?? p.hasCompare ?? false;
+          const price = parseFloat(p.price || "0");
+
+          return (
+            <div key={i} style={{
+              background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 10,
+              overflow: "hidden", position: "relative",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${gradeColor(grade)}66, transparent)` }} />
+              <div style={{ display: "flex", gap: 8, padding: 8 }}>
+                {p.imageUrl ? (
+                  <div style={{ width: 48, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: "var(--ink3)", border: "1px solid var(--ink3)" }}>
+                    <img src={p.imageUrl} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  </div>
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 6, flexShrink: 0, background: "var(--ink3)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t4)", fontSize: 18 }}>&#128247;</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                    <span style={{
+                      display: "inline-block", padding: "1px 5px", borderRadius: 4,
+                      fontSize: 9, fontWeight: 800, color: gradeColor(grade),
+                      background: gradeBg(grade), border: `1px solid ${gradeColor(grade)}33`,
+                    }}>{grade}</span>
+                    <span style={{ fontSize: 9, color: "var(--t4)" }}>{score}/100</span>
+                    {price > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: "var(--t2)" }}>{price.toFixed(2)}€</span>}
+                    {p.compareAtPrice && <span style={{ fontSize: 8, color: "var(--t4)", textDecoration: "line-through" }}>{parseFloat(p.compareAtPrice).toFixed(2)}€</span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 8px 6px", fontSize: 9, color: "var(--t3)" }}>
+                <span>{checkOrWarn(imgCount >= 3)} {imgCount}img</span>
+                <span>{checkOrWarn(descLen >= 500)} {descLen}ch</span>
+                <span>{checkOrWarn(tags >= 10)} {tags}tags</span>
+                <span>{checkOrWarn(hasCompare)} cmp</span>
+                <span>{variants}var</span>
+                {p.published === false && <span style={{ color: "#f43f5e", fontWeight: 700 }}>NO PUB</span>}
+              </div>
+              {p.issues && p.issues.length > 0 && (
+                <div style={{ padding: "0 8px 6px", fontSize: 8, color: "#f59e0b" }}>
+                  ⚠ {p.issues.slice(0, 2).join(" · ")}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {products.length > 4 && (
+        <button onClick={() => setExpanded(!expanded)} style={{
+          display: "block", width: "100%", marginTop: 6, padding: "4px 0",
+          background: "var(--ink3)", border: "1px solid var(--ink3)", borderRadius: 6,
+          color: "var(--t3)", fontSize: 9, cursor: "pointer", textAlign: "center",
+        }}>
+          {expanded ? "Mostrar menos" : `Ver ${products.length - 4} productos más`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function extractProductsFromAction(actionName: string, data: unknown): ProductCardItem[] | null {
+  if (!PRODUCT_LIST_ACTIONS.has(actionName) || !data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const products = d.products as ProductCardItem[] | undefined;
+  if (!products || !Array.isArray(products) || products.length === 0) return null;
+  return products;
+}
+
 function ActionButtons({ actionName, content, rawData, isMobile }: {
   actionName: string; content: string; rawData: unknown; isMobile: boolean;
 }) {
@@ -149,7 +265,7 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
       const res = await fetch(`${API}/api/projects/${projectId}/actions/send`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionName, title: actionTitle, content }),
+        body: JSON.stringify({ actionName, title: actionTitle, content, rawData }),
       });
       if (res.ok) setSendState("done");
       else setSendState("error");
@@ -1708,6 +1824,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       {msg.action?.type === "entity-research" && (
                         <EntityResearchCard data={msg.action.data as EntityResearchResult} />
                       )}
+                      {msg.action?.actionName && (() => {
+                        const prods = extractProductsFromAction(msg.action!.actionName!, msg.action!.data);
+                        return prods ? <ProductCardsGrid products={prods} /> : null;
+                      })()}
                       {msg.action?.actionName && (
                         <ActionButtons
                           actionName={msg.action.actionName}

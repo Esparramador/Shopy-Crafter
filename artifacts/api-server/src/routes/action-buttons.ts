@@ -6,6 +6,7 @@ import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
+import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -49,7 +50,38 @@ function extractMetricBlocks(text: string): { metrics: Array<{ value: string; la
   return { metrics: unique, cleanText: text };
 }
 
-function buildProfessionalHtml(title: string, content: string, actionName: string): string {
+function extractProductCards(rawData: unknown): string {
+  if (!rawData || typeof rawData !== "object") return "";
+  const d = rawData as Record<string, unknown>;
+  const products = d.products as Array<Record<string, unknown>> | undefined;
+  if (!products || !Array.isArray(products) || products.length === 0) return "";
+
+  const cards: ProductCardData[] = products.map(p => ({
+    title: String(p.title || ""),
+    status: String(p.status || "unknown"),
+    price: String(p.price || "0"),
+    compareAtPrice: p.compareAtPrice as string | null,
+    imageUrl: (p.imageUrl as string) || null,
+    imageCount: (p.imageCount as number) ?? 0,
+    descriptionLength: (p.descriptionLength as number) ?? (p.descLength as number) ?? 0,
+    tagsCount: (p.tagsCount as number) ?? 0,
+    variantCount: (p.variantCount as number) ?? 1,
+    published: !!p.published,
+    auditScore: (p.auditScore as number) ?? (p.score as number) ?? 0,
+    auditGrade: String(p.auditGrade || p.grade || "D"),
+    hasComparePrice: !!(p.hasComparePrice ?? p.hasCompare),
+    hasMetaTitle: !!p.hasMetaTitle,
+    hasMetaDesc: !!p.hasMetaDesc,
+    hasSchema: !!p.hasSchema,
+    hasAltTexts: !!p.hasAltTexts,
+    cleanHandle: !!p.cleanHandle,
+    issues: (p.issues as string[]) || undefined,
+  }));
+
+  return buildProductCardsSection(cards, `Productos (${cards.length})`);
+}
+
+function buildProfessionalHtml(title: string, content: string, actionName: string, rawData?: unknown): string {
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
@@ -135,6 +167,11 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
         <p style="margin:0;color:${BRAND.white};font-size:14px;line-height:1.8;">${mdToHtml(s.body.trim())}</p>
       </div>`;
     }
+  }
+
+  const productCardsHtml = extractProductCards(rawData);
+  if (productCardsHtml) {
+    bodyHtml += productCardsHtml;
   }
 
   return `<!DOCTYPE html>
@@ -255,8 +292,8 @@ function actionLabel(action: string): string {
 
 router.post("/projects/:projectId/actions/send", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, recipientEmail } = req.body as {
-    actionName: string; title: string; content: string; recipientEmail?: string;
+  const { actionName, title, content, recipientEmail, rawData } = req.body as {
+    actionName: string; title: string; content: string; recipientEmail?: string; rawData?: unknown;
   };
 
   if (!actionName || !content) {
@@ -274,7 +311,7 @@ router.post("/projects/:projectId/actions/send", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const emailTitle = title || `${label} — ${projectName}`;
-  const htmlBody = buildProfessionalHtml(emailTitle, content, label);
+  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData);
 
   const to = recipientEmail || "sadiagiljoan@gmail.com";
   const subject = `📊 ${emailTitle} | Shopy Crafter`;
@@ -304,7 +341,7 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${project.name}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData);
 
   const fileId = await saveToVault({
     projectId,
@@ -359,7 +396,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${projectName}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData);
   const safeName = reportTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
   const dateStr = new Date().toISOString().split("T")[0];
 
