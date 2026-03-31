@@ -1331,20 +1331,35 @@
 
 /* ── CMS Preview Mode: click-to-edit hover indicators ── */
 .cms-preview-mode [data-cms-path] {
-  transition: outline 0.15s, outline-offset 0.15s;
+  transition: outline 0.15s, outline-offset 0.15s, background 0.15s;
   cursor: pointer !important;
+  position: relative;
 }
 .cms-preview-mode [data-cms-path]:hover {
-  outline: 2px dashed rgba(200,168,75,0.6);
+  outline: 2px dashed rgba(200,168,75,0.7);
   outline-offset: 4px;
+  background: rgba(200,168,75,0.06);
   border-radius: 4px;
 }
-.cms-preview-mode h1[onclick],
-.cms-preview-mode h2[onclick],
-.cms-preview-mode p[onclick] {
-  cursor: pointer !important;
+.cms-preview-mode [data-cms-path]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -22px;
+  left: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #c8a84b;
+  background: rgba(8,8,16,0.9);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  font-family: monospace;
 }
-.cms-preview-mode h1:hover,
-.cms-preview-mode h2:hover {
-  text-decoration-color: rgba(200,168,75,0.4);
+.cms-preview-mode h1[data-cms-path],
+.cms-preview-mode h2[data-cms-path],
+.cms-preview-mode p[data-cms-path] {
+  cursor: pointer !important;
 }

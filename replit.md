@@ -41,7 +41,7 @@ A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating
 
 ### Key Features
 - **Client Portal**: KPI summaries and activity timelines.
-- **CMS Editor**: Visual content editor with AI copywriting and version history.
+- **CMS Editor**: Visual click-to-edit editor with 35+ selectable elements, AI copywriting (askClaudeWithBrain), version history, iframe live preview with `data-cms-path` hover highlighting, and bidirectional postMessage communication.
 - **Client Invite Flow**: Secure, token-based onboarding.
 - **Professional Budget/Invoice Generator**: AI-powered tool.
 - **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants. Includes a `referenceImageUrl` system for AI image generation from existing product photos.

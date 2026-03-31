@@ -383,26 +383,33 @@ export default function Landing() {
 
   const parentOrigin = isPreview ? window.location.origin : "";
 
+  const cmsNotify = useCallback((path: string, e: React.MouseEvent) => {
+    if (!isPreview) return;
+    e.stopPropagation();
+    window.parent.postMessage({ type: "cms-click-to-edit", path }, parentOrigin || "*");
+  }, [isPreview, parentOrigin]);
+
   const cmsClick = useCallback((path: string) => {
     if (!isPreview) return undefined;
-    return (e: React.MouseEvent) => {
-      e.stopPropagation();
-      window.parent.postMessage({ type: "cms-click-to-edit", path }, parentOrigin || "*");
-    };
-  }, [isPreview, parentOrigin]);
+    return (e: React.MouseEvent) => cmsNotify(path, e);
+  }, [isPreview, cmsNotify]);
 
   const cmsProps = useCallback((path: string) => {
     if (!isPreview) return {};
     return {
-      onClick: (e: React.MouseEvent) => {
-        e.stopPropagation();
-        window.parent.postMessage({ type: "cms-click-to-edit", path }, parentOrigin || "*");
-      },
-      style: { cursor: "pointer" } as React.CSSProperties,
+      onClick: (e: React.MouseEvent) => cmsNotify(path, e),
       title: `Editar: ${path}`,
       "data-cms-path": path,
     };
-  }, [isPreview, parentOrigin]);
+  }, [isPreview, cmsNotify]);
+
+  const cmsData = useCallback((path: string) => {
+    if (!isPreview) return {};
+    return {
+      title: `Editar: ${path}`,
+      "data-cms-path": path,
+    };
+  }, [isPreview]);
 
   if (!content?.hero) {
     return (
@@ -458,8 +465,8 @@ export default function Landing() {
             <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
           ) : (
             <>
-              <Link href="/login" className="l-btn-ghost">{content.nav.ctaSecondary.label}</Link>
-              <a href="#fp-pricing" className="l-btn-gold" onClick={e => { e.preventDefault(); goToSection(4); }}>{content.nav.ctaPrimary.label}</a>
+              <Link href="/login" className="l-btn-ghost" {...cmsData("nav.ctaSecondary.label")}>{content.nav.ctaSecondary.label}</Link>
+              <a href="#fp-pricing" className="l-btn-gold" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("nav.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
             </>
           )}
         </div>
@@ -524,7 +531,7 @@ export default function Landing() {
                   {content.hero.pill.text}
                 </div>
               )}
-              <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onClick={cmsClick("hero.headline")}>
+              <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onClick={cmsClick("hero.headline")} {...cmsData("hero.headline")}>
                 {hLines.map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
                     {content.hero.headlineHighlight && line.includes(content.hero.headlineHighlight)
@@ -535,15 +542,15 @@ export default function Landing() {
                   </span>
                 ))}
               </h1>
-              <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }} onClick={cmsClick("hero.subheadline")}>{content.hero.subheadline}</p>
+              <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }} onClick={cmsClick("hero.subheadline")} {...cmsData("hero.subheadline")}>{content.hero.subheadline}</p>
               <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
-                <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); goToSection(4); }}>Empieza a potenciar tú tienda</a>
-                <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); goToSection(2); }}>{content.hero.ctaSecondary.label}</a>
+                <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Empieza a potenciar tú tienda"}</a>
+                <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToSection(2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
               </div>
               <ApkDownloadButton labels={content.apkLabels} />
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {content.hero.trustItems.map((item, i) => (
-                  <div key={i} className="l-trust-item"><div className="l-trust-check">✓</div>{item}</div>
+                  <div key={i} className="l-trust-item" {...cmsProps(`hero.trustItems.${i}`)}><div className="l-trust-check">✓</div>{item}</div>
                 ))}
               </div>
             </div>
@@ -618,7 +625,7 @@ export default function Landing() {
           </div>
 
           <div className="fp-scroll-hint">
-            <div className="fp-scroll-hint-text">{content.hero.scrollHint ?? "Desliza para explorar"}</div>
+            <div className="fp-scroll-hint-text" {...cmsProps("hero.scrollHint")}>{content.hero.scrollHint ?? "Desliza para explorar"}</div>
             <div className="fp-scroll-hint-arrow">↓</div>
           </div>
         </section>
@@ -630,9 +637,9 @@ export default function Landing() {
           <div className="fp-bg-solid">{videoBg("features")}</div>
           <div className="fp-content fp-engines-layout">
             <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{content.features.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("features.headline")}>{String(content.features.headline ?? "").split(".")[0]}. <em>{String(content.features.headline ?? "").split(".").slice(1).join(".")}</em></h2>
-              <p className="l-sub">{content.features.subheadline}</p>
+              <div className="l-pill" {...cmsProps("features.pill")}>{content.features.pill}</div>
+              <h2 className="l-h2" onClick={cmsClick("features.headline")} {...cmsData("features.headline")}>{String(content.features.headline ?? "").split(".")[0]}. <em>{String(content.features.headline ?? "").split(".").slice(1).join(".")}</em></h2>
+              <p className="l-sub" {...cmsProps("features.subheadline")}>{content.features.subheadline}</p>
             </div>
 
             <div className={`fp-engine-tabs ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
@@ -640,7 +647,7 @@ export default function Landing() {
                 <button key={feat.id} className={`fp-etab${activeEngine === i ? " active" : ""}`} onClick={() => setActiveEngine(i)}>
                   <span className="fp-etab-num">{feat.num}</span>
                   <span className="fp-etab-icon">{feat.icon}</span>
-                  <span className="fp-etab-name">{String(feat.title ?? "").split(" ")[0]}</span>
+                  <span className="fp-etab-name" {...cmsProps(`features.items.${i}.title`)}>{String(feat.title ?? "").split(" ")[0]}</span>
                 </button>
               ))}
             </div>
@@ -654,8 +661,8 @@ export default function Landing() {
                   <div className="fp-engine-num-badge">{content.features.items[activeEngine].num}</div>
                 </div>
                 <div className="fp-engine-info">
-                  <h3 className="fp-engine-title">{content.features.items[activeEngine].title}</h3>
-                  <p className="fp-engine-desc">{content.features.items[activeEngine].description}</p>
+                  <h3 className="fp-engine-title" {...cmsProps(`features.items.${activeEngine}.title`)}>{content.features.items[activeEngine].title}</h3>
+                  <p className="fp-engine-desc" {...cmsProps(`features.items.${activeEngine}.description`)}>{content.features.items[activeEngine].description}</p>
                   <div className="fp-engine-tags">
                     {(Array.isArray(content.features.items[activeEngine].tags)
                       ? content.features.items[activeEngine].tags
@@ -693,8 +700,8 @@ export default function Landing() {
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
           <div className="fp-content fp-split-layout">
             <div className={`fp-split-left ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{content.how.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("how.headline")}>
+              <div className="l-pill" {...cmsProps("how.pill")}>{content.how.pill}</div>
+              <h2 className="l-h2" onClick={cmsClick("how.headline")} {...cmsData("how.headline")}>
                 {String(content.how.headline ?? "").split("\n").map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
                     {content.how.headlineHighlight && line.includes(content.how.headlineHighlight)
@@ -710,8 +717,8 @@ export default function Landing() {
                   <div key={step.num} className="fp-demo-step">
                     <div className="fp-demo-step-num">{step.num}</div>
                     <div className="fp-demo-step-content">
-                      <div className="fp-demo-step-title">{step.title}</div>
-                      <div className="fp-demo-step-desc">{step.desc}</div>
+                      <div className="fp-demo-step-title" {...cmsProps(`how.steps.${si}.title`)}>{step.title}</div>
+                      <div className="fp-demo-step-desc" {...cmsProps(`how.steps.${si}.desc`)}>{step.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -729,7 +736,7 @@ export default function Landing() {
                   <div key={i} className="l-how-card">
                     <div className="l-how-card-h">
                       <div className="l-how-card-ico" style={{ background: `${cl}18`, color: cl }}>{c.icon}</div>
-                      <div><div className="l-how-card-title">{c.title}</div><div className="l-how-card-sub">{c.sub}</div></div>
+                      <div><div className="l-how-card-title" {...cmsProps(`howCards.${i}.title`)}>{c.title}</div><div className="l-how-card-sub" {...cmsProps(`howCards.${i}.sub`)}>{c.sub}</div></div>
                     </div>
                     <div className="l-how-bar"><div className="l-how-bar-f" style={{ width: `${c.barPercent}%`, background: `linear-gradient(90deg,${cl},${cl}88)`, transition: "width 3s ease" }}></div></div>
                   </div>
@@ -761,8 +768,8 @@ export default function Landing() {
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.72)" }}></div>
           <div className="fp-content fp-results-layout">
             <div className={`fp-section-header ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{content.results?.pill ?? "Resultados probados"}</div>
-              <h2 className="l-h2">{(() => {
+              <div className="l-pill" {...cmsProps("results.pill")}>{content.results?.pill ?? "Resultados probados"}</div>
+              <h2 className="l-h2" onClick={cmsClick("results.headline")} {...cmsData("results.headline")}>{(() => {
                 const hl = content.results?.headline ?? "Números que hablan solos";
                 const hlHighlight = content.results?.headlineHighlight ?? "hablan solos";
                 if (hl.includes(hlHighlight)) {
@@ -805,17 +812,17 @@ export default function Landing() {
           <div className="fp-bg-solid">{videoBg("pricing")}</div>
           <div className="fp-content fp-pricing-layout">
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{content.pricing.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
-              <p className="l-sub">{content.pricing.subheadline}</p>
+              <div className="l-pill" {...cmsProps("pricing.pill")}>{content.pricing.pill}</div>
+              <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
+              <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
             <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {content.pricing.plans.map(plan => (
+              {content.pricing.plans.map((plan, planIdx) => (
                 <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured === true || plan.featured === "true" ? " l-pricing-featured" : ""}`}>
-                  {plan.badge && <div className="l-pricing-badge">{plan.badge}</div>}
-                  <div className="l-pricing-plan">{plan.name}</div>
-                  <div className="l-pricing-price"><span>{plan.currency}</span>{plan.price}</div>
-                  <div className="l-pricing-period">{plan.period}</div>
+                  {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
+                  <div className="l-pricing-plan" {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
+                  <div className="l-pricing-price" {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
+                  <div className="l-pricing-period" {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
                   <div className="l-pricing-divider"></div>
                   <ul className="l-pricing-features">
                     {plan.features.map((f, fi) => (
@@ -825,7 +832,7 @@ export default function Landing() {
                       </li>
                     ))}
                   </ul>
-                  <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`}>{plan.cta.label}</Link>
+                  <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</Link>
                 </div>
               ))}
             </div>
@@ -843,15 +850,15 @@ export default function Landing() {
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.75)" }}></div>
           <div className="fp-content" style={{ maxWidth: 1100, padding: "0 24px" }}>
             <div className={`fp-section-header ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill">{calc.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("calculator.headline")}>
+              <div className="l-pill" {...cmsProps("calculator.pill")}>{calc.pill}</div>
+              <h2 className="l-h2" onClick={cmsClick("calculator.headline")} {...cmsData("calculator.headline")}>
                 {calc.headlineHighlight && String(calc.headline ?? "").includes(calc.headlineHighlight)
                   ? String(calc.headline ?? "").split(calc.headlineHighlight).flatMap((p, i, arr) =>
                       i < arr.length - 1 ? [p, <em key={i}>{calc.headlineHighlight}</em>] : [p]
                     )
                   : (calc.headline ?? "")}
               </h2>
-              <p className="l-sub">{calc.subheadline}</p>
+              <p className="l-sub" {...cmsProps("calculator.subheadline")}>{calc.subheadline}</p>
             </div>
 
             <div className={`fp-calc-grid ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
@@ -976,9 +983,9 @@ export default function Landing() {
           </div>
           <div className="fp-content" style={{ maxWidth: 900, padding: "0 24px" }}>
             <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
-              <h2 className="l-h2">{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
-              <p className="l-sub">{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
+              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }} onClick={cmsClick("contact.pill")} {...cmsData("contact.pill")}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
+              <h2 className="l-h2" onClick={cmsClick("contact.headline")} {...cmsData("contact.headline")}>{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
+              <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
             <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
@@ -1217,11 +1224,11 @@ export default function Landing() {
                     )}
                     <div className="l-nav-logo-text">{content.site.name}</div>
                   </a>
-                  <p className="l-footer-desc">{content.footer.tagline}</p>
+                  <p className="l-footer-desc" {...cmsProps("footer.tagline")}>{content.footer.tagline}</p>
                 </div>
                 {content.footer.columns.slice(0, 3).map((col, i) => (
                   <div key={i} className="fp-footer-col">
-                    <div className="l-footer-col-title">{col.title}</div>
+                    <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
                     <ul className="l-footer-links">
                       {col.links.slice(0, 4).map((l, li) => <li key={li}><a href={l.href}>{l.label}</a></li>)}
                     </ul>
@@ -1229,7 +1236,7 @@ export default function Landing() {
                 ))}
               </div>
               <div className="l-footer-bottom">
-                <div className="l-footer-copy">{content.footer.copyright}</div>
+                <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
             </footer>
