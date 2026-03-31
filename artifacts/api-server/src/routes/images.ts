@@ -53,6 +53,46 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([promise, timeout]);
 }
 
+function normalizeText(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function detectProductCategory(productTitle: string, productType: string | null): "physical" | "digital_art" | "digital_service" | "credits" | "subscription" | "comic" | "audiobook" | "report" {
+  const title = normalizeText(productTitle);
+  const pType = normalizeText(productType ?? "");
+  const combined = title + " " + pType;
+
+  if (/audiobook/i.test(combined)) return "audiobook";
+
+  if (/creditos|credits/i.test(title) || /pack de creditos/i.test(pType)) return "credits";
+
+  if (/suscripcion|saas/i.test(pType)) return "subscription";
+  if (/\b(starter|enterprise)\b/i.test(title) && /shopybrain|shopy/i.test(title)) return "subscription";
+  if (/agency pro/i.test(title)) return "subscription";
+
+  if (/resina|funko/i.test(combined)) return "physical";
+  if (/impresion 3d/i.test(pType)) return "physical";
+
+  if (/manga|pet comic/i.test(title)) return "comic";
+  if (/comic personalizado|manga personalizado/i.test(pType)) return "comic";
+  const titleNoStore = title.replace(/comic crafter/gi, "");
+  if (/comic/i.test(titleNoStore)) return "comic";
+
+  if (/pack de servicios|creacion producto|pack.*productos/i.test(combined)) return "digital_service";
+
+  if (/informe|auditoria|analisis|seo shopify|email marketing|setup.*shopify|sesion.*shopify|investigacion|proyeccion|rediseno|optimizacion|campanas|consultoria/i.test(combined)) return "report";
+  if (/optimizacion|auditoria|analisis|seo|email marketing|investigacion|proyeccion|rediseno|consultoria/i.test(pType)) return "report";
+
+  if (/nft|arte digital|tatuaje|retrato|pop art|sticker|emoji|avatar|personaje 360|ilustracion|portada|storyboard|branding|logo|poster|canvas|album|cuento infantil|escape room|tcg|cartas/i.test(combined)) return "digital_art";
+
+  if (/3d.*model|figura.*3d|merchandising|camiseta|taza/i.test(combined)) return "physical";
+
+  if (/assets|videojuegos|modelos 3d|game/i.test(combined)) return "digital_art";
+  if (/fotografia|photoshoot|imagenes/i.test(combined)) return "digital_service";
+
+  return "digital_service";
+}
+
 export async function buildImagePrompt(
   projectId: number,
   productTitle: string,
@@ -61,7 +101,10 @@ export async function buildImagePrompt(
   storeNiche: string | null,
   brandTone: string | null
 ): Promise<string> {
-  const typeConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+  const category = detectProductCategory(productTitle, productType);
+  const BASE_QUALITY = "high resolution 4k, sharp focus, professional commercial quality";
+
+  const physicalConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
     hero: {
       prefix: "Professional studio product photo,",
       scene: "pure white background, 3-point lighting setup, soft shadows, centered composition",
@@ -77,33 +120,150 @@ export async function buildImagePrompt(
       scene: "close-up texture detail, micro-lens quality, bokeh background, emphasizing material quality",
       suffix: "luxury brand detail shot, 100mm macro lens look",
     },
-    packaging: {
-      prefix: "Premium unboxing photography,",
-      scene: "branded packaging on neutral surface, tissue paper, branded elements visible, flatlay composition",
-      suffix: "luxury unboxing experience, clean minimal setup",
+  };
+
+  const digitalArtConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Stunning digital artwork showcase,",
+      scene: "the artwork displayed on a sleek modern device screen or gallery wall, dramatic cinematic lighting, rich vibrant colors",
+      suffix: "digital art portfolio quality, Behance featured project aesthetic",
     },
-    ugc: {
-      prefix: "Candid lifestyle social media photo,",
-      scene: "authentic user-generated content style, real person context, slightly imperfect composition, genuine feel",
-      suffix: "Instagram organic post quality, trustworthy and relatable",
+    lifestyle: {
+      prefix: "Creative professional workspace scene,",
+      scene: "artist using a tablet/screen showing the digital artwork, modern creative studio environment, warm ambient lighting, inspiration boards in background",
+      suffix: "aspirational creative lifestyle, editorial magazine quality",
     },
-    scale: {
-      prefix: "Product scale reference photography,",
-      scene: "product next to human hand or common everyday object (smartphone, coffee cup), showing exact proportions",
-      suffix: "clean background, clear size comparison, informative composition",
-    },
-    bundle: {
-      prefix: "Product bundle flat lay photography,",
-      scene: "main product with 2-3 complementary items, styled arrangement, overhead shot, consistent aesthetic",
-      suffix: "cross-selling visual, premium styled flatlay",
+    detail: {
+      prefix: "Close-up of digital artwork details,",
+      scene: "zoomed-in view showing intricate artistic details, color palette, brushwork/vector precision, on high-resolution retina display",
+      suffix: "artistic detail showcase, gallery exhibition quality",
     },
   };
 
-  const config = typeConfigs[imageType] ?? typeConfigs.hero;
-  const BASE_QUALITY = "professional product photography, commercial quality, sharp focus, high resolution 4k";
-  const subjectAnchor = `SUBJECT: ${productTitle}${productType ? ` (${productType})` : ""}`;
+  const comicConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Epic comic book cover illustration,",
+      scene: "dynamic action pose, bold comic book colors, dramatic perspective, speech bubbles, halftone dots pattern, panel borders visible",
+      suffix: "professional comic book art, Marvel/DC cover quality, vibrant and eye-catching",
+    },
+    lifestyle: {
+      prefix: "Person enjoying reading a custom comic book,",
+      scene: "cozy reading nook, the comic book open showing colorful illustrated pages, warm lighting, excited expression, immersive storytelling moment",
+      suffix: "editorial lifestyle photography, authentic reading experience, comic collector atmosphere",
+    },
+    detail: {
+      prefix: "Detailed comic book page layout,",
+      scene: "multiple panels showing sequential art, expressive character faces, dynamic action lines, professional lettering, rich ink work",
+      suffix: "professional comic interior art quality, clear panel composition, engaging visual narrative",
+    },
+  };
 
-  return `${config.prefix} ${subjectAnchor}, ${config.scene}, niche: ${storeNiche ?? "e-commerce"}, brand tone: ${brandTone ?? "professional"}, ${BASE_QUALITY}, ${config.suffix}`;
+  const audiobookConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Premium audiobook listening experience,",
+      scene: "stylish headphones with glowing sound waves emanating, comic book pages floating and transforming into audio waveforms, dark atmospheric background with neon accents",
+      suffix: "premium audio product visual, Audible-quality promotional art",
+    },
+    lifestyle: {
+      prefix: "Person immersed in audiobook experience,",
+      scene: "wearing premium headphones with eyes closed, enjoying the story, comic characters subtly appearing as imagination visuals around them, warm cozy environment",
+      suffix: "aspirational audio lifestyle, emotional storytelling moment",
+    },
+    detail: {
+      prefix: "Audio waveform visualization art,",
+      scene: "beautiful sound wave pattern with comic art elements integrated, character silhouettes within the waveform, vibrant frequency spectrum colors, play button icon",
+      suffix: "modern audio tech aesthetic, premium digital product visual",
+    },
+  };
+
+  const creditConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Premium digital credit pack promotional graphic,",
+      scene: "glowing golden/neon credit tokens floating in space, futuristic holographic interface, quantity numbers displayed prominently, sleek dark background with gradient accents",
+      suffix: "premium SaaS product visual, modern fintech aesthetic",
+    },
+    lifestyle: {
+      prefix: "Creative professional using AI generation platform,",
+      scene: "person at modern workstation generating amazing digital art with AI tools, multiple stunning outputs visible on screens, creative energy and productivity",
+      suffix: "aspirational creator economy lifestyle, productivity showcase",
+    },
+    detail: {
+      prefix: "Infographic showing credit pack value breakdown,",
+      scene: "clean modern infographic design showing what credits unlock: comics, 3D models, art, animations — each with small icon, value proposition clear, premium pricing card design",
+      suffix: "modern SaaS pricing visual, clear value communication",
+    },
+  };
+
+  const subscriptionConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Premium SaaS platform dashboard showcase,",
+      scene: "sleek modern dashboard interface with analytics, AI automation indicators, multiple store management panels, dark mode UI with accent colors, floating holographic elements",
+      suffix: "enterprise software visual, professional SaaS product hero",
+    },
+    lifestyle: {
+      prefix: "Business owner managing multiple Shopify stores with AI,",
+      scene: "confident entrepreneur at modern desk, multiple screens showing store analytics and AI optimizations, success metrics rising, professional office environment",
+      suffix: "business success lifestyle, aspirational entrepreneur visual",
+    },
+    detail: {
+      prefix: "AI automation feature showcase,",
+      scene: "detailed view of AI engine processing product optimizations, neural network visualization, before/after product improvements, performance metrics graphs",
+      suffix: "tech product feature detail, enterprise software quality",
+    },
+  };
+
+  const reportConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Professional business report/service deliverable,",
+      scene: "elegant report document mockup on tablet/laptop screen showing charts and insights, clean data visualization, professional consulting aesthetic, dark premium background",
+      suffix: "consulting deliverable visual, McKinsey-quality presentation",
+    },
+    lifestyle: {
+      prefix: "Business professional reviewing strategic analysis,",
+      scene: "professional in modern office analyzing data on screen, charts showing growth trends, strategic planning session, confident decision-making moment",
+      suffix: "business consulting lifestyle, professional service visual",
+    },
+    detail: {
+      prefix: "Data analytics dashboard detail,",
+      scene: "close-up of professional charts, KPI metrics, conversion funnels, SEO performance graphs, clean modern data visualization design, actionable insights highlighted",
+      suffix: "business intelligence visual, data-driven decision aesthetic",
+    },
+  };
+
+  const serviceConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
+    hero: {
+      prefix: "Professional service package promotional visual,",
+      scene: "elegant service offering display with included deliverables shown as floating elements, premium badge/seal, modern gradient background, trust indicators",
+      suffix: "professional service visual, premium offering aesthetic",
+    },
+    lifestyle: {
+      prefix: "Happy client reviewing their optimized Shopify store,",
+      scene: "entrepreneur excitedly looking at improved store on laptop, visible sales notifications, modern workspace, growth metrics on screen",
+      suffix: "client success story visual, service results showcase",
+    },
+    detail: {
+      prefix: "Service deliverables breakdown visual,",
+      scene: "clean infographic showing each included component: images, SEO, copywriting, optimization — with checkmarks, professional icons, modern card design",
+      suffix: "service inclusions detail, premium package visual",
+    },
+  };
+
+  const configMap: Record<string, Record<string, { prefix: string; scene: string; suffix: string }>> = {
+    physical: physicalConfigs,
+    digital_art: digitalArtConfigs,
+    comic: comicConfigs,
+    audiobook: audiobookConfigs,
+    credits: creditConfigs,
+    subscription: subscriptionConfigs,
+    report: reportConfigs,
+    digital_service: serviceConfigs,
+  };
+
+  const configs = configMap[category] ?? serviceConfigs;
+  const config = configs[imageType] ?? configs.hero;
+  const subjectAnchor = `SUBJECT: "${productTitle}"${productType ? ` (category: ${productType})` : ""}`;
+
+  return `${config.prefix} ${subjectAnchor}, ${config.scene}, store niche: ${storeNiche ?? "comics and digital art"}, brand tone: ${brandTone ?? "professional creative"}, ${BASE_QUALITY}, ${config.suffix}`;
 }
 
 /**
@@ -170,10 +330,33 @@ export async function runImageGeneration(params: {
     };
 
     const output = await runWithRetry();
-    const imageUrl = Array.isArray(output) ? (output[0] as string) : (output as string);
 
-    const altTextPrompt = `Generate a concise SEO alt text (max 125 chars) for a Shopify product image. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "e-commerce"}. Include main keyword naturally. In Spanish.`;
-    const altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
+    function extractUrl(val: unknown): string {
+      if (typeof val === "string") return val;
+      if (val && typeof val === "object") {
+        const s = val.toString();
+        if (s.startsWith("http")) return s;
+        if (typeof (val as Record<string, unknown>).url === "function") {
+          const u = (val as { url: () => { href: string } }).url();
+          return u?.href ?? String(u);
+        }
+        if (typeof (val as Record<string, unknown>).url === "string") {
+          return (val as { url: string }).url;
+        }
+      }
+      return String(val);
+    }
+
+    const raw = Array.isArray(output) ? output[0] : output;
+    const imageUrl = extractUrl(raw);
+    console.log(`[IMG] Replicate resolved URL: ${imageUrl?.slice(0, 120)}`);
+    if (!imageUrl || !imageUrl.startsWith("http")) {
+      throw new Error(`Replicate returned invalid image URL: ${String(raw).slice(0, 200)}`);
+    }
+
+    const altTextPrompt = `Write ONLY a plain text SEO alt text (max 125 characters) for a Shopify product image. No markdown, no code blocks, no backticks, no analysis — ONLY the alt text string itself, nothing else. Product: ${product.title}. Image type: ${imageType}. Store niche: ${project.storeNiche ?? "comics y arte digital"}. In Spanish.`;
+    let altText = await askClaudeWithBrain(projectId, [{ role: "user", content: altTextPrompt }], undefined, "images", project.storeNiche ?? undefined);
+    altText = altText.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/\*\*[^*]*\*\*/g, "").replace(/^[\s\n]+|[\s\n]+$/g, "").split("\n")[0].trim();
 
     const statusUpdate: Record<string, unknown> = { status: "succeeded", imageUrl, altText: altText.slice(0, 125), completedAt: new Date() };
     if (params.autoUploadToShopify) statusUpdate.status = "uploading";
