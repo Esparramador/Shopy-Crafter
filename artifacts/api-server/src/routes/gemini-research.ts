@@ -44,11 +44,10 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
     );
 
     learnFromOperation({
-      projectId: 0,
-      operation: "business_research",
-      result: `Business research: ${businessName} (${domain}) in ${niche}. Strategic plan generated with ${typeof claudeEnhancement === "string" ? claudeEnhancement.length : 0} chars.`,
+      operationType: "business_research",
+      title: `Business research: ${businessName} (${domain})`,
+      content: `Business research in ${niche}. Strategic plan generated with ${typeof claudeEnhancement === "string" ? claudeEnhancement.length : 0} chars.`,
       niche,
-      category: "competitor_intel",
     });
 
     res.json({ profile, strategicPlan: claudeEnhancement, source: "gemini+claude" });
@@ -84,11 +83,10 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
     );
 
     learnFromOperation({
-      projectId: 0,
-      operation: "competitor_analysis",
-      result: `Competitor analysis: ${domain} in ${niche}. Quick wins: ${(gaps as any)?.quickWins?.length ?? 0}, pricing opportunity: ${(gaps as any)?.pricingOpportunity ?? "none"}.`,
+      operationType: "competitor_analysis",
+      title: `Competitor analysis: ${domain}`,
+      content: `Competitor analysis in ${niche}. Quick wins: ${(gaps as any)?.quickWins?.length ?? 0}, pricing opportunity: ${(gaps as any)?.pricingOpportunity ?? "none"}.`,
       niche,
-      category: "competitor_intel",
     });
 
     res.json({ competitor: intel, gaps, source: "gemini+claude" });
