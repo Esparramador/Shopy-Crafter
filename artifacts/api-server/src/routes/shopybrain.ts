@@ -1257,7 +1257,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         const limit = Math.min(params?.limit ?? 10, 50);
         const statusFilter = params?.statusFilter || "any";
         let allProducts: Array<Record<string, unknown>> = [];
-        const fieldsToFetch = "id,title,status,variants,images,tags,body_html,published_at,published_scope";
+        const fieldsToFetch = "id,title,handle,status,variants,images,tags,body_html,published_at,published_scope,metafields_global_title_tag,metafields_global_description_tag";
 
         if (statusFilter === "any") {
           for (const st of ["active", "draft", "archived"]) {
@@ -1302,6 +1302,12 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
 
           const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
 
+          const hasMetaTitle = !!(p.metafields_global_title_tag || (typeof p.title === "string" && (p.title as string).length >= 30));
+          const hasMetaDesc = !!(p.metafields_global_description_tag || bodyLen >= 300);
+          const hasAltTexts = images.length > 0 && images.every((img: Record<string, unknown>) => !!img.alt);
+          const handle = (p.handle as string) || "";
+          const cleanHandleVal = !!handle && !handle.includes("_");
+
           return {
             id: p.id,
             title: p.title,
@@ -1319,6 +1325,10 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             auditScore: score,
             auditGrade: grade,
             hasComparePrice: hasCompare,
+            hasMetaTitle,
+            hasMetaDesc,
+            hasAltTexts,
+            cleanHandle: cleanHandleVal,
             issues: issues.length > 0 ? issues : undefined,
           };
         });
@@ -2225,7 +2235,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let allSearchResults: Array<Record<string, unknown>> = [];
         for (const st of ["active", "draft", "archived"]) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
+            parseInt(projectId), project.shopDomain, `/products.json?title=${encodeURIComponent(query)}&limit=10&status=${st}&published_status=any&fields=id,title,handle,status,variants,images,tags,body_html,published_at,published_scope`
           );
           allSearchResults = allSearchResults.concat(d.products || []);
         }
@@ -2253,6 +2263,8 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             if (hasCompare) score += 25;
 
             const searchImages = (p.images as Array<Record<string, unknown>>) || [];
+            const spHasAltTexts = searchImages.length > 0 && searchImages.every((img: Record<string, unknown>) => !!img.alt);
+            const spHandle = (p.handle as string) || "";
             return {
               id: p.id, title: p.title, status: p.status,
               price: variants[0]?.price,
@@ -2267,6 +2279,10 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               auditScore: score,
               auditGrade: score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D",
               hasComparePrice: hasCompare,
+              hasMetaTitle: typeof p.title === "string" && (p.title as string).length >= 30,
+              hasMetaDesc: bodyLen >= 300,
+              hasAltTexts: spHasAltTexts,
+              cleanHandle: !!spHandle && !spHandle.includes("_"),
               issues: issues.length > 0 ? issues : undefined,
             };
           }),
@@ -2736,11 +2752,38 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           if (allIssues.length > 0) psMessage += `\n⚠️ Problemas: ${allIssues.slice(0, 3).join("; ")}`;
         }
 
+        const scanProducts = await db.select().from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+        const scanCards = scanProducts.map((p: typeof productsTable.$inferSelect) => {
+          const imgs = Array.isArray(p.imagesJson) ? p.imagesJson as Array<{ src?: string; alt?: string | null }> : [];
+          const descLen = typeof p.bodyHtml === "string" ? p.bodyHtml.length : 0;
+          const tagsList = typeof p.tags === "string" ? p.tags.split(",").filter((t: string) => t.trim()) : [];
+          return {
+            title: p.title ?? "Sin título",
+            status: p.status ?? "active",
+            price: p.price ?? "0",
+            compareAtPrice: p.compareAtPrice ?? null,
+            imageUrl: imgs[0]?.src ?? null,
+            imageCount: p.imageCount ?? 0,
+            variantCount: p.variantCount ?? 1,
+            descriptionLength: descLen,
+            tagsCount: tagsList.length,
+            published: !!p.publishedAt,
+            auditScore: p.auditScore ?? 0,
+            auditGrade: p.auditGrade ?? "F",
+            hasComparePrice: !!p.compareAtPrice,
+            hasMetaTitle: (p.seoScore ?? 0) >= 60,
+            hasMetaDesc: descLen >= 300,
+            hasAltTexts: imgs.length > 0 && imgs.every((i: { alt?: string | null }) => !!i.alt),
+            cleanHandle: !!p.handle && !p.handle.includes("_"),
+          };
+        });
+
         result = {
           ...syncData,
+          products: scanCards,
           statusFilter,
           pageSpeed: psData ? { mobile: psData.mobile, desktop: psData.desktop } : null,
-          message: `Escaneo completado (filtro: ${statusFilter}). ${syncData.total ?? 0} productos analizados. Nota media: ${typeof syncData.avgScore === "number" ? syncData.avgScore.toFixed(0) : "N/A"}/100${psMessage}`,
+          message: `Escaneo completado (filtro: ${statusFilter}). ${syncData.synced ?? syncData.total ?? 0} productos analizados. Nota media: ${typeof syncData.avgScore === "number" ? syncData.avgScore.toFixed(0) : "N/A"}/100${psMessage}`,
         };
         break;
       }
@@ -2781,7 +2824,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let allProds: Array<Record<string, unknown>> = [];
         for (const st of statusesToQuery) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags,product_type,body_html`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,handle,status,published_at,variants,images,tags,product_type,body_html`
           );
           allProds = allProds.concat(d.products || []);
         }
@@ -2812,6 +2855,9 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             if (hasCompare) score += 25;
             const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
 
+            const lapHasAltTexts = images.length > 0 && images.every((img: Record<string, unknown>) => !!img.alt);
+            const lapHandle = (p.handle as string) || "";
+
             return {
               id: p.id, title: p.title, status: p.status,
               published: !!p.published_at,
@@ -2827,6 +2873,10 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               auditScore: score,
               auditGrade: grade,
               hasComparePrice: hasCompare,
+              hasMetaTitle: typeof p.title === "string" && (p.title as string).length >= 30,
+              hasMetaDesc: bodyLen >= 300,
+              hasAltTexts: lapHasAltTexts,
+              cleanHandle: !!lapHandle && !lapHandle.includes("_"),
             };
           }),
           total: allProds.length,

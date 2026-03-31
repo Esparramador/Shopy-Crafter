@@ -174,6 +174,10 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
     g === "A" ? "rgba(52,211,153,.1)" : g === "B" ? "rgba(200,168,75,.1)" : g === "C" ? "rgba(245,158,11,.1)" : "rgba(244,63,94,.1)";
   const checkOrWarn = (ok: boolean) =>
     ok ? <span style={{ color: "#34d399", fontSize: 10 }}>&#10003;</span> : <span style={{ color: "#f59e0b", fontSize: 10 }}>&#9888;</span>;
+  const imgQuality = (count: number) =>
+    count >= 8 ? <span style={{ color: "#fbbf24", fontSize: 10 }}>&#9733;</span> :
+    count >= 4 ? <span style={{ color: "#34d399", fontSize: 10 }}>&#10003;</span> :
+    <span style={{ color: "#f43f5e", fontSize: 10 }}>&#9888;</span>;
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -217,7 +221,7 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
                 </div>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 8px 4px", fontSize: 9, color: "var(--t3)" }}>
-                <span>{checkOrWarn(imgCount >= 3)} {imgCount}img</span>
+                <span>{imgQuality(imgCount)} {imgCount}img</span>
                 <span>{checkOrWarn(descLen >= 500)} {descLen}ch</span>
                 <span>{checkOrWarn(tags >= 10)} {tags}tags</span>
                 <span>{checkOrWarn(hasCompare)} cmp</span>
@@ -232,7 +236,7 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
                   {p.hasSchema !== undefined && <span>{checkOrWarn(p.hasSchema)} schema</span>}
                   {p.hasAltTexts !== undefined && <span>{checkOrWarn(p.hasAltTexts)} alts</span>}
                   {p.cleanHandle !== undefined && <span>{checkOrWarn(p.cleanHandle)} handle</span>}
-                  <span>{checkOrWarn(imgCount >= 3)} imgs</span>
+                  <span>{imgQuality(imgCount)} imgs</span>
                 </div>
               )}
               {p.issues && p.issues.length > 0 && (
