@@ -15,6 +15,55 @@ import { saveToVault } from "../lib/vault.js";
 import * as fs from "fs";
 import * as path from "path";
 
+function findWorkspaceRoot(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i++) {
+    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.env.REPL_HOME || "/home/runner/workspace";
+}
+const WORKSPACE_ROOT = findWorkspaceRoot();
+const FRONTEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer");
+const BACKEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/api-server");
+const FRONTEND_SRC = path.resolve(FRONTEND_ROOT, "src");
+
+function isInsideWorkspace(candidate: string): boolean {
+  try {
+    const real = fs.realpathSync(candidate);
+    const rel = path.relative(WORKSPACE_ROOT, real);
+    return !rel.startsWith("..") && !path.isAbsolute(rel);
+  } catch {
+    const rel = path.relative(WORKSPACE_ROOT, candidate);
+    return !rel.startsWith("..") && !path.isAbsolute(rel);
+  }
+}
+
+function resolveFilePath(filePath: string): string | null {
+  const normalized = String(filePath).replace(/^\/+/, "");
+  const candidates = [
+    path.resolve(FRONTEND_ROOT, normalized),
+    path.resolve(BACKEND_ROOT, normalized),
+    path.resolve(WORKSPACE_ROOT, normalized),
+  ];
+  if (!normalized.startsWith("src/")) {
+    candidates.push(
+      path.resolve(FRONTEND_ROOT, "src", normalized),
+      path.resolve(BACKEND_ROOT, "src", normalized),
+    );
+  }
+  const unique = [...new Set(candidates)];
+  for (const c of unique) {
+    if (!isInsideWorkspace(c)) continue;
+    try {
+      if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -3204,10 +3253,6 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
       }
 
       case "list_source_files": {
-        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
-        const FRONTEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer");
-        const BACKEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/api-server");
-
         const directory = params?.directory || "";
         const pattern = params?.pattern || "";
 
@@ -3255,27 +3300,12 @@ ${issues.map(i => `  ${i.status === "ok" ? "✅" : i.status === "warning" ? "⚠
         if (!filePath) { res.status(400).json({ error: "filePath requerido (ej: src/pages/projects/Audit.tsx)" }); return; }
         if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
 
-        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
-        const candidates = [
-          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
-          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
-          path.resolve(WORKSPACE_ROOT, filePath),
-        ].filter(c => c.startsWith(WORKSPACE_ROOT));
-
-        let resolvedPath = "";
-        let fileContent = "";
-        for (const c of candidates) {
-          if (fs.existsSync(c)) {
-            resolvedPath = c;
-            fileContent = fs.readFileSync(c, "utf-8");
-            break;
-          }
-        }
-
-        if (!fileContent) {
+        const resolvedPath = resolveFilePath(String(filePath));
+        if (!resolvedPath) {
           res.status(404).json({ error: `Archivo no encontrado: ${filePath}. Prueba con list_source_files para ver los archivos disponibles.` });
           return;
         }
+        const fileContent = fs.readFileSync(resolvedPath, "utf-8");
 
         const lines = fileContent.split("\n").length;
         const truncated = fileContent.length > 15000 ? fileContent.slice(0, 15000) + "\n\n// ... [truncado, archivo demasiado largo]" : fileContent;
@@ -3331,22 +3361,12 @@ ${truncated}
         if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
         const focusOn = params?.focusOn || "all";
 
-        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
-        const candidates = [
-          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
-          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
-          path.resolve(WORKSPACE_ROOT, filePath),
-        ].filter(c => c.startsWith(WORKSPACE_ROOT));
-
-        let fileContent = "";
-        for (const c of candidates) {
-          if (fs.existsSync(c)) { fileContent = fs.readFileSync(c, "utf-8"); break; }
-        }
-
-        if (!fileContent) {
-          res.status(404).json({ error: `Archivo no encontrado: ${filePath}` });
+        const resolvedAnalyzePath = resolveFilePath(String(filePath));
+        if (!resolvedAnalyzePath) {
+          res.status(404).json({ error: `Archivo no encontrado: ${filePath}. Prueba con list_source_files para ver los archivos disponibles.` });
           return;
         }
+        const fileContent = fs.readFileSync(resolvedAnalyzePath, "utf-8");
 
         const truncated = fileContent.length > 18000 ? fileContent.slice(0, 18000) + "\n// ... [truncado]" : fileContent;
 
@@ -3425,27 +3445,12 @@ ${truncated}
         }
         if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
 
-        const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
-        const candidates = [
-          path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer", filePath),
-          path.resolve(WORKSPACE_ROOT, "artifacts/api-server", filePath),
-          path.resolve(WORKSPACE_ROOT, filePath),
-        ].filter(c => c.startsWith(WORKSPACE_ROOT));
-
-        let resolvedPath = "";
-        let fileContent = "";
-        for (const c of candidates) {
-          if (fs.existsSync(c)) {
-            resolvedPath = c;
-            fileContent = fs.readFileSync(c, "utf-8");
-            break;
-          }
-        }
-
+        const resolvedPath = resolveFilePath(String(filePath));
         if (!resolvedPath) {
-          res.status(404).json({ error: `Archivo no encontrado: ${filePath}` });
+          res.status(404).json({ error: `Archivo no encontrado: ${filePath}. Prueba con list_source_files para ver los archivos disponibles.` });
           return;
         }
+        let fileContent = fs.readFileSync(resolvedPath, "utf-8");
 
         if (!fileContent.includes(oldCode)) {
           result = {
@@ -4721,27 +4726,41 @@ Responde en español, de forma directa y accionable.`;
         if (String(target).includes("..") || path.isAbsolute(String(target))) { res.status(400).json({ error: "Target inválido" }); return; }
 
         try {
-          const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
-          const frontendSrc = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer/src");
+          const relevantFiles: { path: string; content: string }[] = [];
+          const possibleFiles = ["pages/Landing.tsx", "pages/landing.css", "pages/projects/Audit.tsx", "App.tsx", "index.css"];
+          for (const f of possibleFiles) {
+            const resolved = resolveFilePath(`src/${f}`) || resolveFilePath(f);
+            if (resolved) {
+              const fc = fs.readFileSync(resolved, "utf-8");
+              relevantFiles.push({ path: f, content: fc.length > 8000 ? fc.slice(0, 8000) + "\n// ... [truncado]" : fc });
+            }
+          }
+
+          const fileListForPrompt = relevantFiles.map(f => `--- ${f.path} ---\n${f.content}`).join("\n\n");
 
           const analyzePrompt = `Eres un experto frontend React+TypeScript+CSS. El usuario quiere hacer este cambio visual/UI:
 
 TARGET: ${target}
 CAMBIO DESEADO: ${change}
 
+Estos son los archivos del proyecto (path relativo desde src/):
+
+${fileListForPrompt}
+
 Necesito que me digas:
-1. Qué archivo(s) hay que modificar (path relativo desde src/)
-2. Qué código hay que buscar (oldCode exacto)
+1. Qué archivo(s) hay que modificar (path relativo desde src/, ej: "pages/Landing.tsx", "pages/landing.css")
+2. Qué código hay que buscar (oldCode exacto, copiado del archivo)
 3. Qué código nuevo poner (newCode)
 
-Si es un cambio CSS, busca en archivos .css
-Si es un cambio de layout/componente, busca en archivos .tsx
+IMPORTANTE: Los paths deben ser relativos desde src/ SIN incluir "src/" al inicio.
+Ejemplo correcto: "pages/Landing.tsx"
+Ejemplo INCORRECTO: "src/pages/Landing.tsx"
 
 Responde SOLO JSON:
 {
   "files": [
     {
-      "filePath": "ruta/desde/src/...",
+      "filePath": "pages/Landing.tsx",
       "changes": [
         {"oldCode": "código exacto a reemplazar", "newCode": "código nuevo", "description": "qué hace este cambio"}
       ]
@@ -4753,7 +4772,7 @@ Responde SOLO JSON:
           const uiText = await askClaudeWithBrain(
             parseInt(params?.projectId) || 2,
             [{ role: "user", content: analyzePrompt }],
-            "Eres un experto frontend senior. Responde SOLO JSON válido. Los archivos del proyecto están en artifacts/shopify-optimizer/src/.",
+            "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
             "general",
             undefined,
             3000
@@ -4762,33 +4781,57 @@ Responde SOLO JSON:
 
           let changesApplied = 0;
           const appliedFiles: string[] = [];
+          const failedFiles: string[] = [];
+          const failedChanges: string[] = [];
 
           if (uiJson.files) {
             for (const file of uiJson.files) {
-              const fullPath = path.resolve(frontendSrc, file.filePath);
-              if (!fullPath.startsWith(frontendSrc)) continue;
-              if (!fs.existsSync(fullPath)) continue;
+              const rawPath = String(file.filePath).replace(/^src\//, "");
+              const fullPath = resolveFilePath(`src/${rawPath}`) || resolveFilePath(rawPath);
+              if (!fullPath) {
+                failedFiles.push(file.filePath);
+                continue;
+              }
 
               let content = fs.readFileSync(fullPath, "utf-8");
-              for (const change of file.changes || []) {
-                if (content.includes(change.oldCode)) {
-                  content = content.replace(change.oldCode, change.newCode);
+              let fileChanged = false;
+              for (const ch of file.changes || []) {
+                if (content.includes(ch.oldCode)) {
+                  content = content.replace(ch.oldCode, ch.newCode);
                   changesApplied++;
+                  fileChanged = true;
+                } else {
+                  failedChanges.push(`${file.filePath}: ${(ch.description || ch.oldCode?.slice(0, 50) || "cambio desconocido")}`);
                 }
               }
-              fs.writeFileSync(fullPath, content, "utf-8");
-              appliedFiles.push(file.filePath);
+              if (fileChanged) {
+                fs.writeFileSync(fullPath, content, "utf-8");
+                appliedFiles.push(file.filePath);
+              }
             }
+          }
+
+          let msg = "";
+          if (changesApplied > 0) {
+            msg = `✅ **Cambio UI aplicado:** ${uiJson.summary || change}\n📁 Archivos: ${appliedFiles.join(", ")}\n🔧 ${changesApplied} cambios aplicados\n⚠️ Recarga la página para ver los cambios.`;
+          } else {
+            msg = `⚠️ No se pudieron aplicar los cambios automáticamente.`;
+          }
+          if (failedFiles.length > 0) {
+            msg += `\n❌ Archivos no encontrados: ${failedFiles.join(", ")}`;
+          }
+          if (failedChanges.length > 0) {
+            msg += `\n⚠️ Cambios no coincidieron: ${failedChanges.join("; ")}`;
           }
 
           result = {
             success: changesApplied > 0,
             changesApplied,
             files: appliedFiles,
+            failedFiles,
+            failedChanges,
             summary: uiJson.summary || "Cambio UI aplicado",
-            message: changesApplied > 0
-              ? `✅ **Cambio UI aplicado:** ${uiJson.summary || change}\n📁 Archivos: ${appliedFiles.join(", ")}\n🔧 ${changesApplied} cambios aplicados\n⚠️ Recarga la página para ver los cambios.`
-              : `⚠️ No se pudieron aplicar los cambios automáticamente. Usa fix_code manualmente para hacer el cambio.`,
+            message: msg,
           };
         } catch (err) {
           result = { error: true, message: `Error modificando UI: ${err instanceof Error ? err.message : String(err)}` };
