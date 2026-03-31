@@ -2,12 +2,12 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
+import type { PlatformType } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
-import type { PlatformType } from "@workspace/db";
 
 const router = Router();
 
@@ -279,6 +279,7 @@ router.post("/projects", async (req, res): Promise<void> => {
       } else {
         req.log.warn({ projectId: project.id, err }, "Connection test failed for non-Shopify platform — project saved for retry");
       }
+      await db.update(projectsTable).set({ accessToken: null }).where(eq(projectsTable.id, project.id));
     }
   }
 
@@ -545,6 +546,19 @@ router.post("/projects/:projectId/test-connection", async (req, res): Promise<vo
       platformType: project.platformType ?? "shopify",
     });
   } catch (err) {
+    if (err instanceof PlatformNotSupportedError) {
+      res.json({
+        connected: false,
+        storeName: null,
+        planName: null,
+        productCount: null,
+        tokenValid: false,
+        tokenExpiresAt: null,
+        error: err.message,
+        platformType: project.platformType ?? "shopify",
+      });
+      return;
+    }
     const message = err instanceof Error ? err.message : "Error desconocido";
     const isPlatformError = err instanceof PlatformNotSupportedError;
     res.json({

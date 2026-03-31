@@ -38,7 +38,15 @@ The platform supports multiple e-commerce platforms via a connector abstraction 
 - **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
 
 ### Database
-PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data.
+PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data. The `projects` table includes a `platform_type` column (text, not-null, default "shopify") supporting: shopify, woocommerce, prestashop, wordpress, universal.
+
+### Multi-Platform Connector Architecture
+A connector abstraction layer in `artifacts/api-server/src/connectors/` provides:
+- `IPlatformConnector` interface (`types.ts`) — generic contract for platform operations (auth, products, orders, SEO, inventory, images)
+- `ShopifyConnector` (`shopify.ts`) — wraps existing `shopify.ts` functions without modifying them
+- `ConnectorFactory` (`index.ts`) — `getConnector(project)` returns the correct connector based on `project.platformType`
+- `PlatformNotSupportedError` for unsupported platforms (woocommerce, prestashop, wordpress, universal — stubs only)
+- All connectors must route AI calls through `askClaudeWithBrain` (no direct Claude bypasses)
 
 ### AI Stack (Single Brain Architecture)
 A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating with Replicate and OpenAI gpt-image-1 for image generation.
