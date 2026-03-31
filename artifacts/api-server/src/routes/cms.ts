@@ -8,10 +8,9 @@ import { db } from "@workspace/db";
 import { cmsContent, cmsVersions } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
-import Anthropic from "@anthropic-ai/sdk";
+import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
-const anthropic = new Anthropic();
 
 const MEDIA_DIR = path.join(process.cwd(), "../../artifacts/shopify-optimizer/public/media");
 if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
@@ -217,9 +216,16 @@ router.post("/ai/improve", async (req: Request, res: Response) => {
     const { text, instruction, context } = req.body as { text: string; instruction: string; context?: string };
     const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: Shopy Crafter — plataforma independiente de optimización IA para tiendas Shopify, con OmniCore Brain (IA acumulativa). Shopy Crafter NO es Shopify ni está afiliada a Shopify Inc. Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
     const userPrompt = `Texto original: "${text}"\n\nInstrucción: ${instruction}\n${context ? `\nContexto adicional: ${context}` : ""}\n\nDevuelve solo el texto mejorado:`;
-    const message = await anthropic.messages.create({ model: "claude-sonnet-4-5", max_tokens: 1024, messages: [{ role: "user", content: userPrompt }], system: systemPrompt });
-    const improved = message.content[0].type === "text" ? message.content[0].text.trim() : text;
-    res.json({ improved });
+    const improved = await askClaudeWithBrain(0, [{ role: "user", content: userPrompt }], systemPrompt, "general", undefined, 1024);
+
+    learnFromOperation({
+      operationType: "cms_copy_improvement",
+      title: `CMS copy mejorado: ${instruction.slice(0, 80)}`,
+      content: `Original: ${text.slice(0, 500)}\nMejorado: ${improved.slice(0, 500)}`,
+      tags: ["cms", "copywriting", "improvement"],
+    });
+
+    res.json({ improved: improved.trim() });
   } catch (e) {
     res.status(500).json({ error: "AI improvement failed" });
   }

@@ -516,6 +516,7 @@ export function learnFromOperation(params: {
     chatbot_action_create_ab_test: "ab_insight",
     chatbot_action_list_ab_tests: "ab_insight",
     chatbot_action_declare_winner: "ab_insight",
+    cms_copy_improvement: "prompt_template",
     explicit_instruction: "general",
     strategic_learning: "general",
     conversation_insight: "general",

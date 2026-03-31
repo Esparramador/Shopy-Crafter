@@ -4,6 +4,7 @@ import { projectFilesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { saveToVault } from "../lib/vault.js";
+import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
@@ -377,6 +378,14 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
   }
 
   logger.info({ projectId, actionName, fileId }, "Action result saved to vault");
+
+  learnFromOperation({
+    operationType: `action_save_${actionName}`,
+    title: `Acción guardada: ${reportTitle}`,
+    content: typeof content === "string" ? content.slice(0, 2000) : JSON.stringify(content).slice(0, 2000),
+    tags: ["action_save", actionName],
+  });
+
   res.json({ success: true, message: "Guardado en el vault del proyecto", fileId });
 });
 
