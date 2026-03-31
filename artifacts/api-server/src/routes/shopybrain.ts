@@ -4727,13 +4727,30 @@ Responde en español, de forma directa y accionable.`;
 
         try {
           const relevantFiles: { path: string; content: string }[] = [];
-          const possibleFiles = ["pages/Landing.tsx", "pages/landing.css", "pages/projects/Audit.tsx", "App.tsx", "index.css"];
-          for (const f of possibleFiles) {
-            const resolved = resolveFilePath(`src/${f}`) || resolveFilePath(f);
-            if (resolved) {
-              const fc = fs.readFileSync(resolved, "utf-8");
-              relevantFiles.push({ path: f, content: fc.length > 8000 ? fc.slice(0, 8000) + "\n// ... [truncado]" : fc });
-            }
+          const scanDirs = [
+            { root: FRONTEND_SRC, prefix: "" },
+          ];
+          const targetLower = String(target).toLowerCase();
+          for (const { root, prefix } of scanDirs) {
+            if (!fs.existsSync(root)) continue;
+            const scanRecursive = (dir: string, depth: number) => {
+              if (depth > 3 || relevantFiles.length >= 6) return;
+              try {
+                for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                  if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
+                  const full = path.join(dir, entry.name);
+                  if (entry.isDirectory()) { scanRecursive(full, depth + 1); continue; }
+                  if (!/\.(tsx|css)$/.test(entry.name)) continue;
+                  const relPath = path.relative(root, full);
+                  const nameLower = entry.name.toLowerCase().replace(/\.(tsx|css)$/, "");
+                  if (targetLower.includes(nameLower) || nameLower.includes("landing") || nameLower.includes("index") || nameLower === "app") {
+                    const fc = fs.readFileSync(full, "utf-8");
+                    relevantFiles.push({ path: `${prefix}${relPath}`, content: fc.length > 8000 ? fc.slice(0, 8000) + "\n// ... [truncado]" : fc });
+                  }
+                }
+              } catch { /* skip */ }
+            };
+            scanRecursive(root, 0);
           }
 
           const fileListForPrompt = relevantFiles.map(f => `--- ${f.path} ---\n${f.content}`).join("\n\n");
