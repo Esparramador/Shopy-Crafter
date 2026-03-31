@@ -341,48 +341,48 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
 RESEARCH DATA (from 12 parallel Google Search Grounding searches + Gemini URL deep-dive + ${research.allSources.length} discovered sources):
 
 === BRAND OVERVIEW & HISTORY ===
-${research.overview.slice(0, 2000)}
+${research.overview.slice(0, 5000)}
 
 === PRODUCTS, CATALOG & PRICING ===
-${research.products.slice(0, 2000)}
+${research.products.slice(0, 5000)}
 
 === SOCIAL MEDIA & ONLINE PRESENCE ===
-${research.social.slice(0, 2000)}
+${research.social.slice(0, 4000)}
 
 === NEWS & PRESS (RECENT) ===
-${research.news.slice(0, 1500)}
+${research.news.slice(0, 3000)}
 
 === CUSTOMER REVIEWS & SENTIMENT ===
-${research.reviews.slice(0, 1500)}
+${research.reviews.slice(0, 3000)}
 
 === COMPETITORS & MARKET POSITIONING ===
-${research.competitors.slice(0, 1500)}
+${research.competitors.slice(0, 4000)}
 
 === ECOMMERCE STRATEGY & TECH STACK ===
-${research.ecommerce.slice(0, 1500)}
+${research.ecommerce.slice(0, 3000)}
 
 === VISUAL IDENTITY & BRAND DESIGN ===
-${(research as any).visual?.slice(0, 1000) ?? ""}
+${(research as any).visual?.slice(0, 2500) ?? ""}
 
 === PRICING STRATEGY & PSYCHOLOGY ===
-${research.pricing?.slice(0, 1200) ?? ""}
+${research.pricing?.slice(0, 3000) ?? ""}
 
 === PAID ADVERTISING & CAMPAIGNS ===
-${research.paidAds?.slice(0, 1200) ?? ""}
+${research.paidAds?.slice(0, 3000) ?? ""}
 
 === FOUNDERS, TEAM & CULTURE ===
-${research.founders?.slice(0, 1000) ?? ""}
+${research.founders?.slice(0, 2500) ?? ""}
 
 === INTERNATIONAL PRESENCE ===
-${research.international?.slice(0, 1000) ?? ""}
+${research.international?.slice(0, 2500) ?? ""}
 
 === GEMINI URL DEEP-DIVE (Direct reading of top discovered URLs) ===
-${research.urlDeepDive?.slice(0, 3000) ?? ""}
+${research.urlDeepDive?.slice(0, 6000) ?? ""}
 
 ${fallbackPageContent ? `=== MAIN WEBSITE FALLBACK ===\n${fallbackPageContent}` : ""}
 
 === ALL DISCOVERED SOURCES (${research.allSources.length} URLs) ===
-${research.allSources.slice(0, 25).join("\n")}
+${research.allSources.slice(0, 40).join("\n")}
 
 Create the most comprehensive brand intelligence profile possible in JSON format:
 {
@@ -651,19 +651,19 @@ Return ONLY valid JSON. Populate every field with real found data or "Unknown" i
       profile,
       // All 12 research dimensions + URL deep-dive
       research: {
-        overview:      research.overview.slice(0, 3000),
-        products:      research.products.slice(0, 3000),
-        social:        research.social.slice(0, 2500),
-        news:          research.news.slice(0, 2000),
-        reviews:       research.reviews.slice(0, 2000),
-        competitors:   research.competitors.slice(0, 2500),
-        ecommerce:     research.ecommerce.slice(0, 2000),
-        pricing:       research.pricing?.slice(0, 2000) ?? "",
-        paidAds:       research.paidAds?.slice(0, 2000) ?? "",
-        founders:      research.founders?.slice(0, 1500) ?? "",
-        international: research.international?.slice(0, 1500) ?? "",
-        urlDeepDive:   research.urlDeepDive?.slice(0, 3000) ?? "",
-        extraInsights: extraInsights.slice(0, 1500),
+        overview:      research.overview,
+        products:      research.products,
+        social:        research.social,
+        news:          research.news,
+        reviews:       research.reviews,
+        competitors:   research.competitors,
+        ecommerce:     research.ecommerce,
+        pricing:       research.pricing ?? "",
+        paidAds:       research.paidAds ?? "",
+        founders:      research.founders ?? "",
+        international: research.international ?? "",
+        urlDeepDive:   research.urlDeepDive ?? "",
+        extraInsights: extraInsights,
       },
       sourcesFound:    research.allSources.length,
       queriesExecuted: research.allQueries.length,

@@ -40,7 +40,7 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
       undefined,
       "general",
       niche,
-      1500
+      4096
     );
 
     learnFromOperation({
@@ -264,7 +264,7 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
       undefined,
       "general",
       niche,
-      2000
+      8192
     );
 
     try {
@@ -291,7 +291,7 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
     learnFromOperation({
       operationType: "full_gemini_audit",
       title: `Auditoría completa: ${businessName} (${domain}) en ${niche}`,
-      content: synthesis.slice(0, 500),
+      content: synthesis,
       confidence: 0.85,
       tags: ["gemini_research", "business_audit", niche, domain],
     });
