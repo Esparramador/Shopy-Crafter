@@ -164,8 +164,41 @@ interface ProductCardItem {
   issues?: string[];
 }
 
+function getCardRecommendations(p: ProductCardItem) {
+  const recs: Array<{ dim: string; icon: string; status: "ok" | "warn" | "bad"; what: string; why: string; impact: string }> = [];
+  const imgCount = p.imageCount ?? 0;
+  const descLen = p.descriptionLength ?? p.descLength ?? 0;
+  const tags = p.tagsCount ?? 0;
+  const hasCompare = p.hasComparePrice ?? p.hasCompare ?? false;
+
+  if (imgCount === 0) recs.push({ dim: "Imagenes", icon: "📷", status: "bad", what: `0 imagenes`, why: "Sin imagenes el producto no genera confianza", impact: "+80% conversion con galeria" });
+  else if (imgCount < 4) recs.push({ dim: "Imagenes", icon: "📷", status: "warn", what: `${imgCount} imagen${imgCount > 1 ? "es" : ""}`, why: `Añadir ${4 - imgCount} mas (Hero, Lifestyle, Detalle)`, impact: "+30-50% conversion" });
+  else if (imgCount < 8) recs.push({ dim: "Imagenes", icon: "📷", status: "warn", what: `${imgCount} imagenes`, why: "Ampliar a 8+ con variantes y close-ups", impact: "+15-25% conversion" });
+  else recs.push({ dim: "Imagenes", icon: "📷", status: "ok", what: `${imgCount} imagenes`, why: "Galeria completa y profesional", impact: "Confianza maximizada" });
+
+  if (descLen < 200) recs.push({ dim: "Descripcion", icon: "📝", status: "bad", what: `${descLen}ch — muy corta`, why: "Añadir beneficios, FAQ, trust signals", impact: "+40% SEO + conversion" });
+  else if (descLen < 500) recs.push({ dim: "Descripcion", icon: "📝", status: "warn", what: `${descLen}ch`, why: "Ampliar con secciones de uso y FAQ", impact: "+20-30% conversion" });
+  else if (descLen < 1000) recs.push({ dim: "Descripcion", icon: "📝", status: "warn", what: `${descLen}ch`, why: "Añadir storytelling y garantias", impact: "+10-15% conversion" });
+  else recs.push({ dim: "Descripcion", icon: "📝", status: "ok", what: `${descLen}ch`, why: "Descripcion completa y detallada", impact: "SEO optimizado" });
+
+  if (tags < 5) recs.push({ dim: "Tags", icon: "🏷", status: "bad", what: `${tags} tags`, why: "Añadir 10+ tags para busqueda interna", impact: "+25% descubrimiento" });
+  else if (tags < 10) recs.push({ dim: "Tags", icon: "🏷", status: "warn", what: `${tags} tags`, why: "Añadir tags de material, uso, estilo", impact: "+15% descubrimiento" });
+  else recs.push({ dim: "Tags", icon: "🏷", status: "ok", what: `${tags} tags`, why: "Taxonomia completa", impact: "Busqueda optimizada" });
+
+  if (!hasCompare) recs.push({ dim: "Precio", icon: "💰", status: "warn", what: "Sin compare_at_price", why: "Precio tachado aumenta urgencia de compra", impact: "+15-25% conversion" });
+  else recs.push({ dim: "Precio", icon: "💰", status: "ok", what: "Precio tachado activo", why: "Estrategia de anclaje de precio", impact: "Urgencia activada" });
+
+  if (p.hasMetaTitle === false) recs.push({ dim: "SEO Title", icon: "🔍", status: "warn", what: "Meta title debil", why: "Keyword-first con <60ch para CTR", impact: "+20% clicks organicos" });
+  if (p.hasMetaDesc === false) recs.push({ dim: "SEO Desc", icon: "🔍", status: "warn", what: "Meta descripcion corta", why: "Añadir 155ch con CTA y beneficio", impact: "+15% CTR" });
+  if (p.hasAltTexts === false) recs.push({ dim: "Alt Texts", icon: "🖼", status: "warn", what: "Imagenes sin alt text", why: "Esencial para SEO de imagenes", impact: "+10% trafico organico" });
+  if (p.cleanHandle === false) recs.push({ dim: "Handle", icon: "🔗", status: "warn", what: "URL no optimizada", why: "Usar guiones, keywords, sin underscores", impact: "+5% SEO" });
+
+  return recs;
+}
+
 function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
   const [expanded, setExpanded] = useState(false);
+  const [detailIdx, setDetailIdx] = useState<number | null>(null);
   const visible = expanded ? products : products.slice(0, 4);
 
   const gradeColor = (g: string) =>
@@ -178,6 +211,8 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
     count >= 8 ? <span style={{ color: "#fbbf24", fontSize: 10 }}>&#9733;</span> :
     count >= 4 ? <span style={{ color: "#34d399", fontSize: 10 }}>&#10003;</span> :
     <span style={{ color: "#f43f5e", fontSize: 10 }}>&#9888;</span>;
+  const recStatusColor = (s: "ok" | "warn" | "bad") =>
+    s === "ok" ? "#34d399" : s === "warn" ? "#f59e0b" : "#f43f5e";
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -191,12 +226,15 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
           const variants = p.variantCount ?? 1;
           const hasCompare = p.hasComparePrice ?? p.hasCompare ?? false;
           const price = parseFloat(p.price || "0");
+          const recs = getCardRecommendations(p);
+          const showDetail = detailIdx === i;
 
           return (
             <div key={i} style={{
               background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 10,
-              overflow: "hidden", position: "relative",
-            }}>
+              overflow: "hidden", position: "relative", cursor: "pointer",
+              gridColumn: showDetail ? "1 / -1" : undefined,
+            }} onClick={() => setDetailIdx(showDetail ? null : i)}>
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${gradeColor(grade)}66, transparent)` }} />
               <div style={{ display: "flex", gap: 8, padding: 8 }}>
                 {p.imageUrl ? (
@@ -228,22 +266,38 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
                 <span>{variants}var</span>
                 {p.published === false && <span style={{ color: "#f43f5e", fontWeight: 700 }}>NO PUB</span>}
               </div>
-              {(p.hasMetaTitle !== undefined || p.hasMetaDesc !== undefined || p.hasSchema !== undefined || p.hasAltTexts !== undefined || p.cleanHandle !== undefined) && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, padding: "0 8px 6px", fontSize: 8, color: "var(--t4)" }}>
-                  <span style={{ opacity: 0.7 }}>SEO:</span>
-                  {p.hasMetaTitle !== undefined && <span>{checkOrWarn(p.hasMetaTitle)} title</span>}
-                  {p.hasMetaDesc !== undefined && <span>{checkOrWarn(p.hasMetaDesc)} desc</span>}
-                  {p.hasSchema !== undefined && <span>{checkOrWarn(p.hasSchema)} schema</span>}
-                  {p.hasAltTexts !== undefined && <span>{checkOrWarn(p.hasAltTexts)} alts</span>}
-                  {p.cleanHandle !== undefined && <span>{checkOrWarn(p.cleanHandle)} handle</span>}
-                  <span>{imgQuality(imgCount)} imgs</span>
-                </div>
-              )}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, padding: "0 8px 4px", fontSize: 8, color: "var(--t4)" }}>
+                <span style={{ opacity: 0.7 }}>SEO:</span>
+                <span>{checkOrWarn(p.hasMetaTitle !== false)} title</span>
+                <span>{checkOrWarn(p.hasMetaDesc !== false)} desc</span>
+                <span>{checkOrWarn(p.hasSchema !== false)} schema</span>
+                <span>{checkOrWarn(p.hasAltTexts !== false)} alts</span>
+                <span>{checkOrWarn(p.cleanHandle !== false)} handle</span>
+                <span>{imgQuality(imgCount)} imgs</span>
+              </div>
               {p.issues && p.issues.length > 0 && (
-                <div style={{ padding: "0 8px 6px", fontSize: 8, color: "#f59e0b" }}>
+                <div style={{ padding: "0 8px 4px", fontSize: 8, color: "#f59e0b" }}>
                   ⚠ {p.issues.slice(0, 2).join(" · ")}
                 </div>
               )}
+              {showDetail && (
+                <div style={{ padding: "4px 8px 8px", borderTop: "1px solid var(--ink3)" }}>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: "var(--t2)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>Recomendaciones por dimension</div>
+                  {recs.map((r, ri) => (
+                    <div key={ri} style={{ display: "flex", gap: 4, padding: "3px 0", borderBottom: ri < recs.length - 1 ? "1px solid var(--ink3)" : "none" }}>
+                      <span style={{ fontSize: 10, flexShrink: 0 }}>{r.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 8, fontWeight: 700, color: recStatusColor(r.status) }}>{r.dim}: {r.what}</div>
+                        <div style={{ fontSize: 7, color: "var(--t3)" }}>{r.why}</div>
+                      </div>
+                      <span style={{ fontSize: 7, color: recStatusColor(r.status), fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>{r.impact}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ padding: "2px 8px 4px", textAlign: "center", fontSize: 7, color: "var(--t4)", opacity: 0.6 }}>
+                {showDetail ? "▲ Cerrar" : "▼ Ver recomendaciones"}
+              </div>
             </div>
           );
         })}
