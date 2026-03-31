@@ -840,22 +840,29 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "store_status":
         return `✅ **Estado de la tienda:**\n🏪 ${result.storeName} (${result.domain})\n📦 ${result.productsCount} productos total (✅ ${result.activeProducts ?? "?"} activos | 📝 ${result.draftProducts ?? "?"} borradores | 📁 ${result.archivedProducts ?? "?"} archivados)\n📢 Publicados: ${result.publishedProducts ?? "?"} | 🔇 No publicados: ${result.unpublishedProducts ?? "0"}${(result.unpublishedProducts as number) > 0 ? " ⚠️" : ""}\n🛒 ${result.ordersCount} pedidos\n🔑 Token: ${result.tokenStatus === "valid" ? `✅ válido (${result.tokenHoursLeft}h)` : "❌ EXPIRADO"}`;
       case "list_products": {
-        const prods = (result.products as Array<{ title: string; status: string; price: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; issues?: string[] }>) ?? [];
+        const prods = (result.products as Array<{ title: string; status: string; price: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; imageUrl?: string; descriptionLength?: number; tagsCount?: number; variantCount?: number; hasComparePrice?: boolean; issues?: string[] }>) ?? [];
         if (!prods.length) return "📦 No se encontraron productos.";
-        const statusIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
         const gradeIcon = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
         const auditW = result.auditWarnings as { unpublished?: number; noCompare?: number; lowImages?: number; shortDesc?: number } | undefined;
-        let msg = `📦 **${result.total} productos:**\n`;
+        let msg = `📦 **${result.total} productos:**\n\n`;
         msg += prods.map((p, i) => {
-          let line = `${i + 1}. ${statusIcon(p.status)} ${gradeIcon(p.auditGrade || "D")} **${p.title}** — ${p.price}€`;
+          const grade = p.auditGrade || "D";
+          let line = `${gradeIcon(grade)} **${p.title}** — ${p.price}€`;
           if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
-          if (p.published === false) line += ` 🔇`;
-          if (p.imageCount !== undefined) line += ` | ${p.imageCount}img`;
-          if (p.issues?.length) line += ` ⚠️`;
+          line += ` | Grade: **${grade}** (${p.auditScore ?? 0}/100)`;
+          if (p.published === false) line += ` | 🔇 NO PUBLICADO`;
+          const details: string[] = [];
+          if (p.imageCount !== undefined) details.push(`${p.imageCount >= 3 ? "✅" : "⚠️"} ${p.imageCount} imgs`);
+          if (p.variantCount !== undefined) details.push(`${p.variantCount} variants`);
+          if (p.descriptionLength !== undefined) details.push(`${p.descriptionLength >= 500 ? "✅" : "⚠️"} ${p.descriptionLength}ch desc`);
+          if (p.tagsCount !== undefined) details.push(`${p.tagsCount >= 10 ? "✅" : "⚠️"} ${p.tagsCount} tags`);
+          if (p.hasComparePrice !== undefined) details.push(p.hasComparePrice ? "✅ compare_at" : "⚠️ sin compare_at");
+          if (details.length) line += `\n   ${details.join(" | ")}`;
+          if (p.issues?.length) line += `\n   ⚠️ ${p.issues.join(" | ")}`;
           return line;
-        }).join("\n");
+        }).join("\n\n");
         if (auditW && (auditW.unpublished || auditW.noCompare || auditW.lowImages || auditW.shortDesc)) {
-          msg += "\n\n🔍 **Auditoría:**";
+          msg += "\n\n🔍 **Resumen de auditoría:**";
           if (auditW.unpublished) msg += `\n⚠️ ${auditW.unpublished} no publicados`;
           if (auditW.noCompare) msg += `\n⚠️ ${auditW.noCompare} sin precio tachado`;
           if (auditW.lowImages) msg += `\n⚠️ ${auditW.lowImages} con pocas imágenes`;
@@ -889,18 +896,23 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         }
         return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
       case "search_product": {
-        const searchProds = (result.products as Array<{ title: string; id: number; price: string; status: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; issues?: string[] }>) ?? [];
+        const searchProds = (result.products as Array<{ title: string; id: number; price: string; status: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; imageUrl?: string; descriptionLength?: number; tagsCount?: number; variantCount?: number; hasComparePrice?: boolean; issues?: string[] }>) ?? [];
         if (!searchProds.length) return "🔍 No se encontraron productos.";
-        const sIcon = (s: string) => s === "active" ? "✅" : s === "draft" ? "📝" : s === "archived" ? "📁" : "❓";
         const sGradeIcon = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
-        return `🔍 **${result.total} resultados:**\n${searchProds.map((p, i) => {
-          let line = `${i + 1}. ${sIcon(p.status)} ${sGradeIcon(p.auditGrade || "D")} **${p.title}** — ${p.price}€`;
+        return `🔍 **${result.total} resultados:**\n\n${searchProds.map((p) => {
+          const grade = p.auditGrade || "D";
+          let line = `${sGradeIcon(grade)} **${p.title}** — ${p.price}€`;
           if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
-          if (p.published === false) line += ` 🔇 NO PUBLICADO`;
-          if (p.imageCount !== undefined) line += ` | ${p.imageCount}img`;
+          line += ` | **${grade}** (${p.auditScore ?? 0}/100)`;
+          if (p.published === false) line += ` | 🔇 NO PUBLICADO`;
+          const details: string[] = [];
+          if (p.imageCount !== undefined) details.push(`${p.imageCount >= 3 ? "✅" : "⚠️"} ${p.imageCount} imgs`);
+          if (p.variantCount !== undefined) details.push(`${p.variantCount} variants`);
+          if (p.hasComparePrice !== undefined) details.push(p.hasComparePrice ? "✅ compare" : "⚠️ sin compare");
+          if (details.length) line += `\n   ${details.join(" | ")}`;
           if (p.issues?.length) line += `\n   ⚠️ ${p.issues.join(" | ")}`;
           return line;
-        }).join("\n")}`;
+        }).join("\n\n")}`;
       }
       case "publish_product": {
         const pubIssues = (result.auditIssues as string[]) || [];
@@ -920,11 +932,24 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (critIssues.length > 0) auditMsg += `\n🚨 **PROBLEMAS CRÍTICOS:**\n${critIssues.join("\n")}`;
         if (warnIssues.length > 0) auditMsg += `\n\n⚠️ **ADVERTENCIAS:**\n${warnIssues.join("\n")}`;
         if (critIssues.length === 0 && warnIssues.length === 0) auditMsg += `\n✅ ¡Todos los productos están en perfecto estado!`;
-        const auditProds = (result.products as Array<{ title: string; grade: string; score: number; issues?: string[] }>) || [];
-        const withIssues = auditProds.filter(p => p.issues?.length);
-        if (withIssues.length > 0 && withIssues.length <= 10) {
-          auditMsg += `\n\n📋 **Productos con issues:**\n`;
-          auditMsg += withIssues.map(p => `• ${p.grade === "A" ? "🟢" : p.grade === "B" ? "🟡" : p.grade === "C" ? "🟠" : "🔴"} **${p.title}** (${p.score}/100): ${p.issues?.join(", ")}`).join("\n");
+        const auditProds = (result.products as Array<{ title: string; grade: string; score: number; imageCount?: number; imageUrl?: string; descLength?: number; tagsCount?: number; variantCount?: number; price?: string; compareAtPrice?: string; hasComparePrice?: boolean; issues?: string[] }>) || [];
+        const gradeIcon3 = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
+        if (auditProds.length > 0) {
+          auditMsg += `\n\n📋 **Detalle por producto:**\n\n`;
+          auditMsg += auditProds.map(p => {
+            let line = `${gradeIcon3(p.grade)} **${p.title}** — Grade: **${p.grade}** (${p.score}/100)`;
+            if (p.price) line += ` | ${p.price}€`;
+            if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
+            const details: string[] = [];
+            if (p.imageCount !== undefined) details.push(`${p.imageCount >= 3 ? "✅" : "⚠️"} ${p.imageCount} imgs`);
+            if (p.variantCount !== undefined) details.push(`${p.variantCount} variants`);
+            if (p.descLength !== undefined) details.push(`${p.descLength >= 500 ? "✅" : "⚠️"} ${p.descLength}ch desc`);
+            if (p.tagsCount !== undefined) details.push(`${p.tagsCount >= 10 ? "✅" : "⚠️"} ${p.tagsCount} tags`);
+            if (p.hasComparePrice !== undefined) details.push(p.hasComparePrice ? "✅ compare" : "⚠️ sin compare");
+            if (details.length) line += `\n   ${details.join(" | ")}`;
+            if (p.issues?.length) line += `\n   ⚠️ ${p.issues.join(" | ")}`;
+            return line;
+          }).join("\n\n");
         }
         return auditMsg;
       }
@@ -966,12 +991,26 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           ? `✅ **Fix aplicado en ${result.filePath}**\n📝 ${result.description}\n📊 ${result.linesChanged ?? 0} líneas modificadas\n💾 Backup creado\n⚠️ Reinicia el servidor para aplicar los cambios.`
           : `❌ ${result.message ?? "No se pudo aplicar el fix."}`;
       case "list_all_products": {
-        const allProds = (result.products as Array<{ title: string; status: string; price: string }>) ?? [];
+        const allProds = (result.products as Array<{ title: string; status: string; price: string; compareAtPrice?: string; imageCount?: number; imageUrl?: string; auditScore?: number; auditGrade?: string; descriptionLength?: number; tagsCount?: number; variantCount?: number; hasComparePrice?: boolean }>) ?? [];
         const stats = result.byStatus as Record<string, number> ?? {};
         if (!allProds.length) return "📦 No se encontraron productos.";
+        const gradeIcon2 = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
         let msg = `📦 **${result.total} productos** (filtro: ${result.statusFilter ?? "any"})`;
         if (Object.keys(stats).length) msg += `\n📊 ${Object.entries(stats).map(([s, c]) => `${s}: ${c}`).join(" | ")}`;
-        msg += `\n${allProds.map((p, i) => `${i + 1}. **${p.title}** — ${p.price}€ (${p.status})`).join("\n")}`;
+        msg += `\n📢 Publicados: ${result.published ?? "?"} | 🔇 No publicados: ${result.unpublished ?? "?"}\n\n`;
+        msg += allProds.map((p) => {
+          const grade = p.auditGrade || "D";
+          let line = `${gradeIcon2(grade)} **${p.title}** — ${p.price}€`;
+          if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
+          line += ` | **${grade}** (${p.auditScore ?? 0}/100)`;
+          const details: string[] = [];
+          if (p.imageCount !== undefined) details.push(`${p.imageCount >= 3 ? "✅" : "⚠️"} ${p.imageCount} imgs`);
+          if (p.variantCount !== undefined) details.push(`${p.variantCount} variants`);
+          if (p.descriptionLength !== undefined) details.push(`${p.descriptionLength >= 500 ? "✅" : "⚠️"} ${p.descriptionLength}ch`);
+          if (p.hasComparePrice !== undefined) details.push(p.hasComparePrice ? "✅ compare" : "⚠️ sin compare");
+          if (details.length) line += `\n   ${details.join(" | ")}`;
+          return line;
+        }).join("\n\n");
         return msg;
       }
       case "get_orders": {

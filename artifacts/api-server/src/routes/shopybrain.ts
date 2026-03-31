@@ -1280,7 +1280,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
 
         const mappedProducts = allProducts.map((p: Record<string, unknown>) => {
           const variants = (p.variants as Array<Record<string, string>>) || [];
-          const images = (p.images as unknown[]) || [];
+          const images = (p.images as Array<Record<string, unknown>>) || [];
           const bodyLen = (p.body_html as string || "").length;
           const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
           const hasCompare = !!variants[0]?.compare_at_price;
@@ -1310,6 +1310,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             compareAtPrice: variants[0]?.compare_at_price || null,
             variantCount: variants.length,
             imageCount: imgCount,
+            imageUrl: images[0]?.src || null,
             tags: p.tags,
             tagsCount: tagsArr.length,
             descriptionLength: bodyLen,
@@ -1317,6 +1318,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             publishedScope: p.published_scope || "unknown",
             auditScore: score,
             auditGrade: grade,
+            hasComparePrice: hasCompare,
             issues: issues.length > 0 ? issues : undefined,
           };
         });
@@ -2250,17 +2252,21 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
             if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
             if (hasCompare) score += 25;
 
+            const searchImages = (p.images as Array<Record<string, unknown>>) || [];
             return {
               id: p.id, title: p.title, status: p.status,
               price: variants[0]?.price,
               compareAtPrice: variants[0]?.compare_at_price || null,
               imageCount: imgCount,
+              imageUrl: searchImages[0]?.src || null,
               tagsCount: tagsArr.length,
+              variantCount: variants.length,
               descriptionLength: bodyLen,
               published: isPublished,
               publishedScope: p.published_scope || "unknown",
               auditScore: score,
               auditGrade: score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D",
+              hasComparePrice: hasCompare,
               issues: issues.length > 0 ? issues : undefined,
             };
           }),
@@ -2455,7 +2461,8 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           totalScore += score;
           const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
 
-          return { id: p.id, title: p.title, status, published: isPublished, publishedScope: p.published_scope, score, grade, imageCount: imgCount, descLength: bodyLen, tagsCount: tagsArr.length, hasCompare, issues: issues.length > 0 ? issues : undefined };
+          const auditImages = (p.images as Array<Record<string, unknown>>) || [];
+          return { id: p.id, title: p.title, status, published: isPublished, publishedScope: p.published_scope, score, grade, imageCount: imgCount, imageUrl: auditImages[0]?.src || auditImages[0]?.node?.url || null, descLength: bodyLen, tagsCount: tagsArr.length, variantCount: (p.variants as unknown[])?.length ?? 1, price: ((p.variants as Array<Record<string, unknown>>)?.[0]?.price as string) ?? "0", compareAtPrice: ((p.variants as Array<Record<string, unknown>>)?.[0]?.compare_at_price || (p.variants as Array<Record<string, unknown>>)?.[0]?.compareAtPrice) as string || null, hasCompare, hasComparePrice: hasCompare, issues: issues.length > 0 ? issues : undefined };
         });
 
         if (unpublishedCount > 0) criticalIssues.push(`🚨 ${unpublishedCount} producto(s) NO PUBLICADOS — invisibles para clientes`);
@@ -2774,7 +2781,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let allProds: Array<Record<string, unknown>> = [];
         for (const st of statusesToQuery) {
           const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags,product_type`
+            parseInt(projectId), project.shopDomain, `/products.json?limit=${limit}&status=${st}&published_status=any&fields=id,title,status,published_at,variants,images,tags,product_type,body_html`
           );
           allProds = allProds.concat(d.products || []);
         }
@@ -2792,15 +2799,34 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         result = {
           products: allProds.map((p: Record<string, unknown>) => {
             const variants = (p.variants as Array<Record<string, string>>) || [];
+            const images = (p.images as Array<Record<string, unknown>>) || [];
+            const bodyLen = (p.body_html as string || "").length;
+            const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
+            const hasCompare = !!variants[0]?.compare_at_price;
+            const imgCount = images.length;
+
+            let score = 0;
+            if (imgCount >= 3) score += 25; else if (imgCount >= 1) score += 10;
+            if (bodyLen >= 1000) score += 25; else if (bodyLen >= 500) score += 15; else if (bodyLen >= 200) score += 8;
+            if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
+            if (hasCompare) score += 25;
+            const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+
             return {
               id: p.id, title: p.title, status: p.status,
               published: !!p.published_at,
               price: variants[0]?.price ?? "0.00",
               compareAtPrice: variants[0]?.compare_at_price || null,
               variantCount: variants.length,
-              imageCount: (p.images as unknown[])?.length ?? 0,
+              imageCount: imgCount,
+              imageUrl: images[0]?.src || null,
               tags: p.tags,
+              tagsCount: tagsArr.length,
+              descriptionLength: bodyLen,
               product_type: p.product_type || null,
+              auditScore: score,
+              auditGrade: grade,
+              hasComparePrice: hasCompare,
             };
           }),
           total: allProds.length,

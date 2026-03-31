@@ -19,6 +19,7 @@ import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
+import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 
 const router = Router();
 
@@ -306,20 +307,36 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   const withSchema = seoData.filter(s => s.hasSchema).length;
   const withAltTexts = seoData.filter(s => s.hasAltTexts).length;
 
-  let productRows = "";
-  for (const p of products) {
+  const seoProductCards: ProductCardData[] = products.map(p => {
     const seo = seoMap.get(p.shopifyProductId);
-    const score = seo?.seoScore ?? 0;
-    const grade = seo?.seoGrade ?? "—";
-    productRows += `<tr><!-- nosemgrep -->
-      <td style="font-weight:500;">${sanitizeHtml(p.title)}</td><!-- nosemgrep -->
-      <td><span class="grade ${gradeClass(grade)}">${grade}</span></td><!-- nosemgrep -->
-      <td><div style="display:flex;align-items:center;gap:8px;"><span>${Math.round(score)}</span><div class="score-bar" style="width:80px;"><div class="score-fill" style="width:${score}%;background:${scoreColor(score)};"></div></div></div></td><!-- nosemgrep -->
-      <td>${seo?.hasSchema ? "✅" : "❌"}</td>
-      <td>${seo?.hasAltTexts ? "✅" : "❌"}</td>
-      <td class="text-muted">${sanitizeHtml(seo?.metaTitle?.slice(0, 40) ?? "Sin meta title")}${(seo?.metaTitle?.length ?? 0) > 40 ? "…" : ""}</td><!-- nosemgrep -->
-    </tr>`;
-  }
+    const imgs = (p.imagesJson as Array<{ src?: string }> | null) ?? [];
+    const tagsArr = (p.tags || "").split(",").filter(t => t.trim());
+    return {
+      title: p.title,
+      status: p.status,
+      price: p.price || "0",
+      compareAtPrice: p.compareAtPrice,
+      imageUrl: imgs[0]?.src || null,
+      imageCount: p.imageCount ?? 0,
+      descriptionLength: (p.bodyHtml || "").length,
+      tagsCount: tagsArr.length,
+      tags: p.tags || "",
+      variantCount: p.variantCount ?? 1,
+      published: !!p.publishedAt,
+      auditScore: seo?.seoScore ?? 0,
+      auditGrade: seo?.seoGrade ?? "D",
+      hasComparePrice: !!p.compareAtPrice,
+      hasMetaTitle: !!seo?.metaTitle && seo.metaTitle.length > 10,
+      hasMetaDesc: !!seo?.metaDescription && seo.metaDescription.length > 10,
+      hasSchema: !!seo?.hasSchema,
+      hasAltTexts: !!seo?.hasAltTexts,
+      cleanHandle: !!seo?.cleanHandle,
+      seoScore: seo?.seoScore ?? 0,
+      productType: p.productType,
+      vendor: p.vendor,
+    };
+  });
+  const seoProductCardsHtml = buildProductCardsSection(seoProductCards, "Detalle SEO por Producto");
 
   const gradeDistribution: Record<string, number> = {};
   seoData.forEach(s => {
@@ -366,13 +383,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
     </div>
 
     <div class="section">
-      <div class="section-title">Detalle por Producto</div>
-      <div class="card" style="overflow-x:auto;">
-        <table>
-          <thead><tr><th>Producto</th><th>Grado</th><th>Score</th><th>Schema</th><th>Alt Texts</th><th>Meta Title</th></tr></thead>
-          <tbody>${productRows}</tbody><!-- nosemgrep -->
-        </table>
-      </div>
+      ${seoProductCardsHtml}
     </div>`;
 
   const html = reportShell("Informe SEO Técnico", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
@@ -1270,39 +1281,71 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>`;
   }
 
-  let seoDetailRows = "";
-  for (const a of liveAudit.slice(0, 60)) {
-    seoDetailRows += `<tr>
-      <td style="font-weight:600;">${esc(a.product.title).slice(0, 45)}</td>
-      <td><span class="grade ${gradeClass(a.grade)}">${a.grade}</span></td>
-      <td>${a.score}</td>
-      <td>${a.hasMetaTitle ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
-      <td>${a.hasMetaDesc ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
-      <td>${a.hasSchema ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
-      <td>${a.hasAltTexts ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
-      <td>${a.cleanHandle ? '<span class="text-jade">&#10003;</span>' : '<span class="text-red">&#10007;</span>'}</td>
-      <td>${a.descLen}</td>
-    </tr>`;
-  }
+  const seoCardsList: ProductCardData[] = liveAudit.slice(0, 60).map(a => {
+    const imgs = (a.product.imagesJson as Array<{ src?: string }> | null) ?? [];
+    const tagsArr = (a.product.tags || "").split(",").filter(t => t.trim());
+    return {
+      title: a.product.title,
+      status: a.product.status,
+      price: a.product.price || "0",
+      compareAtPrice: a.product.compareAtPrice,
+      imageUrl: imgs[0]?.src || null,
+      imageCount: a.product.imageCount ?? 0,
+      descriptionLength: a.descLen,
+      tagsCount: tagsArr.length,
+      tags: a.product.tags || "",
+      variantCount: a.product.variantCount ?? 1,
+      published: !!a.product.publishedAt,
+      auditScore: a.score,
+      auditGrade: a.grade,
+      hasComparePrice: !!a.product.compareAtPrice,
+      hasMetaTitle: a.hasMetaTitle,
+      hasMetaDesc: a.hasMetaDesc,
+      hasSchema: a.hasSchema,
+      hasAltTexts: a.hasAltTexts,
+      cleanHandle: a.cleanHandle,
+      seoScore: a.score,
+      productType: a.product.productType,
+      vendor: a.product.vendor,
+    };
+  });
+  const seoDetailCardsHtml = buildProductCardsSection(seoCardsList, "Analisis SEO por Producto");
 
-  let productRows = "";
-  for (const p of products.slice(0, 60)) {
+  const catalogCardsList: ProductCardData[] = products.slice(0, 60).map(p => {
     const seo = seoMap.get(p.shopifyProductId);
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
     const audit = liveAudit.find(a => a.product.shopifyProductId === p.shopifyProductId);
-    productRows += `<tr>
-      <td style="font-weight:600;">${esc(p.title)}</td>
-      <td>${p.status === "active" ? '<span class="tag tag-jade">Activo</span>' : p.status === "draft" ? '<span class="tag">Borrador</span>' : p.status === "archived" ? '<span class="tag" style="background:#ff9800;color:#fff;">Archivado</span>' : `<span class="tag">${p.status || "?"}</span>`}</td>
-      <td style="font-weight:600;">${price > 0 ? price.toFixed(2) + "€" : "—"}</td>
-      <td>${cogs ? cogs.totalCogs.toFixed(2) + "€" : '<span class="text-muted fs-sm">Sin datos</span>'}</td>
-      <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
-      <td>${audit ? `<span class="grade ${gradeClass(audit.grade)}">${audit.grade}</span>` : "—"}</td>
-      <td>${p.auditScore != null ? Math.round(p.auditScore) : "—"}</td>
-      <td>${p.imageCount ?? 0}</td>
-    </tr>`;
-  }
+    const imgs = (p.imagesJson as Array<{ src?: string }> | null) ?? [];
+    const tagsArr = (p.tags || "").split(",").filter(t => t.trim());
+    return {
+      title: p.title,
+      status: p.status,
+      price: p.price || "0",
+      compareAtPrice: p.compareAtPrice,
+      imageUrl: imgs[0]?.src || null,
+      imageCount: p.imageCount ?? 0,
+      descriptionLength: (p.bodyHtml || "").length,
+      tagsCount: tagsArr.length,
+      tags: p.tags || "",
+      variantCount: p.variantCount ?? 1,
+      published: !!p.publishedAt,
+      auditScore: audit?.score ?? (p.auditScore ?? 0),
+      auditGrade: audit?.grade ?? (p.auditGrade ?? "D"),
+      hasComparePrice: !!p.compareAtPrice,
+      hasMetaTitle: !!seo?.metaTitle && seo.metaTitle.length > 10,
+      hasMetaDesc: !!seo?.metaDescription && seo.metaDescription.length > 10,
+      hasSchema: !!seo?.hasSchema,
+      hasAltTexts: !!seo?.hasAltTexts,
+      cleanHandle: !!seo?.cleanHandle,
+      cogs: cogs ? cogs.totalCogs : null,
+      margin,
+      productType: p.productType,
+      vendor: p.vendor,
+    };
+  });
+  const catalogCardsHtml = buildProductCardsSection(catalogCardsList, "Catalogo Completo");
 
   let cogsDetailRows = "";
   for (const p of products.slice(0, 60)) {
@@ -1607,13 +1650,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           <div class="metric"><div class="value">${withAltTexts}<span style="font-size:14px;color:${BRAND.muted};">/${products.length}</span></div><div class="label">Alt Texts</div></div>
         </div>
         ${Object.keys(seoGrades).length > 0 ? `<div class="card"><div class="stat-item-label" style="margin-bottom:12px;">Distribucion de grados SEO</div>${gradeBreakdown}</div>` : ""}
-        <div class="card" style="overflow-x:auto;">
-          <div class="stat-item-label" style="margin-bottom:12px;">Detalle SEO por producto</div>
-          <table>
-            <thead><tr><th>Producto</th><th>Grade</th><th>Score</th><th>Title</th><th>Desc</th><th>Schema</th><th>Alt</th><th>Handle</th><th>Chars</th></tr></thead>
-            <tbody>${seoDetailRows}</tbody>
-          </table>
-        </div>
+        ${seoDetailCardsHtml}
         ${aiBlock("seoDeepAnalysis")}
       </div>
     </div>
@@ -1806,21 +1843,11 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       </div>
     </div>
 
-    <!-- PAGE 9: FULL PRODUCT TABLE -->
+    <!-- PAGE 9: FULL PRODUCT CARDS -->
     <div class="report-page">
       ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 9 : 8)}
       <div class="section">
-        <div class="section-header">
-          <div class="section-icon section-icon-blue">&#128203;</div>
-          <div class="section-title">Catalogo Completo</div>
-          <div class="section-count">${products.length} productos</div>
-        </div>
-        <div class="card" style="overflow-x:auto;">
-          <table>
-            <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
-            <tbody>${productRows || '<tr><td colspan="8" class="text-muted" style="text-align:center;">Sin productos importados</td></tr>'}</tbody>
-          </table>
-        </div>
+        ${catalogCardsHtml || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
       </div>
     </div>`;
 
