@@ -1111,7 +1111,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
 
     const now = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-    const html = `<!DOCTYPE html> // nosemgrep
+    const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">

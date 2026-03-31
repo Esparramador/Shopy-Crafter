@@ -364,7 +364,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   let recommendationsHtml = issues.map(i => `<div class="recommendation">${i}</div>`).join(""); // nosemgrep
   if (issues.length === 0) recommendationsHtml = `<div class="recommendation" style="border-left-color:${BRAND.jade};">✅ Excelente: No se detectaron problemas críticos de SEO.</div>`; // nosemgrep
 
-  const body = ` // nosemgrep
+  const body = `
     <div class="metric-row">
       <div class="metric"><div class="value">${totalProducts}</div><div class="label">Productos</div></div><!-- nosemgrep -->
       <div class="metric"><div class="value">${Math.round(avgScore)}</div><div class="label">Score SEO medio</div></div><!-- nosemgrep -->
@@ -447,7 +447,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
   });
   const catalogCardsHtmlCatalog = buildProductCardsSection(catalogCards, "Catalogo Completo");
 
-  const body = ` // nosemgrep
+  const body = `
     <div class="metric-row">
       <div class="metric"><div class="value">${totalProducts}</div><div class="label">Total productos</div></div><!-- nosemgrep -->
       <div class="metric"><div class="value">${activeProducts}</div><div class="label">Activos</div></div><!-- nosemgrep -->
@@ -567,7 +567,7 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
     ? { min: Math.min(...products.map(p => parseFloat(p.price ?? "0"))), max: Math.max(...products.map(p => parseFloat(p.price ?? "0"))) }
     : { min: 0, max: 0 };
 
-  const body = ` // nosemgrep
+  const body = `
     <div class="section">
       <div class="section-title">Identidad de Marca</div>
       <div class="card">
@@ -652,7 +652,7 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
     </tr>`;
   }
 
-  const body = ` // nosemgrep
+  const body = `
     <div class="metric-row">
       <div class="metric"><div class="value">${totalTests}</div><div class="label">Tests totales</div></div><!-- nosemgrep -->
       <div class="metric"><div class="value">${active}</div><div class="label">Activos</div></div><!-- nosemgrep -->
