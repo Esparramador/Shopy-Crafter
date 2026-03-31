@@ -569,7 +569,7 @@ export default function Landing() {
                       <div className="l-dot" style={{ background: "#ffbd2e" }}></div>
                       <div className="l-dot" style={{ background: "#28ca41" }}></div>
                     </div>
-                    <div className="l-preview-url">{content.hero.demo?.url ?? "app.shopifyai.pro/admin — Moda Urbana"}</div>
+                    <div className="l-preview-url">{content.hero.demo?.url ?? "app.shopycrafter.com/admin — Moda Urbana"}</div>
                     <div className="l-preview-status"><div className="l-status-dot"></div>{content.hero.demo?.status ?? "6 motores activos"}</div>
                   </div>
                   <div className="l-preview-body">
@@ -795,7 +795,7 @@ export default function Landing() {
               ))}
             </div>
             <div className={`fp-tech-logos ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.25s" }}>
-              {(content.results?.techBadges ?? [{ icon: "🛍️", label: "Shopify API" }, { icon: "🤖", label: "Claude AI" }, { icon: "🎨", label: "Replicate" }, { icon: "🔍", label: "GSC" }, { icon: "📧", label: "Klaviyo" }, { icon: "🔐", label: "AES-256" }, { icon: "⚡", label: "Shopify Flow" }]).map((badge, i) => (
+              {(content.results?.techBadges ?? [{ icon: "🛍️", label: "eCommerce API" }, { icon: "🤖", label: "Claude AI" }, { icon: "🎨", label: "Replicate" }, { icon: "🔍", label: "GSC" }, { icon: "📧", label: "Klaviyo" }, { icon: "🔐", label: "AES-256" }, { icon: "⚡", label: "Automation" }]).map((badge, i) => (
                 <div key={i} className="fp-tech-badge">
                   <span>{badge.icon}</span>
                   <span>{badge.label}</span>
@@ -1042,10 +1042,10 @@ export default function Landing() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.storeUrl ?? "URL de tu tienda Shopify"}</label>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.storeUrl ?? "URL de tu tienda online"}</label>
                       <input
                         type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
-                        placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.myshopify.com"}
+                        placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.com"}
                         style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                         onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                         onBlur={e => e.target.style.borderColor = "var(--ink3)"}

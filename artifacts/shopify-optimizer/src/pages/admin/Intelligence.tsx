@@ -164,7 +164,7 @@ export default function Intelligence() {
             }}
           >
             <ShoppingCart size={14} />
-            {syncing ? "Sincronizando..." : "Sincronizar desde Shopify"}
+            {syncing ? "Sincronizando..." : "Sincronizar tienda"}
           </button>
           <button className="btn-primary" onClick={runAnalysis} disabled={analyzing || !selectedProject}
             style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -197,7 +197,7 @@ export default function Intelligence() {
       <ReferenceMediaPanel
         projectId={selectedProject ? parseInt(selectedProject) : undefined}
         onIntelligenceReady={setReferenceIntelligence}
-        context="Análisis de revenue e inteligencia de negocio Shopify"
+        context="Análisis de revenue e inteligencia de negocio eCommerce"
         collapsed
       />
 

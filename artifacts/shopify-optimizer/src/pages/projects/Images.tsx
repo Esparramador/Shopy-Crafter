@@ -139,7 +139,7 @@ function PromptModal({
                 { onSuccess: (d) => setPromptData(d as typeof promptData) }
               );
             }}
-            context={`Generación de imagen tipo "${IMAGE_TYPES.find(t => t.id === imageType)?.label}" para producto Shopify`}
+            context={`Generación de imagen tipo "${IMAGE_TYPES.find(t => t.id === imageType)?.label}" para producto eCommerce`}
             collapsed
           />
 

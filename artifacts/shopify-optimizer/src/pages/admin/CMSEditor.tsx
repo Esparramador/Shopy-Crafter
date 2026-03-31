@@ -42,7 +42,7 @@ const SECTIONS: SectionDef[] = [
     id: "site", icon: "🌐", label: "Sitio",
     fields: [
       { label: "Nombre", path: "site.name", type: "text", placeholder: "Shopy Crafter" },
-      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "Optimización IA para tu tienda Shopify" },
+      { label: "Tagline", path: "site.tagline", type: "text", placeholder: "Optimización IA para tu tienda online" },
       { label: "Logo tipo", path: "site.logo.type", type: "text", placeholder: "emoji", hint: "emoji o image" },
       { label: "Emoji/Logo", path: "site.logo.value", type: "text", placeholder: "⚡" },
       { label: "Logo imagen", path: "site.logo.imageUrl", type: "image", hint: "Sube una imagen para reemplazar el emoji del logo" },

@@ -58,7 +58,7 @@ export default function AdminSettings() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error guardando");
-      setShopifySuccess("¡Credenciales guardadas! Ya puedes vincular tiendas Shopify.");
+      setShopifySuccess("¡Credenciales guardadas! Ya puedes vincular tiendas.");
       setShopifyClientId("");
       setShopifyClientSecret("");
       const updated = await fetch(`${API_BASE}/api/admin/shopify-config`, { credentials: "include" }).then(r => r.json());
@@ -341,8 +341,8 @@ export default function AdminSettings() {
             <Store size={18} style={{ color: "#60b841" }} />
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Conexión Shopify OAuth</p>
-            <p style={{ fontSize: 12, color: "var(--t2)" }}>Configura las credenciales de tu app de Shopify Partners para vincular tiendas automáticamente</p>
+            <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Conexión OAuth eCommerce</p>
+            <p style={{ fontSize: 12, color: "var(--t2)" }}>Configura las credenciales de tu app para vincular tiendas automáticamente</p>
           </div>
           <div style={{
             display: "flex", alignItems: "center", gap: 6,

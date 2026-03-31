@@ -14,7 +14,7 @@ const STEPS: CoachStep[] = [
   {
     selector: ".sidebar-clients",
     title: "Tus Tiendas",
-    description: "Aquí verás todas las tiendas Shopify que gestiones. Cada una tiene su propio panel de optimización.",
+    description: "Aquí verás todas las tiendas que gestiones. Cada una tiene su propio panel de optimización.",
     position: "right",
   },
   {

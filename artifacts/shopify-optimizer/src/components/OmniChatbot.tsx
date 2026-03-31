@@ -438,7 +438,7 @@ function AbsorbResultCard({ data }: { data: AbsorbResult }) {
     { key: "technical_chemical_composition", label: "Composición Técnica/Química", icon: <Cpu size={10} /> },
     { key: "brand_marketing_intelligence", label: "Inteligencia de Marca", icon: <ZapIcon size={10} /> },
     { key: "ecommerce_conversion_signals", label: "Señales eCommerce", icon: <ZapIcon size={10} /> },
-    { key: "actionable_insights_for_shopify", label: "Insights Shopify", icon: <Brain size={10} /> },
+    { key: "actionable_insights_for_shopify", label: "Insights eCommerce", icon: <Brain size={10} /> },
   ].filter(s => a[s.key]);
 
   return (
@@ -696,7 +696,7 @@ function EntityResearchCard({ data }: { data: EntityResearchResult }) {
           <div>
             {p.shopifyOpportunities && p.shopifyOpportunities.length > 0 && (
               <div style={{ marginBottom: 8 }}>
-                <p style={{ margin: "0 0 5px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>🛒 Shopify</p>
+                <p style={{ margin: "0 0 5px", fontWeight: 700, color: "var(--gold)", fontSize: 9, textTransform: "uppercase" }}>🛒 eCommerce</p>
                 {p.shopifyOpportunities.map((o, i) => <p key={i} style={{ margin: "3px 0", color: "var(--t2)", lineHeight: 1.4 }}>· {o}</p>)}
               </div>
             )}
@@ -866,9 +866,9 @@ function AttachmentPreview({ file, url, onRemove }: {
 const QUICK_ACTIONS = [
   { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
   { icon: "🏪", label: "Estado de la tienda", prompt: "Muéstrame el estado de la tienda: productos, pedidos y estado del token." },
-  { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda Shopify." },
-  { icon: "➕", label: "Crear producto", prompt: "Crea un producto nuevo en Shopify con IA. Título: " },
-  { icon: "🔑", label: "Regenerar token", prompt: "Regenera el token de acceso de Shopify ahora." },
+  { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda." },
+  { icon: "➕", label: "Crear producto", prompt: "Crea un producto nuevo con IA. Título: " },
+  { icon: "🔑", label: "Regenerar token", prompt: "Regenera el token de acceso de la tienda ahora." },
   { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
   { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
   { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
@@ -876,9 +876,9 @@ const QUICK_ACTIONS = [
   { icon: "⚖️", label: "Auditoría Copyright", prompt: "Realiza una auditoría de copyright y marcas registradas de todos los productos de la tienda. Identifica posibles infracciones y sugiere nombres alternativos seguros." },
 ];
 
-const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización Shopify.
+const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce.
 Tienes acceso a tres motores de análisis: investigación de mercado, análisis estratégico y memoria permanente.
-Eres experto en: Shopify, Klaviyo, email marketing, SEO, pricing, eCommerce, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
+Eres experto en: eCommerce, Klaviyo, email marketing, SEO, pricing, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
 Cuando el usuario comparte una imagen o URL, puedes absorberla y extraer TODA la inteligencia posible.
 También eres el ASISTENTE DE NAVEGACIÓN de la app: conoces TODAS las páginas, botones y funciones. Cuando te pregunten cómo hacer algo, guía paso a paso con nombres EXACTOS de botones y secciones.
 IMPORTANTE: Siempre refiérete a la plataforma como "Shopy Crafter". Nunca uses nombres internos.
@@ -895,13 +895,13 @@ export default function OmniChatbot() {
     id: "welcome", role: "assistant", timestamp: new Date(), model: "omnicore",
     content: `¡Hola${user?.name ? ` ${user.name.split(" ")[0]}` : ""}! 👋 Soy el asistente inteligente de **Shopy Crafter**.
 
-🚀 **Ahora puedo EJECUTAR acciones en Shopify directamente:**
+🚀 **Ahora puedo EJECUTAR acciones en tu tienda directamente:**
 · ➕ "Crea un producto llamado X" — lo creo en tu tienda
 · 📦 "Lista mis productos" — te los muestro todos
-· 💰 "Cambia el precio de X a Y" — actualizo en Shopify
+· 💰 "Cambia el precio de X a Y" — actualizo en tu tienda
 · 🔑 "Regenera el token" — renuevo acceso automáticamente
 · 🛒 "Ver pedidos" — últimos pedidos de la tienda
-· 🗑️ "Elimina el producto X" — lo borro de Shopify
+· 🗑️ "Elimina el producto X" — lo borro de tu tienda
 · 🔐 "Ver scopes" — permisos activos de la app
 
 **También absorbo y analizo:**
@@ -1065,7 +1065,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return msg;
       }
       case "create_product":
-        return `✅ **Producto creado en Shopify:**\n🆔 ID: ${result.productId}\n📝 "${result.title}"\n📊 Estado: ${result.status}`;
+        return `✅ **Producto creado en tu tienda:**\n🆔 ID: ${result.productId}\n📝 "${result.title}"\n📊 Estado: ${result.status}`;
       case "edit_product": {
         const preIss = (result.preAuditIssues as string[]) || [];
         const postIss = (result.postAuditIssues as string[]) || [];
@@ -1088,7 +1088,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (result.requiresConfirmation || result.success === false) {
           return `⚠️ ${result.message || "No se pudo eliminar el producto. Confirma la acción e inténtalo de nuevo."}`;
         }
-        return `🗑️ Producto ${result.productId} eliminado de Shopify.`;
+        return `🗑️ Producto ${result.productId} eliminado de tu tienda.`;
       case "search_product": {
         const searchProds = (result.products as Array<{ title: string; id: number; price: string; status: string; compareAtPrice?: string; published?: boolean; auditScore?: number; auditGrade?: string; imageCount?: number; imageUrl?: string; descriptionLength?: number; tagsCount?: number; variantCount?: number; hasComparePrice?: boolean; issues?: string[] }>) ?? [];
         if (!searchProds.length) return "🔍 No se encontraron productos.";
@@ -1281,7 +1281,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         let msg = `🎯 **${result.plansGenerated} planes de precio generados**\n\n`;
         msg += plans.map((p, i) => `${i + 1}. **${p.name}** — ${p.price}${p.featured ? " ⭐" : ""}${p.badge ? ` [${p.badge}]` : ""}`).join("\n");
         if (result.cmsUpdated) msg += `\n\n✅ CMS actualizado con los nuevos planes`;
-        if (result.shopifyProductsCreated) msg += `\n🛍️ ${result.shopifyProductsCreated} productos creados en Shopify`;
+        if (result.shopifyProductsCreated) msg += `\n🛍️ ${result.shopifyProductsCreated} productos creados en tu tienda`;
         if (result.strategy) msg += `\n\n🧠 ${result.strategy}`;
         if (result.competitorsAnalyzed) msg += `\n📊 ${result.competitorsAnalyzed} competidores analizados`;
         return msg;
@@ -1295,7 +1295,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "redesign_product":
         return `🎨 **Rediseño IA completado:**\n📝 "${result.newTitle || result.title}"\n📄 Descripción: ${result.descriptionLength || "?"} chars con ${result.sectionsGenerated || 8} secciones\n🏷 ${result.tagsCount || "?"} tags SEO\n📸 ${result.photoBriefs || 0} briefs de fotografía\n\n${result.message || "Listo para aplicar con apply_redesign."}`;
       case "apply_redesign":
-        return `✅ **Rediseño aplicado en Shopify:**\n📝 "${result.title}"\n📊 Título + Descripción + Tags + SEO actualizados\n${result.message || ""}`;
+        return `✅ **Rediseño aplicado en tu tienda:**\n📝 "${result.title}"\n📊 Título + Descripción + Tags + SEO actualizados\n${result.message || ""}`;
       case "bulk_redesign":
         return `🎨 **Rediseño masivo completado:**\n📦 ${result.total || "?"} productos procesados\n✅ ${result.redesigned || "?"} rediseñados\n${result.failed ? `❌ ${result.failed} errores` : ""}\n${result.message || ""}`;
       case "seo_full_audit":
@@ -1376,13 +1376,13 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "brain_sync":
         return `🧠 **Brain sincronizado:**\n${result.message || "Conocimiento actualizado."}`;
       case "inventory_sync":
-        return `📦 **Inventario sincronizado:**\n${result.message || "Stock actualizado desde Shopify."}`;
+        return `📦 **Inventario sincronizado:**\n${result.message || "Stock actualizado desde tu tienda."}`;
       case "inventory_alerts":
         return `⚠️ **Alertas de inventario:**\n${result.message || "Verificación de stock completada."}`;
       case "inventory_deep_report":
         return `📦 **Informe profundo de inventario:**\n${result.message || "Análisis completo de stock generado."}`;
       case "inventory_sync_orders":
-        return `📋 **Pedidos sincronizados:**\n${result.message || "Datos de ventas importados de Shopify."}`;
+        return `📋 **Pedidos sincronizados:**\n${result.message || "Datos de ventas importados de tu tienda."}`;
       case "inventory_sales_analytics":
         return `📈 **Analytics de ventas:**\n${result.message || "Análisis de ventas por producto, variante y cliente."}`;
       case "inventory_customer_history":
@@ -1528,7 +1528,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const wantsProduct = content && attachType === "image" && isProductCreationIntent(content) && projectIdFromUrl;
 
         if (wantsProduct && attachFile) {
-          setMessages(m => [...m, { id: uuid(), role: "assistant", content: `🚀 **Creando producto desde imagen** — ${attachName}\n\n**Paso 1** — Claude Vision analiza el producto en profundidad\n**Paso 2** — Gemini investiga precios REALES del mercado (búsquedas Google)\n**Paso 3** — Claude genera copywriting profesional optimizado\n**Paso 4** — Se crea el producto en Shopify con la imagen\n\n_⏱️ Esto puede tardar 30-60 segundos. Investigando precios reales..._`, timestamp: new Date(), model: "gemini+claude+brain" }]);
+          setMessages(m => [...m, { id: uuid(), role: "assistant", content: `🚀 **Creando producto desde imagen** — ${attachName}\n\n**Paso 1** — Claude Vision analiza el producto en profundidad\n**Paso 2** — Gemini investiga precios REALES del mercado (búsquedas Google)\n**Paso 3** — Claude genera copywriting profesional optimizado\n**Paso 4** — Se crea el producto en tu tienda con la imagen\n\n_⏱️ Esto puede tardar 30-60 segundos. Investigando precios reales..._`, timestamp: new Date(), model: "gemini+claude+brain" }]);
 
           const formData = new FormData();
           formData.append("file", attachFile);
@@ -1545,7 +1545,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             const pr = prodData.pricing;
             const an = prodData.analysis;
 
-            assistantContent = `✅ **Producto creado en Shopify**\n\n`;
+            assistantContent = `✅ **Producto creado en tu tienda**\n\n`;
             assistantContent += `📦 **${p.title}**\n`;
             assistantContent += `🏷️ ID: \`${p.id}\` | Estado: \`${p.status}\`\n\n`;
 
@@ -1710,12 +1710,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           assistantContent = d.answer ?? d.result ?? "No pude procesar la respuesta.";
 
           const longActions: Record<string, string> = {
-            generate_competitive_pricing: "🔍 **Investigación de mercado en curso...**\n\n**Paso 1** — Buscando precios reales de competidores con Google Search\n**Paso 2** — Analizando posicionamiento del mercado\n**Paso 3** — Generando catálogo de precios competitivo\n**Paso 4** — Actualizando CMS y creando productos en Shopify\n\n_⏱️ Esto toma 30-90 segundos. Investigando datos reales del mercado..._",
-            copyright_audit: "⚖️ **Auditoría de Copyright en curso...**\n\n**Paso 1** — Cargando catálogo completo de Shopify\n**Paso 2** — Analizando cada producto buscando marcas registradas y derechos de autor\n**Paso 3** — Generando sugerencias de nombres alternativos\n\n_⏱️ 15-30 segundos..._",
+            generate_competitive_pricing: "🔍 **Investigación de mercado en curso...**\n\n**Paso 1** — Buscando precios reales de competidores con Google Search\n**Paso 2** — Analizando posicionamiento del mercado\n**Paso 3** — Generando catálogo de precios competitivo\n**Paso 4** — Actualizando CMS y creando productos en tu tienda\n\n_⏱️ Esto toma 30-90 segundos. Investigando datos reales del mercado..._",
+            copyright_audit: "⚖️ **Auditoría de Copyright en curso...**\n\n**Paso 1** — Cargando catálogo completo de la tienda\n**Paso 2** — Analizando cada producto buscando marcas registradas y derechos de autor\n**Paso 3** — Generando sugerencias de nombres alternativos\n\n_⏱️ 15-30 segundos..._",
             audit_app_offerings: "🔍 **Auditando la oferta de Shopy Crafter...**\n\n**Paso 1** — Leyendo planes y features actuales del CMS\n**Paso 2** — Comparando con capacidades reales de la plataforma\n**Paso 3** — Analizando pricing vs. valor entregado\n**Paso 4** — Generando recomendaciones estratégicas\n\n_⏱️ Analizando... 15-30 segundos._",
-            scan_store: "📊 **Escaneando tienda Shopify...**\n\n**Paso 1** — Conectando con Shopify API\n**Paso 2** — Descargando catálogo completo\n**Paso 3** — Analizando calidad de cada producto\n\n_⏱️ Dependiendo del catálogo, 10-60 segundos..._",
-            optimize_all_products: "🧠 **Optimización masiva con IA...**\n\n**Paso 1** — Cargando productos de Shopify\n**Paso 2** — Claude genera SEO + copywriting para cada producto\n**Paso 3** — Actualizando títulos, descripciones, tags y meta\n\n_⏱️ ~5 segundos por producto..._",
-            design_all_pages: "📄 **Diseñando páginas de la tienda...**\n\n**Paso 1** — Analizando nicho y marca\n**Paso 2** — Claude genera contenido profesional para cada página\n**Paso 3** — Creando páginas en Shopify\n\n_⏱️ ~10 segundos por página..._",
+            scan_store: "📊 **Escaneando tienda...**\n\n**Paso 1** — Conectando con la API de tu tienda\n**Paso 2** — Descargando catálogo completo\n**Paso 3** — Analizando calidad de cada producto\n\n_⏱️ Dependiendo del catálogo, 10-60 segundos..._",
+            optimize_all_products: "🧠 **Optimización masiva con IA...**\n\n**Paso 1** — Cargando productos de tu tienda\n**Paso 2** — Claude genera SEO + copywriting para cada producto\n**Paso 3** — Actualizando títulos, descripciones, tags y meta\n\n_⏱️ ~5 segundos por producto..._",
+            design_all_pages: "📄 **Diseñando páginas de la tienda...**\n\n**Paso 1** — Analizando nicho y marca\n**Paso 2** — Claude genera contenido profesional para cada página\n**Paso 3** — Creando páginas en tu tienda\n\n_⏱️ ~10 segundos por página..._",
             search_suppliers: "🔍 **Investigando proveedores...**\n\n**Paso 1** — 6 búsquedas Google paralelas (proveedores, fábricas, mayoristas...)\n**Paso 2** — Analizando costes, MOQs y tiempos de entrega\n**Paso 3** — Claude genera informe estratégico\n\n_⏱️ 30-60 segundos..._",
             diagnose_app: "🔬 **Diagnóstico de la app en curso...**\n\n**Paso 1** — Verificando tokens y conectividad\n**Paso 2** — Comprobando sincronización de datos\n**Paso 3** — Reparando automáticamente lo que sea posible\n\n_⏱️ 10-20 segundos..._",
             create_product: "🛍️ **Creando producto profesional 100/100...**\n\n**Paso 1** — Investigando precios del mercado real\n**Paso 2** — Claude genera título SEO + descripción 800-1200 palabras\n**Paso 3** — Generando tags, meta tags y schema\n**Paso 4** — Generando imágenes IA profesionales\n\n_⏱️ ~15-30 segundos por producto..._",
@@ -1774,7 +1774,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
 
       setMessages(m => {
-        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda Shopify", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA"];
+        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA"];
         const filtered = m.filter(msg => !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });

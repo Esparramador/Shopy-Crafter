@@ -148,7 +148,7 @@ export default function MyPricing() {
       const data = await r.json();
       setPushResult(data);
     } catch {
-      setPushResult({ success: false, message: "Error de conexión al intentar hacer push a Shopify" });
+      setPushResult({ success: false, message: "Error de conexión al sincronizar con la tienda" });
     } finally {
       setPushing(false);
     }
@@ -270,7 +270,7 @@ ${c.validity ? `<p><strong>Validez:</strong> ${c.validity}</p>` : ""}
 ${c.includesRevisions ? `<p><strong>Revisiones:</strong> ${c.includesRevisions}</p>` : ""}
 ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""}
 </div>
-<div class="footer"><div class="stamp">PRESUPUESTO</div><p style="margin-top:12px">Shopy Crafter · Agencia de Optimización Shopify con IA</p></div>
+<div class="footer"><div class="stamp">PRESUPUESTO</div><p style="margin-top:12px">Shopy Crafter · Agencia de Optimización eCommerce con IA</p></div>
 </body></html>`;
   };
 
@@ -299,7 +299,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
     { id: "costs", label: "Estructura de costes" },
     { id: "budget", label: "Presupuesto / Factura" },
     { id: "quote", label: "Propuesta rápida" },
-    { id: "shopify", label: "Shopify Sync" },
+    { id: "shopify", label: "Sync Tienda" },
   ];
 
   return (
@@ -319,7 +319,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
               color: "var(--jade)", cursor: "pointer", fontSize: 13, fontWeight: 600,
             }}>
               {pushing ? <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={14} />}
-              {pushing ? "Subiendo..." : "Push a Shopify"}
+              {pushing ? "Subiendo..." : "Sincronizar tienda"}
             </button>
             <button onClick={runAnalysis} disabled={analyzing} className="btn-primary">
               {analyzing ? <><RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> Analizando...</> : <><TrendingUp size={14} /> Analizar precios</>}

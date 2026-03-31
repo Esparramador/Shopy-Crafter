@@ -246,7 +246,7 @@ export default function RedesignPage() {
       },
       {
         onSuccess: () => {
-          toast({ title: "✓ Cambios aplicados en Shopify" });
+          toast({ title: "✓ Cambios aplicados en tu tienda" });
           queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
         },
         onError: () => toast({ title: "Error aplicando cambios", variant: "destructive" }),
@@ -337,7 +337,7 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
       <ReferenceMediaPanel
         projectId={projectId}
         onIntelligenceReady={setReferenceIntelligence}
-        context="Rediseño de producto Shopify — título, descripción, pricing y photo briefs"
+        context="Rediseño de producto eCommerce — título, descripción, pricing y photo briefs"
         collapsed
       />
       <GenerationProgress
@@ -578,7 +578,7 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
                           ) : (
                             <Check className="w-4 h-4" />
                           )}
-                          Aplicar a Shopify
+                          Aplicar cambios
                         </button>
 
                         {result.photoBriefs && result.photoBriefs.length > 0 && (

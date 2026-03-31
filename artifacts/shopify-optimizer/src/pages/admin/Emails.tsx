@@ -533,7 +533,7 @@ export default function Emails() {
                   <ReferenceMediaPanel
                     projectId={selectedProjectId ?? undefined}
                     onIntelligenceReady={setReferenceIntelligence}
-                    context="Email marketing de ecommerce Shopify"
+                    context="Email marketing de ecommerce"
                     collapsed
                   />
                   <GenerationProgress

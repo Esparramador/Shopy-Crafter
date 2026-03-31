@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, CheckCircle, Circle } from "lucide-react";
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const STEPS = [
-  { key: "store_connected", label: "Conectar tienda Shopify", icon: "🏪" },
+  { key: "store_connected", label: "Conectar tienda", icon: "🏪" },
   { key: "audit_run", label: "Ejecutar auditoría IA", icon: "📊" },
   { key: "image_generated", label: "Generar imágenes IA", icon: "🎨" },
   { key: "price_optimized", label: "Optimizar precios", icon: "💰" },

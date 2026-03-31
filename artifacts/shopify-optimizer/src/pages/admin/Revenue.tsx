@@ -285,7 +285,7 @@ export default function Revenue() {
       </div>
 
       <p style={{ fontSize: 12, color: "var(--t3)", marginTop: 20, textAlign: "center" }}>
-        La facturación real se gestiona vía Shopify Payments directamente con cada cliente · Este panel es solo de seguimiento
+        La facturación real se gestiona directamente con cada cliente · Este panel es solo de seguimiento
       </p>
     </div>
   );

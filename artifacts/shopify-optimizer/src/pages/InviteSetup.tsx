@@ -227,8 +227,8 @@ function StepCredentials({ inviteData, onDone }: { inviteData: InviteData; onDon
             },
             {
               n: "3",
-              title: "Conecta tu tienda Shopify",
-              desc: "En 'Configuración → Credenciales' podrás introducir o verificar que tu tienda Shopify está correctamente enlazada.",
+              title: "Conecta tu tienda online",
+              desc: "En 'Configuración → Credenciales' podrás introducir o verificar que tu tienda está correctamente enlazada.",
             },
             {
               n: "4",

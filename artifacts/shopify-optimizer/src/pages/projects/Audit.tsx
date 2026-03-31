@@ -156,7 +156,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-      setSuccessMsg("Producto actualizado en Shopify y re-auditado");
+      setSuccessMsg("Producto actualizado y re-auditado");
       setTimeout(() => {
         onUpdated();
         onClose();
@@ -189,7 +189,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
             </div>
             <div>
               <h2 className="text-lg font-bold text-foreground">Editar Producto</h2>
-              <p className="text-xs text-muted-foreground">Los cambios se aplican directamente en Shopify</p>
+              <p className="text-xs text-muted-foreground">Los cambios se aplican directamente en tu tienda</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
@@ -374,7 +374,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
             className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? "Guardando en Shopify..." : "Guardar Cambios"}
+            {saving ? "Guardando..." : "Guardar Cambios"}
           </button>
         </div>
       </motion.div>
@@ -462,7 +462,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
           const allValues = validOpts.map(o => o.values.split(",").map(v => v.trim()).filter(Boolean));
           const totalCombos = allValues.reduce((acc, v) => acc * v.length, 1);
           if (totalCombos > 100) {
-            setError(`Demasiadas combinaciones de variantes (${totalCombos}). Shopify permite máximo 100.`);
+            setError(`Demasiadas combinaciones de variantes (${totalCombos}). El máximo permitido es 100.`);
             setCreating(false);
             return;
           }
@@ -525,7 +525,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
           background: "linear-gradient(135deg, rgba(200,168,75,0.06), transparent)",
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--t1)" }}>Crear Producto en Shopify</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--t1)" }}>Crear Producto</h2>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>
               Se crea directamente en la tienda del cliente
             </p>
@@ -566,7 +566,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
                   background: "linear-gradient(135deg, #c8a84b, #e8c87b)", color: "#000",
                   borderRadius: 10, fontWeight: 700, fontSize: 13, textDecoration: "none",
                 }}>
-                <ExternalLink size={14} /> Ver en Shopify
+                <ExternalLink size={14} /> Ver en tienda
               </a>
               <button onClick={() => { setResult(null); setForm(INITIAL_FORM); }}
                 style={{
@@ -748,9 +748,9 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
               }}>
               {creating ? (
                 <><Loader2 size={15} style={{ animation: "spin 0.6s linear infinite" }} />
-                  {form.aiGenerate ? "Shopy Crafter generando contenido..." : "Creando en Shopify..."}</>
+                  {form.aiGenerate ? "Shopy Crafter generando contenido..." : "Creando producto..."}</>
               ) : (
-                <><Plus size={15} /> Crear producto en Shopify</>
+                <><Plus size={15} /> Crear producto</>
               )}
             </button>
           </div>
@@ -987,7 +987,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           >
             <RefreshCw className={`w-5 h-5 ${isScanning ? "animate-spin" : ""}`} />
             {scanStatus === "syncing"
-              ? "Sincronizando Shopify..."
+              ? "Sincronizando..."
               : scanStatus === "auditing"
               ? "Calculando scores..."
               : "Escanear Tienda"}

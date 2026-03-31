@@ -214,7 +214,7 @@ router.post("/versions/:id/restore", async (req: Request, res: Response) => {
 router.post("/ai/improve", async (req: Request, res: Response) => {
   try {
     const { text, instruction, context } = req.body as { text: string; instruction: string; context?: string };
-    const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: Shopy Crafter — plataforma independiente de optimización IA para tiendas Shopify, con OmniCore Brain (IA acumulativa). Shopy Crafter NO es Shopify ni está afiliada a Shopify Inc. Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
+    const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: Shopy Crafter — plataforma independiente de optimización IA para tiendas eCommerce, con OmniCore Brain (IA acumulativa). Shopy Crafter es una marca propia e independiente. Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
     const userPrompt = `Texto original: "${text}"\n\nInstrucción: ${instruction}\n${context ? `\nContexto adicional: ${context}` : ""}\n\nDevuelve solo el texto mejorado:`;
     const improved = await askClaudeWithBrain(0, [{ role: "user", content: userPrompt }], systemPrompt, "general", undefined, 1024);
 

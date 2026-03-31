@@ -303,7 +303,7 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     .set({ appliedAt: new Date(), appliedFields: fields })
     .where(eq(redesignsTable.id, redesign.id));
 
-  res.json({ success: true, message: "Cambios aplicados a Shopify correctamente" });
+  res.json({ success: true, message: "Cambios aplicados correctamente en tu tienda" });
 });
 
 router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void> => {

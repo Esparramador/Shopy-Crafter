@@ -233,7 +233,7 @@ export default function Forecast() {
             </div>
             <div className="grid-r3">
               {[
-                { title: "Datos reales de Shopify", description: "Shopy Crafter lee tus productos, precios, imágenes y resultados A/B directamente de la API de Shopify" },
+                { title: "Datos reales de tu tienda", description: "Shopy Crafter lee tus productos, precios, imágenes y resultados A/B directamente de la API de tu tienda" },
                 { title: "Análisis Claude IA", description: "Cada análisis pasa por Claude con contexto acumulado de memorias y aprendizajes anteriores de tu nicho" },
                 { title: "Sin inventar cifras", description: "Los valores monetarios solo aparecen cuando hay revenue real registrado. Sin datos históricos, se muestran insights cualitativos" },
               ].map(m => (

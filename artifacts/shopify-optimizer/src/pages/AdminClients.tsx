@@ -357,7 +357,7 @@ function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalPro
               style={{ flex: 2, justifyContent: "center" }}
             >
               {generating ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
-              {generating ? "Generando..." : "Generar link Shopify"}
+              {generating ? "Generando..." : "Generar link de pago"}
             </button>
           </div>
         </div>
@@ -764,7 +764,7 @@ export default function AdminClients() {
                         <button
                           onClick={() => setPaymentClient(u)}
                           className="btn btn-sm btn-ghost"
-                          title="Generar link de pago Shopify"
+                          title="Generar link de pago"
                           style={{ borderColor: "rgba(200,168,75,0.25)", color: "var(--gold)" }}
                         >
                           <ShoppingCart size={11} />

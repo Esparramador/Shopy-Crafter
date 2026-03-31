@@ -86,8 +86,8 @@ const COST_CATEGORIES: CostCategory[] = [
   {
     id: "platform", label: "Plataforma y Pagos", icon: "💳",
     fields: [
-      { key: "shopifyPaymentFee", label: "Comisión Shopify Payments", placeholder: "0.015", suffix: "%" },
-      { key: "shopifyPlanCostPerOrder", label: "Plan Shopify por pedido" },
+      { key: "shopifyPaymentFee", label: "Comisión pasarela de pago", placeholder: "0.015", suffix: "%" },
+      { key: "shopifyPlanCostPerOrder", label: "Coste plataforma por pedido" },
       { key: "paymentProcessingFee", label: "Comisión pasarela pago" },
       { key: "platformCommission", label: "Comisión marketplace / plataforma" },
     ],
@@ -293,7 +293,7 @@ function CogsModal({
     applyPrice.mutate(
       { projectId, productId: product.id, data: { price: String(price), compareAtPrice: compareAt ? String(compareAt) : undefined } },
       {
-        onSuccess: () => { toast({ title: "Precio aplicado en Shopify" }); onClose(); },
+        onSuccess: () => { toast({ title: "Precio aplicado en tu tienda" }); onClose(); },
         onError: () => toast({ title: "Error aplicando precio", variant: "destructive" }),
       }
     );
@@ -657,7 +657,7 @@ function CogsModal({
                 className="w-full bg-green-500 text-black py-2.5 rounded-xl text-sm font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {applyPrice.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                Aplicar Precio en Shopify
+                Aplicar Precio
               </button>
             </motion.div>
           )}

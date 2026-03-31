@@ -60,7 +60,7 @@ router.post("/shopify/oauth/start", async (req, res): Promise<void> => {
   const clientSecret = (bodyClientSecret ?? "").trim() || platform.clientSecret;
 
   if (!clientId || !clientSecret) {
-    res.status(400).json({ error: "Se requiere el Client ID y Client Secret de Shopify. Introdúcelos en el formulario o configúralos en Ajustes." });
+    res.status(400).json({ error: "Se requiere el Client ID y Client Secret. Introdúcelos en el formulario o configúralos en Ajustes." });
     return;
   }
 
@@ -90,7 +90,7 @@ router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
 
   const { clientId, clientSecret } = await getShopifyCredentials();
   if (!clientId || !clientSecret) {
-    res.status(400).json({ error: "Se requiere el Client ID y Client Secret de Shopify. Introdúcelos en el formulario o configúralos en Ajustes." });
+    res.status(400).json({ error: "Se requiere el Client ID y Client Secret. Introdúcelos en el formulario o configúralos en Ajustes." });
     return;
   }
 
@@ -525,7 +525,7 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
   const rawDomain = shopDomain || project.shopDomain;
   const domain = normalizeShopDomain(rawDomain);
   if (!domain) {
-    res.status(400).json({ error: "Dominio Shopify inválido." });
+    res.status(400).json({ error: "Dominio de tienda inválido." });
     return;
   }
 

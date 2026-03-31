@@ -286,12 +286,12 @@ export function AppLayout({ children }: AppLayoutProps) {
               </svg>
             </a>
 
-            {/* Shopify Store */}
+            {/* Store Link */}
             <a
               href="https://comic-crafter.myshopify.com/"
               target="_blank"
               rel="noopener noreferrer"
-              title="Tienda Shopify"
+              title="Mi Tienda"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 30, height: 30, borderRadius: 7,

@@ -8,7 +8,7 @@ const ROADMAP_PHASES = [
     phase: "30 días",
     color: "var(--crim)",
     tasks: [
-      { key: "store_connected", label: "Conectar tienda Shopify", description: "Configura el acceso OAuth a tu tienda" },
+      { key: "store_connected", label: "Conectar tienda", description: "Configura el acceso a tu tienda online" },
       { key: "audit_run", label: "Ejecutar auditoría IA", description: "Análisis completo de todos tus productos" },
       { key: "image_generated", label: "Generar primeras imágenes", description: "Crea imágenes profesionales con IA" },
       { key: "price_optimized", label: "Optimizar precios", description: "Aplica estrategias de pricing inteligente" },

@@ -24,7 +24,7 @@ interface Step {
 }
 
 const ALL_STEPS: Record<GenerationStepId, Step> = {
-  connecting:         { id: "connecting",         label: "Conectando con Shopify",       detail: "Autenticando acceso a la tienda..." },
+  connecting:         { id: "connecting",         label: "Conectando con la tienda",       detail: "Autenticando acceso a la tienda..." },
   loading_products:   { id: "loading_products",   label: "Cargando catálogo",            detail: "Leyendo productos, precios e inventario..." },
   loading_history:    { id: "loading_history",    label: "Analizando historial",         detail: "Revisando datos históricos y tendencias..." },
   building_context:   { id: "building_context",   label: "Construyendo contexto",        detail: "Cargando memorias y aprendizajes previos..." },

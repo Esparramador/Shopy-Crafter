@@ -187,7 +187,7 @@ export default function SettingsPage() {
       <GlassCard className="p-6">
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/5">
           <Shield className="w-6 h-6 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Estado de Conexión Shopify</h2>
+          <h2 className="text-xl font-bold text-foreground">Estado de Conexión</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
@@ -396,7 +396,7 @@ export default function SettingsPage() {
             <h3 className="text-lg font-bold" style={{ color: "#c8a84b" }}>Tienda desconectada</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Las credenciales Shopify fueron eliminadas. Todo el trabajo generado (imágenes, rediseños, SEO, etc.) se conserva intacto. Para volver a operar con esta tienda, reconecta con nuevas credenciales.
+            Las credenciales fueron eliminadas. Todo el trabajo generado (imágenes, rediseños, SEO, etc.) se conserva intacto. Para volver a operar con esta tienda, reconecta con nuevas credenciales.
           </p>
           {!reconnectMode ? (
             <button onClick={() => setReconnectMode(true)} className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all">
@@ -406,7 +406,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Dominio Shopify (opcional, mantiene el actual)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Dominio de tienda (opcional, mantiene el actual)</label>
                   <input value={reconnectData.shopDomain} onChange={e => setReconnectData({ ...reconnectData, shopDomain: e.target.value })} placeholder={project?.shopDomain || "mi-tienda.myshopify.com"} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm" />
                 </div>
                 <div className="space-y-1">
@@ -440,7 +440,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.15)" }}>
               <div>
                 <p className="font-medium text-foreground text-sm">Desconectar tienda</p>
-                <p className="text-xs text-muted-foreground mt-1">Elimina las credenciales Shopify pero conserva todo el trabajo generado (imágenes, rediseños, auditorías, SEO, etc.)</p>
+                <p className="text-xs text-muted-foreground mt-1">Elimina las credenciales pero conserva todo el trabajo generado (imágenes, rediseños, auditorías, SEO, etc.)</p>
               </div>
               {!showDisconnectConfirm ? (
                 <button onClick={() => setShowDisconnectConfirm(true)} className="px-5 py-2 rounded-xl font-medium text-sm flex items-center gap-2 transition-all" style={{ border: "1px solid rgba(200,168,75,.4)", color: "#c8a84b" }}>
@@ -473,7 +473,7 @@ export default function SettingsPage() {
                 <div className="p-3 rounded-lg flex items-center justify-between" style={{ background: "rgba(200,168,75,.06)", border: "1px solid rgba(200,168,75,.25)" }}>
                   <div className="flex-1 mr-3">
                     <p className="font-semibold text-sm" style={{ color: "#c8a84b" }}>Desasociar tienda</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Desconecta Shopify pero <strong>conserva</strong> todos tus productos, COGS, SEO, imágenes y datos.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Desconecta la tienda pero <strong>conserva</strong> todos tus productos, COGS, SEO, imágenes y datos.</p>
                   </div>
                   <button onClick={() => handleDeleteProject("dissociate")} disabled={deleting} className="px-4 py-2 rounded-xl font-bold text-sm text-white shrink-0 transition-all" style={{ background: "#c8a84b" }}>
                     {deleting ? "..." : "Desasociar"}
