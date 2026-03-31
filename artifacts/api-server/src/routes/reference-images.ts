@@ -101,6 +101,46 @@ function getScenesForProductType(productType: string, niche: string): SceneConfi
   ];
 }
 
+async function generateReferenceImagePrompt(
+  projectId: number,
+  productTitle: string,
+  productType: string,
+  niche: string,
+  sceneLabel: string,
+  sceneKey: string
+): Promise<string | null> {
+  try {
+    const systemPrompt = `You are the world's TOP commercial photography art director specializing in product photography with reference images. You direct campaigns for Nike, Zara, Sephora, Apple.
+
+Your job: Write ONE hyper-specific image editing prompt that will transform a reference photo of a product into a professional commercial shot for a specific scene type.
+
+CRITICAL RULES:
+1. The reference image shows the REAL product — every detail (color, shape, texture, design, logos) must be EXACTLY preserved.
+2. You are EDITING the reference — specify what to CHANGE around the product (background, lighting, model, context) while keeping the product IDENTICAL.
+3. For wearable products (clothing, shoes, jewelry, accessories): ALWAYS include a model wearing/using the product. Specify model type, pose, expression, demographic.
+4. For beauty/cosmetics: Include model applying or showcasing the product with close-up skin detail.
+5. Include SPECIFIC technical direction: lighting type, color temperature, composition, lens simulation, mood.
+6. Output ONLY the editing prompt — no explanations, no markdown.
+7. Maximum 150 words. Every word must add visual direction.
+8. NEVER include text/typography/watermarks.
+9. Emphasize: "The product must remain EXACTLY as shown in the reference image."`;
+
+    const userPrompt = `PRODUCT: "${productTitle}"
+CATEGORY: ${productType}
+STORE NICHE: ${niche}
+SCENE TYPE: ${sceneLabel} (key: ${sceneKey})
+
+Write a specialized image editing prompt for this SPECIFIC product and scene. The reference image will be provided alongside your prompt to the image model.`;
+
+    const result = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", niche);
+    const cleaned = result.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").trim();
+    if (cleaned.length < 30) return null;
+    return cleaned;
+  } catch {
+    return null;
+  }
+}
+
 function validateImageUrl(url: string): void {
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("URL de imagen inválida"); }
@@ -224,7 +264,8 @@ router.post("/projects/:projectId/products/:productId/images/generate-from-refer
         sendEvent({ type: "generating", scene: scene.key, label: scene.label, progress: results.length + 1, total: finalScenes.length });
 
         try {
-          const prompt = scene.promptTemplate(productTitle, productType, niche);
+          const aiPrompt = await generateReferenceImagePrompt(projectId, productTitle, productType, niche, scene.label, scene.key);
+          const prompt = aiPrompt || scene.promptTemplate(productTitle, productType, niche);
 
           const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
 

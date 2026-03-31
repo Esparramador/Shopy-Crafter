@@ -57,40 +57,20 @@ function normalizeText(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function detectProductCategory(productTitle: string, productType: string | null): "physical" | "digital_art" | "digital_service" | "credits" | "subscription" | "comic" | "audiobook" | "report" {
-  const title = normalizeText(productTitle);
-  const pType = normalizeText(productType ?? "");
-  const combined = title + " " + pType;
+function detectProductNature(productTitle: string, productType: string | null): "physical" | "digital" | "unknown" {
+  const t = normalizeText(productTitle + " " + (productType ?? ""));
+  const physicalPatterns = /resina|funko|3d.*impres|impresion 3d|camiseta|taza|poster|lienzo|canvas|figura.*3d|merchandising|calzado|zapato|zapatilla|bota|sandalia|joya|collar|anillo|pulsera|pendiente|crema|perfume|botella|serum|locion|cosmetica|maquillaje|comida|alimento|bebida|cafe|chocolate|vino|cerveza|snack|electronica|gadget|auricular|altavoz|cargador|phone|tablet|reloj|gafas|bolso|mochila|cartera|cinturon|sombrero|gorra|guantes|bufanda|libro|cuaderno|agenda|vela|incienso|planta|maceta|decoracion|mueble|lampara|alfombra|cojin|toalla|sabana|juguete|peluche|puzzle|herramienta|cuchillo|sarten|olla|vajilla|bicicleta|patinete|ropa|vestido|falda|pantalon|short|chaqueta|abrigo|sudadera|hoodie|polo|blusa|jersey|chaleco|swimwear|bikini|banador/i;
+  const digitalPatterns = /saas|suscripcion|creditos|credits|software|servicio|auditoria|informe|analisis|seo|email marketing|optimizacion|consultoria|coaching|curso|ebook|template|plantilla|licencia|descarga|digital|virtual|online|api|plataforma|app|ia|inteligencia artificial|automatizacion|pack de servicios|rediseno|fotografia ia|setup/i;
+  if (physicalPatterns.test(t)) return "physical";
+  if (digitalPatterns.test(t)) return "digital";
+  return "unknown";
+}
 
-  if (/audiobook/i.test(combined)) return "audiobook";
+const promptCache = new Map<string, { prompt: string; timestamp: number }>();
+const PROMPT_CACHE_TTL = 30 * 60 * 1000;
 
-  if (/creditos|credits/i.test(title) || /pack de creditos/i.test(pType)) return "credits";
-
-  if (/suscripcion|saas/i.test(pType)) return "subscription";
-  if (/\b(starter|enterprise)\b/i.test(title) && /shopybrain|shopy/i.test(title)) return "subscription";
-  if (/agency pro/i.test(title)) return "subscription";
-
-  if (/resina|funko/i.test(combined)) return "physical";
-  if (/impresion 3d/i.test(pType)) return "physical";
-
-  if (/manga|pet comic/i.test(title)) return "comic";
-  if (/comic personalizado|manga personalizado/i.test(pType)) return "comic";
-  const titleNoStore = title.replace(/comic crafter/gi, "");
-  if (/comic/i.test(titleNoStore)) return "comic";
-
-  if (/pack de servicios|creacion producto|pack.*productos/i.test(combined)) return "digital_service";
-
-  if (/informe|auditoria|analisis|seo shopify|email marketing|setup.*shopify|sesion.*shopify|investigacion|proyeccion|rediseno|optimizacion|campanas|consultoria/i.test(combined)) return "report";
-  if (/optimizacion|auditoria|analisis|seo|email marketing|investigacion|proyeccion|rediseno|consultoria/i.test(pType)) return "report";
-
-  if (/nft|arte digital|tatuaje|retrato|pop art|sticker|emoji|avatar|personaje 360|ilustracion|portada|storyboard|branding|logo|poster|canvas|album|cuento infantil|escape room|tcg|cartas/i.test(combined)) return "digital_art";
-
-  if (/3d.*model|figura.*3d|merchandising|camiseta|taza/i.test(combined)) return "physical";
-
-  if (/assets|videojuegos|modelos 3d|game/i.test(combined)) return "digital_art";
-  if (/fotografia|photoshoot|imagenes/i.test(combined)) return "digital_service";
-
-  return "digital_service";
+function getCacheKey(productTitle: string, imageType: string, storeNiche: string | null): string {
+  return `${productTitle}::${imageType}::${storeNiche ?? "default"}`;
 }
 
 export async function buildImagePrompt(
@@ -99,171 +79,97 @@ export async function buildImagePrompt(
   productType: string | null,
   imageType: string,
   storeNiche: string | null,
-  brandTone: string | null
+  brandTone: string | null,
+  productDescription?: string | null
 ): Promise<string> {
-  const category = detectProductCategory(productTitle, productType);
-  const BASE_QUALITY = "high resolution 4k, sharp focus, professional commercial quality";
+  const cacheKey = getCacheKey(productTitle, imageType, storeNiche);
+  const cached = promptCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < PROMPT_CACHE_TTL) {
+    return cached.prompt;
+  }
 
-  const physicalConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Professional studio product photo,",
-      scene: "pure white background, 3-point lighting setup, soft shadows, centered composition",
-      suffix: "e-commerce hero shot, Phase One quality, no reflections",
-    },
-    lifestyle: {
-      prefix: "Lifestyle product photography,",
-      scene: "aspirational real-world context matching brand aesthetic, natural lighting, shallow depth of field",
-      suffix: "editorial magazine quality, authentic atmosphere",
-    },
-    detail: {
-      prefix: "Extreme macro product photography,",
-      scene: "close-up texture detail, micro-lens quality, bokeh background, emphasizing material quality",
-      suffix: "luxury brand detail shot, 100mm macro lens look",
-    },
+  const nature = detectProductNature(productTitle, productType);
+
+  const imageTypeDescriptions: Record<string, string> = {
+    hero: "HERO SHOT — The main product image. Must instantly communicate what this product IS and its value. This is the first image a customer sees — it must stop scrolling and create desire.",
+    lifestyle: "LIFESTYLE/CONTEXT SHOT — Show the product being used, enjoyed, or experienced in its natural context. Must create an emotional connection and help the customer imagine owning/using it.",
+    detail: "DETAIL/CLOSE-UP SHOT — Zoom into what makes this product special. Show quality, craftsmanship, unique features, or the transformative result the customer gets.",
+    packaging: "UNBOXING/PACKAGING SHOT — The premium unboxing experience or how the product is delivered/presented.",
+    ugc: "SOCIAL PROOF/UGC STYLE — Authentic-looking social media content showing real people enjoying the product.",
+    scale: "SCALE REFERENCE — Show the product's size relative to everyday objects or human hands.",
+    bundle: "BUNDLE/COLLECTION SHOT — Show what's included, complementary items, or the complete package.",
   };
 
-  const digitalArtConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Stunning digital artwork showcase,",
-      scene: "the artwork displayed on a sleek modern device screen or gallery wall, dramatic cinematic lighting, rich vibrant colors",
-      suffix: "digital art portfolio quality, Behance featured project aesthetic",
-    },
-    lifestyle: {
-      prefix: "Creative professional workspace scene,",
-      scene: "artist using a tablet/screen showing the digital artwork, modern creative studio environment, warm ambient lighting, inspiration boards in background",
-      suffix: "aspirational creative lifestyle, editorial magazine quality",
-    },
-    detail: {
-      prefix: "Close-up of digital artwork details,",
-      scene: "zoomed-in view showing intricate artistic details, color palette, brushwork/vector precision, on high-resolution retina display",
-      suffix: "artistic detail showcase, gallery exhibition quality",
-    },
+  const shotDesc = imageTypeDescriptions[imageType] ?? imageTypeDescriptions.hero;
+  const descriptionSnippet = productDescription ? productDescription.replace(/<[^>]+>/g, "").slice(0, 400) : "";
+
+  const systemPrompt = `You are the world's TOP commercial photography art director and creative director. You have directed campaigns for Apple, Nike, Chanel, Marvel, Netflix, Adobe, and Shopify.
+
+Your job: Write ONE hyper-specific, expert-level image generation prompt for a specific product. 
+
+RULES:
+1. Your prompt must be SPECIFIC to THIS exact product — not a generic category template. Analyze the product name, type, description, and store niche to understand EXACTLY what's being sold.
+2. For PHYSICAL products (clothing, shoes, cosmetics, food, tech, figures, posters): Include a REAL PERSON/MODEL interacting with or wearing/using the product when appropriate. Specify model demographics, pose, expression, and setting.
+3. For DIGITAL products/services: Create a conceptual visualization that communicates the VALUE and RESULT, not just the product. Show outcomes, transformations, or aspirational scenarios.
+4. Include SPECIFIC technical photography/art direction: lens type, lighting setup, color grading, composition rules, mood, environment details.
+5. The prompt must be in ENGLISH (image models work best in English).
+6. Output ONLY the prompt text — no explanations, no markdown, no quotes around it.
+7. Maximum 200 words. Every word must add visual direction.
+8. NEVER include text/typography/logos/watermarks in the image.
+9. Include negative guidance for what to AVOID (specific to this product).`;
+
+  const userPrompt = `PRODUCT: "${productTitle}"
+CATEGORY: ${productType || "General"}
+STORE NICHE: ${storeNiche || "e-commerce"}
+BRAND TONE: ${brandTone || "Professional"}
+SHOT TYPE: ${shotDesc}
+PRODUCT IS: ${nature === "physical" ? "PHYSICAL — can be photographed, held, worn, used. Include models/actors when appropriate." : nature === "digital" ? "DIGITAL — service, software, digital art, or intangible product. Focus on value visualization and outcomes." : "UNKNOWN — Analyze the product name and description to determine if it's physical or digital, then craft the prompt accordingly."}
+${descriptionSnippet ? `PRODUCT DESCRIPTION: ${descriptionSnippet}` : ""}
+
+Write the specialized prompt for this SPECIFIC product and shot type. Be an EXPERT in this product's industry.`;
+
+  try {
+    const { askClaudeWithBrain } = await import("../lib/claude.js");
+    let prompt = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", storeNiche ?? undefined);
+    prompt = prompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").replace(/^\*\*.*?\*\*\s*/gm, "").trim();
+    if (prompt.length < 50) throw new Error("Prompt too short");
+    const qualitySuffix = ", ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading";
+    const finalPrompt = prompt + qualitySuffix;
+    promptCache.set(cacheKey, { prompt: finalPrompt, timestamp: Date.now() });
+    return finalPrompt;
+  } catch (err) {
+    console.warn(`[IMG] AI prompt generation failed, using expert fallback: ${err instanceof Error ? err.message : String(err)}`);
+    const effectiveNature = nature === "unknown" ? "digital" : nature;
+    return buildFallbackPrompt(productTitle, productType, imageType, storeNiche, brandTone, effectiveNature);
+  }
+}
+
+function buildFallbackPrompt(
+  productTitle: string,
+  productType: string | null,
+  imageType: string,
+  storeNiche: string | null,
+  brandTone: string | null,
+  nature: "physical" | "digital"
+): string {
+  const BASE_QUALITY = "ultra high resolution 4K, sharp focus, professional commercial quality, award-winning photography";
+  const subject = `"${productTitle}"${productType ? ` (${productType})` : ""}`;
+
+  if (nature === "physical") {
+    const configs: Record<string, string> = {
+      hero: `Professional studio product photography of ${subject}. Attractive model interacting with/wearing/holding the product. Clean background, 3-point lighting, Phase One quality, centered composition. ${BASE_QUALITY}`,
+      lifestyle: `Editorial lifestyle photography featuring ${subject}. Real model using the product in an aspirational ${storeNiche ?? "lifestyle"} setting. Natural golden hour lighting, shallow depth of field, candid but styled. ${BASE_QUALITY}`,
+      detail: `Extreme macro close-up of ${subject}. Focus on texture, craftsmanship, material quality. 100mm macro lens, shallow depth of field, dramatic side lighting. ${BASE_QUALITY}`,
+    };
+    return configs[imageType] ?? configs.hero;
+  }
+
+  const configs: Record<string, string> = {
+    hero: `Stunning conceptual visualization for ${subject}. Cinematic composition showing the core value proposition. Dark premium background with dramatic lighting, floating elements, modern design aesthetic. Brand tone: ${brandTone ?? "professional"}. Store niche: ${storeNiche ?? "e-commerce"}. ${BASE_QUALITY}`,
+    lifestyle: `Aspirational scene showing the transformation/result of using ${subject}. Professional person in modern environment experiencing the benefits. Success indicators visible. Brand tone: ${brandTone ?? "professional"}. ${BASE_QUALITY}`,
+    detail: `Detailed feature showcase for ${subject}. Close-up on the key differentiator or unique value. Modern UI/visualization elements, clean data-driven design. ${BASE_QUALITY}`,
   };
-
-  const comicConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Epic comic book cover illustration,",
-      scene: "dynamic action pose, bold comic book colors, dramatic perspective, speech bubbles, halftone dots pattern, panel borders visible",
-      suffix: "professional comic book art, Marvel/DC cover quality, vibrant and eye-catching",
-    },
-    lifestyle: {
-      prefix: "Person enjoying reading a custom comic book,",
-      scene: "cozy reading nook, the comic book open showing colorful illustrated pages, warm lighting, excited expression, immersive storytelling moment",
-      suffix: "editorial lifestyle photography, authentic reading experience, comic collector atmosphere",
-    },
-    detail: {
-      prefix: "Detailed comic book page layout,",
-      scene: "multiple panels showing sequential art, expressive character faces, dynamic action lines, professional lettering, rich ink work",
-      suffix: "professional comic interior art quality, clear panel composition, engaging visual narrative",
-    },
-  };
-
-  const audiobookConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Premium audiobook listening experience,",
-      scene: "stylish headphones with glowing sound waves emanating, comic book pages floating and transforming into audio waveforms, dark atmospheric background with neon accents",
-      suffix: "premium audio product visual, Audible-quality promotional art",
-    },
-    lifestyle: {
-      prefix: "Person immersed in audiobook experience,",
-      scene: "wearing premium headphones with eyes closed, enjoying the story, comic characters subtly appearing as imagination visuals around them, warm cozy environment",
-      suffix: "aspirational audio lifestyle, emotional storytelling moment",
-    },
-    detail: {
-      prefix: "Audio waveform visualization art,",
-      scene: "beautiful sound wave pattern with comic art elements integrated, character silhouettes within the waveform, vibrant frequency spectrum colors, play button icon",
-      suffix: "modern audio tech aesthetic, premium digital product visual",
-    },
-  };
-
-  const creditConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Premium digital credit pack promotional graphic,",
-      scene: "glowing golden/neon credit tokens floating in space, futuristic holographic interface, quantity numbers displayed prominently, sleek dark background with gradient accents",
-      suffix: "premium SaaS product visual, modern fintech aesthetic",
-    },
-    lifestyle: {
-      prefix: "Creative professional using AI generation platform,",
-      scene: "person at modern workstation generating amazing digital art with AI tools, multiple stunning outputs visible on screens, creative energy and productivity",
-      suffix: "aspirational creator economy lifestyle, productivity showcase",
-    },
-    detail: {
-      prefix: "Infographic showing credit pack value breakdown,",
-      scene: "clean modern infographic design showing what credits unlock: comics, 3D models, art, animations — each with small icon, value proposition clear, premium pricing card design",
-      suffix: "modern SaaS pricing visual, clear value communication",
-    },
-  };
-
-  const subscriptionConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Premium SaaS platform dashboard showcase,",
-      scene: "sleek modern dashboard interface with analytics, AI automation indicators, multiple store management panels, dark mode UI with accent colors, floating holographic elements",
-      suffix: "enterprise software visual, professional SaaS product hero",
-    },
-    lifestyle: {
-      prefix: "Business owner managing multiple Shopify stores with AI,",
-      scene: "confident entrepreneur at modern desk, multiple screens showing store analytics and AI optimizations, success metrics rising, professional office environment",
-      suffix: "business success lifestyle, aspirational entrepreneur visual",
-    },
-    detail: {
-      prefix: "AI automation feature showcase,",
-      scene: "detailed view of AI engine processing product optimizations, neural network visualization, before/after product improvements, performance metrics graphs",
-      suffix: "tech product feature detail, enterprise software quality",
-    },
-  };
-
-  const reportConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Professional business report/service deliverable,",
-      scene: "elegant report document mockup on tablet/laptop screen showing charts and insights, clean data visualization, professional consulting aesthetic, dark premium background",
-      suffix: "consulting deliverable visual, McKinsey-quality presentation",
-    },
-    lifestyle: {
-      prefix: "Business professional reviewing strategic analysis,",
-      scene: "professional in modern office analyzing data on screen, charts showing growth trends, strategic planning session, confident decision-making moment",
-      suffix: "business consulting lifestyle, professional service visual",
-    },
-    detail: {
-      prefix: "Data analytics dashboard detail,",
-      scene: "close-up of professional charts, KPI metrics, conversion funnels, SEO performance graphs, clean modern data visualization design, actionable insights highlighted",
-      suffix: "business intelligence visual, data-driven decision aesthetic",
-    },
-  };
-
-  const serviceConfigs: Record<string, { prefix: string; scene: string; suffix: string }> = {
-    hero: {
-      prefix: "Professional service package promotional visual,",
-      scene: "elegant service offering display with included deliverables shown as floating elements, premium badge/seal, modern gradient background, trust indicators",
-      suffix: "professional service visual, premium offering aesthetic",
-    },
-    lifestyle: {
-      prefix: "Happy client reviewing their optimized Shopify store,",
-      scene: "entrepreneur excitedly looking at improved store on laptop, visible sales notifications, modern workspace, growth metrics on screen",
-      suffix: "client success story visual, service results showcase",
-    },
-    detail: {
-      prefix: "Service deliverables breakdown visual,",
-      scene: "clean infographic showing each included component: images, SEO, copywriting, optimization — with checkmarks, professional icons, modern card design",
-      suffix: "service inclusions detail, premium package visual",
-    },
-  };
-
-  const configMap: Record<string, Record<string, { prefix: string; scene: string; suffix: string }>> = {
-    physical: physicalConfigs,
-    digital_art: digitalArtConfigs,
-    comic: comicConfigs,
-    audiobook: audiobookConfigs,
-    credits: creditConfigs,
-    subscription: subscriptionConfigs,
-    report: reportConfigs,
-    digital_service: serviceConfigs,
-  };
-
-  const configs = configMap[category] ?? serviceConfigs;
-  const config = configs[imageType] ?? configs.hero;
-  const subjectAnchor = `SUBJECT: "${productTitle}"${productType ? ` (category: ${productType})` : ""}`;
-
-  return `${config.prefix} ${subjectAnchor}, ${config.scene}, store niche: ${storeNiche ?? "comics and digital art"}, brand tone: ${brandTone ?? "professional creative"}, ${BASE_QUALITY}, ${config.suffix}`;
+  return configs[imageType] ?? configs.hero;
 }
 
 /**
@@ -440,11 +346,13 @@ router.post("/projects/:projectId/build-image-prompt", async (req, res): Promise
   }
 
   const model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
-  const estimatedCost = COST_MAP[model] ?? 0.04;
-  const estimatedTime = model.includes("flux-dev") ? 20 : model.includes("recraft") ? 15 : 10;
+  const imageCost = COST_MAP[model] ?? 0.04;
+  const aiPromptCost = 0.005;
+  const estimatedCost = parseFloat((imageCost + aiPromptCost).toFixed(3));
+  const estimatedTime = model.includes("flux-dev") ? 25 : model.includes("recraft") ? 20 : 15;
 
   const prompt = await buildImagePrompt(
-    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone
+    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone, product.bodyHtml
   );
 
   const modelReasons: Record<string, string> = {
@@ -496,7 +404,7 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
   const estimatedCost = COST_MAP[model] ?? 0.04;
 
   const finalPrompt = customPrompt ?? await buildImagePrompt(
-    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone
+    projectId, product.title, product.productType, imageType, project.storeNiche, project.brandTone, product.bodyHtml
   );
 
   const [job] = await db.insert(generationJobsTable).values({
@@ -748,7 +656,7 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
         try {
           const finalPrompt = await buildImagePrompt(
             projectId, product.title, product.productType, imageType,
-            project.storeNiche, project.brandTone
+            project.storeNiche, project.brandTone, product.bodyHtml
           );
 
           // Insert the job record

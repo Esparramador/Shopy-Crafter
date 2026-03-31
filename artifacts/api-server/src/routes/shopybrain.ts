@@ -1837,7 +1837,7 @@ Responde SOLO JSON válido:
                     const estimatedCost = costMap[model] ?? 0.04;
                     const prompt = await buildPrompt(
                       parseInt(projectId), createdTitle, params?.productType || null,
-                      imageType, storeNiche, project.brandTone
+                      imageType, storeNiche, project.brandTone, finalBody || null
                     );
 
                     const [job] = await db.insert(gjTable).values({
