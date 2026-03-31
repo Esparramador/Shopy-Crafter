@@ -3368,10 +3368,36 @@ ${truncated}
         const currentCompareAt = String(variants[0]?.compare_at_price || "");
         const storeNiche = project.storeNiche || "comics y cultura pop";
 
+        const tagsArr = currentTags.split(",").filter(t => t.trim());
+        const imgCount = images.length;
+        const bodyLen = currentDesc.length;
+        const hasCompare = !!currentCompareAt;
+        let optScore = 0;
+        if (imgCount >= 3) optScore += 25; else if (imgCount >= 1) optScore += 10;
+        if (bodyLen >= 1000) optScore += 25; else if (bodyLen >= 500) optScore += 15; else if (bodyLen >= 200) optScore += 8;
+        if (tagsArr.length >= 10) optScore += 25; else if (tagsArr.length >= 5) optScore += 15;
+        if (hasCompare) optScore += 25;
+        const optGrade = optScore >= 85 ? "A" : optScore >= 60 ? "B" : optScore >= 40 ? "C" : "D";
+
         result = {
           status: "optimizing",
           productId,
           currentTitle,
+          products: [{
+            title: currentTitle,
+            status: String(prod.status || "active"),
+            price: currentPrice,
+            compareAtPrice: currentCompareAt || null,
+            imageCount: imgCount,
+            imageUrl: images[0]?.src || null,
+            variantCount: variants.length,
+            descriptionLength: bodyLen,
+            tagsCount: tagsArr.length,
+            published: !!prod.published_at,
+            auditScore: optScore,
+            auditGrade: optGrade,
+            hasComparePrice: hasCompare,
+          }],
           message: `⏳ Optimización 10/10 iniciada para "${currentTitle}".\n\nEl ShopyBrain Dual AI (Gemini + Claude) está generando:\n📝 Descripción 400+ palabras\n🏷 22+ tags SEO\n🔍 Meta title + description\n🎯 Variantes inteligentes\n💰 Análisis de precios\n\nTarda ~90s. El producto se actualizará automáticamente en Shopify.`,
         };
 
@@ -5228,7 +5254,27 @@ Responde SOLO con JSON válido (sin markdown):
             body: JSON.stringify({ parts: params?.parts }),
           });
           const data = await resp.json() as Record<string, unknown>;
-          result = { ...data, message: `✅ **Rediseño 100/100 completado**\n\n📝 Nuevo título: ${data.title ?? "(generado)"}\n📊 Precio sugerido: €${data.price ?? "-"}\n🏷️ Tags: ${typeof data.tags === "string" ? data.tags.split(",").length : "?"} tags\n📸 ${Array.isArray(data.photo_brief) ? data.photo_brief.length : 0} photo briefs\n\n💡 Usa **apply_redesign** para aplicar estos cambios en Shopify.` };
+          const rdTags = typeof data.tags === "string" ? data.tags.split(",").filter((t: string) => t.trim()) : [];
+          const rdDescLen = typeof data.description === "string" ? (data.description as string).length : 0;
+          result = {
+            ...data,
+            products: [{
+              title: String(data.title ?? "(generado)"),
+              status: "active",
+              price: String(data.price ?? "0"),
+              compareAtPrice: data.compare_at_price ? String(data.compare_at_price) : null,
+              imageCount: Array.isArray(data.photo_brief) ? (data.photo_brief as unknown[]).length : 0,
+              imageUrl: null,
+              variantCount: 1,
+              descriptionLength: rdDescLen,
+              tagsCount: rdTags.length,
+              published: true,
+              auditScore: rdDescLen >= 500 && rdTags.length >= 10 ? 75 : 50,
+              auditGrade: rdDescLen >= 500 && rdTags.length >= 10 ? "B" : "C",
+              hasComparePrice: !!data.compare_at_price,
+            }],
+            message: `✅ **Rediseño 100/100 completado**\n\n📝 Nuevo título: ${data.title ?? "(generado)"}\n📊 Precio sugerido: €${data.price ?? "-"}\n🏷️ Tags: ${rdTags.length} tags\n📸 ${Array.isArray(data.photo_brief) ? (data.photo_brief as unknown[]).length : 0} photo briefs\n\n💡 Usa **apply_redesign** para aplicar estos cambios en Shopify.`,
+          };
         } catch (err) { result = { error: true, message: `❌ Error en rediseño: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }

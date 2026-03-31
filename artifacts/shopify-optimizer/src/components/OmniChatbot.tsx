@@ -155,6 +155,11 @@ interface ProductCardItem {
   grade?: string;
   hasComparePrice?: boolean;
   hasCompare?: boolean;
+  hasMetaTitle?: boolean;
+  hasMetaDesc?: boolean;
+  hasSchema?: boolean;
+  hasAltTexts?: boolean;
+  cleanHandle?: boolean;
   published?: boolean;
   issues?: string[];
 }
@@ -211,7 +216,7 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
                   </div>
                 </div>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 8px 6px", fontSize: 9, color: "var(--t3)" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 8px 4px", fontSize: 9, color: "var(--t3)" }}>
                 <span>{checkOrWarn(imgCount >= 3)} {imgCount}img</span>
                 <span>{checkOrWarn(descLen >= 500)} {descLen}ch</span>
                 <span>{checkOrWarn(tags >= 10)} {tags}tags</span>
@@ -219,6 +224,17 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
                 <span>{variants}var</span>
                 {p.published === false && <span style={{ color: "#f43f5e", fontWeight: 700 }}>NO PUB</span>}
               </div>
+              {(p.hasMetaTitle !== undefined || p.hasMetaDesc !== undefined || p.hasSchema !== undefined || p.hasAltTexts !== undefined || p.cleanHandle !== undefined) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, padding: "0 8px 6px", fontSize: 8, color: "var(--t4)" }}>
+                  <span style={{ opacity: 0.7 }}>SEO:</span>
+                  {p.hasMetaTitle !== undefined && <span>{checkOrWarn(p.hasMetaTitle)} title</span>}
+                  {p.hasMetaDesc !== undefined && <span>{checkOrWarn(p.hasMetaDesc)} desc</span>}
+                  {p.hasSchema !== undefined && <span>{checkOrWarn(p.hasSchema)} schema</span>}
+                  {p.hasAltTexts !== undefined && <span>{checkOrWarn(p.hasAltTexts)} alts</span>}
+                  {p.cleanHandle !== undefined && <span>{checkOrWarn(p.cleanHandle)} handle</span>}
+                  <span>{checkOrWarn(imgCount >= 3)} imgs</span>
+                </div>
+              )}
               {p.issues && p.issues.length > 0 && (
                 <div style={{ padding: "0 8px 6px", fontSize: 8, color: "#f59e0b" }}>
                   ⚠ {p.issues.slice(0, 2).join(" · ")}
