@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
+import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
+import type { PlatformType } from "@workspace/db";
 
 const router = Router();
 
@@ -211,25 +213,41 @@ router.post("/projects", async (req, res): Promise<void> => {
   const {
     name, shopDomain, clientId, clientSecret,
     storeNiche, brandTone, targetAudience, storeMarkets,
-    replicateApiToken, anthropicApiKey, plan,
+    replicateApiToken, anthropicApiKey, plan, platformType: rawPlatformType,
   } = req.body;
 
-  if (!name || !shopDomain || !clientId || !clientSecret) {
+  const validPlatforms: PlatformType[] = ["shopify", "woocommerce", "prestashop", "wordpress", "universal"];
+  const platformType: PlatformType = validPlatforms.includes(rawPlatformType) ? rawPlatformType : "shopify";
+
+  const isShopify = platformType === "shopify";
+  const isUniversal = platformType === "universal";
+
+  if (!name || !shopDomain) {
+    res.status(400).json({ error: "name y shopDomain (URL de la tienda) son obligatorios" });
+    return;
+  }
+
+  if (isShopify && (!clientId || !clientSecret)) {
     res.status(400).json({ error: "name, shopDomain, clientId y clientSecret son obligatorios" });
+    return;
+  }
+
+  if (!isUniversal && !isShopify && !clientSecret) {
+    res.status(400).json({ error: "name, shopDomain y las credenciales de la plataforma son obligatorios" });
     return;
   }
 
   const validPlans = ["admin", "starter", "agency_pro", "enterprise", "trial"];
   const finalPlan = validPlans.includes(plan) ? plan : "starter";
 
-  const normalizedDomain = normalizeShopDomain(shopDomain);
+  const normalizedDomain = isShopify ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
 
-  // Save project first (without token)
   const [project] = await db.insert(projectsTable).values({
     name,
+    platformType,
     shopDomain: normalizedDomain,
-    clientId,
-    clientSecret: encrypt(clientSecret),
+    clientId: clientId ?? "",
+    clientSecret: clientSecret ? encrypt(clientSecret) : "",
     storeNiche: storeNiche ?? null,
     brandTone: brandTone ?? null,
     targetAudience: targetAudience ?? null,
@@ -240,18 +258,28 @@ router.post("/projects", async (req, res): Promise<void> => {
     planRenewsAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
   }).returning();
 
-  // Auto-generate token immediately via client_credentials grant
-  // clientSecret passed in plaintext (before encryption) so no decrypt needed here
-  try {
-    await refreshToken(project.id, normalizedDomain, clientId, clientSecret);
-  } catch (err) {
-    // Token generation failed — project is saved, user can retry from settings
-    req.log.warn({ projectId: project.id, err }, "Initial token generation failed — credentials may be incorrect");
-    await db.delete(projectsTable).where(eq(projectsTable.id, project.id));
-    res.status(400).json({
-      error: `No se pudo generar el token de acceso. Verifica que el Client ID y el Secret sean correctos para ${normalizedDomain}.`,
-    });
-    return;
+  if (isShopify) {
+    try {
+      await refreshToken(project.id, normalizedDomain, clientId, clientSecret);
+    } catch (err) {
+      req.log.warn({ projectId: project.id, err }, "Initial token generation failed — credentials may be incorrect");
+      await db.delete(projectsTable).where(eq(projectsTable.id, project.id));
+      res.status(400).json({
+        error: `No se pudo generar el token de acceso. Verifica que el Client ID y el Secret sean correctos para ${normalizedDomain}.`,
+      });
+      return;
+    }
+  } else if (!isUniversal) {
+    try {
+      const connector = getConnector(project);
+      await connector.testConnection();
+    } catch (err) {
+      if (err instanceof PlatformNotSupportedError) {
+        req.log.info({ projectId: project.id, platformType }, "Platform not yet implemented — project saved without connection test");
+      } else {
+        req.log.warn({ projectId: project.id, err }, "Connection test failed for non-Shopify platform — project saved for retry");
+      }
+    }
   }
 
   const [refreshed] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
@@ -260,7 +288,7 @@ router.post("/projects", async (req, res): Promise<void> => {
     userId: req.session.userId!,
     action: "project_create",
     projectId: String(refreshed.id),
-    details: `Created project "${name}" (${normalizedDomain})`,
+    details: `Created ${platformType} project "${name}" (${normalizedDomain})`,
     ipAddress: req.ip ?? "unknown",
   });
 
@@ -299,9 +327,14 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const { name, shopDomain, clientId, clientSecret, storeNiche, brandTone, targetAudience, storeMarkets, replicateApiToken, anthropicApiKey, autoPilotEnabled } = req.body;
 
+  const [existing] = await db.select({ platformType: projectsTable.platformType }).from(projectsTable).where(eq(projectsTable.id, id));
+  const platform = existing?.platformType ?? "shopify";
+
   const updateData: Partial<typeof projectsTable.$inferInsert> = {};
   if (name !== undefined) updateData.name = name;
-  if (shopDomain !== undefined) updateData.shopDomain = normalizeShopDomain(shopDomain);
+  if (shopDomain !== undefined) {
+    updateData.shopDomain = platform === "shopify" ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
+  }
   if (clientId !== undefined) updateData.clientId = clientId;
   if (clientSecret !== undefined) updateData.clientSecret = encrypt(clientSecret);
   if (storeNiche !== undefined) updateData.storeNiche = storeNiche;
@@ -495,31 +528,25 @@ router.post("/projects/:projectId/test-connection", async (req, res): Promise<vo
   }
 
   try {
-    const data = await shopifyRequest<{ shop: { name: string; plan_name: string } }>(
-      id,
-      project.shopDomain,
-      "/shop.json"
-    );
-
-    const countData = await shopifyRequest<{ count: number }>(
-      id,
-      project.shopDomain,
-      "/products/count.json"
-    );
+    const connector = getConnector(project);
+    const result = await connector.testConnection();
 
     const [updated] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
 
     res.json({
-      connected: true,
-      storeName: data.shop.name,
-      planName: data.shop.plan_name,
-      productCount: countData.count,
-      tokenValid: true,
+      connected: result.connected,
+      storeName: result.storeName,
+      planName: result.platformInfo,
+      productCount: result.productCount,
+      tokenValid: result.tokenValid,
       tokenExpiresAt: updated.tokenExpiresAt?.toISOString() ?? null,
-      error: null,
+      error: result.error,
+      errorCode: result.errorCode ?? null,
+      platformType: project.platformType ?? "shopify",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
+    const isPlatformError = err instanceof PlatformNotSupportedError;
     res.json({
       connected: false,
       storeName: null,
@@ -528,6 +555,8 @@ router.post("/projects/:projectId/test-connection", async (req, res): Promise<vo
       tokenValid: false,
       tokenExpiresAt: null,
       error: message,
+      errorCode: isPlatformError ? "PLATFORM_NOT_SUPPORTED" : "UNKNOWN",
+      platformType: project.platformType ?? "shopify",
     });
   }
 });

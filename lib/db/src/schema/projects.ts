@@ -10,9 +10,12 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal";
+
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  platformType: text("platform_type").notNull().default("shopify").$type<PlatformType>(),
   shopDomain: text("shop_domain").notNull(),
   clientId: text("client_id").notNull(),
   clientSecret: text("client_secret").notNull(),

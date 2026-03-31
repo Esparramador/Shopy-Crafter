@@ -28,6 +28,15 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Responsive Design**: Three breakpoints — Desktop (>900px), Tablet (≤900px), Mobile (≤768px). Admin panel features adaptive layouts.
 - **Landing Page Sections**: 7 sections including Hero, Engines, Demo, Results, Pricing, Calculator, and Contact.
 
+### Multi-Platform Connector Architecture
+The platform supports multiple e-commerce platforms via a connector abstraction layer:
+- **Supported Platforms**: Shopify (fully implemented), WooCommerce, PrestaShop, WordPress, Universal (planned)
+- **IPlatformConnector Interface**: Standard interface for testConnection, getProducts, createProduct, updateProduct, deleteProduct, getProductCount, getSEO, updateSEO, uploadImage
+- **ConnectorFactory**: `getConnector(project)` returns the appropriate connector based on `platformType` field
+- **ShopifyConnector**: Wraps existing `shopify.ts` functions without modifying them (13 files depend on shopify.ts)
+- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, index.ts)
+- **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
+
 ### Database
 PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data.
 
