@@ -298,6 +298,23 @@ export function buildProductCard(product: ProductCardData): string {
       </div>
     </div>
 
+    <div style="margin-top:14px;padding:12px;background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:10px;">
+      <div style="font-size:10px;font-weight:700;color:${BRAND.gold};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">&#128270; SEO Checklist (6 criterios)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        ${[
+          { label: "Meta Title", ok: product.hasMetaTitle !== false },
+          { label: "Meta Desc", ok: product.hasMetaDesc !== false },
+          { label: "Schema/JSON-LD", ok: product.hasSchema !== false },
+          { label: "Alt Texts", ok: product.hasAltTexts !== false },
+          { label: "Clean Handle", ok: product.cleanHandle !== false },
+          { label: "Imagenes 4+", ok: product.imageCount >= 4 },
+        ].map(c => `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:${c.ok ? BRAND.jadeBg : BRAND.redBg};border:1px solid ${c.ok ? "rgba(52,211,153,.15)" : "rgba(244,63,94,.15)"};">
+          <span style="font-size:12px;color:${c.ok ? BRAND.jade : BRAND.red};">${c.ok ? "&#10003;" : "&#10007;"}</span>
+          <span style="font-size:10px;color:${c.ok ? BRAND.jade : BRAND.red};font-weight:600;">${c.label}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+
     ${recs.length > 0 ? `
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid ${BRAND.border};">
       <div style="font-size:11px;font-weight:700;color:${BRAND.gold};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128161; Mejoras recomendadas</div>

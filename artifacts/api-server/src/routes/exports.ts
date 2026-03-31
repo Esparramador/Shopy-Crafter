@@ -1291,7 +1291,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>`;
   }
 
-  const seoCardsList: ProductCardData[] = liveAudit.slice(0, 60).map(a => {
+  const seoCardsList: ProductCardData[] = liveAudit.map(a => {
     const imgs = (a.product.imagesJson as Array<{ src?: string }> | null) ?? [];
     const tagsArr = (a.product.tags || "").split(",").filter(t => t.trim());
     return {
@@ -1321,7 +1321,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   });
   const seoDetailCardsHtml = buildProductCardsSection(seoCardsList, "Analisis SEO por Producto");
 
-  const catalogCardsList: ProductCardData[] = products.slice(0, 60).map(p => {
+  const catalogCardsList: ProductCardData[] = products.map(p => {
     const seo = seoMap.get(p.shopifyProductId);
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
@@ -1358,7 +1358,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   const catalogCardsHtml = buildProductCardsSection(catalogCardsList, "Catalogo Completo");
 
   let cogsDetailRows = "";
-  for (const p of products.slice(0, 60)) {
+  for (const p of products) {
     const cogs = cogsMap.get(p.shopifyProductId);
     const price = parseFloat(p.price ?? "0");
     const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
