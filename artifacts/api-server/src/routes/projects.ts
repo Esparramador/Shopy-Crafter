@@ -370,7 +370,17 @@ router.post("/projects", async (req, res): Promise<void> => {
         : { connected: false, error: wcConnectionResult.error, errorCode: wcConnectionResult.errorCode },
     });
     return;
-  } else if (!isUniversal) {
+  } else if (isUniversal) {
+    try {
+      const connector = getConnector(project);
+      const testResult = await connector.testConnection();
+      if (!testResult.connected) {
+        req.log.warn({ projectId: project.id, url: normalizedDomain, error: testResult.error }, "Universal project URL not reachable — project saved for retry");
+      }
+    } catch (err) {
+      req.log.warn({ projectId: project.id, err }, "Universal project URL check failed — project saved for retry");
+    }
+  } else {
     try {
       const connector = getConnector(project);
       const testResult = await connector.testConnection();

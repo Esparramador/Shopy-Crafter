@@ -4,6 +4,7 @@ import { PlatformNotSupportedError } from "./types";
 import { ShopifyConnector } from "./shopify";
 import { PrestaShopConnector } from "./prestashop";
 import { WooCommerceConnector } from "./woocommerce";
+import { UniversalAuditConnector } from "./universal";
 
 export function getConnector(project: Project): IPlatformConnector {
   const platformType = (project as Project & { platformType?: string }).platformType ?? "shopify";
@@ -15,14 +16,14 @@ export function getConnector(project: Project): IPlatformConnector {
     case "prestashop":
       return new PrestaShopConnector(project);
 
+    case "universal":
+      return new UniversalAuditConnector(project);
+
     case "woocommerce":
       return new WooCommerceConnector(project);
 
     case "wordpress":
       throw new PlatformNotSupportedError("wordpress");
-
-    case "universal":
-      throw new PlatformNotSupportedError("universal");
 
     default:
       throw new PlatformNotSupportedError(platformType);
@@ -32,6 +33,7 @@ export function getConnector(project: Project): IPlatformConnector {
 export { ShopifyConnector } from "./shopify";
 export { PrestaShopConnector } from "./prestashop";
 export { WooCommerceConnector } from "./woocommerce";
+export { UniversalAuditConnector } from "./universal";
 export { PlatformNotSupportedError, FeatureNotSupportedError } from "./types";
 export type {
   IPlatformConnector,

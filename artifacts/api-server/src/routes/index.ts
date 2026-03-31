@@ -40,6 +40,7 @@ import automationsRouter from "./automations.js";
 import brainSyncRouter from "./brain-sync.js";
 import referenceImagesRouter from "./reference-images.js";
 import actionButtonsRouter from "./action-buttons.js";
+import auditRouter from "./audit.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -90,5 +91,6 @@ router.use(automationsRouter);
 router.use(brainSyncRouter);
 router.use(referenceImagesRouter);
 router.use(actionButtonsRouter);
+router.use(auditRouter);
 
 export default router;

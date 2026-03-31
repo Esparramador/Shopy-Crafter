@@ -30,15 +30,25 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 
 ### Multi-Platform Connector Architecture
 The platform supports multiple e-commerce platforms via a connector abstraction layer:
-- **Supported Platforms**: Shopify (fully implemented), PrestaShop (fully implemented), WooCommerce (fully implemented), WordPress, Universal (planned)
+- **Supported Platforms**: Shopify (fully implemented), PrestaShop (fully implemented), WooCommerce (fully implemented), Universal Web Audit (fully implemented), WordPress (planned)
 - **IPlatformConnector Interface**: Standard interface for testConnection, getProducts, createProduct, updateProduct, deleteProduct, getProductCount, getSEO, updateSEO, uploadImage
 - **ConnectorFactory**: `getConnector(project)` returns the appropriate connector based on `platformType` field
 - **ShopifyConnector**: Wraps existing `shopify.ts` functions without modifying them (13 files depend on shopify.ts)
 - **PrestaShopConnector**: Full implementation with XML writes / JSON reads, HTTP Basic Auth, multipart image upload, native SEO fields (meta_title, meta_description, link_rewrite, meta_keywords), stock management via stock_availables, combinations support
 - **WooCommerceConnector**: Full implementation with HTTP Basic Auth (consumer key/secret), WC REST API v3, product CRUD, variations, orders, SEO (Yoast), inventory. Pagination via X-WP-Total/X-WP-TotalPages headers.
-- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, woocommerce.ts, index.ts)
+- **UniversalAuditConnector**: Read-only connector for auditing any website. Uses PageSpeed Insights API + HTML scraping + Claude AI analysis. No product CRUD. supportsFeature("audit") returns true.
+- **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, woocommerce.ts, universal.ts, index.ts)
 - **Schema**: `platformType` column on projectsTable (text, NOT NULL, default "shopify")
 - **PrestaShop API Key**: Stored in `clientSecret` (encrypted), `clientId` left empty. Auth via HTTP Basic (key as username, empty password)
+
+### Universal Web Audit System
+Analyzes any website regardless of platform using Google PageSpeed Insights API + HTML scraping + AI analysis.
+- **PageSpeed Service**: `artifacts/api-server/src/lib/pagespeed.ts` — runs dual mobile/desktop audits via Google PageSpeed Insights API
+- **Web Scraper**: `artifacts/api-server/src/lib/web-scraper.ts` — extracts title, meta tags, OG tags, headings, images, links, JSON-LD, robots.txt, sitemap.xml. Includes SSRF protection.
+- **Audit Routes**: `artifacts/api-server/src/routes/audit.ts` — POST run, GET results, GET history
+- **DB Table**: `audit_results` stores all audit data including PageSpeed scores, scraping results, AI analysis, issues, and recommendations
+- **Brain Learning**: Each audit triggers 3 `learnFromOperation()` calls (web_audit, performance_audit, strategic_learning)
+- **NewProject UI**: "Auditoría Universal" mode requires only business name + URL (no API credentials)
 
 ### Database
 PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data. The `projects` table includes a `platform_type` column (text, not-null, default "shopify") supporting: shopify, woocommerce, prestashop, wordpress, universal.

@@ -63,4 +63,3 @@ export const insertProjectSchema = createInsertSchema(projectsTable).omit({
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projectsTable.$inferSelect;
 export type PlanType = "admin" | "emprendedor" | "starter" | "agency_pro" | "enterprise" | "trial";
-export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal";

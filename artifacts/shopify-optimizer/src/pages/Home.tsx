@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Plus, Brain, BarChart3, Mail, TrendingUp, Zap, Users, ShieldCheck } from "lucide-react";
+import { ArrowRight, Plus, Brain, BarChart3, Mail, TrendingUp, Zap, Users, ShieldCheck, Globe } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
@@ -96,29 +96,43 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid-r3">
-            {projects!.map((p: { id: number; name: string; shopDomain?: string | null; storeNiche?: string | null }) => (
-              <Link key={p.id} href={`/projects/${p.id}/audit`}>
-                <div className="glass-card card-hover" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ position: "relative", flexShrink: 0 }}>
-                      <div className="logo-gem" style={{ width: 30, height: 30, fontSize: 13, background: "rgba(200,168,75,0.1)", color: "var(--gold2)" }}>🛍</div>
-                      <span style={{
-                        position: "absolute", top: -6, right: -8,
-                        background: "var(--ink3)", border: "1px solid var(--bdr)",
-                        borderRadius: 6, padding: "1px 5px",
-                        fontSize: 9, fontWeight: 800, color: "var(--t3)", letterSpacing: "0.5px",
-                        lineHeight: "14px",
-                      }}>#{p.id}</span>
+            {projects!.map((p: { id: number; name: string; shopDomain?: string | null; storeNiche?: string | null; platformType?: string | null; avgAuditScore?: number | null }) => {
+              const isUniversal = p.platformType === "universal";
+              return (
+                <Link key={p.id} href={`/projects/${p.id}/audit`}>
+                  <div className="glass-card card-hover" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <div className="logo-gem" style={{
+                          width: 30, height: 30, fontSize: 13,
+                          background: isUniversal ? "rgba(91,155,213,0.1)" : "rgba(200,168,75,0.1)",
+                          color: isUniversal ? "#5b9bd5" : "var(--gold2)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {isUniversal ? <Globe size={15} /> : "🛍"}
+                        </div>
+                        <span style={{
+                          position: "absolute", top: -6, right: -8,
+                          background: "var(--ink3)", border: "1px solid var(--bdr)",
+                          borderRadius: 6, padding: "1px 5px",
+                          fontSize: 9, fontWeight: 800, color: "var(--t3)", letterSpacing: "0.5px",
+                          lineHeight: "14px",
+                        }}>#{p.id}</span>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>{p.name}</p>
+                        <p style={{ fontSize: 11, color: "var(--t3)" }}>
+                          {p.shopDomain ?? "—"}
+                          {p.storeNiche ? ` · ${p.storeNiche}` : ""}
+                          {isUniversal && p.avgAuditScore != null ? ` · Score: ${Math.round(p.avgAuditScore)}/100` : ""}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>{p.name}</p>
-                      <p style={{ fontSize: 11, color: "var(--t3)" }}>{p.shopDomain ?? "—"}{p.storeNiche ? ` · ${p.storeNiche}` : ""}</p>
-                    </div>
+                    <ArrowRight size={14} style={{ color: "var(--t4)", flexShrink: 0 }} />
                   </div>
-                  <ArrowRight size={14} style={{ color: "var(--t4)", flexShrink: 0 }} />
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
