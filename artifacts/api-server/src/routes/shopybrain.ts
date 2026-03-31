@@ -480,7 +480,16 @@ Acciones disponibles:
 - delete_email_flow: Eliminar un flujo de email. Params: {flowId}
 - send_restock_email: Generar email de restock a proveedor con IA. Params: {projectId, productId, productTitle?, currentStock?, daysRemaining?, supplierEmail?}
 - restock_orders: Ver órdenes de restock pendientes/historial. Params: {projectId}
+- edit_collection: Editar una colección existente (título, descripción HTML, SEO, imagen, orden). Params: {projectId, collectionId, collectionType? ("custom"|"smart"), title?, bodyHtml?, sortOrder?, published?, seoTitle?, seoDescription?, image? (URL)}
+- delete_collection: Eliminar una colección. Params: {projectId, collectionId, collectionType? ("custom"|"smart")}
+- get_collection_products: Ver todos los productos de una colección con stock y variantes. Params: {projectId, collectionId, limit?}
 - remove_from_collection: Quitar un producto de una colección. Params: {projectId, collectionId, productId}
+- list_variants: Ver todas las variantes de un producto con stock, precio, SKU, opciones. Params: {projectId, productId}
+- add_variant: Añadir variante a un producto con precio, stock, SKU. Params: {projectId, productId, option1?, option2?, option3?, price?, compareAtPrice?, sku?, barcode?, weight?, weightUnit?, quantity?}
+- edit_variant: Editar una variante (precio, SKU, opciones, stock). Params: {projectId, variantId, option1?, option2?, option3?, price?, compareAtPrice?, sku?, barcode?, weight?, weightUnit?, quantity?}
+- delete_variant: Eliminar una variante de un producto. Params: {projectId, productId, variantId}
+- update_stock: Actualizar stock de un producto/variante. Si se pasa productId sin variantId, actualiza TODAS las variantes. Params: {projectId, productId?, variantId?, quantity}
+- bulk_update_stock: Actualizar stock de múltiples productos/variantes a la vez. Params: {projectId, items: [{variantId? o productId?, quantity}]}
 - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
 - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
 - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
@@ -550,7 +559,11 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Automatizaciones / cron jobs / tareas programadas → list_automations; Ejecutar automatización / ejecutar job / run job → run_automation
 - Flujos de email / email flows / listar flujos → list_email_flows; Crear flujo email (CRUD) → create_email_flow; Eliminar flujo → delete_email_flow
 - Email restock / email proveedor / restock → send_restock_email; Órdenes restock / pedidos restock → restock_orders
+- Editar colección / cambiar descripción colección / actualizar colección → edit_collection; Eliminar colección / borrar colección → delete_collection
+- Productos de una colección / ver colección / qué hay en la colección → get_collection_products
 - Quitar de colección / eliminar de colección / sacar de colección → remove_from_collection
+- Variantes / tallas / colores / opciones de producto → list_variants; Añadir variante / nueva talla / nuevo color → add_variant; Editar variante → edit_variant; Eliminar variante → delete_variant
+- Stock / inventario / actualizar stock / cambiar cantidad → update_stock; Stock masivo / actualizar varios stocks → bulk_update_stock
 - Generar informe / exportar reporte / report / export → generate_export; Auditoría completa / full audit report → run_full_audit_report; Informe IA / AI report → generate_ai_report
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
@@ -564,6 +577,8 @@ Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, dispo
 • DISEÑO DE THEME: Editar Liquid, CSS, secciones, settings del theme de Shopify
 • EMAIL MARKETING: Flujos automáticos (welcome, abandoned cart, post-purchase, win-back), newsletters, campañas
 • COMPETIDORES: Escaneo de competencia, precios, productos, amenazas, alertas
+• COLECCIONES TOTAL: Crear/editar/eliminar colecciones (custom y smart), añadir/quitar productos, ver productos, descripción SEO, imagen, ordenación
+• VARIANTES Y STOCK: Ver/añadir/editar/eliminar variantes, actualizar stock individual y masivo, SKU, códigos de barras, precios por variante
 • INVENTARIO: Sincronización, alertas de stock bajo, restock emails a proveedores, analytics de ventas
 • PROPUESTAS COMERCIALES: Presupuestos y propuestas para clientes
 • CMS COMPLETO: Editar toda la landing, precios, textos, colores de la app
@@ -981,7 +996,7 @@ Responde SOLO con el JSON, sin texto adicional.`;
     insightsCreated,
     summary: parsed.summary ?? `Sesión de estudio completada para ${domainsToStudy.length} dominios`,
     keyDiscoveries: parsed.keyDiscoveries ? JSON.stringify(parsed.keyDiscoveries) : null,
-    tokensUsed: aiRes.usage?.input_tokens + aiRes.usage?.output_tokens,
+    tokensUsed: rawText.length,
   });
 
   res.json({
@@ -4178,6 +4193,378 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
           failedIds: failed,
           message: `✅ ${added.length} productos añadidos a la colección. ${failed.length > 0 ? `${failed.length} fallaron (posiblemente ya asignados).` : ""}`,
         };
+        break;
+      }
+
+      case "edit_collection": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+        const collectionId = params?.collectionId;
+        const collectionType = params?.collectionType || "custom";
+        if (!collectionId) { result = { error: true, message: "❌ Falta collectionId" }; break; }
+        try {
+          const updates: Record<string, unknown> = {};
+          if (params?.title) updates.title = params.title;
+          if (params?.bodyHtml) updates.body_html = params.bodyHtml;
+          if (params?.sortOrder) updates.sort_order = params.sortOrder;
+          if (params?.published !== undefined) updates.published = params.published;
+          if (params?.seoTitle || params?.seoDescription) {
+            updates.metafields_global_title_tag = params.seoTitle || undefined;
+            updates.metafields_global_description_tag = params.seoDescription || undefined;
+          }
+          if (params?.image) updates.image = { src: params.image };
+          if (Object.keys(updates).length === 0) { result = { error: true, message: "❌ No se proporcionaron campos para editar" }; break; }
+
+          const endpoint = collectionType === "smart"
+            ? `/smart_collections/${collectionId}.json`
+            : `/custom_collections/${collectionId}.json`;
+          const bodyKey = collectionType === "smart" ? "smart_collection" : "custom_collection";
+
+          const updated = await shopifyRequest<Record<string, Record<string, unknown>>>(
+            parseInt(projectId), project.shopDomain, endpoint,
+            { method: "PUT", body: JSON.stringify({ [bodyKey]: updates }) }
+          );
+          const col = updated[bodyKey] || {};
+          result = {
+            collectionId: col.id, title: col.title, type: collectionType,
+            message: `✅ Colección "${col.title}" actualizada — campos modificados: ${Object.keys(updates).join(", ")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "delete_collection": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+        const collectionId = params?.collectionId;
+        const collectionType = params?.collectionType || "custom";
+        if (!collectionId) { result = { error: true, message: "❌ Falta collectionId" }; break; }
+        try {
+          const endpoint = collectionType === "smart"
+            ? `/smart_collections/${collectionId}.json`
+            : `/custom_collections/${collectionId}.json`;
+          await shopifyRequest(parseInt(projectId), project.shopDomain, endpoint, { method: "DELETE" });
+          result = { message: `🗑️ Colección ${collectionId} eliminada correctamente` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "get_collection_products": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+        const collectionId = params?.collectionId;
+        if (!collectionId) { result = { error: true, message: "❌ Falta collectionId" }; break; }
+        try {
+          const limit = Math.min(params?.limit ?? 50, 250);
+          const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain,
+            `/collections/${collectionId}/products.json?limit=${limit}&fields=id,title,status,product_type,vendor,tags,variants,images`
+          );
+          const products = data.products || [];
+          const summary = products.map((p: Record<string, unknown>) => {
+            const variants = p.variants as Array<Record<string, unknown>> | undefined;
+            const totalStock = variants?.reduce((sum: number, v: Record<string, unknown>) => sum + (Number(v.inventory_quantity) || 0), 0) || 0;
+            const imgs = p.images as Array<Record<string, unknown>> | undefined;
+            return `• **${p.title}** (ID: ${p.id}) — ${p.status}, stock total: ${totalStock}, variantes: ${variants?.length || 0}, imágenes: ${imgs?.length || 0}`;
+          }).join("\n");
+          result = {
+            collectionId: parseInt(String(collectionId)),
+            products: products.map((p: Record<string, unknown>) => ({
+              id: p.id, title: p.title, status: p.status,
+              productType: p.product_type, vendor: p.vendor,
+              variants: (p.variants as Array<Record<string, unknown>> | undefined)?.map((v: Record<string, unknown>) => ({
+                id: v.id, title: v.title, price: v.price,
+                inventoryQuantity: v.inventory_quantity, sku: v.sku,
+              })),
+              imageCount: (p.images as unknown[] | undefined)?.length || 0,
+            })),
+            total: products.length,
+            message: `📦 **${products.length} productos en colección ${collectionId}**\n\n${summary || "(vacía)"}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_variants": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const data = await shopifyRequest<{ product: Record<string, unknown> }>(
+            parseInt(String(projectId)), project.shopDomain,
+            `/products/${productId}.json?fields=id,title,variants,options`
+          );
+          const product = data.product;
+          const variants = product.variants as Array<Record<string, unknown>> | undefined;
+          const options = product.options as Array<Record<string, unknown>> | undefined;
+          const summary = variants?.map((v: Record<string, unknown>) =>
+            `• ${v.title} — Precio: ${v.price}€, Compare: ${v.compare_at_price || "—"}, Stock: ${v.inventory_quantity}, SKU: ${v.sku || "—"}, Barcode: ${v.barcode || "—"}`
+          ).join("\n") || "(sin variantes)";
+          const optionsSummary = options?.map((o: Record<string, unknown>) =>
+            `  ${o.name}: ${(o.values as string[])?.join(", ")}`
+          ).join("\n") || "";
+          result = {
+            productId, productTitle: product.title,
+            options: options?.map((o: Record<string, unknown>) => ({ name: o.name, values: o.values })),
+            variants: variants?.map((v: Record<string, unknown>) => ({
+              id: v.id, title: v.title, price: v.price, compareAtPrice: v.compare_at_price,
+              inventoryQuantity: v.inventory_quantity, sku: v.sku, barcode: v.barcode,
+              inventoryItemId: v.inventory_item_id, option1: v.option1, option2: v.option2, option3: v.option3,
+            })),
+            totalVariants: variants?.length || 0,
+            totalStock: variants?.reduce((s: number, v: Record<string, unknown>) => s + (Number(v.inventory_quantity) || 0), 0) || 0,
+            message: `📊 **${product.title}** — ${variants?.length || 0} variantes\n\nOpciones:\n${optionsSummary}\n\nVariantes:\n${summary}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "update_stock": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const variantId = params?.variantId;
+        const quantity = params?.quantity;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        if (quantity === undefined || quantity === null) { result = { error: true, message: "❌ Falta quantity (stock a establecer)" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const token = safeDecrypt(project.accessToken);
+          const domain = project.shopDomain;
+
+          let targetVariants: Array<{ variantId: string | number; inventoryItemId: string | number; title: string }> = [];
+
+          if (variantId) {
+            const vData = await shopifyRequest<{ variant: Record<string, unknown> }>(
+              parseInt(String(projectId)), domain, `/variants/${variantId}.json?fields=id,title,inventory_item_id`
+            );
+            targetVariants = [{ variantId: vData.variant.id as number, inventoryItemId: vData.variant.inventory_item_id as number, title: String(vData.variant.title) }];
+          } else if (productId) {
+            const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
+              parseInt(String(projectId)), domain, `/products/${productId}.json?fields=variants`
+            );
+            const variants = pData.product.variants as Array<Record<string, unknown>>;
+            targetVariants = variants.map(v => ({
+              variantId: v.id as number, inventoryItemId: v.inventory_item_id as number, title: String(v.title),
+            }));
+          } else {
+            result = { error: true, message: "❌ Falta productId o variantId para identificar qué stock actualizar" }; break;
+          }
+
+          const locationsResp = await fetch(`https://${domain}/admin/api/2024-01/locations.json`, {
+            headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+          });
+          const locationsData = await locationsResp.json() as { locations: Array<{ id: number; name: string }> };
+          const locationId = locationsData.locations?.[0]?.id;
+          if (!locationId) { result = { error: true, message: "❌ No se encontró ubicación (location) en Shopify" }; break; }
+
+          const updated: string[] = [];
+          for (const tv of targetVariants) {
+            const levelResp = await fetch(`https://${domain}/admin/api/2024-01/inventory_levels/set.json`, {
+              method: "POST",
+              headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location_id: locationId,
+                inventory_item_id: tv.inventoryItemId,
+                available: parseInt(String(quantity)),
+              }),
+            });
+            if (levelResp.ok) {
+              updated.push(`✅ ${tv.title}: stock → ${quantity}`);
+            } else {
+              const err = await levelResp.json().catch(() => ({})) as Record<string, unknown>;
+              updated.push(`❌ ${tv.title}: ${err.errors || "error"}`);
+            }
+          }
+          result = {
+            updated: updated.length,
+            locationId,
+            message: `📦 **Stock actualizado**\n\n${updated.join("\n")}\n\n📍 Ubicación: ${locationsData.locations?.[0]?.name || locationId}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "bulk_update_stock": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        const items = params?.items as Array<{ variantId?: string; productId?: string; quantity: number }> | undefined;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          result = { error: true, message: "❌ Falta items — array de {variantId o productId, quantity}" }; break;
+        }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const token = safeDecrypt(project.accessToken);
+          const domain = project.shopDomain;
+
+          const locationsResp = await fetch(`https://${domain}/admin/api/2024-01/locations.json`, {
+            headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+          });
+          const locationsData = await locationsResp.json() as { locations: Array<{ id: number }> };
+          const locationId = locationsData.locations?.[0]?.id;
+          if (!locationId) { result = { error: true, message: "❌ No se encontró ubicación" }; break; }
+
+          let successCount = 0;
+          let failCount = 0;
+          const details: string[] = [];
+          for (const item of items) {
+            try {
+              let inventoryItemId: number | null = null;
+              let label = "";
+              if (item.variantId) {
+                const vData = await shopifyRequest<{ variant: Record<string, unknown> }>(
+                  parseInt(String(projectId)), domain, `/variants/${item.variantId}.json?fields=id,title,inventory_item_id`
+                );
+                inventoryItemId = vData.variant.inventory_item_id as number;
+                label = String(vData.variant.title);
+              } else if (item.productId) {
+                const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
+                  parseInt(String(projectId)), domain, `/products/${item.productId}.json?fields=title,variants`
+                );
+                const firstVariant = (pData.product.variants as Array<Record<string, unknown>>)?.[0];
+                inventoryItemId = firstVariant?.inventory_item_id as number;
+                label = String(pData.product.title);
+              }
+              if (!inventoryItemId) { failCount++; details.push(`❌ ${label || item.variantId || item.productId}: sin inventory_item_id`); continue; }
+              const resp = await fetch(`https://${domain}/admin/api/2024-01/inventory_levels/set.json`, {
+                method: "POST",
+                headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+                body: JSON.stringify({ location_id: locationId, inventory_item_id: inventoryItemId, available: item.quantity }),
+              });
+              if (resp.ok) { successCount++; details.push(`✅ ${label}: stock → ${item.quantity}`); }
+              else { failCount++; details.push(`❌ ${label}: error`); }
+            } catch { failCount++; details.push(`❌ Item: error`); }
+          }
+          result = {
+            success: successCount, failed: failCount,
+            message: `📦 **Stock actualizado en lote**: ${successCount} exitosos, ${failCount} fallidos\n\n${details.join("\n")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "add_variant": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const variant: Record<string, unknown> = {};
+          if (params?.option1) variant.option1 = params.option1;
+          if (params?.option2) variant.option2 = params.option2;
+          if (params?.option3) variant.option3 = params.option3;
+          if (params?.price) variant.price = String(params.price);
+          if (params?.compareAtPrice) variant.compare_at_price = String(params.compareAtPrice);
+          if (params?.sku) variant.sku = params.sku;
+          if (params?.barcode) variant.barcode = params.barcode;
+          if (params?.weight) variant.weight = params.weight;
+          if (params?.weightUnit) variant.weight_unit = params.weightUnit;
+          variant.inventory_management = "shopify";
+
+          const created = await shopifyRequest<{ variant: Record<string, unknown> }>(
+            parseInt(String(projectId)), project.shopDomain, `/products/${productId}/variants.json`,
+            { method: "POST", body: JSON.stringify({ variant }) }
+          );
+          const v = created.variant;
+
+          if (params?.quantity !== undefined) {
+            const token = safeDecrypt(project.accessToken);
+            const locResp = await fetch(`https://${project.shopDomain}/admin/api/2024-01/locations.json`, {
+              headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+            });
+            const locData = await locResp.json() as { locations: Array<{ id: number }> };
+            const locId = locData.locations?.[0]?.id;
+            if (locId && v.inventory_item_id) {
+              await fetch(`https://${project.shopDomain}/admin/api/2024-01/inventory_levels/set.json`, {
+                method: "POST",
+                headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+                body: JSON.stringify({ location_id: locId, inventory_item_id: v.inventory_item_id, available: parseInt(String(params.quantity)) }),
+              });
+            }
+          }
+
+          result = {
+            variantId: v.id, productId,
+            title: v.title, price: v.price, sku: v.sku,
+            inventoryQuantity: params?.quantity ?? v.inventory_quantity,
+            message: `✅ **Variante creada**: ${v.title}\n💰 Precio: ${v.price}€\n📦 Stock: ${params?.quantity ?? v.inventory_quantity}\n🏷️ SKU: ${v.sku || "—"}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "edit_variant": {
+        const projectId = params?.projectId;
+        const variantId = params?.variantId;
+        if (!projectId || !variantId) { result = { error: true, message: "❌ Falta projectId o variantId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const updates: Record<string, unknown> = {};
+          if (params?.option1) updates.option1 = params.option1;
+          if (params?.option2) updates.option2 = params.option2;
+          if (params?.option3) updates.option3 = params.option3;
+          if (params?.price) updates.price = String(params.price);
+          if (params?.compareAtPrice) updates.compare_at_price = String(params.compareAtPrice);
+          if (params?.sku) updates.sku = params.sku;
+          if (params?.barcode) updates.barcode = params.barcode;
+          if (params?.weight) updates.weight = params.weight;
+          if (params?.weightUnit) updates.weight_unit = params.weightUnit;
+
+          const updated = await shopifyRequest<{ variant: Record<string, unknown> }>(
+            parseInt(String(projectId)), project.shopDomain, `/variants/${variantId}.json`,
+            { method: "PUT", body: JSON.stringify({ variant: updates }) }
+          );
+          const v = updated.variant;
+
+          if (params?.quantity !== undefined) {
+            const token = safeDecrypt(project.accessToken);
+            const locResp = await fetch(`https://${project.shopDomain}/admin/api/2024-01/locations.json`, {
+              headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+            });
+            const locData = await locResp.json() as { locations: Array<{ id: number }> };
+            const locId = locData.locations?.[0]?.id;
+            if (locId && v.inventory_item_id) {
+              await fetch(`https://${project.shopDomain}/admin/api/2024-01/inventory_levels/set.json`, {
+                method: "POST",
+                headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+                body: JSON.stringify({ location_id: locId, inventory_item_id: v.inventory_item_id, available: parseInt(String(params.quantity)) }),
+              });
+            }
+          }
+
+          result = {
+            variantId: v.id, title: v.title, price: v.price,
+            message: `✅ **Variante actualizada**: ${v.title}\n💰 Precio: ${v.price}€${params?.quantity !== undefined ? `\n📦 Stock: ${params.quantity}` : ""}\n🏷️ SKU: ${v.sku || "—"}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "delete_variant": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const variantId = params?.variantId;
+        if (!projectId || !productId || !variantId) { result = { error: true, message: "❌ Falta projectId, productId o variantId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          await shopifyRequest(
+            parseInt(String(projectId)), project.shopDomain, `/products/${productId}/variants/${variantId}.json`,
+            { method: "DELETE" }
+          );
+          result = { message: `🗑️ **Variante ${variantId} eliminada** del producto ${productId}` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
 
