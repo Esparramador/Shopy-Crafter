@@ -77,3 +77,23 @@ export async function editImageFromBuffer(
   const base64 = response.data[0]?.b64_json ?? "";
   return Buffer.from(base64, "base64");
 }
+
+export async function editMultipleImagesFromBuffers(
+  imageBuffers: Array<{ buffer: Buffer; name: string }>,
+  prompt: string,
+  size: "1024x1024" | "1536x1024" | "1024x1536" | "auto" = "1024x1024"
+): Promise<Buffer> {
+  const files = await Promise.all(
+    imageBuffers.map((img) => toFile(img.buffer, img.name, { type: "image/png" }))
+  );
+
+  const response = await openai.images.edit({
+    model: "gpt-image-1",
+    image: files,
+    prompt,
+    size,
+  });
+
+  const base64 = response.data[0]?.b64_json ?? "";
+  return Buffer.from(base64, "base64");
+}

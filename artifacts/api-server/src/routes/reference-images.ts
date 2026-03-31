@@ -353,5 +353,304 @@ router.get("/reference-image-scenes", (req, res): void => {
   res.json({ scenes: scenes.map(s => ({ key: s.key, label: s.label })), productType, niche });
 });
 
+interface TryOnScene {
+  key: string;
+  label: string;
+  aspectRatio: "1024x1024" | "1536x1024" | "1024x1536";
+}
+
+function getTryOnScenes(productType: string): TryOnScene[] {
+  const lower = productType.toLowerCase();
+
+  if (/camis|camiseta|polo|sudadera|hoodie|jersey|blusa|top|vest|shirt|ropa|vestido|falda|pantalon|chaqueta|abrigo/i.test(lower)) {
+    return [
+      { key: "model_front", label: "Modelo frontal — outfit completo", aspectRatio: "1024x1536" },
+      { key: "model_street", label: "Street style — paseo urbano", aspectRatio: "1024x1536" },
+      { key: "model_editorial", label: "Editorial de moda — revista", aspectRatio: "1024x1536" },
+      { key: "model_casual", label: "Casual lifestyle — día a día", aspectRatio: "1536x1024" },
+      { key: "model_close", label: "Close-up — detalle del outfit", aspectRatio: "1024x1024" },
+    ];
+  }
+
+  if (/zapato|zapatilla|sneaker|bota|sandalia|calzado|shoe|boot/i.test(lower)) {
+    return [
+      { key: "feet_street", label: "Calzado en calle — caminando", aspectRatio: "1536x1024" },
+      { key: "feet_full", label: "Outfit completo — calzado visible", aspectRatio: "1024x1536" },
+      { key: "feet_detail", label: "Close-up — detalle del calzado", aspectRatio: "1024x1024" },
+      { key: "feet_lifestyle", label: "Lifestyle — en contexto", aspectRatio: "1536x1024" },
+    ];
+  }
+
+  if (/joya|collar|anillo|pulsera|pendiente|arete|reloj|gafas|bolso|accesorio/i.test(lower)) {
+    return [
+      { key: "worn_elegant", label: "Modelo con accesorio — elegante", aspectRatio: "1024x1536" },
+      { key: "worn_closeup", label: "Close-up — accesorio puesto", aspectRatio: "1024x1024" },
+      { key: "worn_lifestyle", label: "Lifestyle — uso cotidiano", aspectRatio: "1536x1024" },
+      { key: "worn_editorial", label: "Editorial — revista de moda", aspectRatio: "1024x1536" },
+    ];
+  }
+
+  if (/cosmetica|maquillaje|crema|serum|perfume|beauty|skincare|makeup|locion|champu|shampoo/i.test(lower)) {
+    return [
+      { key: "model_apply", label: "Modelo aplicando producto", aspectRatio: "1024x1024" },
+      { key: "model_result", label: "Resultado — piel/cabello perfecto", aspectRatio: "1024x1536" },
+      { key: "model_routine", label: "Rutina de belleza", aspectRatio: "1536x1024" },
+      { key: "model_closeup", label: "Close-up facial con producto", aspectRatio: "1024x1024" },
+    ];
+  }
+
+  return [
+    { key: "model_using", label: "Modelo usando el producto", aspectRatio: "1024x1024" },
+    { key: "model_lifestyle", label: "Lifestyle con producto", aspectRatio: "1536x1024" },
+    { key: "model_hero", label: "Hero con modelo", aspectRatio: "1024x1536" },
+    { key: "model_detail", label: "Detalle de uso", aspectRatio: "1024x1024" },
+  ];
+}
+
+const multiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Solo se aceptan imágenes"));
+  },
+});
+
+router.post(
+  "/projects/:projectId/products/:productId/images/virtual-tryon",
+  multiUpload.fields([
+    { name: "modelImage", maxCount: 1 },
+    { name: "productImages", maxCount: 5 },
+  ]),
+  async (req, res): Promise<void> => {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+
+    const productTitle = product?.title || req.body.productTitle || "Producto";
+    const productType = product?.productType || req.body.productType || "";
+    const niche = project.storeNiche || "general";
+    const autoUpload = req.body.autoUpload !== "false";
+
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const modelImageFile = files?.modelImage?.[0];
+    const productImageFiles = files?.productImages || [];
+
+    let modelBuffer: Buffer | null = null;
+    const productBuffers: Buffer[] = [];
+
+    if (modelImageFile) {
+      modelBuffer = modelImageFile.buffer;
+    } else if (req.body.modelImageUrl) {
+      try { modelBuffer = await downloadImageToBuffer(req.body.modelImageUrl); } catch (e) {
+        res.status(400).json({ error: `Error descargando imagen del modelo: ${e instanceof Error ? e.message : "desconocido"}` }); return;
+      }
+    }
+
+    if (!modelBuffer) {
+      res.status(400).json({ error: "Se requiere una imagen de la persona/modelo (modelImage o modelImageUrl)" }); return;
+    }
+
+    for (const f of productImageFiles) {
+      productBuffers.push(f.buffer);
+    }
+
+    if (req.body.productImageUrls) {
+      try {
+        const urls: string[] = JSON.parse(req.body.productImageUrls);
+        const maxUrls = 5;
+        for (const url of urls.slice(0, maxUrls)) {
+          const buf = await downloadImageToBuffer(url);
+          productBuffers.push(buf);
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    if (productBuffers.length === 0) {
+      res.status(400).json({ error: "Se requiere al menos una imagen del producto (productImages o productImageUrls)" }); return;
+    }
+
+    if (productBuffers.length > 5) {
+      productBuffers.length = 5;
+    }
+
+    let selectedScenes: string[] | null = null;
+    if (req.body.scenes) {
+      try { selectedScenes = JSON.parse(req.body.scenes); } catch { /* ignore */ }
+    }
+
+    const allScenes = getTryOnScenes(productType);
+    const scenesToGen = selectedScenes
+      ? allScenes.filter(s => selectedScenes!.includes(s.key))
+      : allScenes;
+
+    const limitCheck = await checkProductionLimit(projectId, "image", scenesToGen.length);
+    const allowedCount = limitCheck.allowed ? scenesToGen.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+    if (allowedCount === 0) {
+      res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return;
+    }
+    const finalScenes = scenesToGen.slice(0, allowedCount);
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const sendEvent = (data: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    sendEvent({ type: "started", totalScenes: finalScenes.length, scenes: finalScenes.map(s => ({ key: s.key, label: s.label })) });
+
+    const results: Array<{ scene: string; label: string; success: boolean; shopifyImageId?: number; error?: string }> = [];
+
+    try {
+      const { editMultipleImagesFromBuffers } = await import("@workspace/integrations-openai-ai-server/image");
+      let position = 1;
+
+      for (const scene of finalScenes) {
+        sendEvent({ type: "generating", scene: scene.key, label: scene.label, progress: results.length + 1, total: finalScenes.length });
+
+        try {
+          const aiPrompt = await generateTryOnPrompt(projectId, productTitle, productType, niche, scene.label, scene.key);
+
+          const imageInputs: Array<{ buffer: Buffer; name: string }> = [
+            { buffer: modelBuffer, name: "person_model.png" },
+            ...productBuffers.map((buf, i) => ({ buffer: buf, name: `product_${i + 1}.png` })),
+          ];
+
+          const generatedBuffer = await editMultipleImagesFromBuffers(imageInputs, aiPrompt, scene.aspectRatio);
+
+          const altTextRaw = await askClaudeWithBrain(projectId, [{
+            role: "user",
+            content: `Genera un alt text SEO conciso (max 125 chars) para una foto de producto. Producto: ${productTitle}. Escena: ${scene.label}. Es una foto tipo "virtual try-on" con modelo real. En español. Solo el texto, sin comillas ni markdown.`
+          }], undefined, "images", niche).catch(() => `${productTitle} - ${scene.label}`);
+          const altText = altTextRaw.replace(/```[\s\S]*?```/g, "").replace(/["`]/g, "").split("\n")[0].trim().slice(0, 125);
+
+          let shopifyImageId: number | undefined;
+          if (autoUpload) {
+            const uploadResult = await uploadBufferToShopify({
+              projectId,
+              shopDomain: project.shopDomain,
+              shopifyProductId,
+              imageBuffer: generatedBuffer,
+              altText,
+              position: position++,
+            });
+            if (uploadResult.success) shopifyImageId = uploadResult.shopifyImageId;
+          }
+
+          await recordUsage(projectId, "image", 1);
+
+          const [job] = await db.insert(generationJobsTable).values({
+            projectId,
+            shopifyProductId,
+            imageType: `tryon_${scene.key}`,
+            status: "succeeded",
+            prompt: aiPrompt.slice(0, 2000),
+            model: "gpt-image-1",
+            estimatedCost: 0.08,
+            altText,
+            shopifyImageId: shopifyImageId ?? null,
+            completedAt: new Date(),
+          }).returning();
+
+          await saveToVault({
+            projectId,
+            fileType: "image",
+            category: `tryon_${scene.key}`,
+            title: `Virtual Try-On: ${scene.label} — ${productTitle}`,
+            description: altText,
+            mimeType: "image/png",
+            productId: shopifyProductId,
+            productTitle,
+            generatedBy: "virtual_tryon_engine",
+            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id },
+          }).catch(() => {});
+
+          results.push({ scene: scene.key, label: scene.label, success: true, shopifyImageId });
+          sendEvent({ type: "completed", scene: scene.key, label: scene.label, success: true, shopifyImageId, progress: results.length, total: finalScenes.length });
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : "Error generando imagen";
+          results.push({ scene: scene.key, label: scene.label, success: false, error: errorMsg });
+          sendEvent({ type: "error", scene: scene.key, label: scene.label, error: errorMsg, progress: results.length, total: finalScenes.length });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+
+      learnFromOperation({
+        operationType: "images",
+        niche,
+        productType,
+        title: `Virtual Try-On: ${productTitle} (${successCount}/${results.length} exitosas)`,
+        content: `Tipo: virtual_tryon\nProducto: ${productTitle}\nEscenas: ${results.map(r => `${r.label}(${r.success ? "ok" : "fail"})`).join(", ")}\nModelo: gpt-image-1\nImágenes producto: ${productBuffers.length}`,
+        confidence: 0.90,
+        tags: ["virtual_tryon", niche, productType].filter(Boolean),
+      });
+
+      sendEvent({ type: "done", results, summary: { total: results.length, success: successCount, failed: failedCount } });
+    } catch (fatalErr: unknown) {
+      const msg = fatalErr instanceof Error ? fatalErr.message : "Error fatal";
+      sendEvent({ type: "error", scene: "system", label: "Sistema", error: msg, progress: 0, total: finalScenes.length });
+      sendEvent({ type: "done", results, summary: { total: finalScenes.length, success: 0, failed: finalScenes.length } });
+    }
+    res.end();
+  }
+);
+
+router.get("/virtual-tryon-scenes", (req, res): void => {
+  const productType = (req.query.productType as string) || "";
+  const scenes = getTryOnScenes(productType);
+  res.json({ scenes: scenes.map(s => ({ key: s.key, label: s.label })), productType });
+});
+
+async function generateTryOnPrompt(
+  projectId: number,
+  productTitle: string,
+  productType: string,
+  niche: string,
+  sceneLabel: string,
+  sceneKey: string
+): Promise<string> {
+  const systemPrompt = `You are the world's TOP fashion photographer and creative director specializing in virtual try-on and product-on-model photography. You have directed campaigns for Zara, Nike, Chanel, Supreme, Gucci, and Sephora.
+
+Your job: Write ONE hyper-specific image editing prompt that will DRESS the person from Image 1 (the model photo) with ALL the products/items shown in Image 2+ (the product photos).
+
+CRITICAL RULES:
+1. Image 1 is the PERSON/MODEL. PRESERVE their face, identity, body type, skin tone, and natural features EXACTLY. Do not alter the person's appearance.
+2. Images 2+ are the PRODUCT(S) to put ON the model. Every product detail (color, pattern, texture, design, brand elements) must be EXACTLY preserved on the model.
+3. The result must look like a REAL photograph — no AI artifacts, no uncanny valley, no floating products.
+4. Specify the EXACT scene/setting matching the shot type. Include specific lighting, environment, mood.
+5. For clothing: the garments must FIT naturally on the person's body with proper draping, wrinkles, and shadows.
+6. For accessories: they must be worn/held naturally with proper scale and positioning.
+7. For cosmetics: show natural application with realistic skin interaction.
+8. Output ONLY the prompt — no explanations, no markdown, no quotes.
+9. Maximum 200 words. Every word must add visual direction.
+10. NEVER include text/typography/watermarks in the image.
+11. Always start with: "Take the person from Image 1 and..."`;
+
+  const userPrompt = `PRODUCT: "${productTitle}"
+CATEGORY: ${productType}
+STORE NICHE: ${niche}
+SCENE: ${sceneLabel} (key: ${sceneKey})
+NUMBER OF PRODUCT IMAGES: Multiple product/outfit pieces to combine on the model
+
+Write the specialized virtual try-on prompt for this product and scene.`;
+
+  try {
+    const result = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", niche);
+    const cleaned = result.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").trim();
+    if (cleaned.length >= 50) return cleaned;
+  } catch { /* fall through to default */ }
+
+  return `Take the person from Image 1 and dress them wearing ALL the clothing and accessories shown in the product images (Images 2+). The product "${productTitle}" must appear EXACTLY as shown — same color, texture, pattern, design details. The person's face, identity, and body type must remain EXACTLY the same. Create a professional ${sceneLabel} photo with natural lighting, realistic fabric draping, proper shadows, and commercial fashion photography quality. Shot on 85mm f/1.8 lens, editorial magazine quality.`;
+}
+
 export default router;
-export { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify };
+export { getScenesForProductType, getTryOnScenes, downloadImageToBuffer, uploadBufferToShopify };

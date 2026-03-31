@@ -69,8 +69,8 @@ function detectProductNature(productTitle: string, productType: string | null): 
 const promptCache = new Map<string, { prompt: string; timestamp: number }>();
 const PROMPT_CACHE_TTL = 30 * 60 * 1000;
 
-function getCacheKey(productTitle: string, imageType: string, storeNiche: string | null): string {
-  return `${productTitle}::${imageType}::${storeNiche ?? "default"}`;
+function getCacheKey(projectId: number, productTitle: string, productType: string | null, imageType: string, storeNiche: string | null, brandTone: string | null): string {
+  return `${projectId}::${productTitle}::${productType ?? ""}::${imageType}::${storeNiche ?? "default"}::${brandTone ?? "default"}`;
 }
 
 export async function buildImagePrompt(
@@ -82,7 +82,7 @@ export async function buildImagePrompt(
   brandTone: string | null,
   productDescription?: string | null
 ): Promise<string> {
-  const cacheKey = getCacheKey(productTitle, imageType, storeNiche);
+  const cacheKey = getCacheKey(projectId, productTitle, productType, imageType, storeNiche, brandTone);
   const cached = promptCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < PROMPT_CACHE_TTL) {
     return cached.prompt;

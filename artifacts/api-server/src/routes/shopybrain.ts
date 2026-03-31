@@ -394,6 +394,7 @@ Acciones disponibles:
 - financial_dashboard: Ver dashboard financiero completo (márgenes, COGS, revenue). Params: {projectId}
 - generate_product_images: Generar imágenes IA para un producto (hero, lifestyle, detalle, etc). Params: {projectId, productId, imageTypes? (array)}
 - generate_images_from_reference: Generar imágenes profesionales a partir de una IMAGEN DE REFERENCIA del producto real. El usuario proporciona una foto de su producto y el sistema genera múltiples fotos profesionales desde diferentes ángulos, con modelos, lifestyle, detalles, flat-lay, etc., manteniendo la FIDELIDAD EXACTA al producto original. Se adapta al tipo de producto: ropa (modelo frontal/trasera/lateral/lifestyle), calzado (puesto/par/suela), joyería (modelo/elegante/macro), cosmética (textura/aplicación/ingredientes), comida (apetitoso/servir/mesa), electrónica (hero/uso/ángulos), y CUALQUIER otro tipo. Params: {projectId, productId, referenceImageUrl, productTitle?, productType?, scenes? (array de keys específicos), autoUpload? (default true)}
+- virtual_tryon: VIRTUAL TRY-ON / OOTD / Photoshoot con modelo. Vestir a una persona real con los productos de la tienda. El usuario proporciona: 1) foto de una persona/modelo, 2) fotos del producto (ropa, zapatos, accesorios, cosméticos, etc). El sistema VISTE a esa persona con los productos generando fotos ultra-profesionales tipo campaña de moda (frontal, street style, editorial, lifestyle, close-up). Funciona para CUALQUIER producto físico: ropa, calzado, joyería, cosméticos, accesorios, etc. Params: {projectId, productId, modelImageUrl (URL de la foto de la persona), productImageUrls (array de URLs de fotos de productos), productTitle?, productType?, scenes? (array de keys), autoUpload? (default true)}
 - bulk_generate_images: Generar imágenes para múltiples productos. Params: {projectId, productIds (array de IDs), imageTypes? (array: "hero","lifestyle","detail","packaging","ugc","scale" — default: ["hero","lifestyle","detail"])}
 - generate_email_flow: Crear flujo de email marketing completo con IA (welcome, abandoned cart, post-purchase). Params: {projectId, flowType ("welcome"|"abandoned_cart"|"post_purchase"|"win_back"|"custom"), customTopic?}
 - generate_email: Generar un email de marketing individual con IA. Params: {projectId, emailType ("promotional"|"newsletter"|"product_launch"|"sale"), subject?, products?}
@@ -462,7 +463,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Precio óptimo / mejor precio → calculate_optimal_price; Estimar costos / COGS → estimate_cogs
 - Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
 - Dashboard financiero / márgenes → financial_dashboard
-- Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Imágenes todos / bulk images → bulk_generate_images
+- Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
 - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
 - Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
@@ -1124,7 +1125,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const seoActions = ["seo_full_audit", "generate_all_metas", "generate_schemas", "fix_all_alt_texts", "audit_page_speed", "generate_sitemap", "keyword_intelligence", "blog_strategy", "generate_blog_post"];
   const pricingActions = ["change_price", "calculate_optimal_price", "estimate_cogs", "price_simulator", "financial_forecast", "financial_dashboard", "generate_competitive_pricing"];
   const productActions = ["create_product", "edit_product", "optimize_product", "redesign_product", "apply_redesign", "bulk_redesign", "optimize_all_products", "set_product_status", "publish_product", "delete_product"];
-  const imageActions = ["generate_product_images", "generate_images_from_reference", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
+  const imageActions = ["generate_product_images", "generate_images_from_reference", "virtual_tryon", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
   const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
@@ -5599,6 +5600,58 @@ Responde SOLO con JSON válido (sin markdown):
 
           result = {
             message: `🖼️ **Imágenes generadas desde referencia**\n\n📸 ${summary.success}/${summary.total} fotos profesionales creadas:\n${sceneResults.join("\n")}\n\n${summary.success > 0 ? "✅ Imágenes subidas automáticamente a Shopify" : "⚠️ Algunas imágenes no se pudieron generar"}`,
+            imagesGenerated: summary.success,
+            imagesFailed: summary.failed,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "virtual_tryon": {
+        const projectId = params?.projectId;
+        const productId = params?.productId;
+        const modelImageUrl = params?.modelImageUrl;
+        const productImageUrls = params?.productImageUrls as string[] | undefined;
+        if (!projectId || !productId) { result = { error: true, message: "❌ Falta projectId o productId" }; break; }
+        if (!modelImageUrl) { result = { error: true, message: "❌ Falta modelImageUrl — necesito la URL de la foto de la persona/modelo" }; break; }
+        if (!productImageUrls || !productImageUrls.length) { result = { error: true, message: "❌ Falta productImageUrls — necesito al menos una URL de foto del producto (ropa, calzado, accesorio, etc)" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const formData = new FormData();
+          formData.append("modelImageUrl", String(modelImageUrl));
+          formData.append("productImageUrls", JSON.stringify(productImageUrls));
+          if (params?.productTitle) formData.append("productTitle", String(params.productTitle));
+          if (params?.productType) formData.append("productType", String(params.productType));
+          if (params?.scenes) formData.append("scenes", JSON.stringify(params.scenes));
+          formData.append("autoUpload", String(params?.autoUpload ?? "true"));
+
+          const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${productId}/images/virtual-tryon`, {
+            method: "POST",
+            headers: { cookie: req.headers.cookie ?? "" },
+            body: formData,
+          });
+
+          if (!resp.ok) {
+            const errData = await resp.json() as Record<string, unknown>;
+            result = { error: true, message: `❌ ${errData.error ?? "Error en virtual try-on"}` };
+            break;
+          }
+
+          const text = await resp.text();
+          const lines = text.split("\n").filter(l => l.startsWith("data: "));
+          let summary = { total: 0, success: 0, failed: 0 };
+          const sceneResults: string[] = [];
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
+              if (data.type === "done") summary = data.summary as typeof summary;
+              if (data.type === "completed" && data.success) sceneResults.push(`✅ ${data.label}`);
+              if (data.type === "error") sceneResults.push(`❌ ${data.label}: ${data.error}`);
+            } catch {}
+          }
+
+          result = {
+            message: `👗 **Virtual Try-On completado**\n\n📸 ${summary.success}/${summary.total} fotos profesionales generadas:\n${sceneResults.join("\n")}\n\n${summary.success > 0 ? "✅ Imágenes subidas automáticamente a Shopify\n\n🎯 Tipo: Modelo real vistiendo los productos de la tienda" : "⚠️ Algunas imágenes no se pudieron generar"}`,
             imagesGenerated: summary.success,
             imagesFailed: summary.failed,
           };

@@ -1,7 +1,7 @@
 # Shopy Crafter Agency Platform
 
 ## Overview
-Shopy Crafter (shopycrafter.com) is a multi-user Shopify AI optimization agency platform for `admin` and `client` roles. Public name: "Shopy Crafter"; internal AI engine: "ShopyBrain". It utilizes a Dual AI Engine (Gemini + Claude) for market research, competitor analysis, product trend identification, and content generation. The platform integrates with Shopify to provide comprehensive business intelligence and automation, aiming to maximize ROI for Shopify stores through AI-driven insights and actions.
+Shopy Crafter is a multi-user Shopify AI optimization agency platform (shopycrafter.com) designed for `admin` and `client` roles. It leverages a Dual AI Engine (Gemini + Claude), internally named "ShopyBrain," for comprehensive market research, competitor analysis, product trend identification, and content generation. The platform integrates deeply with Shopify to deliver AI-driven insights and automation, aiming to significantly enhance ROI for Shopify stores. Key capabilities include AI-powered product creation, image generation, SEO optimization, and financial analysis.
 
 ## User Preferences
 - Admin email: `sadiagiljoan@gmail.com` (password stored in DB, bcrypt-hashed)
@@ -29,92 +29,55 @@ The project is a pnpm workspace monorepo built with TypeScript and Node.js 24.
 - **Landing Page Sections**: 7 sections including Hero, Engines, Demo, Results, Pricing, Calculator, and Contact.
 
 ### Database
-PostgreSQL with Drizzle ORM, utilizing over 44 tables for user management, project data, product information, deep inventory tracking, sales analytics, and extensive AI-related memory and insight storage.
+PostgreSQL with Drizzle ORM, managing over 44 tables for user, project, product, inventory, sales, and extensive AI-related data.
 
 ### AI Stack (Single Brain Architecture)
-A **Dual AI Engine** architecture integrates Claude and Gemini for superior output and also integrates with Replicate for image generation.
-- **Dual AI Engine**: Supports `parallel_synthesis`, `gemini_research_claude_redact`, `claude_only`, `gemini_only` modes with graceful fallback.
-- **ShopyBrain (SINGLE BRAIN)**: The central AI "brain" for all AI calls, utilizing 46,000+ knowledge insights and 79+ chatbot actions for Shopify CRUD, product redesign, A/B testing, SEO intelligence, pricing intelligence, image generation, email marketing, competitor analysis, copyright audit, and full store setup. Every operation passes through ShopyBrain context (`askClaudeWithBrain`/`askClaudeJsonWithBrain`), executes, then learns via `learnFromOperation`. NEVER use `askClaude()` directly.
-- **Knowledge Search Engine**: Smart keyword-based relevance search across insights, used to build AI contexts.
-- **Brain Sync System**: Infrastructure for full brain import/export/sync, including self-knowledge injection and Shopify service product creation.
-- **Retroactive Learning (Deep)**: Chatbot actions trigger `learnFromOperation()` to categorize results and extract structured data. Conversations feed the brain via `learnFromConversation()`, detecting explicit instructions and insights. Includes `learn_from_url`, `learn_from_content`, `recall_knowledge`, and `brain_status` actions.
-- **Landing Pre-Report System**: Generates AI pre-reports for leads from contact form submissions, including business research, market analysis, SEO audit, and product sample optimization.
+A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating with Replicate and OpenAI gpt-image-1 for image generation.
+- **ShopyBrain**: The central AI "brain" for all AI calls, utilizing over 46,000 knowledge insights and 79+ chatbot actions for Shopify CRUD, product redesign, A/B testing, SEO intelligence, pricing intelligence, image generation, email marketing, competitor analysis, copyright audit, and full store setup. All operations pass through ShopyBrain context and facilitate learning via `learnFromOperation` and `learnFromConversation`.
+- **Knowledge Search Engine**: Smart keyword-based relevance search for building AI contexts.
+- **Brain Sync System**: Infrastructure for brain import/export/sync, self-knowledge injection, and Shopify service product creation.
+- **Retroactive Learning (Deep)**: Chatbot actions trigger `learnFromOperation()` to categorize results and extract structured data. Conversations feed the brain via `learnFromConversation()`.
+- **Landing Pre-Report System**: Generates AI pre-reports for leads from contact forms, including business research, market analysis, SEO audit, and product sample optimization.
 
 ### Key Features
-- **Client Portal**: Provides KPI summaries and activity timelines.
+- **Client Portal**: KPI summaries and activity timelines.
 - **CMS Editor**: Visual content editor with AI copywriting and version history.
-- **AI-Powered Lead Pre-Report**: Generates detailed pre-reports for landing form submissions.
 - **Client Invite Flow**: Secure, token-based onboarding.
 - **Professional Budget/Invoice Generator**: AI-powered tool.
-- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants with inventory. Supports `referenceImageUrl` for generating images from a real product photo.
-- **AI Creative Director Image System**: `buildImagePrompt()` uses Claude as an expert creative director (Apple/Nike/Chanel-level) to generate hyper-specialized, unique prompts for EACH specific product. No static templates — every prompt is AI-crafted with exact lens specs, lighting setups, color grading, composition rules, and model direction. `detectProductNature()` determines physical vs digital for model/actor inclusion. Product description (`bodyHtml`) is fed to Claude for maximum context. Fallback prompts exist if AI generation fails. Reference image system (`reference-images.ts`) also uses AI-generated prompts via `generateReferenceImagePrompt()` with fallback to category templates. Replicate SDK `FileOutput` objects resolved via `extractUrl()`. Alt text stripped of markdown. `generation_jobs.shopifyImageId` is `bigint`.
-- **Reference Image Generation System**: Uses OpenAI gpt-image-1 to generate professional product photos from a reference image. Adapts scenes by product type (ropa: modelo frontal/trasera/lateral/lifestyle/flat-lay/detalle; calzado: hero/modelo/par/suela/lifestyle/textura; joyería: elegante/modelo/escala/macro/regalo; cosmética/comida/electrónica/genérico). New chatbot action `generate_images_from_reference` + integrated into `create_product`. SSE streaming progress. Auto-uploads to Shopify.
-- **Audit-First Brain Actions**: `store_status`, `list_products`, `search_product`, `edit_product`, `publish_product` all include audit fields (score, grade, issues, published status, compare_at_price). Three new bulk actions: `audit_store` (deep audit with scores/grades/critical issues), `fix_unpublished` (bulk-publish hidden products), `fix_missing_compare_prices` (auto-calculate and set compare_at_price). OmniChatbot formatters display all audit data with grade icons and warnings.
-- **GraphQL Product Discovery**: `audit_store`, `fix_unpublished`, and `fix_missing_compare_prices` use Shopify GraphQL API with cursor pagination to find ALL products including those not published to Online Store channel (REST API only returns products with `published_scope=global`). Falls back to REST API on GraphQL failure. `shopifyGraphQL()` in `shopify.ts` has bounded 401 retry (single refresh attempt).
-- **Deep Inventory & Sales Control System**: Professional-grade stock management with 6 chatbot actions for syncing, alerts, reporting, sales analytics, and customer history.
+- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and niche-specific variants. Includes a `referenceImageUrl` system for AI image generation from existing product photos.
+- **AI Creative Director Image System**: `buildImagePrompt()` uses Claude as an expert creative director to generate highly specialized, unique prompts for EACH specific product, considering lens specs, lighting, color grading, composition, and model direction.
+- **Reference Image Generation System**: Uses OpenAI gpt-image-1 to generate professional product photos from a reference image, adapting scenes by product type.
+- **Virtual Try-On / OOTD System**: Uses GPT Image-1 multi-image editing to dress a person/model with product photos (clothing, shoes, accessories, cosmetics), with Claude as fashion director for prompt generation.
+- **Audit-First Brain Actions**: `store_status`, `list_products`, `search_product`, `edit_product`, `publish_product` include audit fields. New bulk actions `audit_store`, `fix_unpublished`, and `fix_missing_compare_prices` use Shopify GraphQL API for comprehensive product management.
+- **Deep Inventory & Sales Control System**: Professional-grade stock management with 6 chatbot actions.
 - **Supplier Research System**: AI-driven intelligence.
-- **PDF Commercial Report**: 17-page A4 dark-theme PDFKit report with detailed analysis for Comic Crafter.
-- **Universal Export System**: Generates a 9-page paginated comprehensive audit report with AI deep analysis, including executive summary, SEO audit, financial analysis, price optimization, and strategic recommendations. **Auto-Save to Vault**: All 14 report types are automatically saved to `projectFilesTable` vault on generation. **Brain Action Vault Save**: All chatbot brain actions (except destructive/config ops) auto-save their results as JSON to vault (`fileType: "brain_action"`). **External Store Analysis** (`analyze_external_store`): Full analysis of ANY store without Shopify connection. Reports queryable via `/projects/:id/vault?fileType=report|brain_action|research|analysis` with category filtering.
-- **Vault Professional Download System**: Multi-tier download system in `ProjectVault.tsx` with: (1) Individual file download, (2) Multi-select mode with checkboxes to pick specific files then download as ZIP, (3) Per-folder "Descargar ZIP" button on each folder card, (4) "Descargar todo" for full vault ZIP with all files. Backend: `POST /projects/:id/vault/download-selected` accepts `{fileIds: number[]}` or `{folderTypes: string[]}`. Frontend: Sticky selection toolbar with count, "Seleccionar todos", "Descargar selección", and "Limpiar" buttons. Folder view and list view both support selection.
-- **Universal Action Buttons (Enviar/Guardar/Descargar)**: Three action buttons appear below EVERY chatbot action result. **Enviar** (📧 blue): Sends result as professional HTML email via Gmail to admin. **Guardar** (💾 green): Saves result as professional HTML report + raw JSON data to vault. **Descargar** (📥 gold): Downloads as professional HTML file for single reports, or as a complete ZIP bundle for full audits (includes 10 HTML reports, CSV, JSON data exports, vault images, and README). Backend routes: `POST /api/projects/:id/actions/send|save|download`. Frontend: `ActionButtons` component in `OmniChatbot.tsx`. Files: `action-buttons.ts` (backend), `OmniChatbot.tsx` (frontend).
-- **100/100 Quality Standard + Semrush SEO Intelligence**: Integrates Semrush-inspired methodology for SEO scoring (16 weighted criteria) and product auditing (7 weighted dimensions), ensuring high-quality content and optimization.
+- **PDF Commercial Report**: 17-page A4 dark-theme PDFKit report.
+- **Universal Export System**: Generates a 9-page paginated comprehensive audit report with AI deep analysis. All 14 report types and chatbot brain action results are automatically saved to `projectFilesTable` vault. Includes "External Store Analysis" (`analyze_external_store`).
+- **Vault Professional Download System**: Multi-tier download system supporting individual, multi-select, per-folder, and full vault ZIP downloads. All exported content is branded HTML.
+- **Universal Action Buttons (Enviar/Guardar/Descargar)**: Three action buttons below every chatbot result to send as email, save to vault, or download as HTML/ZIP bundle.
+- **100/100 Quality Standard + Semrush SEO Intelligence**: Integrates Semrush-inspired methodology for SEO scoring and product auditing.
 - **AI Economist with Market Research**: Calculates optimal prices using parallel Gemini searches and Claude analysis.
 - **A/B Testing (Image + Price)**: Supports image and price variant tests with AI-generated impact predictions.
 - **Price Simulator & P&L Forecast**: Tools for financial analysis and scenario simulation.
 - **Comprehensive COGS System**: Detailed cost of goods sold tracking with AI auto-estimation.
 - **Partial Redesign**: Allows users to select specific product attributes for AI-driven redesign.
 - **Automated Cron Jobs**: Twelve tasks for continuous learning and intelligence.
-
-### Copyright Audit System
-The `copyright_audit` brain action fetches all products via Shopify GraphQL API, then uses `askClaudeJsonWithBrain` to detect trademark/IP risks (registered brands like Funko, Disney, Marvel, etc.), suggest alternative safe names, and classify risks by severity (alta/media/baja). Available via quick action button in OmniChatbot and natural language triggers.
-
-### Pricing Plans
-Four subscription plans: Emprendedor (€19/mes, 5 products/month, 10 images), Growth Studio (€297/mes), Performance Lab (€597/mes), Enterprise (€997/mes). Plus one-time plans: Photoshoot Pro (€497), Auditoría Completa (€297), Rediseño IA (€397), Pack Imágenes (€197), SEO Completa (€347), Informe Precios (€197), Email Marketing (€297).
-
-### Service Delivery Audit
-All Shopify service products are fully deliverable via the chatbot's 79+ actions, including Photoshoot Pro, Growth Studio, Performance Lab, Auditoría Completa, Rediseño IA 30 Productos, Pack 30 Imágenes IA, SEO Completa, Informe Precios, and Email Marketing.
+- **Copyright Audit System**: The `copyright_audit` brain action detects trademark/IP risks, suggests alternatives, and classifies risks by severity.
 
 ### Security
-- AES-256-GCM encryption for ALL credentials in DB: `accessToken`, `clientSecret`, `replicateApiToken`, `anthropicApiKey` — all encrypted at rest via `encrypt()` from `lib/crypto.ts`. Uses `ENCRYPTION_KEY` env secret (64-char hex = 32 bytes).
-- Startup migration (`migrateTokenEncryption()` in `index.ts`) auto-detects and encrypts any plaintext tokens.
-- API responses NEVER expose raw tokens: `accessToken: undefined` in project responses, reveal-token endpoint shows only first 8 + last 4 chars masked.
-- `safeDecrypt()` used in all read paths to handle both encrypted and legacy plaintext values.
-- Comprehensive audit logging.
-- Database-backed rate limiting for all endpoints.
+- AES-256-GCM encryption for all sensitive credentials in DB.
+- Startup migration (`migrateTokenEncryption()`) automatically encrypts plaintext tokens.
+- API responses mask raw tokens; `safeDecrypt()` handles encrypted and legacy plaintext values.
+- Comprehensive audit logging and database-backed rate limiting.
 - AI API concurrency queues and exponential backoff.
-- Admin route protection, CORS, and secure session management.
-- SVG sanitization, PostMessage origin validation, HTML escaping, and protection against common web vulnerabilities.
+- Admin route protection, CORS, secure session management, SVG sanitization, PostMessage origin validation, and HTML escaping for XSS protection.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.
 - **Replicate**: For image generation (text-to-image).
-- **OpenAI gpt-image-1 (Replit AI Integration)**: For reference-based product image generation/editing.
+- **OpenAI gpt-image-1**: For reference-based product image generation/editing.
 - **Shopify**: Storefront API and Admin API.
 - **Klaviyo**: For email flow integration and lead form notifications.
 - **Gmail (Replit Integration)**: For sending all emails from `craftershopy@gmail.com`.
 - **@google/genai**: For direct Gemini API integration.
-
-### Product Optimization Status (March 30, 2026)
-- **Batch Optimization**: 50/50 products optimized 10/10 with ZERO errors
-- **Total Description Characters**: 409,478 (avg ~8,190 per product)
-- **Total SEO Tags**: 1,280 (avg ~25.6 per product)
-- **Total Variants Created**: 490 intelligent variants (49/50 products have multi-variants)
-- **Total Alt Texts**: 178 image alt texts generated
-- **Image Generation**: Bulk generation with auto-upload to Shopify. 30 products have images, 20 more in progress (3 types each: hero, lifestyle, detail). Uses Replicate flux-1.1-pro/flux-dev models. 12-second delay between calls for rate limiting.
-- **Image Auto-Upload Fix**: `generation_jobs.shopify_image_id` column migrated from integer to bigint to support Shopify's large image IDs. Images now auto-upload to Shopify during generation.
-- **Bulk Upload Endpoint**: `POST /projects/:id/bulk-upload-generated-images` uploads all unuploaded generated images to Shopify.
-- **`list_products` and `list_all_products` actions now include `variantCount` and `compareAtPrice`**.
-- **Async Batch System**: `optimize_all_products` action runs in background, returns immediate response, processes sequentially (~2min/product via Dual AI)
-- **Brain Learning**: Each optimization triggers `learnFromOperation` + vault save
-
-### Download System (March 30, 2026)
-- **All downloads are branded HTML**: No more raw JSON or plain text downloads
-- **Vault metadata-only files**: Converted to branded HTML with tables, tags, color-coded values
-- **Vault JSON-content files**: Parsed and rendered as professional branded HTML
-- **ZIP exports**: All files inside ZIPs also get HTML conversion
-- **ProjectVault.tsx**: Individual downloads use fetch+blob+credentials (no auth failures)
-- **Competitors export**: Full branded HTML report with severity badges
-- **Intelligence CSV**: BOM + semicolons + quoting for Excel compatibility
-- **Client TXT report**: Now generates branded HTML with KPI cards and product table
-- **XSS protection**: All user-interpolated data escaped in exported HTML
