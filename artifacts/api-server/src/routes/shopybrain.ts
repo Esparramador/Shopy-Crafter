@@ -4809,6 +4809,10 @@ Responde SOLO JSON:
                 failedFiles.push(file.filePath);
                 continue;
               }
+              if (!fullPath.startsWith(FRONTEND_SRC)) {
+                failedFiles.push(`${file.filePath} (solo se permiten cambios en frontend)`);
+                continue;
+              }
 
               let content = fs.readFileSync(fullPath, "utf-8");
               let fileChanged = false;
