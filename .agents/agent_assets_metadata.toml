@@ -185,3 +185,15 @@ id = "KKgnVpMh7T-VknI61lTiu"
 uri = "file://artifacts/shopify-optimizer/public/informes/lazy-lizard-elegance.pdf"
 type = "pdf"
 title = "Informe Lazy Lizard Elegance (PDF - 12 páginas)"
+
+[[outputs]]
+id = "txP_G2qcpJNq8exPWjGzX"
+uri = "file://exports/Auditoria_Completa_Comic_Crafter.pdf"
+type = "pdf"
+title = "Auditoría Completa Comic Crafter - 57 Productos"
+
+[[outputs]]
+id = "bT1emMpliPm0Yt9JkDF_L"
+uri = "file://exports/Informe_Ventas_Stock_Comic_Crafter.pdf"
+type = "pdf"
+title = "Informe de Ventas y Stock - Comic Crafter (59 productos, todas las variantes)"

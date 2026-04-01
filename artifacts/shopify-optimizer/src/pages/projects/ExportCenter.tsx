@@ -135,6 +135,16 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       category: "reports",
     },
     {
+      id: "sales-report",
+      title: "Informe de Ventas y Stock",
+      description: "Desglose completo de ventas por producto y variante: tallas, colores, tamaños, planes, etc. Cantidades vendidas, revenue y stock actual.",
+      icon: <TrendingUp className="w-6 h-6" />,
+      endpoint: `/api/inventory/sales-report?projectId=${projectId}`,
+      format: "HTML",
+      color: "#e74c3c",
+      category: "reports",
+    },
+    {
       id: "redesigns",
       title: "Rediseños IA",
       description: "Historial de fichas rediseñadas por IA: títulos optimizados, descripciones SEO, precios recomendados y estado.",
@@ -437,6 +447,26 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
               <><Download className="w-4 h-4" /> Descargar</>
             )}
           </button>
+          {exp.id === "sales-report" && (
+            <button
+              onClick={() => handleDownload({ ...exp, id: "sales-report-pdf", endpoint: exp.endpoint + "&format=pdf", format: "HTML" as ExportFormat })}
+              disabled={downloading === "sales-report-pdf"}
+              className="py-2.5 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+              style={{
+                background: completed.has("sales-report-pdf") ? "rgba(46,204,113,.1)" : "rgba(231,76,60,.12)",
+                border: `1px solid ${completed.has("sales-report-pdf") ? "rgba(46,204,113,.3)" : "rgba(231,76,60,.3)"}`,
+                color: completed.has("sales-report-pdf") ? "#2ecc71" : "#e74c3c",
+              }}
+            >
+              {downloading === "sales-report-pdf" ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
+              ) : completed.has("sales-report-pdf") ? (
+                <><CheckCircle className="w-4 h-4" /> PDF</>
+              ) : (
+                <><FileText className="w-4 h-4" /> PDF</>
+              )}
+            </button>
+          )}
         </div>
       </GlassCard>
     );

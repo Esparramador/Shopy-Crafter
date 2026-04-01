@@ -456,6 +456,7 @@ Acciones disponibles:
 - inventory_deep_report: Informe profundo de inventario (por producto, por opcion/talla/color, por tipo, stock total, valor, margen, agotados). Params: {projectId}
 - inventory_sync_orders: Sincronizar pedidos de Shopify para analytics de ventas (que se vende, quien compra, que tallas/colores, cantidades). Params: {projectId}
 - inventory_sales_analytics: Analytics completo de ventas (top productos, top variantes por talla/color, top clientes, ventas por opcion, por pais). Params: {projectId}
+- sales_report: Informe completo de ventas y stock desglosado por producto y variante (talla, color, tamaño, plan, idioma, etc). Cantidades vendidas, revenue, stock actual. Descargable en HTML y PDF. Params: {projectId}
 - inventory_customer_history: Historial completo de un cliente (que ha comprado, tallas preferidas, colores, gasto total, frecuencia). Params: {projectId, customerId?, customerEmail?}
 - agency_quote: Generar presupuesto/cotización profesional para un cliente. Params: {projectId, services? (array), clientName?}
 - agency_proposal: Generar propuesta comercial completa con análisis y estrategia. Params: {projectId, clientName?, clientUrl?}
@@ -550,7 +551,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Dashboard financiero / márgenes → financial_dashboard
 - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
-- Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
+- Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history; Informe ventas y stock / report ventas stock / cuantos se han vendido / ventas por variante talla color → sales_report
 - Presupuesto / cotización / quote / cuánto cobrar / cuánto cuesta / precio de / tarifa / budget → generate_budget. Params: {clientName?, services: [{name, quantity, unitPrice, subtotal}], discount?, notes?, deliveryDays?, projectName?}. Genera un documento HTML profesional de presupuesto.
 - Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
@@ -1366,7 +1367,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings", "sync_store_theme"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
   const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "update_page", "add_to_collection"];
-  const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history"];
+  const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history", "sales_report"];
 
   if (seoActions.includes(action)) {
     extraTags.push("seo", "optimization");
@@ -7131,6 +7132,37 @@ Responde SOLO con JSON válido (sin markdown):
             operationType: "inventory_sales_analytics",
             title: `Analytics ventas: ${analytics.totalOrders} pedidos, ${analytics.totalRevenue}€ revenue, ticket medio ${analytics.avgOrderValue}€`,
             content: JSON.stringify({ totalOrders: analytics.totalOrders, totalRevenue: analytics.totalRevenue, topProducts: (analytics.topProducts as Array<Record<string, unknown>>)?.slice(0, 3) }),
+            confidence: 0.9,
+          });
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "sales_report": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/inventory/sales-report?projectId=${projectId}&format=json`, { headers: { cookie: req.headers.cookie ?? "" } });
+          if (!resp.ok) { result = { error: true, message: "❌ Error generando informe de ventas" }; break; }
+          const report = await resp.json() as Record<string, unknown>;
+          const summary = report.summary as Record<string, unknown>;
+          const prods = (report.products as Array<Record<string, unknown>>)?.slice(0, 10) || [];
+          let prodsMsg = "";
+          for (const p of prods) {
+            const variants = (p.variants as Array<Record<string, unknown>>)?.slice(0, 5) || [];
+            const varMsg = variants.map((v: Record<string, unknown>) => {
+              const opts = (v.options as string[])?.join(" · ") || v.variantTitle;
+              return `    · ${opts}: ${v.qtySold} vendidos, stock ${v.currentStock}`;
+            }).join("\n");
+            prodsMsg += `\n📦 **${p.title}**: ${p.totalQtySold} uds vendidas, ${p.totalRevenue}€, stock actual: ${p.totalCurrentStock}\n${varMsg}\n`;
+          }
+          const downloadUrl = `/api/inventory/sales-report?projectId=${projectId}`;
+          result = { ...report, message: `📊 **Informe de Ventas y Stock**\n\n📈 Resumen General:\n• ${summary.totalOrders} pedidos | ${summary.totalItems} artículos vendidos\n• Revenue total: ${summary.totalRevenue}€\n• Ticket medio: ${summary.avgTicket}€\n• Stock total actual: ${summary.totalStock} unidades\n• ${summary.totalProducts} productos\n\n🏆 Top Productos (por ventas):\n${prodsMsg || "Sin datos de ventas — sincroniza pedidos primero con inventory_sync_orders"}\n\n📥 Descarga el informe completo:\n• [HTML](${downloadUrl})\n• [PDF](${downloadUrl}&format=pdf)` };
+          learnFromOperation({
+            operationType: "sales_report",
+            title: `Informe ventas: ${summary.totalProducts} productos, ${summary.totalItems} items, ${summary.totalRevenue}€`,
+            content: JSON.stringify({ totalOrders: summary.totalOrders, totalRevenue: summary.totalRevenue, totalProducts: summary.totalProducts }),
             confidence: 0.9,
           });
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
