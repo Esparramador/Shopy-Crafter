@@ -231,7 +231,7 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
     </div>
     <div class="cover-title">
       <h1>${sanitizeHtml(title)}</h1>
-      <div class="subtitle">Generado por ShopyBrain AI Engine</div>
+      <div class="subtitle">Generado por Shopy Crafter AI</div>
     </div>
     <div class="cover-meta">
       <div class="cover-meta-item"><div class="cover-meta-dot"></div>${safeTag(actionName)}</div>
@@ -245,7 +245,7 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">ShopyBrain AI Engine &mdash; shopycrafter.com</div>
+    <div class="footer-sub">Shopy Crafter AI &mdash; shopycrafter.com</div>
     <div class="footer-sub">&copy; ${year} Shopy Crafter. Todos los derechos reservados.</div>
     <div class="footer-sub" style="margin-top:4px;">DOCUMENTO CONFIDENCIAL</div>
   </div>
@@ -439,7 +439,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
       { name: "Consistencia_BrandDNA", path: "consistency" },
       { name: "Inventario", path: "inventory" },
       { name: "Revenue_Forecast", path: "revenue" },
-      { name: "ShopyBrain_Intel", path: "shopybrain" },
+      { name: "ShopyCrafter_Intel", path: "shopybrain" },
     ];
 
     for (const rpt of reportEndpoints) {
@@ -490,7 +490,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
 
     archive.append(`# Exportación Completa — ${projectName}
 Fecha: ${dateStr}
-Generado por: Shopy Crafter (ShopyBrain AI)
+Generado por: Shopy Crafter AI
 
 ## Contenido
 - Resultado del chatbot: ${label}

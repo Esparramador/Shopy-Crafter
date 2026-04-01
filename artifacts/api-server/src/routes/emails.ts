@@ -266,7 +266,7 @@ router.post("/emails/flows/:id/push", async (req, res): Promise<void> => {
 
     if (!flow.html_content) { res.status(400).json({ error: "Generate email content first" }); return; }
 
-    const templateName = `[${flow.project_name || "ShopifyAI"}] ${flow.name}`;
+    const templateName = `[${flow.project_name || "Shopy Crafter"}] ${flow.name}`;
 
     const templateRes = await klaviyoPost<any>("/templates/", {
       data: {

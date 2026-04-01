@@ -353,7 +353,7 @@ function buildReportHtml(
 </td></tr>
 
 ${research.productSample ? `
-<!-- SECTION 4: Product Sample by ShopyBrain -->
+<!-- SECTION 4: Product Sample by Shopy Crafter -->
 <tr><td style="padding:28px 48px 0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
     <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.3);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#10024;</div>

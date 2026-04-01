@@ -363,7 +363,7 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       urlType,
       title,
       analysis,
-      message: `✅ ${urlType} absorbido al ShopyBrain. Conocimiento guardado permanentemente.`,
+      message: `✅ ${urlType} absorbido a Shopy Crafter. Conocimiento guardado permanentemente.`,
     });
   } catch (err) {
     logger.error(err, "ShopyBrain URL absorb failed");
@@ -497,7 +497,7 @@ router.post("/shopybrain/absorb-image",
           marketingAngles: a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles,
           shopifyTitle: a.actionable_insights_for_shopify?.suggested_shopify_product_title ?? a.ecommerce_conversion_signals?.suggested_product_title,
         },
-        message: `✅ ${sourceType === "image" ? "Imagen" : "Vídeo"} absorbido al ShopyBrain con análisis completo de composición, texturas, topología y señales eCommerce.`,
+        message: `✅ ${sourceType === "image" ? "Imagen" : "Vídeo"} absorbido a Shopy Crafter con análisis completo de composición, texturas, topología y señales eCommerce.`,
       });
     } catch (err) {
       logger.error(err, "ShopyBrain image/video absorb failed");
@@ -530,7 +530,7 @@ router.post("/shopybrain/absorb-text", requireAdmin, async (req: Request, res: R
       tags: ["text", "absorbed", niche ?? "general"],
     });
     
-    res.json({ success: true, memoryId, analysis, message: "✅ Texto absorbido al ShopyBrain." });
+    res.json({ success: true, memoryId, analysis, message: "✅ Texto absorbido a Shopy Crafter." });
   } catch (err) {
     logger.error(err, "ShopyBrain text absorb failed");
     res.status(500).json({ error: String(err) });
@@ -591,7 +591,7 @@ Responde en español con un análisis completo y detallado. Si detectas una list
       fileType: ext,
       contentLength: text.length,
       analysis,
-      message: `✅ Documento "${docLabel}" absorbido y analizado. ${text.length} caracteres procesados. La información ha sido guardada en la memoria del ShopyBrain y está lista para usar.`,
+      message: `✅ Documento "${docLabel}" absorbido y analizado. ${text.length} caracteres procesados. La información ha sido guardada en la memoria de Shopy Crafter y está lista para usar.`,
     });
   } catch (err) {
     logger.error(err, "ShopyBrain document absorb failed");
@@ -1195,7 +1195,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Informe de Proveedores — ${productName} | ShopyBrain</title><!-- nosemgrep -->
+  <title>Informe de Proveedores — ${productName} | Shopy Crafter</title><!-- nosemgrep -->
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:#080810; color:#e0e0e0; line-height:1.6; }
@@ -1227,7 +1227,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
   <div class="header">
     <h1>🔍 Informe de Proveedores</h1>
     <div style="font-size:24px;color:#e6c668;margin:8px 0;">${productName}</div><!-- nosemgrep -->
-    <div class="subtitle">Generado por ShopyBrain Intelligence Engine — ${now}</div>
+    <div class="subtitle">Generado por Shopy Crafter AI — ${now}</div>
     <div style="margin-top:12px;">
       <span class="badge">📊 ${suppliersList.length} proveedores analizados</span><!-- nosemgrep -->
       <span class="badge">🌐 ${sourcesAnalyzed || 0} fuentes investigadas</span><!-- nosemgrep -->
@@ -1317,7 +1317,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
   <div class="card"><ol style="padding-left:20px;">${nextSteps}</ol></div>` : ""}<!-- nosemgrep -->
 
   <div class="footer">
-    <p><strong>ShopyBrain</strong> — Inteligencia de Sourcing Profesional</p>
+    <p><strong>Shopy Crafter</strong> — Inteligencia de Sourcing Profesional</p>
     <p>Informe generado automáticamente con 3 modelos IA (Claude Vision + Gemini Search + Claude Strategy)</p>
     <p style="margin-top:8px;">© ${new Date().getFullYear()} Shopy Crafter · shopycrafter.com</p>
   </div>

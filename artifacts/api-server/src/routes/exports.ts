@@ -91,7 +91,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${safeTitle} — ShopyBrain</title>
+<title>${safeTitle} — Shopy Crafter</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -103,8 +103,9 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.gold}44, transparent); }
   .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
   .cover-logo { display: flex; align-items: center; gap: 12px; }
-  .cover-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark}); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #0a0a0f; }
-  .cover-logo-text { font-size: 20px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: -0.3px; }
+  .cover-logo-icon { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }
+  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-logo-text { font-size: 20px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: 1px; text-transform: uppercase; }
   .cover-badge { background: ${BRAND.surface}; border: 1px solid ${BRAND.borderLight}; border-radius: 8px; padding: 8px 16px; }
   .cover-badge-label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
   .cover-badge-value { font-size: 13px; color: ${BRAND.white}; font-weight: 600; margin-top: 2px; }
@@ -239,8 +240,8 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   <div class="cover">
     <div class="cover-top">
       <div class="cover-logo">
-        <div class="cover-logo-icon">S</div>
-        <div class="cover-logo-text">ShopyBrain</div>
+        <div class="cover-logo-icon"><img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" /></div>
+        <div class="cover-logo-text">Shopy Crafter</div>
       </div>
       <div class="cover-badge">
         <div class="cover-badge-label">Fecha del informe</div>
@@ -262,7 +263,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   </div>
   <div class="footer">
     <div class="footer-line"></div>
-    <div class="footer-brand">ShopyBrain AI</div>
+    <div class="footer-brand">Shopy Crafter</div>
     <div class="footer-sub">Shopy Crafter &mdash; Optimización IA para tiendas Shopify &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
@@ -1959,7 +1960,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     return `<div class="card" style="margin-top:16px;border-left:3px solid ${BRAND.gold};padding:20px 24px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
         <span style="font-size:16px;">&#129504;</span>
-        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${BRAND.gold};">Analisis ShopyBrain AI</span>
+        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${BRAND.gold};">Analisis Shopy Crafter AI</span>
       </div>
       <div style="font-size:13px;line-height:1.9;color:${BRAND.mutedLight};">${safeHtml}</div>
     </div>`;
@@ -2731,10 +2732,10 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
     </div>`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
-  const html = getReportShell(tpl)("Informe ShopyBrain — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
+  const html = getReportShell(tpl)("Informe Shopy Crafter — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="ShopyBrain_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
-  autoSaveReport(projectId, "Informe ShopyBrain — Inteligencia Artificial", html, "shopybrain_intelligence").catch(() => {});
+  res.setHeader("Content-Disposition", `attachment; filename="ShopyCrafter_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
+  autoSaveReport(projectId, "Informe Shopy Crafter — Inteligencia Artificial", html, "shopybrain_intelligence").catch(() => {});
   res.send(html);
 });
 
@@ -2832,7 +2833,7 @@ router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<voi
     { name: "Inventario", path: "inventory" },
     { name: "Rediseños_IA", path: "redesigns" },
     { name: "Revenue_Forecast", path: "revenue" },
-    { name: "ShopyBrain_Intel", path: "shopybrain" },
+    { name: "ShopyCrafter_Intel", path: "shopybrain" },
   ];
 
   const zipTpl = (req.query.template as ReportTemplate) || "prestige";
@@ -2874,7 +2875,7 @@ router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<voi
 
   const readmeContent = `# Exportación Completa — ${project.name}
 Fecha: ${dateStr}
-Generado por: Shopy Crafter (ShopyBrain AI)
+Generado por: Shopy Crafter AI
 
 ## Contenido del ZIP
 
@@ -2909,7 +2910,7 @@ router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promi
   const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Shopy Crafter — ShopyBrain AI";
+  workbook.creator = "Shopy Crafter AI";
   workbook.created = new Date();
 
   const ws = workbook.addWorksheet("Productos", {
@@ -3048,7 +3049,7 @@ router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<v
   const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Shopy Crafter — ShopyBrain AI";
+  workbook.creator = "Shopy Crafter AI";
   workbook.created = new Date();
 
   const headerStyle = (cell: ExcelJS.Cell) => {

@@ -120,7 +120,7 @@ ${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
   </table>
 </td></tr>` : ""}
 <tr><td style="text-align:center;padding:20px 48px;border-top:1px solid #1a1a28;">
-  <p style="color:#6b6b80;font-size:11px;margin:0;">Generado por <span style="color:#c8a84b;font-weight:600;">Shopy Crafter</span> &mdash; ShopyBrain AI</p>
+  <p style="color:#6b6b80;font-size:11px;margin:0;">Generado por <span style="color:#c8a84b;font-weight:600;">Shopy Crafter</span> AI</p>
   <p style="color:#6b6b80;font-size:11px;margin:4px 0 0;">&copy; ${new Date().getFullYear()} Shopy Crafter. Todos los derechos reservados.</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
