@@ -2402,9 +2402,9 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           };
         } catch (e) {
           result = {
-            scopes: ["read_products", "write_products", "read_orders", "read_customers", "read_analytics", "read_inventory", "write_inventory", "read_price_rules", "write_price_rules", "read_content", "write_content", "read_themes", "write_themes"],
-            total: 13,
-            message: "Scopes configurados en OAuth: read/write_products, orders, customers, analytics, inventory, price_rules, content, read/write_themes",
+            scopes: ["read_products", "write_products", "read_orders", "write_orders", "read_all_orders", "read_customers", "write_customers", "read_analytics", "read_inventory", "write_inventory", "read_price_rules", "write_price_rules", "read_content", "write_content", "read_themes", "write_themes", "read_discounts", "write_discounts", "read_shipping", "write_shipping", "read_fulfillments", "write_fulfillments", "read_assigned_fulfillment_orders", "write_assigned_fulfillment_orders", "read_merchant_managed_fulfillment_orders", "write_merchant_managed_fulfillment_orders", "read_draft_orders", "write_draft_orders", "read_checkouts", "write_checkouts", "read_locations", "read_reports", "read_script_tags", "write_script_tags", "unauthenticated_read_product_listings"],
+            total: 35,
+            message: "35 scopes configurados en OAuth (todos los scopes del Admin API de Shopify)",
             note: "Error consultando scopes en vivo, mostrando scopes configurados",
           };
         }

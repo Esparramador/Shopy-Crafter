@@ -34,11 +34,24 @@ async function getShopifyCredentials(): Promise<{ clientId: string; clientSecret
 
 const OAUTH_SCOPES = [
   "read_products", "write_products",
-  "read_orders", "read_customers",
-  "read_analytics", "read_inventory", "write_inventory",
+  "read_orders", "write_orders", "read_all_orders",
+  "read_customers", "write_customers",
+  "read_analytics",
+  "read_inventory", "write_inventory",
   "read_price_rules", "write_price_rules",
   "read_content", "write_content",
   "read_themes", "write_themes",
+  "read_discounts", "write_discounts",
+  "read_shipping", "write_shipping",
+  "read_fulfillments", "write_fulfillments",
+  "read_assigned_fulfillment_orders", "write_assigned_fulfillment_orders",
+  "read_merchant_managed_fulfillment_orders", "write_merchant_managed_fulfillment_orders",
+  "read_draft_orders", "write_draft_orders",
+  "read_checkouts", "write_checkouts",
+  "read_locations",
+  "read_reports",
+  "read_script_tags", "write_script_tags",
+  "unauthenticated_read_product_listings",
 ].join(",");
 
 const oauthState = new Map<string, { shop: string; projectName: string; storeNiche: string; brandTone: string; targetAudience: string; storeMarkets: string; clientId: string; clientSecret: string }>();
