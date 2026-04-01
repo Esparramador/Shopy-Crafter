@@ -202,16 +202,16 @@ title = "Informe de Ventas y Stock - Comic Crafter (59 productos, todas las vari
 id = "rqv_A8QKCHFlBpN1jBjqa"
 uri = "file://exports/portada-classic.pdf"
 type = "pdf"
-title = "CLASSIC (Dorado)"
+title = "CLASSIC (Dorado) - Sin márgenes"
 
 [[outputs]]
 id = "dizepQUsBm2mK3KhQz2Qs"
 uri = "file://exports/portada-elegance.pdf"
 type = "pdf"
-title = "ELEGANCE (Plata)"
+title = "ELEGANCE (Plata) - Sin márgenes"
 
 [[outputs]]
 id = "ojcZIyZeu-niKwXkDxn31"
 uri = "file://exports/portada-prestige.pdf"
 type = "pdf"
-title = "PRESTIGE (Cobre)"
+title = "PRESTIGE (Cobre) - Sin márgenes"
