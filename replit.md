@@ -111,6 +111,18 @@ Every product created MUST include ALL of these fields fully completed:
 - Must look like a deliverable from a major consulting firm (McKinsey/Deloitte level)
 - Three templates available: Classic, Elegance (navy/blue), Prestige (charcoal/copper)
 
+### COGS Estimation (Automatic)
+- COGS estimation is AUTOMATIC in all audit reports when no manual COGS data exists
+- Uses AI (Claude via `askClaudeJsonWithBrain`) to research and estimate costs based on:
+  - Business type, sector, and location
+  - Products/services offered
+  - Real market data from providers (Idealista, Manutan.es, Amazon Business, sector providers)
+- Always includes a DISCLAIMER: "Estimación basada en datos de mercado buscados, cercados y comparados en fuentes públicas"
+- When COGS are NOT specified/known, clearly states they are RELATIVE estimates based on searched/compared data
+- Estimates include: fixed costs, variable costs, initial investment, service margins, competitor pricing, breakeven analysis
+- Functions: `estimateCogsWithAI()` and `buildCogsEstimationHtml()` in `exports.ts`
+- Both internal reports (complete-report) and external audit reports include COGS sections
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

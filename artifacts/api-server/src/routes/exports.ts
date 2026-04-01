@@ -17,12 +17,171 @@ import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
+import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
 
 const router = Router();
+
+interface CogsEstimation {
+  businessType: string;
+  location: string;
+  disclaimer: string;
+  fixedCosts: Array<{ concept: string; rangeMin: number; rangeMax: number; unit: string; source: string }>;
+  variableCosts: Array<{ concept: string; costPerUnit: string; basis: string }>;
+  initialInvestment: Array<{ concept: string; rangeMin: number; rangeMax: number; source: string }>;
+  serviceMargins?: Array<{ service: string; materials: string; costRange: string; priceRange: string; marginRange: string }>;
+  competitors: Array<{ name: string; price: string; model: string; presence: string }>;
+  breakeven: { fixedCostsMonthly: number; avgMarginPercent: number; minServicesMonth: number; perWeek: string };
+  avgTicket: number;
+  cogsPerUnit: number;
+  marginPercent: number;
+}
+
+async function estimateCogsWithAI(projectId: number, businessInfo: {
+  name: string; sector: string; location: string; services: string[];
+  products: Array<{ title: string; price: string }>; domain?: string;
+}): Promise<CogsEstimation | null> {
+  try {
+    const prompt = `Eres un analista financiero experto. Debes estimar los COGS (Coste de los Bienes/Servicios Vendidos) para este negocio basándote EXCLUSIVAMENTE en datos de mercado reales que puedas contrastar.
+
+NEGOCIO:
+- Nombre: ${businessInfo.name}
+- Sector: ${businessInfo.sector}
+- Ubicación: ${businessInfo.location}
+- Servicios/Productos: ${businessInfo.services.join(", ")}
+${businessInfo.products.length > 0 ? `- Catálogo (${businessInfo.products.length} productos): ${businessInfo.products.slice(0, 10).map(p => `${p.title} (${p.price}€)`).join(", ")}` : ""}
+${businessInfo.domain ? `- Web: ${businessInfo.domain}` : ""}
+
+INSTRUCCIONES CRÍTICAS:
+1. Basa TODOS los costes en precios reales de mercado de proveedores españoles (Manutan.es, Idealista, Amazon Business, proveedores sectoriales)
+2. Los alquileres deben basarse en la zona geográfica real del negocio
+3. Incluye fuentes específicas para cada coste (nombre del proveedor o plataforma)
+4. Si el negocio es de servicios, incluye coste de materiales por servicio
+5. Si es comercio, incluye coste de adquisición por producto
+6. Incluye competidores reales con precios reales del mercado local
+7. Calcula el punto de equilibrio con datos conservadores
+
+Responde en JSON con esta estructura exacta:
+{
+  "businessType": "tipo de negocio",
+  "location": "ubicación",
+  "disclaimer": "Estimación basada en datos de mercado buscados, cercados y comparados en fuentes públicas. Los costes reales pueden variar según condiciones contractuales y volumen de operaciones.",
+  "fixedCosts": [{"concept":"Alquiler local","rangeMin":800,"rangeMax":1200,"unit":"€/mes","source":"Idealista zona X"}],
+  "variableCosts": [{"concept":"Comisión pago","costPerUnit":"1.5-2.9%","basis":"Tarifas Stripe/Redsys"}],
+  "initialInvestment": [{"concept":"Equipamiento","rangeMin":500,"rangeMax":1000,"source":"Proveedor X"}],
+  "serviceMargins": [{"service":"Servicio X","materials":"material1,material2","costRange":"10-20€","priceRange":"50-100€","marginRange":"70-80%"}],
+  "competitors": [{"name":"Competidor","price":"50€","model":"modelo","presence":"zona"}],
+  "breakeven": {"fixedCostsMonthly":1500,"avgMarginPercent":70,"minServicesMonth":10,"perWeek":"3/sem"},
+  "avgTicket": 100,
+  "cogsPerUnit": 15,
+  "marginPercent": 85
+}`;
+
+    const result = await askClaudeJsonWithBrain<CogsEstimation>(
+      projectId, prompt,
+      "Eres un analista financiero que estima COGS basándose en datos de mercado reales y contrastados. Nunca inventes datos. Cita fuentes reales de proveedores.",
+      "financial", undefined, 4000
+    );
+    return result;
+  } catch (err) {
+    logger.error({ err, projectId }, "Failed to estimate COGS with AI");
+    return null;
+  }
+}
+
+function buildCogsEstimationHtml(est: CogsEstimation, brandColors: { accent: string; muted: string; jade: string; orange: string; card: string; surface: string; border: string; silver?: string }): string {
+  const C = brandColors;
+  const silverColor = C.silver || C.muted;
+
+  const fixedRows = est.fixedCosts.map(c =>
+    `<tr><td>${c.concept}</td><td><strong>${c.rangeMin.toLocaleString("es-ES")} — ${c.rangeMax.toLocaleString("es-ES")}${c.unit}</strong></td><td>${c.source}</td></tr>`
+  ).join("");
+  const totalFixedMin = est.fixedCosts.reduce((s, c) => s + c.rangeMin, 0);
+  const totalFixedMax = est.fixedCosts.reduce((s, c) => s + c.rangeMax, 0);
+
+  const investRows = est.initialInvestment.map(c =>
+    `<tr><td>${c.concept}</td><td><strong>${c.rangeMin.toLocaleString("es-ES")} — ${c.rangeMax.toLocaleString("es-ES")}€</strong></td><td>${c.source}</td></tr>`
+  ).join("");
+  const totalInvestMin = est.initialInvestment.reduce((s, c) => s + c.rangeMin, 0);
+  const totalInvestMax = est.initialInvestment.reduce((s, c) => s + c.rangeMax, 0);
+
+  const variableRows = est.variableCosts.map(c =>
+    `<tr><td>${c.concept}</td><td><strong>${c.costPerUnit}</strong></td><td>${c.basis}</td></tr>`
+  ).join("");
+
+  const marginRows = (est.serviceMargins || []).map(s =>
+    `<tr><td><strong>${s.service}</strong></td><td>${s.materials}</td><td><strong>${s.costRange}</strong></td><td>${s.priceRange}</td><td style="color:${C.jade};font-weight:700">${s.marginRange}</td></tr>`
+  ).join("");
+
+  const compRows = est.competitors.map(c =>
+    `<tr><td>${c.name}</td><td>${c.price}</td><td>${c.model}</td><td>${c.presence}</td></tr>`
+  ).join("");
+
+  return `
+    <div class="card" style="border-left:3px solid ${C.orange};background:rgba(245,158,11,.02)">
+      <p style="font-size:11px;color:${C.orange};font-weight:700;margin-bottom:4px">⚠ COGS ESTIMADOS — DATOS DE MERCADO</p>
+      <p style="font-size:11px;color:${silverColor};line-height:1.5">${est.disclaimer}</p>
+    </div>
+
+    <div class="card" style="overflow-x:auto;">
+      <div class="stat-item-label" style="margin-bottom:12px;">Costes Fijos Mensuales Estimados</div>
+      <table>
+        <thead><tr><th>Concepto</th><th>Rango Estimado</th><th>Fuente / Base</th></tr></thead>
+        <tbody>
+          ${fixedRows}
+          <tr style="background:${C.surface}"><td><strong>TOTAL FIJOS ESTIMADOS</strong></td><td><strong style="color:${C.orange}">${totalFixedMin.toLocaleString("es-ES")} — ${totalFixedMax.toLocaleString("es-ES")}€/mes</strong></td><td>Rango según volumen y acuerdos</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    ${investRows ? `<div class="card" style="overflow-x:auto;">
+      <div class="stat-item-label" style="margin-bottom:12px;">Inversión Inicial (Amortizable)</div>
+      <table>
+        <thead><tr><th>Concepto</th><th>Coste Estimado</th><th>Fuente</th></tr></thead>
+        <tbody>
+          ${investRows}
+          <tr style="background:${C.surface}"><td><strong>TOTAL INVERSIÓN</strong></td><td><strong style="color:${C.orange}">${totalInvestMin.toLocaleString("es-ES")} — ${totalInvestMax.toLocaleString("es-ES")}€</strong></td><td>Amortización 36-60 meses</td></tr>
+        </tbody>
+      </table>
+    </div>` : ""}
+
+    ${variableRows ? `<div class="card" style="overflow-x:auto;">
+      <div class="stat-item-label" style="margin-bottom:12px;">Costes Variables por Transacción</div>
+      <table>
+        <thead><tr><th>Concepto</th><th>Coste Estimado</th><th>Base</th></tr></thead>
+        <tbody>${variableRows}</tbody>
+      </table>
+    </div>` : ""}
+
+    ${marginRows ? `<div class="card" style="overflow-x:auto;">
+      <div class="stat-item-label" style="margin-bottom:12px;">Margen por Servicio/Producto</div>
+      <table>
+        <thead><tr><th>Servicio</th><th>Materiales</th><th>Coste Material</th><th>Precio Mercado</th><th>Margen Bruto</th></tr></thead>
+        <tbody>${marginRows}</tbody>
+      </table>
+    </div>` : ""}
+
+    ${compRows ? `<div class="card" style="overflow-x:auto;">
+      <div class="stat-item-label" style="margin-bottom:12px;">Análisis de Precios vs Competencia</div>
+      <table>
+        <thead><tr><th>Competidor</th><th>Precio</th><th>Modelo</th><th>Presencia</th></tr></thead>
+        <tbody>${compRows}</tbody>
+      </table>
+    </div>` : ""}
+
+    <div class="card">
+      <div class="stat-item-label" style="margin-bottom:12px;">Punto de Equilibrio Estimado</div>
+      <div class="metric-row">
+        <div class="metric"><div class="value" style="color:${C.orange}">~${est.breakeven.fixedCostsMonthly.toLocaleString("es-ES")}€</div><div class="label">Costes fijos/mes</div></div>
+        <div class="metric"><div class="value" style="color:${C.jade}">~${est.marginPercent}%</div><div class="label">Margen bruto medio</div></div>
+        <div class="metric"><div class="value" style="color:${C.jade}">~${est.breakeven.minServicesMonth}</div><div class="label">Servicios/mes mín.</div></div>
+        <div class="metric"><div class="value" style="color:${C.jade}">~${est.breakeven.perWeek}</div><div class="label">Punto equilibrio</div></div>
+      </div>
+      <p style="font-size:10px;color:${C.muted};line-height:1.4;margin-top:8px">Cálculo basado en ticket medio de ~${est.avgTicket}€, COGS variable ~${est.cogsPerUnit}€/unidad, y costes fijos de ~${est.breakeven.fixedCostsMonthly}€/mes. Los datos son estimaciones de mercado — se recomienda contrastar con la contabilidad real del negocio.</p>
+    </div>`;
+}
 
 async function autoSaveReport(projectId: number, title: string, htmlContent: string, category: string): Promise<number | null> {
   try {
@@ -1966,6 +2125,28 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>`;
   };
 
+  let cogsEstimationHtml = "";
+  if (allCogs.length === 0 && products.length > 0) {
+    try {
+      const cogsEst = await estimateCogsWithAI(projectId, {
+        name: project.shopifyDomain?.replace(".myshopify.com", "") || project.storeName || "Tienda",
+        sector: project.storeNiche || "eCommerce",
+        location: project.storeMarkets || "España",
+        services: productTypes,
+        products: products.slice(0, 15).map(p => ({ title: p.title ?? "", price: p.price ?? "0" })),
+        domain: project.shopifyDomain ?? undefined,
+      });
+      if (cogsEst) {
+        cogsEstimationHtml = buildCogsEstimationHtml(cogsEst, {
+          accent: BRAND.gold, muted: BRAND.muted, jade: BRAND.jade,
+          orange: "#f59e0b", card: BRAND.card, surface: BRAND.surface, border: BRAND.border, silver: BRAND.mutedLight,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, projectId }, "COGS auto-estimation failed, skipping");
+    }
+  }
+
   const body = `
     <!-- PAGE 1: EXECUTIVE SUMMARY + TABLE OF CONTENTS -->
     <div class="section">
@@ -2013,7 +2194,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
         <div class="toc-item"><div class="toc-num">1</div><div><div class="toc-label">Resumen Ejecutivo</div><div class="toc-desc">Health score, KPIs y vision general</div></div></div>
         <div class="toc-item"><div class="toc-num">2</div><div><div class="toc-label">Identidad de Marca</div><div class="toc-desc">Nicho, tono, audiencia, categorias</div></div></div>
         <div class="toc-item"><div class="toc-num">3</div><div><div class="toc-label">Auditoria SEO Tecnico</div><div class="toc-desc">Score por producto, meta tags, schema, alt texts</div></div></div>
-        <div class="toc-item"><div class="toc-num">4</div><div><div class="toc-label">Analisis Economico y COGS</div><div class="toc-desc">Estructura de costes, margenes, distribucion de precios</div></div></div>
+        <div class="toc-item"><div class="toc-num">4</div><div><div class="toc-label">Analisis Economico y COGS</div><div class="toc-desc">${allCogs.length > 0 ? "Estructura de costes reales, margenes, distribucion de precios" : "Estimacion automatica de costes basada en datos de mercado contrastados"}</div></div></div>
         ${totalShopifyOrders > 0 ? '<div class="toc-item"><div class="toc-num">5</div><div><div class="toc-label">Analisis de Ventas</div><div class="toc-desc">Revenue real, pedidos, AOV, tendencias</div></div></div>' : ""}
         <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 6 : 5}</div><div><div class="toc-label">A/B Testing y Optimizacion de Precios</div><div class="toc-desc">Tests activos, resultados, sugerencias de precio IA</div></div></div>
         <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 7 : 6}</div><div><div class="toc-label">AI Economist — Analisis Economico</div><div class="toc-desc">Posicionamiento, margenes, bundles, proyecciones</div></div></div>
@@ -2074,7 +2255,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
         <div class="section-header">
           <div class="section-icon section-icon-orange">&#128176;</div>
           <div class="section-title">Analisis Economico y Estructura de Costes</div>
-          <div class="section-count">${allCogs.length}/${products.length} con COGS</div>
+          <div class="section-count">${allCogs.length > 0 ? `${allCogs.length}/${products.length} con COGS` : cogsEstimationHtml ? "Estimación automática IA" : `${allCogs.length}/${products.length} con COGS`}</div>
         </div>
         <div class="metric-row">
           <div class="metric"><div class="value">${totalCatalogValue.toFixed(0)}€</div><div class="label">Valor catalogo</div></div>
@@ -2082,7 +2263,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
           <div class="metric"><div class="value">${(totalCatalogValue - totalCogs).toFixed(0)}€</div><div class="label">Beneficio bruto</div></div>
           <div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : allCogs.length > 0 ? BRAND.red : BRAND.muted};">${allCogs.length > 0 ? avgMargin.toFixed(1) + "%" : "—"}</div><div class="label">Margen medio</div></div>
         </div>
-        ${allCogs.length === 0 ? `<div class="recommendation recommendation-critical">No hay datos de costes (COGS) registrados. Sin costes no es posible calcular margenes reales ni rentabilidad. Usa la funcion "Estimar COGS con IA" en cada producto o registra costes manualmente (materiales, envio, empaquetado, APIs, mano de obra, etc.).</div>` : ""}
+        ${allCogs.length === 0 && !cogsEstimationHtml ? `<div class="recommendation recommendation-critical">No hay datos de costes (COGS) registrados. Sin costes no es posible calcular margenes reales ni rentabilidad. Usa la funcion "Estimar COGS con IA" en cada producto o registra costes manualmente (materiales, envio, empaquetado, APIs, mano de obra, etc.).</div>` : ""}
+        ${allCogs.length === 0 && cogsEstimationHtml ? cogsEstimationHtml : ""}
         ${allCogs.length > 0 ? `<div class="card" style="overflow-x:auto;">
           <div class="stat-item-label" style="margin-bottom:12px;">Desglose de costes por producto</div>
           <table>
