@@ -432,7 +432,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
           <button
             onClick={() => handleDownload(exp)}
             disabled={isDownloading}
-            className={`${canView ? "flex-1" : "w-full"} py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all`}
+            className={`${canView ? "flex-1" : "flex-1"} py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all`}
             style={{
               background: isCompleted ? "rgba(46,204,113,.1)" : `${exp.color}12`,
               border: `1px solid ${isCompleted ? "rgba(46,204,113,.3)" : exp.color + "30"}`,
@@ -444,23 +444,27 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
             ) : isCompleted ? (
               <><CheckCircle className="w-4 h-4" /> Descargado</>
             ) : (
-              <><Download className="w-4 h-4" /> Descargar</>
+              <><Download className="w-4 h-4" /> {exp.format === "HTML" ? "HTML" : "Descargar"}</>
             )}
           </button>
-          {exp.id === "sales-report" && (
+          {exp.format === "HTML" && (
             <button
-              onClick={() => handleDownload({ ...exp, id: "sales-report-pdf", endpoint: exp.endpoint + "&format=pdf", format: "HTML" as ExportFormat })}
-              disabled={downloading === "sales-report-pdf"}
+              onClick={() => {
+                const pdfId = `${exp.id}-pdf`;
+                const sep = exp.endpoint.includes("?") ? "&" : "?";
+                handleDownload({ ...exp, id: pdfId, endpoint: `${exp.endpoint}${sep}format=pdf`, format: "HTML" as ExportFormat });
+              }}
+              disabled={downloading === `${exp.id}-pdf`}
               className="py-2.5 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
               style={{
-                background: completed.has("sales-report-pdf") ? "rgba(46,204,113,.1)" : "rgba(231,76,60,.12)",
-                border: `1px solid ${completed.has("sales-report-pdf") ? "rgba(46,204,113,.3)" : "rgba(231,76,60,.3)"}`,
-                color: completed.has("sales-report-pdf") ? "#2ecc71" : "#e74c3c",
+                background: completed.has(`${exp.id}-pdf`) ? "rgba(46,204,113,.1)" : "rgba(231,76,60,.12)",
+                border: `1px solid ${completed.has(`${exp.id}-pdf`) ? "rgba(46,204,113,.3)" : "rgba(231,76,60,.3)"}`,
+                color: completed.has(`${exp.id}-pdf`) ? "#2ecc71" : "#e74c3c",
               }}
             >
-              {downloading === "sales-report-pdf" ? (
+              {downloading === `${exp.id}-pdf` ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> PDF...</>
-              ) : completed.has("sales-report-pdf") ? (
+              ) : completed.has(`${exp.id}-pdf`) ? (
                 <><CheckCircle className="w-4 h-4" /> PDF</>
               ) : (
                 <><FileText className="w-4 h-4" /> PDF</>

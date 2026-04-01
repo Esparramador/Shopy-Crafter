@@ -24,9 +24,16 @@ let defaultClient: Anthropic | null = null;
 
 function getDefaultClient(): Anthropic {
   if (!defaultClient) {
-    defaultClient = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    if (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL && process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
+      defaultClient = new Anthropic({
+        baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+      });
+    } else {
+      defaultClient = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+    }
   }
   return defaultClient;
 }

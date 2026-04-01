@@ -25,6 +25,7 @@ import {
   Calculator,
   BarChart3,
   Target,
+  Brain,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line, CartesianGrid } from "recharts";
 import { useState, useCallback } from "react";
@@ -937,11 +938,13 @@ export default function PricingPage() {
   const { toast } = useToast();
 
   const { data: dashboard, isLoading: isLoadingDash } = useGetFinancialDashboard(projectId);
-  const { data: productsData } = useGetProjectProducts(projectId, { limit: 100 });
+  const { data: productsData } = useGetProjectProducts(projectId, { limit: 500 });
   const analyzeCompetitors = useAnalyzeCompetitorPrices();
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [simulatorProduct, setSimulatorProduct] = useState<Product | null>(null);
+  const [bulkEstimating, setBulkEstimating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [competitorUrl, setCompetitorUrl] = useState("");
   const [competitorResult, setCompetitorResult] = useState<{
     analysis?: string;
@@ -957,6 +960,38 @@ export default function PricingPage() {
         onError: () => toast({ title: "Error analizando competidores", variant: "destructive" }),
       }
     );
+  };
+
+  const handleBulkEstimate = async () => {
+    const allProducts = productsData?.products || [];
+    if (!allProducts.length) return;
+    setBulkEstimating(true);
+    setBulkProgress({ done: 0, total: allProducts.length });
+    let successCount = 0;
+    const failedProducts: string[] = [];
+    for (const product of allProducts) {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/ai-estimate-cogs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (res.ok) {
+          successCount++;
+        } else {
+          failedProducts.push(product.title || `ID ${product.id}`);
+        }
+      } catch {
+        failedProducts.push(product.title || `ID ${product.id}`);
+      }
+      setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
+    }
+    setBulkEstimating(false);
+    toast({
+      title: "Estimación masiva completada",
+      description: failedProducts.length > 0
+        ? `${successCount} OK, ${failedProducts.length} fallidos: ${failedProducts.slice(0, 3).join(", ")}${failedProducts.length > 3 ? "…" : ""}`
+        : `${successCount} de ${allProducts.length} productos estimados correctamente.`,
+    });
   };
 
   if (isLoadingDash) return <div className="p-12 text-center text-muted-foreground">Cargando...</div>;
@@ -1044,6 +1079,22 @@ ${products.slice(0, 50).map((p: any) => `<tr><td>${p.title}</td><td>${p.price ? 
             <h2 className="text-lg font-bold text-foreground">Calculadora COGS por Producto</h2>
             <p className="text-sm text-muted-foreground">Haz clic en "Optimizar" para calcular el precio óptimo con IA.</p>
           </div>
+          <button
+            onClick={handleBulkEstimate}
+            disabled={bulkEstimating}
+            className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shrink-0"
+            style={{
+              background: bulkEstimating ? "rgba(200,168,75,.08)" : "rgba(200,168,75,.12)",
+              border: "1px solid rgba(200,168,75,.3)",
+              color: "#c8a84b",
+            }}
+          >
+            {bulkEstimating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Estimando {bulkProgress.done}/{bulkProgress.total}...</>
+            ) : (
+              <><Brain className="w-4 h-4" /> Auto-estimar todos</>
+            )}
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

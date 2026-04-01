@@ -22,8 +22,25 @@ import { logger } from "../lib/logger.js";
 import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
 import { buildCoverPage } from "../lib/report-cover.js";
+import { generatePdfFromHtml } from "../lib/pdf-generator.js";
+import type { Request, Response } from "express";
 
 const router = Router();
+
+async function sendHtmlOrPdf(req: Request, res: Response, html: string, filename: string): Promise<void> {
+  const format = (req.query.format as string || "").toLowerCase();
+  if (format === "pdf") {
+    try {
+      await generatePdfFromHtml(html, filename, res);
+    } catch (e: any) {
+      res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+    }
+    return;
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+  res.send(html);
+}
 
 interface CogsEstimation {
   businessType: string;
@@ -1212,9 +1229,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe SEO Técnico", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
   autoSaveReport(projectId, "Informe SEO Técnico", html, "seo_audit").catch(() => {});
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="SEO_Audit_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `SEO_Audit_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/product-catalog", async (req, res): Promise<void> => {
@@ -1285,10 +1300,8 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Catálogo de Productos", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Product_Catalog_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Catálogo de Productos", html, "product_catalog").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Product_Catalog_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/financial", async (req, res): Promise<void> => {
@@ -1368,10 +1381,8 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Financial_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe Financiero y COGS", html, "financial").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Financial_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise<void> => {
@@ -1449,10 +1460,8 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Brand Brief & Estrategia", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Brand_Brief_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Brand Brief & Estrategia", html, "brand_brief").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Brand_Brief_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<void> => {
@@ -1497,10 +1506,8 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe A/B Testing", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="AB_Tests_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe A/B Testing", html, "ab_testing").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `AB_Tests_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/images-gallery", async (req, res): Promise<void> => {
@@ -1544,10 +1551,8 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Galería de Imágenes IA", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Images_Gallery_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Galería de Imágenes IA", html, "images_gallery").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Images_Gallery_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Promise<void> => {
@@ -2718,12 +2723,13 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     `${project.shopDomain || "Sin dominio"} — ${project.storeNiche || "eCommerce"}`,
     body, date, targetCompany
   );
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  if (req.query.view !== "true") {
-    res.setHeader("Content-Disposition", `attachment; filename="Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.html"`);
-  }
   autoSaveReport(projectId, `Auditoría Completa — ${project.name}`, html, "complete_audit").catch(() => {});
-  res.send(html);
+  if (req.query.view === "true" && (req.query.format as string || "").toLowerCase() !== "pdf") {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } else {
+    await sendHtmlOrPdf(req, res, html, `Full_Audit_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}`);
+  }
   } catch (err: any) {
     console.error("complete-report error:", err);
     res.status(500).json({ error: "Error generando el informe completo" });
@@ -2833,10 +2839,8 @@ router.get("/projects/:projectId/exports/competitors", async (req, res): Promise
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Competencia", `${project.name} — Análisis Competitivo`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Competitor_Analysis_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Competencia", html, "competitors").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Competitor_Analysis_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/consistency", async (req, res): Promise<void> => {
@@ -2899,10 +2903,8 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Consistency_BrandDNA_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Consistencia y ADN de Marca", html, "brand_consistency").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Consistency_BrandDNA_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<void> => {
@@ -2971,10 +2973,8 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Inventory_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Inventario", html, "inventory").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Inventory_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<void> => {
@@ -3028,10 +3028,8 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Redesigns_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Rediseños IA", html, "redesigns").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Redesigns_Report_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<void> => {
@@ -3102,10 +3100,8 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="Revenue_Forecast_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe de Revenue y Forecast", html, "revenue_forecast").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `Revenue_Forecast_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<void> => {
@@ -3182,10 +3178,8 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe Shopy Crafter — Inteligencia Artificial", `${project.name} — Estado del Cerebro IA`, body, date);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="ShopyCrafter_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}.html"`);
   autoSaveReport(projectId, "Informe Shopy Crafter — Inteligencia Artificial", html, "shopybrain_intelligence").catch(() => {});
-  res.send(html);
+  await sendHtmlOrPdf(req, res, html, `ShopyCrafter_Intelligence_${project.name.replace(/\s/g, "_")}_${new Date().toISOString().split("T")[0]}`);
 });
 
 router.get("/projects/:projectId/exports/json/products", async (req, res): Promise<void> => {
