@@ -7,6 +7,7 @@ import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
@@ -180,6 +181,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: sanitizeHtml(project?.name || "Proyecto"), template: "classic" })}
 <div class="page">
   <div class="header">
     <div class="header-left">
@@ -972,6 +974,7 @@ function buildBrandedHtmlFromMetadata(file: {
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: sanitizeHtml(file.title), template: "prestige" })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -1336,6 +1339,7 @@ function generateProfessionalReport(opts: { title: string; content: string; enti
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: sanitizeHtml(opts.entityName), template: "classic" })}
 <div class="page">
   <div class="header">
     <div class="header-left">

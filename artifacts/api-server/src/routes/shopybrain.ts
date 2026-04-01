@@ -13,6 +13,7 @@ import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -7263,6 +7264,7 @@ thead th{background:rgba(200,168,75,0.08);padding:12px 16px;text-align:left;colo
 .conditions{padding:32px 40px;border-top:1px solid rgba(200,168,75,0.08);font-size:12px;color:#888;line-height:1.8}
 .footer{padding:24px 40px;background:rgba(200,168,75,0.05);text-align:center;font-size:11px;color:#666}
 </style></head><body>
+${buildCoverPage({ companyName: clientName, template: "prestige" })}
 <div class="budget">
   <div class="header">
     <div class="logo">Shopy <span>Crafter</span></div>

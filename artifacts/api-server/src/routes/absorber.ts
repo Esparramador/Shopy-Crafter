@@ -13,6 +13,7 @@ import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
+import { buildCoverPage } from "../lib/report-cover.js";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
 import { getClaudeClient, learnFromOperation } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
@@ -1223,6 +1224,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
   </style>
 </head>
 <body>
+${buildCoverPage({ companyName: productName, template: "prestige" })}
 <div class="container">
   <div class="header">
     <h1>🔍 Informe de Proveedores</h1>

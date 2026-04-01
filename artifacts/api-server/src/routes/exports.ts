@@ -21,6 +21,7 @@ import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "
 import { logger } from "../lib/logger.js";
 import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 
 const router = Router();
 
@@ -379,10 +380,11 @@ const BRAND = {
   borderLight: "#24243a",
 };
 
-function reportShell(title: string, subtitle: string, body: string, date: string): string {
+function reportShell(title: string, subtitle: string, body: string, date: string, targetCompany?: string): string {
   const safeTitle = sanitizeHtml(title);
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
+  const coverCompany = targetCompany || safeSub.split(" — ")[0] || "";
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -536,6 +538,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: coverCompany, template: "classic" })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -618,6 +621,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
   const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  const coverCompanyE = safeCompany || safeSub.split(" — ")[0] || "";
   const subtitleParts = safeSub.split(" — ");
   const coverSector = subtitleParts.length > 1 ? subtitleParts[1] : safeSub;
   const coverDomain = subtitleParts.length > 1 ? subtitleParts[0] : "";
@@ -786,6 +790,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: coverCompanyE, template: "elegance" })}
 <div class="page">
   <div class="cover-portfolio">
     <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
@@ -851,6 +856,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
   const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  const coverCompanyP = safeCompany || safeSub.split(" — ")[0] || "";
   const subtitleParts = safeSub.split(" — ");
   const coverSector = subtitleParts.length > 1 ? subtitleParts[1] : safeSub;
   const coverDomain = subtitleParts.length > 1 ? subtitleParts[0] : "";
@@ -1019,6 +1025,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: coverCompanyP, template: "prestige" })}
 <div class="page">
   <div class="cover-portfolio">
     <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
@@ -1082,7 +1089,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 function getReportShell(template: ReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
   if (template === "elegance") return reportShellElegance;
   if (template === "prestige") return reportShellPrestige;
-  return (t, s, b, d, c) => reportShell(t, s, b, d);
+  return (t, s, b, d, c) => reportShell(t, s, b, d, c);
 }
 
 function gradeClass(grade: string): string {

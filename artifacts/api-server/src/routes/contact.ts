@@ -9,6 +9,7 @@ import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { requireAdmin } from "../lib/auth.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 
 const router = Router();
 
@@ -238,6 +239,7 @@ function buildReportHtml(
 <html>
 <head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+${buildCoverPage({ companyName: esc(lead.name), template: "elegance" })}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;">
 <tr><td align="center">
 <table width="680" cellpadding="0" cellspacing="0" style="background:#101018;border-radius:16px;overflow:hidden;">

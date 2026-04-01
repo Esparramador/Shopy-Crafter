@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { db, usersTable, approvalsTable, messagesTable, productsTable, auditLogTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { requireAuth, requireClientAccess } from "../lib/auth.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -197,6 +198,7 @@ router.get("/reports/export", async (req, res): Promise<void> => {
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de Tienda — Shopy Crafter</title></head>
 <body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,sans-serif;">
+${buildCoverPage({ companyName: "Tienda", template: "elegance" })}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;"><tr><td align="center">
 <table width="720" cellpadding="0" cellspacing="0" style="background:#0c0c14;border-radius:16px;overflow:hidden;">
 <tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f);padding:40px 48px 28px;">

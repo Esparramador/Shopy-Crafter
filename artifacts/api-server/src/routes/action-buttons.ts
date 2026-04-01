@@ -8,6 +8,7 @@ import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -82,7 +83,7 @@ function extractProductCards(rawData: unknown): string {
   return buildProductCardsSection(cards, `Productos (${cards.length})`);
 }
 
-function buildProfessionalHtml(title: string, content: string, actionName: string, rawData?: unknown): string {
+function buildProfessionalHtml(title: string, content: string, actionName: string, rawData?: unknown, companyName?: string): string {
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
@@ -181,6 +182,7 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${sanitizeHtml(title)} — Shopy Crafter</title>
+<style>.sc-cover-page + .page .cover { margin-top: 0; }</style>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -217,6 +219,7 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
 </style>
 </head>
 <body>
+${buildCoverPage({ companyName: companyName || "", template: "classic" })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -312,7 +315,7 @@ router.post("/projects/:projectId/actions/send", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const emailTitle = title || `${label} — ${projectName}`;
-  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData);
+  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName);
 
   const to = recipientEmail || "sadiagiljoan@gmail.com";
   const subject = `📊 ${emailTitle} | Shopy Crafter`;
@@ -342,7 +345,7 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${project.name}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, project.name);
 
   const fileId = await saveToVault({
     projectId,
@@ -405,7 +408,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${projectName}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, projectName);
   const safeName = reportTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
   const dateStr = new Date().toISOString().split("T")[0];
 

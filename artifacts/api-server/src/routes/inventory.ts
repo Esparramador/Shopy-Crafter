@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
+import { buildCoverPage } from "../lib/report-cover.js";
 
 const router = Router();
 
@@ -800,7 +801,9 @@ router.get("/inventory/sales-report", async (req, res): Promise<void> => {
     @media print { body { background: #0d0d1a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style>
 </head>
-<body style="padding:30px;max-width:1200px;margin:0 auto;">
+<body>
+${buildCoverPage({ companyName: esc(storeName), template: "prestige" })}
+<div style="padding:30px;max-width:1200px;margin:0 auto;">
 
   <div style="text-align:center;margin-bottom:40px;padding:40px 20px;background:linear-gradient(145deg,#1a1a2e,#0d0d1a);border-radius:20px;border:2px solid #c8a84e;">
     <div style="font-size:12px;text-transform:uppercase;letter-spacing:3px;color:#c8a84e;margin-bottom:8px;">Shopy Crafter eCommerce</div>
@@ -849,6 +852,7 @@ router.get("/inventory/sales-report", async (req, res): Promise<void> => {
     <div>IA para tu eCommerce · ${dateStr}</div>
   </div>
 
+</div>
 </body>
 </html>`;
 
