@@ -615,6 +615,10 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
   const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  const subtitleParts = safeSub.split(" — ");
+  const coverSector = subtitleParts.length > 1 ? subtitleParts[1] : safeSub;
+  const coverDomain = subtitleParts.length > 1 ? subtitleParts[0] : "";
+  const refCode = `SC-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -627,40 +631,55 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${ELEGANCE.navy}; color: ${ELEGANCE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
-  .cover-full { position: relative; min-height: 600px; background: linear-gradient(155deg, #070e1c 0%, ${ELEGANCE.navy} 35%, #0d1a35 70%, #091428 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid ${ELEGANCE.border}; }
-  .cover-full::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(74,144,217,.02) 80px, rgba(74,144,217,.02) 81px); pointer-events: none; }
-  .cover-full::after { content: ''; position: absolute; top: -200px; right: -200px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(74,144,217,.06) 0%, transparent 65%); pointer-events: none; }
-  .cover-full .cover-corner { position: absolute; width: 80px; height: 80px; border-color: ${ELEGANCE.accent}33; border-style: solid; }
-  .cover-full .corner-tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
-  .cover-full .corner-tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
-  .cover-full .corner-bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
-  .cover-full .corner-br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
+  .cover-portfolio {
+    position: relative; width: 100%; min-height: 900px;
+    background: linear-gradient(155deg, #070e1c 0%, ${ELEGANCE.navy} 35%, #0d1a35 70%, #091428 100%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 80px 56px 60px; overflow: hidden;
+    border-bottom: 2px solid ${ELEGANCE.border}; page-break-after: always;
+  }
+  .cover-portfolio::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(74,144,217,.06) 0%, transparent 60%); pointer-events: none; }
+  .cover-portfolio::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 85%, rgba(74,144,217,.03) 0%, transparent 50%); pointer-events: none; }
 
-  .cover-logo-img { width: 100px; height: 100px; border-radius: 16px; object-fit: cover; margin-bottom: 28px; box-shadow: 0 8px 40px rgba(74,144,217,.15), 0 0 0 1px ${ELEGANCE.border}; position: relative; z-index: 2; }
-  .cover-brand { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: ${ELEGANCE.accent}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 32px; position: relative; z-index: 2; }
-  .cover-divider { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}, transparent); margin: 0 auto 32px; position: relative; z-index: 2; }
-  .cover-title-main { font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 800; color: ${ELEGANCE.white}; letter-spacing: -0.5px; line-height: 1.2; max-width: 700px; margin-bottom: 16px; position: relative; z-index: 2; }
-  .cover-subtitle-main { font-size: 16px; color: ${ELEGANCE.silver}; font-weight: 400; max-width: 500px; margin: 0 auto 36px; position: relative; z-index: 2; line-height: 1.6; }
-  .cover-target { font-family: 'Playfair Display', serif; font-size: 20px; color: ${ELEGANCE.accentSoft}; font-weight: 600; margin-bottom: 12px; position: relative; z-index: 2; }
-  .cover-date { font-size: 12px; color: ${ELEGANCE.muted}; letter-spacing: 2px; text-transform: uppercase; position: relative; z-index: 2; }
+  .cover-frame { position: absolute; inset: 36px; pointer-events: none; }
+  .cover-frame::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${ELEGANCE.accent}; }
+  .cover-frame::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${ELEGANCE.accent}44; }
+  .cover-frame-h1 { position: absolute; top: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}22, transparent); }
+  .cover-frame-h2 { position: absolute; bottom: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}22, transparent); }
 
-  .cover { background: linear-gradient(160deg, ${ELEGANCE.navy} 0%, ${ELEGANCE.navyLight} 50%, ${ELEGANCE.navy} 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${ELEGANCE.border}; position: relative; overflow: hidden; }
-  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}44, transparent); }
-  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
-  .cover-logo { display: flex; align-items: center; gap: 12px; }
-  .cover-logo-icon { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; }
-  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
-  .cover-logo-text { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: ${ELEGANCE.accent}; letter-spacing: 0.5px; }
-  .cover-badge { background: ${ELEGANCE.surface}; border: 1px solid ${ELEGANCE.borderLight}; border-radius: 8px; padding: 8px 16px; }
-  .cover-badge-label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
-  .cover-badge-value { font-size: 13px; color: ${ELEGANCE.white}; font-weight: 600; margin-top: 2px; }
-  .cover-title { position: relative; z-index: 1; }
-  .cover-title h1 { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 800; color: ${ELEGANCE.white}; letter-spacing: -0.5px; line-height: 1.2; }
-  .cover-title h1 span { color: ${ELEGANCE.accent}; }
-  .cover-title .subtitle { font-size: 15px; color: ${ELEGANCE.silver}; margin-top: 8px; font-weight: 400; }
-  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
-  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${ELEGANCE.muted}; }
-  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${ELEGANCE.accent}; }
+  .cover-inner { position: relative; z-index: 5; max-width: 680px; }
+
+  .cover-diamond-top { width: 14px; height: 14px; background: ${ELEGANCE.accent}; transform: rotate(45deg); margin: 0 auto 36px; box-shadow: 0 0 20px rgba(74,144,217,.3); }
+
+  .cover-agency-line { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 44px; }
+  .cover-agency-bar { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}55); }
+  .cover-agency-bar-r { width: 50px; height: 1px; background: linear-gradient(90deg, ${ELEGANCE.accent}55, transparent); }
+  .cover-agency-name { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 600; color: ${ELEGANCE.accent}; letter-spacing: 5px; text-transform: uppercase; }
+
+  .cover-logo-container { margin-bottom: 44px; }
+  .cover-logo-circle { width: 100px; height: 100px; border-radius: 16px; overflow: hidden; margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 0 1px ${ELEGANCE.border}, 0 0 60px rgba(74,144,217,.06); border: 2px solid ${ELEGANCE.accent}44; }
+  .cover-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+  .cover-sep { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto 40px; }
+  .cover-sep-line { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}44); }
+  .cover-sep-line-r { width: 70px; height: 1px; background: linear-gradient(90deg, ${ELEGANCE.accent}44, transparent); }
+  .cover-sep-dot { width: 6px; height: 6px; background: ${ELEGANCE.accent}; transform: rotate(45deg); opacity: .6; }
+
+  .cover-doc-type { font-size: 11px; font-weight: 700; color: ${ELEGANCE.muted}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
+  .cover-main-title { font-family: 'Playfair Display', serif; font-size: 50px; font-weight: 800; color: ${ELEGANCE.white}; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 16px; text-shadow: 0 4px 30px rgba(0,0,0,.4); }
+  .cover-main-subtitle { font-size: 16px; color: ${ELEGANCE.silver}; font-weight: 400; line-height: 1.6; margin-bottom: 48px; max-width: 520px; margin-left: auto; margin-right: auto; }
+
+  .cover-client-box { background: #0d1628; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+  .cover-client-label { font-size: 10px; color: ${ELEGANCE.muted}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+  .cover-client-name { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: ${ELEGANCE.accentSoft}; font-style: italic; letter-spacing: 0.5px; }
+
+  .cover-meta-row { display: flex; justify-content: center; gap: 40px; margin-top: 16px; }
+  .cover-meta-item { text-align: center; }
+  .cover-meta-label { font-size: 9px; color: ${ELEGANCE.muted}; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .cover-meta-value { font-size: 13px; color: ${ELEGANCE.silver}; font-weight: 500; }
+
+  .cover-footer-line { position: absolute; bottom: 24px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
+  .cover-footer-text { font-size: 9px; color: ${ELEGANCE.muted}44; letter-spacing: 2px; text-transform: uppercase; }
 
   .body-content { padding: 40px 56px 48px; }
 
@@ -748,8 +767,13 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 
   @media print {
     body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .cover-full { background: #f0f4f8; min-height: 400px; } .cover-full::before, .cover-full::after { display: none; }
-    .cover-title-main, .cover-title h1 { color: #1a1a1a; }
+    .cover-portfolio { background: #f0f4f8 !important; min-height: 100vh; page-break-after: always; }
+    .cover-portfolio::before, .cover-portfolio::after { display: none; }
+    .cover-main-title, .cover-title h1 { color: #1a1a1a; }
+    .cover-client-name { color: #2a6ab5; }
+    .card, .metric, .recommendation, .toc-item, .stat-item { break-inside: avoid; }
+    table, tr { break-inside: avoid; }
+    .metric-row, .stat-grid { break-inside: avoid; }
     .card, .metric { background: #fafafa; border: 1px solid #d8dce4; }
     .metric .value { color: #2a6ab5; }
     th { background: #eef2f6; color: #2a6ab5; }
@@ -760,15 +784,51 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 </head>
 <body>
 <div class="page">
-  <div class="cover-full">
-    <div class="cover-corner corner-tl"></div><div class="cover-corner corner-tr"></div><div class="cover-corner corner-bl"></div><div class="cover-corner corner-br"></div>
-    <img class="cover-logo-img" src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" />
-    <div class="cover-brand">Shopy Crafter</div>
-    <div class="cover-divider"></div>
-    <div class="cover-title-main">${safeTitle}</div>
-    <div class="cover-subtitle-main">${safeSub}</div>
-    ${safeCompany ? `<div class="cover-target">Preparado para: ${safeCompany}</div>` : ""}
-    <div class="cover-date">${safeDate}</div>
+  <div class="cover-portfolio">
+    <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
+
+    <div class="cover-inner">
+      <div class="cover-diamond-top"></div>
+
+      <div class="cover-agency-line">
+        <div class="cover-agency-bar"></div>
+        <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
+        <div class="cover-agency-bar-r"></div>
+      </div>
+
+      <div class="cover-logo-container">
+        <div class="cover-logo-circle">
+          <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" />
+        </div>
+      </div>
+
+      <div class="cover-sep">
+        <div class="cover-sep-line"></div>
+        <div class="cover-sep-dot"></div>
+        <div class="cover-sep-line-r"></div>
+      </div>
+
+      <div class="cover-doc-type">Informe de Consultoría Digital</div>
+      <div class="cover-main-title">${safeTitle}</div>
+      <div class="cover-main-subtitle">${safeSub}</div>
+
+      ${safeCompany ? `<div class="cover-client-box">
+        <div class="cover-client-label">Preparado para</div>
+        <div class="cover-client-name">${safeCompany}</div>
+      </div>` : ""}
+
+      <div class="cover-meta-row">
+        <div class="cover-meta-item"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></div>
+        <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></div>
+        ${coverDomain ? `<div class="cover-meta-item"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></div>` : ""}
+        <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></div>
+      </div>
+    </div>
+
+    <div class="cover-footer-line">
+      <div class="cover-footer-text">shopycrafter.com</div>
+      <div class="cover-footer-text">Confidencial</div>
+    </div>
   </div>
   <div class="body-content">
     ${body}
@@ -788,6 +848,10 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   const safeSub = sanitizeHtml(subtitle);
   const safeDate = sanitizeHtml(date);
   const safeCompany = targetCompany ? sanitizeHtml(targetCompany) : "";
+  const subtitleParts = safeSub.split(" — ");
+  const coverSector = subtitleParts.length > 1 ? subtitleParts[1] : safeSub;
+  const coverDomain = subtitleParts.length > 1 ? subtitleParts[0] : "";
+  const refCode = `SC-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -795,47 +859,60 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${safeTitle} — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${PRESTIGE.charcoal}; color: ${PRESTIGE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
-  .cover-full { position: relative; min-height: 620px; background: linear-gradient(170deg, #120e0a 0%, ${PRESTIGE.charcoal} 30%, #1e1810 60%, #150f0a 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid ${PRESTIGE.border}; }
-  .cover-full::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(196,149,106,.06) 0%, transparent 60%); pointer-events: none; }
-  .cover-full::after { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 80px; background: linear-gradient(180deg, ${PRESTIGE.copper}44, transparent); pointer-events: none; }
+  .cover-portfolio {
+    position: relative; width: 100%; min-height: 900px;
+    background: linear-gradient(170deg, #120e0a 0%, ${PRESTIGE.charcoal} 30%, #1e1810 60%, #150f0a 100%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 80px 56px 60px; overflow: hidden;
+    border-bottom: 2px solid ${PRESTIGE.border}; page-break-after: always;
+  }
+  .cover-portfolio::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(196,149,106,.06) 0%, transparent 60%); pointer-events: none; }
+  .cover-portfolio::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 85%, rgba(196,149,106,.03) 0%, transparent 50%); pointer-events: none; }
 
-  .cover-ornament { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; }
-  .cover-ornament-line { width: 60px; height: 1px; background: ${PRESTIGE.copper}44; }
-  .cover-ornament-diamond { width: 6px; height: 6px; background: ${PRESTIGE.copper}; transform: rotate(45deg); }
+  .cover-frame { position: absolute; inset: 36px; pointer-events: none; }
+  .cover-frame::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${PRESTIGE.copper}; }
+  .cover-frame::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${PRESTIGE.copper}44; }
+  .cover-frame-h1 { position: absolute; top: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}22, transparent); }
+  .cover-frame-h2 { position: absolute; bottom: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}22, transparent); }
 
-  .cover-logo-img { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin-bottom: 24px; box-shadow: 0 0 0 3px ${PRESTIGE.charcoal}, 0 0 0 4px ${PRESTIGE.copper}44, 0 12px 48px rgba(196,149,106,.12); position: relative; z-index: 2; }
-  .cover-brand { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 600; color: ${PRESTIGE.copper}; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 8px; position: relative; z-index: 2; }
-  .cover-separator { display: flex; align-items: center; gap: 16px; margin: 24px auto 28px; position: relative; z-index: 2; }
-  .cover-sep-line { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}88); }
-  .cover-sep-line-r { background: linear-gradient(90deg, ${PRESTIGE.copper}88, transparent); }
-  .cover-sep-icon { font-size: 10px; color: ${PRESTIGE.copper}; }
-  .cover-title-main { font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 700; color: ${PRESTIGE.white}; letter-spacing: -0.3px; line-height: 1.2; max-width: 700px; margin-bottom: 14px; position: relative; z-index: 2; }
-  .cover-subtitle-main { font-size: 15px; color: ${PRESTIGE.mutedLight}; font-weight: 400; max-width: 500px; margin: 0 auto 32px; position: relative; z-index: 2; line-height: 1.6; }
-  .cover-target { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: ${PRESTIGE.copperLight}; font-weight: 600; margin-bottom: 16px; position: relative; z-index: 2; font-style: italic; }
-  .cover-date { font-size: 11px; color: ${PRESTIGE.muted}; letter-spacing: 3px; text-transform: uppercase; position: relative; z-index: 2; }
+  .cover-inner { position: relative; z-index: 5; max-width: 680px; }
 
-  .cover { background: linear-gradient(160deg, ${PRESTIGE.charcoal} 0%, ${PRESTIGE.charcoalLight} 50%, ${PRESTIGE.charcoal} 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${PRESTIGE.border}; position: relative; overflow: hidden; }
-  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}44, transparent); }
-  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
-  .cover-logo { display: flex; align-items: center; gap: 12px; }
-  .cover-logo-icon { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; }
-  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
-  .cover-logo-text { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 700; color: ${PRESTIGE.copper}; }
-  .cover-badge { background: ${PRESTIGE.surface}; border: 1px solid ${PRESTIGE.borderLight}; border-radius: 8px; padding: 8px 16px; }
-  .cover-badge-label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
-  .cover-badge-value { font-size: 13px; color: ${PRESTIGE.white}; font-weight: 600; margin-top: 2px; }
-  .cover-title { position: relative; z-index: 1; }
-  .cover-title h1 { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 700; color: ${PRESTIGE.white}; letter-spacing: -0.3px; line-height: 1.2; }
-  .cover-title h1 span { color: ${PRESTIGE.copper}; }
-  .cover-title .subtitle { font-size: 15px; color: ${PRESTIGE.mutedLight}; margin-top: 8px; font-weight: 400; }
-  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
-  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${PRESTIGE.muted}; }
-  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${PRESTIGE.copper}; }
+  .cover-diamond-top { width: 14px; height: 14px; background: ${PRESTIGE.copper}; transform: rotate(45deg); margin: 0 auto 36px; box-shadow: 0 0 20px rgba(196,149,106,.3); }
+
+  .cover-agency-line { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 44px; }
+  .cover-agency-bar { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}55); }
+  .cover-agency-bar-r { width: 50px; height: 1px; background: linear-gradient(90deg, ${PRESTIGE.copper}55, transparent); }
+  .cover-agency-name { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; color: ${PRESTIGE.copper}; letter-spacing: 5px; text-transform: uppercase; }
+
+  .cover-logo-container { margin-bottom: 44px; }
+  .cover-logo-circle { width: 100px; height: 100px; border-radius: 50%; overflow: hidden; margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 0 1px #2e2620, 0 0 60px rgba(196,149,106,.06); border: 2px solid ${PRESTIGE.copper}44; }
+  .cover-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+  .cover-sep { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto 40px; }
+  .cover-sep-line { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}44); }
+  .cover-sep-line-r { width: 70px; height: 1px; background: linear-gradient(90deg, ${PRESTIGE.copper}44, transparent); }
+  .cover-sep-dot { width: 6px; height: 6px; background: ${PRESTIGE.copper}; transform: rotate(45deg); opacity: .6; }
+
+  .cover-doc-type { font-size: 11px; font-weight: 700; color: ${PRESTIGE.muted}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
+  .cover-main-title { font-family: 'Cormorant Garamond', serif; font-size: 50px; font-weight: 800; color: ${PRESTIGE.white}; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 16px; text-shadow: 0 4px 30px rgba(0,0,0,.4); }
+  .cover-main-subtitle { font-size: 16px; color: ${PRESTIGE.mutedLight}; font-weight: 400; line-height: 1.6; margin-bottom: 48px; max-width: 520px; margin-left: auto; margin-right: auto; }
+
+  .cover-client-box { background: #211c15; border: 1px solid #3d332a; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+  .cover-client-label { font-size: 10px; color: ${PRESTIGE.muted}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+  .cover-client-name { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 700; color: ${PRESTIGE.copperLight}; font-style: italic; letter-spacing: 0.5px; }
+
+  .cover-meta-row { display: flex; justify-content: center; gap: 40px; margin-top: 16px; }
+  .cover-meta-item { text-align: center; }
+  .cover-meta-label { font-size: 9px; color: ${PRESTIGE.muted}; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .cover-meta-value { font-size: 13px; color: ${PRESTIGE.mutedLight}; font-weight: 500; }
+
+  .cover-footer-line { position: absolute; bottom: 24px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
+  .cover-footer-text { font-size: 9px; color: ${PRESTIGE.muted}44; letter-spacing: 2px; text-transform: uppercase; }
 
   .body-content { padding: 40px 56px 48px; }
 
@@ -923,8 +1000,13 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 
   @media print {
     body { background: #faf8f5; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .cover-full { background: #f5f0eb; min-height: 400px; } .cover-full::before, .cover-full::after { display: none; }
-    .cover-title-main, .cover-title h1 { color: #1a1a1a; }
+    .cover-portfolio { background: #f5f0eb !important; min-height: 100vh; page-break-after: always; }
+    .cover-portfolio::before, .cover-portfolio::after { display: none; }
+    .cover-main-title, .cover-title h1 { color: #1a1a1a; }
+    .cover-client-name { color: #8b6340; }
+    .card, .metric, .recommendation, .toc-item, .stat-item { break-inside: avoid; }
+    table, tr { break-inside: avoid; }
+    .metric-row, .stat-grid { break-inside: avoid; }
     .card, .metric { background: #fafaf8; border: 1px solid #e0dcd6; }
     .metric .value { color: #8b6340; }
     th { background: #f0ece6; color: #8b6340; }
@@ -935,15 +1017,51 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 </head>
 <body>
 <div class="page">
-  <div class="cover-full">
-    <div class="cover-ornament"><div class="cover-ornament-line"></div><div class="cover-ornament-diamond"></div><div class="cover-ornament-line"></div></div>
-    <img class="cover-logo-img" src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="Shopy Crafter" />
-    <div class="cover-brand">Shopy Crafter</div>
-    <div class="cover-separator"><div class="cover-sep-line"></div><div class="cover-sep-icon">&#9830;</div><div class="cover-sep-line cover-sep-line-r"></div></div>
-    <div class="cover-title-main">${safeTitle}</div>
-    <div class="cover-subtitle-main">${safeSub}</div>
-    ${safeCompany ? `<div class="cover-target">Preparado para: ${safeCompany}</div>` : ""}
-    <div class="cover-date">${safeDate}</div>
+  <div class="cover-portfolio">
+    <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
+
+    <div class="cover-inner">
+      <div class="cover-diamond-top"></div>
+
+      <div class="cover-agency-line">
+        <div class="cover-agency-bar"></div>
+        <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
+        <div class="cover-agency-bar-r"></div>
+      </div>
+
+      <div class="cover-logo-container">
+        <div class="cover-logo-circle">
+          <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" />
+        </div>
+      </div>
+
+      <div class="cover-sep">
+        <div class="cover-sep-line"></div>
+        <div class="cover-sep-dot"></div>
+        <div class="cover-sep-line-r"></div>
+      </div>
+
+      <div class="cover-doc-type">Informe de Consultoría Digital</div>
+      <div class="cover-main-title">${safeTitle}</div>
+      <div class="cover-main-subtitle">${safeSub}</div>
+
+      ${safeCompany ? `<div class="cover-client-box">
+        <div class="cover-client-label">Preparado para</div>
+        <div class="cover-client-name">${safeCompany}</div>
+      </div>` : ""}
+
+      <div class="cover-meta-row">
+        <div class="cover-meta-item"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></div>
+        <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></div>
+        ${coverDomain ? `<div class="cover-meta-item"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></div>` : ""}
+        <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></div>
+      </div>
+    </div>
+
+    <div class="cover-footer-line">
+      <div class="cover-footer-text">shopycrafter.com</div>
+      <div class="cover-footer-text">Confidencial</div>
+    </div>
   </div>
   <div class="body-content">
     ${body}
