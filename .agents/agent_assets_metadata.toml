@@ -179,3 +179,9 @@ id = "NDZ9KWmk7Cj7GPFybPk3W"
 uri = "file://exports/Rasta_Lo_Prestige_Audit.pdf"
 type = "pdf"
 title = "Rasta Lo — Auditoría con COGS (Prestige, 974 KB)"
+
+[[outputs]]
+id = "KKgnVpMh7T-VknI61lTiu"
+uri = "file://artifacts/shopify-optimizer/public/informes/lazy-lizard-elegance.pdf"
+type = "pdf"
+title = "Informe Lazy Lizard - Elegance (PDF)"
