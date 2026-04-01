@@ -75,7 +75,7 @@ export async function dualAI(
 ): Promise<DualAIResult> {
   const start = Date.now();
   const mode = opts.mode ?? "parallel_synthesis";
-  const maxTokens = opts.maxTokens ?? 4096;
+  const maxTokens = opts.maxTokens ?? 16384;
   const useCase = opts.useCase ?? "general";
   const niche = opts.niche;
   const geminiAvailable = isGeminiAvailable();
@@ -230,7 +230,7 @@ export async function dualAIJson<T>(
   if (mode === "claude_only" || !geminiAvailable) {
     const { askClaudeJsonWithBrain } = await import("./claude.js");
     const t0 = Date.now();
-    const data = await askClaudeJsonWithBrain<T>(projectId, prompt, opts.claudeSystemPrompt ?? opts.systemPrompt ?? "", toClaudeUseCase(useCase), opts.niche, opts.maxTokens ?? 4096);
+    const data = await askClaudeJsonWithBrain<T>(projectId, prompt, opts.claudeSystemPrompt ?? opts.systemPrompt ?? "", toClaudeUseCase(useCase), opts.niche, opts.maxTokens ?? 16384);
     return { data, sources: { claude: data }, mode: "claude_only", timings: { claude: Date.now() - t0, total: Date.now() - start } };
   }
 
@@ -270,7 +270,7 @@ export async function dualAIJson<T>(
       opts.claudeSystemPrompt ?? opts.systemPrompt ?? "",
       toClaudeUseCase(useCase),
       opts.niche,
-      opts.maxTokens ?? 4096
+      opts.maxTokens ?? 16384
     );
     const claudeTime = Date.now() - t0c;
 
@@ -283,7 +283,7 @@ export async function dualAIJson<T>(
   const [claudeSettled, geminiSettled] = await Promise.allSettled([
     (async () => {
       const t = Date.now();
-      const data = await askClaudeJsonWithBrain<T>(projectId, prompt, opts.claudeSystemPrompt ?? opts.systemPrompt ?? "", toClaudeUseCase(useCase), opts.niche, opts.maxTokens ?? 4096);
+      const data = await askClaudeJsonWithBrain<T>(projectId, prompt, opts.claudeSystemPrompt ?? opts.systemPrompt ?? "", toClaudeUseCase(useCase), opts.niche, opts.maxTokens ?? 16384);
       return { data, time: Date.now() - t };
     })(),
     (async () => {

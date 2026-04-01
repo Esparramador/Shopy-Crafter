@@ -956,7 +956,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) {
+    if (file) {
       setAttachFile(file); setAttachUrl(""); setShowAttach(true);
     }
   };
@@ -1269,7 +1269,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `🖼 **Optimización de imágenes completada:**\n📊 ${result.productsProcessed} productos procesados\n🖼 ${result.optimizedImages}/${result.totalImages} imágenes con alt text SEO`;
       case "read_cms":
         if (result.sections) return `📋 **CMS tiene ${result.totalSections} secciones:**\n${(result.sections as string[]).map(s => `· ${s}`).join("\n")}`;
-        return `📋 **CMS — ${result.section}:**\n${typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2).slice(0, 800)}`;
+        { const cmsVal = typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2);
+        return `📋 **CMS — ${result.section}:**\n${cmsVal.length > 2000 ? cmsVal.slice(0, 2000) + "\n\n... *(contenido completo disponible en la respuesta)*" : cmsVal}`; }
       case "update_cms":
         return `✅ **CMS actualizado:**\n📝 Campo: \`${result.path}\`\n💾 Nuevo valor: ${typeof result.value === "string" ? `"${result.value}"` : JSON.stringify(result.value)}`;
       case "update_cms_batch":
@@ -1301,7 +1302,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "seo_full_audit":
         return `📊 **Auditoría SEO completada (16 criterios):**\n🏆 Score: **${result.averageScore || result.score || "?"}**/100\n📦 ${result.productsAudited || result.total || "?"} productos analizados\n${result.topIssues ? `\n⚠️ **Problemas principales:**\n${(result.topIssues as string[]).map((i: string) => `· ${i}`).join("\n")}` : ""}\n${result.message || ""}`;
       case "keyword_intelligence":
-        return `🔍 **Keyword Intelligence:**\n${result.message || JSON.stringify(result.keywords || result.data || result, null, 2).slice(0, 800)}`;
+        { const kwData = result.message || JSON.stringify(result.keywords || result.data || result, null, 2);
+        return `🔍 **Keyword Intelligence:**\n${kwData.length > 3000 ? kwData.slice(0, 3000) + "\n\n... *(datos completos disponibles)*" : kwData}`; }
       case "generate_schemas":
         return `📋 **Schemas JSON-LD generados e inyectados:**\n${result.message || `${result.totalItems || "?"} productos con schema Product + FAQ + Breadcrumb. Organization + WebSite inyectados en theme.liquid.`}`;
       case "generate_all_metas":
@@ -1325,9 +1327,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return `🎨 **${result.total || themes.length} themes:**\n${themes.map((t, i) => `${i + 1}. **${t.name}** (${t.role}) ID: ${t.id}`).join("\n")}`;
       }
       case "list_theme_files":
-        return `📂 **Archivos del theme:**\n${result.message || JSON.stringify(result.files || result, null, 2).slice(0, 800)}`;
+        { const filesData = result.message || JSON.stringify(result.files || result, null, 2);
+        return `📂 **Archivos del theme:**\n${filesData.length > 3000 ? filesData.slice(0, 3000) + "\n\n... *(lista completa disponible)*" : filesData}`; }
       case "read_theme_file":
-        return `📄 **${result.assetKey || "Archivo"}:**\n\`\`\`\n${(result.content || result.value || "").toString().slice(0, 1000)}\n\`\`\``;
+        { const fileContent = (result.content || result.value || "").toString();
+        return `📄 **${result.assetKey || "Archivo"}:**\n\`\`\`\n${fileContent.length > 5000 ? fileContent.slice(0, 5000) + "\n\n... *(archivo completo: " + fileContent.length + " chars)*" : fileContent}\n\`\`\``; }
       case "edit_theme_file":
         return `✅ **Theme file editado:**\n📁 ${result.assetKey}\n${result.message || "Cambios aplicados al theme."}`;
       case "edit_theme_css":
@@ -1407,8 +1411,32 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     }
   };
 
-  // ─── Absorb image/video file ───────────────────────────────────────────────
+  const isDocumentFile = (file: File): boolean => {
+    const textExts = [".txt", ".md", ".csv", ".json"];
+    return textExts.some(ext => file.name.toLowerCase().endsWith(ext))
+      || ["text/plain", "text/markdown", "text/csv", "application/json"].includes(file.type);
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
   const absorbFile = async (file: File, niche?: string): Promise<AbsorbResult> => {
+    if (isDocumentFile(file)) {
+      const text = await readFileAsText(file);
+      const res = await fetch(`${API}/api/shopybrain/absorb-document`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, fileName: file.name, fileType: file.type, niche, label: file.name }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("label", file.name);
@@ -1495,7 +1523,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     if (!content && !attachFile && !attachUrl) return;
 
     const hasAttach = !!(attachFile || attachUrl);
-    const attachType = attachFile ? (attachFile.type.startsWith("video/") ? "video" : "image") : "url";
+    const attachType = attachFile
+      ? (attachFile.type.startsWith("video/") ? "video" : (isDocumentFile(attachFile) ? "document" : "image"))
+      : "url";
     const attachName = attachFile?.name ?? attachUrl;
 
     const userMsg: Message = {
@@ -1584,7 +1614,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           }
 
         } else {
-          const absorbingMsg = attachType === "image"
+          const absorbingMsg = attachType === "document"
+            ? `📄 Absorbiendo documento **${attachName}**...\n\nAnalizando contenido: estructura, datos, productos, precios, instrucciones...\nExtrayendo toda la información relevante para tu eCommerce.\n\n_Procesando con IA..._`
+            : attachType === "image"
             ? `🔬 Absorbiendo imagen **${attachName}**...\n\nAnalizando: composición visual, paleta de colores, texturas y superficies, topología y geometría, técnica de rendering, composición química/técnica, inteligencia de marca, señales eCommerce, impacto psicológico...\n\n_Esto puede tardar 20-40 segundos._`
             : attachType === "video"
             ? `🎬 Absorbiendo vídeo **${attachName}**...\n\nExtrayendo: técnica de producción, estilo visual, señales de conversión, estrategia de marketing...\n\n_Procesando..._`
@@ -1602,20 +1634,31 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             result = await absorbUrl(attachUrl);
           }
 
+          const isDocument = attachType === "document";
           const isImage = attachType === "image";
-          const a = result.analysis as Record<string, Record<string, string[]>>;
-          const angles = a.ecommerce_conversion_signals?.recommended_marketing_angles ?? a.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
 
           assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
-          if (isImage && a.visual_composition) {
-            assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
+
+          if (isDocument) {
+            const docAnalysis = typeof result.analysis === "string" ? result.analysis : JSON.stringify(result.analysis, null, 2);
+            assistantContent += `📄 **Documento analizado:** ${attachName}\n`;
+            assistantContent += `📊 **Tamaño:** ${(result as Record<string, unknown>).contentLength ?? "?"} caracteres\n\n`;
+            assistantContent += `**Análisis:**\n${docAnalysis}\n\n`;
+          } else {
+            const a = result.analysis as Record<string, Record<string, string[]>>;
+            const angles = a?.ecommerce_conversion_signals?.recommended_marketing_angles ?? a?.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
+
+            if (isImage && a?.visual_composition) {
+              assistantContent += `**Composición:** ${typeof a.visual_composition === "string" ? a.visual_composition : JSON.stringify(a.visual_composition).slice(0, 200)}\n\n`;
+            }
+            if (a?.technical_chemical_composition) {
+              assistantContent += `**Material/Técnica:** ${typeof a.technical_chemical_composition === "object" ? (a.technical_chemical_composition.manufacturing_process_indicators ?? JSON.stringify(a.technical_chemical_composition).slice(0, 150)) : a.technical_chemical_composition}\n\n`;
+            }
+            if (angles?.length > 0) {
+              assistantContent += `**Top Marketing Angles:**\n${(Array.isArray(angles) ? angles : []).slice(0, 3).map(a => `· ${a}`).join("\n")}\n\n`;
+            }
           }
-          if (a.technical_chemical_composition) {
-            assistantContent += `**Material/Técnica:** ${typeof a.technical_chemical_composition === "object" ? (a.technical_chemical_composition.manufacturing_process_indicators ?? JSON.stringify(a.technical_chemical_composition).slice(0, 150)) : a.technical_chemical_composition}\n\n`;
-          }
-          if (angles?.length > 0) {
-            assistantContent += `**Top Marketing Angles:**\n${(Array.isArray(angles) ? angles : []).slice(0, 3).map(a => `· ${a}`).join("\n")}\n\n`;
-          }
+
           if (content) {
             assistantContent += `\n**Tu pregunta:** ${content}\n\n`;
             const followUp = await fetch(`${API}/api/shopybrain/search`, {
@@ -1628,8 +1671,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               assistantContent += d.answer ?? "";
             }
           }
-          assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
-          action = { type: "absorb-result", label: "Ver análisis completo", data: result };
+
+          if (!isDocument) {
+            assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
+          }
+          action = { type: "absorb-result", label: isDocument ? "Ver documento completo" : "Ver análisis completo", data: result };
         }
 
       // ── CASE 2: Klaviyo workflow request ──
@@ -2042,7 +2088,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       )}
 
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleFileSelect} />
+      <input ref={fileInputRef} type="file" accept="image/*,video/*,.txt,.md,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} onChange={handleFileSelect} />
 
       <style>{`
         @keyframes pulseGold {

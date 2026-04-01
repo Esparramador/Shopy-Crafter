@@ -537,6 +537,68 @@ router.post("/shopybrain/absorb-text", requireAdmin, async (req: Request, res: R
   }
 });
 
+// ─── POST /api/shopybrain/absorb-document ──────────────────────────────────────
+router.post("/shopybrain/absorb-document", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { text, fileName, fileType, niche, label } = req.body as {
+    text: string; fileName?: string; fileType?: string; niche?: string; label?: string;
+  };
+
+  if (!text) { res.status(400).json({ error: "text es requerido" }); return; }
+
+  try {
+    const ext = (fileName ?? "").split(".").pop()?.toLowerCase() ?? "txt";
+    const docLabel = label ?? fileName ?? "Documento";
+    logger.info({ fileName, fileType, ext, length: text.length }, "ShopyBrain absorbing document");
+
+    const { askClaudeWithBrain } = await import("../lib/claude.js");
+    const analysis = await askClaudeWithBrain(
+      0,
+      `Analiza este documento "${docLabel}" (${ext.toUpperCase()}, ${text.length} caracteres) y extrae TODA la información relevante.
+
+DOCUMENTO:
+---
+${text.slice(0, 50000)}
+---
+
+Debes:
+1. ENTENDER el tipo de documento (lista de productos, precios, instrucciones, datos, investigación, etc.)
+2. EXTRAER toda la información estructurada (nombres, precios, cantidades, descripciones, etc.)
+3. INTERPRETAR la intención del usuario (¿quiere crear productos? ¿actualizar precios? ¿aprender algo?)
+4. RESUMIR las acciones sugeridas que ShopyBrain podría ejecutar con esta información
+
+Responde en español con un análisis completo y detallado. Si detectas una lista de productos con precios, extrae CADA producto con su nombre y precio exacto.`,
+      "ShopyBrain Document Intelligence Engine. You extract maximum value from any document format. You identify products, prices, instructions, and data structures. Be thorough and complete.",
+      "documents",
+      niche
+    );
+
+    const memoryId = await saveToShopyBrain({
+      title: `[DOC] ${docLabel}`,
+      content: `DOCUMENT TYPE: ${ext.toUpperCase()}\nFILE: ${docLabel}\nSIZE: ${text.length} chars\n\nANALYSIS:\n${analysis}\n\nORIGINAL CONTENT:\n${text.slice(0, 30000)}`,
+      memoryType: "absorbed_document",
+      niche,
+      sourceType: "document",
+      confidence: 0.9,
+      tags: ["document", ext, "absorbed", niche ?? "general"],
+    });
+
+    res.json({
+      success: true,
+      memoryId,
+      title: `[DOC] ${docLabel}`,
+      sourceType: "document",
+      fileName: docLabel,
+      fileType: ext,
+      contentLength: text.length,
+      analysis,
+      message: `✅ Documento "${docLabel}" absorbido y analizado. ${text.length} caracteres procesados. La información ha sido guardada en la memoria del ShopyBrain y está lista para usar.`,
+    });
+  } catch (err) {
+    logger.error(err, "ShopyBrain document absorb failed");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // ─── POST /api/shopybrain/create-product-from-image ────────────────────────────
 router.post("/shopybrain/create-product-from-image",
   requireAdmin,

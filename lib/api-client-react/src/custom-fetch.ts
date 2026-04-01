@@ -141,7 +141,7 @@ function getStringField(value: unknown, key: string): string | undefined {
   return trimmed === "" ? undefined : trimmed;
 }
 
-function truncate(text: string, maxLength = 300): string {
+function truncate(text: string, maxLength = 2000): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
