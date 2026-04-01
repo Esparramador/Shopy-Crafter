@@ -564,7 +564,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>
@@ -839,7 +839,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>
@@ -1072,7 +1072,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>

@@ -909,7 +909,7 @@ export const DEFAULT_CMS_CONTENT = {
     },
   },
   footer: {
-    tagline: "Shopy Crafter — Inteligencia eCommerce con IA. Powered by Claude AI + Gemini + Replicate.",
+    tagline: "Shopy Crafter — Shopy Crafter eCommerce. Powered by Claude AI + Gemini + Replicate.",
     columns: [
       { title: "Producto", links: [{ label: "Motores IA", href: "#features" }, { label: "Precios", href: "#pricing" }, { label: "Changelog", href: "#" }, { label: "Documentación", href: "#" }, { label: "API Reference", href: "#" }] },
       { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#" }, { label: "Blog", href: "#" }, { label: "Casos de éxito", href: "#" }, { label: "Afiliados", href: "#" }, { label: "Contacto", href: "#" }] },
