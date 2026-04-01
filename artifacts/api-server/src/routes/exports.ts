@@ -524,6 +524,9 @@ function reportShell(title: string, subtitle: string, body: string, date: string
     .page { max-width: 100%; }
     .cover { background: #f8f7f4; padding: 32px; }
     .cover-title h1 { color: #1a1a1a; }
+    .card, .metric, .recommendation, .toc-item, .stat-item { break-inside: avoid; }
+    table, tr { break-inside: avoid; }
+    .metric-row, .stat-grid { break-inside: avoid; }
     .card, .metric { background: #fafafa; border: 1px solid #e0e0e0; }
     .metric .value { color: ${BRAND.goldDark}; }
     th { background: #f0f0f0; color: ${BRAND.goldDark}; }
@@ -561,7 +564,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   <div class="footer">
     <div class="footer-line"></div>
     <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">Shopy Crafter &mdash; Optimización IA para tiendas Shopify &middot; ${safeDate} &middot; Confidencial</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; ${safeDate} &middot; Confidencial</div>
   </div>
 </div>
 </body>
@@ -1389,7 +1392,7 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
       <div class="card">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
           <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nombre del Proyecto</p><p style="font-size:18px;font-weight:600;">${project.name}</p></div><!-- nosemgrep -->
-          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Dominio Shopify</p><p style="font-size:18px;font-weight:600;">${project.shopDomain || "No configurado"}</p></div><!-- nosemgrep -->
+          <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Dominio Web</p><p style="font-size:18px;font-weight:600;">${project.shopDomain || "No configurado"}</p></div><!-- nosemgrep -->
           <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Nicho de Mercado</p><p style="font-size:16px;font-weight:500;">${project.storeNiche || "No definido"}</p></div><!-- nosemgrep -->
           <div><p class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Mercados Objetivo</p><p style="font-size:16px;font-weight:500;">${project.storeMarkets || "Global"}</p></div><!-- nosemgrep -->
         </div>

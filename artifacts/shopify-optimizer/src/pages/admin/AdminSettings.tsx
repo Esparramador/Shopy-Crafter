@@ -324,7 +324,7 @@ export default function AdminSettings() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <User size={11} />
-            <span>Admin exclusivo: <strong style={{ color: "var(--t2)" }}>sadiagiljoan@gmail.com</strong></span>
+            <span>Admin exclusivo: <strong style={{ color: "var(--t2)" }}>cuenta de administrador</strong></span>
           </div>
           <span>Usa al menos 8 caracteres con mayúsculas, números y símbolos para mayor seguridad.</span>
         </div>
