@@ -13,7 +13,7 @@ import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -7264,7 +7264,7 @@ thead th{background:rgba(200,168,75,0.08);padding:12px 16px;text-align:left;colo
 .conditions{padding:32px 40px;border-top:1px solid rgba(200,168,75,0.08);font-size:12px;color:#888;line-height:1.8}
 .footer{padding:24px 40px;background:rgba(200,168,75,0.05);text-align:center;font-size:11px;color:#666}
 </style></head><body>
-${buildCoverPage({ companyName: clientName, template: "prestige" })}
+${buildCoverPage({ reportTitle: `Presupuesto ${budgetId}`, reportSubtitle: "Shopy Crafter — Agencia de Optimización IA", companyName: clientName, date: budgetDate, template: "prestige" })}
 <div class="budget">
   <div class="header">
     <div class="logo">Shopy <span>Crafter</span></div>
@@ -7969,7 +7969,7 @@ ${buildCoverPage({ companyName: clientName, template: "prestige" })}
         const projectId = params?.projectId;
         const reportType = params?.reportType || "complete-report";
         if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
-        const validTypes = ["seo-audit", "product-catalog", "financial", "brand-brief", "ab-tests", "images-gallery", "competitors", "consistency", "inventory", "redesigns", "revenue", "complete-report", "csv/products"];
+        const validTypes = ["seo-audit", "product-catalog", "financial", "brand-brief", "ab-tests", "images-gallery", "competitors", "consistency", "inventory", "redesigns", "revenue", "complete-report", "shopybrain", "csv/products"];
         if (!validTypes.includes(reportType)) {
           result = { error: true, message: `❌ Tipo de reporte inválido. Tipos válidos: ${validTypes.join(", ")}` }; break;
         }
@@ -7982,7 +7982,7 @@ ${buildCoverPage({ companyName: clientName, template: "prestige" })}
           }
           const contentType = resp.headers.get("content-type") || "";
           if (contentType.includes("text/html")) {
-            result = { message: `📊 **Reporte "${reportType}" generado correctamente** (HTML)\n\nEl reporte está disponible en:\n🔗 /api/projects/${projectId}/exports/${reportType}\n\nPuedes verlo desde el panel de admin → Exports.` };
+            result = { message: `📊 **Reporte "${reportType}" generado correctamente** (HTML)\n\nEl reporte está disponible en:\n🔗 HTML: /api/projects/${projectId}/exports/${reportType}\n📄 PDF: /api/projects/${projectId}/exports/${reportType}?format=pdf\n\nPuedes verlo desde el panel de admin → Exports.` };
           } else if (contentType.includes("text/csv")) {
             result = { message: `📊 **CSV "${reportType}" generado** — disponible en /api/projects/${projectId}/exports/${reportType}` };
           } else {

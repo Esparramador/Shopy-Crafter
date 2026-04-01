@@ -8,7 +8,7 @@ import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -83,7 +83,7 @@ function extractProductCards(rawData: unknown): string {
   return buildProductCardsSection(cards, `Productos (${cards.length})`);
 }
 
-function buildProfessionalHtml(title: string, content: string, actionName: string, rawData?: unknown, companyName?: string): string {
+function buildProfessionalHtml(title: string, content: string, actionName: string, rawData?: unknown, companyName?: string, template: CoverTemplate = "classic"): string {
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
@@ -219,7 +219,7 @@ function buildProfessionalHtml(title: string, content: string, actionName: strin
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: companyName || "", template: "classic" })}
+${buildCoverPage({ reportTitle: sanitizeHtml(title), reportSubtitle: safeTag(actionName), companyName: companyName || "", date: safeTag(date), template })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -296,9 +296,10 @@ function actionLabel(action: string): string {
 
 router.post("/projects/:projectId/actions/send", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, recipientEmail, rawData } = req.body as {
-    actionName: string; title: string; content: string; recipientEmail?: string; rawData?: unknown;
+  const { actionName, title, content, recipientEmail, rawData, template: bodyTpl } = req.body as {
+    actionName: string; title: string; content: string; recipientEmail?: string; rawData?: unknown; template?: string;
   };
+  const tplAction = ((req.query.template || bodyTpl) as CoverTemplate) || "classic";
 
   if (!actionName || !content) {
     res.status(400).json({ error: "Se requiere actionName y content" });
@@ -315,7 +316,7 @@ router.post("/projects/:projectId/actions/send", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const emailTitle = title || `${label} — ${projectName}`;
-  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName);
+  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName, tplAction);
 
   const to = recipientEmail || "sadiagiljoan@gmail.com";
   const subject = `📊 ${emailTitle} | Shopy Crafter`;
@@ -331,9 +332,10 @@ router.post("/projects/:projectId/actions/send", async (req, res): Promise<void>
 
 router.post("/projects/:projectId/actions/save", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, rawData } = req.body as {
-    actionName: string; title: string; content: string; rawData?: unknown;
+  const { actionName, title, content, rawData, template: bodyTpl2 } = req.body as {
+    actionName: string; title: string; content: string; rawData?: unknown; template?: string;
   };
+  const tplSave = ((req.query.template || bodyTpl2) as CoverTemplate) || "classic";
 
   if (!actionName || !content) {
     res.status(400).json({ error: "Se requiere actionName y content" });
@@ -345,7 +347,7 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${project.name}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, project.name);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, project.name, tplSave);
 
   const fileId = await saveToVault({
     projectId,
@@ -394,9 +396,10 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
 
 router.post("/projects/:projectId/actions/download", async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, rawData, downloadType } = req.body as {
-    actionName: string; title: string; content: string; rawData?: unknown; downloadType?: "pdf" | "zip";
+  const { actionName, title, content, rawData, downloadType, template: bodyTpl3 } = req.body as {
+    actionName: string; title: string; content: string; rawData?: unknown; downloadType?: "pdf" | "zip"; template?: string;
   };
+  const tplDownload = ((req.query.template || bodyTpl3) as CoverTemplate) || "classic";
 
   if (!actionName || !content) {
     res.status(400).json({ error: "Se requiere actionName y content" });
@@ -408,7 +411,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
 
   const label = actionLabel(actionName);
   const reportTitle = title || `${label} — ${projectName}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, projectName);
+  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, projectName, tplDownload);
   const safeName = reportTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
   const dateStr = new Date().toISOString().split("T")[0];
 

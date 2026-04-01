@@ -555,7 +555,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: coverCompany, template: "classic" })}
+${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompany, date: safeDate, template: "classic" })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -807,7 +807,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: coverCompanyE, template: "elegance" })}
+${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyE, date: safeDate, template: "elegance" })}
 <div class="page">
   <div class="cover-portfolio">
     <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
@@ -1042,7 +1042,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: coverCompanyP, template: "prestige" })}
+${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyP, date: safeDate, template: "prestige" })}
 <div class="page">
   <div class="cover-portfolio">
     <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>

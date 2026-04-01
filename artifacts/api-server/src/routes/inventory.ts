@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 
 const router = Router();
 
@@ -518,8 +518,9 @@ router.get("/inventory/customer-history", async (req, res): Promise<void> => {
 });
 
 router.get("/inventory/sales-report", async (req, res): Promise<void> => {
-  const { projectId, format } = req.query as Record<string, string>;
+  const { projectId, format, template } = req.query as Record<string, string>;
   if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+  const tpl = (template as CoverTemplate) || "prestige";
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
@@ -802,7 +803,7 @@ router.get("/inventory/sales-report", async (req, res): Promise<void> => {
   </style>
 </head>
 <body>
-${buildCoverPage({ companyName: esc(storeName), template: "prestige" })}
+${buildCoverPage({ reportTitle: "Informe de Ventas y Stock", reportSubtitle: esc(storeName), companyName: esc(storeName), date: dateStr, template: tpl })}
 <div style="padding:30px;max-width:1200px;margin:0 auto;">
 
   <div style="text-align:center;margin-bottom:40px;padding:40px 20px;background:linear-gradient(145deg,#1a1a2e,#0d0d1a);border-radius:20px;border:2px solid #c8a84e;">

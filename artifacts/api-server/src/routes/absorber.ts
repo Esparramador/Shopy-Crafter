@@ -13,7 +13,7 @@ import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
 import { getClaudeClient, learnFromOperation } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
@@ -1140,7 +1140,8 @@ Genera JSON:
 
 // ─── POST /api/shopybrain/supplier-report ──────────────────────────────────────
 router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  const { productName, suppliers, costs, deals, synthesis, sourcesAnalyzed } = req.body;
+  const { productName, suppliers, costs, deals, synthesis, sourcesAnalyzed, template: bodyTemplate } = req.body;
+  const tplAbsorber = ((req.query?.template || bodyTemplate) as CoverTemplate) || "prestige";
 
   if (!productName) { res.status(400).json({ error: "productName requerido" }); return; }
 
@@ -1224,7 +1225,7 @@ router.post("/shopybrain/supplier-report", requireAdmin, async (req: Request, re
   </style>
 </head>
 <body>
-${buildCoverPage({ companyName: productName, template: "prestige" })}
+${buildCoverPage({ reportTitle: "Informe de Proveedores", reportSubtitle: productName, companyName: productName, date: now, template: tplAbsorber })}
 <div class="container">
   <div class="header">
     <h1>🔍 Informe de Proveedores</h1>

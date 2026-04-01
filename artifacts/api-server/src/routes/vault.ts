@@ -7,7 +7,7 @@ import { requireAuth } from "../lib/auth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
@@ -291,7 +291,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
     if (isJson) {
       try {
         const parsed = JSON.parse(file.content);
-        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
         const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
         res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -307,7 +307,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
 
   if (file.metadata) {
     try {
-      const htmlReport = buildBrandedHtmlFromMetadata(file);
+      const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
       const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
       res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -368,7 +368,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         if (isJsonContent) {
           try {
             const parsed = JSON.parse(file.content);
-            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
             archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
           } catch {
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -378,7 +378,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         }
         added++;
       } else if (file.metadata) {
-        const htmlReport = buildBrandedHtmlFromMetadata(file);
+        const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
@@ -466,7 +466,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         if (isJsonContent) {
           try {
             const parsed = JSON.parse(file.content);
-            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
             archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
           } catch {
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -476,7 +476,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         }
         added++;
       } else if (file.metadata) {
-        const htmlReport = buildBrandedHtmlFromMetadata(file);
+        const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
@@ -593,12 +593,12 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     } else if (!htmlContent && file.content) {
       try {
         const parsed = JSON.parse(file.content);
-        htmlContent = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+        htmlContent = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
       } catch {}
     }
     if (!htmlContent && file.metadata) {
       try {
-        htmlContent = buildBrandedHtmlFromMetadata(file);
+        htmlContent = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
       } catch {}
     }
 
@@ -872,7 +872,7 @@ function buildBrandedHtmlFromMetadata(file: {
   title: string; fileType: string | null; category: string | null;
   productTitle: string | null; generatedBy: string | null;
   createdAt: Date | string | null; metadata: unknown;
-}): string {
+}, coverTemplate: CoverTemplate = "prestige"): string {
   const date = new Date(file.createdAt ?? Date.now()).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date(file.createdAt ?? Date.now()).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
@@ -974,7 +974,7 @@ function buildBrandedHtmlFromMetadata(file: {
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: sanitizeHtml(file.title), template: "prestige" })}
+${buildCoverPage({ reportTitle: sanitizeHtml(file.title), reportSubtitle: sanitizeHtml(typeLabel), companyName: sanitizeHtml(file.title), date: date, template: coverTemplate })}
 <div class="page">
   <div class="cover">
     <div class="cover-top">
@@ -1339,7 +1339,7 @@ function generateProfessionalReport(opts: { title: string; content: string; enti
 </style>
 </head>
 <body>
-${buildCoverPage({ companyName: sanitizeHtml(opts.entityName), template: "classic" })}
+${buildCoverPage({ reportTitle: sanitizeHtml(opts.title), reportSubtitle: sanitizeHtml(opts.entityName), companyName: sanitizeHtml(opts.entityName), date: opts.date, template: "classic" })}
 <div class="page">
   <div class="header">
     <div class="header-left">
