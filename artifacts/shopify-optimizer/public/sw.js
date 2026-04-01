@@ -1,4 +1,4 @@
-// ShopyBrain Service Worker — v4
+// Shopy Crafter Service Worker — v4
 const STATIC_CACHE = 'shopybrain-static-v4';
 
 const PRECACHE = [
@@ -46,7 +46,7 @@ self.addEventListener('fetch', e => {
           <head>
             <meta charset="UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>ShopyBrain — Sin conexión</title>
+            <title>Shopy Crafter — Sin conexión</title>
             <style>
               body { background: #080810; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; flex-direction: column; gap: 16px; text-align: center; padding: 24px; }
               h1 { font-size: 24px; color: #c8a84b; }
@@ -56,7 +56,7 @@ self.addEventListener('fetch', e => {
           </head>
           <body>
             <div style="font-size:48px">⚡</div>
-            <h1>ShopyBrain</h1>
+            <h1>Shopy Crafter</h1>
             <p>Sin conexión — Revisa tu internet e intenta de nuevo</p>
             <button onclick="window.location.reload()">Reintentar</button>
           </body>
@@ -97,7 +97,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   const data = e.data ? e.data.json() : {};
   e.waitUntil(
-    self.registration.showNotification(data.title || 'ShopyBrain', {
+    self.registration.showNotification(data.title || 'Shopy Crafter', {
       body: data.body || 'Nueva notificación',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',

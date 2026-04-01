@@ -1,5 +1,124 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "FWv2csv42TE8tf_9bd3Mx"
+uri = "file://attached_assets/generated_images/campanas_virales_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "I45EyAd7rH6aNeF1QRQE5"
+uri = "file://attached_assets/generated_images/campanas_virales_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "7ktbhmSd9H3nTxPnDIbPH"
+uri = "file://attached_assets/generated_images/campanas_virales_3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "-ModmmcgUTZBFa8kdHwB7"
+uri = "file://attached_assets/generated_images/campanas_virales_4.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "cm7eoeu53e2_DSbmE9bPw"
+uri = "file://attached_assets/generated_images/creacion_unitario_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "tXLhjuSzn0k5OnjF5nc0A"
+uri = "file://attached_assets/generated_images/creacion_unitario_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "pJxB9qmyjmgMGjYCb142u"
+uri = "file://attached_assets/generated_images/creacion_unitario_3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "DLZZKS4XVCStDVTwKpU0l"
+uri = "file://attached_assets/generated_images/pack_catalogo_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "3gf5_ODSS4dvLGf5SWFU2"
+uri = "file://attached_assets/generated_images/pack_catalogo_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "s6ktOuR6Tnl16n_DpFbk5"
+uri = "file://attached_assets/generated_images/pack_catalogo_3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "mS4UKf3o-7IoDIPP8PKBW"
+uri = "file://attached_assets/generated_images/pack_director_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "raUB3clA6YFE1Pwy4_Bz3"
+uri = "file://attached_assets/generated_images/pack_director_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "TdfJoxCOzAWgggcuwxD9F"
+uri = "file://attached_assets/generated_images/pack_director_3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "ruRiNv7ofvk-TzL0NDVAY"
+uri = "file://attached_assets/generated_images/saga_epica_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "hsBjHWKt8YjVXIJZGXeKI"
+uri = "file://attached_assets/generated_images/saga_epica_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "IUekTIgFZXRjvtayMh8Vg"
+uri = "file://attached_assets/generated_images/saga_epica_3.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "8NMQf_YwRBLjy51IVFOx3"
+uri = "file://attached_assets/generated_images/pack_5_productos_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "jXXKJJRz-ORFMbLuFyR3E"
+uri = "file://attached_assets/generated_images/pack_5_productos_2.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "UaLk2_iPyj24LZgGD_lwt"
+uri = "file://attached_assets/generated_images/pack_15_productos_1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "zUZppN07nkClx1C6wAFDB"
+uri = "file://attached_assets/generated_images/pack_30_productos_1.png"
+type = "image"
+title = "generated_image"
 
 [[outputs]]
 id = "9EyhiMCidMT9gdjJwunVq"
