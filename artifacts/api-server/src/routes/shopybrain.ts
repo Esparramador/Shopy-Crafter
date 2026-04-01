@@ -9,6 +9,7 @@ import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from 
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
@@ -2701,19 +2702,28 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               node {
                 id
                 title
+                handle
                 status
                 descriptionHtml
                 tags
                 publishedAt
                 onlineStoreUrl
                 totalInventory
-                images(first: 20) { edges { node { id } } }
+                seo { title description }
+                images(first: 20) { edges { node { id url altText } } }
                 variants(first: 100) {
                   edges {
                     node {
                       id
+                      title
                       price
                       compareAtPrice
+                      sku
+                      barcode
+                      weight
+                      weightUnit
+                      inventoryQuantity
+                      image { url }
                     }
                   }
                 }
@@ -2723,13 +2733,28 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           }
         }`;
 
+        interface AuditGqlNode {
+          id: string;
+          title: string;
+          handle: string;
+          status: string;
+          descriptionHtml: string;
+          tags: string[];
+          publishedAt: string | null;
+          onlineStoreUrl: string | null;
+          totalInventory: number;
+          seo: { title: string | null; description: string | null };
+          images: { edges: Array<{ node: { id: string; url: string; altText: string | null } }> };
+          variants: { edges: Array<{ node: { id: string; title: string; price: string; compareAtPrice: string | null; sku: string | null; barcode: string | null; weight: number | null; weightUnit: string | null; inventoryQuantity: number | null; image: { url: string } | null } }> };
+        }
+
         let allAuditProducts: Array<Record<string, unknown>> = [];
         try {
           let hasNext = true;
           let cursor: string | undefined;
-          const allEdges: Array<{ node: Record<string, unknown> }> = [];
+          const allEdges: Array<{ node: AuditGqlNode }> = [];
           while (hasNext) {
-            const gqlData = await shopifyGraphQL<{ products: { edges: Array<{ node: Record<string, unknown> }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+            const gqlData = await shopifyGraphQL<{ products: { edges: Array<{ node: AuditGqlNode }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
               parseInt(projectId), project.shopDomain, gqlAuditQuery(cursor)
             );
             allEdges.push(...(gqlData.products?.edges || []));
@@ -2739,21 +2764,43 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           allAuditProducts = allEdges.map(({ node }) => {
             const gid = String(node.id || "");
             const numericId = gid.includes("/") ? gid.split("/").pop() : gid;
-            const variants = ((node.variants as Record<string, unknown>)?.edges as Array<{ node: Record<string, unknown> }>) || [];
-            const images = ((node.images as Record<string, unknown>)?.edges as Array<unknown>) || [];
+            const variantEdges = node.variants?.edges || [];
+            const imageEdges = node.images?.edges || [];
+            const seoTitle = node.seo?.title || null;
+            const seoDesc = node.seo?.description || null;
+            const metafields: Array<{ namespace: string; key: string; value: string }> = [];
+            if (seoTitle) metafields.push({ namespace: "seo", key: "title", value: seoTitle });
+            if (seoDesc) metafields.push({ namespace: "seo", key: "description", value: seoDesc });
+
             return {
               id: numericId,
               title: node.title,
-              status: (node.status as string || "").toLowerCase(),
+              handle: node.handle,
+              status: (node.status || "").toLowerCase(),
               body_html: node.descriptionHtml,
-              tags: Array.isArray(node.tags) ? (node.tags as string[]).join(", ") : node.tags,
+              tags: Array.isArray(node.tags) ? node.tags.join(", ") : node.tags,
               published_at: node.publishedAt,
               published_scope: node.onlineStoreUrl ? "global" : "web",
-              images: images,
-              variants: variants.map(({ node: v }) => ({
+              totalInventory: node.totalInventory,
+              seoTitle,
+              seoDescription: seoDesc,
+              metafields,
+              images: imageEdges.map(({ node: img }) => ({
+                id: img.id,
+                src: img.url,
+                alt: img.altText,
+              })),
+              variants: variantEdges.map(({ node: v }) => ({
                 id: v.id,
+                title: v.title,
                 price: v.price,
                 compare_at_price: v.compareAtPrice,
+                sku: v.sku,
+                barcode: v.barcode,
+                weight: v.weight,
+                weight_unit: v.weightUnit,
+                inventory_quantity: v.inventoryQuantity,
+                image_url: v.image?.url || null,
               })),
             };
           });
@@ -2761,9 +2808,30 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           logger.warn({ err: gqlErr }, "GraphQL failed, falling back to REST API for audit");
           for (const st of ["active", "draft", "archived"]) {
             const d = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
-              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,status,variants,images,tags,body_html,published_at,published_scope`
+              parseInt(projectId), project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any`
             );
-            allAuditProducts = allAuditProducts.concat(d.products || []);
+            const restProducts = d.products || [];
+            for (const rp of restProducts) {
+              try {
+                const metaRes = await shopifyRequest<{ metafields: Array<{ namespace: string; key: string; value: string }> }>(
+                  parseInt(projectId), project.shopDomain, `/products/${rp.id}/metafields.json?namespace=global`
+                );
+                const seoMeta = metaRes.metafields || [];
+                const seoTitleMeta = seoMeta.find((m: Record<string, string>) => m.key === "title_tag");
+                const seoDescMeta = seoMeta.find((m: Record<string, string>) => m.key === "description_tag");
+                const metafields: Array<{ namespace: string; key: string; value: string }> = [];
+                if (seoTitleMeta) metafields.push({ namespace: "seo", key: "title", value: seoTitleMeta.value });
+                if (seoDescMeta) metafields.push({ namespace: "seo", key: "description", value: seoDescMeta.value });
+                (rp as Record<string, unknown>).metafields = metafields;
+                (rp as Record<string, unknown>).seoTitle = seoTitleMeta?.value || null;
+                (rp as Record<string, unknown>).seoDescription = seoDescMeta?.value || null;
+              } catch { /* metafields fetch failed, continue without */ }
+              await new Promise(r => setTimeout(r, 100));
+            }
+            for (const rp2 of restProducts) {
+              (rp2 as Record<string, unknown>).id = String(rp2.id);
+            }
+            allAuditProducts = allAuditProducts.concat(restProducts);
           }
         }
 
@@ -2776,56 +2844,166 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
         let shortDescCount = 0;
         let lowTagsCount = 0;
         let draftCount = 0;
+        let noMetaTitleCount = 0;
+        let noMetaDescCount = 0;
+        let noAltTextCount = 0;
+        let noSkuCount = 0;
+        let zeroStockCount = 0;
+        let noHandleCount = 0;
 
         const productAudits = allAuditProducts.map((p: Record<string, unknown>) => {
           const variants = (p.variants as Array<Record<string, unknown>>) || [];
-          const images = (p.images as unknown[]) || [];
-          const bodyLen = (p.body_html as string || "").length;
-          const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
-          const hasCompare = !!variants[0]?.compare_at_price;
+          const images = (p.images as Array<Record<string, unknown>>) || [];
+          const bodyHtml = (p.body_html as string) || "";
+          const bodyLen = bodyHtml.length;
+          const tagsStr = (p.tags as string) || "";
+          const tagsArr = tagsStr.split(",").filter((t: string) => t.trim());
+          const hasCompare = variants.some(v => !!v.compare_at_price || !!v.compareAtPrice);
           const isPublished = !!p.published_at;
           const imgCount = images.length;
           const status = p.status as string;
+          const handle = (p.handle as string) || "";
+          const seoTitle = p.seoTitle as string | null;
+          const seoDescription = p.seoDescription as string | null;
+          const metafields = (p.metafields as Array<{ namespace: string; key: string; value: string }>) || [];
 
-          const issues: string[] = [];
+          const audit = auditProduct({
+            title: (p.title as string) || "",
+            body_html: bodyHtml,
+            price: (variants[0]?.price as string) || null,
+            compare_at_price: (variants[0]?.compare_at_price as string) || (variants[0]?.compareAtPrice as string) || null,
+            images: images.map((img: Record<string, unknown>) => ({
+              alt: (img.alt as string) || (img.altText as string) || null,
+            })),
+            tags: tagsStr,
+            variants: variants.map(v => ({ price: (v.price as string) || "0" })),
+            metafields,
+          });
+
+          const issues: string[] = [...audit.problems];
           if (!isPublished) { issues.push("NO PUBLICADO"); unpublishedCount++; }
           if (status === "draft") { issues.push("BORRADOR"); draftCount++; }
-          if (!hasCompare) { issues.push("sin compare_at_price"); noCompareCount++; }
-          if (imgCount < 3) { issues.push(`pocas imágenes (${imgCount})`); lowImageCount++; }
-          if (bodyLen < 500) { issues.push(`descripción corta (${bodyLen}ch)`); shortDescCount++; }
-          if (tagsArr.length < 10) { issues.push(`pocos tags (${tagsArr.length})`); lowTagsCount++; }
+          if (!hasCompare) noCompareCount++;
+          if (imgCount < 3) lowImageCount++;
+          if (bodyLen < 500) shortDescCount++;
+          if (tagsArr.length < 10) lowTagsCount++;
+          if (!seoTitle && !metafields.some(m => m.namespace === "seo" && m.key === "title")) noMetaTitleCount++;
+          if (!seoDescription && !metafields.some(m => m.namespace === "seo" && m.key === "description")) noMetaDescCount++;
+          const hasAllAlt = imgCount > 0 && images.every((img: Record<string, unknown>) => {
+            const alt = (img.alt as string) || (img.altText as string) || "";
+            return alt.trim().length > 0;
+          });
+          if (imgCount > 0 && !hasAllAlt) noAltTextCount++;
+          const allVariantsHaveSku = variants.every(v => !!(v.sku as string)?.trim());
+          if (!allVariantsHaveSku && variants.length > 0) noSkuCount++;
+          const totalInv = typeof p.totalInventory === "number" ? p.totalInventory : variants.reduce((sum, v) => sum + (typeof v.inventory_quantity === "number" ? v.inventory_quantity : 0), 0);
+          if (totalInv <= 0 && status === "active") zeroStockCount++;
+          if (!handle || handle.includes("_") || !/^[a-z0-9-]+$/.test(handle)) noHandleCount++;
 
-          let score = 0;
-          if (imgCount >= 3) score += 20; else if (imgCount >= 1) score += 8;
-          if (bodyLen >= 1000) score += 20; else if (bodyLen >= 500) score += 12; else if (bodyLen >= 200) score += 5;
-          if (tagsArr.length >= 10) score += 20; else if (tagsArr.length >= 5) score += 10;
-          if (hasCompare) score += 20;
-          if (isPublished) score += 20;
+          const variantDetails = variants.map((v: Record<string, unknown>) => ({
+            title: v.title,
+            price: v.price,
+            compareAtPrice: v.compare_at_price || v.compareAtPrice || null,
+            sku: v.sku || null,
+            barcode: v.barcode || null,
+            weight: v.weight || null,
+            weightUnit: v.weight_unit || v.weightUnit || null,
+            inventoryQuantity: v.inventory_quantity ?? v.inventoryQuantity ?? null,
+            hasImage: !!(v.image_url || v.image),
+          }));
 
-          totalScore += score;
-          const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+          totalScore += audit.overallScore;
 
-          const auditImages = (p.images as Array<Record<string, unknown>>) || [];
-          return { id: p.id, title: p.title, status, published: isPublished, publishedScope: p.published_scope, score, grade, imageCount: imgCount, imageUrl: auditImages[0]?.src || auditImages[0]?.node?.url || null, descLength: bodyLen, tagsCount: tagsArr.length, variantCount: (p.variants as unknown[])?.length ?? 1, price: ((p.variants as Array<Record<string, unknown>>)?.[0]?.price as string) ?? "0", compareAtPrice: ((p.variants as Array<Record<string, unknown>>)?.[0]?.compare_at_price || (p.variants as Array<Record<string, unknown>>)?.[0]?.compareAtPrice) as string || null, hasCompare, hasComparePrice: hasCompare, issues: issues.length > 0 ? issues : undefined };
+          const firstImg = images[0] as Record<string, unknown> | undefined;
+          return {
+            id: p.id,
+            title: p.title,
+            handle,
+            status,
+            published: isPublished,
+            publishedScope: p.published_scope,
+            score: audit.overallScore,
+            grade: audit.grade,
+            titleScore: audit.titleScore,
+            descriptionScore: audit.descriptionScore,
+            priceScore: audit.priceScore,
+            imageScore: audit.imageScore,
+            seoScore: audit.seoScore,
+            contentQualityScore: audit.contentQualityScore,
+            trustScore: audit.trustScore,
+            imageCount: imgCount,
+            imageUrl: firstImg?.src || firstImg?.url || null,
+            descLength: bodyLen,
+            tagsCount: tagsArr.length,
+            variantCount: variants.length || 1,
+            price: (variants[0]?.price as string) ?? "0",
+            compareAtPrice: (variants[0]?.compare_at_price as string) || (variants[0]?.compareAtPrice as string) || null,
+            hasCompare,
+            hasComparePrice: hasCompare,
+            hasMetaTitle: !!(seoTitle || metafields.some(m => m.namespace === "seo" && m.key === "title")),
+            hasMetaDesc: !!(seoDescription || metafields.some(m => m.namespace === "seo" && m.key === "description")),
+            hasAltTexts: hasAllAlt,
+            cleanHandle: !!handle && /^[a-z0-9-]+$/.test(handle) && handle.length <= 60,
+            totalInventory: totalInv,
+            variants: variantDetails,
+            problems: audit.problems,
+            suggestions: audit.suggestions.slice(0, 5),
+            issues: issues.length > 0 ? issues : undefined,
+          };
         });
 
         if (unpublishedCount > 0) criticalIssues.push(`🚨 ${unpublishedCount} producto(s) NO PUBLICADOS — invisibles para clientes`);
         if (draftCount > 0) criticalIssues.push(`📝 ${draftCount} producto(s) en BORRADOR — no visibles en la tienda`);
+        if (zeroStockCount > 0) criticalIssues.push(`📦 ${zeroStockCount} producto(s) ACTIVOS con stock 0 — no se pueden comprar`);
+        if (noMetaTitleCount > 0) warnings.push(`🔍 ${noMetaTitleCount} producto(s) sin meta title SEO — Google usará el título por defecto`);
+        if (noMetaDescCount > 0) warnings.push(`📋 ${noMetaDescCount} producto(s) sin meta description — impacto crítico en CTR de Google`);
         if (noCompareCount > 0) warnings.push(`💰 ${noCompareCount} producto(s) sin precio tachado (compare_at_price)`);
         if (lowImageCount > 0) warnings.push(`🖼 ${lowImageCount} producto(s) con menos de 3 imágenes`);
+        if (noAltTextCount > 0) warnings.push(`🏷️ ${noAltTextCount} producto(s) con imágenes sin alt text — pierde SEO en Google Images`);
         if (shortDescCount > 0) warnings.push(`📝 ${shortDescCount} producto(s) con descripción corta (<500 caracteres)`);
         if (lowTagsCount > 0) warnings.push(`🏷 ${lowTagsCount} producto(s) con menos de 10 tags SEO`);
+        if (noSkuCount > 0) warnings.push(`🔢 ${noSkuCount} producto(s) sin SKU en variantes — dificulta gestión de inventario`);
+        if (noHandleCount > 0) warnings.push(`🔗 ${noHandleCount} producto(s) con URL handle no optimizada`);
 
         const avgScore = allAuditProducts.length > 0 ? Math.round(totalScore / allAuditProducts.length) : 0;
-        const overallGrade = avgScore >= 85 ? "A" : avgScore >= 60 ? "B" : avgScore >= 40 ? "C" : "D";
+        const overallGrade = scoreToGrade(avgScore);
 
-        let auditMessage = `🔍 AUDITORÍA PROFUNDA — ${project.shopDomain}\n\n`;
+        let auditMessage = `🔍 AUDITORÍA PROFUNDA COMPLETA — ${project.shopDomain}\n\n`;
         auditMessage += `📊 Puntuación media: ${avgScore}/100 (${overallGrade})\n`;
         auditMessage += `📦 Total: ${allAuditProducts.length} productos\n`;
-        auditMessage += `📢 Publicados: ${allAuditProducts.length - unpublishedCount} | 🔇 No publicados: ${unpublishedCount}\n`;
+        auditMessage += `📢 Publicados: ${allAuditProducts.length - unpublishedCount} | 🔇 No publicados: ${unpublishedCount}\n\n`;
+        auditMessage += `📐 Criterios evaluados: Título, Descripción, Precio, Imágenes (cantidad + alt texts), SEO (meta title + meta description + tags + handle), Calidad de contenido, Confianza, Variantes (stock + SKU + precio tachado).\n`;
         if (criticalIssues.length > 0) auditMessage += `\n🚨 PROBLEMAS CRÍTICOS:\n${criticalIssues.join("\n")}`;
         if (warnings.length > 0) auditMessage += `\n\n⚠️ ADVERTENCIAS:\n${warnings.join("\n")}`;
         if (criticalIssues.length === 0 && warnings.length === 0) auditMessage += `\n✅ ¡Todos los productos están en perfecto estado!`;
+
+        const projIdInt = parseInt(projectId);
+        for (const pa of productAudits) {
+          const pid = String(pa.id);
+          const seoT = (allAuditProducts.find(ap => ap.id === pid) as Record<string, unknown>)?.seoTitle as string | null;
+          const seoD = (allAuditProducts.find(ap => ap.id === pid) as Record<string, unknown>)?.seoDescription as string | null;
+          try {
+            const seoValues = {
+              metaTitle: seoT || null,
+              metaDescription: seoD || null,
+              hasAltTexts: !!pa.hasAltTexts,
+              cleanHandle: !!pa.cleanHandle,
+              seoScore: pa.seoScore as number,
+              seoGrade: scoreToGrade(pa.seoScore as number),
+              descriptionLength: pa.descLength as number,
+              lastAuditedAt: new Date(),
+            };
+            const [existing] = await db.select({ id: seoDataTable.id }).from(seoDataTable)
+              .where(and(eq(seoDataTable.projectId, projIdInt), eq(seoDataTable.shopifyProductId, pid)));
+            if (existing) {
+              await db.update(seoDataTable).set(seoValues).where(eq(seoDataTable.id, existing.id));
+            } else {
+              await db.insert(seoDataTable).values({ projectId: projIdInt, shopifyProductId: pid, ...seoValues });
+            }
+          } catch (seoSaveErr) {
+            logger.warn({ err: seoSaveErr, productId: pid }, "Failed to save SEO data during audit");
+          }
+        }
 
         result = {
           totalProducts: allAuditProducts.length,
@@ -2838,8 +3016,15 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           lowImageCount,
           shortDescCount,
           lowTagsCount,
+          noMetaTitleCount,
+          noMetaDescCount,
+          noAltTextCount,
+          noSkuCount,
+          zeroStockCount,
+          noHandleCount,
           criticalIssues,
           warnings,
+          criteriaEvaluated: ["Título (longitud, keywords, genérico)", "Descripción (longitud, estructura, H2/H3, bullets, FAQ)", "Precio (compare_at, pricing psicológico, variantes)", "Imágenes (cantidad, alt texts SEO)", "SEO (meta title, meta description, tags, handle URL)", "Calidad de contenido (beneficios, specs, FAQ, CTA, garantía)", "Confianza (garantía, imágenes, alt texts, FAQ, specs)", "Variantes (stock, SKU, precio tachado, imágenes)"],
           products: productAudits,
           message: auditMessage,
         };

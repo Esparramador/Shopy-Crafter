@@ -27,6 +27,9 @@ The platform features an extensible connector abstraction layer (`IPlatformConne
 ### Product Enrichment System
 This system enriches products with AI-generated SEO meta titles and descriptions, Shopify Standard Product Taxonomy categories, custom metafields (e.g., delivery_format, target_audience), and manages inventory for digital products. It supports batch enrichment and ensures comprehensive product data.
 
+### Comprehensive Product Audit System
+The `audit_store` action in shopybrain.ts fetches ALL product data via GraphQL including `seo{title,description}`, image `altText`, and full variant details (`sku`, `barcode`, `weight`, `inventoryQuantity`, `image`). It uses the `auditProduct()` function (lib/audit.ts) for 7-criteria weighted scoring: Title (12%), Description (22%), Price (10%), Images (18%), SEO (18%), Content Quality (12%), Trust (8%). The product sync (`products.ts`) also fetches SEO data via GraphQL and saves to `seoDataTable`, ensuring `scan_store` always has accurate meta title/description data. The audit checks: title optimization, description depth/structure, pricing psychology, image count + alt texts, meta title/description, tags, URL handle, variant stock/SKU, compare_at_price, content structure (H2/H3/bullets/FAQ/specs), and keyword consistency.
+
 ### Chatbot Capabilities
 The chatbot leverages a `maxTokens` of 16384 for extensive AI responses and supports file uploads of various types (images, videos, documents). It includes a document absorption feature where Claude analyzes uploaded content for ShopyBrain memory. Display truncations have been removed or increased across the platform. Three report templates (classic, elegance, prestige) are available for all exports.
 

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, bulkJobsTable } from "@workspace/db";
+import { projectsTable, productsTable, bulkJobsTable, seoDataTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify";
+import { shopifyRequest, shopifyRequestPaged, shopifyGraphQL } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
 import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
@@ -589,7 +589,58 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   let auditedCount = 0;
   let totalScore = 0;
 
+  const seoGqlQuery = (cursor?: string) => `{
+    products(first: 250${cursor ? `, after: "${cursor}"` : ""}) {
+      edges {
+        node {
+          id
+          seo { title description }
+          images(first: 20) { edges { node { altText } } }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }`;
+
+  interface SyncSeoNode {
+    id: string;
+    seo: { title: string | null; description: string | null };
+    images: { edges: Array<{ node: { altText: string | null } }> };
+  }
+
+  const seoLookup = new Map<string, { seoTitle: string | null; seoDesc: string | null; hasAllAlts: boolean }>();
+  try {
+    let seoHasNext = true;
+    let seoCursor: string | undefined;
+    while (seoHasNext) {
+      const seoGqlData = await shopifyGraphQL<{ products: { edges: Array<{ node: SyncSeoNode }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+        id, project.shopDomain, seoGqlQuery(seoCursor)
+      );
+      for (const { node } of (seoGqlData.products?.edges || [])) {
+        const numId = String(node.id || "").includes("/") ? String(node.id).split("/").pop()! : String(node.id);
+        const imgEdges = node.images?.edges || [];
+        const allAlts = imgEdges.length > 0 && imgEdges.every(e => !!e.node.altText?.trim());
+        seoLookup.set(numId, {
+          seoTitle: node.seo?.title || null,
+          seoDesc: node.seo?.description || null,
+          hasAllAlts: allAlts,
+        });
+      }
+      seoHasNext = seoGqlData.products?.pageInfo?.hasNextPage || false;
+      seoCursor = seoGqlData.products?.pageInfo?.endCursor;
+    }
+    logger.info({ projectId: id, seoCount: seoLookup.size }, "Shopify sync: SEO data fetched via GraphQL");
+  } catch (seoGqlErr) {
+    logger.warn({ err: seoGqlErr }, "Shopify sync: GraphQL SEO fetch failed, audit will use REST data only");
+  }
+
   for (const sp of allProducts) {
+    const spId = String(sp.id);
+    const seoInfo = seoLookup.get(spId);
+    const metafields: Array<{ namespace: string; key: string; value: string }> = [];
+    if (seoInfo?.seoTitle) metafields.push({ namespace: "seo", key: "title", value: seoInfo.seoTitle });
+    if (seoInfo?.seoDesc) metafields.push({ namespace: "seo", key: "description", value: seoInfo.seoDesc });
+
     const audit = auditProduct({
       title: sp.title,
       body_html: sp.body_html,
@@ -597,13 +648,15 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
       compare_at_price: sp.variants?.[0]?.compare_at_price,
       images: sp.images,
       tags: sp.tags,
+      variants: sp.variants?.map(v => ({ price: v.price })),
+      metafields,
     });
 
     await db
       .insert(productsTable)
       .values({
         projectId: id,
-        shopifyProductId: String(sp.id),
+        shopifyProductId: spId,
         title: sp.title,
         handle: sp.handle,
         bodyHtml: sp.body_html,
@@ -654,6 +707,30 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
           lastAuditedAt: new Date(),
         },
       });
+
+    try {
+      const hasAltTexts = seoInfo ? seoInfo.hasAllAlts : (sp.images?.length > 0 && sp.images.every((img: { alt: string | null }) => !!img.alt?.trim()));
+      const cleanHandle = !!sp.handle && /^[a-z0-9-]+$/.test(sp.handle) && sp.handle.length <= 60;
+      const seoValues = {
+        metaTitle: seoInfo?.seoTitle || null,
+        metaDescription: seoInfo?.seoDesc || null,
+        hasAltTexts: !!hasAltTexts,
+        cleanHandle,
+        seoScore: audit.seoScore,
+        seoGrade: scoreToGrade(audit.seoScore),
+        descriptionLength: (sp.body_html || "").length,
+        lastAuditedAt: new Date(),
+      };
+      const [existingSeo] = await db.select({ id: seoDataTable.id }).from(seoDataTable)
+        .where(and(eq(seoDataTable.projectId, id), eq(seoDataTable.shopifyProductId, spId)));
+      if (existingSeo) {
+        await db.update(seoDataTable).set(seoValues).where(eq(seoDataTable.id, existingSeo.id));
+      } else {
+        await db.insert(seoDataTable).values({ projectId: id, shopifyProductId: spId, ...seoValues });
+      }
+    } catch (seoErr) {
+      logger.warn({ err: seoErr, productId: spId }, "Failed to save SEO data during sync");
+    }
 
     auditedCount++;
     totalScore += audit.overallScore;
