@@ -1,140 +1,91 @@
 export function Prestige() {
+  const logoSrc = "/sc-logo-prestige.png";
+
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #FAF7F2 0%, #F0E6D3 40%, #E8D5B8 100%)',
+      background: 'linear-gradient(160deg, #1A1510 0%, #231D15 30%, #1E1812 60%, #151010 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: "'Georgia', 'Times New Roman', serif",
       position: 'relative',
       overflow: 'hidden',
-      padding: '60px 40px',
+      padding: '0',
     }}>
       <div style={{
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(ellipse at 20% 80%, rgba(184,115,51,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(184,115,51,0.05) 0%, transparent 50%)',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'radial-gradient(ellipse at 50% 40%, rgba(196,149,106,0.06) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
       <div style={{
-        position: 'absolute',
-        top: '40px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '80px',
-        height: '2px',
-        background: 'linear-gradient(90deg, transparent, #B87333, transparent)',
-      }} />
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1, maxWidth: '700px', textAlign: 'center' }}>
-        
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1,
+      }}>
         <div style={{
-          display: 'inline-block',
-          padding: '8px 28px',
-          border: '1px solid rgba(184,115,51,0.35)',
-          borderRadius: '2px',
-          fontSize: '11px',
-          letterSpacing: '4px',
-          textTransform: 'uppercase',
-          color: '#B87333',
-          marginBottom: '48px',
-          fontFamily: "'Helvetica Neue', Arial, sans-serif",
-          fontWeight: 500,
+          width: '180px',
+          height: '180px',
+          borderRadius: '50%',
+          overflow: 'hidden',
+          border: '3px solid rgba(196,149,106,0.3)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 80px rgba(196,149,106,0.08)',
+          marginBottom: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#1a1510',
         }}>
-          Informe Oficial
+          <div style={{
+            width: '180px',
+            height: '180px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #C4956A 0%, #8B6914 50%, #C4956A 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '72px',
+            fontWeight: 700,
+            color: '#1A1510',
+            fontFamily: "'Georgia', serif",
+          }}>SC</div>
         </div>
 
-        <div style={{
-          width: '60px',
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, #B87333, transparent)',
-          marginBottom: '40px',
-        }} />
-
-        <h1 style={{
-          fontSize: '42px',
-          fontWeight: 400,
-          color: '#2C1810',
-          lineHeight: 1.2,
-          margin: '0 0 16px 0',
-          letterSpacing: '1px',
-        }}>
-          Auditoría Completa
-        </h1>
-        <h2 style={{
-          fontSize: '22px',
-          fontWeight: 300,
-          color: '#8B6914',
-          margin: '0 0 40px 0',
-          letterSpacing: '2px',
-          textTransform: 'uppercase',
-          fontFamily: "'Helvetica Neue', Arial, sans-serif",
-        }}>
-          de Tienda Online
-        </h2>
-
-        <div style={{
-          width: '60px',
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, #B87333, transparent)',
-          marginBottom: '40px',
-        }} />
-
         <p style={{
-          fontSize: '14px',
-          color: '#7A6A5A',
-          letterSpacing: '1px',
+          fontSize: '28px',
+          fontWeight: 300,
+          color: '#C4956A',
+          letterSpacing: '8px',
+          textTransform: 'uppercase',
           margin: 0,
           fontFamily: "'Helvetica Neue', Arial, sans-serif",
         }}>
-          1 de Abril, 2026
+          Shopy Crafter
         </p>
       </div>
 
-      <div style={{ zIndex: 1, textAlign: 'center', marginTop: 'auto', paddingTop: '40px' }}>
-        <div style={{
-          width: '120px',
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, rgba(184,115,51,0.3), transparent)',
-          margin: '0 auto 32px',
-        }} />
-        
-        <h3 style={{
-          fontSize: '28px',
-          fontWeight: 400,
-          color: '#2C1810',
-          margin: '0 0 8px 0',
-          letterSpacing: '3px',
-          textTransform: 'uppercase',
-        }}>
-          Comic Crafter
-        </h3>
+      <div style={{
+        position: 'absolute',
+        bottom: '48px',
+        right: '60px',
+        textAlign: 'right',
+        zIndex: 1,
+      }}>
         <p style={{
-          fontSize: '12px',
-          color: '#9A8A7A',
-          letterSpacing: '2px',
-          textTransform: 'uppercase',
-          margin: '0 0 40px 0',
-          fontFamily: "'Helvetica Neue', Arial, sans-serif",
-        }}>
-          comic-crafter.myshopify.com
-        </p>
-
-        <p style={{
-          fontSize: '10px',
-          color: '#B0A090',
+          fontSize: '14px',
+          color: 'rgba(196,149,106,0.5)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
           margin: 0,
           fontFamily: "'Helvetica Neue', Arial, sans-serif",
+          fontWeight: 300,
         }}>
-          Shopy Crafter eCommerce
+          Comic Crafter
         </p>
       </div>
     </div>
