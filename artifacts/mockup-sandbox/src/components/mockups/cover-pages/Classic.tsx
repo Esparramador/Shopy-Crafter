@@ -29,17 +29,23 @@ export function Classic() {
         <div style={{
           width: '200px',
           height: '200px',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          border: '2px solid rgba(200,168,75,0.25)',
+          borderRadius: '50%',
+          border: '2px solid rgba(200,168,75,0.3)',
           boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(200,168,75,0.06)',
           marginBottom: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, rgba(200,168,75,0.08) 0%, rgba(139,105,20,0.04) 100%)',
         }}>
-          <img
-            src="/__mockup/sc-logo-corporate.png"
-            alt="Shopy Crafter"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+          <span style={{
+            fontSize: '80px',
+            fontWeight: 800,
+            color: '#c8a84b',
+            fontFamily: "'Georgia', 'Times New Roman', serif",
+            letterSpacing: '4px',
+            textShadow: '0 4px 20px rgba(200,168,75,0.3)',
+          }}>SC</span>
         </div>
 
         <p style={{
