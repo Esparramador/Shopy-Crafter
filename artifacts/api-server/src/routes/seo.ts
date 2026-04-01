@@ -295,7 +295,7 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
 
 router.post("/projects/:projectId/seo/generate-metas", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const { applyToShopify, productIds } = req.body as { applyToShopify: boolean; productIds?: string[] };
+  const { applyToShopify = false, productIds } = (req.body || {}) as { applyToShopify?: boolean; productIds?: string[] };
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
 
@@ -691,7 +691,7 @@ router.post("/projects/:projectId/seo/fix-alt-texts", async (req, res): Promise<
 
 router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promise<void> => {
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const { applyToShopify, productIds } = req.body as { applyToShopify: boolean; productIds?: string[] };
+  const { applyToShopify = false, productIds } = (req.body || {}) as { applyToShopify?: boolean; productIds?: string[] };
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }

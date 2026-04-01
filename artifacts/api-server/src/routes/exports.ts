@@ -2264,10 +2264,11 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     </div>`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
+  const targetCompany = req.query.targetCompany ? String(req.query.targetCompany) : undefined;
   const html = getReportShell(tpl)(
     `Auditoria Completa — ${project.name}`,
     `${project.shopDomain || "Sin dominio"} — ${project.storeNiche || "eCommerce"}`,
-    body, date
+    body, date, targetCompany
   );
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   if (req.query.view !== "true") {
