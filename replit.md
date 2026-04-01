@@ -111,17 +111,24 @@ Every product created MUST include ALL of these fields fully completed:
 - Must look like a deliverable from a major consulting firm (McKinsey/Deloitte level)
 - Three templates available: Classic, Elegance (navy/blue), Prestige (charcoal/copper)
 
-### COGS Estimation (Automatic)
+### COGS Estimation (Automatic — Professional Grade)
 - COGS estimation is AUTOMATIC in all audit reports when no manual COGS data exists
-- Uses AI (Claude via `askClaudeJsonWithBrain`) to research and estimate costs based on:
-  - Business type, sector, and location
-  - Products/services offered
-  - Real market data from providers (Idealista, Manutan.es, Amazon Business, sector providers)
-- Always includes a DISCLAIMER: "Estimación basada en datos de mercado buscados, cercados y comparados en fuentes públicas"
-- When COGS are NOT specified/known, clearly states they are RELATIVE estimates based on searched/compared data
-- Estimates include: fixed costs, variable costs, initial investment, service margins, competitor pricing, breakeven analysis
+- Uses AI (Claude via `askClaudeJsonWithBrain`, 8000 tokens) to generate professional-grade financial analysis:
+  - **Personal y Nóminas**: Puestos necesarios, salarios brutos según convenio colectivo CCAA, Seguridad Social empresa (~30-33%)
+  - **Análisis de Alquiler por Zona**: Precio/m² real de la zona exacta (barrio/calle), m² estimados, comparables Idealista/Fotocasa
+  - **Costes Fijos Desglosados**: Alquiler, suministros (luz, agua, gas), telecomunicaciones, seguros, gestoría, software/TPV, mantenimiento, autónomos, marketing — categorizados (Personal/Local/Operaciones/Admin/Marketing)
+  - **Costes Variables**: Materiales específicos con precios de proveedores reales, comisiones de pago, embalaje
+  - **Inversión Inicial**: Equipamiento sectorial, adecuación local, licencias municipales, stock inicial, branding
+  - **Márgenes por Servicio**: Materiales, coste, PVP, margen %, tiempo en minutos por servicio
+  - **Impuestos y Obligaciones**: IVA, IRPF, IS, tasas municipales, PRL, RGPD
+  - **Competencia Local**: 3-5 competidores reales con precios y modelo
+  - **Estacionalidad**: Meses alta/baja demanda, variación ingresos
+  - **Punto de Equilibrio**: Costes totales/mes, margen medio, servicios mínimos, meses hasta ROI
+  - **Proyección Anual**: Ingresos, costes y beneficio estimado (escenario conservador)
+- SIEMPRE cita fuentes verificables: Idealista, INE, convenios colectivos, AEAT, proveedores con nombre
+- Always includes DISCLAIMER about market-based estimation
 - Functions: `estimateCogsWithAI()` and `buildCogsEstimationHtml()` in `exports.ts`
-- Both internal reports (complete-report) and external audit reports include COGS sections
+- User can ALWAYS override with real costs for 100% accurate reports
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
