@@ -293,6 +293,9 @@ importers:
       pino-http:
         specifier: ^10
         version: 10.5.0
+      puppeteer-core:
+        specifier: ^24.40.0
+        version: 24.40.0
       replicate:
         specifier: ^1.4.0
         version: 1.4.0

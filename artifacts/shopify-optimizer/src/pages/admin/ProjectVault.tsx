@@ -6,7 +6,8 @@ import {
   Archive, ExternalLink, AlertTriangle, Grid, List,
   Folder, Eye, ChevronRight, DollarSign, Palette, Wand2,
   SplitSquareHorizontal, ShieldCheck, FileSpreadsheet,
-  CheckSquare, Square, XCircle, CheckCircle,
+  CheckSquare, Square, XCircle, CheckCircle, FileDown,
+  BookOpen, ClipboardList,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -25,6 +26,8 @@ const FILE_TYPE_CONFIG: Record<string, { label: string; icon: typeof Image; colo
   consistency:    { label: "Consistencia Visual",  icon: Palette,               color: "#9c27b0" },
   bulk_export:    { label: "Exportaciones",       icon: FileSpreadsheet,       color: "#607d8b" },
   product_card:   { label: "Productos",           icon: Package,               color: "var(--gold)" },
+  report:         { label: "Informes",            icon: ClipboardList,         color: "#26a69a" },
+  brain_action:   { label: "Acciones IA",         icon: BookOpen,              color: "#7c4dff" },
 };
 
 const FOLDER_CONFIG: Array<{
@@ -34,6 +37,8 @@ const FOLDER_CONFIG: Array<{
   color: string;
   matchTypes: string[];
 }> = [
+  { id: "reports",      label: "Informes Completos", icon: ClipboardList,         color: "#26a69a",     matchTypes: ["report", "complete_audit"] },
+  { id: "brain",        label: "Acciones IA",        icon: BookOpen,              color: "#7c4dff",     matchTypes: ["brain_action"] },
   { id: "images",       label: "Imágenes",           icon: Image,                 color: "#5b4eff",     matchTypes: ["image"] },
   { id: "audit",        label: "Auditorías",         icon: ShieldCheck,           color: "#ff9800",     matchTypes: ["audit"] },
   { id: "seo",          label: "Informes SEO",       icon: Search,                color: "var(--jade)", matchTypes: ["seo_report", "seo_audit"] },
@@ -123,10 +128,20 @@ export default function ProjectVault() {
 
   useEffect(() => { if (pid) loadData(); }, [filterType, filterCategory]);
 
-  const downloadFile = async (file: VaultFile) => {
+  const isReportFile = (file: VaultFile) => {
+    const reportTypes = ["report", "complete_audit", "seo_report", "seo_audit", "brain_action", "audit"];
+    return reportTypes.includes(file.fileType) ||
+      file.mimeType === "text/html" ||
+      (file.mimeType === "application/json" && !file.fileType?.startsWith("image"));
+  };
+
+  const downloadFile = async (file: VaultFile, format?: string) => {
     setDownloading(file.id);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/${file.id}/download`, { credentials: "include" });
+      const endpoint = format
+        ? `${API_BASE}/api/projects/${pid}/vault/${file.id}/download/${format}`
+        : `${API_BASE}/api/projects/${pid}/vault/${file.id}/download`;
+      const res = await fetch(endpoint, { credentials: "include" });
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -241,6 +256,10 @@ export default function ProjectVault() {
 
   const getDisplayFiles = () => {
     if (!activeFolder) return files;
+    if (activeFolder === "__uncategorized") {
+      const allMatchTypes = FOLDER_CONFIG.flatMap(f => f.matchTypes);
+      return files.filter(f => !allMatchTypes.includes(f.fileType));
+    }
     const folder = FOLDER_CONFIG.find(f => f.id === activeFolder);
     if (!folder) return files;
     return files.filter(f => folder.matchTypes.includes(f.fileType));
@@ -604,10 +623,24 @@ export default function ProjectVault() {
                           {file.fileSizeBytes && ` · ${formatBytes(file.fileSizeBytes)}`}
                         </p>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button onClick={() => downloadFile(file)} disabled={downloading === file.id} style={{ padding: "7px 12px", borderRadius: 7, border: `1px solid ${cfg?.color ?? "var(--bdr)"}`, background: `${cfg?.color ?? "var(--t3)"}15`, color: cfg?.color ?? "var(--t)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                          {downloading === file.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={12} />} Descargar
-                        </button>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                        {isReportFile(file) ? (
+                          <>
+                            <button onClick={() => downloadFile(file)} disabled={downloading === file.id} style={{ padding: "7px 12px", borderRadius: 7, border: `1px solid ${cfg?.color ?? "var(--bdr)"}`, background: `${cfg?.color ?? "var(--t3)"}15`, color: cfg?.color ?? "var(--t)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                              {downloading === file.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <FileText size={12} />} HTML
+                            </button>
+                            <button onClick={() => downloadFile(file, "pdf")} disabled={downloading === file.id} style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #e74c3c", background: "rgba(231,76,60,0.1)", color: "#e74c3c", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                              <FileDown size={12} /> PDF
+                            </button>
+                            <button onClick={() => downloadFile(file, "docx")} disabled={downloading === file.id} style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #2980b9", background: "rgba(41,128,185,0.1)", color: "#2980b9", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                              <FileDown size={12} /> Word
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => downloadFile(file)} disabled={downloading === file.id} style={{ padding: "7px 12px", borderRadius: 7, border: `1px solid ${cfg?.color ?? "var(--bdr)"}`, background: `${cfg?.color ?? "var(--t3)"}15`, color: cfg?.color ?? "var(--t)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                            {downloading === file.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={12} />} Descargar
+                          </button>
+                        )}
                         <button onClick={() => deleteFile(file)} disabled={deleting === file.id} style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid rgba(255,75,75,0.2)", background: "rgba(255,75,75,0.06)", color: "#ff4b4b", cursor: "pointer", display: "flex", alignItems: "center" }}>
                           <Trash2 size={12} />
                         </button>
@@ -715,20 +748,37 @@ function FolderGrid({ files, onOpenFolder, onDownloadFolder, zippingFolder }: {
         {uncategorized.length > 0 && (
           <div
             style={{
-              padding: "20px 18px 16px", border: "1px solid var(--bdr)", borderRadius: 14,
-              background: "var(--ink3)",
+              border: "1px solid var(--bdr)", borderRadius: 14,
+              background: "var(--ink3)", overflow: "hidden", transition: "all 0.2s", cursor: "pointer",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "var(--t3)";
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "var(--bdr)";
+              (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(150,150,150,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <FileText size={22} color="var(--t3)" />
+            <button
+              onClick={() => onOpenFolder("__uncategorized")}
+              style={{
+                padding: "20px 18px 16px", border: "none", background: "transparent",
+                cursor: "pointer", textAlign: "left", width: "100%", display: "block",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(150,150,150,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FileText size={22} color="var(--t3)" />
+                </div>
+                <ChevronRight size={16} style={{ color: "var(--t3)" }} />
               </div>
-            </div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Otros</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 20, fontWeight: 800, color: "var(--t3)" }}>{uncategorized.length}</span>
-              <span style={{ fontSize: 11, color: "var(--t3)" }}>archivo{uncategorized.length !== 1 ? "s" : ""}</span>
-            </div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Otros</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "var(--t3)" }}>{uncategorized.length}</span>
+                <span style={{ fontSize: 11, color: "var(--t3)" }}>archivo{uncategorized.length !== 1 ? "s" : ""}</span>
+              </div>
+            </button>
           </div>
         )}
       </div>

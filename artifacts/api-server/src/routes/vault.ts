@@ -539,8 +539,9 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
   const fileId = parseInt(String(req.params.fileId));
   const format = (req.params.format || "png").toLowerCase();
 
-  if (!["png", "jpg", "jpeg", "webp", "tiff", "avif"].includes(format)) {
-    res.status(400).json({ error: "Formato no soportado. Usa: png, jpg, webp, tiff, avif" }); return;
+  const allFormats = ["png", "jpg", "jpeg", "webp", "tiff", "avif", "pdf", "docx"];
+  if (!allFormats.includes(format)) {
+    res.status(400).json({ error: "Formato no soportado. Usa: png, jpg, webp, tiff, avif, pdf, docx" }); return;
   }
 
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
@@ -555,6 +556,132 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     .limit(1);
 
   if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+  const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+
+  if (format === "pdf" || format === "docx") {
+    let htmlContent: string | null = null;
+
+    if (file.objectPath) {
+      try {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const response = await getStorage().downloadObject(gcsFile);
+        const buf = Buffer.from(await response.arrayBuffer());
+        const text = buf.toString("utf-8");
+        if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
+          htmlContent = text;
+        }
+      } catch {}
+    }
+
+    if (!htmlContent && file.originalUrl) {
+      try {
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(30000) });
+        if (response.ok) {
+          const text = await response.text();
+          if (text.trim().startsWith("<") || text.trim().startsWith("<!DOCTYPE")) {
+            htmlContent = text;
+          }
+        }
+      } catch {}
+    }
+
+    if (!htmlContent && file.content && (file.mimeType === "text/html" || file.content.trim().startsWith("<") || file.content.trim().startsWith("<!DOCTYPE"))) {
+      htmlContent = file.content;
+    } else if (!htmlContent && file.content) {
+      try {
+        const parsed = JSON.parse(file.content);
+        htmlContent = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed });
+      } catch {}
+    }
+    if (!htmlContent && file.metadata) {
+      try {
+        htmlContent = buildBrandedHtmlFromMetadata(file);
+      } catch {}
+    }
+
+    if (!htmlContent) {
+      res.status(400).json({ error: "Este archivo no se puede convertir a " + format.toUpperCase() }); return;
+    }
+
+    if (format === "pdf") {
+      try {
+        const puppeteer = await import("puppeteer-core");
+        const chromiumPath = "/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium";
+        const browser = await puppeteer.default.launch({
+          executablePath: chromiumPath,
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        });
+        const page = await browser.newPage();
+        await page.setRequestInterception(true);
+        page.on("request", (req: any) => {
+          const rtype = req.resourceType();
+          if (rtype === "script" || rtype === "xhr" || rtype === "fetch" || rtype === "websocket") {
+            req.abort();
+          } else {
+            req.continue();
+          }
+        });
+        await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await new Promise(r => setTimeout(r, 1500));
+        const pdfBuffer = await page.pdf({
+          format: "A4",
+          printBackground: true,
+          margin: { top: "15mm", bottom: "15mm", left: "10mm", right: "10mm" },
+        });
+        await browser.close();
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.pdf"`);
+        res.setHeader("Content-Length", String(pdfBuffer.length));
+        res.send(Buffer.from(pdfBuffer));
+      } catch (e: any) {
+        logger.error({ err: e }, "Error generating PDF");
+        res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+      }
+      return;
+    }
+
+    if (format === "docx") {
+      try {
+        const cleanHtml = htmlContent
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<script[\s\S]*?<\/script>/gi, "");
+
+        const docxHtml = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office"
+                xmlns:w="urn:schemas-microsoft-com:office:word"
+                xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #222; line-height: 1.6; max-width: 100%; }
+              h1 { font-size: 22pt; color: #1a1a2e; border-bottom: 2px solid #c9a96e; padding-bottom: 8px; }
+              h2 { font-size: 16pt; color: #2d2d44; margin-top: 20px; }
+              h3 { font-size: 13pt; color: #444; }
+              table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+              td, th { border: 1px solid #ccc; padding: 6px 10px; font-size: 10pt; }
+              th { background: #f0ebe0; font-weight: bold; }
+              img { max-width: 400px; }
+              .grade-badge, .score-circle { font-weight: bold; }
+            </style>
+          </head>
+          <body>${cleanHtml}</body>
+          </html>`;
+
+        const docxBuffer = Buffer.from(docxHtml, "utf-8");
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.doc"`);
+        res.setHeader("Content-Length", String(docxBuffer.length));
+        res.send(docxBuffer);
+      } catch (e: any) {
+        logger.error({ err: e }, "Error generating DOCX");
+        res.status(500).json({ error: `Error generando Word: ${e.message}` });
+      }
+      return;
+    }
+  }
 
   let imageBuffer: Buffer | null = null;
 
@@ -579,7 +706,6 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     let pipeline = sharp(imageBuffer);
 
     const targetFormat = format === "jpeg" ? "jpg" : format;
-    const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
 
     if (targetFormat === "png") {
       pipeline = pipeline.png({ quality: 100, compressionLevel: 0 });

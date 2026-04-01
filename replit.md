@@ -1,7 +1,7 @@
 # Shopy Crafter Agency Platform
 
 ## Overview
-Shopy Crafter is a multi-user Shopify AI optimization agency platform (shopycrafter.com) for `admin` and `client` roles. It utilizes a Dual AI Engine (Gemini + Claude), named "ShopyBrain," for market research, competitor analysis, product trend identification, and content generation. The platform integrates with Shopify to provide AI-driven insights and automation, aiming to boost ROI for Shopify stores. Its capabilities include AI-powered product creation, image generation, SEO optimization, financial analysis, and a Universal Web Audit system. The project aims to be a leading AI-driven solution for e-commerce optimization, expanding its reach to various platforms and offering comprehensive agency-level services.
+Shopy Crafter is a multi-user Shopify AI optimization agency platform (shopycrafter.com) designed for `admin` and `client` roles. It leverages a Dual AI Engine (Gemini + Claude), named "ShopyBrain," for comprehensive e-commerce optimization, including market research, competitor analysis, product trend identification, and content generation. The platform integrates deeply with Shopify to deliver AI-driven insights, automation, and advanced features such as AI-powered product creation, image generation, SEO optimization, financial analysis, and a Universal Web Audit system. The project aims to become a leading AI-driven solution for e-commerce, expanding to various platforms and offering extensive agency-level services to boost client ROI.
 
 ## User Preferences
 - Admin email: `sadiagiljoan@gmail.com` (password stored in DB, bcrypt-hashed)
@@ -16,122 +16,34 @@ Shopy Crafter is a multi-user Shopify AI optimization agency platform (shopycraf
 The project is a pnpm workspace monorepo built with TypeScript and Node.js 24, structured into `api-server`, `shopify-optimizer` (React+Vite), and `mockup-sandbox`.
 
 ### Design System
-A premium dark theme is applied using specific color variables (`--ink`, `--gold`, `--jade`, `--crim`), custom typography (Instrument Serif, Geist), and a fixed layout featuring a gold gradient topline, sidebar, and topbar. A custom "SCCursor" component provides a branded cursor. The design is responsive across Desktop, Tablet, and Mobile breakpoints, with an adaptive admin panel. The landing page is structured into 7 key sections including Hero, Engines, Demo, Results, Pricing, Calculator, and Contact.
+A premium dark theme is implemented with custom color variables (`--ink`, `--gold`, `--jade`, `--crim`), specific typography (Instrument Serif, Geist), and a fixed layout featuring a gold gradient topline, sidebar, and topbar. A custom "SCCursor" component provides a branded cursor. The design is responsive across Desktop, Tablet, and Mobile, with an adaptive admin panel. The landing page comprises 7 sections: Hero, Engines, Demo, Results, Pricing, Calculator, and Contact.
 
 ### Multi-Platform Connector Architecture
-The platform features an extensible connector abstraction layer (`IPlatformConnector`) to support various e-commerce platforms.
-- **Supported Platforms**: Shopify, PrestaShop, WooCommerce, Universal Web Audit. WordPress is planned.
-- **ConnectorFactory**: Dynamically provides the correct connector based on the project's `platformType`.
-- **Implementations**: Dedicated connectors exist for Shopify (wrapping existing functions), PrestaShop (XML/JSON, HTTP Basic Auth, SEO, stock, combinations), WooCommerce (WC REST API v3, variations, orders, Yoast SEO), and Universal Audit (PageSpeed Insights API + HTML scraping + Claude AI for read-only analysis).
+An extensible connector abstraction layer (`IPlatformConnector`) supports various e-commerce platforms including Shopify, PrestaShop, WooCommerce, and Universal Web Audit, with WordPress planned. A `ConnectorFactory` dynamically selects the appropriate connector based on the project's `platformType`.
 
-### Product Enrichment System
-This system enriches products with AI-generated SEO meta titles and descriptions, Shopify Standard Product Taxonomy categories, custom metafields (e.g., delivery_format, target_audience), and manages inventory for digital products. It supports batch enrichment and ensures comprehensive product data.
-
-### Comprehensive Product Audit System
-The `audit_store` action in shopybrain.ts fetches ALL product data via GraphQL including `seo{title,description}`, image `altText`, and full variant details (`sku`, `barcode`, `weight`, `inventoryQuantity`, `image`). It uses the `auditProduct()` function (lib/audit.ts) for 7-criteria weighted scoring: Title (12%), Description (22%), Price (10%), Images (18%), SEO (18%), Content Quality (12%), Trust (8%). **ALL code paths that call `auditProduct()` now pass SEO metafields**: product sync (`products.ts`), product update (PUT), product create (POST), warmup sync (`index.ts`), `list_all_products` action, and `create_product` action (both image-generation paths and post-creation audit). SEO data is fetched via GraphQL (paginated for >250 products in warmup) and saved to `seoDataTable` with select-then-insert/update pattern (no unique constraint). The audit checks: title optimization, description depth/structure, pricing psychology, image count + alt texts, meta title/description, tags, URL handle, variant stock/SKU, compare_at_price, content structure (H2/H3/bullets/FAQ/specs), and keyword consistency. The `calculateSeoScoreInline` in exports.ts provides a 14-criteria weighted SEO-specific scoring for reports.
+### Product Enrichment and Audit Systems
+The platform includes a Product Enrichment System that uses AI to generate SEO meta titles/descriptions, assign Shopify Standard Product Taxonomy categories, and manage custom metafields and digital product inventory. A Comprehensive Product Audit System fetches all product data via GraphQL and performs a 7-criteria weighted scoring (Title, Description, Price, Images, SEO, Content Quality, Trust). All product-related code paths ensure SEO metafields are passed and audited.
 
 ### Chatbot Capabilities
-The chatbot leverages a `maxTokens` of 16384 for extensive AI responses and supports file uploads of various types (images, videos, documents). It includes a document absorption feature where Claude analyzes uploaded content for ShopyBrain memory. Display truncations have been removed or increased across the platform. Three report templates (classic, elegance, prestige) are available for all exports.
+The chatbot supports extensive AI responses (`maxTokens` of 16384), file uploads (images, videos, documents), and includes a document absorption feature for ShopyBrain memory. Display truncations are removed or increased, and three report templates (classic, elegance, prestige) are available for all exports.
 
-### Error Handling
-The system includes professional branded 404 and 500 error pages. Backend error handling provides specific JSON responses for 404, 504, 503, and 429 status codes.
-
-### Global Vault (Bóveda Global)
-A centralized repository for reports, images, and research from both registered projects and external entities. It uses a `project_files` database table and provides API routes for listing, saving, downloading, and deleting files. A dedicated frontend page (`/admin/vault`) allows navigation and management of vault content.
+### Global Vault
+A centralized "Bóveda Global" stores reports, images, and research from projects and external entities, managed via a `project_files` database table and accessible through API routes and a dedicated frontend page (`/admin/vault`).
 
 ### Universal Web Audit System
-This system audits any website using Google PageSpeed Insights API, an internal web scraper for HTML content, and Claude AI for analysis. It stores detailed audit results in the `audit_results` table, including PageSpeed scores, scraping data, AI analysis, issues, and recommendations. Each audit contributes to the ShopyBrain's learning via `learnFromOperation()` calls.
+This system audits any website using the Google PageSpeed Insights API, an internal web scraper, and Claude AI for analysis, storing detailed results in the `audit_results` table. Each audit contributes to ShopyBrain's learning via `learnFromOperation()`.
 
 ### Database
-PostgreSQL with Drizzle ORM is used, managing over 44 tables for core platform data and extensive AI-related information. The `projects` table includes a `platform_type` column for platform specificity.
+PostgreSQL with Drizzle ORM manages over 44 tables, including a `platform_type` column in the `projects` table for platform specificity.
 
 ### AI Stack (Single Brain Architecture)
-A Dual AI Engine (Claude and Gemini) powered by "ShopyBrain" acts as the central intelligence, integrating also with Replicate and OpenAI gpt-image-1 for image generation. ShopyBrain incorporates over 46,000 knowledge insights and 79+ chatbot actions covering various e-commerce operations like Shopify CRUD, product redesign, A/B testing, and SEO. All AI interactions pass through ShopyBrain to facilitate continuous learning via `learnFromOperation` and `learnFromConversation`. It includes a knowledge search engine for context building, a brain sync system, and a retroactive learning mechanism. A landing page pre-report system generates AI reports for new leads.
+The "ShopyBrain" is a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 79+ chatbot actions for e-commerce operations. All AI interactions pass through ShopyBrain for continuous learning via `learnFromOperation` and `learnFromConversation`, supported by a knowledge search engine, brain sync, and retroactive learning.
 
 ### Key Features
-- **Client Portal**: Provides KPI summaries and activity timelines.
-- **CMS Editor**: A visual click-to-edit editor with 35+ elements, AI copywriting, version history, and live iframe preview.
-- **Global CMS Context**: Manages all user-visible strings via `CmsProvider` and `useCmsSection`.
-- **Client Invite Flow**: Secure, token-based onboarding.
-- **Professional Budget/Invoice Generator**: AI-powered tool.
-- **Shopify Product Creation (Full AI Pipeline)**: Automates product creation with AI-generated content, pricing, SEO, images, and variants, utilizing reference image URLs for AI image generation.
-- **AI Creative Director Image System**: Uses Claude to generate specialized prompts for unique product images.
-- **Reference Image Generation System**: Leverages OpenAI gpt-image-1 to create professional product photos from reference images.
-- **Virtual Try-On / OOTD System**: Uses GPT Image-1 for multi-image editing, guided by Claude, for virtual fashion applications.
-- **Audit-First Brain Actions**: Integrates audit fields into core Shopify actions and introduces bulk actions for store auditing and product fixes.
-- **Page and Theme Management**: Comprehensive CRUD operations for Shopify pages and themes, including AI content generation and full theme file/settings editing.
-- **Purchase Protection**: A theme-level script intercepts checkout for non-logged-in users, redirecting them to login.
-- **CMS Store Theme Section & Chatbot Sync**: Allows editing all Shopify store theme elements via CMS, synced by the `sync_store_theme` chatbot action.
-- **Deep Inventory & Sales Control System**: Professional stock management with chatbot actions.
-- **Supplier Research System**: AI-driven intelligence.
-- **PDF Commercial Report**: Generates a 17-page branded PDF report.
-- **Universal Export System**: Produces comprehensive audit reports with AI analysis and saves all report types to the vault.
-- **Vault Professional Download System**: Supports multi-tier downloads with unified branding.
-- **Universal Action Buttons**: Provides options to email, save, or download chatbot results.
-- **Unified Report Branding System**: All document outputs share SC branding with three selectable templates (Prestige, Elegance, Classic).
-- **Quality Standards**: Integrates Semrush-inspired SEO intelligence and applies a "100/100 Quality Standard."
-- **AI Economist**: Calculates optimal prices using AI market research.
-- **A/B Testing**: Supports image and price variant tests with AI predictions.
-- **Price Simulator & P&L Forecast**: Financial analysis tools.
-- **Comprehensive COGS System**: AI-estimated cost of goods sold tracking.
-- **Partial Redesign**: Allows AI-driven redesign of specific product attributes, including Shopify taxonomy categories and comprehensive metafields.
-- **Automated Cron Jobs**: Twelve tasks for continuous learning.
-- **Copyright Audit System**: Detects trademark/IP risks and suggests alternatives.
+Core features include a Client Portal, a visual CMS Editor with AI copywriting, a secure Client Invite Flow, an AI-powered Professional Budget/Invoice Generator, and a full AI Pipeline for Shopify Product Creation (including AI-generated content, pricing, SEO, images, and variants). Other features encompass AI Creative Director Image System, Reference Image Generation System, Virtual Try-On / OOTD System, Audit-First Brain Actions, Page and Theme Management, Purchase Protection, Deep Inventory & Sales Control, Supplier Research, PDF Commercial Reports, and Universal Export/Download systems with unified branding. The platform also includes an AI Economist for optimal pricing, A/B Testing, Price Simulator & P&L Forecast, Comprehensive COGS System, Partial Redesign capabilities, Automated Cron Jobs, and a Copyright Audit System.
 
 ### Security
-The platform employs AES-256-GCM encryption for sensitive credentials, includes a migration for token encryption, masks raw tokens in API responses, and provides `safeDecrypt()` for legacy values. It features comprehensive audit logging, database-backed rate limiting, AI API concurrency queues with exponential backoff, admin route protection, CORS, secure session management, SVG sanitization, PostMessage origin validation, and HTML escaping for XSS protection.
-
-## Quality Standards — MANDATORY Rules
-
-### Product Creation (100/100 Quality)
-Every product created MUST include ALL of these fields fully completed:
-- **Meta Title** (50-60 chars, with keywords)
-- **Meta Description** (150-160 chars, compelling with CTA)
-- **Schema/JSON-LD** (Product, Offer, AggregateRating when applicable)
-- **Alt Texts** on ALL images (descriptive, with product name + key feature)
-- **Clean Handle/URL** (lowercase, hyphenated, keyword-rich)
-- **Categories** (Shopify Standard Product Taxonomy ID)
-- **Stock/Inventory** (tracked, with quantity set)
-- **Variants** (size, color, format — whatever fits the product)
-- **Stock per Variant** (each variant must have inventory tracked)
-- **Metafields** (delivery_format, target_audience, custom fields)
-- **Vendor** = "Shopy Crafter" or client store name (NEVER "ShopyBrain")
-- **Product Type** set correctly
-- **Tags** relevant and complete
-
-### AI Image Generation
-- Images MUST be directly relevant to the specific product being created
-- Describe the actual product visually in the prompt (material, color, style, use case)
-- Never generate generic or abstract images — they must represent the real product
-- Include product context (e.g., "professional e-commerce photo of [specific product] on white background")
-
-### External Audits & Reports
-- Must research the ACTUAL business (not use own store data)
-- Analyze: meta titles, meta descriptions, schema/JSON-LD, alt texts, clean URLs, categories, stock, variants, variant stock, Open Graph, Twitter Cards, sitemap, robots.txt, page speed, security headers
-- Reports must have PREMIUM PORTFOLIO-QUALITY covers suitable for printing
-- Cover must include: agency logo/brand, report title, client name, date, decorative elements
-- Interior must be professionally designed with consistent visual hierarchy
-- Must look like a deliverable from a major consulting firm (McKinsey/Deloitte level)
-- Three templates available: Classic, Elegance (navy/blue), Prestige (charcoal/copper)
-
-### COGS Estimation (Automatic — Professional Grade)
-- COGS estimation is AUTOMATIC in all audit reports when no manual COGS data exists
-- Uses AI (Claude via `askClaudeJsonWithBrain`, 8000 tokens) to generate professional-grade financial analysis:
-  - **Personal y Nóminas**: Puestos necesarios, salarios brutos según convenio colectivo CCAA, Seguridad Social empresa (~30-33%)
-  - **Análisis de Alquiler por Zona**: Precio/m² real de la zona exacta (barrio/calle), m² estimados, comparables Idealista/Fotocasa
-  - **Costes Fijos Desglosados**: Alquiler, suministros (luz, agua, gas), telecomunicaciones, seguros, gestoría, software/TPV, mantenimiento, autónomos, marketing — categorizados (Personal/Local/Operaciones/Admin/Marketing)
-  - **Costes Variables**: Materiales específicos con precios de proveedores reales, comisiones de pago, embalaje
-  - **Inversión Inicial**: Equipamiento sectorial, adecuación local, licencias municipales, stock inicial, branding
-  - **Márgenes por Servicio**: Materiales, coste, PVP, margen %, tiempo en minutos por servicio
-  - **Impuestos y Obligaciones**: IVA, IRPF, IS, tasas municipales, PRL, RGPD
-  - **Competencia Local**: 3-5 competidores reales con precios y modelo
-  - **Estacionalidad**: Meses alta/baja demanda, variación ingresos
-  - **Punto de Equilibrio**: Costes totales/mes, margen medio, servicios mínimos, meses hasta ROI
-  - **Proyección Anual**: Ingresos, costes y beneficio estimado (escenario conservador)
-- SIEMPRE cita fuentes verificables: Idealista, INE, convenios colectivos, AEAT, proveedores con nombre
-- Always includes DISCLAIMER about market-based estimation
-- Functions: `estimateCogsWithAI()` and `buildCogsEstimationHtml()` in `exports.ts`
-- User can ALWAYS override with real costs for 100% accurate reports
+The platform uses AES-256-GCM encryption for sensitive credentials, audit logging, database-backed rate limiting, AI API concurrency queues with exponential backoff, admin route protection, CORS, secure session management, SVG sanitization, PostMessage origin validation, and HTML escaping for XSS protection.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
