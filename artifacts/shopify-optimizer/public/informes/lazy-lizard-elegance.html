@@ -1,327 +1,411 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Auditoría Digital — Lazy Lizard — Shopy Crafter</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditoría Digital Completa — Shopy Crafter</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap');
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:#0b1628;color:#f0f2f8;line-height:1.65;-webkit-font-smoothing:antialiased}
-.page{max-width:960px;margin:0 auto}
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #0b1628; color: #f0f2f8; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
-/* COVER - exact from exports.ts elegance */
-.cover-full{position:relative;min-height:100vh;background:linear-gradient(155deg,#070e1c 0%,#0b1628 35%,#0d1a35 70%,#091428 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 56px;overflow:hidden;border-bottom:2px solid #1a2a4a;page-break-after:always;}
-.cover-full::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 80px,rgba(74,144,217,.02) 80px,rgba(74,144,217,.02) 81px);pointer-events:none;}
-.cover-full::after{content:'';position:absolute;top:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(74,144,217,.06) 0%,transparent 65%);pointer-events:none;}
-.cover-full .cover-corner{position:absolute;width:80px;height:80px;border-color:#4a90d933;border-style:solid;}
-.corner-tl{top:24px;left:24px;border-width:2px 0 0 2px;}
-.corner-tr{top:24px;right:24px;border-width:2px 2px 0 0;}
-.corner-bl{bottom:24px;left:24px;border-width:0 0 2px 2px;}
-.corner-br{bottom:24px;right:24px;border-width:0 2px 2px 0;}
+  .cover-full { position: relative; min-height: 620px; background: linear-gradient(155deg, #070e1c 0%, #0b1628 35%, #0d1a35 70%, #091428 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid #1a2a4a; }
+  .cover-full::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(74,144,217,.02) 80px, rgba(74,144,217,.02) 81px); pointer-events: none; }
+  .cover-full::after { content: ''; position: absolute; top: -200px; right: -200px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(74,144,217,.06) 0%, transparent 65%); pointer-events: none; }
+  .cover-full .cover-corner { position: absolute; width: 80px; height: 80px; border-color: #4a90d933; border-style: solid; }
+  .corner-tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
+  .corner-tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
+  .corner-bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
+  .corner-br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
 
-.cover-logo-img{width:100px;height:100px;border-radius:16px;object-fit:cover;margin-bottom:28px;box-shadow:0 8px 40px rgba(74,144,217,.15),0 0 0 1px #1a2a4a;position:relative;z-index:2;}
-.cover-brand{font-family:'Playfair Display',serif;font-size:16px;font-weight:600;color:#4a90d9;letter-spacing:4px;text-transform:uppercase;margin-bottom:32px;position:relative;z-index:2;}
-.cover-divider{width:60px;height:1px;background:linear-gradient(90deg,transparent,#4a90d9,transparent);margin:0 auto 32px;position:relative;z-index:2;}
-.cover-title-main{font-family:'Playfair Display',serif;font-size:42px;font-weight:800;color:#f0f2f8;letter-spacing:-0.5px;line-height:1.2;max-width:700px;margin-bottom:16px;position:relative;z-index:2;}
-.cover-subtitle-main{font-size:16px;color:#c0c8d8;font-weight:400;max-width:500px;margin:0 auto 36px;position:relative;z-index:2;line-height:1.6;}
-.cover-target{font-family:'Playfair Display',serif;font-size:22px;color:#6ba8f0;font-weight:600;margin-bottom:12px;position:relative;z-index:2;}
-.cover-date{font-size:12px;color:#6880a8;letter-spacing:2px;text-transform:uppercase;position:relative;z-index:2;}
+  .cover-logo-img { width: 100px; height: 100px; border-radius: 16px; object-fit: cover; margin-bottom: 28px; box-shadow: 0 8px 40px rgba(74,144,217,.15), 0 0 0 1px #1a2a4a; position: relative; z-index: 2; }
+  .cover-brand { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: #4a90d9; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 32px; position: relative; z-index: 2; }
+  .cover-divider { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, #4a90d9, transparent); margin: 0 auto 32px; position: relative; z-index: 2; }
+  .cover-title-main { font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 800; color: #f0f2f8; letter-spacing: -0.5px; line-height: 1.2; max-width: 700px; margin-bottom: 16px; position: relative; z-index: 2; }
+  .cover-subtitle-main { font-size: 16px; color: #c0c8d8; font-weight: 400; max-width: 500px; margin: 0 auto 36px; position: relative; z-index: 2; line-height: 1.6; }
+  .cover-target { font-family: 'Playfair Display', serif; font-size: 20px; color: #6ba8f0; font-weight: 600; margin-bottom: 12px; position: relative; z-index: 2; }
+  .cover-date { font-size: 12px; color: #6880a8; letter-spacing: 2px; text-transform: uppercase; position: relative; z-index: 2; }
 
-.cover-meta-row{display:flex;justify-content:center;gap:36px;margin-top:28px;position:relative;z-index:2;}
-.cover-meta-item{text-align:center;}
-.cover-meta-label{font-size:9px;color:#6880a8;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
-.cover-meta-value{font-size:12px;color:#c0c8d8;font-weight:500;}
+  .body-content { padding: 40px 56px 48px; }
 
-.cover-footer-line{position:absolute;bottom:20px;left:56px;right:56px;display:flex;justify-content:space-between;align-items:center;z-index:5;}
-.cover-footer-text{font-size:9px;color:#6880a855;letter-spacing:2px;text-transform:uppercase;}
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #1a2a4a; }
+  .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-icon-gold { background: rgba(74,144,217,.1); border: 1px solid rgba(74,144,217,.2); }
+  .section-icon-jade { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); }
+  .section-icon-blue { background: rgba(74,144,217,.08); border: 1px solid rgba(74,144,217,.2); }
+  .section-icon-red { background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.2); }
+  .section-icon-orange { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #f0f2f8; letter-spacing: -0.3px; }
 
-/* CONTENT */
-.body-content{padding:40px 56px 48px;}
-.section{margin-bottom:36px;}
-.section-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #1a2a4a;}
-.section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.2);}
-.section-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#f0f2f8;}
+  .card { background: #0f1930; border: 1px solid #1a2a4a; border-radius: 14px; padding: 24px; margin-bottom: 16px; transition: border-color .15s; }
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric { background: #0f1930; border: 1px solid #1a2a4a; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #4a90d933, transparent); }
+  .metric .value { font-size: 30px; font-weight: 900; color: #4a90d9; letter-spacing: -0.5px; line-height: 1.1; }
+  .metric .label { font-size: 10px; color: #6880a8; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
 
-.card{background:#0f1930;border:1px solid #1a2a4a;border-radius:14px;padding:22px;margin-bottom:14px;}
-.card-title{font-size:12px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;}
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th { background: #111e36; color: #4a90d9; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  th:first-child { border-radius: 8px 0 0 0; } th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 12px 16px; border-bottom: 1px solid #1a2a4a; color: #f0f2f8; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
 
-.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
-.metric{background:#0f1930;border:1px solid #1a2a4a;border-radius:12px;padding:20px;text-align:center;position:relative;overflow:hidden;}
-.metric::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90d933,transparent);}
-.metric .value{font-size:32px;font-weight:900;letter-spacing:-0.5px;line-height:1.1;}
-.metric .label{font-size:10px;color:#6880a8;text-transform:uppercase;letter-spacing:1px;margin-top:6px;font-weight:600;}
+  .grade { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; }
+  .grade-a { background: rgba(52,211,153,.12); color: #34d399; }
+  .grade-b { background: rgba(74,144,217,.12); color: #4a90d9; }
+  .grade-c { background: rgba(245,158,11,.12); color: #f59e0b; }
+  .grade-d { background: rgba(244,63,94,.12); color: #f43f5e; }
+  .grade-f { background: rgba(244,63,94,.18); color: #f43f5e; }
 
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.ci{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(26,42,74,.3);}
-.ci:last-child{border-bottom:none;}
-.ci-icon{font-size:15px;min-width:22px;text-align:center;margin-top:1px;}
-.ci-text{font-size:13px;color:#c0c8d8;line-height:1.5;}
-.ci-text strong{color:#f0f2f8;}
+  .tag { display: inline-block; background: rgba(74,144,217,.08); color: #4a90d9; padding: 3px 10px; border-radius: 6px; font-size: 11px; margin: 2px 4px 2px 0; font-weight: 600; border: 1px solid rgba(74,144,217,.15); }
+  .tag-red { background: rgba(244,63,94,.08); color: #f43f5e; border-color: rgba(244,63,94,.15); }
 
-.rec{background:rgba(74,144,217,.03);border-left:3px solid #4a90d9;padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:10px;}
-.rec-crit{border-left-color:#f43f5e;background:rgba(244,63,94,.03);}
-.rec-high{border-left-color:#f59e0b;background:rgba(245,158,11,.03);}
-.rec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
-.rec-title{font-size:13px;font-weight:700;color:#4a90d9;}
-.rec-crit .rec-title{color:#f43f5e;}
-.rec-high .rec-title{color:#f59e0b;}
-.rec-text{font-size:12px;color:#c0c8d8;line-height:1.6;}
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;}
-.b-crit{background:rgba(244,63,94,.12);color:#f43f5e;}
-.b-high{background:rgba(245,158,11,.12);color:#f59e0b;}
-.b-med{background:rgba(74,144,217,.12);color:#4a90d9;}
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, #1a2a4a, transparent); margin: 32px 0; }
+  .report-page { page-break-before: always; padding-top: 12px; } .report-page:first-child { page-break-before: avoid; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; margin-bottom: 12px; border-bottom: 1px solid #1a2a4a; }
+  .page-header-title { font-size: 11px; color: #6880a8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+  .page-header-num { font-size: 11px; color: #4a90d9; font-weight: 700; }
 
-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}
-th{background:#111e36;color:#4a90d9;font-weight:700;text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1px;}
-th:first-child{border-radius:8px 0 0 0;}th:last-child{border-radius:0 8px 0 0;}
-td{padding:10px 14px;border-bottom:1px solid #1a2a4a;color:#f0f2f8;font-size:13px;}
-tr:last-child td{border-bottom:none;}
+  .toc { padding: 24px 0; }
+  .toc-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 6px; border-radius: 10px; background: #0f1930; border: 1px solid #1a2a4a; }
+  .toc-num { width: 32px; height: 32px; border-radius: 8px; background: rgba(74,144,217,.1); border: 1px solid rgba(74,144,217,.2); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #4a90d9; margin-right: 16px; flex-shrink: 0; }
+  .toc-label { font-size: 14px; font-weight: 600; color: #f0f2f8; }
+  .toc-dot { flex: 1; border-bottom: 1px dotted #1a2a4a; margin: 0 12px; min-width: 40px; }
 
-.footer{padding:32px 56px;border-top:1px solid #1a2a4a;background:#0f1d35;text-align:center;}
-.footer-brand{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#4a90d9;}
-.footer-sub{font-size:11px;color:#6880a8;margin-top:6px;}
-.footer-line{width:40px;height:2px;background:#4a90d9;margin:12px auto;border-radius:1px;}
+  .recommendation { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid #4a90d9; background: rgba(74,144,217,.03); font-size: 13px; line-height: 1.7; }
+  .recommendation-critical { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid #f43f5e; background: rgba(244,63,94,.03); font-size: 13px; line-height: 1.7; }
 
-@media print{
-  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .cover-full{min-height:100vh;page-break-after:always;}
-  .section{page-break-inside:avoid;}
-}
+  .footer { padding: 32px 56px; border-top: 1px solid #1a2a4a; background: #0f1d35; text-align: center; }
+  .footer-brand { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: #4a90d9; }
+  .footer-sub { font-size: 11px; color: #6880a8; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: #4a90d9; margin: 12px auto; border-radius: 1px; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cover-full { min-height: 620px; }
+    .report-page { page-break-before: always; }
+    .section { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
 <div class="page">
-
-<!-- PORTADA - IDENTICAL to exports.ts elegance cover-full -->
-<div class="cover-full">
-  <div class="cover-corner corner-tl"></div><div class="cover-corner corner-tr"></div>
-  <div class="cover-corner corner-bl"></div><div class="cover-corner corner-br"></div>
-  <img class="cover-logo-img" src="data:image/png;base64,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ug9Dz7DECQ4nuA1Crt0sHNUvXtwmG6658uTRo1s7+/ni7iopr9arxUxPHJmFauLC9t5guOnay5n9YO1EWK6WZ08dyZQu7lvObp5furA90/y199509dnTn3rwmU9+4dHTx7fecO9NmxuLxebW579y/qlnX9rYmG1v7x7dkG/5+vt/9yMPXdzeubh98fX33PiNb3+zs4rwh/7ws/fdc+fxE6dWfX/F6aPv+dXfWa/2/tyffjfJ/Pixre/7h//6rjuv/fP/7X+jkj78yUfe88u/N0sdah8tRmODic2Kg4hc3ELoG8XZk2fOcrWDG+uHofk4bH5mgMrU8pUMvl4tl/v7GA7uvunUXTefvvHs0WOb3XMXLl166cI7H7hlY/PI089vD/3qpReef+Cuszddf/bhx57f2720lfI3vOHON77q+tuvP3nndSdA9JWnz29ffOmBu85+2zvvveuG06+58+z9d13/xUeeetO9N7zpNbd/5HOPn3/hwukt/57vftcjT+8898K25/VTTz99xXH9B//DN9572xXHNuXPf9tbH3nq+YsvPf/P/pdvu+ryrVfedtU3f/3XfPKLTz/85SeeeebpP/nOe37wh/7aFz775Q986BMXX3rxu7/tLd/+zW9ZHqxPHp0/9vjT973qtnvvues19962Xu5/6KOffe09N779Tfc+9OWnVPRXf+P3vus7vuHKy09+8COf+s53v+ul7dUXH3psNusiIBR44eFCFcsPEDkDtTQmYGYKkMThsxFL6I6gNQojB3j1iwLIq3zH3Jerg/XBMverNz5wy7FjRx989FzHfsM1Zxg+DMN8xrOcLOc8LPMwzGcpKV+6tL05y9/yjtf1g/38//Oxnb2D268/88fefP/+cvWbv/d0Ejr/4s7P/8aHk/J3fMPrvv7rXvVL7/3oP/7rN9909uiXHnrwr37rH3/i/MEjT7zoeXXh4o4NB9/7F79tZ01/8397z/nnL3zDW+7/8jMXN5I+9tyl7/nhX3zmufP/6ge/+51vuOM33/v78+Svv++uP/jN999/93U/SR5uWD/2M+/7e//7zx87skhKP/yj7/nOb3/XX/8rf+bNf+KvLg8O3vmm7/tXP/Xev/dPfvbUqa3l/u7GPP3QP/+Zn/rJfyei99x98y//3++fb87MHWV9yEGr1Wo+64oR9wgbAXhkkymqYxpDOaKpCB62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" alt="Shopy Crafter" />
-  <div class="cover-brand">Shopy Crafter</div>
-  <div class="cover-divider"></div>
-  <div class="cover-title-main">Auditoría Digital Completa</div>
-  <div class="cover-subtitle-main">Análisis exhaustivo de presencia digital, posicionamiento SEO, experiencia de usuario y oportunidades de crecimiento</div>
-  <div class="cover-target">Preparado para: Lazy Lizard</div>
-  <div class="cover-date">01 DE ABRIL DE 2026</div>
-  <div class="cover-meta-row">
-    <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">Turismo / Consigna</div></div>
-    <div class="cover-meta-item"><div class="cover-meta-label">Ubicación</div><div class="cover-meta-value">Barcelona, España</div></div>
-    <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">SC-AUD-2026-LL</div></div>
+  <div class="cover-full">
+    <div class="cover-corner corner-tl"></div><div class="cover-corner corner-tr"></div><div class="cover-corner corner-bl"></div><div class="cover-corner corner-br"></div>
+    <img class="cover-logo-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAIAAAC2BqGFAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAB2elRYdFJhdyBwcm9maWxlIHR5cGUgaXB0YwAACJlNizsOhTAMBHufgiPYZv3hOIkhEh0F9xcRBe/NNlPs0HndRcuLJa0JxYadMfchIsXqx9SCYFNGuPnhFuoSmD7fv1aN/mIezTVLIZkavUb2sUd4ttVabzzoAXFGHf7hiGzjAAABgnpUWHRSYXcgcHJvZmlsZSB0eXBlIHhtcAAAKJGNU1tyxSAI/WcVXYIBBF1OEvWvM/3s8nvQe9veV6dxkqgI5xxA+nz/oLd4VCrJKcOLJ9tM7LDsysnYsrlV69KY+ziOYzBjv5rGTnbJ2iRp86SCs8UqafHd4ZjFd+1ZDX8EFIETswzpnOT0IrsXg6O1ALONU6zttO4SNgoEsFEbwUP2Zfg+Ppn8hMHeMTkVbTlx8BlBgxNJ5j7fBPyFzghrsmdWVbtDXrYAL64YSXaADXdyPNwdp7jP6M5DNqkxMEvC+DK+bQXBXxzZC75euAVAmOmWBSggk8gTW51CKiTjxNWOJDDgIDtYLdmLLwVhXU4iujKhGXXURwGX4L+4g52iKEMrPQsxxSQMUJ/iGtZ1Jf4F6E4a9NEzodnOLJM4o6fQCbCcaAx1OKOiUS31qDFyhO5RhQd8gx0YqYXKaqItjJhtfyG/Aqb/Ir4AvDQsD7rtmuv2YyeHJcbTK5VRtXV70EvzOtAXKlfP/eOMk1sAAEouSURBVHjalb1plGXZVR64h3PfexGRQ+VQWZU1z5NKqlKVUElIaJawgeXGIAxexrTx0G23u71sQ7fN8oDBNqbtbq/VGNuA243BgLGYTWNayAwSaELzXINU85BZWVUZGdN7796z99c/9jnn3iixvLqzlkq1IiNevHfuOft8+9vf/jbffPf9AIgIRFT+D0TEzPFf3L7OROVbnYgJDoCZiJWYCMwEMBExAW5ZRInJciZm0cQsTCDA4SxKzJ4zgTQlYjATkxCzm8Gduf1iYmYQpzQTFSJmZmIW5vgXEbGKEBExld9OJMTlB4mJCMwc751JGACX/2Qqr0ZM7GZmDnJ3MIHixcsfApgQX4yl4rpk4+KVrzMm7x5MRMQJQKxe+QmgLDHw8tdA+QYCAWaWmVg1td9PkyfDzESAE0Ai8XNe3h2I4sWZAQc8lpKJCeQAizBzvAFmZhUCoT7G+CwOYoCFmIVAzkRMAiYmMDHK12NZYonBDC6/Ol4JBAaxw5nj+agySFgJbmZO7iDUJytlDetyxCMkRl34ugSTfVv+FpTo/8+f9kSYKGlyd3dTTUQEuLuJKhHHsoOlrADLeDDqjmBmETHEGoqQMIu7EZGKgondiZlYWJTcmQXCsQdjV5fHCpATVIS57KU4GvGJPR4okTConLfJsgD18QkRGCBmcDxdVpA7ADMDHDACqLyFOEwcy8yT3UwE4kkoAJOAQAmHl5KZ/+g1jsPTokfsJVHPA+BMYpbLupRtU7+X6/Hzto/KW2JmVam/lIngcBFhZYBiX7MIxQYlYRJhFm6vWMIFEwsrEUGImTmOXP00ElvWoZOPhngH4PbfXpao/HB9KiwszFLOkjss/pdbTGERBjFJecwRYeI1uJ6+/487Gu5uJqpxxiMYlifEQixORIBoavseXEIIppGrbLMaHAFm4fpx3JyYVYWZhYgg7W/jTdfNpCxCEeKYOOIz6m+o8Rc1gHs87WkYJxKvTzvWFFwiOBHYY6sAxCAnMMBSzpaIgrrY6O5ODncjdiIRiUfCEr+eqDw9MPi/ttDcbsbyJtxJlYlBcHeup5iEyRxl7ab3AtcgQhE6icjHw1o/uDAzwwG4igoLkYCdlYmJWMBMEO06ERFWYlbh8SaIf9zdEQ8WXPZ1icFxGstbibfHkBIHmeounMReAbd3We4PAO6Ij8IsEceUKCCBO9zNMoGY2aXEdMQ+IRLn9EcFibLdyvEjsCoJzEwAZnbLDGJNNQiw17VDOYhctpgwO0dsaaejLD/AJCTlNoJDVUWUSab3dkRMMDFYSOK2FAaDnYmtwoNymTILkdRFjXUGEcA+XtglrtaFL4iJmIgEcGIwKPY44vXjQoyNEi/gHOEhHqoqawIQdwzc3Z3IibmEHebEZQ+Ob8LdYUZEEpdS+asIjgRyuLOmsrTM0+dTN3Q8JRALq44oDQCgqvE3xEIE4XrHxMaTEj3LOsTlRMwEh8XTM2MW58klJLEQ8W9p+zO+WIN3vc3h7aDFr6e6mGVxHVOcSxQwEeXGISmPPm7CCsNATKqpYTYAcIM7HE5U16uBOYe7w52ZwZhE43Io4SiRkQ/Dx/GOicjnBGUOcFe+1d1b3GVRQt1PokQMciArUgDcOIbtuiqRKDZJ+/CxwMJtRZhIqNy7UoI0WYtWUu8Mj4ADKqCzIBmwmJtwwJASc4hIQGAOJMocW4QcEJS4wkzOXPBiCzAqUGdiAmJHcwE6REykLJTELJfIbCYiDVQ5rGwlvCyex0GKLYMKVMaEwd3IXVKKnV7iQo2dKkzUmQ8OE66RlYQnsLfubdQTwpPzVJ8KSIgMLqJMBBEwyLlADNR40VBJRSmRhomIMsXdN8Z0lJAODSzBIJBDCjSJp14geg0PKMsdcF84eSBgdxWtp5WoXtNwn6RDI+B/GbRWEctObqwSN1OsQ3sYgMNdVMq+ooIASzwq1x7FWoMi85xkYaAAeyxMwkQsZU0nF1w9USAkUWEpkS5OAJUQUT5h/a1eYT0AJnI4ARKPa3wwcVxIwADKhcRxhXJLqxkBliLrKw8zFttBKTA5AeXKYhrvoNi/h5I+TJF2JH+AMIumrjwMBzlE47QFqqLYLHXvaQue8bJCwqQMEmWHlu3AcuiCDkQb6RkxmKVuOz4cvQJg1QViITjV610quGWuqKMGuzgpJYaDPbLJgH4cpy/OpmBMnLlml8SESICZxWP5W1QHg1KsL6uWQANwy+3iacs0l5oSIEyRYrcISsKAW2ZpK9w2UEn8HKaFWhBmzp5BLPUwSc3diYQh9SKO2ByPKF6OhUr8rkliwxnxCNsJ9glWLfClgLkRdRTk3R4NKugvu7huOx5PBTOTlBsf9bzXQzieUmI4gYWQmKXFKwDkRqpjdks4xO5ENlgAIwGRcvAkszECSUrEL7srQcQqmj0DFheBuTk8aSfSkmdmZqDsyFiACtYjx65J+BQPlaAbu7u9VH298kFaWsBj1jihhuIFnYngQlwzZ0A4IKkDMKBCCiYikQKWJmGfSsTn8YkwEwWObkDNPZ7wBLWV27zFFhYR6uIecnhhvloghrOm2Pdy6EzHIkDi7DMTyNyZVVnKSkjkyzXnGNEAs5BEaA4Wadzn7Z+WrmL6N+MZFGlojTAlzepjKPdyXB0t+2UH6t+jXH5CEs+diFkcFSCP9wWIySPQeln8VK9IHpMNTH60cp+geA8FUQdWI0CTTDa8kHbuRk4iiSp1CvO4xuP6ixPpcCC4oBo1eZqQti0ab41JpLIc42ZsG+bw45wm2zXJPpSxHiZ1KjlTUHL5QvkBpQonVVnKbp1iknqeRsquAmEijpcjJkpUtw/oEKfrJSpMLn4c5gLdWJVYKgGDkjhI8jwQHCJEcDMASVNQFkFKR3gviJhArAVGTN8Dj+smIlohppbYMVlE5q9C9A0olXc3fsCyQhPw1PjtmmgJTb4FKJQy2hkr34cp4dYoVCcQIWjJcrcCRKnh3Upm19vUwYBIyevoMBkPOIlE0jHdKcG5QwRwIXW4u2kKGohqUlCfHDeuMVZWueYS7T4mYTipSJe6yBda+KUWNHiM1xjZlkO0iwjX+6r+7jFmlmNsmGZviKQMYPayP0DeAPihDQrW8vJEQmYWtH4hUYUIlOpnLWEjXolRD2fgeQBwqcl0yc4Bd1NWtODhZTMISzDBcA82tb1YvQNaII1fUdPsepHwmJPEFimVkMl2JWmpy4ShqqF1ckcENOICbxsGQrs5ERkH2AnBbCuPzB7B6zEnkskvq3USYGRGmYlJU0r1QwSKAzwdDmTMosxcqiFcEzOP4pNMQB6EGWCHCyuBLA8iKqRjvI4kVThorsACheCLBL99X0W2VOmxygaXWyIuQZoAi7j3ZDy6wXQ2zD9GUGYp5C6mpxYjtc4MQEhY2xuO0k/L+2mEu9N8bRKMWkkouI/4BZGfxAdLQeyCCHCRND4H0ZLtluJWgyL1bgxuDiBitxwbmTB95MHkarlGGUrsRMxxA0q8JWFFSfvYzYKcjoJWvXslsleREXEfxo3cLjBuVyIBAg4+ruQZGD9BQ18FURRMohV6xFMJGu8QxP1qgmeSVNW9NB4er9ApVSILUveWw3nMnVBiqDu7sSiI3YwlsgcOBAy4iI60WQPswYVHPSb2RgQvZpHIXzBBtGQI1knAHiwECzNYVVW1UIhl84z3IbVyIsYlKQwUUaRpjFomrRiwoAlQRP6ygzzOrSD4PAK8pkYtIWp3QEn6cAjOTK7cAB0Rh1OhHWoNlWoaWUJUywpF4MYEdwCeONXNw4UjHOupZfEn5aZKQpZdXnK7jtWJnSHBPBLMvUtJRCqfQMwCeJfSrOtKtSFy7EpeNFqn3CdjdKu0aCnVV1aR0Ra9AOQxppTPQlP0U3C/VIK77PWy2xsYPcwEHNr1EqGDIhNp0KMGhMgTgPqUgzNhhxWSodB1VDdlwGQSZo8XnCx0vb4kl3ItgTioshKFmYdsTJw0je9ZauSu2K4mHHVT1a0oPEaMmpCQe4lJ03ybD/NPh8JCqeVSZTPHdE1oQl5NsUqBGsCUaj6s0YgfSDVvkvFU1TATuR+RCwsmCLSE3THDKLtVuKZtNXVWFXO0BC8wgKjWTcLtCZi7u6eUVJOZBQaKb0AlOioPcugclwBx6Agzc3Blk/c42fb1m1vIRtnVhTLmSRSQyuo3kI+vSn2IJpCzXIeRqTGRg4UInIiYRSPIIhKJUg/1KAOEOoXru+HxFuexBhukXGW8W40wSeKItgxmNoCYRaTtzTjUDlg2VemSCrEVjBqPbpo11rOKOMuNpm4R29t9pUqqUt90Q7ARN8g5mNBJOB9h5fg4uUXF4OImOdVXBYhDt2Lh4GMLM6NmhoKykmwon66uVyn4T0Fu+SqTe9nOXJgEroETUTQmosRaK0VkZsrx9SbOiJoiVDUllbLLX5YsNwRdlEX1epDDuXbsUoSuph3vSj4XwIz2fEb8DJpuzPpfATYlkANLoSIK2Ybx3n25YIPG27mgIQZ5mlxcFNwb14Qo0o3DAaptj1EfoiKp3JwSdxcASSp18wU5MlhmItUUNdZa4mOhUMgATqTj0o7bmBtkqRKPmvNPMptYF2XyyEjaZnXxGjQQxG7AzoYc2m4Gca1x1erseA4q3pusIVeGGqNW6WUypXI2lCUZMFJ9gT3KqeSmDqMRU0hQiRJ6LPLQTCStZWsmNwizitYLm0DI7gBS6jSydqmJQIFZzIwhm5O3pL/tSZ7wu85CjXqoNaqaxsSvKpkvMN58XAvcqN8kdUPVCw6NUKaRxmi4ZdSnjHw/N3IVkxuWvxppxwdJh1NKlsm1OS1wR5lHVeABNzTqBxKEQP1McDg8paSVKm2MS5c6FZXywOUQGQtSUSTOlnPchJVgxhQGMCkRO5faRKQj1GiH9pK57IySLqDt+CpGm4SbwhBV+d8kKamkM5M38DwpjdCEaDqESdCIlingSy3LrNs/6OFyyUc5vKaeIObI4ytHAFEWJq90obmJapLUaj8EEhJSDokJF0Q3pikcUkVQUnFnhxWlUFnssneMwHF3g0BC3i5i1JS93VVS0wmpsXUSMIkA5+mZKayUMJMHjYzCfaFeOEXPUAjKqInVD82tNC2EyQ1d+NKSaqbYGuUh8VgBAlhZrGwKgnuttpWypbmzsEbhh5hr7bnTRExeSmjltyozRAcb4NSF+IGZgJwzMXWpU2JlTQn9kIlJJbgdEVEGkojU9MGLlrTUiWhS6zvELVUFxrjNyu6IfGeqlq348JBWtOAjOApLAYyKPQGjagABcsq1RmO1FkhTqSlzqpc4SsWuXd9wLnuz5OWi2shIcwNhph23ggBIRAxubqoqBRZx42uFSVXNzAlKRO69ZXfvuo6IzC27HSyXXSfZaBjMAZEkooBT6uazmQqLctKkojUKjPC2xrfDjB6BJ8kaitKoIuKWCo+4josqBLKzt2tuqqKqSVNKSSSusfJM1anC70M5VqtqTQF5auk7MzQOIQtgU1rcYcSc4uNx+T2dJo37qN0KRIl4MCOmJBohyd0BUhYiVhaXoJspu2WzLiVlWS6Xy/395y9ceNcbbv/OP/m25WrY2d07WOe9g/Xewbo3hsxXve3uL/uMde8H656ZCsBnFhFVMfN1n1MqMF1EIguLMOQhqoCVA95ChnxV4ozgYTDkYbABK8RLXXbseNclg7X4hDEwk7SF+OriToQOnshrC+OMSHq1kszuHiWSkf8VFXcEBzQ5By6iQlQ2tYib9XkQEU0BbVlYAl+bWZBtq/Xq0vb2+XPPvesNd/ylb3vrYmN+1ZnLGKeFCfCuS5tbRzY2NnPOabbY2tz6+MPnf+BHfmlzY+6lBk3m+eL2weY8nb3y1O7+ahisH9wcbjBHrEDXdVubCyCNVytVsdJEflJzabe4nFh66ynbqRMnutSFqIoNxO5ELmUtGRR3BogEk6c2QSCpChzKwjOzA7FNGnEjIircqFswKUlmHxyzouUlg0kwGJX1J2CwTERJtck+hYPthbkD6Pt+Z2fn0sWXvuVd9337N35tNluvemZNKeU8iMhq6NfDbj/kWTdTtXnHmxszTaoqIUhZr5ZPP/nUvKMf/Tf/4DX33XHx0qXVuj9Y2t7ecvvS7sVL+xcv7a17PPLouY9/6qHNjfkwDIU+DIJEivipXd3xR1lU02A2m836YRBREXF35lBaMmRym47Bhw7p0jGWgRMR1xJReUAAtND/JdA6YI4U1aAgdomU2RwOKPNg5vBZ15WLUYRJzN3cOxWdpMEhe3G4mVnOy/393Z3tb3nnq7/pbV+zXA2yqYnILXOSrptJyN2ELRsSzHO23A8ZDgA5D8uDvScfe2JroT/3Ez9w/+tf2e/unTh+nClT6qjUg0A0J+qI6Hv/zr/+gw9/+siRRR6MlVTUMenXKTyfStHS8eZisZjNNKW+72cpkXsRhklN0b1UshkT+MgTWdiEYRI4qvyoKZ5bsl4ijopYlNQ41ihHkq1M8Riy5aRaRLhEwsIEcyciDeHeyMdzVJeGfr2zvb2389K733nP2193997+QVAVzGxmfc5By6gqHObIObsDjtz3ZubuB3u7jz78lSML/uWf+oH7X/+q5cWL5Dn3fb/q++V62Nsfdnf7vWV/sLfev0i+/IG//V0333jNctlvbC6SpKSaUqeSQpQtJdv1poedpbSxWMy0m6UuicYFJ6GpjLsMCDXBhJsYMWa9XAugkwr1eKyXslgTeHCpWmlNHXPOEQNQH4m5EVNE3mivkqAUIgSFkrxCgxA4r9bL1fLAhuU3v/VVb/qauw6WKzhENTY6i1p2N4s3JiIhAs/mIrJeHiyXq/293ce/8tiVlx/5lZ/+h6+6787lS7sJTiDKa6EoR4mwqCYV7joe+n7rqPyT7/+LR48e6YcsReNaPi+zCEmVwRecD6IQmBdevoHG2MI+KetxU0gRKBgrehnuEGEBCF60Z4HSqCZnOTSlgUiF4wFoy5ILQw0JGU3pInhZsYFaH0tJPSwvD/Z3d3dfd89Nb3nd3Zcu7RGgQjBjkuzuDhXJQ3aHu0eambMF5DXQpYsvPvzgI9edvexX/t0P3H33bQfb+wqHe9CAVGrzWjlLJ7gK9cuD66678h/93f/esg05T2TpdWUYrZoio1a1smAty0b5d9msaO0MiNRa6tLHGjlRCPERt1Pcth5FSRYizu5jeZKZSdxRm/vG7BVowgmwsDfhX+nPC1K11PQ8pKvmlvNyNZiTpuTAkIdIkxzSDxnAYjEXpnjf8/mcQOv12gx9b888/cwdN5z6jz/xfbfcfN3+pT2Fww0gzwMRkSQ44FZCpecqeZ2tlzuvue/2v/5X3m3ZgCBKHBEBeNKU0yQlYyowgu4gWqu+cpJ5FJU6CUOLlHdE7YXRZ2EKJBD1Q6FSw2bhWlsNtqXWofHyyF/FTK22LK38Q6PyMnQ5otql9NzzF9d9FtU4yEPO0QyiQn2mx5958YWXLu3u7ffZu2527NjWYp625rJer2+94cwv/MT33XDt2Z1Lu5FEgKLLJJMkdwhTSkpgd0T6WBguAtH+O97ymtOnTuRsjdot/A3GjJIOLXd0H8Fj87d6h9RiPaQq5Ov1SjV8U+wVTggCmtkd8XYqm4NWE+PCnNWjhiknGM2XjeEtWSVIVSSDQ/mD1iSKiIWautnO/upg3R/dnAEQUdFkZszOaev/+Pe//bFPfXFr0c1m6cjW5pGtjY15SkxXX3HZI09tv/Fr7rz66rMvXdydz2eAMyssu4OZnHgxk/39FfW2tbmgmQ57a+VExG79bDHf27Pv+Tv/6sILLx3ZXET3wli6CJUAmqRLiEtNLvaac8m8XV6Ok2XCi2LKKLfMsDUstVpC2yA0UbOi8jSHCvYOERIWKwxLaScsrVfMSdRbxx3Y3YlJRTTprJsdHOy8eHH3+JHTZqXFT0RVeLUenrpwcPzyqzYX82yWRZeYX9rpd3f2PvL5Z7YvvHDXrWfzYCqC6P7M2dzcTGabmycv++AHPvm3vv/H93d3hP2f/9Bfe/M737re3xehbjbb2V7/zb/7bx/+yuMbGwsDRMaCVZC/NUbEh5fJbVYRMsPBRczs0+pWUaWHsKK2uIyxI4izUpsYKZYmNCtqeIJ7lVjEO+PaaAwVEWYnrwp4b0R4J5JUUQhit6LNENWUutRnP//CpShIBjtogDnN1b/rm+47feJIn31jc2Pr6NbJk8evuOLy06dPnDp5Wbc575SUnMAiybOZDblfEdOR08d/532f+sF/+otOmztL/9TnHv32P/f9n/n4Z+ZbR1LS/T3+nr/zf37+i48cO7pl5iVBc4gTgwRjP1khjMiJvdZfqgQHxCH/aPKFth25HFzBpJrXumAmRT+aFjKbuCqedFRplUuqGfE2bk5mnolKaZhwMy9ymEa8kghrNiMgiQoVnQaIzr+wI6JFS1kUb7xe96++9fL/+bve9MArr9/ZOViueoIPQ16tlv16lXNezGaAOdxytjzYkAlIs9lP/vvf+sF/9nPz+eLkZUfPXnn2jjtv31uu/9g3/9UvfvrzcP1bf/8nHv7K48ePHxmGPNUROleawht1L0T1PiMnBkvDga0nYrpQ462Fgl2kMqjltkwvL9ARE8MNIhIyn2pKAADCkkSiLcvz0KjeWqGOYjZmKfGhKiYNls2sS52wgBBJjIq+sL2XDZE0FeTv4E5XvW8m/tPvvOuO60699yNf3t1bLRaz6BcjosV8ZkZu5uRRN9nc3Hrwye3/6z+8/7JjR0IfdWTriAhvbW0+9dSz/9Pf/tFX3n335770yNGjm8vV0M10ZH+4sNcT9Nx0zo03ssp3l/BCXvl5OiyfKXrSUb7TMpnKdQAiHM2nQNHedRrZNnuJBhNUAwTHX59lWBUg50FFtKoa4092c/OkKZW0mKNFftali5f2Vqth1pGZu3nUIeJ/OfvB3sF9t5584JVvf9/Hn3z/x7+8XPdBUGwsFgDb0JOTaGJh0WTQzSObRVxEJEmOHDmytXXkzJkrl+vhc1969NixrWGwqeQl9px40YoUlwUa/1dOZKxB67BlQAEQWVF+tfNfV7Wk5cx1J0bzUXQaqWhSaX4PrfzMRO4+aqVBRAF7ozBYjwzcchbWTrtCxaN+EhZRrcoYFCKSJaW0s7e8tLfvDnPLZkPOZuYW/cDGhN2D9aKj73jHnX/53Q9cdfmxS7v7KtKlNAxrs8FLb2ZQ0e7mU0l4SE0ItLGYLRYzM28Rs1ZID8k0ysktsKBmg7VVSNAUN3VhtZJ1tVBdHT5KeWVEgqW7PUo3VcSFKo+LYlV2i2phi+TR3dalFJlh8V0IgUhI+CvvSrW3kon63MfBB1HEaBU9WK4v7R4klXU/ZDOPdiIPYo6ZJaXOSPYPlq+47vg//Rvf/F1/8uscdOzIIvcrywOzhk4OZnnIoWdsN3q9vUqzdhWlN6KNBa1iVgHyIQ0MRssLEkbQDoXjLtIpqV01VApyXNWfDdvFauvJy6+kCnSYOTvgnkQbFWDwiAZcu0lLE6o0HVYpFxBT9uhtHrvh4yFHSpI9l6tPI3f3g/29p549d+WZE1ecPJatYMToCgmuSlU35zMVyQ5V/vo3vfrLT7+4fWn7XV93b29giQImzWfpqfM7v/PhL3SzRJg0TlRJXhE1ORwkIgBEag5Yl/iwhQa3fiUSUhaZiHfaLYj68yOp1JqlqzAvXlxPXH62spcUz1iKBQVVqZDUdt/6csKOYP2l0RixvlGUqorQiQCESUTciQiqSsyqCuau685dePFjn3lIUrrlhqtnXZfNlZmVIZLNhGlzMWcmYSUWs3zbDVf90L/8xftfdduN151drwdVdmA+mz15fuf9H/5iN0vttNLkw9d1BohEicAqLGhtBS3dOLzUTTZyWNzXZCJNawOe9H/y6IzS9M6lm0yKNMmVWypfgLsweeFI0RqxVZQAg9UDWJXhwsRs8ECiZjbkAfCwBRCRIowHZzMQHzt+4pZb7zh+6sr/9Nuf/Bc/9RuPP/P8kc2ZJmXmpKIqScI9oGNREVn169tvvPy+e27/sZ/5TZHkbkO/spwdPgy5KL8d5E6HmlSmYvKX6QAq/m3tlJO25xpMojwe4SVgK8ZnMJHrCRpkmb4MEUhPXXFV4R/4kKik9QnFSXBAJQJ0BIdSEAs4POShgE2SkMeIqLn3ObNEhWWs/KuKu/dDFuFFN1vM50ePXXbkyNEnn3n+Q5/4QjbcfuPVi8Ws73szSyLzxUIlbmlzx6xLOt/6D7/2+9/45nuObM7cSDR1iR977tIHP/7QvBvNLWordFG5Bc0AhGCAVEo0IGZIWC7RaI7QuGMQiDRWQ5ruceSZIm/xYNFGsftX0aQTPTcV54K4YInNzcxoohHMZtksCIFa/ePBMgEhTWKI1CbBwQZiJNUwK5puoSJc0hSX5yylEydP33TL7afOXP2rv/3JH/qxX/7Cw08uusRANgAUJ2PoBxvy/sH6FbdcnTM+8okvdipOMgxDzsMwDAhlZiQTUZGtMiMO6YuP1BEqmQmeIom4xiZrwgXxEqBGo3oRL+/rLVdXpYgmh4kLJg+OIlt5I7H8DpgVwS4xhJlA7lYMbYJ7ZfFIrDUaP7i1jRh5BHFhEYzJK1VLNmZOIgRaD/lgtdrb2z1z6ujJU1fcfMutT5zb+Uc/+os/+UvvXw8+n89Wq9VqtRqGwdwBOliujm2k0yePfubBJ1W7vl/3/Qqgfp2jo5jduclqQJ2qmw+rQUozRyHKvOEuZiGBsI+5V+uqHTtFS+21SGyYMGn/IghK2wiED/Mj1V0A1dfC4Vzr81Mx+cgl1uSQpo4hqO2FE/6FUZwkpHlZjQGQRwobtFqttrcvPvrYY2eP4d1vvu1Vt19t0BtuvPnk5Vf9xu995od//Nc+9tmv5GEwy+4+ZB9yzjl34tdddfr8i7vroV+vDgDk7MeObPWDDe5S9K+UHQ48f+GlzYVed92V+8ulCDc3jZASR926hWJmDjoUDUlEMQNMYJdW525pJIEJ6pBCrtLL9O11b+vpM2drY7+LatwKCLBc2uHLTer1vEu1V+PSwetJu9FKKxRqBHNPqhqHZuLIxszZDYDlYW9n+/nnL9x325V//OvudhtuuPLY7jI/e2H3xInjG5sb5y+89Pt/+IWbb7jqhmvPrPohyIacbT6bffaR57a3L73za19hIE2dO11zxZGjx45+7HOPpk6Tanbb2dt57NHHfNj/8X/+vd/6J97+W+//+MXt3cViRoUplLbixfJKKj4pbxg0UViARv8JblrGkTrmZsX2Veil8qiFK+ZpR0ErmwOTn+Sq05sI6fEymV8zWOF2y3PpG2nFN7ivV8tLF1+6cOHCa15x7Te97V5zX/fD3t7OO19z7Wvvvn5vf32wGrRbZKdhMHdywzD0y9VqyAZRVe3XKzPL2c186NfbF7f/xJvu+Jt/4Zv6bOde3H78yac/99kviq9/7sf+3p2vuOmyzfzD3/edG4tZP2SNvnKa6DkbTxSAAkJhaTCWVSqaAIPJ2UMXNinLFKFX7aiO8zLKKfXkmbNN0K6iDbY7AvOMoD5ucNHWThLvpKTvXHmUyMGI2dxVJIqzYWpUPa744GB/b2d759Kle++4+uu/9hVmbm4FyJvddv3pJLTZ+Y1Xnbj/7htf/YrrlSmbm5cjNp/PfvejDybB2772FevBCN73PYmu1sOdN5+55uyJ55597rLNdPWZ4//07/+l133NXctLO8NqeeVVJ19x+y3v//Dn3b00PE/An08ZoEnT0SEzrkLt1cYnIimeTAVujH2Oh/pdmIn41rvvo4oxUvgwEpgrMAiBR72Ws+UudaUnsDqyDXnoNJU+BuYh52gI7IchiXTh8ygs5a9k6IeLLz7fr1d333LV1913MxNEon+Qk+psPp916ejmXJNqSsLS50xAN0uL+UJVYP2RI0f//o/82h03nvkf/+zXL1frlNSBjcVmmnUp6WXHj0TNc9Z1cX8uFnMSduDkicve+8GH/vG/+KWNjQIZC43b2gn9kKIXDDgYBZpK07CXi8rZyzVlVVmH5glqqN2LVbbrcA1XVkCFQzarIjlbkeE4mKCanCUakVtpMCQ8gJeW4OJlQ8yURB1ODhYJSiFI1PXqYLU8UMadt1zl7v3Qp6TJdNZ1osJMZra9dxBUHzPPZt1iPhcOGMcpye6yf+q559/2ujvcbXlwkFJiVaJVyv3G5sbFi7vLVc9MqjxLaWNzY71eB6156aUX77/91F/49rf+7K99uKnJMSrzwyKuKCXKRp3YwJRd7CEGK60voKmXzaQXXQ51NumpM2eDnGutKx6aAq2GFMzu7oQkxRs0jGCyZQ70VpyoCqLIbqFHCdcQhJCwkqjCnDSZ26Xt7eee37727KlOhIBZ12nS0OQF9xJyJGFKXaciALJld5vP5+/76Fc++qmHzl948a6brzp+ZHN/1YuGrymSpmy+XC4tZ3KPeNX3/Xrdr5bL1WoFzxf3hk984akulQeprUNmLKWMqUiViqNJisDTGkmrQVUREkZ2vvWlM5OevPxKIGj+4n8YtmCjazBRdlepajxmYTZ3N1NRlgIQY7FzzgAlVWLh2lcdFbNs5sAsdbPUyWymqufOnX/m/MWbrzu7uZgVf0q3oj53iKowa1Iqxn3soPk8/cGnn37vhx8+fvz4Vx598lOf//Jr773jyNYsDxmwpEkl9YMtl0t4JuLotx2GnPt+6PPWYv6Fxy/+y5/7QJQuA0dN/Pq4qmNGz4FqQSCjix7Jy5J4RqVrX5YPYnSg0ctOXyHNiJnJzImgmloPzWAeTT5ojxEYzEQ4aQr3VC4JrudsKqKqRQgcMgkSB4acVYKVpi6lbj7XlM6fe/65C5duveHqLom7UQ39mhIzYiO7FSna5mL+pSd23/exx3Wekqb5rHv62fMPPvbs19x987xjgObzuYNXq3U/9ASwSGhi89D3fb+Y66PP7f74L3zUmTRVrTfAxWGiLmkVkY9ilRFB/REOudN2taIqmrDWDQjrqSuu4mo9TAR3RLzm2rABR6cakSVeKxBCSl3xOolbG8hmERm4hpjqG4ohD8LcpSQljZEkmmbzlNK58xfOvbB947VXqlDfD6lLIkJwYcpDDiUCgFmSh57Z/51PPTNfzJJoBK35LD36+DOPPnn+gXtu2djYYO4cfnCwH1s1zmU8/k7pmZdW//I/fiSDZl0iFHm1FLl3IXmqnopLo+PYdh4pcthgHqalcKgB/nCPZ62egPXkmbNFJTMaIrSCYwk9IdqtrCeDWeMOHAXdRZmkmmr9svjjRu4jLJpUR/0PiYiqptm8S/rsc+eePvfiDddcftnRrW6WZklnMyVQ16X5bNYlnc/00XPL3//s+dmsUxYRmaXZxmwukkTl4S8/cWH74O1vuPfk8a3ERG5bG4v5Yn5kc3NznuazbmORLi3x47/yye39tXYauuQAJFFdwmh50mzEi8OBV7snUNNUHCqHBtTwRt0xqqlRdZKN/XbzXa8uHsggKRYTLiLVGwOGgBBNGs+Ghp1patBm7rEKh3zFiA0OQmIthWGJ3pCCn5bL1d6lixfOn7v+6tOvuv3aEEuZeVJJKYnqxmLeLY4+em6dHSo8uBvxPCV2H/p+b39/++JLL7z4wlsfuOvOm69cHqzMcprPRLukAjMRvuzEZY8813/lqRfTLHzEKQD+obbM0gbImPQKCnM2jyzRADdbzGa1xjLpI/WqiqGisyk6geoCz8R8yyteXdSxZfVLokEBHRkgNkcnE5co5sG8KMwnECaUGwG0RxpRmJiyGTF1rMwMFQaVhh9hYur7oV+v+vUAor5fm1mpdWki4iNHj1x27PhiMVMWYhncnXmuCe4U/s3ZVuvVhZe2s5mKRpFhNptFLx4zbW5uHT9+bNalIdus6xxQFZ0aT7/Mt39C+rlHr0lRDXaampULTeyFwn0HzcgJaH7QkdeN7rAWKKItEdzMkmpAGidWIisEiIhwK+zVpkAJTts8J+0m/JITOKkOZpm8i+6jposHiGXWdcyysSld1/Xr3txEpSJ00pQGt/5gWcUOIO26UlpTqKimbj6fbR3ZWMyTirnnbItu1mwPQMiDmbuKls3mANXCbtOIEr3MmYkr2xiimcRjJzZNv4UcMppTYspHjLqOgp2r6U0FJDkbV6FiXGvZfcjDLHX1KwHtPedMxKlLDGESR1g3iRPMBo68nuLZoEg3axsmELZYrMJ9HuAh6zeBMJuwhk6nj5K2yEyERcgZ3azkaXGSABuyqSJzP+QMY6cJTyxFJFs9i6sdQvUUbjWq0qYcF5SHa3CsgTCYSs112oQxwsK2g0bl6RiYUgOCBUIUOQKBKMiX2vVLQU+3OzDKOjnn7DaPcAEICsyEo7fe4TOZhauPkoCt+FsxspnBkyaNz8EitWmjaTKJoSSbs1kjIkQYtR3XUcCZCJNHS1l4V7BnFilF3jbPJIhpNxCTdFG0jC5OFuVq3w13T8Qi4jAC9xgCr5ILCOROE5r4MEU3ChbJw9mvILe20NTMxYr4A5gAxBAvEYAUVVtCsyKz4iYtwuKF2yIWGnIesnVdShIiGwHqRyG4+3oYAIILd5I6iVDojmEINQOlTuDcG04cnQmzC4QlD5bhXgElCw+DrdaDk5vbfD4fBtvZWw5DXs/zfJ7ms44Qd5ptb+8cObqpKkS8v7/s133cYRuLRd/3IVRbD8NiMWPm9XoQ4ZBpu63dXZMS89bmfFyqZsJCU/E0saH0EhfjbzC3ha6Wql40jaMZ7dTJhhsPeEh3wqtV77bcWHQi3Sqbug9Dz7DECQ4nuA1Crt0sHNUvXtwmG6658uTRo1s7+/ni7iopr9arxUxPHJmFauLC9t5guOnay5n9YO1EWK6WZ08dyZQu7lvObp5furA90/y199509dnTn3rwmU9+4dHTx7fecO9NmxuLxebW579y/qlnX9rYmG1v7x7dkG/5+vt/9yMPXdzeubh98fX33PiNb3+zs4rwh/7ws/fdc+fxE6dWfX/F6aPv+dXfWa/2/tyffjfJ/Pixre/7h//6rjuv/fP/7X+jkj78yUfe88u/N0sdah8tRmODic2Kg4hc3ELoG8XZk2fOcrWDG+uHofk4bH5mgMrU8pUMvl4tl/v7GA7uvunUXTefvvHs0WOb3XMXLl166cI7H7hlY/PI089vD/3qpReef+Cuszddf/bhx57f2720lfI3vOHON77q+tuvP3nndSdA9JWnz29ffOmBu85+2zvvveuG06+58+z9d13/xUeeetO9N7zpNbd/5HOPn3/hwukt/57vftcjT+8898K25/VTTz99xXH9B//DN9572xXHNuXPf9tbH3nq+YsvPf/P/pdvu+ryrVfedtU3f/3XfPKLTz/85SeeeebpP/nOe37wh/7aFz775Q986BMXX3rxu7/tLd/+zW9ZHqxPHp0/9vjT973qtnvvues19962Xu5/6KOffe09N779Tfc+9OWnVPRXf+P3vus7vuHKy09+8COf+s53v+ul7dUXH3psNusiIBR44eFCFcsPEDkDtTQmYGYKkMThsxFL6I6gNQojB3j1iwLIq3zH3Jerg/XBMverNz5wy7FjRx989FzHfsM1Zxg+DMN8xrOcLOc8LPMwzGcpKV+6tL05y9/yjtf1g/38//Oxnb2D268/88fefP/+cvWbv/d0Ejr/4s7P/8aHk/J3fMPrvv7rXvVL7/3oP/7rN9909uiXHnrwr37rH3/i/MEjT7zoeXXh4o4NB9/7F79tZ01/8397z/nnL3zDW+7/8jMXN5I+9tyl7/nhX3zmufP/6ge/+51vuOM33/v78+Svv++uP/jN999/93U/SR5uWD/2M+/7e//7zx87skhKP/yj7/nOb3/XX/8rf+bNf+KvLg8O3vmm7/tXP/Xev/dPfvbUqa3l/u7GPP3QP/+Zn/rJfyei99x98y//3++fb87MHWV9yEGr1Wo+64oR9wgbAXhkkymqYxpDOaKpCB62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" alt="Shopy Crafter" />
+    <div class="cover-brand">Shopy Crafter</div>
+    <div class="cover-divider"></div>
+    <div class="cover-title-main">Auditoría Digital Completa</div>
+    <div class="cover-subtitle-main">Análisis exhaustivo de presencia digital, posicionamiento SEO, experiencia de usuario y oportunidades de crecimiento</div>
+    <div class="cover-target">Preparado para: Lazy Lizard</div>
+    <div class="cover-date">01 de abril de 2026</div>
   </div>
-  <div class="cover-footer-line">
-    <div class="cover-footer-text">shopycrafter.com</div>
-    <div class="cover-footer-text">Confidencial</div>
+  <div class="body-content">
+    
+<!-- TABLE OF CONTENTS -->
+<div class="section">
+  <div class="section-header"><div class="section-icon section-icon-gold">📋</div><div class="section-title">Índice</div></div>
+  <div class="toc">
+    <div class="toc-item"><div class="toc-num">01</div><div class="toc-label">Resumen Ejecutivo</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">02</div><div class="toc-label">Ficha del Negocio</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">03</div><div class="toc-label">Análisis Tecnológico</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">04</div><div class="toc-label">Auditoría SEO Completa</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">05</div><div class="toc-label">Análisis por Página</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">06</div><div class="toc-label">Presencia Digital y Redes Sociales</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">07</div><div class="toc-label">Seguridad y Rendimiento</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">08</div><div class="toc-label">Plan de Acción Prioritario</div><div class="toc-dot"></div></div>
+    <div class="toc-item"><div class="toc-num">09</div><div class="toc-label">Conclusión</div><div class="toc-dot"></div></div>
   </div>
 </div>
 
-<div class="body-content">
+<div class="divider"></div>
 
-<!-- RESUMEN EJECUTIVO -->
+<!-- 01 RESUMEN EJECUTIVO -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">01</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">★</div><div class="section-title">Resumen Ejecutivo</div></div>
+  <div class="section-header"><div class="section-icon section-icon-gold">★</div><div class="section-title">Resumen Ejecutivo</div></div>
   <div class="card">
-    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;margin-bottom:14px;">
-      <strong style="color:#f0f2f8">Lazy Lizard</strong> es un servicio de consigna de equipaje ubicado en <strong style="color:#f0f2f8">Carrer d'Elkano 46, Poble Sec, Barcelona</strong>. Ofrece taquillas M, L y XL con servicio 24h, videovigilancia permanente y reserva online. La web <strong style="color:#4a90d9">lazylizard.es</strong> soporta 4 idiomas (ES, EN, FR, IT) y cuenta con sistema de reservas con date picker integrado.
+    <p style="font-size:14px;line-height:1.85;margin-bottom:14px;color:#c0c8d8">
+      <strong style="color:#f0f2f8">Lazy Lizard</strong> es un servicio de consigna de equipaje situado en <strong style="color:#f0f2f8">Carrer d'Elkano 46, Poble Sec, Barcelona</strong>. El negocio ofrece taquillas en tres tamaños (M, L y XL) con disponibilidad las 24 horas del día, videovigilancia permanente y un sistema de reserva online integrado en su página web. Su sitio, <strong style="color:#4a90d9">lazylizard.es</strong>, está disponible en cuatro idiomas: español, inglés, francés e italiano, lo que demuestra una orientación clara hacia el turismo internacional.
     </p>
-    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;">
-      Tras un análisis exhaustivo, el negocio presenta <strong style="color:#f43f5e">graves carencias en SEO</strong> que impiden su visibilidad en buscadores, <strong style="color:#f59e0b">ausencia total de schema markup</strong> para negocios locales, y <strong style="color:#f59e0b">deficiencias en accesibilidad de imágenes</strong>. Sin embargo, cuenta con web funcional, HTTPS, soporte multiidioma y sistema de reservas operativo.
+    <p style="font-size:14px;line-height:1.85;color:#c0c8d8">
+      Tras realizar un análisis exhaustivo de su presencia digital, se han identificado <strong style="color:#f43f5e">carencias significativas en la optimización para motores de búsqueda (SEO)</strong> que limitan gravemente su visibilidad online. Destaca la <strong style="color:#f59e0b">ausencia total de datos estructurados (Schema Markup)</strong>, la falta de meta descriptions en todas las páginas, y problemas de accesibilidad en las imágenes. Sin embargo, el negocio cuenta con una web funcional, certificado SSL activo y un sistema de reservas operativo, lo que constituye una base sólida sobre la que trabajar.
     </p>
   </div>
   <div class="metric-row">
     <div class="metric"><div class="value" style="color:#f43f5e">F</div><div class="label">Nota SEO Global</div></div>
-    <div class="metric"><div class="value" style="color:#f59e0b">28</div><div class="label">Puntuación /100</div></div>
-    <div class="metric"><div class="value" style="color:#f43f5e">14</div><div class="label">Problemas Críticos</div></div>
+    <div class="metric"><div class="value" style="color:#f59e0b">28<span style="font-size:14px;color:#6880a8">/100</span></div><div class="label">Puntuación Total</div></div>
+    <div class="metric"><div class="value" style="color:#f43f5e">14</div><div class="label">Problemas Detectados</div></div>
   </div>
 </div>
+</div>
 
-<!-- FICHA -->
+<!-- 02 FICHA -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">02</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">🏢</div><div class="section-title">Ficha del Negocio</div></div>
-  <div class="grid2">
-    <div class="card"><div class="card-title">Información General</div>
-      <div class="ci"><span class="ci-icon">🏪</span><div class="ci-text"><strong>Nombre:</strong> Lazy Lizard</div></div>
-      <div class="ci"><span class="ci-icon">📍</span><div class="ci-text"><strong>Dirección:</strong> Carrer d'Elkano 46, Poble Sec, Barcelona</div></div>
-      <div class="ci"><span class="ci-icon">📞</span><div class="ci-text"><strong>Teléfono:</strong> +34 658 67 58 84</div></div>
-      <div class="ci"><span class="ci-icon">📧</span><div class="ci-text"><strong>Email:</strong> info@lazylizard.es</div></div>
-      <div class="ci"><span class="ci-icon">🌐</span><div class="ci-text"><strong>Web:</strong> lazylizard.es</div></div>
-      <div class="ci"><span class="ci-icon">💼</span><div class="ci-text"><strong>Sector:</strong> Consigna de equipaje / Turismo</div></div>
+  <div class="section-header"><div class="section-icon section-icon-blue">🏢</div><div class="section-title">Ficha del Negocio</div></div>
+  <div class="stat-grid">
+    <div class="card">
+      <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Información General</p>
+      <table>
+        <tr><td style="color:#6880a8;font-weight:600;width:120px">Nombre</td><td><strong>Lazy Lizard</strong></td></tr>
+        <tr><td style="color:#6880a8;font-weight:600">Dirección</td><td>Carrer d'Elkano 46, Poble Sec, Barcelona</td></tr>
+        <tr><td style="color:#6880a8;font-weight:600">Teléfono</td><td>+34 658 67 58 84</td></tr>
+        <tr><td style="color:#6880a8;font-weight:600">Email</td><td>info@lazylizard.es</td></tr>
+        <tr><td style="color:#6880a8;font-weight:600">Web</td><td style="color:#4a90d9">lazylizard.es</td></tr>
+        <tr><td style="color:#6880a8;font-weight:600">Sector</td><td>Consigna de equipaje / Turismo</td></tr>
+      </table>
     </div>
-    <div class="card"><div class="card-title">Servicios Detectados</div>
-      <div class="ci"><span class="ci-icon">🔒</span><div class="ci-text"><strong>Taquillas M, L y XL</strong> — alquiler por horas o días</div></div>
-      <div class="ci"><span class="ci-icon">📹</span><div class="ci-text"><strong>Videovigilancia 24h</strong></div></div>
-      <div class="ci"><span class="ci-icon">📅</span><div class="ci-text"><strong>Reserva online</strong> con date picker</div></div>
-      <div class="ci"><span class="ci-icon">🌍</span><div class="ci-text"><strong>4 idiomas:</strong> ES, EN, FR, IT</div></div>
+    <div class="card">
+      <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Servicios Detectados</p>
+      <table>
+        <tr><td>🔒 Taquillas M, L y XL — alquiler por horas o días</td></tr>
+        <tr><td>📹 Videovigilancia permanente 24 horas</td></tr>
+        <tr><td>📅 Reserva online con selección de fecha</td></tr>
+        <tr><td>🌍 Web en 4 idiomas: ES, EN, FR, IT</td></tr>
+        <tr><td>📍 Ubicación céntrica en Poble Sec</td></tr>
+      </table>
     </div>
   </div>
 </div>
+</div>
 
-<!-- TECNOLOGÍA -->
+<!-- 03 TECNOLOGÍA -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">03</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">⚙️</div><div class="section-title">Stack Tecnológico</div></div>
+  <div class="section-header"><div class="section-icon section-icon-blue">⚙️</div><div class="section-title">Análisis Tecnológico</div></div>
   <div class="card">
     <table>
-      <tr><th>Componente</th><th>Tecnología</th><th>Estado</th></tr>
-      <tr><td>Servidor</td><td>Nginx + PHP 7.4.33</td><td style="color:#f59e0b">⚠️ PHP 7.4 EOL</td></tr>
-      <tr><td>Hosting</td><td>Plesk Linux</td><td style="color:#34d399">✅</td></tr>
-      <tr><td>SSL/HTTPS</td><td>Activo</td><td style="color:#34d399">✅</td></tr>
-      <tr><td>Framework CSS</td><td>Bootstrap + Slick + Swiper</td><td style="color:#34d399">✅</td></tr>
-      <tr><td>Archivos CSS/JS</td><td>8 CSS + 9 JS</td><td style="color:#f59e0b">⚠️ Muchos</td></tr>
-      <tr><td>Google Analytics</td><td>No detectado</td><td style="color:#f43f5e">❌ CRÍTICO</td></tr>
-      <tr><td>Google Tag Manager</td><td>No detectado</td><td style="color:#f43f5e">❌ CRÍTICO</td></tr>
+      <tr><th>Componente</th><th>Tecnología Detectada</th><th>Estado</th></tr>
+      <tr><td>Servidor web</td><td>Nginx + PHP 7.4.33</td><td><span class="grade grade-d">⚠️ PHP 7.4 sin soporte</span></td></tr>
+      <tr><td>Panel de hosting</td><td>Plesk Linux</td><td><span class="grade grade-a">✅ Operativo</span></td></tr>
+      <tr><td>Certificado SSL</td><td>HTTPS activo</td><td><span class="grade grade-a">✅ Seguro</span></td></tr>
+      <tr><td>Framework CSS</td><td>Bootstrap + Slick + Swiper</td><td><span class="grade grade-b">✅ Funcional</span></td></tr>
+      <tr><td>Recursos estáticos</td><td>8 archivos CSS + 9 archivos JS</td><td><span class="grade grade-c">⚠️ Optimizable</span></td></tr>
+      <tr><td>Google Analytics</td><td>No detectado</td><td><span class="grade grade-f">❌ Sin analítica</span></td></tr>
+      <tr><td>Google Tag Manager</td><td>No detectado</td><td><span class="grade grade-f">❌ Sin seguimiento</span></td></tr>
+      <tr><td>Cookies</td><td>HttpOnly + SameSite</td><td><span class="grade grade-a">✅ Configuradas</span></td></tr>
     </table>
   </div>
-</div>
-
-<!-- SEO -->
-<div class="section">
-  <div class="section-header"><div class="section-icon">🔍</div><div class="section-title">Auditoría SEO Completa</div></div>
-
-  <div class="card"><div class="card-title">Meta Title</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Actual:</strong> "Lazylizard" — Solo 10 chars (ideal: 50-60)</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Recomendado:</strong> "Consigna de Equipaje 24H en Barcelona | Lazy Lizard — Poble Sec"</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:10%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">10/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Meta Description</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Estado:</strong> NO EXISTE — Google genera description aleatoria</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Recomendado:</strong> "Guarda tu equipaje de forma segura en Poble Sec, Barcelona. Taquillas M, L y XL con videovigilancia 24h. Reserva online fácil y rápida."</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">0/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Schema Markup / JSON-LD</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Estado:</strong> NO HAY SCHEMA — CRÍTICO para negocio local</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Necesario:</strong> LocalBusiness, PostalAddress, OpeningHoursSpecification, GeoCoordinates, Service, FAQPage</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">0/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Open Graph Tags</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>og:title:</strong> "Lazylizard" — sin keywords | <strong>og:description:</strong> VACÍO | <strong>og:image:</strong> VACÍO</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Imágenes y Alt Texts</div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>3</strong> con alt descriptivo</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text"><strong>4</strong> con alt vacío (alt="")</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>9</strong> SIN atributo alt — Problema de accesibilidad y SEO</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:19%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">19/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Estructura de URLs</div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">URLs limpias: /es/booking/, /es/page/contacto, /es/page/faqs</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:75%;height:100%;background:#f59e0b;border-radius:4px;"></div></div><span style="font-weight:700;color:#f59e0b;min-width:45px;text-align:right;font-size:13px;">75/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Encabezados H1/H2/H3</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>2 H1</strong> en home (debe ser 1). Errores tipográficos en H2</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:35%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">35/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Hreflang / Internacionalización</div>
-    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">4 hreflang (es, en, fr, it) + canonical correcto</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:65%;height:100%;background:#f59e0b;border-radius:4px;"></div></div><span style="font-weight:700;color:#f59e0b;min-width:45px;text-align:right;font-size:13px;">65/100</span></div>
-  </div>
-
-  <div class="card"><div class="card-title">Sitemap XML / Robots.txt</div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Sitemap:</strong> NO EXISTE (404). <strong>Robots.txt:</strong> Solo "User-agent: *" sin directivas</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span></div>
+  <div class="recommendation-critical" style="padding:16px 20px;margin-top:14px;border-radius:10px;border-left:3px solid #f43f5e;background:rgba(244,63,94,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f43f5e">Alerta de seguridad:</strong> PHP 7.4 dejó de recibir actualizaciones de seguridad en noviembre de 2022. Esto expone al servidor a vulnerabilidades conocidas. Se recomienda actualizar a PHP 8.2 o superior.
   </div>
 </div>
+</div>
 
-<!-- ANÁLISIS POR PÁGINA -->
+<!-- 04 SEO -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">04</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">📄</div><div class="section-title">Análisis por Página</div></div>
+  <div class="section-header"><div class="section-icon section-icon-gold">🔍</div><div class="section-title">Auditoría SEO Completa</div></div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Meta Title</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> El título de la página principal es simplemente <em>"Lazylizard"</em> — con solo 10 caracteres, muy por debajo del rango recomendado de 50-60 caracteres. No incluye ninguna palabra clave relevante para el negocio.</p>
+    <p style="font-size:13px;color:#34d399;line-height:1.7;">💡 <strong>Sugerencia:</strong> "Consigna de Equipaje 24H en Barcelona | Lazy Lizard — Poble Sec"</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:10%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">10/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Meta Description</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> No existe meta description en ninguna página del sitio. Esto significa que Google genera automáticamente un fragmento de texto, sin control por parte del negocio sobre lo que aparece en los resultados de búsqueda.</p>
+    <p style="font-size:13px;color:#34d399;line-height:1.7;">💡 <strong>Sugerencia:</strong> "Guarda tu equipaje de forma segura en Poble Sec, Barcelona. Taquillas M, L y XL con videovigilancia 24h. Reserva online fácil y rápida."</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:0%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">0/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Schema Markup / Datos Estructurados (JSON-LD)</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> El sitio no implementa ningún tipo de datos estructurados. Para un negocio local como una consigna de equipaje, esto es especialmente grave, ya que impide que Google muestre información enriquecida como horarios, ubicación, valoraciones y servicios directamente en los resultados de búsqueda.</p>
+    <p style="font-size:13px;color:#34d399;line-height:1.7;">💡 <strong>Schemas necesarios:</strong> LocalBusiness, PostalAddress, OpeningHoursSpecification, GeoCoordinates, Service, FAQPage</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:0%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">0/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Open Graph y Twitter Cards</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> La etiqueta og:title contiene solo "Lazylizard" sin palabras clave. Las etiquetas og:description y og:image están vacías. No se detectan Twitter Cards. Cuando alguien comparte un enlace del sitio en redes sociales, la vista previa aparece incompleta y poco atractiva.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:5%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">5/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Imágenes y Textos Alternativos</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> De las 16 imágenes analizadas, solo 3 disponen de un texto alternativo (alt) descriptivo. 4 imágenes tienen el atributo alt vacío, y las 9 restantes carecen por completo de este atributo. Esto afecta tanto a la accesibilidad como al posicionamiento en la búsqueda de imágenes de Google.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:19%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">19/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Estructura de URLs y Encabezados</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">URLs:</strong> La estructura de URLs es limpia y legible (/es/booking/, /es/page/contacto, /es/page/faqs), lo que es positivo para el SEO.</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Encabezados:</strong> Se detectan 2 etiquetas H1 en la página principal (solo debería haber 1). También se han encontrado errores tipográficos en varios H2: "elpropio" debería ser "el propio", "odesde" debería ser "o desde", y "Videovigilancialas" debería ser "Videovigilancia las".</p>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Internacionalización (Hreflang)</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Estado actual:</strong> El sitio implementa correctamente las etiquetas hreflang para los 4 idiomas (es, en, fr, it) y dispone de una etiqueta canonical correcta. Este es uno de los puntos mejor implementados del sitio. Sin embargo, las subpáginas internas no disponen de meta titles ni descriptions propios en cada idioma.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:65%;height:100%;background:#f59e0b;border-radius:3px;"></div></div><span style="font-weight:700;color:#f59e0b;font-size:12px;">65/100</span></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Sitemap XML y Robots.txt</p>
+    <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:8px;"><strong style="color:#f0f2f8">Sitemap:</strong> No existe (devuelve error 404). <strong style="color:#f0f2f8">Robots.txt:</strong> Existe pero solo contiene "User-agent: *" sin ninguna directiva adicional ni referencia al sitemap. Sin estos archivos, los motores de búsqueda no pueden rastrear el sitio de forma eficiente.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;"><div style="flex:1;height:6px;background:#1a2a4a;border-radius:3px;overflow:hidden;"><div style="width:5%;height:100%;background:#f43f5e;border-radius:3px;"></div></div><span style="font-weight:700;color:#f43f5e;font-size:12px;">5/100</span></div>
+  </div>
+</div>
+</div>
+
+<!-- 05 ANÁLISIS POR PÁGINA -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">05</div></div>
+<div class="section">
+  <div class="section-header"><div class="section-icon section-icon-blue">📄</div><div class="section-title">Análisis por Página</div></div>
   <div class="card">
     <table>
-      <tr><th>Página</th><th>Meta Title</th><th>Meta Desc</th><th>H1</th><th>Schema</th><th>Nota</th></tr>
-      <tr><td>Home</td><td style="color:#f43f5e">❌ 10ch</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e">❌ 2 H1</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-      <tr><td>Contacto</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-      <tr><td>FAQs</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-      <tr><td>Booking</td><td style="color:#f43f5e">❌ Genérico</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+      <tr><th>Página</th><th>Meta Title</th><th>Meta Description</th><th>H1</th><th>Schema</th><th>Nota</th></tr>
+      <tr><td>Página principal</td><td><span class="grade grade-f">10 ch</span></td><td><span class="grade grade-f">No existe</span></td><td><span class="grade grade-d">2 H1</span></td><td><span class="grade grade-f">No</span></td><td><span class="grade grade-f">F</span></td></tr>
+      <tr><td>Contacto</td><td><span class="grade grade-f">Vacío</span></td><td><span class="grade grade-f">No existe</span></td><td><span class="grade grade-a">Correcto</span></td><td><span class="grade grade-f">No</span></td><td><span class="grade grade-f">F</span></td></tr>
+      <tr><td>Preguntas frecuentes</td><td><span class="grade grade-f">Vacío</span></td><td><span class="grade grade-f">No existe</span></td><td><span class="grade grade-a">Correcto</span></td><td><span class="grade grade-f">No</span></td><td><span class="grade grade-f">F</span></td></tr>
+      <tr><td>Reservas</td><td><span class="grade grade-d">Genérico</span></td><td><span class="grade grade-f">No existe</span></td><td><span class="grade grade-a">Correcto</span></td><td><span class="grade grade-f">No</span></td><td><span class="grade grade-f">F</span></td></tr>
     </table>
   </div>
+  <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-top:14px;">Todas las páginas comparten la misma carencia fundamental: ausencia de meta descriptions y datos estructurados. El meta title de la página principal es el único que contiene algún texto, aunque insuficiente. Las páginas internas de Contacto y FAQs ni siquiera disponen de título propio.</p>
+</div>
 </div>
 
-<!-- REDES -->
+<!-- 06 REDES -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">06</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">📱</div><div class="section-title">Presencia Digital y Redes</div></div>
+  <div class="section-header"><div class="section-icon section-icon-red">📱</div><div class="section-title">Presencia Digital y Redes Sociales</div></div>
   <div class="card">
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Instagram:</strong> No detectado</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Facebook:</strong> No detectado</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Google Analytics:</strong> No instalado</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Google Tag Manager:</strong> No instalado</div></div>
-    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>TripAdvisor:</strong> No verificado (crucial para turismo)</div></div>
-    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;"><div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;"></div></div><span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span></div>
+    <table>
+      <tr><th>Canal</th><th>Estado</th><th>Valoración</th></tr>
+      <tr><td>Instagram</td><td>No se ha detectado perfil vinculado al negocio</td><td><span class="grade grade-f">Sin presencia</span></td></tr>
+      <tr><td>Facebook</td><td>No se ha detectado página de empresa</td><td><span class="grade grade-f">Sin presencia</span></td></tr>
+      <tr><td>Google Business Profile</td><td>No verificado o no enlazado desde la web</td><td><span class="grade grade-f">Sin presencia</span></td></tr>
+      <tr><td>TripAdvisor</td><td>No se ha detectado perfil</td><td><span class="grade grade-f">Sin presencia</span></td></tr>
+      <tr><td>Google Analytics</td><td>No instalado en el sitio web</td><td><span class="grade grade-f">Sin datos</span></td></tr>
+    </table>
   </div>
+  <p style="font-size:13px;color:#c0c8d8;line-height:1.7;margin-top:14px;">La ausencia total de presencia en redes sociales y plataformas de reseñas es especialmente preocupante para un negocio orientado al turismo. Los viajeros internacionales suelen buscar recomendaciones en Google Maps, TripAdvisor e Instagram antes de elegir un servicio de consigna. Sin estos canales, el negocio depende exclusivamente del tráfico directo a su web, que como se ha visto, tiene serias limitaciones de SEO.</p>
+</div>
 </div>
 
-<!-- SEGURIDAD -->
+<!-- 07 SEGURIDAD -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">07</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">🔐</div><div class="section-title">Seguridad y Rendimiento</div></div>
-  <div class="grid2">
-    <div class="card"><div class="card-title">Seguridad</div>
-      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">HTTPS activo + Cookies HttpOnly/SameSite</div></div>
-      <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>PHP 7.4 EOL</strong> — Sin parches de seguridad</div></div>
-      <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">X-Powered-By expone PHP y Plesk</div></div>
+  <div class="section-header"><div class="section-icon section-icon-jade">🔐</div><div class="section-title">Seguridad y Rendimiento</div></div>
+  <div class="stat-grid">
+    <div class="card">
+      <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Seguridad</p>
+      <table>
+        <tr><td><span class="grade grade-a">✅</span> HTTPS activo con certificado válido</td></tr>
+        <tr><td><span class="grade grade-a">✅</span> Cookies configuradas con HttpOnly y SameSite</td></tr>
+        <tr><td><span class="grade grade-f">❌</span> PHP 7.4 fuera de soporte desde noviembre 2022</td></tr>
+        <tr><td><span class="grade grade-c">⚠️</span> Cabecera X-Powered-By expone versión de PHP y Plesk</td></tr>
+      </table>
     </div>
-    <div class="card"><div class="card-title">Rendimiento</div>
-      <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">17 archivos CSS+JS sin minificar</div></div>
-      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">Cache-Control configurado</div></div>
-      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">Viewport correcto para móvil</div></div>
+    <div class="card">
+      <p style="font-size:11px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Rendimiento</p>
+      <table>
+        <tr><td><span class="grade grade-c">⚠️</span> 17 archivos CSS y JS cargados individualmente</td></tr>
+        <tr><td><span class="grade grade-a">✅</span> Cache-Control configurado correctamente</td></tr>
+        <tr><td><span class="grade grade-a">✅</span> Viewport meta tag presente y correcto</td></tr>
+        <tr><td><span class="grade grade-c">⚠️</span> Sin compresión Gzip/Brotli detectada</td></tr>
+      </table>
     </div>
   </div>
 </div>
-
-<!-- RECOMENDACIONES -->
-<div class="section">
-  <div class="section-header"><div class="section-icon">🎯</div><div class="section-title">Plan de Acción Prioritario</div></div>
-
-  <div class="rec rec-crit"><div class="rec-head"><div class="rec-title">1. Implementar Schema LocalBusiness</div><span class="badge b-crit">CRÍTICO</span></div>
-  <div class="rec-text">JSON-LD con @type LocalBusiness: nombre, dirección, teléfono, email, horarios, GPS, tipo de servicio, precios y valoraciones.</div></div>
-
-  <div class="rec rec-crit"><div class="rec-head"><div class="rec-title">2. Optimizar Meta Titles y Descriptions</div><span class="badge b-crit">CRÍTICO</span></div>
-  <div class="rec-text">Meta title 50-60ch y description 150-160ch por página con keywords: "consigna equipaje Barcelona", "luggage storage", "taquillas Poble Sec".</div></div>
-
-  <div class="rec rec-crit"><div class="rec-head"><div class="rec-title">3. Instalar Google Analytics 4 + Tag Manager</div><span class="badge b-crit">CRÍTICO</span></div>
-  <div class="rec-text">Medir reservas, idiomas de visitantes, fuentes de tráfico y conversiones del booking.</div></div>
-
-  <div class="rec rec-high"><div class="rec-head"><div class="rec-title">4. Corregir Alt Texts de todas las imágenes</div><span class="badge b-high">ALTO</span></div>
-  <div class="rec-text">9 de 16 imágenes sin alt text. Cada una debe describir su contenido con keywords relevantes.</div></div>
-
-  <div class="rec rec-high"><div class="rec-head"><div class="rec-title">5. Crear Sitemap XML + actualizar Robots.txt</div><span class="badge b-high">ALTO</span></div>
-  <div class="rec-text">Sitemap con URLs en 4 idiomas. Enviar a Google Search Console.</div></div>
-
-  <div class="rec rec-high"><div class="rec-head"><div class="rec-title">6. Corregir H1 duplicados y errores tipográficos</div><span class="badge b-high">ALTO</span></div>
-  <div class="rec-text">1 solo H1 por página. Corregir: "elpropio" → "el propio", "odesde" → "o desde".</div></div>
-
-  <div class="rec"><div class="rec-head"><div class="rec-title">7. Open Graph + Twitter Cards completos</div><span class="badge b-med">MEDIO</span></div>
-  <div class="rec-text">og:title, og:description, og:image para que al compartir en redes se vea profesional.</div></div>
-
-  <div class="rec rec-high"><div class="rec-head"><div class="rec-title">8. Actualizar PHP 7.4 → 8.2+</div><span class="badge b-high">ALTO</span></div>
-  <div class="rec-text">PHP 7.4 sin soporte desde Nov 2022. Riesgo de seguridad y rendimiento inferior.</div></div>
-
-  <div class="rec"><div class="rec-head"><div class="rec-title">9. Crear perfiles en Instagram, Google Business y TripAdvisor</div><span class="badge b-med">MEDIO</span></div>
-  <div class="rec-text">Esencial para negocio turístico. Vincular todas las redes desde la web.</div></div>
-
-  <div class="rec"><div class="rec-head"><div class="rec-title">10. Ocultar headers X-Powered-By</div><span class="badge b-med">MEDIO</span></div>
-  <div class="rec-text">Los headers exponen PHP 7.4 y PleskLin, facilitando ataques dirigidos.</div></div>
 </div>
 
-<!-- CTA -->
+<!-- 08 RECOMENDACIONES -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">08</div></div>
 <div class="section">
-  <div class="section-header"><div class="section-icon">💼</div><div class="section-title">Siguiente Paso</div></div>
-  <div class="card" style="text-align:center;padding:32px;">
-    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;margin-bottom:14px;">Shopy Crafter puede implementar todas las mejoras identificadas en esta auditoría.</p>
-    <p style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#4a90d9;margin-bottom:8px;">shopycrafter.com</p>
-    <p style="color:#6880a8;font-size:12px;">Tu agencia de optimización digital</p>
+  <div class="section-header"><div class="section-icon section-icon-gold">🎯</div><div class="section-title">Plan de Acción Prioritario</div></div>
+
+  <div class="recommendation-critical" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f43f5e;background:rgba(244,63,94,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f43f5e">1. Implementar datos estructurados (Schema Markup)</strong> <span class="tag tag-red" style="margin-left:8px;">Crítico</span><br>
+    Añadir JSON-LD con esquema LocalBusiness que incluya nombre, dirección, teléfono, email, horarios de apertura, coordenadas GPS y descripción de los servicios ofrecidos. Esto permitirá que Google muestre información enriquecida en los resultados de búsqueda.
+  </div>
+
+  <div class="recommendation-critical" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f43f5e;background:rgba(244,63,94,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f43f5e">2. Crear meta titles y descriptions para todas las páginas</strong> <span class="tag tag-red" style="margin-left:8px;">Crítico</span><br>
+    Cada página debe tener un título único de 50-60 caracteres y una descripción de 150-160 caracteres con las palabras clave principales: "consigna equipaje Barcelona", "luggage storage", "taquillas Poble Sec", adaptados a cada idioma.
+  </div>
+
+  <div class="recommendation-critical" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f43f5e;background:rgba(244,63,94,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f43f5e">3. Instalar herramientas de analítica web</strong> <span class="tag tag-red" style="margin-left:8px;">Crítico</span><br>
+    Configurar Google Analytics 4 y Google Tag Manager para medir el tráfico, las fuentes de visitantes, el comportamiento en la web y las conversiones del sistema de reservas. Sin estos datos es imposible tomar decisiones informadas.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f59e0b">4. Añadir textos alternativos a todas las imágenes</strong> <span class="tag" style="margin-left:8px;background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.2);">Alto</span><br>
+    Las 9 imágenes sin atributo alt y las 4 con alt vacío deben incluir descripciones relevantes que incluyan palabras clave del negocio.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f59e0b">5. Crear sitemap XML y mejorar robots.txt</strong> <span class="tag" style="margin-left:8px;background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.2);">Alto</span><br>
+    Generar un sitemap que incluya las URLs en los 4 idiomas y enviarlo a Google Search Console. Actualizar el robots.txt con directivas claras.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f59e0b">6. Corregir H1 duplicados y errores tipográficos</strong> <span class="tag" style="margin-left:8px;background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.2);">Alto</span><br>
+    Mantener un solo H1 por página y corregir los textos concatenados en los H2.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #4a90d9;background:rgba(74,144,217,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#4a90d9">7. Configurar Open Graph y Twitter Cards</strong> <span class="tag" style="margin-left:8px;">Medio</span><br>
+    Completar las etiquetas og:title, og:description, og:image y og:type para que al compartir enlaces en redes sociales la vista previa sea atractiva y profesional.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#f59e0b">8. Actualizar PHP a versión 8.2 o superior</strong> <span class="tag" style="margin-left:8px;background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.2);">Alto</span><br>
+    La versión actual no recibe parches de seguridad. Además, las versiones recientes de PHP ofrecen mejoras significativas de rendimiento.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #4a90d9;background:rgba(74,144,217,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#4a90d9">9. Establecer presencia en redes sociales y directorios</strong> <span class="tag" style="margin-left:8px;">Medio</span><br>
+    Crear perfiles en Instagram, Google Business Profile y TripAdvisor. Para un negocio turístico, estas plataformas son canales de captación fundamentales.
+  </div>
+
+  <div class="recommendation" style="padding:16px 20px;margin-bottom:10px;border-radius:10px;border-left:3px solid #4a90d9;background:rgba(74,144,217,.03);font-size:13px;line-height:1.7;">
+    <strong style="color:#4a90d9">10. Ocultar cabeceras del servidor</strong> <span class="tag" style="margin-left:8px;">Medio</span><br>
+    Las cabeceras X-Powered-By revelan la versión de PHP y el panel de administración utilizado, lo que facilita ataques dirigidos. Se recomienda desactivarlas en la configuración del servidor.
   </div>
 </div>
-
-</div><!-- end body-content -->
-
-<div class="footer">
-  <div class="footer-line"></div>
-  <div class="footer-brand">Shopy Crafter</div>
-  <div class="footer-sub">shopycrafter.com — Inteligencia eCommerce con IA · 01 de abril de 2026 · Confidencial</div>
 </div>
 
-</div></body></html>
+<!-- 09 CONCLUSIÓN -->
+<div class="report-page">
+<div class="page-header"><div class="page-header-title">Auditoría Digital — Lazy Lizard</div><div class="page-header-num">09</div></div>
+<div class="section">
+  <div class="section-header"><div class="section-icon section-icon-jade">📌</div><div class="section-title">Conclusión</div></div>
+  <div class="card">
+    <p style="font-size:14px;color:#c0c8d8;line-height:1.85;margin-bottom:14px;">
+      Lazy Lizard cuenta con una base funcional sólida: una web operativa, soporte multiidioma, sistema de reservas integrado y certificado de seguridad SSL. Estos elementos demuestran un negocio con visión digital que ha invertido en su presencia online.
+    </p>
+    <p style="font-size:14px;color:#c0c8d8;line-height:1.85;margin-bottom:14px;">
+      Sin embargo, la ausencia de optimización SEO, datos estructurados, analítica web y presencia en redes sociales limita enormemente su capacidad de atraer clientes a través de buscadores y plataformas digitales. En un sector tan competitivo como el de las consignas de equipaje en Barcelona, estos elementos no son opcionales sino fundamentales.
+    </p>
+    <p style="font-size:14px;color:#c0c8d8;line-height:1.85;">
+      Las mejoras recomendadas en este informe están priorizadas por impacto y urgencia. Implementar las tres primeras acciones críticas (schema markup, meta tags y analítica) supondría un avance significativo en la visibilidad del negocio en un plazo relativamente corto.
+    </p>
+  </div>
+</div>
+</div>
+
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">Shopy Crafter</div>
+    <div class="footer-sub">shopycrafter.com &mdash; Inteligencia eCommerce con IA &middot; 01 de abril de 2026 &middot; Confidencial</div>
+  </div>
+</div>
+</body>
+</html>
