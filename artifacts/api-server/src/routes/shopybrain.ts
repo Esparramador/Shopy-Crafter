@@ -2775,8 +2775,6 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
                       compareAtPrice
                       sku
                       barcode
-                      weight
-                      weightUnit
                       inventoryQuantity
                       image { url }
                     }
@@ -2800,7 +2798,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           totalInventory: number;
           seo: { title: string | null; description: string | null };
           images: { edges: Array<{ node: { id: string; url: string; altText: string | null } }> };
-          variants: { edges: Array<{ node: { id: string; title: string; price: string; compareAtPrice: string | null; sku: string | null; barcode: string | null; weight: number | null; weightUnit: string | null; inventoryQuantity: number | null; image: { url: string } | null } }> };
+          variants: { edges: Array<{ node: { id: string; title: string; price: string; compareAtPrice: string | null; sku: string | null; barcode: string | null; inventoryQuantity: number | null; image: { url: string } | null } }> };
         }
 
         let allAuditProducts: Array<Record<string, unknown>> = [];
@@ -2852,8 +2850,6 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
                 compare_at_price: v.compareAtPrice,
                 sku: v.sku,
                 barcode: v.barcode,
-                weight: v.weight,
-                weight_unit: v.weightUnit,
                 inventory_quantity: v.inventoryQuantity,
                 image_url: v.image?.url || null,
               })),
