@@ -1212,6 +1212,36 @@ router.put("/projects/:projectId/products/:productId", async (req, res): Promise
     );
 
     const sp = result.product;
+
+    const updMetafields: Array<{ namespace: string; key: string; value: string }> = [];
+    try {
+      const seoGqlSingle = `{ product(id: "gid://shopify/Product/${shopifyProductId}") { seo { title description } } }`;
+      const seoGqlRes = await shopifyGraphQL<{ product: { seo: { title: string | null; description: string | null } } }>(
+        projectId, project.shopDomain, seoGqlSingle
+      );
+      const seoT = seoGqlRes.product?.seo?.title || null;
+      const seoD = seoGqlRes.product?.seo?.description || null;
+      if (seoT) updMetafields.push({ namespace: "seo", key: "title", value: seoT });
+      if (seoD) updMetafields.push({ namespace: "seo", key: "description", value: seoD });
+
+      const updSeoVals = {
+        metaTitle: seoT,
+        metaDescription: seoD,
+        hasAltTexts: (sp.images?.length ?? 0) > 0 && sp.images.every((img: { alt: string | null }) => !!img.alt?.trim()),
+        cleanHandle: !!sp.handle && /^[a-z0-9-]+$/.test(sp.handle) && sp.handle.length <= 60,
+        lastAuditedAt: new Date(),
+      };
+      const [existUpd] = await db.select({ id: seoDataTable.id }).from(seoDataTable)
+        .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, shopifyProductId)));
+      if (existUpd) {
+        await db.update(seoDataTable).set(updSeoVals).where(eq(seoDataTable.id, existUpd.id));
+      } else {
+        await db.insert(seoDataTable).values({ projectId, shopifyProductId, ...updSeoVals });
+      }
+    } catch (seoUpdErr) {
+      logger.warn({ err: seoUpdErr }, "PUT product: failed to fetch SEO via GraphQL");
+    }
+
     const audit = auditProduct({
       title: sp.title,
       body_html: sp.body_html,
@@ -1219,6 +1249,8 @@ router.put("/projects/:projectId/products/:productId", async (req, res): Promise
       compare_at_price: sp.variants?.[0]?.compare_at_price,
       images: sp.images,
       tags: sp.tags,
+      variants: sp.variants?.map((v: { price: string }) => ({ price: v.price })),
+      metafields: updMetafields,
     });
 
     await db
@@ -1866,6 +1898,32 @@ Responde SOLO JSON válido.`,
     );
 
     const sp = result.product;
+
+    const createMetafields: Array<{ namespace: string; key: string; value: string }> = [];
+    try {
+      const createSeoGql = `{ product(id: "gid://shopify/Product/${sp.id}") { seo { title description } } }`;
+      const createSeoRes = await shopifyGraphQL<{ product: { seo: { title: string | null; description: string | null } } }>(
+        projectId, project.shopDomain, createSeoGql
+      );
+      const cSeoT = createSeoRes.product?.seo?.title || null;
+      const cSeoD = createSeoRes.product?.seo?.description || null;
+      if (cSeoT) createMetafields.push({ namespace: "seo", key: "title", value: cSeoT });
+      if (cSeoD) createMetafields.push({ namespace: "seo", key: "description", value: cSeoD });
+
+      if (cSeoT || cSeoD) {
+        const cSeoVals = {
+          metaTitle: cSeoT,
+          metaDescription: cSeoD,
+          hasAltTexts: (sp.images?.length ?? 0) > 0 && sp.images.every((img: { alt: string | null }) => !!img.alt?.trim()),
+          cleanHandle: !!sp.handle && /^[a-z0-9-]+$/.test(sp.handle) && sp.handle.length <= 60,
+          lastAuditedAt: new Date(),
+        };
+        await db.insert(seoDataTable).values({ projectId, shopifyProductId: String(sp.id), ...cSeoVals }).catch(() => {});
+      }
+    } catch {
+      logger.warn("POST create product: failed to fetch SEO via GraphQL for new product");
+    }
+
     const audit = auditProduct({
       title: sp.title,
       body_html: sp.body_html,
@@ -1873,6 +1931,8 @@ Responde SOLO JSON válido.`,
       compare_at_price: sp.variants?.[0]?.compare_at_price,
       images: sp.images,
       tags: sp.tags,
+      variants: sp.variants?.map((v: { price: string }) => ({ price: v.price })),
+      metafields: createMetafields,
     });
 
     await db.insert(productsTable).values({

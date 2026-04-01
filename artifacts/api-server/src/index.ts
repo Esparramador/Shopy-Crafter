@@ -13,9 +13,9 @@ import {
   runInventorySync,
 } from "./lib/scheduler.js";
 import { ensureAllKnowledgeDomains } from "./routes/shopybrain.js";
-import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable } from "@workspace/db";
-import { eq, sql, isNull, or } from "drizzle-orm";
-import { shopifyRequestPaged } from "./lib/shopify.js";
+import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable, seoDataTable } from "@workspace/db";
+import { eq, sql, isNull, or, and } from "drizzle-orm";
+import { shopifyRequestPaged, shopifyGraphQL } from "./lib/shopify.js";
 import { auditProduct } from "./lib/audit.js";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
@@ -196,15 +196,45 @@ async function warmupProdKnowledge() {
             }
           }
 
+          const seoLookupWarmup = new Map<string, { metaTitle: string | null; metaDesc: string | null }>();
+          try {
+            let seoHasNext = true;
+            let seoCursor: string | null = null;
+            while (seoHasNext) {
+              const afterClause = seoCursor ? `, after: "${seoCursor}"` : "";
+              const warmupSeoGql = `{ products(first: 250${afterClause}) { edges { node { id seo { title description } } } pageInfo { hasNextPage endCursor } } }`;
+              const warmupSeoRes = await shopifyGraphQL<{ products: { edges: Array<{ node: { id: string; seo: { title: string | null; description: string | null } } }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+                project.id, project.shopDomain, warmupSeoGql
+              );
+              for (const edge of warmupSeoRes.products?.edges ?? []) {
+                const gid = edge.node.id.replace("gid://shopify/Product/", "");
+                seoLookupWarmup.set(gid, { metaTitle: edge.node.seo?.title || null, metaDesc: edge.node.seo?.description || null });
+              }
+              seoHasNext = warmupSeoRes.products?.pageInfo?.hasNextPage ?? false;
+              seoCursor = warmupSeoRes.products?.pageInfo?.endCursor ?? null;
+              if (seoHasNext) await new Promise(r => setTimeout(r, 200));
+            }
+          } catch {
+            logger.warn({ projectId: project.id }, "Warmup: GraphQL SEO fetch failed, auditing without SEO data");
+          }
+
           let totalScore = 0;
           for (const sp of allProducts) {
+            const spId = String(sp.id);
+            const seoW = seoLookupWarmup.get(spId);
+            const warmupMetafields: Array<{ namespace: string; key: string; value: string }> = [];
+            if (seoW?.metaTitle) warmupMetafields.push({ namespace: "seo", key: "title", value: seoW.metaTitle });
+            if (seoW?.metaDesc) warmupMetafields.push({ namespace: "seo", key: "description", value: seoW.metaDesc });
+
             const audit = auditProduct({
               title: sp.title, body_html: sp.body_html,
               price: sp.variants?.[0]?.price, compare_at_price: sp.variants?.[0]?.compare_at_price,
               images: sp.images, tags: sp.tags,
+              variants: sp.variants?.map(v => ({ price: v.price })),
+              metafields: warmupMetafields,
             });
             await db.insert(productsTable).values({
-              projectId: project.id, shopifyProductId: String(sp.id),
+              projectId: project.id, shopifyProductId: spId,
               title: sp.title, handle: sp.handle, bodyHtml: sp.body_html,
               vendor: sp.vendor, productType: sp.product_type, status: sp.status,
               publishedAt: sp.published_at ?? null, tags: sp.tags,
@@ -219,8 +249,29 @@ async function warmupProdKnowledge() {
               lastAuditedAt: new Date(),
             }).onConflictDoUpdate({
               target: [productsTable.projectId, productsTable.shopifyProductId],
-              set: { title: sp.title, status: sp.status, price: sp.variants?.[0]?.price ?? null },
+              set: {
+                title: sp.title, status: sp.status, price: sp.variants?.[0]?.price ?? null,
+                auditScore: audit.overallScore, auditGrade: audit.grade,
+                seoScore: audit.seoScore, auditProblems: audit.problems,
+              },
             });
+
+            if (seoW?.metaTitle || seoW?.metaDesc) {
+              const warmSeoVals = {
+                metaTitle: seoW?.metaTitle || null,
+                metaDescription: seoW?.metaDesc || null,
+                hasAltTexts: (sp.images?.length ?? 0) > 0 && sp.images!.every(img => !!img.alt?.trim()),
+                cleanHandle: !!sp.handle && /^[a-z0-9-]+$/.test(sp.handle),
+                lastAuditedAt: new Date(),
+              };
+              const [existWarm] = await db.select({ id: seoDataTable.id }).from(seoDataTable)
+                .where(and(eq(seoDataTable.projectId, project.id), eq(seoDataTable.shopifyProductId, spId)));
+              if (existWarm) {
+                await db.update(seoDataTable).set(warmSeoVals).where(eq(seoDataTable.id, existWarm.id));
+              } else {
+                await db.insert(seoDataTable).values({ projectId: project.id, shopifyProductId: spId, ...warmSeoVals });
+              }
+            }
             totalScore += audit.overallScore;
           }
 

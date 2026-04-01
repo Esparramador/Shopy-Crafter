@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable } from "@workspace/db";
+import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -2070,6 +2070,16 @@ Responde SOLO JSON válido:
               const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
               const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
 
+              const refMetafields: Array<{ namespace: string; key: string; value: string }> = [];
+              if (seoTitle) refMetafields.push({ namespace: "seo", key: "title", value: seoTitle });
+              if (seoDescription) refMetafields.push({ namespace: "seo", key: "description", value: seoDescription });
+              const refAudit = auditProduct({
+                title: createdTitle, body_html: finalBody || "",
+                price: finalPrice, compare_at_price: finalCompareAt,
+                images: (created.product.images as Array<{ alt: string | null }>) || [],
+                tags: finalTags, metafields: refMetafields,
+              });
+
               await db.insert(pTable).values({
                 projectId: parseInt(projectId),
                 shopifyProductId: createdProductId,
@@ -2084,6 +2094,15 @@ Responde SOLO JSON válido:
                 compareAtPrice: finalCompareAt,
                 imageCount: 0,
                 variantCount: 1,
+                auditScore: refAudit.overallScore,
+                auditGrade: refAudit.grade,
+                titleScore: refAudit.titleScore,
+                descriptionScore: refAudit.descriptionScore,
+                priceScore: refAudit.priceScore,
+                imageScore: refAudit.imageScore,
+                seoScore: refAudit.seoScore,
+                auditProblems: refAudit.problems,
+                lastAuditedAt: new Date(),
               }).onConflictDoNothing().catch(() => {});
 
               const referenceBuffer = await downloadImageToBuffer(String(params.referenceImageUrl));
@@ -2145,6 +2164,16 @@ Responde SOLO JSON válido:
               const { productsTable: pTable, generationJobsTable: gjTable } = await import("@workspace/db");
               const { buildImagePrompt: buildPrompt, runImageGeneration: runGeneration, MODEL_MAP: modelMap, COST_MAP: costMap, NEGATIVE_PROMPT: negPrompt, uploadGeneratedImageToShopify: uploadImg } = await import("./images.js");
 
+              const genMf: Array<{ namespace: string; key: string; value: string }> = [];
+              if (seoTitle) genMf.push({ namespace: "seo", key: "title", value: seoTitle });
+              if (seoDescription) genMf.push({ namespace: "seo", key: "description", value: seoDescription });
+              const genAudit = auditProduct({
+                title: createdTitle, body_html: finalBody || "",
+                price: finalPrice, compare_at_price: finalCompareAt,
+                images: (created.product.images as Array<{ alt: string | null }>) || [],
+                tags: finalTags, metafields: genMf,
+              });
+
               await db.insert(pTable).values({
                 projectId: parseInt(projectId),
                 shopifyProductId: createdProductId,
@@ -2159,6 +2188,15 @@ Responde SOLO JSON válido:
                 compareAtPrice: finalCompareAt,
                 imageCount: 0,
                 variantCount: 1,
+                auditScore: genAudit.overallScore,
+                auditGrade: genAudit.grade,
+                titleScore: genAudit.titleScore,
+                descriptionScore: genAudit.descriptionScore,
+                priceScore: genAudit.priceScore,
+                imageScore: genAudit.imageScore,
+                seoScore: genAudit.seoScore,
+                auditProblems: genAudit.problems,
+                lastAuditedAt: new Date(),
               }).onConflictDoNothing().catch(() => {});
 
               const limitCheck = await checkProdLimit(parseInt(projectId), "image", imageTypes.length);
@@ -2276,13 +2314,30 @@ Responde SOLO JSON válido:
           const spVariants = (sp.variants as Array<Record<string, unknown>>) || [];
           const { productsTable: syncPT } = await import("@workspace/db");
           const { auditProduct: auditProd } = await import("../lib/audit.js");
+
+          const postMf: Array<{ namespace: string; key: string; value: string }> = [];
+          if (seoTitle) postMf.push({ namespace: "seo", key: "title", value: seoTitle });
+          if (seoDescription) postMf.push({ namespace: "seo", key: "description", value: seoDescription });
+          if (postMf.length === 0) {
+            try {
+              const postSeoGql = `{ product(id: "gid://shopify/Product/${createdProductId}") { seo { title description } } }`;
+              const postSeoRes = await shopifyGraphQL<{ product: { seo: { title: string | null; description: string | null } } }>(
+                parseInt(projectId), project.shopDomain, postSeoGql
+              );
+              if (postSeoRes.product?.seo?.title) postMf.push({ namespace: "seo", key: "title", value: postSeoRes.product.seo.title });
+              if (postSeoRes.product?.seo?.description) postMf.push({ namespace: "seo", key: "description", value: postSeoRes.product.seo.description });
+            } catch {}
+          }
+
           const audit = auditProd({
             title: String(sp.title || ""),
             body_html: String(sp.body_html || ""),
             price: String((spVariants[0] as Record<string, unknown>)?.price || "0"),
             compare_at_price: (spVariants[0] as Record<string, unknown>)?.compare_at_price ? String((spVariants[0] as Record<string, unknown>).compare_at_price) : null,
-            images: spImages.map(img => ({ id: img.id, src: img.src, alt: img.alt })),
+            images: spImages.map(img => ({ alt: (img.alt as string) || null })),
             tags: String(sp.tags || ""),
+            variants: spVariants.map((v: Record<string, unknown>) => ({ price: String(v.price || "0") })),
+            metafields: postMf,
           });
           await db.insert(syncPT).values({
             projectId: parseInt(projectId),
@@ -3362,21 +3417,29 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           products: allProds.map((p: Record<string, unknown>) => {
             const variants = (p.variants as Array<Record<string, string>>) || [];
             const images = (p.images as Array<Record<string, unknown>>) || [];
-            const bodyLen = (p.body_html as string || "").length;
-            const tagsArr = ((p.tags as string) || "").split(",").filter((t: string) => t.trim());
-            const hasCompare = !!variants[0]?.compare_at_price;
+            const bodyHtmlLap = (p.body_html as string) || "";
+            const tagsStrLap = (p.tags as string) || "";
+            const tagsArr = tagsStrLap.split(",").filter((t: string) => t.trim());
             const imgCount = images.length;
 
-            let score = 0;
-            if (imgCount >= 3) score += 25; else if (imgCount >= 1) score += 10;
-            if (bodyLen >= 1000) score += 25; else if (bodyLen >= 500) score += 15; else if (bodyLen >= 200) score += 8;
-            if (tagsArr.length >= 10) score += 25; else if (tagsArr.length >= 5) score += 15;
-            if (hasCompare) score += 25;
-            const grade = score >= 85 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
-
             const lapSeo = lapSeoLookup.get(String(p.id));
-            const lapHasAltTexts = images.length > 0 && images.every((img: Record<string, unknown>) => !!img.alt);
+            const metafieldsLap: Array<{ namespace: string; key: string; value: string }> = [];
+            if (lapSeo?.metaTitle) metafieldsLap.push({ namespace: "seo", key: "title", value: lapSeo.metaTitle });
+            if (lapSeo?.metaDescription) metafieldsLap.push({ namespace: "seo", key: "description", value: lapSeo.metaDescription });
+
+            const lapAudit = auditProduct({
+              title: (p.title as string) || "",
+              body_html: bodyHtmlLap,
+              price: variants[0]?.price || null,
+              compare_at_price: variants[0]?.compare_at_price || null,
+              images: images.map((img: Record<string, unknown>) => ({ alt: (img.alt as string) || null })),
+              tags: tagsStrLap,
+              variants: variants.map(v => ({ price: v.price || "0" })),
+              metafields: metafieldsLap,
+            });
+
             const lapHandle = (p.handle as string) || "";
+            const lapHasAltTexts = imgCount > 0 && images.every((img: Record<string, unknown>) => !!(img.alt as string)?.trim());
 
             return {
               id: p.id, title: p.title, status: p.status,
@@ -3388,15 +3451,21 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
               imageUrl: images[0]?.src || null,
               tags: p.tags,
               tagsCount: tagsArr.length,
-              descriptionLength: bodyLen,
+              descriptionLength: bodyHtmlLap.length,
               product_type: p.product_type || null,
-              auditScore: score,
-              auditGrade: grade,
-              hasComparePrice: hasCompare,
+              auditScore: lapAudit.overallScore,
+              auditGrade: lapAudit.grade,
+              titleScore: lapAudit.titleScore,
+              descriptionScore: lapAudit.descriptionScore,
+              imageScore: lapAudit.imageScore,
+              seoScore: lapAudit.seoScore,
+              hasComparePrice: !!variants[0]?.compare_at_price,
               hasMetaTitle: !!(lapSeo?.metaTitle && lapSeo.metaTitle.length > 10),
               hasMetaDesc: !!(lapSeo?.metaDescription && lapSeo.metaDescription.length > 10),
               hasAltTexts: lapHasAltTexts,
-              cleanHandle: !!lapHandle && !lapHandle.includes("_"),
+              cleanHandle: !!lapHandle && /^[a-z0-9-]+$/.test(lapHandle) && lapHandle.length <= 60,
+              problems: lapAudit.problems.slice(0, 3),
+              suggestions: lapAudit.suggestions.slice(0, 2),
             };
           }),
           total: allProds.length,
