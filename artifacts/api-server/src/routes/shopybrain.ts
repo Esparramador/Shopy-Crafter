@@ -394,6 +394,7 @@ Acciones disponibles:
 - list_collections: Listar colecciones. Params: {projectId, limit?}
 - auto_collections: Analizar productos y crear colecciones inteligentes automáticamente. Params: {projectId}
 - create_page: Crear página Shopify con contenido IA. Params: {projectId, title?, pageType? ("about"|"contact"|"faq"|"shipping"|"returns"|"privacy"|"terms"|"size_guide")}
+- update_page: Actualizar página Shopify existente. Params: {projectId, pageId, title?, bodyHtml?, published? (boolean), handle?}
 - list_pages: Listar páginas de la tienda. Params: {projectId}
 - design_all_pages: Diseñar TODAS las páginas esenciales de la tienda. Params: {projectId, pageTypes? (default ["about","faq","shipping","returns","contact"])}
 - optimize_images: Generar alt texts SEO para imágenes. Params: {projectId, productId? (si no se da, optimiza todos)}
@@ -1246,7 +1247,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
-  const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "add_to_collection"];
+  const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "update_page", "add_to_collection"];
   const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history"];
 
   if (seoActions.includes(action)) {
@@ -4757,6 +4758,35 @@ Responde SOLO el HTML, sin envolver en \`\`\`html.`;
           handle: created.page.handle,
           contentLength: String(pageContent).length,
           message: `✅ Página "${created.page.title}" creada y publicada en Shopify.\n📝 ${String(pageContent).length} caracteres de contenido profesional generado por IA.\n🔗 URL: /pages/${created.page.handle}`,
+        };
+        break;
+      }
+
+      case "update_page": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const pageId = params?.pageId;
+        if (!pageId) { res.status(400).json({ error: "pageId requerido" }); return; }
+        const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const updateData: Record<string, unknown> = {};
+        if (params?.title !== undefined) updateData.title = params.title;
+        if (params?.bodyHtml !== undefined) updateData.body_html = params.bodyHtml;
+        if (params?.handle !== undefined) updateData.handle = params.handle;
+        if (params?.published !== undefined) updateData.published = params.published;
+
+        const updated = await shopifyRequest<{ page: Record<string, unknown> }>(
+          parseInt(projectId), project.shopDomain, `/pages/${pageId}.json`,
+          { method: "PUT", body: JSON.stringify({ page: updateData }) }
+        );
+
+        result = {
+          pageId: updated.page.id,
+          title: updated.page.title,
+          handle: updated.page.handle,
+          published: updated.page.published_at != null,
+          message: `✅ Página "${updated.page.title}" actualizada.\n📄 Publicada: ${updated.page.published_at != null ? 'Sí' : 'No'}\n🔗 URL: /pages/${updated.page.handle}`,
         };
         break;
       }

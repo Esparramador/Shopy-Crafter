@@ -87,6 +87,9 @@ A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating
 - **Reference Image Generation System**: Uses OpenAI gpt-image-1 to generate professional product photos from a reference image, adapting scenes by product type.
 - **Virtual Try-On / OOTD System**: Uses GPT Image-1 multi-image editing to dress a person/model with product photos (clothing, shoes, accessories, cosmetics), with Claude as fashion director for prompt generation.
 - **Audit-First Brain Actions**: `store_status`, `list_products`, `search_product`, `edit_product`, `publish_product` include audit fields. New bulk actions `audit_store`, `fix_unpublished`, and `fix_missing_compare_prices` use Shopify GraphQL API for comprehensive product management.
+- **Page Management**: `create_page`, `update_page` (publish/unpublish/edit), `list_pages`, `design_all_pages` — full page CRUD with AI content generation and publish control.
+- **Theme Management**: `read_theme_file`, `edit_theme_file` (full_replace), `edit_theme_settings` (dot-notation), `list_theme_files`, `list_themes`, `create_theme_section`, `audit_theme`, `edit_theme_css` — complete theme editing capabilities.
+- **Purchase Protection**: Theme-level script (theme.liquid) intercepts checkout for non-logged users, shows branded toast notification, redirects to login with return URL. Cart shows "Iniciar Sesión para Comprar" for guests. Login page supports `checkout_url` and `return_to` redirect parameters.
 - **Deep Inventory & Sales Control System**: Professional-grade stock management with 6 chatbot actions.
 - **Supplier Research System**: AI-driven intelligence.
 - **PDF Commercial Report**: 17-page A4 dark-theme PDFKit report.
