@@ -21,7 +21,7 @@ import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "
 import { logger } from "../lib/logger.js";
 import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
-import { buildCoverPage } from "../lib/report-cover.js";
+import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import type { Request, Response } from "express";
 
@@ -578,6 +578,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <div class="cover-meta-item"><div class="cover-meta-dot"></div>Confidencial</div>
     </div>
   </div>
+  ${buildTableOfContents(body, "classic")}
   <div class="body-content">
     ${body}
   </div>
@@ -855,6 +856,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <div class="cover-footer-text">Confidencial</div>
     </div>
   </div>
+  ${buildTableOfContents(body, "elegance")}
   <div class="body-content">
     ${body}
   </div>
@@ -1090,6 +1092,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <div class="cover-footer-text">Confidencial</div>
     </div>
   </div>
+  ${buildTableOfContents(body, "prestige")}
   <div class="body-content">
     ${body}
   </div>
@@ -2456,21 +2459,6 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
         <div class="metric"><div class="value">${Math.round(avgSeo)}</div><div class="label">Score SEO</div></div>
         ${allCogs.length > 0 ? `<div class="metric"><div class="value" style="color:${avgMargin >= 30 ? BRAND.jade : BRAND.red};">${avgMargin.toFixed(0)}%</div><div class="label">Margen medio</div></div>` : ""}
         ${totalShopifyOrders > 0 ? `<div class="metric"><div class="value" style="color:${BRAND.jade};">${totalShopifyRevenue.toFixed(0)}€</div><div class="label">Revenue real</div></div>` : ""}
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-header"><div class="section-icon section-icon-gold">&#128196;</div><div class="section-title">Indice del Informe</div></div>
-      <div class="toc">
-        <div class="toc-item"><div class="toc-num">1</div><div><div class="toc-label">Resumen Ejecutivo</div><div class="toc-desc">Health score, KPIs y vision general</div></div></div>
-        <div class="toc-item"><div class="toc-num">2</div><div><div class="toc-label">Identidad de Marca</div><div class="toc-desc">Nicho, tono, audiencia, categorias</div></div></div>
-        <div class="toc-item"><div class="toc-num">3</div><div><div class="toc-label">Auditoria SEO Tecnico</div><div class="toc-desc">Score por producto, meta tags, schema, alt texts</div></div></div>
-        <div class="toc-item"><div class="toc-num">4</div><div><div class="toc-label">Analisis Economico y COGS</div><div class="toc-desc">${allCogs.length > 0 ? "Estructura de costes reales, margenes, distribucion de precios" : "Estimacion automatica de costes basada en datos de mercado contrastados"}</div></div></div>
-        ${totalShopifyOrders > 0 ? '<div class="toc-item"><div class="toc-num">5</div><div><div class="toc-label">Analisis de Ventas</div><div class="toc-desc">Revenue real, pedidos, AOV, tendencias</div></div></div>' : ""}
-        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 6 : 5}</div><div><div class="toc-label">A/B Testing y Optimizacion de Precios</div><div class="toc-desc">Tests activos, resultados, sugerencias de precio IA</div></div></div>
-        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 7 : 6}</div><div><div class="toc-label">AI Economist — Analisis Economico</div><div class="toc-desc">Posicionamiento, margenes, bundles, proyecciones</div></div></div>
-        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 8 : 7}</div><div><div class="toc-label">Recomendaciones Estrategicas</div><div class="toc-desc">Acciones priorizadas por impacto</div></div></div>
-        <div class="toc-item"><div class="toc-num">${totalShopifyOrders > 0 ? 9 : 8}</div><div><div class="toc-label">Catalogo Completo</div><div class="toc-desc">Detalle por producto: precio, COGS, SEO, imagenes</div></div></div>
       </div>
     </div>
 
