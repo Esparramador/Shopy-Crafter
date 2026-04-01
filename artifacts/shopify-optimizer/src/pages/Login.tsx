@@ -121,7 +121,7 @@ export default function LoginPage() {
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
             <p style={{ fontSize: 10, color: "var(--t3)", opacity: 0.6 }}>
-              Admin: sadiagiljoan@gmail.com
+              Shopy Crafter &copy; {new Date().getFullYear()}
             </p>
           </div>
         </div>
