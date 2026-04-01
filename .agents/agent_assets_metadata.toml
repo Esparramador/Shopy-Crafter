@@ -167,3 +167,15 @@ id = "5_4uj5i3Z3VjRt2gXibVU"
 uri = "file://exports/Comic-Crafter-Auditoria-Completa-2026.pdf"
 type = "pdf"
 title = "Auditoría Completa Comic Crafter 2026 (101 páginas)"
+
+[[outputs]]
+id = "NdPFyaKBOgk8yCmDjn8M2"
+uri = "file://exports/Lazy_Lizard_Elegance_Audit.pdf"
+type = "pdf"
+title = "Auditoría Lazy Lizard - Plantilla Elegance"
+
+[[outputs]]
+id = "NDZ9KWmk7Cj7GPFybPk3W"
+uri = "file://exports/Rasta_Lo_Prestige_Audit.pdf"
+type = "pdf"
+title = "Auditoría Rasta Lo - Plantilla Prestige"
