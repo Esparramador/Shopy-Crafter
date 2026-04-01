@@ -99,7 +99,8 @@ A **Dual AI Engine** architecture integrates Claude and Gemini, also integrating
 - **A/B Testing (Image + Price)**: Supports image and price variant tests with AI-generated impact predictions.
 - **Price Simulator & P&L Forecast**: Tools for financial analysis and scenario simulation.
 - **Comprehensive COGS System**: Detailed cost of goods sold tracking with AI auto-estimation.
-- **Partial Redesign**: Allows users to select specific product attributes for AI-driven redesign.
+- **Partial Redesign**: Allows users to select specific product attributes for AI-driven redesign (title, bodyHtml, price, tags, seoMeta, photoBriefs, category, metafields).
+- **Redesign 100/100 Quality**: Redesign AI now generates Shopify taxonomy category + comprehensive metafields (material, color, care_instructions, origin, warranty, weight_detail) alongside all other fields. Apply-redesign pushes category (product_type), metafields (upsert via Shopify API), and auto-triggers creative image generation from existing product photos by default.
 - **Automated Cron Jobs**: Twelve tasks for continuous learning and intelligence.
 - **Copyright Audit System**: The `copyright_audit` brain action detects trademark/IP risks, suggests alternatives, and classifies risks by severity.
 

@@ -588,7 +588,7 @@ Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, dispo
 • FLUJOS EMAIL CRUD: Crear, listar, eliminar flujos de email marketing (además de generar con IA)
 - IMPORTANTE: SIEMPRE leer el archivo ANTES de editarlo (read_theme_file → edit_theme_file). NUNCA sobrescribir a ciegas.
 - Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
-- USA projectId del contexto si hay proyecto activo
+- USA projectId del contexto si hay proyecto activo. El projectId SIEMPRE es un número entero (ej: 2), NUNCA un string largo ni un CUID.
 - Explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
 - Si no necesitas acción, responde normalmente sin :::ACTION:::
 - SIGUE la conversación: comprende el contexto previo y lo que el usuario ya pidió. No repitas ni ignores instrucciones anteriores.
@@ -745,8 +745,23 @@ CEREBRO OMNICORE: 46,000+ insights importados cubriendo IA, diseño, marketing, 
 
 Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de lo que "podrías hacer" — HAZLO.`) + agencyPricingKnowledge + actionDetectionBlock + expertKnowledgeBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
 
-    const projectContext = req.body.activeProjectId ? `\n[CONTEXTO: El usuario tiene el proyecto activo con ID ${req.body.activeProjectId}. Úsalo como projectId en las acciones.]` : "";
-    const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContext;
+    let resolvedProjectId = req.body.activeProjectId;
+    let projectContextInfo = "";
+    if (resolvedProjectId && !isNaN(parseInt(resolvedProjectId))) {
+      const [activeProj] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain }).from(projectsTable).where(eq(projectsTable.id, parseInt(resolvedProjectId))).limit(1);
+      if (activeProj) {
+        projectContextInfo = `\n[CONTEXTO PROYECTO ACTIVO: ID=${activeProj.id} (numérico), nombre="${activeProj.name}", dominio="${activeProj.shopDomain}". USA projectId=${activeProj.id} en TODAS las acciones. El projectId es SIEMPRE el número ${activeProj.id}.]`;
+      }
+    }
+    if (!projectContextInfo) {
+      const allProjects = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(5);
+      if (allProjects.length === 1) {
+        projectContextInfo = `\n[CONTEXTO: Solo hay un proyecto registrado: ID=${allProjects[0].id}, nombre="${allProjects[0].name}", dominio="${allProjects[0].shopDomain}". USA projectId=${allProjects[0].id} en TODAS las acciones.]`;
+      } else if (allProjects.length > 0) {
+        projectContextInfo = `\n[PROYECTOS DISPONIBLES: ${allProjects.map(p => `ID=${p.id} "${p.name}" (${p.shopDomain})`).join(", ")}. Usa el projectId numérico correspondiente en las acciones.]`;
+      }
+    }
+    const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContextInfo;
 
     const aiRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
@@ -1304,6 +1319,25 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   if (!action) { res.status(400).json({ error: "action requerida" }); return; }
 
   const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
+
+  if (params?.projectId && isNaN(parseInt(String(params.projectId)))) {
+    const allProjects = await db.select({ id: projectsTable.id, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(10);
+    if (allProjects.length === 1) {
+      params.projectId = String(allProjects[0].id);
+      logger.info({ originalId: params.projectId, resolvedId: allProjects[0].id }, "Resolved non-numeric projectId to only available project");
+    } else {
+      const byDomain = allProjects.find(p => String(params.projectId).includes(p.shopDomain) || p.shopDomain.includes(String(params.projectId)));
+      if (byDomain) {
+        params.projectId = String(byDomain.id);
+      } else if (allProjects.length > 0) {
+        params.projectId = String(allProjects[0].id);
+        logger.warn({ originalProjectId: String(params.projectId).slice(0, 40), resolvedId: allProjects[0].id, totalProjects: allProjects.length }, "Non-numeric projectId resolved to first project (ambiguous)");
+      } else {
+        res.status(400).json({ error: "projectId no válido y no hay proyectos registrados" });
+        return;
+      }
+    }
+  }
 
   try {
     let result: Record<string, unknown> = {};

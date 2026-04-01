@@ -26,6 +26,8 @@ export const redesignsTable = pgTable("redesigns", {
   metaDescription: text("meta_description").notNull(),
   photoBrief: text("photo_brief").array(),
   priceReasoning: text("price_reasoning"),
+  newCategory: text("new_category"),
+  newMetafields: jsonb("new_metafields"),
   appliedAt: timestamp("applied_at", { withTimezone: true }),
   appliedFields: text("applied_fields").array(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

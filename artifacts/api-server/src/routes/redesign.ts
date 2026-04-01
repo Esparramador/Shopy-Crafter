@@ -9,6 +9,13 @@ import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
+interface MetafieldEntry {
+  namespace: string;
+  key: string;
+  value: string;
+  type: string;
+}
+
 interface RedesignOutput {
   title: string;
   body_html: string;
@@ -20,6 +27,8 @@ interface RedesignOutput {
   meta_description: string;
   photo_brief: string[];
   price_reasoning: string;
+  category: string;
+  metafields: MetafieldEntry[];
 }
 
 async function doRedesign(projectId: number, shopifyProductId: string): Promise<RedesignOutput> {
@@ -104,6 +113,20 @@ OPTIMIZACIÓN SEO AVANZADA (Metodología Semrush):
 - FAQ SCHEMA-READY: Formato <strong>¿Pregunta?</strong> + <p>Respuesta</p> para Rich Snippets Google
 - SEARCH INTENT: Todo el contenido orientado a intención TRANSACCIONAL (comprar, conseguir, pedir)
 
+CATEGORÍA SHOPIFY (Taxonomía oficial):
+- Asigna la categoría MÁS ESPECÍFICA posible de la taxonomía de Shopify
+- Formato: "Ruta > Completa > De > Categoría" (ej: "Apparel & Accessories > Clothing > Shirts & Tops > T-Shirts")
+- NUNCA uses categorías genéricas si existe una más específica
+
+METAFIELDS OBLIGATORIOS (namespace "custom"):
+- material: Material principal del producto (single_line_text_field)
+- color: Color principal o colores disponibles (single_line_text_field)
+- care_instructions: Instrucciones de cuidado y lavado (multi_line_text_field)
+- origin: País/región de origen o fabricación (single_line_text_field)
+- warranty: Información de garantía si aplica (single_line_text_field)
+- weight_detail: Peso exacto con unidad (single_line_text_field)
+- Añade metafields adicionales relevantes para el tipo de producto (fragrance, flavor, size_guide, etc.)
+
 Devuelve SOLO JSON:
 {
   "title": "título SEO 45-65 chars, keyword transaccional primero",
@@ -115,7 +138,9 @@ Devuelve SOLO JSON:
   "meta_title": "40-60 chars: [Keyword] — [Beneficio] | [Marca]",
   "meta_description": "130-155 chars: [Beneficio]. [Keyword+detalle]. [CTA urgencia]. Responder intent en primeros 100 chars",
   "photo_brief": ["8 briefs: hero frontal", "lifestyle en contexto", "detalle/textura macro", "escala/tamaño con referencia", "packaging premium", "proceso/behind-the-scenes", "variante/color alternativo", "UGC/modelo real"],
-  "price_reasoning": "justificación con análisis competitivo y posicionamiento de mercado"
+  "price_reasoning": "justificación con análisis competitivo y posicionamiento de mercado",
+  "category": "Ruta > Completa > Taxonomía > Shopify (la más específica posible)",
+  "metafields": [{"namespace":"custom","key":"material","value":"valor real","type":"single_line_text_field"},{"namespace":"custom","key":"color","value":"valor","type":"single_line_text_field"},{"namespace":"custom","key":"care_instructions","value":"instrucciones detalladas","type":"multi_line_text_field"},{"namespace":"custom","key":"origin","value":"país/región","type":"single_line_text_field"},{"namespace":"custom","key":"warranty","value":"info garantía","type":"single_line_text_field"},{"namespace":"custom","key":"weight_detail","value":"peso con unidad","type":"single_line_text_field"}]
 }`;
 
   return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 8000);
@@ -138,8 +163,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
 
   const result = await doRedesign(projectId, shopifyProductId);
 
-  if (parts && parts.length > 0 && parts.length < 6) {
-    const allParts = ["title", "bodyHtml", "price", "tags", "metafields", "photoBriefs"];
+  if (parts && parts.length > 0) {
+    const allParts = ["title", "bodyHtml", "price", "tags", "seoMeta", "photoBriefs", "category", "metafields"];
     for (const key of allParts) {
       if (!parts.includes(key)) {
         if (key === "title") result.title = product.title;
@@ -150,11 +175,13 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
           result.price_reasoning = "Precio original mantenido (no incluido en rediseño parcial)";
         }
         if (key === "tags") result.tags = product.tags ?? "";
-        if (key === "metafields") {
+        if (key === "seoMeta") {
           result.meta_title = "";
           result.meta_description = "";
         }
         if (key === "photoBriefs") result.photo_brief = [];
+        if (key === "category") result.category = "";
+        if (key === "metafields") result.metafields = [];
       }
     }
   }
@@ -174,6 +201,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
     metaDescription: result.meta_description,
     photoBrief: result.photo_brief,
     priceReasoning: result.price_reasoning,
+    newCategory: result.category || null,
+    newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
   });
 
   // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
@@ -229,6 +258,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
     originalTitle: product.title,
     originalPrice: product.price ?? "0",
     priceReasoning: result.price_reasoning,
+    category: result.category || null,
+    metafields: Array.isArray(result.metafields) ? result.metafields : [],
   });
 });
 
@@ -236,7 +267,7 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
   const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
   const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
   const { fields: rawFields } = req.body as { fields?: string[]; redesignId?: number };
-  const fields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : ["title", "description", "tags", "meta", "price"];
+  const fields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : ["title", "description", "tags", "meta", "price", "category", "metafields", "images"];
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   const [redesign] = await db
@@ -274,6 +305,10 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     }
   }
 
+  if (fields.includes("category") && redesign.newCategory) {
+    updateData.product_type = redesign.newCategory;
+  }
+
   if (fields.includes("price")) {
     try {
       const liveProduct = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
@@ -299,6 +334,47 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
       method: "PUT",
       body: JSON.stringify({ product: updateData }),
     });
+  }
+
+  let metafieldsApplied = 0;
+  if (fields.includes("metafields") && redesign.newMetafields) {
+    const metafieldsArr = redesign.newMetafields as MetafieldEntry[];
+    if (Array.isArray(metafieldsArr) && metafieldsArr.length > 0) {
+      for (const mf of metafieldsArr) {
+        try {
+          await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`, {
+            method: "POST",
+            body: JSON.stringify({
+              metafield: {
+                namespace: mf.namespace || "custom",
+                key: mf.key,
+                value: mf.value,
+                type: mf.type || "single_line_text_field",
+              },
+            }),
+          });
+          metafieldsApplied++;
+        } catch {
+          try {
+            const existingMeta = await shopifyRequest<{ metafields: Array<{ id: number; namespace: string; key: string }> }>(
+              projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`
+            );
+            const existing = existingMeta?.metafields?.find(
+              (m) => m.namespace === (mf.namespace || "custom") && m.key === mf.key
+            );
+            if (existing) {
+              await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields/${existing.id}.json`, {
+                method: "PUT",
+                body: JSON.stringify({
+                  metafield: { id: existing.id, value: mf.value, type: mf.type || "single_line_text_field" },
+                }),
+              });
+              metafieldsApplied++;
+            }
+          } catch { /* skip individual metafield failure */ }
+        }
+      }
+    }
   }
 
   await db
@@ -370,11 +446,17 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     }
   }
 
+  const messageParts: string[] = ["Cambios aplicados correctamente en tu tienda."];
+  if (metafieldsApplied > 0) messageParts.push(`${metafieldsApplied} metafields actualizados.`);
+  if (redesign.newCategory && fields.includes("category")) messageParts.push(`Categoría: ${redesign.newCategory}.`);
+  if (imagesGenerated > 0) messageParts.push(`${imagesGenerated} imágenes creativas generadas desde la foto de referencia.`);
+  if (imageErrors.length > 0) messageParts.push(`${imageErrors.length} errores en imágenes.`);
+
   res.json({
     success: true,
-    message: shouldGenerateImages
-      ? `Cambios aplicados correctamente. ${imagesGenerated > 0 ? `${imagesGenerated} imágenes creativas generadas desde la foto de referencia.` : ""}${imageErrors.length > 0 ? ` ${imageErrors.length} errores en imágenes.` : ""}`
-      : "Cambios aplicados correctamente en tu tienda",
+    message: messageParts.join(" "),
+    metafieldsApplied,
+    categoryApplied: !!(redesign.newCategory && fields.includes("category")),
     imagesGenerated,
     imageErrors: imageErrors.length > 0 ? imageErrors : undefined,
   });
