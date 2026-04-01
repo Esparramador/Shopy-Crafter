@@ -396,6 +396,7 @@ Acciones disponibles:
 - create_page: Crear página Shopify con contenido IA. Params: {projectId, title?, pageType? ("about"|"contact"|"faq"|"shipping"|"returns"|"privacy"|"terms"|"size_guide")}
 - update_page: Actualizar página Shopify existente. Params: {projectId, pageId, title?, bodyHtml?, published? (boolean), handle?}
 - list_pages: Listar páginas de la tienda. Params: {projectId}
+- sync_store_theme: Sincronizar configuración del CMS (sección storeTheme) al theme activo de Shopify. Aplica: header nav, hero CTAs, announcement bar, login redirect, protección de compra. Params: {projectId, themeId?}
 - design_all_pages: Diseñar TODAS las páginas esenciales de la tienda. Params: {projectId, pageTypes? (default ["about","faq","shipping","returns","contact"])}
 - optimize_images: Generar alt texts SEO para imágenes. Params: {projectId, productId? (si no se da, optimiza todos)}
 - inspect_code: Leer y analizar un archivo de código fuente de la app. Params: {filePath (ej: "src/pages/projects/Audit.tsx"), analyze? (boolean, default true)}
@@ -1245,7 +1246,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const productActions = ["create_product", "edit_product", "optimize_product", "redesign_product", "apply_redesign", "bulk_redesign", "optimize_all_products", "set_product_status", "publish_product", "delete_product"];
   const imageActions = ["generate_product_images", "generate_images_from_reference", "virtual_tryon", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
   const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
-  const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings"];
+  const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings", "sync_store_theme"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
   const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "update_page", "add_to_collection"];
   const inventoryActions = ["inventory_sync", "inventory_alerts", "inventory_deep_report", "inventory_sync_orders", "inventory_sales_analytics", "inventory_customer_history"];
@@ -4788,6 +4789,13 @@ Responde SOLO el HTML, sin envolver en \`\`\`html.`;
           published: updated.page.published_at != null,
           message: `✅ Página "${updated.page.title}" actualizada.\n📄 Publicada: ${updated.page.published_at != null ? 'Sí' : 'No'}\n🔗 URL: /pages/${updated.page.handle}`,
         };
+        learnFromOperation({
+          operationType: "page_update",
+          title: `Page updated: ${updated.page.title}`,
+          content: `Página "${updated.page.title}" (ID: ${pageId}) actualizada. Published: ${updated.page.published_at != null}. Handle: ${updated.page.handle}. Changes: ${Object.keys(updateData).join(", ")}`,
+          confidence: 0.85,
+          tags: ["page", "update", "shopify"],
+        });
         break;
       }
 
@@ -5822,6 +5830,157 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
         } catch (err) {
           result = { error: true, message: `❌ Error parseando settings_data.json: ${err instanceof Error ? err.message : String(err)}` };
         }
+        learnFromOperation({
+          operationType: "theme_settings_edit",
+          title: `Theme settings: ${settingsPath}`,
+          content: `Editado setting ${settingsPath} = ${JSON.stringify(value)}`,
+          confidence: 0.85,
+          tags: ["theme", "settings", "configuration"],
+        });
+        break;
+      }
+
+      case "sync_store_theme": {
+        const projectId = params?.projectId;
+        if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+        const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+        if (!proj) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+        const { getActiveTheme, readThemeFile, writeThemeFile } = await import("../lib/shopify-theme.js");
+        let themeId = params?.themeId ? parseInt(params.themeId) : undefined;
+        if (!themeId) {
+          const active = await getActiveTheme(parseInt(projectId), proj.shopDomain);
+          if (!active) { res.status(404).json({ error: "No se encontró theme activo" }); return; }
+          themeId = active.id;
+        }
+
+        const { DEFAULT_CMS_CONTENT } = await import("../lib/cms-defaults.js");
+        const { cmsContent: cmsContentTable } = await import("@workspace/db/schema");
+        const cmsRows = await db.select().from(cmsContentTable).limit(1);
+        const storedContent = cmsRows.length > 0 ? (cmsRows[0].content as Record<string, unknown>) : {};
+        const mergedCms = { ...DEFAULT_CMS_CONTENT, ...storedContent };
+        if (DEFAULT_CMS_CONTENT.storeTheme && !storedContent.storeTheme) {
+          (mergedCms as Record<string, unknown>).storeTheme = DEFAULT_CMS_CONTENT.storeTheme;
+        }
+        const storeTheme = (mergedCms as Record<string, unknown>).storeTheme as Record<string, unknown> | undefined;
+        if (!storeTheme) {
+          result = { message: "⚠️ No hay configuración storeTheme en el CMS. Edita la sección 'storeTheme' del CMS primero." };
+          break;
+        }
+
+        const header = storeTheme.header as Record<string, unknown>;
+        const hero = storeTheme.hero as Record<string, unknown>;
+        const announcement = storeTheme.announcementBar as Record<string, unknown>;
+        const loginRedirect = storeTheme.loginRedirect as Record<string, unknown>;
+        const purchaseProtection = storeTheme.purchaseProtection as Record<string, unknown>;
+        const changes: string[] = [];
+
+        if (header) {
+          const navLinks = (header.navLinks as Array<Record<string, unknown>>) || [];
+          const visibleLinks = navLinks.filter((l: Record<string, unknown>) => l.visible !== false);
+          const loginBtn = header.loginButton as Record<string, unknown>;
+          const accountBtn = header.accountButton as Record<string, unknown>;
+
+          const desktopNav = visibleLinks.map((l: Record<string, unknown>) =>
+            `      <a href="${l.href}" class="cc-header__link{% if page.handle == '${String(l.href).replace('/pages/','')}' %} cc-header__link--active{% endif %}">${l.label}</a>`
+          ).join("\n");
+
+          const mobileNav = visibleLinks.map((l: Record<string, unknown>) =>
+            `  <a href="${l.href}" class="cc-mobile-menu__link">${l.label}</a>`
+          ).join("\n");
+
+          const headerLiquid = `<header class="cc-header">
+  <div class="cc-header__inner">
+    <a href="/" class="cc-header__logo">
+      <img src="{{ 'logo-app.png' | asset_url }}" alt="{{ shop.name }}" />
+      <span class="cc-header__logo-text">{{ shop.name }}</span>
+    </a>
+
+    <nav class="cc-header__nav">
+${desktopNav}
+    </nav>
+
+    <div class="cc-header__actions">
+      <a href="/cart" class="cc-header__cart" aria-label="Carrito">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        {% if cart.item_count > 0 %}
+          <span class="cc-header__cart-count">{{ cart.item_count }}</span>
+        {% endif %}
+      </a>
+      {% if customer %}
+        <a href="${accountBtn?.href || '/account'}" class="cc-header__link cc-header__link--active" style="background:linear-gradient(135deg,var(--cc-purple),var(--cc-pink));color:#fff;padding:0.5rem 1rem;border-radius:var(--cc-radius-full);font-weight:700;font-size:0.8125rem;">${accountBtn?.label || 'Mi Cuenta'}</a>
+      {% else %}
+        <a href="${loginBtn?.href || '/account/login'}" class="cc-header__link cc-header__link--active" style="background:linear-gradient(135deg,var(--cc-purple),var(--cc-pink));color:#fff;padding:0.5rem 1rem;border-radius:var(--cc-radius-full);font-weight:700;font-size:0.8125rem;">${loginBtn?.label || 'Iniciar Sesión'}</a>
+      {% endif %}
+      <button class="cc-header__menu-toggle" aria-label="Abrir menú" onclick="document.querySelector('.cc-mobile-menu').classList.toggle('active')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<nav class="cc-mobile-menu">
+${mobileNav}
+  {% if customer %}
+    <a href="${accountBtn?.href || '/account'}" class="cc-mobile-menu__link cc-mobile-menu__link--cta">${accountBtn?.label || 'Mi Cuenta'}</a>
+  {% else %}
+    <a href="${loginBtn?.href || '/account/login'}" class="cc-mobile-menu__link cc-mobile-menu__link--cta">${loginBtn?.label || 'Iniciar Sesión'}</a>
+  {% endif %}
+</nav>`;
+
+          await writeThemeFile(parseInt(projectId), proj.shopDomain, themeId!, "snippets/header.liquid", headerLiquid);
+          changes.push(`Header: ${visibleLinks.length} links, login="${loginBtn?.label}", account="${accountBtn?.label}"`);
+        }
+
+        if (hero) {
+          const indexFile = await readThemeFile(parseInt(projectId), proj.shopDomain, themeId!, "templates/index.json");
+          if (indexFile?.value) {
+            try {
+              const indexSettings = JSON.parse(indexFile.value);
+              if (indexSettings.sections?.hero?.settings) {
+                const hs = indexSettings.sections.hero.settings;
+                if (hero.eyebrow) hs.eyebrow = hero.eyebrow;
+                if (hero.title) hs.title = hero.title;
+                if (hero.titleGradient) hs.title_gradient = hero.titleGradient;
+                if (hero.subtitle) hs.subtitle = hero.subtitle;
+                const ctaPrimary = hero.ctaPrimary as Record<string, unknown>;
+                const ctaSecondary = hero.ctaSecondary as Record<string, unknown>;
+                if (ctaPrimary) { hs.cta_text = ctaPrimary.label; hs.cta_url = ctaPrimary.href; }
+                if (ctaSecondary) { hs.cta2_text = ctaSecondary.label; hs.cta2_url = ctaSecondary.href; }
+                await writeThemeFile(parseInt(projectId), proj.shopDomain, themeId!, "templates/index.json", JSON.stringify(indexSettings, null, 2));
+                changes.push(`Hero: title="${hero.title}", CTA="${(hero.ctaPrimary as Record<string, unknown>)?.label}"`);
+              }
+            } catch {}
+          }
+        }
+
+        if (announcement) {
+          const settingsFile = await readThemeFile(parseInt(projectId), proj.shopDomain, themeId!, "config/settings_data.json");
+          if (settingsFile?.value) {
+            try {
+              const settings = JSON.parse(settingsFile.value);
+              const announcementSection = settings.current?.sections?.["announcement-bar"];
+              if (announcementSection?.settings) {
+                announcementSection.settings.show_announcement = !!(announcement.enabled);
+                if (announcement.text) announcementSection.settings.announcement_text = announcement.text;
+                await writeThemeFile(parseInt(projectId), proj.shopDomain, themeId!, "config/settings_data.json", JSON.stringify(settings, null, 2));
+                changes.push(`Announcement: enabled=${announcement.enabled}, text="${String(announcement.text).substring(0,50)}..."`);
+              }
+            } catch {}
+          }
+        }
+
+        result = {
+          synced: changes,
+          message: `✅ Store theme sincronizado desde CMS:\n${changes.map(c => `• ${c}`).join("\n")}\n\n📝 Cambios aplicados al theme activo del proyecto.`,
+        };
+        learnFromOperation({
+          operationType: "store_theme_sync",
+          title: "CMS → Store theme sync",
+          content: `Sincronizado storeTheme del CMS al theme Shopify: ${changes.join("; ")}`,
+          confidence: 0.9,
+          tags: ["theme", "sync", "cms", "store"],
+        });
         break;
       }
 

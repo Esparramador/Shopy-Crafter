@@ -838,6 +838,55 @@ export const DEFAULT_CMS_CONTENT = {
       no: "No",
     },
   },
+  storeTheme: {
+    header: {
+      navLinks: [
+        { id: "store-nav-1", label: "Inicio", href: "/", visible: true },
+        { id: "store-nav-2", label: "Tienda", href: "/collections", visible: true },
+        { id: "store-nav-3", label: "Planes", href: "/collections/suscripciones", visible: true },
+        { id: "store-nav-4", label: "Créditos", href: "/collections/packs-de-creditos", visible: true },
+        { id: "store-nav-5", label: "Sobre Nosotros", href: "/pages/sobre-comic-crafter", visible: true },
+        { id: "store-nav-6", label: "FAQ", href: "/pages/faq-preguntas-frecuentes", visible: true },
+        { id: "store-nav-7", label: "Contacto", href: "/pages/contacto", visible: true },
+      ],
+      loginButton: { label: "Iniciar Sesión", href: "/account/login" },
+      accountButton: { label: "Mi Cuenta", href: "/account" },
+    },
+    hero: {
+      eyebrow: "Comic Crafter",
+      title: "Crea Universos Enteros",
+      titleGradient: "Haz tus ideas realidad",
+      subtitle: "Cómics, Manga, Animación y Personajes 3D en segundos. Tu imaginación, nuestra inteligencia.",
+      ctaPrimary: { label: "Empieza Gratis", href: "/account/register" },
+      ctaSecondary: { label: "Ver Planes", href: "/collections/suscripciones" },
+    },
+    announcementBar: {
+      enabled: true,
+      text: "🚚 Envío GRATIS en pedidos superiores a 50€",
+      link: "",
+    },
+    purchaseProtection: {
+      enabled: true,
+      requireLogin: true,
+      toastMessage: "Debes iniciar sesión para finalizar tu compra",
+      cartButtonText: "Iniciar Sesión para Comprar",
+      loginRedirectUrl: "/cart",
+    },
+    footer: {
+      showPlatformLinks: true,
+      showPolicyLinks: true,
+      platformUrl: "https://comiccrafter.es",
+    },
+    gallery: {
+      enabled: true,
+      autoPlay: true,
+      animationSpeed: 30,
+    },
+    loginRedirect: {
+      afterLogin: "/",
+      afterRegister: "/",
+    },
+  },
   footer: {
     tagline: "Shopy Crafter — Optimización IA para tiendas Shopify. Powered by Claude AI + Gemini + Replicate.",
     columns: [
