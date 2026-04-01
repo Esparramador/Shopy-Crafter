@@ -2,7 +2,7 @@ export function Classic() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(170deg, #0D0D0D 0%, #1A1A1A 40%, #111111 100%)',
+      background: 'linear-gradient(170deg, #08080e 0%, #0c0c14 40%, #08080e 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -14,7 +14,7 @@ export function Classic() {
       <div style={{
         position: 'absolute',
         top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(ellipse at 50% 40%, rgba(212,175,55,0.04) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse at 50% 40%, rgba(200,168,75,0.05) 0%, transparent 60%)',
         pointerEvents: 'none',
       }} />
 
@@ -27,37 +27,25 @@ export function Classic() {
         zIndex: 1,
       }}>
         <div style={{
-          width: '180px',
-          height: '180px',
-          borderRadius: '50%',
+          width: '200px',
+          height: '200px',
+          borderRadius: '20px',
           overflow: 'hidden',
-          border: '3px solid rgba(212,175,55,0.3)',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(212,175,55,0.05)',
-          marginBottom: '36px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#141414',
+          border: '2px solid rgba(200,168,75,0.25)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(200,168,75,0.06)',
+          marginBottom: '40px',
         }}>
-          <div style={{
-            width: '180px',
-            height: '180px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #D4AF37 0%, #8B6914 50%, #D4AF37 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '72px',
-            fontWeight: 700,
-            color: '#0D0D0D',
-            fontFamily: "'Georgia', serif",
-          }}>SC</div>
+          <img
+            src="/__mockup/sc-logo-corporate.png"
+            alt="Shopy Crafter"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
 
         <p style={{
           fontSize: '28px',
           fontWeight: 300,
-          color: '#D4AF37',
+          color: '#c8a84b',
           letterSpacing: '8px',
           textTransform: 'uppercase',
           margin: 0,
@@ -76,7 +64,7 @@ export function Classic() {
       }}>
         <p style={{
           fontSize: '14px',
-          color: 'rgba(212,175,55,0.35)',
+          color: 'rgba(200,168,75,0.4)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
           margin: 0,

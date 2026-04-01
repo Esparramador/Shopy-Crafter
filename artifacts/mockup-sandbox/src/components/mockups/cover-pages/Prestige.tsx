@@ -1,10 +1,8 @@
 export function Prestige() {
-  const logoSrc = "/sc-logo-prestige.png";
-
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(160deg, #1A1510 0%, #231D15 30%, #1E1812 60%, #151010 100%)',
+      background: 'linear-gradient(160deg, #1a1410 0%, #211a14 30%, #1e1812 60%, #1a1410 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -29,37 +27,25 @@ export function Prestige() {
         zIndex: 1,
       }}>
         <div style={{
-          width: '180px',
-          height: '180px',
+          width: '200px',
+          height: '200px',
           borderRadius: '50%',
           overflow: 'hidden',
-          border: '3px solid rgba(196,149,106,0.3)',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 80px rgba(196,149,106,0.08)',
-          marginBottom: '36px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#1a1510',
+          border: '2px solid rgba(196,149,106,0.35)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px #2e2620, 0 0 60px rgba(196,149,106,0.06)',
+          marginBottom: '40px',
         }}>
-          <div style={{
-            width: '180px',
-            height: '180px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #C4956A 0%, #8B6914 50%, #C4956A 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '72px',
-            fontWeight: 700,
-            color: '#1A1510',
-            fontFamily: "'Georgia', serif",
-          }}>SC</div>
+          <img
+            src="/__mockup/sc-logo-prestige.png"
+            alt="Shopy Crafter"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
 
         <p style={{
           fontSize: '28px',
           fontWeight: 300,
-          color: '#C4956A',
+          color: '#c4956a',
           letterSpacing: '8px',
           textTransform: 'uppercase',
           margin: 0,
@@ -78,7 +64,7 @@ export function Prestige() {
       }}>
         <p style={{
           fontSize: '14px',
-          color: 'rgba(196,149,106,0.5)',
+          color: 'rgba(196,149,106,0.4)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
           margin: 0,

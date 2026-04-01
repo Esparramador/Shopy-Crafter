@@ -2,7 +2,7 @@ export function Elegance() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(160deg, #0A1628 0%, #0F2340 35%, #162D50 65%, #0A1628 100%)',
+      background: 'linear-gradient(160deg, #0b1628 0%, #0f1d35 35%, #111e36 65%, #0b1628 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -27,37 +27,25 @@ export function Elegance() {
         zIndex: 1,
       }}>
         <div style={{
-          width: '180px',
-          height: '180px',
-          borderRadius: '50%',
+          width: '200px',
+          height: '200px',
+          borderRadius: '20px',
           overflow: 'hidden',
-          border: '3px solid rgba(192,192,192,0.25)',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 80px rgba(74,144,217,0.06)',
-          marginBottom: '36px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#0F2340',
+          border: '2px solid rgba(74,144,217,0.3)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px #1a2a4a, 0 0 60px rgba(74,144,217,0.06)',
+          marginBottom: '40px',
         }}>
-          <div style={{
-            width: '180px',
-            height: '180px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4A90D9 0%, #2C5F8A 50%, #4A90D9 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '72px',
-            fontWeight: 700,
-            color: '#0A1628',
-            fontFamily: "'Georgia', serif",
-          }}>SC</div>
+          <img
+            src="/__mockup/sc-logo-corporate.png"
+            alt="Shopy Crafter"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
 
         <p style={{
           fontSize: '28px',
           fontWeight: 300,
-          color: 'rgba(192,192,192,0.7)',
+          color: '#c0c8d8',
           letterSpacing: '8px',
           textTransform: 'uppercase',
           margin: 0,
@@ -76,7 +64,7 @@ export function Elegance() {
       }}>
         <p style={{
           fontSize: '14px',
-          color: 'rgba(192,192,192,0.3)',
+          color: 'rgba(192,200,216,0.35)',
           letterSpacing: '3px',
           textTransform: 'uppercase',
           margin: 0,
