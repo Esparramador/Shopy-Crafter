@@ -550,7 +550,8 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
 - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history
-- Presupuesto / cotización / quote → agency_quote; Propuesta comercial / proposal → agency_proposal
+- Presupuesto / cotización / quote / cuánto cobrar / cuánto cuesta / precio de / tarifa / budget → generate_budget. Params: {clientName?, services: [{name, quantity, unitPrice, subtotal}], discount?, notes?, deliveryDays?, projectName?}. Genera un documento HTML profesional de presupuesto.
+- Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
 - Analizar tienda externa / investigar tienda / analizar URL / pre-informe / estudio previo / analizar competencia (sin conexión) / analizar empresa / analizar negocio → analyze_external_store. Params: {url?, name?, instagram?, niche?, projectId}. NO necesita conexión Shopify — funciona solo con URL/nombre/Instagram.
 - Usuarios / clientes / listar usuarios → list_users; Crear usuario / nuevo cliente → create_user; Invitar cliente / enviar invitación → invite_client
@@ -601,61 +602,176 @@ Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, dispo
 CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS Shopy Crafter:
 
 IDENTIDAD: Nombre público "Shopy Crafter" (shopycrafter.com). Motor IA interno "ShopyBrain". Admin: sadiagiljoan@gmail.com. Email: craftershopy@gmail.com.
-MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify, con servicios puntuales (one-time) + retainers mensuales. Pagos por Shopify Billing (NO Stripe). 79 acciones chatbot. 46,000+ insights.
+MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify + estudio creativo Comic Crafter. Servicios puntuales (one-time) + retainers mensuales + créditos IA. Pagos por Shopify Billing (NO Stripe). 130+ acciones chatbot. 46,000+ insights.
 
-4 PLANES DE SUSCRIPCIÓN:
-1. Photoshoot Pro — €497 pago único (sin retainer). 120 imágenes IA (4 variantes × 30 SKUs), consistencia visual con guía de marca, iluminación cinematográfica 5:1 Rembrandt, semantic SEO audit 30 fichas, 1 sesión pricing financiero, entrega 7 días, soporte 30 días. NO: A/B testing, auto-pilot, futuros motores.
-2. Growth Studio — €297/mes + €197 setup único. Imágenes ilimitadas, consistencia visual automática, A/B testing 3 productos, pricing elasticidad, SEO 100 URLs/mes, auto-pilot básico, dashboard analytics, soporte <24h, integraciones Shopify/GA/Meta. NO: A/B ilimitado, custom AI, soporte dedicado. Prueba 14 días gratis.
-3. Performance Lab — €797/mes + €397 setup (MÁS POPULAR). Todo de Growth Studio + A/B ilimitado, auto-pilot avanzado 24/7, pricing predictivo simulación, SEO ilimitado crawling, recomendaciones semantic search, Schema Augmentation IA, custom AI fine-tuning, soporte prioritario <4h, sesión mensual estrategia 60 min, acceso anticipado nuevos motores. NO: account manager dedicado.
-4. Enterprise Omnicore — desde €2,497/mes (setup incluido, personalizado). Todo de Performance Lab + account manager SLA, custom AI development, infraestructura dedicada, API privada webhooks, integración ERPs/PIMs, white-label completo, SSO enterprise, compliance GDPR/SOC2/ISO27001, soporte 24/7 <1h, sesiones estratégicas semanales + QBRs, training ilimitado, features custom bajo demanda.
+═══════════════════════════════════════════════════
+TARIFA COMPLETA DE PRECIOS — CATÁLOGO 57 PRODUCTOS
+═══════════════════════════════════════════════════
 
-9 SERVICIOS PUNTUALES (one-time, precio por unidad):
-1. Auditoría Completa — €197/ud (todos los productos + SEO + COGS + plan de acción)
-2. Rediseño IA (hasta 30 productos) — €147/ud (títulos, descripciones, SEO optimizados con IA)
-3. Pack 30 Imágenes IA — €89/ud (Hero, Lifestyle, Detalle)
-4. Informe de Precios y Márgenes — €97/ud (COGS, márgenes, precios competitivos)
-5. Optimización SEO Completa — €147/ud (meta tags, keywords, Schema JSON-LD, plan de contenido)
-6. Informe de Competidores — €97/ud
-7. Investigación de Proveedores — €97/ud
-8. Setup Email Marketing — €197/ud
-9. Informe de Proyección de Ventas — €127/ud
+▸ PLANES SaaS SHOPY CRAFTER (suscripciones mensuales):
+• Starter — desde €19/mes: Automatización IA básica, 5 productos/mes, 10 imágenes IA, SEO básico
+• Pro — desde €89/mes: Hasta 20 productos/mes, 50 imágenes, A/B testing, pricing financiero
+• Agency Pro — desde €149/mes: Multi-tienda (hasta 15), 200 imágenes, gestión de clientes, white-label parcial
+• Enterprise — desde €2,497/mes: Multi-tienda ilimitado, API privada, SSO, account manager, SLA
+• Growth Studio — €297/mes + €197 setup: Imágenes ilimitadas, A/B testing, SEO 100 URLs/mes, auto-pilot
+• Performance Lab — €797/mes + €397 setup (MÁS POPULAR): Todo de Growth + A/B ilimitado, pricing predictivo, SEO ilimitado, custom AI
 
-3 SERVICIOS RECURRENTES (mensuales):
-1. Mantenimiento Básico — €49/mes
-2. Gestión Activa — €149/mes
-3. Premium Ilimitado — €399/mes
+▸ PACKS DE CRÉDITOS IA (Comic Crafter):
+• Pack Ilustrador 110 Créditos — desde €9.99: Generación básica cómics y arte digital
+• Pack Narrador 330 Créditos — desde €24.99: Cómics + arte + narrativa
+• Pack Creador 3D 550 Créditos — desde €39.99: Modelos 3D + cómics + arte
+• Pack Director 1150 Créditos — desde €74.99: Generación masiva todo tipo
+• Pack Estudio 3000 Créditos — desde €149.99: Todo: cómics, 3D, vídeo, arte
+• Pack 4000 Créditos — desde €179.99: Volumen máximo
 
-CAPACIDADES REALES DE LA PLATAFORMA (79 acciones chatbot):
-- 6 motores IA: M1 Imágenes (Replicate Flux+Recraft, 8 tipos), M2 Consistencia Visual (StyleLock + Visual DNA), M3 A/B Testing (pixel tracking, z-test 95%), M4 Auto-Pilot 24/7 (webhooks, cron jobs), M5 Pricing Financiero (COGS, P&L, simulador, forecast), M6 SEO Técnico (16 criterios Semrush-level)
-- Shopy Crafter Brain: 79 acciones Shopify + investigación de entidades + memoria permanente + 12 cron jobs de aprendizaje continuo + 46,000+ insights
-- IA Dual: Claude (claude-sonnet-4-5) para copywriting/análisis + Gemini con Google Search grounding para research de mercado real
-- Generación de imágenes profesionales con IA (Replicate flux-1.1-pro + recraft-v3)
-- Análisis financiero con Claude (pricing, unit economics, cash flow, elasticidad)
-- Email marketing con templates IA + Klaviyo integration
-- Theme editing: Liquid, CSS, JSON settings, secciones personalizadas
-- Sistema de proveedores con investigación IA via Google Search
-- Encriptación AES-256-GCM, RGPD compliant, rate limiting
-- Panel admin completo + panel cliente read-only con portal de aprobaciones
-- Exportación: PDF 17 páginas, HTML 9 páginas, XLSX, ZIP, AI Deep Analysis Report
+▸ SERVICIOS UNITARIOS DE CONSULTORÍA (Shopy Crafter):
+• Auditoría SEO Completa — €197: Análisis 16 criterios Semrush-level + plan de acción
+• Auditoría Shopify 360° — €197: Productos + SEO + COGS + configuración + plan
+• Creación Producto Unitario + 3 imgs IA — €47: Un producto profesional desde cero
+• Rediseño IA de 30 Productos — €147: Títulos, descripciones, SEO optimizados
+• Pack 30 Imágenes IA — €89: Fotos profesionales (Hero, Lifestyle, Detalle)
+• Photoshoot Pro 120 Imágenes — €497: Sesión completa 4 variantes × 30 SKUs
+• Informe Pricing & Márgenes — €97: COGS real, márgenes, precios competitivos
+• Informe Competidores — €97: Análisis estratégico competencia directa
+• Informe Proyección Ventas — €127: Forecast 3-6 meses con escenarios
+• Investigación Proveedores — €97: Sourcing global con IA
+• Optimización SEO Completa — €147: Meta tags, Schema JSON-LD, keywords
+• Setup Email Marketing — €197: Klaviyo + flujos automáticos completos
+• Sesión Estratégica 1:1 — €147: 60min auditoría + plan de acción personalizado
+• Pack 30 Posts IA — €89: Contenido redes sociales profesional
+• Campañas Virales 360° — desde €147: Instagram + TikTok marketing automatizado
+
+▸ PACKS DE CREACIÓN DE PRODUCTOS (servicios en lote):
+• Pack 5 Productos — €197: 5 productos completos desde cero con imágenes IA + SEO
+• Pack 10 Productos (Catálogo) — €347: 10 productos + SEO + copywriting + imágenes
+• Pack 15 Productos — €497: Escala tu catálogo con 15 productos profesionales
+• Pack 20 Productos Premium — €697: Catálogo completo profesional
+• Pack 30 Productos Enterprise — €997: Catálogo enterprise completo
+
+▸ PRODUCTOS CREATIVOS COMIC CRAFTER (arte IA):
+• Cómic Personalizado — desde €29.99: Cómic único con tu historia
+• Manga Personalizado — desde €34.99: Arte manga estilo japonés
+• Cómic Boda — desde €49.99: Tu historia de amor en cómic
+• Cuento Infantil — desde €29.99: Libro personalizado con tu hijo/a como protagonista
+• Pet Comic — desde €24.99: Tu mascota como superhéroe
+• Saga Épica — desde €59.99: Cómic interactivo multi-capítulo
+• Audiobook Cómic — desde €49.99: Narración profesional con voces IA
+• Álbum Fotos Cómic — desde €39.99: Transforma tus recuerdos en arte
+• Storyboard Profesional — desde €39.99: Planificación visual de proyectos
+• Portada Profesional — desde €19.99: Para libros, cómics, álbumes
+• Cartas TCG — desde €24.99: Cartas coleccionables personalizadas
+• NFT Arte IA 4K — desde €49.99: Arte digital exclusivo blockchain
+• Funko Pop 3D — desde €49.99: Figura personalizada estilo Funko
+• Figuras 3D Resina — desde €79.99: Modelos 3D impresos en resina premium
+• Modelos 3D Realistas — desde €39.99: Personajes game-ready
+• Diseño Tatuaje — desde €19.99: Arte único profesional
+• Retrato Pop Art — desde €24.99: Estilo Warhol/Lichtenstein
+• Logo Profesional — desde €29.99: Identidad visual completa
+• Pack Branding Completo — desde €89.99: Logo + paleta + guía visual
+• Merchandising IA — desde €49.99: Diseños para camisetas, tazas
+• Pack 30 Emojis/Stickers — desde €19.99: Stickers personalizados
+• Pack Assets Videojuegos — desde €59.99: 35 elementos profesionales
+• Escape Room Digital — desde €39.99: Aventura interactiva personalizada
+• Póster/Lienzo — desde €29.99: Arte IA premium para decoración
+• Pack Personaje 360° — desde €49.99: Avatar 3D + ficha + poses
+
+═══════════════════════════════════════════════════
+TARIFAS UNITARIAS PARA PRESUPUESTOS PERSONALIZADOS
+═══════════════════════════════════════════════════
+
+Cuando un cliente pida un proyecto PERSONALIZADO, calcula el presupuesto con estas tarifas unitarias:
+
+▸ DISEÑO WEB / THEME SHOPIFY:
+• Diseño CSS completo del theme (.css/.scss) — €497-€997 (según complejidad)
+• Diseño sección Liquid custom — €97/sección
+• Rediseño homepage completo (hero, secciones, footer) — €347
+• Diseño página "About Us" o "FAQ" — €97/página
+• Diseño página de producto custom — €197
+• Configuración theme settings completa — €97
+• Responsive fixes / mobile optimization — €147
+• Instalación y configuración de apps Shopify — €47/app
+
+▸ CREACIÓN DE PRODUCTOS (desde cero):
+• 1 producto completo (título SEO + descripción 800-1200 palabras + tags + categoría + variantes + imágenes IA) — €47/producto
+• Descuento por volumen: 5 prods = €197 (€39.4/ud), 10 = €347 (€34.7/ud), 15 = €497 (€33.1/ud), 20 = €697 (€34.8/ud), 30 = €997 (€33.2/ud)
+
+▸ REDISEÑO DE PRODUCTOS (productos existentes):
+• Rediseño TOTAL 100/100 (título + descripción + SEO + imágenes nuevas + categoría + variantes + stock) — €29/producto
+• Rediseño PARCIAL (solo título + descripción + SEO, sin imágenes) — €14.90/producto
+• Solo imágenes nuevas — €9.90/producto (3 imágenes IA por producto)
+• Solo SEO (meta title + meta description + alt texts + tags) — €9.90/producto
+• Solo variantes + stock + pricing — €7.90/producto
+• Descuento por volumen: +20 prods = -15%, +50 prods = -25%, +100 prods = -35%
+
+▸ SEO Y MARKETING:
+• Auditoría SEO completa — €197
+• Implementación SEO (meta tags + schemas + keywords) — €147
+• Blog strategy + 5 artículos SEO — €247
+• Keyword intelligence report — €97
+• Setup Google Analytics + Meta Pixel — €97
+• Email marketing setup (Klaviyo + 4 flujos) — €197
+• Campañas social media (30 posts) — €89
+
+▸ ANÁLISIS E INFORMES:
+• Auditoría tienda completa 360° — €197
+• Informe competidores — €97
+• Informe pricing y márgenes — €97
+• Informe proyección ventas — €127
+• Investigación proveedores — €97
+• Sesión estratégica 1:1 (60min) — €147
+
+▸ PACKS COMBINADOS (descuentos):
+• Pack Setup Básico (theme CSS + 5 prods + SEO) — €797 (ahorro €91)
+• Pack Lanzamiento (theme + 10 prods + SEO + email) — €1,247 (ahorro €184)
+• Pack Profesional (theme + 20 prods + SEO + email + auditoría + competidores) — €1,997 (ahorro €387)
+• Pack Enterprise (theme custom + 30 prods + SEO completo + email + auditoría + 3 informes) — €2,997 (ahorro €594)
+• Pack Solo Productos (creación + SEO + imágenes):
+  - 5 prods completos: €197
+  - 10 prods completos: €347
+  - 20 prods completos: €697
+  - 30 prods completos: €997
+  - 50 prods completos: €1,497
+  - 100 prods completos: €2,497
+
+═══════════════════════════════════════════════════
+GENERACIÓN DE PRESUPUESTOS PROFESIONALES
+═══════════════════════════════════════════════════
+
+Cuando te pidan un presupuesto, cotización o quote:
+1. PREGUNTA qué servicios necesita el cliente (o infiere del contexto)
+2. CALCULA el precio desglosado usando las tarifas unitarias de arriba
+3. EJECUTA generate_budget con los servicios, cantidades y precios
+4. El sistema genera un documento HTML profesional descargable
+
+Formato de presupuesto:
+- Encabezado con logo Shopy Crafter y datos del negocio
+- Tabla desglosada: servicio | cantidad | precio unitario | subtotal
+- Descuentos por volumen aplicados automáticamente
+- Total con IVA y sin IVA
+- Condiciones de pago, plazo de entrega
+- Firma y fecha
+- Validez 30 días
 
 CUANDO TE PREGUNTEN SOBRE PRECIOS:
-- Siempre conoces los precios exactos. No digas "no sé" o "comprueba la landing".
-- Si te piden comparar precios con la competencia, EJECUTA generate_competitive_pricing para investigar en REAL TIME con Google Search.
-- Si te piden auditar la oferta actual, EJECUTA audit_app_offerings.
-- Si te piden auditoría de copyright, marcas registradas, propiedad intelectual o infracciones de productos, EJECUTA copyright_audit.
-- Si te piden crear productos de suscripción en Shopify, usa create_product con los datos del plan correspondiente.
+- Siempre conoces los precios exactos. NUNCA digas "no sé" o "comprueba la landing".
+- Da precios concretos y desglosados para cualquier combinación de servicios.
+- Si te piden un presupuesto/cotización/quote → EJECUTA generate_budget.
+- Si te piden comparar precios con la competencia → EJECUTA generate_competitive_pricing.
+- Si te piden auditar la oferta actual → EJECUTA audit_app_offerings.
+- Si te piden auditoría de copyright → EJECUTA copyright_audit.
+- Si te piden crear productos de suscripción en Shopify → usa create_product con los datos del plan.
 - Sugiere proactivamente ajustes de precio cuando detectes oportunidades.
-- Usa psicología de precios: precios acabados en 7 o 9, anclaje con el plan Enterprise, badge "Más popular" en el mid-tier.
+- Usa psicología de precios: precios acabados en 7 o 9, anclaje con Enterprise, badge "Más popular" en mid-tier.
+- Para proyectos CUSTOM, calcula siempre el desglose y ofrece 2-3 opciones (básico, recomendado, premium).
 
 PARA CREAR PRODUCTOS DE SUSCRIPCIÓN EN SHOPIFY:
 Cuando el usuario pida crear productos de servicios/suscripciones en Shopify, crea productos con:
 - Título profesional del servicio
 - Descripción detallada HTML con beneficios y qué incluye
 - Precio del servicio
-- Tags: "servicio", "suscripcion" o "one-time", "shopybrain"
+- Tags: "servicio", "suscripcion" o "one-time", "shopy-crafter"
 - productType: "Service" o "Subscription"
 - vendor: "Shopy Crafter"
-Ejemplo: create_product con title="Plan Agency Pro — Gestión Shopify IA", price="149.00", bodyHtml="<h2>Plan Agency Pro</h2><p>Gestión completa de hasta 15 tiendas...</p>", tags="servicio, suscripcion, mensual, shopybrain"
 `;
 
     let expertKnowledgeBlock = "";
@@ -6805,6 +6921,149 @@ Responde SOLO con JSON válido (sin markdown):
           const data = await resp.json() as Record<string, unknown>;
           result = { ...data, message: `💼 **Presupuesto generado**\n\nCotización profesional lista para enviar al cliente.` };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_budget": {
+        try {
+          const escHtml = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+          const clampNum = (v: unknown, min: number, max: number, fallback: number) => { const n = Number(v); return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback; };
+
+          const services = params?.services || [];
+          const clientName = escHtml(String(params?.clientName || "Cliente").slice(0, 200));
+          const projectName = escHtml(String(params?.projectName || "Proyecto Shopify").slice(0, 200));
+          const discount = clampNum(params?.discount, 0, 100, 0);
+          const notes = escHtml(String(params?.notes || "").slice(0, 500));
+          const deliveryDays = clampNum(params?.deliveryDays, 1, 365, 7);
+          const budgetDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+          const budgetId = `SC-${Date.now().toString(36).toUpperCase()}`;
+
+          let subtotalOneTime = 0;
+          let subtotalRecurring = 0;
+          const serviceRows = (services as Array<{name: string, quantity: number, unitPrice: number, subtotal: number, recurring?: boolean}>).map((s) => {
+            const sName = escHtml(String(s.name || "Servicio").slice(0, 200));
+            const qty = clampNum(s.quantity, 0, 9999, 1);
+            const price = clampNum(s.unitPrice, 0, 999999, 0);
+            const sub = qty * price;
+            if (s.recurring) { subtotalRecurring += sub; } else { subtotalOneTime += sub; }
+            return `<tr>
+              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);color:#e0e0e0;">${sName}</td>
+              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:center;color:#ccc;">${qty}</td>
+              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:right;color:#ccc;">€${price.toFixed(2)}</td>
+              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:right;color:#c8a84b;font-weight:600;">€${sub.toFixed(2)}${s.recurring ? '<small>/mes</small>' : ''}</td>
+            </tr>`;
+          }).join("\n");
+
+          const totalBeforeDiscount = subtotalOneTime + subtotalRecurring;
+          const discountAmount = totalBeforeDiscount * (discount / 100);
+          const totalAfterDiscount = totalBeforeDiscount - discountAmount;
+          const iva = totalAfterDiscount * 0.21;
+          const totalFinal = totalAfterDiscount + iva;
+
+          const budgetHtml = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${budgetId} — Shopy Crafter</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0a0a14;color:#e0e0e0;padding:40px}
+.budget{max-width:800px;margin:0 auto;background:linear-gradient(135deg,#0c0c18,#12121e);border:1px solid rgba(200,168,75,0.15);border-radius:16px;overflow:hidden}
+.header{padding:40px;background:linear-gradient(135deg,#0f0f1a,#1a1a2e);border-bottom:2px solid rgba(200,168,75,0.3)}
+.logo{font-size:28px;font-weight:700;color:#c8a84b;letter-spacing:-0.5px}
+.logo span{color:#fff;font-weight:300}
+.badge{display:inline-block;background:rgba(200,168,75,0.15);color:#c8a84b;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
+.client-info{padding:32px 40px;display:flex;justify-content:space-between;border-bottom:1px solid rgba(200,168,75,0.08)}
+.info-block h4{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.info-block p{color:#e0e0e0;font-size:14px}
+table{width:100%;border-collapse:collapse}
+thead th{background:rgba(200,168,75,0.08);padding:12px 16px;text-align:left;color:#c8a84b;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+.totals{padding:24px 40px;background:rgba(200,168,75,0.03);border-top:1px solid rgba(200,168,75,0.1)}
+.total-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+.total-row.final{font-size:22px;font-weight:700;color:#c8a84b;padding:16px 0 0;border-top:2px solid rgba(200,168,75,0.3);margin-top:12px}
+.conditions{padding:32px 40px;border-top:1px solid rgba(200,168,75,0.08);font-size:12px;color:#888;line-height:1.8}
+.footer{padding:24px 40px;background:rgba(200,168,75,0.05);text-align:center;font-size:11px;color:#666}
+</style></head><body>
+<div class="budget">
+  <div class="header">
+    <div class="logo">Shopy <span>Crafter</span></div>
+    <div class="badge">PRESUPUESTO ${budgetId}</div>
+    <p style="color:#888;font-size:13px;margin-top:12px">Agencia de Optimización IA para Shopify</p>
+  </div>
+  <div class="client-info">
+    <div class="info-block"><h4>Cliente</h4><p>${clientName}</p></div>
+    <div class="info-block"><h4>Proyecto</h4><p>${projectName}</p></div>
+    <div class="info-block"><h4>Fecha</h4><p>${budgetDate}</p></div>
+    <div class="info-block"><h4>Validez</h4><p>30 días</p></div>
+  </div>
+  <div style="padding:0 40px 24px">
+    <table>
+      <thead><tr>
+        <th style="width:45%">Servicio</th><th style="text-align:center">Cantidad</th>
+        <th style="text-align:right">Precio/ud</th><th style="text-align:right">Subtotal</th>
+      </tr></thead>
+      <tbody>${serviceRows}</tbody>
+    </table>
+  </div>
+  <div class="totals">
+    ${subtotalOneTime > 0 ? `<div class="total-row"><span>Servicios puntuales</span><span>€${subtotalOneTime.toFixed(2)}</span></div>` : ''}
+    ${subtotalRecurring > 0 ? `<div class="total-row"><span>Servicios recurrentes</span><span>€${subtotalRecurring.toFixed(2)}/mes</span></div>` : ''}
+    ${(discount as number) > 0 ? `<div class="total-row" style="color:#4ade80"><span>Descuento (${discount}%)</span><span>-€${discountAmount.toFixed(2)}</span></div>` : ''}
+    <div class="total-row"><span>Subtotal sin IVA</span><span>€${totalAfterDiscount.toFixed(2)}</span></div>
+    <div class="total-row"><span>IVA (21%)</span><span>€${iva.toFixed(2)}</span></div>
+    <div class="total-row final"><span>TOTAL</span><span>€${totalFinal.toFixed(2)}</span></div>
+  </div>
+  <div class="conditions">
+    <strong style="color:#c8a84b">Condiciones:</strong><br>
+    • Plazo de entrega estimado: ${deliveryDays} días laborables<br>
+    • Forma de pago: 50% al inicio, 50% a la entrega<br>
+    • Presupuesto válido durante 30 días desde la fecha de emisión<br>
+    • Incluye 1 ronda de revisiones. Revisiones adicionales: €47/hora<br>
+    • Todos los precios en EUR. IVA incluido en el total final<br>
+    ${notes ? `• Notas: ${notes}<br>` : ''}
+  </div>
+  <div class="footer">
+    Shopy Crafter · shopycrafter.com · craftershopy@gmail.com<br>
+    Agencia de Optimización IA para Shopify · © ${new Date().getFullYear()}
+  </div>
+</div></body></html>`;
+
+          const activeProjectId = params?.projectId || null;
+          if (activeProjectId) {
+            try {
+              const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+              await fetch(`${baseUrl}/api/projects/${activeProjectId}/vault/save-report`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+                body: JSON.stringify({
+                  title: `Presupuesto ${budgetId} — ${clientName}`,
+                  content: budgetHtml,
+                  type: "budget",
+                  format: "html",
+                }),
+              });
+            } catch {}
+          }
+
+          result = {
+            budgetId,
+            totalBeforeDiscount: totalBeforeDiscount.toFixed(2),
+            discount: `${discount}%`,
+            totalAfterDiscount: totalAfterDiscount.toFixed(2),
+            iva: iva.toFixed(2),
+            totalFinal: totalFinal.toFixed(2),
+            html: budgetHtml,
+            message: `💼 **Presupuesto ${budgetId} generado**\n\n` +
+              `**Cliente:** ${clientName}\n**Proyecto:** ${projectName}\n\n` +
+              `| Servicio | Cant. | Precio/ud | Subtotal |\n|---|---|---|---|\n` +
+              (services as Array<{name: string, quantity: number, unitPrice: number}>).map((s) => {
+                const n = String(s.name || "Servicio").slice(0, 200).replace(/[|]/g, "\\|");
+                const q = clampNum(s.quantity, 0, 9999, 1);
+                const p = clampNum(s.unitPrice, 0, 999999, 0);
+                return `| ${n} | ${q} | €${p.toFixed(2)} | €${(q * p).toFixed(2)} |`;
+              }).join("\n") +
+              `\n\n${discount > 0 ? `**Descuento ${discount}%:** -€${discountAmount.toFixed(2)}\n` : ''}` +
+              `**Subtotal:** €${totalAfterDiscount.toFixed(2)}\n**IVA (21%):** €${iva.toFixed(2)}\n**TOTAL:** €${totalFinal.toFixed(2)}\n\n` +
+              `📄 Presupuesto guardado en el Vault como documento descargable.\n⏱️ Entrega: ${deliveryDays} días laborables · Validez: 30 días`
+          };
+        } catch (err) { result = { error: true, message: `❌ Error generando presupuesto: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
 

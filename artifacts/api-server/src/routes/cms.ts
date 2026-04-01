@@ -30,7 +30,7 @@ function broadcast(event: string, data: unknown) {
 function deepMergeDefaults(defaults: Record<string, unknown>, stored: Record<string, unknown>): Record<string, unknown> {
   const result = { ...stored };
   for (const key of Object.keys(defaults)) {
-    if (!(key in result)) {
+    if (!(key in result) || result[key] == null) {
       result[key] = defaults[key];
     } else if (
       defaults[key] && typeof defaults[key] === "object" && !Array.isArray(defaults[key]) &&

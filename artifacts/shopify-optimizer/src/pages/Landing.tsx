@@ -142,6 +142,7 @@ export default function Landing() {
   const [activeEngine, setActiveEngine] = useState(0);
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
+  const [calcCategory, setCalcCategory] = useState("all");
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
@@ -440,6 +441,18 @@ export default function Landing() {
   const calcRecurringService = calcSelectedRecurring ? calc.recurringServices.find(s => s.id === calcSelectedRecurring) : null;
   const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
   const calcActiveServices = calc.oneTimeServices.filter(s => (calcQuantities[s.id] || 0) > 0);
+
+  const calcCategories: { key: string; label: string; icon: string; ids: string[] }[] = [
+    { key: "all", label: "Todos", icon: "🔥", ids: [] },
+    { key: "products", label: "Productos", icon: "📦", ids: ["calc-product-1", "calc-redesign-1", "calc-redesign-partial", "calc-images-product", "calc-seo-product"] },
+    { key: "packs", label: "Packs", icon: "🎁", ids: ["calc-pack-5", "calc-pack-10", "calc-pack-20", "calc-pack-30", "calc-images-30", "calc-photoshoot"] },
+    { key: "design", label: "Diseño", icon: "🎨", ids: ["calc-theme-css", "calc-theme-section", "calc-homepage", "calc-product-page", "calc-responsive"] },
+    { key: "seo", label: "SEO & Marketing", icon: "🔍", ids: ["calc-seo-full", "calc-email-setup", "calc-posts-30", "calc-blog-5"] },
+    { key: "reports", label: "Informes", icon: "📊", ids: ["calc-audit", "calc-pricing-report", "calc-competitor", "calc-projection", "calc-supplier", "calc-session", "calc-app-install"] },
+  ];
+  const filteredOneTimeServices = calcCategory === "all"
+    ? calc.oneTimeServices
+    : calc.oneTimeServices.filter(s => calcCategories.find(c => c.key === calcCategory)?.ids.includes(s.id));
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
@@ -865,8 +878,20 @@ export default function Landing() {
               <div className="fp-calc-services">
                 <div className="fp-calc-group">
                   <h3 className="fp-calc-group-title">{calc.oneTimeLabel}</h3>
+                  <div className="fp-calc-tabs">
+                    {calcCategories.map(cat => (
+                      <button key={cat.key} type="button" className={`fp-calc-tab${calcCategory === cat.key ? " active" : ""}`}
+                        onClick={() => setCalcCategory(cat.key)}>
+                        <span>{cat.icon}</span> {cat.label}
+                        {cat.key !== "all" && (() => {
+                          const count = cat.ids.reduce((n, id) => n + (calcQuantities[id] || 0), 0);
+                          return count > 0 ? <span className="fp-calc-tab-badge">{count}</span> : null;
+                        })()}
+                      </button>
+                    ))}
+                  </div>
                   <div className="fp-calc-items">
-                    {calc.oneTimeServices.map(s => {
+                    {filteredOneTimeServices.map(s => {
                       const qty = calcQuantities[s.id] || 0;
                       return (
                         <div key={s.id} className={`fp-calc-item${qty > 0 ? " selected" : ""}`}>
