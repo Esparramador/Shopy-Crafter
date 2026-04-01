@@ -39,6 +39,12 @@ The platform supports multiple e-commerce platforms via a connector abstraction 
 - **UniversalAuditConnector**: Read-only connector for auditing any website. Uses PageSpeed Insights API + HTML scraping + Claude AI analysis. No product CRUD. supportsFeature("audit") returns true.
 - **Files**: `artifacts/api-server/src/lib/connectors/` (types.ts, shopify.ts, prestashop.ts, prestashop-xml.ts, woocommerce.ts, universal.ts, index.ts)
 
+### Product Enrichment System
+- **File**: `artifacts/api-server/src/routes/enrichment.ts`
+- **Endpoints**: `GET /api/enrichment/projects/:id/product-ids` (list all Shopify product IDs), `POST /api/enrichment/projects/:id/enrich-batch` (enrich products by ID array)
+- **Capabilities**: SEO meta titles (40-60 chars), SEO meta descriptions (130-155 chars), Shopify Standard Product Taxonomy categories, custom metafields (delivery_format, delivery_time, target_audience, material, file_format, customization_level, revision_policy, tools_used, language, includes), inventory_management=null for digital products
+- **Status**: All 56 products enriched with SEO + categories + metafields + inventory fix (April 2026)
+
 ### Global Vault (Bóveda Global)
 - **Purpose**: Centralized repository for reports, images, and research from ANY company — registered projects AND external entities
 - **DB**: `project_files` table with `project_id` (nullable), `entity_name`, `entity_url` columns. External research files have null project_id.

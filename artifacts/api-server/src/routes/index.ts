@@ -41,6 +41,7 @@ import brainSyncRouter from "./brain-sync.js";
 import referenceImagesRouter from "./reference-images.js";
 import actionButtonsRouter from "./action-buttons.js";
 import auditRouter from "./audit.js";
+import enrichmentRouter from "./enrichment.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -92,5 +93,6 @@ router.use(brainSyncRouter);
 router.use(referenceImagesRouter);
 router.use(actionButtonsRouter);
 router.use(auditRouter);
+router.use("/enrichment", enrichmentRouter);
 
 export default router;
