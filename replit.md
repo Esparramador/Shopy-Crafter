@@ -78,6 +78,39 @@ A Dual AI Engine (Claude and Gemini) powered by "ShopyBrain" acts as the central
 ### Security
 The platform employs AES-256-GCM encryption for sensitive credentials, includes a migration for token encryption, masks raw tokens in API responses, and provides `safeDecrypt()` for legacy values. It features comprehensive audit logging, database-backed rate limiting, AI API concurrency queues with exponential backoff, admin route protection, CORS, secure session management, SVG sanitization, PostMessage origin validation, and HTML escaping for XSS protection.
 
+## Quality Standards — MANDATORY Rules
+
+### Product Creation (100/100 Quality)
+Every product created MUST include ALL of these fields fully completed:
+- **Meta Title** (50-60 chars, with keywords)
+- **Meta Description** (150-160 chars, compelling with CTA)
+- **Schema/JSON-LD** (Product, Offer, AggregateRating when applicable)
+- **Alt Texts** on ALL images (descriptive, with product name + key feature)
+- **Clean Handle/URL** (lowercase, hyphenated, keyword-rich)
+- **Categories** (Shopify Standard Product Taxonomy ID)
+- **Stock/Inventory** (tracked, with quantity set)
+- **Variants** (size, color, format — whatever fits the product)
+- **Stock per Variant** (each variant must have inventory tracked)
+- **Metafields** (delivery_format, target_audience, custom fields)
+- **Vendor** = "Shopy Crafter" or client store name (NEVER "ShopyBrain")
+- **Product Type** set correctly
+- **Tags** relevant and complete
+
+### AI Image Generation
+- Images MUST be directly relevant to the specific product being created
+- Describe the actual product visually in the prompt (material, color, style, use case)
+- Never generate generic or abstract images — they must represent the real product
+- Include product context (e.g., "professional e-commerce photo of [specific product] on white background")
+
+### External Audits & Reports
+- Must research the ACTUAL business (not use own store data)
+- Analyze: meta titles, meta descriptions, schema/JSON-LD, alt texts, clean URLs, categories, stock, variants, variant stock, Open Graph, Twitter Cards, sitemap, robots.txt, page speed, security headers
+- Reports must have PREMIUM PORTFOLIO-QUALITY covers suitable for printing
+- Cover must include: agency logo/brand, report title, client name, date, decorative elements
+- Interior must be professionally designed with consistent visual hierarchy
+- Must look like a deliverable from a major consulting firm (McKinsey/Deloitte level)
+- Three templates available: Classic, Elegance (navy/blue), Prestige (charcoal/copper)
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

@@ -1,334 +1,304 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Auditoría Digital — Rasta Lo Barcelona — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; background: #1a1410; color: #f5f0eb; line-height: 1.65; }
-  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#1a1410;color:#f5f0eb;line-height:1.65;-webkit-font-smoothing:antialiased}
+.page{max-width:960px;margin:0 auto}
 
-  .cover-full { position: relative; min-height: 620px; background: linear-gradient(155deg, #0f0b08 0%, #1a1410 35%, #1e1610 70%, #140e08 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid #2e2620; }
-  .cover-full::before { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 30px; background: #c4956a; transform: translateX(-50%); }
-  .cover-full::after { content: ''; position: absolute; top: -200px; right: -200px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(196,149,106,.05) 0%, transparent 65%); pointer-events: none; }
+/* ===== PREMIUM PORTFOLIO COVER ===== */
+.cover-portfolio{
+  position:relative;min-height:100vh;
+  background:linear-gradient(170deg,#0d0906 0%,#15100a 20%,#1a1410 50%,#1e1610 80%,#100c08 100%);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;padding:80px 60px;overflow:hidden;
+  page-break-after:always;
+}
+.cover-portfolio::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 30%,rgba(196,149,106,.06) 0%,transparent 50%);
+  pointer-events:none;
+}
+.cover-portfolio::after{
+  content:'';position:absolute;bottom:-200px;left:50%;transform:translateX(-50%);width:1000px;height:500px;
+  background:radial-gradient(ellipse,rgba(196,149,106,.04) 0%,transparent 60%);pointer-events:none;
+}
 
-  .cover-diamond { width: 12px; height: 12px; background: #c4956a; transform: rotate(45deg); margin: 0 auto 28px; position: relative; z-index: 2; }
-  .cover-brand { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 600; color: #c4956a; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px; position: relative; z-index: 2; }
-  .cover-divider { display: flex; align-items: center; gap: 16px; margin: 0 auto 28px; position: relative; z-index: 2; justify-content: center; }
-  .cover-divider-line { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, #c4956a55); }
-  .cover-divider-dot { width: 6px; height: 6px; background: #c4956a; transform: rotate(45deg); }
-  .cover-title { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 800; color: #f5f0eb; line-height: 1.2; margin-bottom: 16px; position: relative; z-index: 2; }
-  .cover-subtitle { font-size: 16px; color: #9a8e80; margin-bottom: 28px; position: relative; z-index: 2; }
-  .cover-target { font-family: 'Cormorant Garamond', serif; font-size: 20px; color: #ddb896; font-weight: 600; font-style: italic; margin-bottom: 8px; position: relative; z-index: 2; }
-  .cover-date { font-size: 12px; color: #7a6e60; letter-spacing: 2px; text-transform: uppercase; position: relative; z-index: 2; }
+.cover-frame{position:absolute;inset:36px;pointer-events:none;}
+.cover-frame::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:28px;background:#c4956a;}
+.cover-frame::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:1px;height:28px;background:#c4956a44;}
+.cover-frame-h1{position:absolute;top:0;left:60px;right:60px;height:1px;background:linear-gradient(90deg,transparent,#c4956a22,transparent);}
+.cover-frame-h2{position:absolute;bottom:0;left:60px;right:60px;height:1px;background:linear-gradient(90deg,transparent,#c4956a22,transparent);}
 
-  .section { padding: 48px 56px; border-bottom: 1px solid #2e2620; }
-  .section-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 700; color: #f5f0eb; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.cover-inner{position:relative;z-index:5;max-width:680px;}
 
-  .card { background: #1e1812; border: 1px solid #2e2620; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-  .card-title { font-size: 14px; font-weight: 700; color: #c4956a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.cover-diamond-top{width:14px;height:14px;background:#c4956a;transform:rotate(45deg);margin:0 auto 36px;box-shadow:0 0 20px rgba(196,149,106,.3);}
 
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.cover-agency-line{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:44px;}
+.cover-agency-bar{width:50px;height:1px;background:linear-gradient(90deg,transparent,#c4956a55);}
+.cover-agency-bar-r{width:50px;height:1px;background:linear-gradient(90deg,#c4956a55,transparent);}
+.cover-agency-name{font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:600;color:#c4956a;letter-spacing:5px;text-transform:uppercase;}
 
-  .stat { text-align: center; }
-  .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 800; }
-  .stat-label { font-size: 12px; color: #7a6e60; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+.cover-logo-container{margin-bottom:44px;}
+.cover-logo-circle{width:100px;height:100px;border-radius:50%;background:linear-gradient(145deg,#211c15,#1e1812);border:2px solid #c4956a44;display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.4),0 0 0 1px #2e2620,0 0 60px rgba(196,149,106,.06);}
+.cover-logo-text{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:800;color:#c4956a;letter-spacing:2px;}
 
-  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #2e262022; }
-  .check-item:last-child { border-bottom: none; }
-  .check-icon { font-size: 16px; min-width: 24px; text-align: center; }
-  .check-label { font-size: 14px; color: #9a8e80; }
-  .check-label strong { color: #f5f0eb; }
+.cover-sep{display:flex;align-items:center;justify-content:center;gap:16px;margin:0 auto 40px;}
+.cover-sep-line{width:70px;height:1px;background:linear-gradient(90deg,transparent,#c4956a44);}
+.cover-sep-line-r{width:70px;height:1px;background:linear-gradient(90deg,#c4956a44,transparent);}
+.cover-sep-dot{width:6px;height:6px;background:#c4956a;transform:rotate(45deg);opacity:.6;}
 
-  .rec { background: #211c15; border-left: 3px solid #c4956a; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 12px; }
-  .rec-title { font-size: 14px; font-weight: 700; color: #c4956a; margin-bottom: 4px; }
-  .rec-text { font-size: 13px; color: #9a8e80; line-height: 1.6; }
-  .rec-priority { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-  .priority-critical { background: #f43f5e22; color: #f43f5e; }
-  .priority-high { background: #f59e0b22; color: #f59e0b; }
-  .priority-medium { background: #6ba8f022; color: #6ba8f0; }
+.cover-doc-type{font-size:11px;font-weight:700;color:#7a6e60;letter-spacing:4px;text-transform:uppercase;margin-bottom:20px;}
+.cover-main-title{font-family:'Cormorant Garamond',serif;font-size:50px;font-weight:800;color:#f5f0eb;line-height:1.15;letter-spacing:-0.5px;margin-bottom:16px;text-shadow:0 4px 30px rgba(0,0,0,.4);}
+.cover-main-subtitle{font-size:16px;color:#9a8e80;font-weight:400;line-height:1.6;margin-bottom:48px;max-width:520px;margin-left:auto;margin-right:auto;}
 
-  .review { background: #211c15; border: 1px solid #2e2620; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-  .review-stars { color: #c4956a; margin-bottom: 6px; }
-  .review-text { font-size: 13px; color: #9a8e80; font-style: italic; line-height: 1.6; }
+.cover-client-box{background:#211c15;border:1px solid #3d332a;border-radius:12px;padding:24px 44px;display:inline-block;margin-bottom:32px;box-shadow:0 8px 32px rgba(0,0,0,.25);}
+.cover-client-label{font-size:10px;color:#7a6e60;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;}
+.cover-client-name{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:#ddb896;font-style:italic;letter-spacing:0.5px;}
 
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; color: #7a6e60; text-transform: uppercase; letter-spacing: 1px; padding: 10px 12px; border-bottom: 1px solid #2e2620; }
-  td { font-size: 13px; color: #9a8e80; padding: 10px 12px; border-bottom: 1px solid #2e262022; }
+.cover-meta-row{display:flex;justify-content:center;gap:40px;margin-top:16px;}
+.cover-meta-item{text-align:center;}
+.cover-meta-label{font-size:9px;color:#7a6e60;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.cover-meta-value{font-size:13px;color:#9a8e80;font-weight:500;}
 
-  .footer { padding: 32px 56px; text-align: center; color: #7a6e60; font-size: 11px; letter-spacing: 1px; }
-  @media print { body { background: #1a1410 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.cover-footer-line{position:absolute;bottom:24px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;z-index:5;}
+.cover-footer-text{font-size:9px;color:#7a6e6044;letter-spacing:2px;text-transform:uppercase;}
+
+/* ===== CONTENT ===== */
+.section{padding:44px 56px;border-bottom:1px solid #2e2620;}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:#f5f0eb;margin-bottom:22px;display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid #2e262044;}
+.section-title .st-icon{font-size:18px;width:36px;height:36px;background:#211c15;border:1px solid #2e2620;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+
+.card{background:#1e1812;border:1px solid #2e2620;border-radius:10px;padding:22px;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;color:#c4956a;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+.stat{text-align:center;padding:20px 16px;}
+.stat-value{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:800;}
+.stat-label{font-size:11px;color:#7a6e60;text-transform:uppercase;letter-spacing:1px;margin-top:6px;}
+
+.ci{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #2e262015;}
+.ci:last-child{border-bottom:none;}
+.ci-icon{font-size:15px;min-width:22px;text-align:center;margin-top:1px;}
+.ci-text{font-size:13px;color:#9a8e80;line-height:1.5;}
+.ci-text strong{color:#f5f0eb;}
+
+.rec{background:#211c15;border-left:3px solid #c4956a;padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:10px;}
+.rec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.rec-title{font-size:13px;font-weight:700;color:#c4956a;}
+.rec-text{font-size:12px;color:#9a8e80;line-height:1.6;}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;}
+.b-crit{background:#f43f5e22;color:#f43f5e;}
+.b-high{background:#f59e0b22;color:#f59e0b;}
+.b-med{background:#6ba8f022;color:#6ba8f0;}
+
+.review{background:#211c15;border:1px solid #2e2620;border-radius:8px;padding:14px;margin-bottom:10px;}
+.review-stars{color:#c4956a;margin-bottom:4px;font-size:14px;}
+.review-text{font-size:12px;color:#9a8e80;font-style:italic;line-height:1.6;}
+
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:10px;color:#7a6e60;text-transform:uppercase;letter-spacing:1px;padding:8px 10px;border-bottom:1px solid #2e2620;}
+td{font-size:12px;color:#9a8e80;padding:8px 10px;border-bottom:1px solid #2e262018;}
+
+.footer{padding:28px 56px;text-align:center;color:#7a6e6088;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}
+
+@media print{
+  body{background:#1a1410!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .cover-portfolio{min-height:100vh;page-break-after:always;}
+  .section{page-break-inside:avoid;}
+}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <div class="cover-full">
-    <div class="cover-diamond"></div>
-    <div class="cover-brand">SHOPY CRAFTER</div>
-    <div class="cover-divider"><div class="cover-divider-line"></div><div class="cover-divider-dot"></div><div class="cover-divider-line" style="background:linear-gradient(90deg,#c4956a55,transparent);"></div></div>
-    <div class="cover-title">Auditoría Digital Completa</div>
-    <div class="cover-subtitle">Análisis exhaustivo de presencia digital, SEO local y oportunidades de crecimiento</div>
-    <div class="cover-target">Preparado para: Rasta Lo Barcelona</div>
-    <div class="cover-date">01 DE ABRIL DE 2026</div>
-  </div>
+<!-- ============== PREMIUM PORTFOLIO COVER ============== -->
+<div class="cover-portfolio">
+  <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
 
-  <!-- RESUMEN EJECUTIVO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">★</span> Resumen Ejecutivo</div>
-    <div class="card">
-      <p style="color:#9a8e80;font-size:15px;line-height:1.8;margin-bottom:20px;">
-        <strong style="color:#f5f0eb">Rasta Lo Barcelona</strong> es una peluquería especializada en rastas ubicada en <strong style="color:#f5f0eb">Galerías Maldá, Plaça del Pi 4, Ciutat Vella, 08002 Barcelona</strong>. Ofrece servicios de creación de rastas con aguja, extensiones, tinte en rastas, deshecho de rastas y servicio a domicilio. Opera bajo cita previa y acepta tarjetas de crédito, débito y NFC.
-      </p>
-      <p style="color:#9a8e80;font-size:15px;line-height:1.8;">
-        El negocio tiene una <strong style="color:#34d399">excelente reputación</strong> con 4.4/5 en Google (225 valoraciones), pero carece de <strong style="color:#f43f5e">web propia</strong>, depende exclusivamente de Instagram (@rasta_lo_barcelona) y su presencia en directorios de terceros. Esto limita severamente su capacidad de posicionamiento SEO local y control sobre su marca digital.
-      </p>
-    </div>
-    <div class="grid3" style="margin-top:20px;">
-      <div class="card stat">
-        <div class="stat-value" style="color:#f59e0b;">D</div>
-        <div class="stat-label">Nota Digital Global</div>
-      </div>
-      <div class="card stat">
-        <div class="stat-value" style="color:#34d399;">4.4★</div>
-        <div class="stat-label">Google Reviews (225)</div>
-      </div>
-      <div class="card stat">
-        <div class="stat-value" style="color:#f43f5e;">11</div>
-        <div class="stat-label">Oportunidades Perdidas</div>
-      </div>
-    </div>
-  </div>
+  <div class="cover-inner">
+    <div class="cover-diamond-top"></div>
 
-  <!-- FICHA DEL NEGOCIO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">✂️</span> Ficha del Negocio</div>
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Información General</div>
-        <div class="check-item"><span class="check-icon">✂️</span><div class="check-label"><strong>Nombre:</strong> Rasta Lo Barcelona</div></div>
-        <div class="check-item"><span class="check-icon">📍</span><div class="check-label"><strong>Dirección:</strong> Galerías Maldá, Plaça del Pi 4, Ciutat Vella, 08002 Barcelona</div></div>
-        <div class="check-item"><span class="check-icon">📱</span><div class="check-label"><strong>Instagram:</strong> @rasta_lo_barcelona</div></div>
-        <div class="check-item"><span class="check-icon">📘</span><div class="check-label"><strong>Facebook:</strong> Barcelona Rastas — Rasta Lo</div></div>
-        <div class="check-item"><span class="check-icon">🌐</span><div class="check-label"><strong>Web propia:</strong> <span style="color:#f43f5e">NO TIENE ❌</span></div></div>
-        <div class="check-item"><span class="check-icon">💼</span><div class="check-label"><strong>Sector:</strong> Peluquería / Rastas / Belleza</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Servicios Detectados</div>
-        <div class="check-item"><span class="check-icon">🔧</span><div class="check-label"><strong>Creación de rastas</strong> — con técnica de aguja</div></div>
-        <div class="check-item"><span class="check-icon">➕</span><div class="check-label"><strong>Extensiones de rastas</strong></div></div>
-        <div class="check-item"><span class="check-icon">🎨</span><div class="check-label"><strong>Tinte en rastas</strong></div></div>
-        <div class="check-item"><span class="check-icon">✂️</span><div class="check-label"><strong>Deshecho de rastas</strong></div></div>
-        <div class="check-item"><span class="check-icon">🏠</span><div class="check-label"><strong>Servicio a domicilio</strong></div></div>
-        <div class="check-item"><span class="check-icon">♿</span><div class="check-label"><strong>Acceso silla de ruedas</strong> y baño adaptado</div></div>
-      </div>
+    <div class="cover-agency-line">
+      <div class="cover-agency-bar"></div>
+      <div class="cover-agency-name">Shopy Crafter</div>
+      <div class="cover-agency-bar-r"></div>
+    </div>
+
+    <div class="cover-logo-container">
+      <div class="cover-logo-circle"><div class="cover-logo-text">SC</div></div>
+    </div>
+
+    <div class="cover-sep">
+      <div class="cover-sep-line"></div>
+      <div class="cover-sep-dot"></div>
+      <div class="cover-sep-line-r"></div>
+    </div>
+
+    <div class="cover-doc-type">Informe de Consultoría Digital</div>
+    <div class="cover-main-title">Auditoría Digital<br>Completa</div>
+    <div class="cover-main-subtitle">Análisis exhaustivo de presencia digital, SEO local,<br>reputación online y oportunidades de crecimiento</div>
+
+    <div class="cover-client-box">
+      <div class="cover-client-label">Preparado para</div>
+      <div class="cover-client-name">Rasta Lo Barcelona</div>
+    </div>
+
+    <div class="cover-meta-row">
+      <div class="cover-meta-item"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">Abril 2026</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">Peluquería / Rastas</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Ubicación</div><div class="cover-meta-value">Barcelona, España</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">SC-AUD-2026-RL</div></div>
     </div>
   </div>
 
-  <!-- PRESENCIA DIGITAL -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🌐</span> Presencia Digital Actual</div>
-
-    <div class="card">
-      <div class="card-title">Canales Activos</div>
-      <table>
-        <tr><th>Canal</th><th>Estado</th><th>Control</th><th>Nota</th></tr>
-        <tr><td>Web propia</td><td style="color:#f43f5e">❌ No existe</td><td style="color:#f43f5e">—</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-        <tr><td>Instagram (@rasta_lo_barcelona)</td><td style="color:#34d399">✅ Activo</td><td style="color:#34d399">Total</td><td style="color:#34d399"><strong>B</strong></td></tr>
-        <tr><td>Facebook (Barcelona Rastas)</td><td style="color:#34d399">✅ Activo</td><td style="color:#34d399">Total</td><td style="color:#f59e0b"><strong>C</strong></td></tr>
-        <tr><td>Google Business Profile</td><td style="color:#34d399">✅ Activo (4.4★)</td><td style="color:#34d399">Total</td><td style="color:#34d399"><strong>A</strong></td></tr>
-        <tr><td>Rosabelle.es (directorio)</td><td style="color:#34d399">✅ Listado</td><td style="color:#f43f5e">Ninguno</td><td style="color:#f59e0b"><strong>C</strong></td></tr>
-        <tr><td>Fresha (reservas)</td><td style="color:#f59e0b">⚠️ Referencia</td><td style="color:#f43f5e">Ninguno</td><td style="color:#f59e0b"><strong>D</strong></td></tr>
-        <tr><td>Google SEO orgánico</td><td style="color:#f43f5e">❌ Sin web propia</td><td style="color:#f43f5e">Ninguno</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-      </table>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Análisis SEO — Sin Web Propia</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Meta Title:</strong> No existe — Sin web no hay meta title propio</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Meta Description:</strong> No existe</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Schema/JSON-LD:</strong> No existe — Google solo tiene datos del directorio Rosabelle</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Alt Texts:</strong> No aplicable sin web</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Clean Handles/URLs:</strong> No aplicable</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Sitemap:</strong> No existe</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Google Business:</strong> Funciona como sustituto parcial pero no da control total sobre el SEO</div></div>
-      <p style="color:#7a6e60;font-size:12px;margin-top:12px;">⚠️ Sin web propia, el 100% del tráfico orgánico va a directorios de terceros como Rosabelle.es, Fresha y Reggae Catalunya. Rasta Lo pierde todo ese tráfico potencial.</p>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:8%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">8/100</span>
-  </div>
-    </div>
-  </div>
-
-  <!-- GOOGLE BUSINESS PROFILE -->
-  <div class="section">
-    <div class="section-title"><span class="icon">📍</span> Google Business Profile</div>
-    <div class="card">
-      <div class="card-title">Datos del Perfil</div>
-      <div class="grid2">
-        <div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Valoración:</strong> 4.4/5 (225 reseñas)</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Categoría:</strong> Peluquería</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Dirección:</strong> Verificada</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Pagos:</strong> Tarjetas + NFC</div></div>
-        </div>
-        <div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Accesibilidad:</strong> Silla de ruedas + baño adaptado</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Cita previa:</strong> Indicado</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Web:</strong> No enlaza a web propia</div></div>
-          <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Servicios:</strong> Podría detallar más (precios, duración)</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- REVIEWS -->
-  <div class="section">
-    <div class="section-title"><span class="icon">⭐</span> Valoraciones Destacadas</div>
-    <div class="review">
-      <div class="review-stars">★★★★★</div>
-      <div class="review-text">"Viajo cada año (o más) desde Suiza a arreglarme y decorar las rastas. El precio es muy adecuado (o barato) para el trabajo que hacen las chicas. Lola es un amor."</div>
-    </div>
-    <div class="review">
-      <div class="review-stars">★★★★★</div>
-      <div class="review-text">"Atención increíble, trato excepcional. Resultados espectaculares."</div>
-    </div>
-    <div class="review">
-      <div class="review-stars">★★★★★</div>
-      <div class="review-text">"Estuve hoy y quedé encantada!!! Profesionales, rápidas y muuuuy amables!!"</div>
-    </div>
-    <div class="review">
-      <div class="review-stars">★★☆☆☆</div>
-      <div class="review-text">"Me cobraron 120€ por 8 rastas y en la primera semana perdí dos y en un mes estaba casi de perder la tercera. Fui a pedir que la arreglaran y me dijeron que tengo que esperar."</div>
-    </div>
-    <div class="card" style="margin-top:16px;">
-      <div class="card-title">Análisis de Reputación</div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Puntos fuertes:</strong> Trato amable, precio competitivo, profesionalidad, clientes internacionales recurrentes</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Puntos a mejorar:</strong> Algunos clientes reportan durabilidad insuficiente y política de garantía/arreglos poco clara</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">💡</span><div class="check-label"><strong>Oportunidad:</strong> Responder públicamente a todas las reseñas (positivas y negativas) para mejorar percepción</div></div>
-    </div>
-  </div>
-
-  <!-- COMPETENCIA -->
-  <div class="section">
-    <div class="section-title"><span class="icon">⚔️</span> Análisis Competitivo</div>
-    <div class="card">
-      <table>
-        <tr><th>Competidor</th><th>Web</th><th>Instagram</th><th>Google ★</th><th>SEO</th></tr>
-        <tr><td><strong>Rasta Lo</strong></td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td>4.4 (225)</td><td style="color:#f43f5e">F</td></tr>
-        <tr><td>Barcelona Roots</td><td style="color:#34d399">✅ reggaecatalunya.com</td><td style="color:#34d399">✅</td><td>—</td><td style="color:#f59e0b">C</td></tr>
-        <tr><td>Otros (Fresha/Treatwell)</td><td style="color:#34d399">✅ Plataformas</td><td>Varía</td><td>Varía</td><td style="color:#34d399">A</td></tr>
-      </table>
-      <p style="color:#7a6e60;font-size:12px;margin-top:12px;">Cuando alguien busca "rastas Barcelona" en Google, Rasta Lo no aparece con web propia — solo directorios de terceros. Los competidores con web propia capturan ese tráfico.</p>
-    </div>
-  </div>
-
-  <!-- RECOMENDACIONES -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🎯</span> Plan de Acción — Recomendaciones Prioritarias</div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">1. Crear Web Propia (rastalo.es o rastalobcn.com)</div>
-        <span class="rec-priority priority-critical">CRÍTICO</span>
-      </div>
-      <div class="rec-text">Es la necesidad más urgente. Una web one-page con: servicios y precios, galería de trabajos, sistema de citas (calendario integrado con Instagram), mapa Google, testimonios, y schema LocalBusiness + HairSalon. Dominio propio con SSL, optimizada para móvil. Con SEO correcto aparecería en las primeras posiciones para "rastas Barcelona".</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">2. Implementar Schema Markup completo</div>
-        <span class="rec-priority priority-critical">CRÍTICO</span>
-      </div>
-      <div class="rec-text">En la nueva web: @type HairSalon + LocalBusiness con: nombre, dirección, teléfono, horarios, coordenadas, servicios con precios, categoría "HairSalon", aggregateRating (4.4/5, 225 reviews), sameAs (Instagram, Facebook), priceRange, paymentAccepted (Credit Card, NFC), accessibilityFeature.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">3. Optimizar Google Business Profile</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">Añadir: todos los servicios con precios y duración estimada, fotos profesionales del local y trabajos, horarios actualizados, enlace a web propia (cuando exista), publicaciones periódicas (Google Posts), y responder a TODAS las reseñas.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">4. Estrategia de contenido en Instagram</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">Publicar antes/después de trabajos, Reels mostrando el proceso, Stories con preguntas frecuentes, Highlights organizados por servicio (Rastas nuevas, Extensiones, Tinte, etc.), precios actualizados en Bio, enlace a web en Bio.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">5. Sistema de reservas online</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">Integrar sistema de reservas en la web: selección de servicio, estimación de precio según longitud de pelo, calendario con disponibilidad, confirmación por email/WhatsApp. Opción Calendly, Booksy o sistema propio integrado en la web.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">6. SEO Local — Keywords objetivo</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Posicionar para: "rastas Barcelona", "peluquería rastas Barcelona", "hacer rastas Barcelona", "dreadlocks Barcelona", "extensiones rastas Barcelona", "deshacer rastas Barcelona", "rasta lo Barcelona reseñas". Con una web optimizada, estas keywords son alcanzables en 3-6 meses.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">7. Galería de trabajos profesional</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Crear galería en web con fotos antes/después de alta calidad. Cada imagen con alt text descriptivo: "Rastas finas hechas con aguja en Rasta Lo Barcelona — pelo largo rubio". Organizar por tipo de servicio. Esto mejora SEO de imágenes y genera confianza.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">8. Política de garantía clara</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Publicar en web e Instagram una política clara de arreglos/garantía para abordar las reseñas negativas sobre durabilidad. Esto mejora confianza y reduce quejas públicas. Ejemplo: "Arreglo gratuito en los primeros 15 días".</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">9. Registrarse en TripAdvisor y Yelp</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Como muchos clientes son turistas (viajan desde Suiza, etc.), estar en TripAdvisor y Yelp captará clientes internacionales que buscan servicios en Barcelona. Completar perfiles con fotos, servicios y horarios.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">10. Colaboraciones con hostales y turismo</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Ubicado en Plaça del Pi (zona turística prime), colaborar con hostales, hoteles boutique y blogs de viaje para captar turistas. Crear flyers multiidioma (ES, EN, FR) con QR a la web.</div>
-    </div>
-  </div>
-
-  <!-- PRESUPUESTO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">💰</span> Presupuesto de Optimización</div>
-    <div class="card">
-      <p style="color:#9a8e80;font-size:14px;line-height:1.8;">
-        Shopy Crafter puede crear la web completa para Rasta Lo, con diseño profesional, SEO local optimizado, schema markup, sistema de reservas, galería de trabajos y conexión con todas las redes sociales. Contacta con nosotros para un presupuesto personalizado.
-      </p>
-      <p style="color:#c4956a;font-size:15px;font-weight:600;margin-top:12px;">
-        🌐 shopycrafter.com — Tu agencia de optimización digital
-      </p>
-    </div>
-  </div>
-
-  <div class="footer">
-    SHOPY CRAFTER — AUDITORÍA DIGITAL PROFESIONAL — 01 DE ABRIL DE 2026 — CONFIDENCIAL
+  <div class="cover-footer-line">
+    <div class="cover-footer-text">shopycrafter.com</div>
+    <div class="cover-footer-text">Confidencial</div>
   </div>
 </div>
-</body>
-</html>
+
+<!-- RESUMEN -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">★</div> Resumen Ejecutivo</div>
+  <div class="card">
+    <p style="color:#9a8e80;font-size:14px;line-height:1.8;margin-bottom:16px;">
+      <strong style="color:#f5f0eb">Rasta Lo Barcelona</strong> es una peluquería especializada en rastas ubicada en <strong style="color:#f5f0eb">Galerías Maldá, Plaça del Pi 4, Ciutat Vella, 08002 Barcelona</strong>. Ofrece creación de rastas con aguja, extensiones, tinte, deshecho y servicio a domicilio. Opera bajo cita previa y acepta tarjetas y NFC.
+    </p>
+    <p style="color:#9a8e80;font-size:14px;line-height:1.8;">
+      El negocio tiene <strong style="color:#34d399">excelente reputación</strong> (4.4/5, 225 valoraciones en Google), pero carece de <strong style="color:#f43f5e">web propia</strong>, dependiendo exclusivamente de Instagram y directorios de terceros. Esto limita severamente su posicionamiento SEO y control sobre su marca digital.
+    </p>
+  </div>
+  <div class="grid3" style="margin-top:16px;">
+    <div class="card stat"><div class="stat-value" style="color:#f59e0b;">D</div><div class="stat-label">Nota Digital</div></div>
+    <div class="card stat"><div class="stat-value" style="color:#34d399;">4.4★</div><div class="stat-label">Google (225)</div></div>
+    <div class="card stat"><div class="stat-value" style="color:#f43f5e;">11</div><div class="stat-label">Oportunidades</div></div>
+  </div>
+</div>
+
+<!-- FICHA -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">✂️</div> Ficha del Negocio</div>
+  <div class="grid2">
+    <div class="card"><div class="card-title">Información</div>
+      <div class="ci"><span class="ci-icon">✂️</span><div class="ci-text"><strong>Nombre:</strong> Rasta Lo Barcelona</div></div>
+      <div class="ci"><span class="ci-icon">📍</span><div class="ci-text"><strong>Dirección:</strong> Galerías Maldá, Plaça del Pi 4, 08002 BCN</div></div>
+      <div class="ci"><span class="ci-icon">📱</span><div class="ci-text"><strong>Instagram:</strong> @rasta_lo_barcelona</div></div>
+      <div class="ci"><span class="ci-icon">📘</span><div class="ci-text"><strong>Facebook:</strong> Barcelona Rastas — Rasta Lo</div></div>
+      <div class="ci"><span class="ci-icon">🌐</span><div class="ci-text"><strong>Web propia:</strong> <span style="color:#f43f5e">NO TIENE ❌</span></div></div>
+    </div>
+    <div class="card"><div class="card-title">Servicios</div>
+      <div class="ci"><span class="ci-icon">🔧</span><div class="ci-text"><strong>Creación de rastas</strong> (aguja)</div></div>
+      <div class="ci"><span class="ci-icon">➕</span><div class="ci-text"><strong>Extensiones de rastas</strong></div></div>
+      <div class="ci"><span class="ci-icon">🎨</span><div class="ci-text"><strong>Tinte en rastas</strong></div></div>
+      <div class="ci"><span class="ci-icon">✂️</span><div class="ci-text"><strong>Deshecho de rastas</strong></div></div>
+      <div class="ci"><span class="ci-icon">🏠</span><div class="ci-text"><strong>Servicio a domicilio</strong></div></div>
+      <div class="ci"><span class="ci-icon">♿</span><div class="ci-text"><strong>Acceso silla de ruedas</strong> + baño adaptado</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRESENCIA DIGITAL -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🌐</div> Presencia Digital</div>
+  <div class="card">
+    <table>
+      <tr><th>Canal</th><th>Estado</th><th>Control</th><th>Nota</th></tr>
+      <tr><td>Web propia</td><td style="color:#f43f5e">❌ No existe</td><td>—</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+      <tr><td>Instagram</td><td style="color:#34d399">✅ Activo</td><td style="color:#34d399">Total</td><td style="color:#34d399"><strong>B</strong></td></tr>
+      <tr><td>Facebook</td><td style="color:#34d399">✅ Activo</td><td style="color:#34d399">Total</td><td style="color:#f59e0b"><strong>C</strong></td></tr>
+      <tr><td>Google Business</td><td style="color:#34d399">✅ 4.4★</td><td style="color:#34d399">Total</td><td style="color:#34d399"><strong>A</strong></td></tr>
+      <tr><td>Rosabelle.es</td><td style="color:#34d399">✅ Listado</td><td style="color:#f43f5e">Ninguno</td><td style="color:#f59e0b"><strong>C</strong></td></tr>
+      <tr><td>SEO orgánico</td><td style="color:#f43f5e">❌ Sin web</td><td style="color:#f43f5e">Ninguno</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+    </table>
+  </div>
+  <div class="card"><div class="card-title">SEO — Sin Web Propia</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Meta Title/Description/Schema/Alt Texts/URLs:</strong> No existen — Sin web no hay control SEO propio</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">100% del tráfico orgánico va a directorios de terceros (Rosabelle, Fresha, Reggae Catalunya)</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:8%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">8/100</span>
+  </div>
+  </div>
+</div>
+
+<!-- GOOGLE BUSINESS -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">📍</div> Google Business Profile</div>
+  <div class="card"><div class="grid2"><div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>4.4/5</strong> (225 reseñas)</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>Categoría:</strong> Peluquería</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>Dirección:</strong> Verificada</div></div>
+  </div><div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>Pagos:</strong> Tarjetas + NFC</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>Accesibilidad:</strong> Completa</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text"><strong>Web:</strong> No enlazada</div></div>
+  </div></div></div>
+</div>
+
+<!-- REVIEWS -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">⭐</div> Valoraciones Destacadas</div>
+  <div class="review"><div class="review-stars">★★★★★</div><div class="review-text">"Viajo cada año desde Suiza a arreglarme y decorar las rastas. El precio es muy adecuado para el trabajo que hacen las chicas. Lola es un amor."</div></div>
+  <div class="review"><div class="review-stars">★★★★★</div><div class="review-text">"Atención increíble, trato excepcional. Resultados espectaculares."</div></div>
+  <div class="review"><div class="review-stars">★★☆☆☆</div><div class="review-text">"Me cobraron 120€ por 8 rastas y en la primera semana perdí dos."</div></div>
+  <div class="card" style="margin-top:12px;"><div class="card-title">Análisis de Reputación</div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>Fortalezas:</strong> Trato amable, precio competitivo, clientes internacionales recurrentes</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text"><strong>Mejorar:</strong> Durabilidad, política de garantía clara</div></div>
+  </div>
+</div>
+
+<!-- RECOMENDACIONES -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🎯</div> Plan de Acción Prioritario</div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">1. Crear Web Propia (rastalo.es)</div><span class="badge b-crit">CRÍTICO</span></div>
+  <div class="rec-text">Web one-page: servicios con precios, galería antes/después, calendario de citas, mapa, testimonios, schema HairSalon + LocalBusiness. SEO optimizado para "rastas Barcelona".</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">2. Schema Markup completo</div><span class="badge b-crit">CRÍTICO</span></div>
+  <div class="rec-text">@type HairSalon: nombre, dirección, GPS, horarios, servicios con precios, aggregateRating 4.4/5, sameAs (Instagram, Facebook), paymentAccepted, accessibilityFeature.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">3. Optimizar Google Business Profile</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">Añadir servicios con precios y duración, fotos profesionales, responder TODAS las reseñas, Google Posts periódicos.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">4. Estrategia Instagram profesional</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">Reels antes/después, Highlights por servicio, precios en Bio, enlace a web, Stories con FAQ.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">5. Sistema de reservas online</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">Calendario integrado en web con selección de servicio, estimación de precio y confirmación por WhatsApp/email.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">6. SEO Local — Keywords objetivo</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">"rastas Barcelona", "dreadlocks Barcelona", "peluquería rastas", "extensiones rastas BCN". Alcanzable en 3-6 meses con web optimizada.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">7. Galería profesional con alt texts</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Fotos antes/después de alta calidad. Alt texts descriptivos: "Rastas finas con aguja en Rasta Lo Barcelona — pelo largo rubio".</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">8. Política de garantía pública</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Publicar en web e Instagram política de arreglos/garantía para abordar reseñas negativas sobre durabilidad.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">9. TripAdvisor + Yelp</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Muchos clientes son turistas. Estar en TripAdvisor y Yelp captará clientes internacionales.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">10. Colaboraciones turismo local</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Ubicado en Plaça del Pi (zona prime). Flyers multiidioma (ES/EN/FR) con QR a web. Colaborar con hostales.</div></div>
+</div>
+
+<!-- CIERRE -->
+<div class="section" style="border-bottom:none;">
+  <div class="section-title"><div class="st-icon">💰</div> Siguiente Paso</div>
+  <div class="card" style="text-align:center;padding:32px;">
+    <p style="color:#9a8e80;font-size:14px;line-height:1.8;margin-bottom:16px;">Shopy Crafter puede crear la web completa para Rasta Lo con diseño profesional, SEO local, sistema de reservas y conexión con redes sociales.</p>
+    <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:#c4956a;margin-bottom:8px;">shopycrafter.com</p>
+    <p style="color:#7a6e60;font-size:12px;">Tu agencia de optimización digital</p>
+  </div>
+</div>
+
+<div class="footer">SHOPY CRAFTER — AUDITORÍA DIGITAL PROFESIONAL — 01 DE ABRIL DE 2026 — CONFIDENCIAL</div>
+</div></body></html>

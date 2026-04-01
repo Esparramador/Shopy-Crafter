@@ -1,454 +1,431 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Auditoría Digital — Lazy Lizard — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; background: #0b1628; color: #f0f2f8; line-height: 1.65; }
-  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#0b1628;color:#f0f2f8;line-height:1.65;-webkit-font-smoothing:antialiased}
+.page{max-width:960px;margin:0 auto}
 
-  .cover-full { position: relative; min-height: 620px; background: linear-gradient(155deg, #070e1c 0%, #0b1628 35%, #0d1a35 70%, #091428 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 56px; overflow: hidden; border-bottom: 2px solid #1a2a4a; }
-  .cover-full::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(74,144,217,.02) 80px, rgba(74,144,217,.02) 81px); pointer-events: none; }
-  .cover-full .corner { position: absolute; width: 80px; height: 80px; border-color: #4a90d933; border-style: solid; }
-  .corner-tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
-  .corner-tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
-  .corner-bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
-  .corner-br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
+/* ===== PREMIUM PORTFOLIO COVER ===== */
+.cover-portfolio{
+  position:relative;min-height:100vh;
+  background:linear-gradient(170deg,#040a18 0%,#081225 20%,#0b1628 50%,#0a1832 80%,#060e20 100%);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;padding:80px 60px;overflow:hidden;
+  page-break-after:always;
+}
+.cover-portfolio::before{
+  content:'';position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 120px,rgba(74,144,217,.015) 120px,rgba(74,144,217,.015) 121px),
+    repeating-linear-gradient(90deg,transparent,transparent 120px,rgba(74,144,217,.015) 120px,rgba(74,144,217,.015) 121px);
+  pointer-events:none;
+}
+.cover-portfolio::after{
+  content:'';position:absolute;top:-300px;right:-300px;width:800px;height:800px;
+  background:radial-gradient(circle,rgba(74,144,217,.06) 0%,transparent 60%);pointer-events:none;
+}
+.cover-glow-bl{position:absolute;bottom:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(74,144,217,.04) 0%,transparent 60%);pointer-events:none;}
 
-  .cover-brand { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 600; color: #4a90d9; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px; position: relative; z-index: 2; }
-  .cover-divider { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, #4a90d9, transparent); margin: 0 auto 28px; position: relative; z-index: 2; }
-  .cover-title { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; color: #f0f2f8; line-height: 1.2; margin-bottom: 16px; position: relative; z-index: 2; }
-  .cover-subtitle { font-size: 16px; color: #c0c8d8; margin-bottom: 28px; position: relative; z-index: 2; }
-  .cover-target { font-family: 'Playfair Display', serif; font-size: 20px; color: #6ba8f0; font-weight: 600; margin-bottom: 8px; position: relative; z-index: 2; }
-  .cover-date { font-size: 12px; color: #6880a8; letter-spacing: 2px; text-transform: uppercase; position: relative; z-index: 2; }
+.cover-frame{position:absolute;inset:32px;border:1px solid #4a90d918;border-radius:2px;pointer-events:none;}
+.cover-frame::before{content:'';position:absolute;top:-1px;left:40px;right:40px;height:1px;background:linear-gradient(90deg,transparent,#4a90d944,transparent);}
+.cover-frame::after{content:'';position:absolute;bottom:-1px;left:40px;right:40px;height:1px;background:linear-gradient(90deg,transparent,#4a90d944,transparent);}
 
-  .section { padding: 48px 56px; border-bottom: 1px solid #1a2a4a; }
-  .section-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: #f0f2f8; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
-  .section-title .icon { font-size: 20px; }
+.cover-corners>div{position:absolute;width:24px;height:24px;border-color:#4a90d955;border-style:solid;}
+.c-tl{top:28px;left:28px;border-width:2px 0 0 2px;}
+.c-tr{top:28px;right:28px;border-width:2px 2px 0 0;}
+.c-bl{bottom:28px;left:28px;border-width:0 0 2px 2px;}
+.c-br{bottom:28px;right:28px;border-width:0 2px 2px 0;}
 
-  .card { background: #0f1930; border: 1px solid #1a2a4a; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-  .card-title { font-size: 14px; font-weight: 700; color: #4a90d9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.cover-inner{position:relative;z-index:5;max-width:680px;}
 
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.cover-agency-line{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:48px;}
+.cover-agency-bar{width:50px;height:1px;background:#4a90d955;}
+.cover-agency-name{font-family:'Playfair Display',serif;font-size:13px;font-weight:600;color:#4a90d9;letter-spacing:5px;text-transform:uppercase;}
 
-  .stat { text-align: center; }
-  .stat-value { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 800; }
-  .stat-label { font-size: 12px; color: #6880a8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+.cover-logo-container{margin-bottom:44px;}
+.cover-logo-svg{width:90px;height:90px;border-radius:18px;background:linear-gradient(135deg,#111e36,#0f1930);border:1px solid #243a5e;display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.3),0 0 0 1px #1a2a4a,0 0 80px rgba(74,144,217,.08);}
+.cover-logo-text{font-family:'Playfair Display',serif;font-size:28px;font-weight:800;color:#4a90d9;letter-spacing:2px;}
 
-  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1a2a4a22; }
-  .check-item:last-child { border-bottom: none; }
-  .check-icon { font-size: 16px; min-width: 24px; text-align: center; }
-  .check-label { font-size: 14px; color: #c0c8d8; }
-  .check-label strong { color: #f0f2f8; }
+.cover-sep{display:flex;align-items:center;justify-content:center;gap:12px;margin:0 auto 44px;}
+.cover-sep-line{width:80px;height:1px;background:linear-gradient(90deg,transparent,#4a90d966,transparent);}
+.cover-sep-diamond{width:8px;height:8px;background:#4a90d9;transform:rotate(45deg);opacity:.7;}
 
-  .grade-badge { display: inline-flex; align-items: center; gap: 8px; background: #111e36; border: 1px solid #243a5e; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
+.cover-doc-type{font-size:11px;font-weight:700;color:#6880a8;letter-spacing:4px;text-transform:uppercase;margin-bottom:20px;}
+.cover-main-title{font-family:'Playfair Display',serif;font-size:52px;font-weight:800;color:#f0f2f8;line-height:1.15;letter-spacing:-1px;margin-bottom:16px;text-shadow:0 4px 30px rgba(0,0,0,.3);}
+.cover-main-subtitle{font-size:17px;color:#c0c8d8;font-weight:400;line-height:1.6;margin-bottom:48px;max-width:550px;margin-left:auto;margin-right:auto;}
 
-  .rec { background: #111e36; border-left: 3px solid #4a90d9; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 12px; }
-  .rec-title { font-size: 14px; font-weight: 700; color: #4a90d9; margin-bottom: 4px; }
-  .rec-text { font-size: 13px; color: #c0c8d8; line-height: 1.6; }
-  .rec-priority { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .priority-critical { background: #f43f5e22; color: #f43f5e; }
-  .priority-high { background: #f59e0b22; color: #f59e0b; }
-  .priority-medium { background: #4a90d922; color: #4a90d9; }
+.cover-client-box{background:#111e36;border:1px solid #243a5e;border-radius:12px;padding:24px 40px;display:inline-block;margin-bottom:32px;box-shadow:0 8px 32px rgba(0,0,0,.2);}
+.cover-client-label{font-size:10px;color:#6880a8;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;}
+.cover-client-name{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#6ba8f0;letter-spacing:0.5px;}
 
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; color: #6880a8; text-transform: uppercase; letter-spacing: 1px; padding: 10px 12px; border-bottom: 1px solid #1a2a4a; }
-  td { font-size: 13px; color: #c0c8d8; padding: 10px 12px; border-bottom: 1px solid #1a2a4a22; }
+.cover-meta-row{display:flex;justify-content:center;gap:40px;margin-top:16px;}
+.cover-meta-item{text-align:center;}
+.cover-meta-label{font-size:9px;color:#6880a8;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.cover-meta-value{font-size:13px;color:#c0c8d8;font-weight:500;}
 
-  .footer { padding: 32px 56px; text-align: center; color: #6880a8; font-size: 11px; letter-spacing: 1px; }
-  @media print { body { background: #0b1628 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.cover-footer-line{position:absolute;bottom:24px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;z-index:5;}
+.cover-footer-text{font-size:9px;color:#6880a844;letter-spacing:2px;text-transform:uppercase;}
+
+/* ===== CONTENT STYLES ===== */
+.section{padding:44px 56px;border-bottom:1px solid #1a2a4a;}
+.section-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#f0f2f8;margin-bottom:22px;display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid #1a2a4a44;}
+.section-title .st-icon{font-size:18px;width:36px;height:36px;background:#111e36;border:1px solid #1a2a4a;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+
+.card{background:#0f1930;border:1px solid #1a2a4a;border-radius:10px;padding:22px;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;color:#4a90d9;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+.stat{text-align:center;padding:20px 16px;}
+.stat-value{font-family:'Playfair Display',serif;font-size:38px;font-weight:800;}
+.stat-label{font-size:11px;color:#6880a8;text-transform:uppercase;letter-spacing:1px;margin-top:6px;}
+
+.ci{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #1a2a4a15;}
+.ci:last-child{border-bottom:none;}
+.ci-icon{font-size:15px;min-width:22px;text-align:center;margin-top:1px;}
+.ci-text{font-size:13px;color:#c0c8d8;line-height:1.5;}
+.ci-text strong{color:#f0f2f8;}
+
+.rec{background:#111e36;border-left:3px solid #4a90d9;padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:10px;}
+.rec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.rec-title{font-size:13px;font-weight:700;color:#4a90d9;}
+.rec-text{font-size:12px;color:#c0c8d8;line-height:1.6;}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.b-crit{background:#f43f5e22;color:#f43f5e;}
+.b-high{background:#f59e0b22;color:#f59e0b;}
+.b-med{background:#4a90d922;color:#4a90d9;}
+
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:10px;color:#6880a8;text-transform:uppercase;letter-spacing:1px;padding:8px 10px;border-bottom:1px solid #1a2a4a;}
+td{font-size:12px;color:#c0c8d8;padding:8px 10px;border-bottom:1px solid #1a2a4a18;}
+
+.footer{padding:28px 56px;text-align:center;color:#6880a888;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}
+
+@media print{
+  body{background:#0b1628!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .cover-portfolio{min-height:100vh;page-break-after:always;}
+  .section{page-break-inside:avoid;}
+}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <div class="cover-full">
-    <div class="corner corner-tl"></div>
-    <div class="corner corner-tr"></div>
-    <div class="corner corner-bl"></div>
-    <div class="corner corner-br"></div>
-    <div class="cover-brand">SHOPY CRAFTER</div>
-    <div class="cover-divider"></div>
-    <div class="cover-title">Auditoría Digital Completa</div>
-    <div class="cover-subtitle">Análisis exhaustivo de presencia digital, SEO, UX y oportunidades de crecimiento</div>
-    <div class="cover-target">Preparado para: Lazy Lizard</div>
-    <div class="cover-date">01 DE ABRIL DE 2026</div>
-  </div>
+<!-- ============== PREMIUM PORTFOLIO COVER ============== -->
+<div class="cover-portfolio">
+  <div class="cover-frame"></div>
+  <div class="cover-corners"><div class="c-tl"></div><div class="c-tr"></div><div class="c-bl"></div><div class="c-br"></div></div>
+  <div class="cover-glow-bl"></div>
 
-  <!-- RESUMEN EJECUTIVO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">★</span> Resumen Ejecutivo</div>
-    <div class="card">
-      <p style="color:#c0c8d8;font-size:15px;line-height:1.8;margin-bottom:20px;">
-        <strong style="color:#f0f2f8">Lazy Lizard</strong> es un servicio de consigna de equipaje ubicado en <strong style="color:#f0f2f8">Carrer d'Elkano 46, Poble Sec, Barcelona</strong>. Ofrece taquillas de tamaño M, L y XL con servicio 24 horas, videovigilancia permanente y reserva online. Su web <strong style="color:#4a90d9">lazylizard.es</strong> está disponible en 4 idiomas (ES, EN, FR, IT) y cuenta con sistema de reservas integrado.
-      </p>
-      <p style="color:#c0c8d8;font-size:15px;line-height:1.8;">
-        Tras un análisis exhaustivo, el negocio presenta <strong style="color:#f43f5e">graves carencias en SEO</strong> que impiden su visibilidad en buscadores, una <strong style="color:#f59e0b">ausencia total de schema markup</strong> para negocios locales, y <strong style="color:#f59e0b">deficiencias en accesibilidad de imágenes</strong>. Sin embargo, cuenta con una web funcional, HTTPS activo, soporte multiidioma y un sistema de reservas operativo.
-      </p>
+  <div class="cover-inner">
+    <div class="cover-agency-line">
+      <div class="cover-agency-bar"></div>
+      <div class="cover-agency-name">Shopy Crafter</div>
+      <div class="cover-agency-bar"></div>
     </div>
-    <div class="grid3" style="margin-top:20px;">
-      <div class="card stat">
-        <div class="stat-value" style="color:#f43f5e;">F</div>
-        <div class="stat-label">Nota SEO Global</div>
-      </div>
-      <div class="card stat">
-        <div class="stat-value" style="color:#f59e0b;">28</div>
-        <div class="stat-label">Puntuación /100</div>
-      </div>
-      <div class="card stat">
-        <div class="stat-value" style="color:#f43f5e;">14</div>
-        <div class="stat-label">Problemas Críticos</div>
-      </div>
-    </div>
-  </div>
 
-  <!-- DATOS DEL NEGOCIO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🏢</span> Ficha del Negocio</div>
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Información General</div>
-        <div class="check-item"><span class="check-icon">🏪</span><div class="check-label"><strong>Nombre:</strong> Lazy Lizard</div></div>
-        <div class="check-item"><span class="check-icon">📍</span><div class="check-label"><strong>Dirección:</strong> Carrer d'Elkano 46, Poble Sec, Barcelona</div></div>
-        <div class="check-item"><span class="check-icon">📞</span><div class="check-label"><strong>Teléfono:</strong> +34 658 67 58 84</div></div>
-        <div class="check-item"><span class="check-icon">📧</span><div class="check-label"><strong>Email:</strong> info@lazylizard.es</div></div>
-        <div class="check-item"><span class="check-icon">🌐</span><div class="check-label"><strong>Web:</strong> lazylizard.es</div></div>
-        <div class="check-item"><span class="check-icon">💼</span><div class="check-label"><strong>Sector:</strong> Consigna de equipaje / Turismo</div></div>
+    <div class="cover-logo-container">
+      <div class="cover-logo-svg"><div class="cover-logo-text">SC</div></div>
+    </div>
+
+    <div class="cover-sep">
+      <div class="cover-sep-line"></div>
+      <div class="cover-sep-diamond"></div>
+      <div class="cover-sep-line"></div>
+    </div>
+
+    <div class="cover-doc-type">Informe de Consultoría Digital</div>
+    <div class="cover-main-title">Auditoría Digital<br>Completa</div>
+    <div class="cover-main-subtitle">Análisis exhaustivo de presencia digital, posicionamiento SEO,<br>experiencia de usuario y oportunidades de crecimiento</div>
+
+    <div class="cover-client-box">
+      <div class="cover-client-label">Preparado para</div>
+      <div class="cover-client-name">Lazy Lizard</div>
+    </div>
+
+    <div class="cover-meta-row">
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Fecha</div>
+        <div class="cover-meta-value">Abril 2026</div>
       </div>
-      <div class="card">
-        <div class="card-title">Servicios Detectados</div>
-        <div class="check-item"><span class="check-icon">🔒</span><div class="check-label"><strong>Taquillas M, L y XL</strong> — alquiler por horas o días</div></div>
-        <div class="check-item"><span class="check-icon">📹</span><div class="check-label"><strong>Videovigilancia 24h</strong></div></div>
-        <div class="check-item"><span class="check-icon">🌐</span><div class="check-label"><strong>Reserva online</strong> con date picker integrado</div></div>
-        <div class="check-item"><span class="check-icon">🌍</span><div class="check-label"><strong>4 idiomas:</strong> ES, EN, FR, IT</div></div>
-        <div class="check-item"><span class="check-icon">📍</span><div class="check-label"><strong>Google Maps</strong> integrado en web</div></div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Sector</div>
+        <div class="cover-meta-value">Turismo / Consigna</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Ubicación</div>
+        <div class="cover-meta-value">Barcelona, España</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cover-meta-label">Referencia</div>
+        <div class="cover-meta-value">SC-AUD-2026-LL</div>
       </div>
     </div>
   </div>
 
-  <!-- TECNOLOGÍA -->
-  <div class="section">
-    <div class="section-title"><span class="icon">⚙️</span> Stack Tecnológico</div>
-    <div class="card">
-      <table>
-        <tr><th>Componente</th><th>Tecnología</th><th>Estado</th></tr>
-        <tr><td>Servidor</td><td>Nginx + PHP 7.4.33</td><td><span style="color:#f59e0b">⚠️ PHP 7.4 EOL</span></td></tr>
-        <tr><td>Hosting</td><td>Plesk Linux</td><td><span style="color:#34d399">✅ Activo</span></td></tr>
-        <tr><td>SSL/HTTPS</td><td>Activo</td><td><span style="color:#34d399">✅ Seguro</span></td></tr>
-        <tr><td>Framework CSS</td><td>Bootstrap</td><td><span style="color:#34d399">✅</span></td></tr>
-        <tr><td>JavaScript</td><td>jQuery + Slick + Swiper</td><td><span style="color:#34d399">✅</span></td></tr>
-        <tr><td>Archivos CSS</td><td>8 archivos</td><td><span style="color:#f59e0b">⚠️ Muchos</span></td></tr>
-        <tr><td>Archivos JS</td><td>9 archivos</td><td><span style="color:#f59e0b">⚠️ Muchos</span></td></tr>
-        <tr><td>Google Analytics</td><td>No detectado</td><td><span style="color:#f43f5e">❌ CRÍTICO</span></td></tr>
-        <tr><td>Google Tag Manager</td><td>No detectado</td><td><span style="color:#f43f5e">❌ CRÍTICO</span></td></tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- SEO ANÁLISIS COMPLETO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🔍</span> Auditoría SEO Completa</div>
-
-    <div class="card">
-      <div class="card-title">Meta Title</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Título actual:</strong> "Lazylizard" — Solo 10 caracteres. Debería tener 50-60 chars con keywords principales.</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">💡</span><div class="check-label"><strong>Recomendado:</strong> "Consigna de Equipaje 24H en Barcelona | Lazy Lizard — Poble Sec" (62 chars)</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:10%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">10/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Meta Description</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Estado:</strong> NO EXISTE — Google generará una description aleatoria del contenido de la página.</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">💡</span><div class="check-label"><strong>Recomendado:</strong> "Guarda tu equipaje de forma segura en Poble Sec, Barcelona. Taquillas M, L y XL desde X€/día. Videovigilancia 24h. Reserva online fácil y rápida." (148 chars)</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">0/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Schema Markup / JSON-LD</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Estado:</strong> NO HAY SCHEMA MARKUP — Esto es CRÍTICO para un negocio local. Sin schema, Google no puede mostrar el negocio con datos enriquecidos (horarios, dirección, valoraciones, teléfono).</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">💡</span><div class="check-label"><strong>Schemas necesarios:</strong> LocalBusiness, PostalAddress, OpeningHoursSpecification, GeoCoordinates, Service, FAQPage, BreadcrumbList</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">0/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Open Graph Tags</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>og:title:</strong> "Lazylizard" — Demasiado corto, sin keywords</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>og:description:</strong> VACÍO</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>og:image:</strong> VACÍO — Cuando se comparta en redes, no mostrará imagen</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>og:type:</strong> NO DEFINIDO</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">5/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Twitter Cards</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>twitter:card:</strong> NO DEFINIDO</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>twitter:title:</strong> "Lazylizard" — Existe pero es muy corto</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:15%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">15/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Imágenes y Alt Texts</div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>3 imágenes</strong> con alt text descriptivo</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>4 imágenes</strong> con alt text vacío (alt="")</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>9 imágenes</strong> SIN atributo alt — Problema de accesibilidad y SEO</div></div>
-      <p style="color:#6880a8;font-size:12px;margin-top:8px;">Total: 16 imágenes. Solo el 19% tiene alt text adecuado.</p>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:19%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">19/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Estructura de URLs (Clean Handles)</div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>/es/booking/</strong> — URL limpia y descriptiva</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>/es/page/contacto</strong> — URL limpia</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>/es/page/faqs</strong> — URL limpia</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>/es/page/aviso-legal</strong> — Podría ser /es/legal/aviso-legal para mejor estructura</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:75%;height:100%;background:#f59e0b;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f59e0b;min-width:40px;text-align:right;">75/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Encabezados (H1, H2, H3)</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>2 etiquetas H1</strong> en la misma página — Debe ser exactamente 1. Actualmente: "Consigna de Equipaje 24H" y "en Poble Sec, Barcelona"</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>8 H2</strong> — Algunos con errores tipográficos: "Alquiler desde elpropio local odesde web" (espacios faltantes)</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>4 H3</strong> — Estructura correcta</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:35%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">35/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Internacionalización (Hreflang)</div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>4 hreflang tags:</strong> es, en, fr, it — Bien configurados</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Canonical:</strong> https://www.lazylizard.es/ — Correcto</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Subpáginas:</strong> Los meta titles de contacto, FAQ y booking están vacíos o son genéricos en todas las páginas</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:65%;height:100%;background:#f59e0b;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f59e0b;min-width:40px;text-align:right;">65/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Sitemap XML</div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>NO EXISTE</strong> — /sitemap.xml devuelve 404. Google no puede descubrir todas las páginas eficientemente.</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">0/100</span>
-  </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Robots.txt</div>
-      <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Existe pero mínimo:</strong> Solo contiene "User-agent: *" sin ninguna directiva adicional ni referencia al sitemap.</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:20%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">20/100</span>
-  </div>
-    </div>
-  </div>
-
-  <!-- ANÁLISIS POR PÁGINA -->
-  <div class="section">
-    <div class="section-title"><span class="icon">📄</span> Análisis por Página</div>
-    <div class="card">
-      <table>
-        <tr><th>Página</th><th>Meta Title</th><th>Meta Desc</th><th>H1</th><th>Schema</th><th>Nota</th></tr>
-        <tr><td>Home (/)</td><td style="color:#f43f5e">❌ 10 chars</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌ 2 H1s</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-        <tr><td>Contacto</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#34d399">✅ 1 H1</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-        <tr><td>FAQs</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#34d399">✅ 1 H1</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-        <tr><td>Booking</td><td style="color:#f43f5e">❌ Genérico</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#34d399">✅ 1 H1</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-        <tr><td>Home EN</td><td style="color:#f43f5e">❌ Genérico</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f59e0b">⚠️</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- REDES SOCIALES -->
-  <div class="section">
-    <div class="section-title"><span class="icon">📱</span> Presencia en Redes Sociales</div>
-    <div class="card">
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Instagram:</strong> No detectado en la web</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Facebook:</strong> No detectado en la web</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>TikTok:</strong> No detectado en la web</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>YouTube:</strong> No detectado en la web</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Google Analytics:</strong> No instalado</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Google Tag Manager:</strong> No instalado</div></div>
-      <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>Google Business Profile:</strong> No verificado si está configurado correctamente</div></div>
-      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
-      <div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;"></div>
-    </div>
-    <span style="font-weight:700;color:#f43f5e;min-width:40px;text-align:right;">5/100</span>
-  </div>
-    </div>
-  </div>
-
-  <!-- SEGURIDAD -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🔐</span> Seguridad y Rendimiento</div>
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Seguridad</div>
-        <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>HTTPS:</strong> Activo y funcionando</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Cookies:</strong> HttpOnly + SameSite=Lax</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#f43f5e">❌</span><div class="check-label"><strong>PHP 7.4:</strong> Fin de vida (EOL). Vulnerable.</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>X-Powered-By:</strong> Expone PHP y Plesk</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Rendimiento</div>
-        <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>8 CSS + 9 JS:</strong> Demasiados archivos sin minificar</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Cache-Control:</strong> max-age configurado</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#f59e0b">⚠️</span><div class="check-label"><strong>Tamaño página:</strong> ~50KB HTML (razonable)</div></div>
-        <div class="check-item"><span class="check-icon" style="color:#34d399">✅</span><div class="check-label"><strong>Viewport:</strong> Configurado correctamente</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- RECOMENDACIONES -->
-  <div class="section">
-    <div class="section-title"><span class="icon">🎯</span> Plan de Acción — Recomendaciones Prioritarias</div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">1. Implementar Schema Markup LocalBusiness</div>
-        <span class="rec-priority priority-critical">CRÍTICO</span>
-      </div>
-      <div class="rec-text">Añadir JSON-LD con @type LocalBusiness incluyendo: nombre, dirección, teléfono, email, horarios, coordenadas GPS, tipo de servicio (LuggageStorage), precios, y valoraciones. Esto permitirá aparecer en el Knowledge Panel de Google y Google Maps con datos enriquecidos.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">2. Optimizar Meta Titles y Descriptions de TODAS las páginas</div>
-        <span class="rec-priority priority-critical">CRÍTICO</span>
-      </div>
-      <div class="rec-text">Cada página debe tener un meta title único (50-60 chars) y meta description única (150-160 chars) con keywords relevantes: "consigna equipaje Barcelona", "luggage storage Barcelona", "taquillas equipaje Poble Sec".</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">3. Instalar Google Analytics y Tag Manager</div>
-        <span class="rec-priority priority-critical">CRÍTICO</span>
-      </div>
-      <div class="rec-text">Sin analítica no hay forma de medir el rendimiento. Instalar GA4 + GTM para trackear: reservas, idiomas de visitantes, fuentes de tráfico, conversiones del formulario de booking, y comportamiento de usuarios.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">4. Corregir Alt Texts de todas las imágenes</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">9 de 16 imágenes no tienen alt text. Cada imagen debe describir su contenido: "Taquilla tamaño XL para maletas grandes en Lazy Lizard Barcelona", "Interior de la consigna con sistema de videovigilancia".</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">5. Crear Sitemap XML y actualizar Robots.txt</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">Generar sitemap.xml con todas las URLs (en los 4 idiomas) y enviar a Google Search Console. Actualizar robots.txt con referencia al sitemap y directivas específicas.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">6. Corregir estructura de H1 y errores tipográficos</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">La home tiene 2 H1 (debe ser 1). Corregir: "Alquiler desde elpropio local odesde web" → "Alquiler desde el propio local o desde web". "Videovigilancialas 24 horas" → "Videovigilancia las 24 horas".</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">7. Implementar Open Graph y Twitter Cards completos</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Añadir og:title, og:description, og:image (foto del local), og:type (website), og:url. Lo mismo para twitter:card, twitter:title, twitter:description, twitter:image. Así cuando alguien comparta la web se verá profesional.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">8. Actualizar PHP 7.4 → PHP 8.2+</div>
-        <span class="rec-priority priority-high">ALTO</span>
-      </div>
-      <div class="rec-text">PHP 7.4 llegó a su fin de vida en noviembre 2022. Ya no recibe parches de seguridad. Actualizar a PHP 8.2 o 8.3 para proteger la web de vulnerabilidades conocidas y mejorar el rendimiento.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">9. Crear perfiles en Instagram, Google Business y TripAdvisor</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Para un negocio turístico en Barcelona, es esencial estar en: Instagram (fotos del local, stories), Google Business (horarios, valoraciones, fotos), TripAdvisor (reviews de turistas), y Facebook. Vincular todas las redes desde la web.</div>
-    </div>
-
-    <div class="rec">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div class="rec-title">10. Ocultar headers X-Powered-By</div>
-        <span class="rec-priority priority-medium">MEDIO</span>
-      </div>
-      <div class="rec-text">Los headers HTTP exponen que usa PHP 7.4.33 y PleskLin, facilitando ataques dirigidos. Ocultar con: Header unset X-Powered-By en .htaccess.</div>
-    </div>
-  </div>
-
-  <!-- PRESUPUESTO -->
-  <div class="section">
-    <div class="section-title"><span class="icon">💰</span> Presupuesto de Optimización</div>
-    <div class="card">
-      <p style="color:#c0c8d8;font-size:14px;line-height:1.8;">
-        Shopy Crafter puede implementar todas las mejoras detectadas en esta auditoría. Contacta con nosotros para un presupuesto personalizado que incluya la implementación de schema markup, optimización SEO on-page, configuración de analítica, creación de perfiles sociales y mantenimiento continuo.
-      </p>
-      <p style="color:#4a90d9;font-size:15px;font-weight:600;margin-top:12px;">
-        🌐 shopycrafter.com — Tu agencia de optimización digital
-      </p>
-    </div>
-  </div>
-
-  <div class="footer">
-    SHOPY CRAFTER — AUDITORÍA DIGITAL PROFESIONAL — 01 DE ABRIL DE 2026 — CONFIDENCIAL
+  <div class="cover-footer-line">
+    <div class="cover-footer-text">shopycrafter.com</div>
+    <div class="cover-footer-text">Confidencial</div>
   </div>
 </div>
-</body>
-</html>
+
+<!-- ============== RESUMEN EJECUTIVO ============== -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">★</div> Resumen Ejecutivo</div>
+  <div class="card">
+    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;margin-bottom:16px;">
+      <strong style="color:#f0f2f8">Lazy Lizard</strong> es un servicio de consigna de equipaje ubicado en <strong style="color:#f0f2f8">Carrer d'Elkano 46, Poble Sec, Barcelona</strong>. Ofrece taquillas M, L y XL con servicio 24h, videovigilancia permanente y reserva online. La web <strong style="color:#4a90d9">lazylizard.es</strong> soporta 4 idiomas (ES, EN, FR, IT) y cuenta con sistema de reservas con date picker integrado.
+    </p>
+    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;">
+      Tras un análisis exhaustivo, el negocio presenta <strong style="color:#f43f5e">graves carencias en SEO</strong> que impiden su visibilidad en buscadores, <strong style="color:#f59e0b">ausencia total de schema markup</strong> para negocios locales, y <strong style="color:#f59e0b">deficiencias en accesibilidad de imágenes</strong>. Sin embargo, cuenta con web funcional, HTTPS, soporte multiidioma y sistema de reservas operativo.
+    </p>
+  </div>
+  <div class="grid3" style="margin-top:16px;">
+    <div class="card stat"><div class="stat-value" style="color:#f43f5e;">F</div><div class="stat-label">Nota SEO</div></div>
+    <div class="card stat"><div class="stat-value" style="color:#f59e0b;">28</div><div class="stat-label">Puntuación /100</div></div>
+    <div class="card stat"><div class="stat-value" style="color:#f43f5e;">14</div><div class="stat-label">Problemas Críticos</div></div>
+  </div>
+</div>
+
+<!-- FICHA -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🏢</div> Ficha del Negocio</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Información General</div>
+      <div class="ci"><span class="ci-icon">🏪</span><div class="ci-text"><strong>Nombre:</strong> Lazy Lizard</div></div>
+      <div class="ci"><span class="ci-icon">📍</span><div class="ci-text"><strong>Dirección:</strong> Carrer d'Elkano 46, Poble Sec, Barcelona</div></div>
+      <div class="ci"><span class="ci-icon">📞</span><div class="ci-text"><strong>Teléfono:</strong> +34 658 67 58 84</div></div>
+      <div class="ci"><span class="ci-icon">📧</span><div class="ci-text"><strong>Email:</strong> info@lazylizard.es</div></div>
+      <div class="ci"><span class="ci-icon">🌐</span><div class="ci-text"><strong>Web:</strong> lazylizard.es</div></div>
+      <div class="ci"><span class="ci-icon">💼</span><div class="ci-text"><strong>Sector:</strong> Consigna de equipaje / Turismo</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Servicios Detectados</div>
+      <div class="ci"><span class="ci-icon">🔒</span><div class="ci-text"><strong>Taquillas M, L y XL</strong> — alquiler por horas o días</div></div>
+      <div class="ci"><span class="ci-icon">📹</span><div class="ci-text"><strong>Videovigilancia 24h</strong></div></div>
+      <div class="ci"><span class="ci-icon">📅</span><div class="ci-text"><strong>Reserva online</strong> con date picker</div></div>
+      <div class="ci"><span class="ci-icon">🌍</span><div class="ci-text"><strong>4 idiomas:</strong> ES, EN, FR, IT</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TECNOLOGÍA -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">⚙️</div> Stack Tecnológico</div>
+  <div class="card">
+    <table>
+      <tr><th>Componente</th><th>Tecnología</th><th>Estado</th></tr>
+      <tr><td>Servidor</td><td>Nginx + PHP 7.4.33</td><td style="color:#f59e0b">⚠️ PHP 7.4 EOL</td></tr>
+      <tr><td>Hosting</td><td>Plesk Linux</td><td style="color:#34d399">✅</td></tr>
+      <tr><td>SSL/HTTPS</td><td>Activo</td><td style="color:#34d399">✅</td></tr>
+      <tr><td>Framework CSS</td><td>Bootstrap + Slick + Swiper</td><td style="color:#34d399">✅</td></tr>
+      <tr><td>Archivos CSS/JS</td><td>8 CSS + 9 JS</td><td style="color:#f59e0b">⚠️ Muchos</td></tr>
+      <tr><td>Google Analytics</td><td>No detectado</td><td style="color:#f43f5e">❌ CRÍTICO</td></tr>
+      <tr><td>Google Tag Manager</td><td>No detectado</td><td style="color:#f43f5e">❌ CRÍTICO</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- SEO COMPLETO -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🔍</div> Auditoría SEO Completa</div>
+
+  <div class="card"><div class="card-title">Meta Title</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Actual:</strong> "Lazylizard" — Solo 10 chars (ideal: 50-60)</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Recomendado:</strong> "Consigna de Equipaje 24H en Barcelona | Lazy Lizard — Poble Sec"</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:10%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">10/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Meta Description</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Estado:</strong> NO EXISTE — Google genera description aleatoria</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Recomendado:</strong> "Guarda tu equipaje de forma segura en Poble Sec, Barcelona. Taquillas M, L y XL con videovigilancia 24h. Reserva online fácil y rápida."</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">0/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Schema Markup / JSON-LD</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Estado:</strong> NO HAY SCHEMA — CRÍTICO para negocio local. Google no puede mostrar datos enriquecidos.</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">💡</span><div class="ci-text"><strong>Necesario:</strong> LocalBusiness, PostalAddress, OpeningHoursSpecification, GeoCoordinates, Service, FAQPage</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:0%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">0/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Open Graph Tags</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>og:title:</strong> "Lazylizard" — sin keywords | <strong>og:description:</strong> VACÍO | <strong>og:image:</strong> VACÍO | <strong>og:type:</strong> NO</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Imágenes y Alt Texts</div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text"><strong>3</strong> con alt descriptivo</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text"><strong>4</strong> con alt vacío (alt="")</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>9</strong> SIN atributo alt — Problema de accesibilidad y SEO</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:19%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">19/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Estructura de URLs</div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">URLs limpias: /es/booking/, /es/page/contacto, /es/page/faqs</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:75%;height:100%;background:#f59e0b;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f59e0b;min-width:45px;text-align:right;font-size:13px;">75/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Encabezados H1/H2/H3</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>2 H1</strong> en home (debe ser 1). Errores tipográficos en H2: "elpropio", "odesde", "Videovigilancialas"</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:35%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">35/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Hreflang / Internacionalización</div>
+    <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">4 hreflang (es, en, fr, it) + canonical correcto</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">Subpáginas sin meta titles/descriptions propios</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:65%;height:100%;background:#f59e0b;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f59e0b;min-width:45px;text-align:right;font-size:13px;">65/100</span>
+  </div>
+  </div>
+
+  <div class="card"><div class="card-title">Sitemap XML / Robots.txt</div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Sitemap:</strong> NO EXISTE (404). <strong>Robots.txt:</strong> Solo "User-agent: *" sin directivas</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span>
+  </div>
+  </div>
+</div>
+
+<!-- ANÁLISIS POR PÁGINA -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">📄</div> Análisis por Página</div>
+  <div class="card">
+    <table>
+      <tr><th>Página</th><th>Meta Title</th><th>Meta Desc</th><th>H1</th><th>Schema</th><th>Nota</th></tr>
+      <tr><td>Home (/)</td><td style="color:#f43f5e">❌ 10ch</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e">❌ 2 H1</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+      <tr><td>Contacto</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+      <tr><td>FAQs</td><td style="color:#f43f5e">❌ Vacío</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+      <tr><td>Booking</td><td style="color:#f43f5e">❌ Genérico</td><td style="color:#f43f5e">❌</td><td style="color:#34d399">✅</td><td style="color:#f43f5e">❌</td><td style="color:#f43f5e"><strong>F</strong></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- REDES SOCIALES -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">📱</div> Presencia Digital y Redes</div>
+  <div class="card">
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Instagram:</strong> No detectado</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Facebook:</strong> No detectado</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Google Analytics:</strong> No instalado</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>Google Tag Manager:</strong> No instalado</div></div>
+    <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>TripAdvisor:</strong> No verificado (crucial para turismo)</div></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+    <div style="flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;">
+      <div style="width:5%;height:100%;background:#f43f5e;border-radius:4px;transition:width .6s;"></div>
+    </div>
+    <span style="font-weight:700;color:#f43f5e;min-width:45px;text-align:right;font-size:13px;">5/100</span>
+  </div>
+  </div>
+</div>
+
+<!-- SEGURIDAD -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🔐</div> Seguridad y Rendimiento</div>
+  <div class="grid2">
+    <div class="card"><div class="card-title">Seguridad</div>
+      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">HTTPS activo + Cookies HttpOnly/SameSite</div></div>
+      <div class="ci"><span class="ci-icon" style="color:#f43f5e">❌</span><div class="ci-text"><strong>PHP 7.4 EOL</strong> — Sin parches de seguridad</div></div>
+      <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">X-Powered-By expone PHP y Plesk</div></div>
+    </div>
+    <div class="card"><div class="card-title">Rendimiento</div>
+      <div class="ci"><span class="ci-icon" style="color:#f59e0b">⚠️</span><div class="ci-text">17 archivos CSS+JS sin minificar/bundlear</div></div>
+      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">Cache-Control configurado</div></div>
+      <div class="ci"><span class="ci-icon" style="color:#34d399">✅</span><div class="ci-text">Viewport correcto para móvil</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- RECOMENDACIONES -->
+<div class="section">
+  <div class="section-title"><div class="st-icon">🎯</div> Plan de Acción Prioritario</div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">1. Implementar Schema LocalBusiness</div><span class="badge b-crit">CRÍTICO</span></div>
+  <div class="rec-text">JSON-LD con @type LocalBusiness: nombre, dirección, teléfono, email, horarios, GPS, tipo de servicio, precios y valoraciones. Permitirá Knowledge Panel en Google.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">2. Optimizar Meta Titles y Descriptions (todas las páginas)</div><span class="badge b-crit">CRÍTICO</span></div>
+  <div class="rec-text">Meta title único 50-60ch y description 150-160ch por página con keywords: "consigna equipaje Barcelona", "luggage storage", "taquillas Poble Sec".</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">3. Instalar Google Analytics 4 + Tag Manager</div><span class="badge b-crit">CRÍTICO</span></div>
+  <div class="rec-text">Medir reservas, idiomas de visitantes, fuentes de tráfico y conversiones del booking.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">4. Corregir Alt Texts de todas las imágenes</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">9 de 16 imágenes sin alt text. Cada una debe describir su contenido con keywords relevantes.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">5. Crear Sitemap XML + actualizar Robots.txt</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">Sitemap con URLs en 4 idiomas. Enviar a Google Search Console.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">6. Corregir H1 duplicados y errores tipográficos</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">1 solo H1 por página. Corregir: "elpropio" → "el propio", "odesde" → "o desde", "Videovigilancialas" → "Videovigilancia las".</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">7. Open Graph + Twitter Cards completos</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">og:title, og:description, og:image (foto del local), og:type. Para que al compartir en redes se vea profesional.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">8. Actualizar PHP 7.4 → 8.2+</div><span class="badge b-high">ALTO</span></div>
+  <div class="rec-text">PHP 7.4 sin soporte desde Nov 2022. Riesgo de seguridad y rendimiento inferior.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">9. Crear perfiles en Instagram, Google Business y TripAdvisor</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Esencial para negocio turístico. Vincular todas las redes desde la web.</div></div>
+
+  <div class="rec"><div class="rec-head"><div class="rec-title">10. Ocultar headers X-Powered-By</div><span class="badge b-med">MEDIO</span></div>
+  <div class="rec-text">Los headers exponen PHP 7.4 y PleskLin, facilitando ataques dirigidos.</div></div>
+</div>
+
+<!-- PRESUPUESTO -->
+<div class="section" style="border-bottom:none;">
+  <div class="section-title"><div class="st-icon">💰</div> Siguiente Paso</div>
+  <div class="card" style="text-align:center;padding:32px;">
+    <p style="color:#c0c8d8;font-size:14px;line-height:1.8;margin-bottom:16px;">Shopy Crafter puede implementar todas las mejoras identificadas en esta auditoría con un plan de acción personalizado.</p>
+    <p style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#4a90d9;margin-bottom:8px;">shopycrafter.com</p>
+    <p style="color:#6880a8;font-size:12px;">Tu agencia de optimización digital</p>
+  </div>
+</div>
+
+<div class="footer">SHOPY CRAFTER — AUDITORÍA DIGITAL PROFESIONAL — 01 DE ABRIL DE 2026 — CONFIDENCIAL</div>
+</div></body></html>
