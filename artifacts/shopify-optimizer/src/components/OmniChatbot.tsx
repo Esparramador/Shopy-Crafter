@@ -332,7 +332,8 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
   const [sendState, setSendState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [saveState, setSaveState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [dlState, setDlState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const projectId = 2;
+  const [loc] = useLocation();
+  const projectId = parseInt(loc.match(/\/projects\/(\d+)/)?.[1] ?? "1", 10);
 
   const actionTitle = actionName.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const isFullAudit = FULL_AUDIT_ACTIONS.has(actionName);
@@ -1000,11 +1001,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   // ─── Execute Shopify action via backend ────────────────────────────────────
   const executeShopifyAction = async (action: string, params: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
     try {
+      const actionController = new AbortController();
+      const actionTimeout = setTimeout(() => actionController.abort(), 180000);
       const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, params }),
+        signal: actionController.signal,
       });
+      clearTimeout(actionTimeout);
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
         let friendlyMsg = `Error ejecutando ${action}`;
@@ -1426,11 +1431,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     });
   };
 
-  const absorbFile = async (file: File, niche?: string): Promise<AbsorbResult> => {
+  const absorbFile = async (file: File, niche?: string, signal?: AbortSignal): Promise<AbsorbResult> => {
     if (isDocumentFile(file)) {
       const text = await readFileAsText(file);
       const res = await fetch(`${API}/api/shopybrain/absorb-document`, {
-        method: "POST", credentials: "include",
+        method: "POST", credentials: "include", signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, fileName: file.name, fileType: file.type, niche, label: file.name }),
       });
@@ -1442,16 +1447,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     formData.append("label", file.name);
     if (niche) formData.append("niche", niche);
     const res = await fetch(`${API}/api/shopybrain/absorb-image`, {
-      method: "POST", credentials: "include", body: formData,
+      method: "POST", credentials: "include", body: formData, signal,
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   };
 
   // ─── Absorb URL ────────────────────────────────────────────────────────────
-  const absorbUrl = async (url: string, niche?: string): Promise<AbsorbResult> => {
+  const absorbUrl = async (url: string, niche?: string, signal?: AbortSignal): Promise<AbsorbResult> => {
     const res = await fetch(`${API}/api/shopybrain/absorb-url`, {
-      method: "POST", credentials: "include",
+      method: "POST", credentials: "include", signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, niche }),
     });
@@ -1493,9 +1498,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   };
 
   // ─── Exhaustive entity research API call ───────────────────────────────────
-  const researchEntity = async (input: string, niche?: string): Promise<EntityResearchResult> => {
+  const researchEntity = async (input: string, niche?: string, signal?: AbortSignal): Promise<EntityResearchResult> => {
     const res = await fetch(`${API}/api/shopybrain/research-entity-sync`, {
-      method: "POST", credentials: "include",
+      method: "POST", credentials: "include", signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ input, niche, market: "es" }),
     });
@@ -1517,10 +1522,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   };
 
   // ─── Send message ──────────────────────────────────────────────────────────
+  const abortRef = useRef<AbortController | null>(null);
+
   const sendMessage = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
     if (loading) return;
     if (!content && !attachFile && !attachUrl) return;
+
+    if (abortRef.current) { abortRef.current.abort(); }
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const hasAttach = !!(attachFile || attachUrl);
     const attachType = attachFile
@@ -1533,9 +1544,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       attachmentType: hasAttach ? attachType as never : undefined,
       attachmentName: hasAttach ? attachName : undefined,
     };
-    setMessages(m => [...m, userMsg]);
+    const thinkingId = uuid();
+    setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: "gemini+claude+brain" }]);
     setInput(""); setAttachFile(null); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
+
+    const fetchWithTimeout = (url: string, opts: RequestInit, timeoutMs = 120000): Promise<Response> => {
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer));
+    };
 
     try {
       let assistantContent = "";
@@ -1565,9 +1582,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           formData.append("projectId", projectIdFromUrl!);
           if (content) formData.append("userInstruction", content);
 
-          const prodRes = await fetch(`${API}/api/shopybrain/create-product-from-image`, {
+          const prodRes = await fetchWithTimeout(`${API}/api/shopybrain/create-product-from-image`, {
             method: "POST", credentials: "include", body: formData,
-          });
+          }, 180000);
 
           if (prodRes.ok) {
             const prodData = await prodRes.json();
@@ -1629,9 +1646,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
           let result: AbsorbResult;
           if (attachFile) {
-            result = await absorbFile(attachFile);
+            result = await absorbFile(attachFile, undefined, controller.signal);
           } else {
-            result = await absorbUrl(attachUrl);
+            result = await absorbUrl(attachUrl, undefined, controller.signal);
           }
 
           const isDocument = attachType === "document";
@@ -1661,7 +1678,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
           if (content) {
             assistantContent += `\n**Tu pregunta:** ${content}\n\n`;
-            const followUp = await fetch(`${API}/api/shopybrain/search`, {
+            const followUp = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
               method: "POST", credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
@@ -1686,11 +1703,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           content: `🔄 Generando workflow Klaviyo para **${kInfo.storeName}**...\n\n**Paso 1** — Investigación del nicho ${kInfo.niche} en España\n**Paso 2** — Diseño de 6 flujos con emails HTML completos\n**Paso 3** — Guardado permanente del conocimiento\n\n_30-60 segundos..._`
         }]);
 
-        const wfRes = await fetch(`${API}/api/klaviyo-ai/generate-workflow`, {
+        const wfRes = await fetchWithTimeout(`${API}/api/klaviyo-ai/generate-workflow`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ shopDomain: kInfo.shopDomain, storeName: kInfo.storeName, niche: kInfo.niche, market: "es" }),
-        });
+        }, 180000);
 
         if (wfRes.ok) {
           const wfData = await wfRes.json();
@@ -1716,7 +1733,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           content: `🔬 **Investigación exhaustiva paralela iniciada**\n\n**Objetivo:** ${entityDisplay}\n\n**Ejecutando en paralelo:**\n· 🌐 8 búsquedas Google (brand overview, productos, redes sociales, noticias, reviews, competidores, eCommerce, identidad visual)\n· 🔗 Descubrimiento y análisis de fuentes relacionadas\n· 🧠 Síntesis inteligente de todo el conocimiento\n· 💾 Guardado permanente en Shopy Crafter\n\n_⏱️ Esto toma 30-90 segundos. Ejecutando todas las búsquedas simultáneamente..._`
         }]);
 
-        const researchResult = await researchEntity(entityInput);
+        const researchResult = await researchEntity(entityInput, undefined, controller.signal);
 
         assistantContent = `✅ **Investigación completada: ${researchResult.entity}**\n\n`;
         assistantContent += `📊 **${researchResult.queriesExecuted} búsquedas Google** ejecutadas en paralelo\n`;
@@ -1731,7 +1748,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
         if (content !== entityInput && !content.startsWith("http")) {
           assistantContent += `\n**Tu pregunta:** `;
-          const followUp = await fetch(`${API}/api/shopybrain/search`, {
+          const followUp = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
@@ -1746,7 +1763,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       } else {
         const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "Shopy Crafter"}: ${m.content}`).join("\n\n");
         const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
-        const res = await fetch(`${API}/api/shopybrain/search`, {
+        const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl }),
@@ -1820,14 +1837,23 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
 
       setMessages(m => {
-        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA"];
-        const filtered = m.filter(msg => !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
+        const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA", "Analizando tu solicitud"];
+        const filtered = m.filter(msg => msg.id !== thinkingId && !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
       });
     } catch (err) {
-      setMessages(m => [...m, { id: uuid(), role: "assistant" as const, content: `❌ Error: ${err instanceof Error ? err.message : "Fallo de conexión"}`, timestamp: new Date() }]);
+      const errMsg = err instanceof Error ? err.message : "Fallo de conexión";
+      const isTimeout = errMsg === "timeout" || errMsg.includes("aborted");
+      const displayMsg = isTimeout
+        ? "⏳ La solicitud tardó demasiado. Por favor, intenta con un mensaje más corto o inténtalo de nuevo."
+        : `❌ Error: ${errMsg}`;
+      setMessages(m => {
+        const filtered = m.filter(msg => msg.id !== thinkingId);
+        return [...filtered, { id: uuid(), role: "assistant" as const, content: displayMsg, timestamp: new Date() }];
+      });
     } finally {
       setLoading(false);
+      abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [input, loading, messages, attachFile, attachUrl]);
