@@ -501,6 +501,9 @@ Acciones disponibles:
 - sync_catalog_prices: Sincronizar TODOS los precios de los productos de Shopify con el catálogo oficial de Shopy Crafter. Analiza todos los productos, detecta discrepancias y actualiza los precios incorrectos automáticamente. Params: {projectId, dryRun? (si true, solo muestra cambios sin aplicar)}
 - price_audit: Auditar los precios de todos los productos de la tienda Shopify, comparándolos con el catálogo oficial. Genera un informe de discrepancias con recomendaciones. Params: {projectId}
 - list_products_with_prices: Listar TODOS los productos de la tienda con sus precios actuales, variantes, SKUs y compare_at_price. Params: {projectId, filter? ("all"|"subscriptions"|"services"|"creative"|"credits")}
+- generate_brand_css: Generar un archivo CSS personalizado adaptado al ADN de marca del cliente (colores, tipografías, botones, tarjetas, responsive). Params: {projectId}
+- generate_brand_kit: Generar el Brand Kit completo (CSS + Guía de marca + Tokens JSON + Sección Liquid + README). Params: {projectId}
+- generate_brand_guide: Generar la Guía de Identidad Visual de la marca (paleta colores, tipografías, componentes, estilo foto, tono de voz). Params: {projectId}
 - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
 - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
 - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
@@ -583,6 +586,9 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Auditoría precios / revisar precios / precios correctos / comprobar precios / auditar precios → price_audit
 - Ver precios / listar precios / todos los precios / productos con precios / precios actuales / cuánto cuesta cada producto → list_products_with_prices
 - Generar informe / exportar reporte / report / export → generate_export; Auditoría completa / full audit report → run_full_audit_report; Informe IA / AI report → generate_ai_report
+- Generar CSS personalizado / descargar CSS de marca / CSS adaptado a mi marca / generar archivo CSS / quiero mi CSS / CSS descargable / custom brand CSS → generate_brand_css (NOTA: esto genera un ARCHIVO CSS descargable, NO edita el theme de Shopify — para editar theme usa edit_theme_css)
+- Brand kit / kit de marca / kit diseño / paquete marca completo / brand package / descargar kit de marca / quiero mi brand kit → generate_brand_kit
+- Guía de marca / manual de marca / identidad visual / brand guide / guía estilo / manual identidad / quiero mi guía de marca → generate_brand_guide
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
 Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -662,6 +668,18 @@ FLEXIBILIDAD DE PAGO:
 • Sesión Estratégica 1:1 — €147: 60min auditoría + plan de acción personalizado
 • Pack 30 Posts IA — €89: Contenido redes sociales profesional
 • Campañas Virales 360° — desde €147: Instagram + TikTok marketing automatizado
+
+▸ SERVICIOS DE DISEÑO Y MARCA (CSS + Brand Identity):
+• CSS Personalizado de Marca — €297: Archivo CSS completo adaptado al ADN visual (colores, tipografías, botones, tarjetas, responsive). Descargable como .css
+• Brand Kit Completo — €497: CSS + Guía de marca HTML + Tokens JSON + Sección Liquid Shopify + README. Todo en ZIP
+• Guía de Identidad Visual — €197: Manual de marca PDF: paleta colores, tipografías, componentes, estilo foto, tono de voz
+• CSS por Sección Web — €47/sección: CSS personalizado para 1 sección específica (header, hero, producto, footer, carrito, FAQ)
+• Brief Fotográfico Profesional — €47: Brief completo para fotógrafo con especificaciones técnicas
+• Kit Redes Sociales — €147: Templates + colores + tipografías + guía de estilo para posts
+• Templates Email Marketing — €197: 5 templates HTML personalizados (bienvenida, carrito, post-compra, newsletter, oferta)
+• Diseño Landing Page — €397: Landing completa: wireframe + CSS + textos + secciones lista para implementar
+• Diseño CSS Theme Completo — €697: Rediseño visual completo del theme: CSS, tipografía, colores, responsive
+• Rediseño Homepage Completo — €347: Hero, secciones, testimonios, footer optimizado
 
 ▸ PACKS DE CREACIÓN DE PRODUCTOS (servicios en lote):
 • Pack 5 Productos — €197: 5 productos completos desde cero con imágenes IA + SEO
@@ -5310,6 +5328,89 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
             message: dryRun
               ? `🔍 **Simulación de sincronización** (sin cambios aplicados)\n\n${changes.length > 0 ? `**${changes.length} cambios pendientes:**\n${changes.join("\n")}` : "✅ Todos los precios ya están sincronizados"}\n\n${noChange.length > 0 ? `\n✅ ${noChange.length} precios correctos` : ""}\n\n💡 Para aplicar los cambios: "sincronizar precios" (sin dryRun)`
               : `✅ **Sincronización completada**: ${updatedCount} precios actualizados\n\n${changes.join("\n")}${noChange.length > 0 ? `\n\n✅ ${noChange.length} ya estaban correctos` : ""}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_brand_css": {
+        const projectId = params?.projectId;
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido (número)" }; break; }
+        try {
+          const { fetchBrandProfile: fbp, generateBrandCss: gbc } = await import("../lib/brand-css-generator.js");
+          const profile = await fbp(parseInt(String(projectId)));
+          if (!profile) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const css = gbc(profile);
+          const lines = css.split("\n").length;
+          result = {
+            message: `🎨 **CSS personalizado generado** para ${profile.shopName || "tu marca"}\n\n` +
+              `📄 **${lines} líneas** de CSS adaptado a tu ADN de marca\n` +
+              `🎯 Colores: ${(profile.primaryColors || []).join(", ") || "detectados de tu tienda"}\n` +
+              `🔤 Tipografía: ${profile.typographyStyle || "Inter (por defecto)"}\n\n` +
+              `**Secciones incluidas:**\n` +
+              `✅ Variables CSS (--brand-primary, --brand-accent, etc.)\n` +
+              `✅ Header / Navegación\n` +
+              `✅ Hero / Banner\n` +
+              `✅ Botones CTA\n` +
+              `✅ Grid y tarjetas de producto\n` +
+              `✅ Página de producto\n` +
+              `✅ Trust badges\n` +
+              `✅ Testimonios\n` +
+              `✅ FAQ\n` +
+              `✅ Footer\n` +
+              `✅ Newsletter\n` +
+              `✅ Carrito\n` +
+              `✅ Responsive mobile\n` +
+              `✅ Animaciones\n\n` +
+              `📥 **Descárgalo:** /api/exports/brand-css/${projectId}\n` +
+              `📥 **Con IA avanzada:** /api/exports/brand-css/${projectId}?mode=ai\n` +
+              `📥 **Kit completo ZIP:** /api/exports/brand-kit/${projectId}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_brand_kit": {
+        const projectId = params?.projectId;
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido (número)" }; break; }
+        try {
+          const { fetchBrandProfile: fbp } = await import("../lib/brand-css-generator.js");
+          const profile = await fbp(parseInt(String(projectId)));
+          if (!profile) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          result = {
+            message: `📋 **Brand Kit disponible** para ${profile.shopName || "tu marca"}\n\n` +
+              `El Brand Kit incluye:\n` +
+              `📁 **css/theme-custom.css** — CSS personalizado completo\n` +
+              `📄 **guia-de-marca.html** — Manual de identidad visual\n` +
+              `📄 **brand-tokens.json** — Tokens de diseño para desarrolladores\n` +
+              `📁 **shopify/sections/brand-section.liquid** — Sección Liquid personalizada\n` +
+              `📄 **LEEME.txt** — Instrucciones de instalación\n\n` +
+              `📥 **Descargar Brand Kit básico:** /api/exports/brand-kit/${projectId}\n` +
+              `📥 **Descargar Brand Kit Premium + IA:** /api/exports/brand-kit-full/${projectId}\n\n` +
+              `💡 El kit Premium incluye CSS avanzado generado por IA con animaciones y efectos personalizados.`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_brand_guide": {
+        const projectId = params?.projectId;
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido (número)" }; break; }
+        try {
+          const { fetchBrandProfile: fbp } = await import("../lib/brand-css-generator.js");
+          const profile = await fbp(parseInt(String(projectId)));
+          if (!profile) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          result = {
+            message: `📖 **Guía de marca disponible** para ${profile.shopName || "tu marca"}\n\n` +
+              `La guía incluye:\n` +
+              `🎨 Paleta de colores completa con códigos hex\n` +
+              `🔤 Tipografías (títulos, cuerpo, precios) con tamaños\n` +
+              `🧩 Componentes visuales (botón CTA, tarjeta producto)\n` +
+              `📸 Estilo fotográfico (fondo, iluminación, temperatura)\n` +
+              `🗣️ Tono de voz y personalidad de marca\n` +
+              `📐 Espaciado y layout\n\n` +
+              `📥 **HTML:** /api/exports/brand-guide/${projectId}\n` +
+              `📥 **PDF:** /api/exports/brand-guide/${projectId}?format=pdf`,
           };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;

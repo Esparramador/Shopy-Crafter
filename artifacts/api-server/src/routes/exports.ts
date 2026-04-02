@@ -23,6 +23,7 @@ import { buildProductCard, buildProductCardsSection, type ProductCardData } from
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
+import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -417,10 +418,22 @@ async function generateAiRecommendations(
     const platform = platformType || "e-commerce";
     const areaPrompt = AREA_SPECIFIC_PROMPTS[area] || "";
 
+    let brandContext = "";
+    try {
+      const profile = await fetchBrandProfile(projectId);
+      if (profile) {
+        brandContext = buildBrandDnaContext(profile);
+      }
+    } catch (e) {
+      logger.warn({ err: e }, "Could not fetch brand profile for report");
+    }
+
     const prompt = `Eres un consultor senior realizando una auditoría profesional EXHAUSTIVA para un e-commerce. Analiza estos datos REALES del negocio y genera un informe de consultoría de MÁXIMA CALIDAD con recomendaciones ULTRA-ESPECÍFICAS.
 
 PLATAFORMA DEL CLIENTE: ${platform} (adapta TODAS las instrucciones a esta plataforma, pero incluye también instrucciones para otras plataformas al final)
 ÁREA DE ANÁLISIS: ${area.toUpperCase()}
+
+${brandContext}
 
 ${dataContext}
 
@@ -4389,6 +4402,455 @@ router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<v
   res.setHeader("Content-Disposition", `attachment; filename="Proyecto_Completo_${sanitizeFilename(project.name)}_${new Date().toISOString().split("T")[0]}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
+});
+
+router.get("/exports/brand-css/:projectId", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const profile = await fetchBrandProfile(projectId);
+    if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const mode = (req.query.mode as string || "").toLowerCase();
+
+    if (mode === "ai") {
+      const baseCss = generateBrandCss(profile);
+      const aiCss = await generateAiBrandCss(projectId, profile);
+      const fullCss = baseCss + "\n\n" + aiCss;
+      const filename = `theme-custom-${sanitizeFilename(profile.shopName || "brand")}-${new Date().toISOString().split("T")[0]}.css`;
+      res.setHeader("Content-Type", "text/css; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(fullCss);
+      return;
+    }
+
+    const css = generateBrandCss(profile);
+    const filename = `theme-custom-${sanitizeFilename(profile.shopName || "brand")}-${new Date().toISOString().split("T")[0]}.css`;
+    res.setHeader("Content-Type", "text/css; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(css);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating brand CSS");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/exports/brand-guide/:projectId", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const profile = await fetchBrandProfile(projectId);
+    if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const html = generateBrandGuideHtml(profile);
+    const format = (req.query.format as string || "").toLowerCase();
+    const filename = `Brand-Guide-${sanitizeFilename(profile.shopName || "brand")}-${new Date().toISOString().split("T")[0]}`;
+
+    if (format === "pdf") {
+      try {
+        await generatePdfFromHtml(html, filename, res);
+      } catch (e: any) {
+        res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+      }
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+    res.send(html);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating brand guide");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/exports/brand-kit/:projectId", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const profile = await fetchBrandProfile(projectId);
+    if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const css = generateBrandCss(profile);
+    const guideHtml = generateBrandGuideHtml(profile);
+    const brandName = sanitizeFilename(profile.shopName || "brand");
+    const date = new Date().toISOString().split("T")[0];
+    const zipFilename = `Brand-Kit-${brandName}-${date}.zip`;
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    archive.append(css, { name: `${brandName}/css/theme-custom.css` });
+    archive.append(guideHtml, { name: `${brandName}/guia-de-marca.html` });
+
+    const readmeContent = `═══════════════════════════════════════════════════════════
+  BRAND KIT — ${profile.shopName || "Tu Marca"}
+  Generado por Shopy Crafter | shopycrafter.com
+  Fecha: ${date}
+═══════════════════════════════════════════════════════════
+
+CONTENIDO DE ESTE KIT:
+─────────────────────
+
+📁 css/
+   └── theme-custom.css
+       CSS personalizado para tu theme.
+       
+       CÓMO USARLO:
+       
+       Shopify:
+       1. Ve a Online Store → Themes → Edit code
+       2. En Assets, haz clic en "Add a new asset"
+       3. Sube "theme-custom.css"
+       4. Abre Layout/theme.liquid
+       5. Antes de </head>, añade:
+          {{ 'theme-custom.css' | asset_url | stylesheet_tag }}
+       6. Guarda.
+       
+       WooCommerce:
+       1. Ve a Apariencia → Personalizar → CSS adicional
+       2. Pega el contenido del archivo CSS
+       3. Publica.
+       
+       PrestaShop:
+       1. Ve a Back Office → Diseño → Tema
+       2. Edita código → custom.css
+       3. Pega el contenido.
+
+📄 guia-de-marca.html
+   Manual de identidad visual completo.
+   Ábrelo en cualquier navegador.
+   Incluye: paleta de colores, tipografías,
+   componentes, estilo fotográfico, tono de voz.
+
+═══════════════════════════════════════════════════════════
+  Para soporte: contacto@shopycrafter.com
+  shopycrafter.com
+═══════════════════════════════════════════════════════════
+`;
+    archive.append(readmeContent, { name: `${brandName}/LEEME.txt` });
+
+    const colorsJson = JSON.stringify({
+      brand: profile.shopName,
+      date,
+      colors: {
+        primary: profile.primaryColors[0] || "#2d2d2d",
+        secondary: profile.primaryColors[1] || "#555555",
+        accent: profile.primaryColors[2] || profile.brandColors[2] || "#e94560",
+        all: [...(profile.primaryColors || []), ...(profile.brandColors || [])],
+      },
+      typography: profile.typographyStyle,
+      personality: profile.brandPersonality,
+      tone: profile.toneOfVoice,
+      audience: profile.targetAudience,
+      photography: {
+        background: profile.backgroundStyle,
+        lighting: profile.lightingStyle,
+        mood: profile.mood,
+      },
+    }, null, 2);
+    archive.append(colorsJson, { name: `${brandName}/brand-tokens.json` });
+
+    await archive.finalize();
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating brand kit");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/exports/report-css/:projectId/:area", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const area = req.params.area as string;
+    const profile = await fetchBrandProfile(projectId);
+    if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const css = generateBrandCss(profile);
+    const areaLabel: Record<string, string> = {
+      seo: "SEO",
+      financial: "Financial",
+      inventory: "Inventory",
+      consistency: "Brand-Identity",
+      redesigns: "Redesigns",
+      revenue: "Revenue",
+    };
+    const label = areaLabel[area] || area;
+    const brandName = sanitizeFilename(profile.shopName || "brand");
+    const date = new Date().toISOString().split("T")[0];
+    const filename = `CSS-${label}-${brandName}-${date}.css`;
+
+    const headerComment = `/*
+ * CSS extraído del informe de ${label}
+ * Marca: ${profile.shopName || "N/A"}
+ * Generado: ${date}
+ * Shopy Crafter | shopycrafter.com
+ */\n\n`;
+
+    res.setHeader("Content-Type", "text/css; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(headerComment + css);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating report CSS");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/exports/report-png/:projectId/:area", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const area = req.params.area as ReportArea;
+    const profile = await fetchBrandProfile(projectId);
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)).limit(1);
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const areaLabels: Record<string, string> = {
+      seo: "Auditoría SEO",
+      financial: "Análisis Financiero",
+      inventory: "Gestión de Inventario",
+      consistency: "Identidad de Marca",
+      redesigns: "Rediseño de Productos",
+      revenue: "Análisis de Revenue",
+    };
+    const label = areaLabels[area] || area;
+    const brandName = sanitizeFilename((project as any).name || "project");
+    const date = new Date().toISOString().split("T")[0];
+
+    let brandSection = "";
+    if (profile) {
+      const allColors = [...(profile.primaryColors || []), ...(profile.brandColors || [])].filter(c => c && c.startsWith("#"));
+      brandSection = `
+        <div style="margin-top:24px;padding:20px;background:#101018;border:1px solid #1a1a28;border-radius:12px;">
+          <h3 style="color:#c8a84b;font-size:14px;margin-bottom:12px;">Paleta de Marca Aplicada</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${allColors.map(c => `<div style="width:48px;height:48px;background:${c};border-radius:8px;border:1px solid #2a2a38;" title="${c}"></div>`).join("")}
+          </div>
+          <p style="margin-top:8px;font-size:12px;color:#6b6b80;">Tipografía: ${profile.typographyStyle || "Inter"} | Personalidad: ${profile.brandPersonality || "Profesional"}</p>
+        </div>`;
+    }
+
+    const previewHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:#08080e; color:#f0f0f5; width:1200px; }
+.preview { padding:48px; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; padding-bottom:16px; border-bottom:1px solid #1a1a28; }
+.logo { font-size:20px; font-weight:800; color:#c8a84b; }
+.badge { background:#16161f; border:1px solid #1a1a28; padding:6px 14px; border-radius:8px; font-size:11px; color:#9494a8; }
+.title { font-size:36px; font-weight:900; color:#f0f0f5; margin-bottom:8px; }
+.title span { color:#c8a84b; }
+.subtitle { font-size:15px; color:#6b6b80; margin-bottom:32px; }
+.metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+.metric { background:#101018; border:1px solid #1a1a28; border-radius:12px; padding:20px; text-align:center; }
+.metric .val { font-size:28px; font-weight:900; color:#c8a84b; }
+.metric .lab { font-size:10px; color:#6b6b80; text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+.sections { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.sec { background:#101018; border:1px solid #1a1a28; border-radius:12px; padding:20px; }
+.sec h3 { font-size:14px; font-weight:700; color:#c8a84b; margin-bottom:8px; }
+.sec p { font-size:12px; color:#9494a8; line-height:1.6; }
+.footer { text-align:center; margin-top:32px; padding-top:16px; border-top:1px solid #1a1a28; }
+.footer p { font-size:11px; color:#6b6b80; }
+</style>
+</head>
+<body>
+<div class="preview">
+  <div class="header">
+    <div class="logo">SHOPY CRAFTER</div>
+    <div class="badge">${date} · Informe ${label}</div>
+  </div>
+  <h1 class="title">Informe de <span>${label}</span></h1>
+  <p class="subtitle">${(project as any).name || "Proyecto"} — Análisis profesional generado por IA</p>
+  <div class="metrics">
+    <div class="metric"><div class="val">A+</div><div class="lab">Puntuación</div></div>
+    <div class="metric"><div class="val">24/7</div><div class="lab">Monitorización</div></div>
+    <div class="metric"><div class="val">6</div><div class="lab">Áreas Analizadas</div></div>
+    <div class="metric"><div class="val">100%</div><div class="lab">Personalizado</div></div>
+  </div>
+  <div class="sections">
+    <div class="sec">
+      <h3>📋 Diagnóstico Ejecutivo</h3>
+      <p>Análisis profundo del estado actual de tu tienda con datos reales y métricas de rendimiento por producto.</p>
+    </div>
+    <div class="sec">
+      <h3>🎯 Plan de Acción</h3>
+      <p>6-8 acciones detalladas con contenido producido listo para copiar y pegar en tu tienda.</p>
+    </div>
+    <div class="sec">
+      <h3>📦 Contenido Producido</h3>
+      <p>CSS personalizado, textos SEO, emails de marketing, posts sociales — todo adaptado a tu marca.</p>
+    </div>
+    <div class="sec">
+      <h3>⚡ Quick Wins</h3>
+      <p>Mejoras rápidas que puedes hacer hoy mismo en menos de 10 minutos cada una.</p>
+    </div>
+  </div>
+  ${brandSection}
+  <div class="footer">
+    <p>Shopy Crafter · shopycrafter.com · Confidencial · ${date}</p>
+  </div>
+</div>
+</body>
+</html>`;
+
+    const format = (req.query.format as string || "png").toLowerCase();
+    const filename = `Preview-${label}-${brandName}-${date}`;
+
+    if (format === "html") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+      res.send(previewHtml);
+      return;
+    }
+
+    try {
+      await generatePdfFromHtml(previewHtml, filename, res);
+    } catch {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+      res.send(previewHtml);
+    }
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating report preview");
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/exports/brand-kit-full/:projectId", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const profile = await fetchBrandProfile(projectId);
+    if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const css = generateBrandCss(profile);
+    const guideHtml = generateBrandGuideHtml(profile);
+    const brandName = sanitizeFilename(profile.shopName || "brand");
+    const date = new Date().toISOString().split("T")[0];
+    const zipFilename = `Brand-Kit-Completo-${brandName}-${date}.zip`;
+
+    let aiCss = "";
+    try {
+      aiCss = await generateAiBrandCss(projectId, profile);
+    } catch (e) {
+      logger.warn({ err: e }, "AI CSS generation failed, using base only");
+    }
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    archive.append(css, { name: `${brandName}/css/theme-custom-base.css` });
+    if (aiCss) archive.append(aiCss, { name: `${brandName}/css/theme-custom-advanced.css` });
+    archive.append(css + "\n\n" + aiCss, { name: `${brandName}/css/theme-custom-completo.css` });
+    archive.append(guideHtml, { name: `${brandName}/guia-de-marca.html` });
+
+    const colorsJson = JSON.stringify({
+      brand: profile.shopName,
+      generated: date,
+      generator: "Shopy Crafter — shopycrafter.com",
+      colors: {
+        primary: profile.primaryColors[0] || "#2d2d2d",
+        secondary: profile.primaryColors[1] || "#555555",
+        accent: profile.primaryColors[2] || profile.brandColors[2] || "#e94560",
+        allExtracted: [...(profile.primaryColors || []), ...(profile.brandColors || [])],
+      },
+      typography: { style: profile.typographyStyle, personality: profile.brandPersonality },
+      photography: { background: profile.backgroundStyle, lighting: profile.lightingStyle, mood: profile.mood, temperature: profile.colorTemp },
+      tone: profile.toneOfVoice,
+      audience: profile.targetAudience,
+      valuePropositions: profile.valuePropositions,
+    }, null, 2);
+    archive.append(colorsJson, { name: `${brandName}/brand-tokens.json` });
+
+    const shopifySectionLiquid = `{% comment %}
+  Sección personalizada generada por Shopy Crafter
+  Marca: ${profile.shopName}
+  Fecha: ${date}
+{% endcomment %}
+
+<style>
+${css.substring(css.indexOf(":root"), css.indexOf("/* ═══════════ BASE") > 0 ? css.indexOf("/* ═══════════ BASE") : css.indexOf("body {"))}
+</style>
+
+<section class="brand-section">
+  <div class="container">
+    <div class="section-header">
+      <h2>{{ section.settings.heading }}</h2>
+      <p>{{ section.settings.subheading }}</p>
+    </div>
+    <div class="section-content">
+      {{ section.settings.content }}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Sección ${profile.shopName}",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Título", "default": "Bienvenido" },
+    { "type": "text", "id": "subheading", "label": "Subtítulo", "default": "" },
+    { "type": "richtext", "id": "content", "label": "Contenido" }
+  ]
+}
+{% endschema %}
+`;
+    archive.append(shopifySectionLiquid, { name: `${brandName}/shopify/sections/brand-section.liquid` });
+
+    const readmeContent = `═══════════════════════════════════════════════════════════
+  BRAND KIT COMPLETO — ${profile.shopName || "Tu Marca"}
+  Generado por Shopy Crafter | shopycrafter.com
+  Fecha: ${date}
+═══════════════════════════════════════════════════════════
+
+CONTENIDO:
+──────────
+
+📁 css/
+   ├── theme-custom-base.css        → CSS base personalizado (colores, tipografías, layout)
+   ├── theme-custom-advanced.css    → CSS avanzado generado por IA (animaciones, efectos)
+   └── theme-custom-completo.css    → Ambos combinados — ARCHIVO RECOMENDADO
+
+📄 guia-de-marca.html              → Manual de identidad visual (abrir en navegador)
+📄 brand-tokens.json                → Tokens de diseño en JSON (para desarrolladores)
+
+📁 shopify/sections/
+   └── brand-section.liquid          → Sección Liquid personalizada para Shopify
+
+INSTRUCCIONES RÁPIDAS:
+──────────────────────
+
+SHOPIFY:
+1. Online Store → Themes → Edit code
+2. Sube theme-custom-completo.css a Assets
+3. En Layout/theme.liquid, antes de </head>:
+   {{ 'theme-custom-completo.css' | asset_url | stylesheet_tag }}
+4. Opcionalmente, sube brand-section.liquid a Sections
+
+WOOCOMMERCE:
+1. Apariencia → Personalizar → CSS adicional
+2. Pega el contenido de theme-custom-completo.css
+
+PRESTASHOP:
+1. Back Office → Diseño → Tema → Editar código → custom.css
+2. Pega el contenido
+
+═══════════════════════════════════════════════════════════
+  Soporte: contacto@shopycrafter.com
+═══════════════════════════════════════════════════════════
+`;
+    archive.append(readmeContent, { name: `${brandName}/LEEME.txt` });
+
+    await archive.finalize();
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating full brand kit");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
 });
 
 export default router;

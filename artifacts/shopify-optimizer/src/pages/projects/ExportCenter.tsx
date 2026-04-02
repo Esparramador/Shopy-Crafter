@@ -9,7 +9,7 @@ import {
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX";
+type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX" | "CSS";
 
 interface ExportOption {
   id: string;
@@ -193,6 +193,46 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       format: "HTML",
       color: "#f39c12",
       category: "reports",
+    },
+    {
+      id: "brand-css",
+      title: "CSS Personalizado de Marca",
+      description: "Archivo .css completo adaptado al ADN visual de la marca: colores, tipografías, botones, tarjetas, responsive. Listo para copiar y pegar.",
+      icon: <Palette className="w-6 h-6" />,
+      endpoint: `/api/exports/brand-css/${projectId}`,
+      format: "CSS" as ExportFormat,
+      color: "#e94560",
+      category: "bundle",
+    },
+    {
+      id: "brand-guide",
+      title: "Guía de Identidad Visual",
+      description: "Manual de marca profesional: paleta de colores, tipografías, componentes visuales, estilo fotográfico, tono de voz.",
+      icon: <Eye className="w-6 h-6" />,
+      endpoint: `/api/exports/brand-guide/${projectId}`,
+      format: "HTML",
+      color: "#8e44ad",
+      category: "bundle",
+    },
+    {
+      id: "brand-kit",
+      title: "Brand Kit Completo (ZIP)",
+      description: "CSS + Guía de marca + Tokens JSON + Sección Liquid Shopify + README con instrucciones. Todo en un ZIP.",
+      icon: <Archive className="w-6 h-6" />,
+      endpoint: `/api/exports/brand-kit/${projectId}`,
+      format: "ZIP",
+      color: "#c8a84b",
+      category: "bundle",
+    },
+    {
+      id: "brand-kit-full",
+      title: "Brand Kit Premium + IA (ZIP)",
+      description: "Kit completo con CSS base + CSS avanzado IA (animaciones, efectos) + Guía de marca + Liquid + Tokens. El paquete definitivo.",
+      icon: <Sparkles className="w-6 h-6" />,
+      endpoint: `/api/exports/brand-kit-full/${projectId}`,
+      format: "ZIP",
+      color: "#f39c12",
+      category: "bundle",
     },
     {
       id: "csv",
