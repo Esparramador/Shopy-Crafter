@@ -22,6 +22,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "seo",         label: "SEO Engine",   icon: "🔍" },
   { id: "vault",       label: "Repositorio",  icon: "🗄️" },
   { id: "exports",     label: "Exportar",     icon: "📥" },
+  { id: "generator",   label: "Generador IA", icon: "✨" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
@@ -35,6 +36,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Flujos de Email", icon: "🔄", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
+  { label: "Generador Universal IA", icon: "✨", href: "/projects/2/generator" },
   { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
 ];

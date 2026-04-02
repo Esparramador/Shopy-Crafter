@@ -504,6 +504,7 @@ Acciones disponibles:
 - generate_brand_css: Generar un archivo CSS personalizado adaptado al ADN de marca del cliente (colores, tipografías, botones, tarjetas, responsive). Params: {projectId}
 - generate_brand_kit: Generar el Brand Kit completo (CSS + Guía de marca + Tokens JSON + Sección Liquid + README). Params: {projectId}
 - generate_brand_guide: Generar la Guía de Identidad Visual de la marca (paleta colores, tipografías, componentes, estilo foto, tono de voz). Params: {projectId}
+- run_universal_generator: Ejecutar el Generador Universal para crear cualquier tipo de contenido profesional. Params: {projectId, generatorType (seo-audit|seo-metas|seo-schemas|seo-alt-texts|seo-keywords|blog-strategy|blog-post|product-catalog|complete-report|financial-report|inventory-report|consistency-report|revenue-analysis|brand-css|brand-css-ai|brand-guide|brand-kit|brand-kit-premium|photo-brief|social-kit|competitor-scan|market-research|pricing-optimal|margin-waterfall|financial-forecast|product-redesign|email-templates|email-flow|social-posts|landing-design|agency-proposal|agency-budget|external-audit|data-csv|data-xlsx|data-json|data-zip), url? (para análisis externo)}
 - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
 - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
 - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
@@ -589,6 +590,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Generar CSS personalizado / descargar CSS de marca / CSS adaptado a mi marca / generar archivo CSS / quiero mi CSS / CSS descargable / custom brand CSS → generate_brand_css (NOTA: esto genera un ARCHIVO CSS descargable, NO edita el theme de Shopify — para editar theme usa edit_theme_css)
 - Brand kit / kit de marca / kit diseño / paquete marca completo / brand package / descargar kit de marca / quiero mi brand kit → generate_brand_kit
 - Guía de marca / manual de marca / identidad visual / brand guide / guía estilo / manual identidad / quiero mi guía de marca → generate_brand_guide
+- Generador universal / herramienta de generación / generar contenido / crear informe / quiero un análisis / generar todo / usar generador → run_universal_generator (pide al usuario qué tipo de contenido quiere: SEO, CSS, informe, presupuesto, etc.)
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
 Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -5411,6 +5413,47 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
               `📐 Espaciado y layout\n\n` +
               `📥 **HTML:** /api/exports/brand-guide/${projectId}\n` +
               `📥 **PDF:** /api/exports/brand-guide/${projectId}?format=pdf`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "run_universal_generator": {
+        const projectId = params?.projectId;
+        const generatorType = params?.generatorType;
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido" }; break; }
+        if (!generatorType) {
+          result = {
+            message: `✨ **Generador Universal de Shopy Crafter** — 41 herramientas IA\n\n` +
+              `Dime qué tipo de contenido quieres generar:\n\n` +
+              `🔍 **SEO**: seo-audit, seo-metas, seo-schemas, seo-alt-texts, seo-keywords, blog-strategy, blog-post\n` +
+              `📊 **Informes**: complete-report, financial-report, inventory-report, consistency-report, revenue-analysis\n` +
+              `🎨 **Marca**: brand-css, brand-css-ai, brand-guide, brand-kit, brand-kit-premium, photo-brief, social-kit\n` +
+              `💰 **Finanzas**: pricing-optimal, margin-waterfall, financial-forecast\n` +
+              `🕵️ **Competencia**: competitor-scan, market-research\n` +
+              `✍️ **Contenido**: product-redesign, email-templates, email-flow, social-posts, landing-design\n` +
+              `📦 **Datos**: data-csv, data-xlsx, data-json, data-zip\n` +
+              `💼 **Agencia**: agency-proposal, agency-budget\n` +
+              `🌍 **Externo**: external-audit (+ url)\n\n` +
+              `📱 **O ve a la página del Generador:** /projects/${projectId}/generator`,
+          };
+          break;
+        }
+        try {
+          const { runGeneratorDirect } = await import("./generator.js");
+          const genData = await runGeneratorDirect(generatorType, {
+            projectId: parseInt(String(projectId)),
+            url: params?.url,
+            format: "html",
+            extraParams: {},
+          });
+          result = {
+            message: `✅ ${genData.message || "Contenido generado"}\n\n` +
+              (genData.vaultSaved ? `🗄️ Guardado en Vault (ID: ${genData.vaultId})\n` : "") +
+              (genData.brainLearned ? `🧠 ShopyBrain ha aprendido de esta generación\n` : "") +
+              (genData.redirect ? `📥 **Descargar:** ${genData.redirect}\n` : "") +
+              (genData.downloadUrl ? `📥 **Descargar:** ${genData.downloadUrl}\n` : "") +
+              (genData.vaultId ? `📥 **Desde Vault:** /api/generator/download/${genData.vaultId}\n` : ""),
           };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;

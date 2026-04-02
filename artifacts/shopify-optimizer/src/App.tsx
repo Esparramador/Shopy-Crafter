@@ -34,6 +34,7 @@ import EmailTemplates from "@/pages/admin/EmailTemplates";
 import ProjectVault from "@/pages/admin/ProjectVault";
 import GlobalVault from "@/pages/admin/GlobalVault";
 import ExportCenter from "@/pages/projects/ExportCenter";
+import UniversalGenerator from "@/pages/projects/UniversalGenerator";
 import ForgotPassword from "@/pages/ForgotPassword";
 import OAuthSuccess from "@/pages/OAuthSuccess";
 import AuditPage from "@/pages/projects/Audit";
@@ -463,6 +464,14 @@ function Router() {
               </AdminWrapper>
             </RequireAdmin>
           )}
+        </Route>
+
+        <Route path="/projects/:id/generator">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><UniversalGenerator /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
         </Route>
 
         {/* Client routes */}
