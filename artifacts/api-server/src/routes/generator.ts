@@ -9,6 +9,7 @@ import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAi
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { shopifyRequest } from "../lib/shopify.js";
+import { getReportShell, type ReportTemplate } from "./exports.js";
 
 const router = Router();
 
@@ -96,7 +97,7 @@ router.get("/generator/types", (_req: Request, res: Response) => {
 });
 
 router.post("/generator/run", async (req: Request, res: Response) => {
-  const { type, projectId, url, format, params: extraParams } = req.body;
+  const { type, projectId, url, format, template, params: extraParams } = req.body;
   if (!type) return res.status(400).json({ error: "Falta el tipo de generación" });
 
   const genType = GENERATOR_TYPES.find(t => t.id === type);
@@ -110,12 +111,14 @@ router.post("/generator/run", async (req: Request, res: Response) => {
   }
 
   const outputFormat = format || genType.outputFormats[0];
+  const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
 
   try {
     const result = await runGenerator(type, {
       projectId: projectId ? parseInt(String(projectId)) : undefined,
       url,
       format: outputFormat,
+      template: tpl,
       extraParams: extraParams || {},
     });
 
@@ -126,6 +129,7 @@ router.post("/generator/run", async (req: Request, res: Response) => {
         format: outputFormat,
         redirect: result.redirect,
         message: result.message,
+        vaultId: result.vaultId ?? null,
         brainLearned: result.brainLearned ?? false,
         vaultSaved: result.vaultSaved ?? false,
       });
@@ -177,6 +181,7 @@ interface GenParams {
   projectId?: number;
   url?: string;
   format: string;
+  template: ReportTemplate;
   extraParams: Record<string, any>;
 }
 
@@ -185,7 +190,7 @@ export async function runGeneratorDirect(type: string, params: GenParams): Promi
 }
 
 async function runGenerator(type: string, params: GenParams): Promise<GenResult> {
-  const { projectId, url, format } = params;
+  const { projectId, url, format, template = "prestige" } = params;
   const baseUrl = `http://localhost:${process.env.PORT || 8080}/api`;
 
   switch (type) {
@@ -208,18 +213,53 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         "brain-export": "shopybrain",
       };
       const reportType = reportMap[type] || type;
-      const fmtParam = format === "pdf" ? "?format=pdf" : "";
-      const downloadUrl = `/api/projects/${projectId}/exports/${reportType}${fmtParam}`;
+      const tplParam = `template=${template}`;
+      const fmtParam = format === "pdf" ? `&format=pdf` : "";
+      const downloadUrl = `/api/projects/${projectId}/exports/${reportType}?${tplParam}${fmtParam}`;
       if (projectId) {
+        const genLabel = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
+        const date = new Date().toLocaleDateString("es-ES");
         learnFromOperation({
           operationType: `generator_${type}`,
           title: `Generado informe ${type} para proyecto ${projectId}`,
-          content: `Informe ${type} generado y disponible para descarga`,
+          content: `Informe ${type} generado con plantilla ${template}`,
         });
+        try {
+          const shell = getReportShell(template);
+          const project = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)).then(r => r[0]);
+          const storeName = project?.shopName || `Proyecto ${projectId}`;
+          const vaultHtml = shell(
+            genLabel,
+            `${storeName} — ${project?.shopDomain || ""}`,
+            `<div class="ai-deliverable"><h2>${genLabel}</h2><p>Informe generado el ${date} con plantilla <strong>${template}</strong>.</p><p>Descarga disponible en: <a href="${downloadUrl}">${downloadUrl}</a></p></div>`,
+            date,
+            storeName
+          );
+          const vaultId = await saveToVault({
+            projectId,
+            fileType: type,
+            category: "generator",
+            title: `${genLabel} [${template}] — ${date}`,
+            description: `Informe generado con plantilla ${template}`,
+            content: vaultHtml,
+            mimeType: "text/html",
+            generatedBy: "universal-generator",
+          });
+          return {
+            redirect: downloadUrl,
+            message: `📊 Informe "${genLabel}" generado con plantilla ${template}. Guardado en Vault.`,
+            downloadUrl,
+            vaultId,
+            brainLearned: true,
+            vaultSaved: true,
+          };
+        } catch (e) {
+          logger.warn({ err: e, type }, "Could not save redirect report to vault");
+        }
       }
       return {
         redirect: downloadUrl,
-        message: `📊 Informe "${GENERATOR_TYPES.find(t => t.id === type)?.label}" generado. Descarga disponible.`,
+        message: `📊 Informe "${GENERATOR_TYPES.find(t => t.id === type)?.label}" generado con plantilla ${template}. Descarga disponible.`,
         downloadUrl,
         brainLearned: true,
         vaultSaved: false,
@@ -257,7 +297,10 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Todo el HTML debe estar dentro de <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente en cualquier CSS.`,
       });
 
-      const html = wrapInProfessionalTemplate(aiContent, GENERATOR_TYPES.find(t => t.id === type)?.label || type, project.shopName || "");
+      const genLabel = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
+      const date = new Date().toLocaleDateString("es-ES");
+      const shell = getReportShell(template);
+      const html = shell(genLabel, `${project.shopName} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date, project.shopName || undefined);
 
       let vaultId: number | null = null;
       if (projectId) {
@@ -265,15 +308,15 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
           projectId,
           fileType: type,
           category: "generator",
-          title: `${GENERATOR_TYPES.find(t => t.id === type)?.label} — ${new Date().toLocaleDateString("es-ES")}`,
-          description: `Generado automáticamente por el Generador Universal`,
+          title: `${genLabel} [${template}] — ${date}`,
+          description: `Generado con plantilla ${template}`,
           content: html,
           mimeType: "text/html",
           generatedBy: "universal-generator",
         });
         learnFromOperation({
           operationType: `generator_${type}`,
-          title: `Generado ${type} para "${project.shopName}"`,
+          title: `Generado ${type} para "${project.shopName}" [${template}]`,
           content: aiContent.substring(0, 2000),
         });
       }
@@ -417,21 +460,24 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Envuelve todo en <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente.`,
       });
 
-      const html = wrapInProfessionalTemplate(aiContent, GENERATOR_TYPES.find(t => t.id === type)?.label || type, project.shopName || "");
+      const genLabel2 = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
+      const date2 = new Date().toLocaleDateString("es-ES");
+      const shell2 = getReportShell(template);
+      const html = shell2(genLabel2, `${project.shopName} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date2, project.shopName || undefined);
 
       const vaultId = await saveToVault({
         projectId,
         fileType: type,
         category: "generator",
-        title: `${GENERATOR_TYPES.find(t => t.id === type)?.label} — ${new Date().toLocaleDateString("es-ES")}`,
-        description: `Generado por el Generador Universal de Shopy Crafter`,
+        title: `${genLabel2} [${template}] — ${date2}`,
+        description: `Generado con plantilla ${template}`,
         content: html,
         mimeType: "text/html",
         generatedBy: "universal-generator",
       });
       learnFromOperation({
         operationType: `generator_${type}`,
-        title: `Generado ${type} para "${project.shopName}"`,
+        title: `Generado ${type} para "${project.shopName}" [${template}]`,
         content: aiContent.substring(0, 2000),
       });
 
@@ -487,7 +533,10 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\nEres un analista experto en e-commerce. Analiza la URL/tienda proporcionada y genera un informe PROFESIONAL y DETALLADO. Todo en HTML dentro de <div class="ai-deliverable">.`,
       });
 
-      const html = wrapInProfessionalTemplate(aiContent, GENERATOR_TYPES.find(t => t.id === type)?.label || type, targetUrl || "Análisis Externo");
+      const genLabel3 = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
+      const date3 = new Date().toLocaleDateString("es-ES");
+      const shell3 = getReportShell(template);
+      const html = shell3(genLabel3, targetUrl || "Análisis Externo", aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date3, targetUrl || undefined);
 
       let vaultId: number | null = null;
       if (projectId) {
@@ -495,15 +544,15 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
           projectId,
           fileType: type,
           category: "generator-external",
-          title: `${GENERATOR_TYPES.find(t => t.id === type)?.label} — ${targetUrl || "Externo"} — ${new Date().toLocaleDateString("es-ES")}`,
-          description: `Análisis externo de ${targetUrl}`,
+          title: `${genLabel3} [${template}] — ${targetUrl || "Externo"} — ${date3}`,
+          description: `Análisis externo con plantilla ${template}`,
           content: html,
           mimeType: "text/html",
           generatedBy: "universal-generator",
         });
         learnFromOperation({
           operationType: `generator_${type}`,
-          title: `Análisis externo de ${targetUrl}`,
+          title: `Análisis externo de ${targetUrl} [${template}]`,
           content: aiContent.substring(0, 2000),
         });
       }
@@ -520,64 +569,6 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
     default:
       return { message: `❌ Tipo de generación no implementado: ${type}` };
   }
-}
-
-function wrapInProfessionalTemplate(content: string, title: string, storeName: string): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} — ${storeName} | Shopy Crafter</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.7; }
-  .report-header {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-    color: white; padding: 40px; text-align: center; position: relative; overflow: hidden;
-  }
-  .report-header::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(99,102,241,0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(168,85,247,0.1) 0%, transparent 50%);
-  }
-  .report-header h1 { font-size: 28px; font-weight: 800; position: relative; z-index: 1; letter-spacing: -0.5px; }
-  .report-header .subtitle { font-size: 14px; opacity: 0.7; margin-top: 8px; position: relative; z-index: 1; }
-  .report-header .brand { font-size: 12px; opacity: 0.5; margin-top: 16px; position: relative; z-index: 1; }
-  .report-body { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
-  .ai-deliverable { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
-  .ai-deliverable h2 { color: #0f172a; font-size: 22px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
-  .ai-deliverable h3 { color: #334155; font-size: 18px; margin: 20px 0 10px; }
-  .ai-deliverable table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
-  .ai-deliverable th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
-  .ai-deliverable td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
-  .ai-deliverable tr:hover td { background: #fafbfd; }
-  .ai-deliverable ul, .ai-deliverable ol { padding-left: 24px; margin: 12px 0; }
-  .ai-deliverable li { margin-bottom: 6px; }
-  .ai-deliverable code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-  .ai-deliverable pre { background: #0f172a; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 16px 0; font-size: 13px; }
-  .ai-deliverable pre code { background: none; color: inherit; }
-  .ai-deliverable blockquote { border-left: 4px solid #6366f1; padding: 12px 20px; margin: 16px 0; background: #f8f7ff; border-radius: 0 8px 8px 0; }
-  .report-footer { text-align: center; padding: 32px; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; margin-top: 40px; }
-  @media print { body { background: white; } .report-body { padding: 20px; } }
-  @media (max-width: 768px) { .report-body { padding: 16px; } .ai-deliverable { padding: 20px; } }
-</style>
-</head>
-<body>
-<div class="report-header">
-  <h1>${title}</h1>
-  <div class="subtitle">${storeName}</div>
-  <div class="brand">Generado por Shopy Crafter — ${new Date().toLocaleDateString("es-ES")} — shopycrafter.com</div>
-</div>
-<div class="report-body">
-  ${content.includes("ai-deliverable") ? content : `<div class="ai-deliverable">${content}</div>`}
-</div>
-<div class="report-footer">
-  © ${new Date().getFullYear()} Shopy Crafter — Generador Universal de Contenido IA — shopycrafter.com
-</div>
-</body>
-</html>`;
 }
 
 router.get("/generator/download/:vaultId", async (req: Request, res: Response) => {

@@ -1163,7 +1163,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
 </html>`;
 }
 
-type ReportTemplate = "classic" | "elegance" | "prestige";
+export type ReportTemplate = "classic" | "elegance" | "prestige";
 
 const ELEGANCE = {
   navy: "#0b1628",
@@ -1743,7 +1743,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
 </html>`;
 }
 
-function getReportShell(template: ReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
+export function getReportShell(template: ReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
   if (template === "elegance") return reportShellElegance;
   if (template === "prestige") return reportShellPrestige;
   return (t, s, b, d, c) => reportShell(t, s, b, d, c);

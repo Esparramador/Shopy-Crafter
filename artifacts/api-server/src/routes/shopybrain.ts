@@ -5445,6 +5445,7 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
             projectId: parseInt(String(projectId)),
             url: params?.url,
             format: "html",
+            template: (params?.template as any) || "prestige",
             extraParams: {},
           });
           result = {

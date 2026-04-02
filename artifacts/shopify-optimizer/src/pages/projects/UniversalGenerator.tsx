@@ -61,6 +61,7 @@ export default function UniversalGenerator() {
   const [results, setResults] = useState<Record<string, GenerationResult>>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [template, setTemplate] = useState<"classic" | "elegance" | "prestige">("prestige");
 
   useEffect(() => {
     fetch(api("/generator/types"), { credentials: "include" })
@@ -88,7 +89,7 @@ export default function UniversalGenerator() {
   const runGeneration = async (typeId: string, genType: GeneratorType) => {
     setGenerating(typeId);
     try {
-      const body: any = { type: typeId, projectId: parseInt(projectId) };
+      const body: any = { type: typeId, projectId: parseInt(projectId), template };
       if (genType.acceptsUrl && externalUrl) body.url = externalUrl;
       if (!genType.requiresProject && genType.acceptsUrl && externalUrl) body.url = externalUrl;
 
@@ -146,6 +147,37 @@ export default function UniversalGenerator() {
             Genera, descarga y guarda cualquier tipo de contenido profesional. Informes, CSS de marca, SEO, análisis de competencia, presupuestos, y mucho más. Todo impulsado por IA y adaptado a tu marca.
           </p>
         </div>
+      </div>
+
+      <div style={{
+        display: "flex", gap: 10, marginBottom: 16, alignItems: "center",
+        background: "linear-gradient(90deg, #0f172a, #1e293b)", padding: "10px 16px", borderRadius: 10, border: "1px solid #334155"
+      }}>
+        <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>Plantilla:</span>
+        {([
+          { id: "classic" as const, label: "Classic", color: "#c8a84b", desc: "Oro / Negro" },
+          { id: "elegance" as const, label: "Elegance", color: "#4a90d9", desc: "Plata / Azul" },
+          { id: "prestige" as const, label: "Prestige", color: "#c4956a", desc: "Cobre / Lujo" },
+        ]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTemplate(t.id)}
+            style={{
+              padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: template === t.id ? `2px solid ${t.color}` : "1px solid #475569",
+              background: template === t.id ? `${t.color}22` : "transparent",
+              color: template === t.id ? t.color : "#94a3b8",
+              transition: "all 0.2s",
+              display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 1,
+            }}
+          >
+            <span>{t.label}</span>
+            <span style={{ fontSize: 9, opacity: 0.7 }}>{t.desc}</span>
+          </button>
+        ))}
+        <span style={{ fontSize: 11, color: "#64748b", marginLeft: "auto" }}>
+          Aplica a todos los informes y contenidos generados
+        </span>
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
