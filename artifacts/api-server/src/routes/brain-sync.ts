@@ -867,4 +867,77 @@ router.post("/admin/brain-inject-self-knowledge", async (_req, res) => {
   }
 });
 
+router.get("/admin/shopify-products-with-prices", async (req, res) => {
+  try {
+    const projectId = Number(req.query.projectId) || 2;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+
+    const allProducts: any[] = [];
+    let pageInfo: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const url = pageInfo
+        ? `/products.json?limit=250&page_info=${pageInfo}`
+        : "/products.json?limit=250";
+      const data = await shopifyRequest<{ products: any[] }>(projectId, project.shopDomain, url);
+      allProducts.push(...data.products);
+      if (data.products.length < 250) break;
+    }
+
+    const result = allProducts.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      handle: p.handle,
+      tags: p.tags,
+      variants: (p.variants || []).map((v: any) => ({
+        id: v.id,
+        price: v.price,
+        compare_at_price: v.compare_at_price,
+        sku: v.sku,
+        title: v.title,
+      })),
+    }));
+
+    res.json({ total: result.length, products: result });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch Shopify products with prices");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/admin/shopify-update-prices", async (req, res) => {
+  try {
+    const projectId = Number(req.body.projectId) || 2;
+    const updates: Array<{ variantId: number | string; price: string; compareAtPrice?: string }> = req.body.updates || [];
+
+    if (!updates.length) { res.status(400).json({ error: "No updates provided" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+
+    const results: any[] = [];
+    const errors: string[] = [];
+
+    for (const u of updates) {
+      try {
+        const body: any = { variant: { price: u.price } };
+        if (u.compareAtPrice) body.variant.compare_at_price = u.compareAtPrice;
+        const data = await shopifyRequest<{ variant: any }>(
+          projectId, project.shopDomain,
+          `/variants/${u.variantId}.json`,
+          { method: "PUT", body: JSON.stringify(body) }
+        );
+        results.push({ variantId: u.variantId, newPrice: data.variant.price, title: data.variant.title });
+      } catch (err) {
+        errors.push(`Variant ${u.variantId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    res.json({ success: true, updated: results.length, results, errors: errors.length ? errors : undefined });
+  } catch (err) {
+    logger.error({ err }, "Failed to update Shopify prices");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 export default router;
