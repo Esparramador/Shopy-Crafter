@@ -64,75 +64,342 @@ function sanitizeAiHtmlOutput(html: string): string {
 
 type ReportArea = "seo" | "pricing" | "inventory" | "consistency" | "revenue" | "redesigns" | "financial";
 
-const AI_REPORT_SYSTEM = `Eres el analista senior de Shopy Crafter, agencia independiente de optimización IA para e-commerce. Generas recomendaciones PROFESIONALES, ESPECÍFICAS y ACCIONABLES. 
+const AI_REPORT_SYSTEM = `Eres el consultor estratégico senior de Shopy Crafter, agencia INDEPENDIENTE de optimización IA para e-commerce (NO somos Shopify, somos agnósticos de plataforma — trabajamos con Shopify, WooCommerce, PrestaShop, y cualquier tienda online).
 
-REGLAS ESTRICTAS:
-- Cada recomendación debe incluir PASOS CONCRETOS de implementación (1, 2, 3...)
-- Nombra productos específicos del catálogo cuando sea posible
-- Incluye métricas de impacto estimado (%, €, tiempo)
-- Usa lenguaje profesional de consultoría
-- Prioriza por impacto/esfuerzo
-- SIEMPRE responde en español
-- Responde en HTML válido (usa <div>, <p>, <strong>, <ol>, <li>, <ul>)
-- NO uses markdown, SOLO HTML`;
+REGLAS ABSOLUTAS:
+- Cada recomendación DEBE incluir PASOS CONCRETOS numerados de implementación (mínimo 4-6 pasos por acción)
+- NOMBRA productos ESPECÍFICOS del catálogo del cliente en cada recomendación
+- Incluye MÉTRICAS DE IMPACTO ESTIMADO concretas (%, €, tiempo, ROI)
+- NUNCA des recomendaciones genéricas tipo "mejorar el SEO" — sé ULTRAESPECÍFICO
+- Prioriza SIEMPRE por ratio impacto/esfuerzo (matriz Eisenhower)
+- SIEMPRE responde en español profesional de consultoría
+- Responde en HTML válido (usa <div>, <p>, <strong>, <ol>, <li>, <ul>, <table>)
+- NO uses markdown, SOLO HTML
+- Incluye datos numéricos del negocio en CADA párrafo
+- Si detectas que la plataforma NO es Shopify, adapta las instrucciones a la plataforma correcta (WooCommerce, PrestaShop, custom, etc.)
+- Incluye SIEMPRE una sección de "Instrucciones por Plataforma" al final indicando cómo implementar en Shopify, WooCommerce Y PrestaShop`;
+
+const AREA_SPECIFIC_PROMPTS: Record<ReportArea, string> = {
+  seo: `FRAMEWORK DE ANÁLISIS SEO PROFUNDO:
+
+Analiza CADA UNO de estos vectores y da instrucciones PASO A PASO para solucionar CADA problema:
+
+1. **ANÁLISIS ON-PAGE COMPLETO**:
+   - Meta titles: ¿Siguen la fórmula óptima "[Keyword Principal] - [Beneficio] | [Marca]"? ¿Longitud 50-60 chars? ¿Incluyen keyword transaccional?
+   - Meta descriptions: ¿150-160 chars? ¿Incluyen CTA? ¿Tienen keyword + propuesta de valor?
+   - H1/H2 structure: ¿Cada producto tiene H1 único? ¿Hay keyword stuffing o keyword cannibalización?
+   - URL slugs: ¿Son limpios y contienen keywords? ¿Hay parámetros innecesarios?
+
+2. **SCHEMA MARKUP / STRUCTURED DATA**:
+   - Product Schema (JSON-LD): ¿Incluye price, availability, reviewRating, brand, sku, gtin?
+   - BreadcrumbList Schema: ¿Implementado correctamente?
+   - Organization Schema en homepage
+   - FAQ Schema donde aplique
+   - DA EL CÓDIGO JSON-LD EXACTO que deben añadir para los productos que faltan
+
+3. **CONTENIDO Y AUTORIDAD**:
+   - ¿Longitud de descripción adecuada (mín. 300 palabras para productos core)?
+   - ¿Hay contenido duplicado entre productos similares?
+   - ¿Internal linking entre productos relacionados?
+   - ¿Hay blog/contenido informacional que apoye keywords transaccionales?
+
+4. **TECHNICAL SEO**:
+   - Alt texts de imágenes: ¿Descriptivos con keyword? Da ejemplos exactos de alt texts para cada producto que falta
+   - Image optimization: ¿WebP? ¿Lazy loading? ¿Dimensiones especificadas?
+   - Mobile-first: ¿Contenido visible sin scroll? ¿Botones CTA accesibles?
+   - Core Web Vitals implications de cada cambio propuesto
+
+5. **KEYWORD STRATEGY**:
+   - ¿Los productos atacan keywords transaccionales o informacionales?
+   - ¿Hay oportunidades de long-tail keywords sin explotar?
+   - ¿Hay canibalization entre productos que compiten por la misma keyword?
+   - Sugiere 3-5 keywords específicas por cada producto problemático
+
+6. **COMPETENCIA Y SERP**:
+   - ¿Qué tipo de resultados aparecen en SERP para los productos del catálogo?
+   - ¿Hay oportunidad de Featured Snippets, Image Pack, Shopping Results?
+   - ¿Qué hacen los competidores directos mejor a nivel SEO?`,
+
+  financial: `FRAMEWORK DE ANÁLISIS FINANCIERO EXHAUSTIVO:
+
+Realiza un análisis financiero de nivel consultoría estratégica cubriendo TODOS estos puntos:
+
+1. **ANÁLISIS DE MÁRGENES POR PRODUCTO**:
+   - Clasificación ABC de productos por contribución al margen bruto
+   - Identifica los "margin killers" (productos con margen <15%) y los "cash cows" (margen >50%)
+   - ¿Hay productos con precio por debajo de su COGS? ¿Cuáles y por cuánto?
+   - Calcula el margen de contribución ponderado por volumen estimado
+
+2. **ESTRATEGIA DE PRICING PSICOLÓGICO**:
+   - ¿Se están usando precios psicológicos (X.99, X.95)? ¿Cuáles no y deberían?
+   - ¿Hay oportunidad de price anchoring (compare-at-price)?
+   - ¿Hay productos que podrían venderse en bundles para mejorar ticket medio?
+   - Calcula el precio óptimo usando elasticidad precio-demanda estimada del nicho
+
+3. **ESTRUCTURA DE COSTES Y PUNTO DE EQUILIBRIO**:
+   - ¿Cuántas unidades necesitan vender al mes para cubrir costes fijos estimados del sector?
+   - Break-even analysis por producto individual
+   - ¿Los COGS incluyen TODOS los costes variables (envío, packaging, pasarela pago, fees plataforma)?
+   - Si faltan COGS, estima rangos realistas basados en el sector/nicho
+
+4. **OPTIMIZACIÓN FISCAL Y OPERATIVA**:
+   - ¿Están maximizando deducciones aplicables a e-commerce (amortización, gastos de marketing)?
+   - ¿Frecuencia óptima de revisión de precios según sector?
+   - ¿Impacto de variaciones estacionales en el cash flow?
+
+5. **PROYECCIONES Y ESCENARIOS**:
+   - Escenario conservador, realista y optimista a 90 días
+   - ¿Qué pasaría si suben precios un 5%, 10%, 15%? Impacto estimado en volumen vs margen
+   - ¿Dónde está el "sweet spot" de precio para maximizar beneficio total?
+
+6. **INSTRUCCIONES DE IMPLEMENTACIÓN POR PLATAFORMA**:
+   - Shopify: Cómo cambiar precios, compare-at-price, descuentos automáticos
+   - WooCommerce: Cómo usar plugins de dynamic pricing, sale prices
+   - PrestaShop: Reglas de precios específicas, gestión de impuestos`,
+
+  inventory: `FRAMEWORK DE ANÁLISIS DE INVENTARIO Y CADENA DE SUMINISTRO:
+
+Analiza con nivel de director de operaciones cubriendo ABSOLUTAMENTE TODO:
+
+1. **ANÁLISIS ABC DEL INVENTARIO**:
+   - Clasifica CADA producto en categoría A (20% productos = 80% ventas), B (30% = 15%) y C (50% = 5%)
+   - ¿Hay productos categoría C que consumen demasiado capital inmovilizado?
+   - ¿Los productos A tienen suficiente stock de seguridad?
+   - Calcula el stock óptimo por producto usando fórmula EOQ (Economic Order Quantity)
+
+2. **GESTIÓN DE STOCK CRÍTICO**:
+   - Para CADA producto en stock crítico, calcula: días hasta rotura, coste de oportunidad perdida/día, urgencia de reposición
+   - ¿Hay productos con sobrestock? ¿Cuánto capital tienen inmovilizado innecesariamente?
+   - ¿Los niveles de stock de seguridad están calibrados correctamente para la variabilidad de demanda?
+   - Define punto de reorden automático exacto para cada producto
+
+3. **CADENA DE SUMINISTRO Y PROVEEDORES**:
+   - ¿Los lead times de proveedores están alineados con la velocidad de ventas?
+   - ¿Hay proveedores alternativos que deberían considerar? ¿Por qué?
+   - ¿Se están negociando descuentos por volumen? ¿A partir de qué cantidad tiene sentido?
+   - Plan de contingencia si un proveedor falla
+
+4. **DEMANDA ESTACIONAL Y FORECASTING**:
+   - ¿Qué patrones estacionales se observan en los datos?
+   - ¿Están preparados para picos de demanda (Black Friday, Navidad, rebajas)?
+   - Modelo de forecasting simple que pueden implementar con los datos que tienen
+
+5. **COSTES DE INVENTARIO OCULTOS**:
+   - Coste de almacenamiento estimado por producto/mes
+   - Coste de obsolescencia: ¿hay productos que podrían quedarse obsoletos?
+   - Coste de rotura de stock: ventas perdidas + daño reputacional
+   - ¿Están usando dropshipping para productos de baja rotación? ¿Deberían?
+
+6. **AUTOMATIZACIÓN Y HERRAMIENTAS**:
+   - Instrucciones exactas para configurar alertas automáticas de stock bajo
+   - Cómo implementar reorder automático según plataforma (Shopify, WooCommerce, PrestaShop)
+   - Apps/plugins recomendados para gestión de inventario por plataforma`,
+
+  consistency: `FRAMEWORK DE ANÁLISIS DE IDENTIDAD VISUAL Y CONSISTENCIA DE MARCA:
+
+Analiza como director creativo senior cubriendo CADA detalle:
+
+1. **AUDITORÍA DE CONSISTENCIA VISUAL**:
+   - ¿Las fotos de producto siguen un estilo uniforme (fondo, iluminación, ángulos)?
+   - ¿Hay productos con fotografías que rompen completamente el estilo visual?
+   - ¿La paleta de colores es coherente en todo el catálogo?
+   - Identifica EXACTAMENTE qué productos necesitan re-fotografiar y por qué
+
+2. **IDENTIDAD DE MARCA PROFUNDA**:
+   - ¿La tipografía transmite los valores de marca correctos para el nicho?
+   - ¿El tono de voz es consistente entre descripciones de productos?
+   - ¿Hay disonancia entre el posicionamiento premium y los materiales visuales?
+   - ¿Los elementos de confianza (sellos, garantías, reviews) están bien integrados?
+
+3. **EXPERIENCIA DE COMPRA VISUAL**:
+   - ¿El layout de la tienda guía el ojo del usuario correctamente?
+   - ¿Las imágenes hero comunican la propuesta de valor en <3 segundos?
+   - ¿Hay suficientes lifestyle photos vs product-only photos?
+   - ¿Las imágenes de producto muestran escala, textura, detalle y contexto de uso?
+
+4. **BENCHMARK COMPETITIVO VISUAL**:
+   - ¿Cómo se compara la calidad visual con los líderes del nicho?
+   - ¿Qué estándares de imagen impone cada marketplace/plataforma?
+   - ¿Están aprovechando las tendencias visuales actuales del sector?
+
+5. **PLAN DE MEJORA VISUAL CONCRETO**:
+   - Para CADA producto con baja consistencia: qué exactamente cambiar, cómo fotografiarlo, qué fondo usar, qué iluminación
+   - Template de brief fotográfico para nuevos productos
+   - Guía de estilo visual completa que pueden seguir internamente
+   - Herramientas de edición gratuitas y de pago recomendadas con pasos exactos
+
+6. **IMPLEMENTACIÓN POR PLATAFORMA**:
+   - Requisitos de imagen por plataforma (Shopify: 2048x2048, WooCommerce: variable, PrestaShop: configurable)
+   - Cómo implementar zoom, gallery, video en cada plataforma
+   - Plugins/apps de optimización de imagen por plataforma`,
+
+  redesigns: `FRAMEWORK DE ANÁLISIS DE REDISEÑOS Y OPTIMIZACIÓN DE FICHAS DE PRODUCTO:
+
+Analiza como consultor de conversión (CRO) senior:
+
+1. **ANÁLISIS DE CALIDAD DE FICHAS ACTUALES**:
+   - ¿Los títulos de producto siguen la fórmula óptima "[Marca] + [Producto] + [Atributo Clave] + [Beneficio]"?
+   - ¿Las descripciones usan storytelling, bullet points y formato scannable?
+   - ¿Hay CTAs claros y urgencia (stock limitado, oferta temporal)?
+   - ¿Se están usando todos los campos disponibles (especificaciones, tabla de tallas, FAQ)?
+
+2. **IMPACTO DE REDISEÑOS APLICADOS vs PENDIENTES**:
+   - De los rediseños ya aplicados, ¿qué cambios específicos se hicieron?
+   - ¿Hay patrones en los rediseños más exitosos que replicar?
+   - ¿Cuáles de los pendientes tienen MAYOR potencial de impacto? Priorízalos
+   - Estima % de mejora en conversión por cada rediseño pendiente
+
+3. **OPTIMIZACIÓN DE CONVERSIÓN (CRO) POR PRODUCTO**:
+   - ¿Se están usando técnicas de persuasión (escasez, prueba social, autoridad)?
+   - ¿Las imágenes complementan la descripción? ¿Hay gap informacional?
+   - ¿El precio está posicionado correctamente (antes/después del valor percibido)?
+   - ¿Los productos tienen suficientes variantes y opciones de personalización?
+
+4. **CONTENIDO AVANZADO POR PRODUCTO**:
+   - ¿Hay FAQ section en cada producto? Da 5 FAQ específicas para cada producto problemático
+   - ¿Se usan comparison tables entre productos similares?
+   - ¿Hay video de producto? ¿User-generated content?
+   - ¿Los productos tienen cross-sell/upsell configurados?
+
+5. **A/B TESTING Y MEDICIÓN**:
+   - ¿Qué elementos deberían testear primero? (título vs descripción vs precio vs imagen)
+   - Diseña 3 tests A/B específicos con hipótesis, métrica principal y duración estimada
+   - ¿Cómo medir el impacto real de cada rediseño? Setup de tracking recomendado
+
+6. **IMPLEMENTACIÓN MULTI-PLATAFORMA**:
+   - Shopify: Cómo editar fichas, usar metafields, implementar tabs/accordion
+   - WooCommerce: Plugins de product tabs, custom fields, ACF integration
+   - PrestaShop: Módulos de fichas avanzadas, combinaciones, personalización`,
+
+  revenue: `FRAMEWORK DE ANÁLISIS DE REVENUE Y CRECIMIENTO:
+
+Analiza como CFO y growth strategist senior:
+
+1. **ANÁLISIS DE TENDENCIAS DE REVENUE**:
+   - ¿La tendencia es ascendente, estable o descendente? Calcula tasa de crecimiento MoM
+   - ¿Hay estacionalidad clara? ¿Qué meses son fuertes vs débiles?
+   - ¿El AOV está subiendo o bajando? ¿Correlaciona con número de pedidos?
+   - ¿La tasa de conversión es competitiva para el sector? (benchmark por nicho)
+   - Identifica puntos de inflexión y qué los causó
+
+2. **ANÁLISIS DE COHORTES Y RETENCIÓN**:
+   - ¿Qué % de revenue viene de clientes recurrentes vs nuevos? (estimación por datos)
+   - ¿El customer lifetime value justifica el coste de adquisición estimado?
+   - ¿Hay oportunidades de subscription/recurrencia para algún producto?
+   - Estrategias de retención específicas para el nicho
+
+3. **OPTIMIZACIÓN DE EMBUDO DE CONVERSIÓN**:
+   - ¿Dónde se pierden más ventas? (estimación por sector: homepage → producto → carrito → checkout)
+   - ¿La tasa de abandono de carrito está por encima del benchmark del sector?
+   - ¿Se están recuperando carritos abandonados? ¿Con qué frecuencia?
+   - Email sequence exacto de recuperación de carrito (3 emails, timing, copy)
+
+4. **ESTRATEGIAS DE CRECIMIENTO CONCRETAS**:
+   - ¿Qué canales de adquisición deberían priorizar? (SEO orgánico, paid, social, email, marketplace)
+   - ¿Hay oportunidad de expandir a nuevos mercados/idiomas?
+   - ¿Se están aprovechando fechas comerciales (BFCM, día madre, Navidad)?
+   - Calcula el budget óptimo de marketing como % del revenue
+
+5. **PREDICCIONES Y ESCENARIOS**:
+   - Proyección a 30/60/90/180 días con 3 escenarios (pesimista, realista, optimista)
+   - ¿Qué acciones moverían más la aguja del revenue con menos esfuerzo?
+   - ¿Cuál es el techo de revenue con el catálogo actual? ¿Se necesitan más productos?
+   - Plan de escalado: ¿a qué revenue necesitan contratar, automatizar, externalizar?
+
+6. **IMPLEMENTACIÓN POR PLATAFORMA**:
+   - Shopify: Apps de upsell, cross-sell, email marketing, analytics
+   - WooCommerce: Plugins de recovery, analytics, marketing automation
+   - PrestaShop: Módulos de estadísticas avanzadas, remarketing, fidelización`,
+
+  pricing: `FRAMEWORK DE ANÁLISIS DE PRICING ESTRATÉGICO:
+
+1. Análisis de elasticidad de precios por producto
+2. Benchmarking competitivo de precios
+3. Estrategia de pricing psicológico
+4. Oportunidades de bundling y cross-sell
+5. Implementación de precios dinámicos
+6. Multi-plataforma: Shopify, WooCommerce, PrestaShop`,
+};
 
 async function generateAiRecommendations(
   projectId: number,
   area: ReportArea,
   dataContext: string,
   niche?: string,
+  platformType?: string,
 ): Promise<string> {
   try {
-    const prompt = `Analiza estos datos REALES de un e-commerce y genera recomendaciones profesionales con pasos de implementación específicos.
+    const platform = platformType || "e-commerce";
+    const areaPrompt = AREA_SPECIFIC_PROMPTS[area] || "";
 
+    const prompt = `Eres un consultor senior realizando una auditoría profesional EXHAUSTIVA para un e-commerce. Analiza estos datos REALES del negocio y genera un informe de consultoría de MÁXIMA CALIDAD con recomendaciones ULTRA-ESPECÍFICAS.
+
+PLATAFORMA DEL CLIENTE: ${platform} (adapta TODAS las instrucciones a esta plataforma, pero incluye también instrucciones para otras plataformas al final)
 ÁREA DE ANÁLISIS: ${area.toUpperCase()}
 
 ${dataContext}
 
-Genera un análisis con esta estructura HTML (NO JSON, devuelve HTML directo):
+${areaPrompt}
+
+GENERA el análisis con esta estructura HTML (NO JSON, devuelve HTML directo):
 
 <div class="ai-analysis">
   <div class="ai-diagnosis">
-    <h3>📋 Diagnóstico Profesional</h3>
-    <p>[2-3 párrafos analizando la situación actual con datos concretos del negocio]</p>
+    <h3>📋 Diagnóstico Ejecutivo</h3>
+    <p>[4-5 párrafos EXTENSOS analizando la situación con CADA dato concreto del negocio. Menciona productos específicos, números exactos, y compara con benchmarks del sector. NO seas genérico.]</p>
   </div>
   
   <div class="ai-actions">
-    <h3>🎯 Plan de Acción Detallado</h3>
-    [Para cada recomendación, genera un bloque así:]
+    <h3>🎯 Plan de Acción Estratégico</h3>
+    [GENERA 6-8 acciones detalladas, cada una así:]
     <div class="action-item">
       <div class="action-header">
-        <strong>[Título de la acción]</strong>
-        <span class="action-impact">[ALTO/MEDIO/BAJO impacto]</span>
+        <strong>[Título de la acción — ESPECÍFICO, no genérico]</strong>
+        <span class="action-impact">[CRÍTICO/ALTO/MEDIO impacto]</span>
       </div>
-      <p><strong>Por qué:</strong> [Razón basada en datos reales del negocio]</p>
-      <p><strong>Cómo implementarlo paso a paso:</strong></p>
+      <p><strong>Diagnóstico:</strong> [Qué problema exacto resuelve, con datos concretos del negocio]</p>
+      <p><strong>Implementación paso a paso:</strong></p>
       <ol>
-        <li>[Paso específico 1 con detalles concretos]</li>
-        <li>[Paso específico 2]</li>
-        <li>[Paso específico 3]</li>
+        <li>[Paso 1: Instrucción EXACTA con detalles técnicos concretos. Si es código, da el código. Si es configuración, da la ruta exacta en el panel de admin.]</li>
+        <li>[Paso 2: Igual de específico]</li>
+        <li>[Paso 3]</li>
+        <li>[Paso 4]</li>
+        <li>[Paso 5 si aplica]</li>
       </ol>
-      <p><strong>Impacto estimado:</strong> [Métrica concreta: +X% conversión, +X€ revenue, etc.]</p>
-      <p><strong>Tiempo estimado:</strong> [Horas/días necesarios]</p>
+      <p><strong>Impacto estimado:</strong> [Métrica concreta con rango: ej. "+12-18% CTR orgánico", "+450-800€/mes revenue adicional"]</p>
+      <p><strong>Tiempo de implementación:</strong> [Horas concretas: ej. "2-3 horas de trabajo técnico"]</p>
+      <p><strong>Prioridad:</strong> [P1/P2/P3 con justificación]</p>
     </div>
   </div>
   
   <div class="ai-quick-wins">
-    <h3>⚡ Quick Wins (Implementar Hoy)</h3>
+    <h3>⚡ Quick Wins — Implementar en las próximas 24 horas</h3>
     <ol>
-      <li>[Acción rápida 1 con instrucciones exactas]</li>
-      <li>[Acción rápida 2]</li>
-      <li>[Acción rápida 3]</li>
+      <li><strong>[Acción]:</strong> [Instrucciones EXACTAS que alguien sin experiencia pueda seguir paso a paso. Incluye rutas de menú, nombres de campos, y valores exactos a introducir.]</li>
+      <li>[Igual de detallado - mínimo 5 quick wins]</li>
     </ol>
+  </div>
+
+  <div class="ai-platform-guide">
+    <h3>🔧 Guía de Implementación Multi-Plataforma</h3>
+    <p>[Para CADA acción clave del plan, indica cómo implementarla en:]</p>
+    <div class="action-item">
+      <p><strong>En Shopify:</strong> [Ruta exacta en admin, apps recomendadas, liquid code si aplica]</p>
+      <p><strong>En WooCommerce:</strong> [Plugin específico, configuración en wp-admin, hooks/filters si aplica]</p>
+      <p><strong>En PrestaShop:</strong> [Módulo específico, ruta en back-office, override si aplica]</p>
+      <p><strong>En tienda custom/headless:</strong> [Approach técnico general, APIs/SDKs recomendados]</p>
+    </div>
   </div>
 </div>
 
-IMPORTANTE: 
-- Genera entre 4-6 acciones detalladas en el Plan de Acción
-- Genera 3-5 Quick Wins
-- Nombra productos ESPECÍFICOS del catálogo
-- Cada paso debe ser lo suficientemente detallado para que alguien sin experiencia pueda ejecutarlo
-- Incluye estimaciones numéricas de impacto realistas`;
+REGLAS OBLIGATORIAS: 
+- MÍNIMO 6 acciones detalladas en el Plan de Acción (idealmente 8)
+- MÍNIMO 5 Quick Wins con instrucciones paso a paso
+- NOMBRA productos ESPECÍFICOS del catálogo del cliente en CADA recomendación
+- CADA paso debe ser lo suficientemente detallado para que un becario sin experiencia pueda ejecutarlo
+- Incluye estimaciones NUMÉRICAS y RANGOS de impacto realistas basados en benchmarks del sector
+- INCLUYE la sección de Guía Multi-Plataforma OBLIGATORIAMENTE
+- NO seas genérico: si dices "optimizar el SEO", especifica EXACTAMENTE qué optimizar, cómo, dónde y con qué herramienta`;
 
     const result = await askClaudeWithBrain(
       projectId,
@@ -140,21 +407,21 @@ IMPORTANTE:
       AI_REPORT_SYSTEM,
       area === "financial" || area === "pricing" || area === "revenue" ? "pricing" : area === "seo" ? "seo" : "general",
       niche,
-      6144,
+      8192,
     );
 
     const sanitized = sanitizeAiHtmlOutput(result);
-    const htmlMatch = sanitized.match(/<div class="ai-analysis">[\s\S]*<\/div>\s*<\/div>\s*<\/div>/);
+    const htmlMatch = sanitized.match(/<div class="ai-analysis">[\s\S]*$/);
     const cleanHtml = htmlMatch ? htmlMatch[0] : `<div class="ai-analysis">${sanitized}</div>`;
 
     return `
     <div class="section" style="page-break-before:always;">
-      <div class="section-title">Análisis y Recomendaciones IA</div>
-      <div class="card" style="padding:24px;line-height:1.8;font-size:13px;">
+      <div class="section-title">Análisis y Recomendaciones IA — Consultoría Estratégica</div>
+      <div class="card" style="padding:28px;line-height:1.85;font-size:13px;">
         ${cleanHtml}
       </div>
       <div style="margin-top:12px;padding:10px 16px;background:rgba(200,168,75,.05);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);">
-        Análisis generado por ShopyBrain AI · Basado en datos reales del negocio · ${new Date().toLocaleDateString("es-ES")}
+        Análisis generado por Shopy Crafter AI · Basado en datos reales del negocio · Agnóstico de plataforma · ${new Date().toLocaleDateString("es-ES")}
       </div>
     </div>`;
   } catch (err) {
@@ -1378,22 +1645,39 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
 
   const worstProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore < 50).sort((a, b) => (a.seoScore ?? 0) - (b.seoScore ?? 0)).slice(0, 10);
   const bestProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore >= 80).slice(0, 5);
+  const noMetaDesc = seoData.filter(s => !s.metaDescription || s.metaDescription.length < 50).length;
+  const shortDescriptions = seoData.filter(s => !s.bodyHtml || s.bodyHtml.length < 200).length;
+  const missingImages = seoData.filter(s => !s.imageCount || s.imageCount < 2).length;
+  const platformLabel = project.platformType || "shopify";
+
   const seoContext = `TIENDA: ${project.name} (${project.shopDomain || "sin dominio"})
+PLATAFORMA: ${platformLabel}
 NICHO: ${project.storeNiche || "No definido"}
 TOTAL PRODUCTOS: ${totalProducts}
 SCORE SEO MEDIO: ${Math.round(avgScore)}/100
-CON SCHEMA JSON-LD: ${withSchema}/${totalProducts}
-CON ALT TEXTS: ${withAltTexts}/${totalProducts}
-SIN META TITLE: ${noMeta}/${totalProducts}
-DISTRIBUCIÓN GRADOS: ${Object.entries(gradeDistribution).map(([g, c]) => `${g}:${c}`).join(", ")}
+CON SCHEMA JSON-LD: ${withSchema}/${totalProducts} (${totalProducts > 0 ? Math.round(withSchema / totalProducts * 100) : 0}%)
+CON ALT TEXTS OPTIMIZADOS: ${withAltTexts}/${totalProducts} (${totalProducts > 0 ? Math.round(withAltTexts / totalProducts * 100) : 0}%)
+SIN META TITLE (<10 chars): ${noMeta}/${totalProducts}
+SIN META DESCRIPTION (<50 chars): ${noMetaDesc}/${totalProducts}
+CON DESCRIPCIÓN CORTA (<200 chars): ${shortDescriptions}/${totalProducts}
+CON POCAS IMÁGENES (<2): ${missingImages}/${totalProducts}
+DISTRIBUCIÓN GRADOS: ${Object.entries(gradeDistribution).map(([g, c]) => `${g}:${c} (${totalProducts > 0 ? Math.round(c / totalProducts * 100) : 0}%)`).join(", ")}
 
-PEORES PRODUCTOS (para mejorar):
-${worstProducts.map(p => `- "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}, MetaTitle: ${p.hasMetaTitle ? "Sí" : "NO"}, MetaDesc: ${p.hasMetaDesc ? "Sí" : "NO"}, Schema: ${p.hasSchema ? "Sí" : "NO"}, AltTexts: ${p.hasAltTexts ? "Sí" : "NO"}`).join("\n")}
+ANÁLISIS DETALLADO — TOP 10 PEORES PRODUCTOS (prioridad de mejora):
+${worstProducts.map((p, i) => `${i + 1}. "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}
+   MetaTitle: ${p.hasMetaTitle ? "Sí" : "❌ FALTA"} | MetaDesc: ${p.hasMetaDesc ? "Sí" : "❌ FALTA"} | Schema: ${p.hasSchema ? "Sí" : "❌ FALTA"} | AltTexts: ${p.hasAltTexts ? "Sí" : "❌ FALTA"}
+   Precio: ${p.price || "N/A"} | Imágenes: ${p.imageCount ?? "?"}`).join("\n")}
 
-MEJORES PRODUCTOS (modelo a seguir):
-${bestProducts.map(p => `- "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}`).join("\n")}`;
+TOP 5 MEJORES PRODUCTOS (modelo de referencia para replicar):
+${bestProducts.map(p => `- "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}`).join("\n")}
 
-  const aiSection = await generateAiRecommendations(projectId, "seo", seoContext, project.storeNiche ?? undefined);
+MÉTRICAS CLAVE DEL SECTOR "${project.storeNiche || "e-commerce general"}":
+- Benchmark SEO score medio del sector: 65-75/100
+- CTR medio orgánico posición 1: 28.5%, posición 2: 15.7%, posición 3: 11%
+- Impacto de Schema markup en CTR: +25-30% de media
+- Impacto de alt texts optimizados: +15-20% tráfico de Google Images`;
+
+  const aiSection = await generateAiRecommendations(projectId, "seo", seoContext, project.storeNiche ?? undefined, platformLabel);
 
   const body = `
     <div class="metric-row">
@@ -1572,23 +1856,42 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
       </div>
     </div>` : ""}
 
-    ${await generateAiRecommendations(projectId, "financial", `TIENDA: ${project.name}
+    ${await generateAiRecommendations(projectId, "financial", (() => {
+  const sorted = products.map(p => {
+    const c = cogsMap.get(p.shopifyProductId);
+    const pr = parseFloat(p.price ?? "0");
+    const margin = c && pr > 0 ? ((pr - c.totalCogs) / pr * 100) : null;
+    return { title: p.title, price: pr, cogs: c?.totalCogs ?? null, margin };
+  }).sort((a, b) => (a.margin ?? -999) - (b.margin ?? -999));
+  const lowMargin = sorted.filter(p => p.margin !== null && p.margin < 20);
+  const highMargin = sorted.filter(p => p.margin !== null && p.margin > 50);
+  const noCogs = sorted.filter(p => p.margin === null);
+  const priceRanges = products.map(p => parseFloat(p.price ?? "0")).filter(p => p > 0);
+  const minPrice = priceRanges.length ? Math.min(...priceRanges) : 0;
+  const maxPrice = priceRanges.length ? Math.max(...priceRanges) : 0;
+  const medianPrice = priceRanges.length ? priceRanges.sort((a, b) => a - b)[Math.floor(priceRanges.length / 2)] : 0;
+  return `TIENDA: ${project.name}
+PLATAFORMA: ${project.platformType || "shopify"}
 NICHO: ${project.storeNiche || "No definido"}
 TOTAL PRODUCTOS: ${products.length}
-REVENUE POTENCIAL: ${totalRevenuePotential.toFixed(2)}€
-COGS TOTAL: ${totalCosts.toFixed(2)}€
+REVENUE POTENCIAL CATÁLOGO: ${totalRevenuePotential.toFixed(2)}€
+COGS TOTAL REGISTRADO: ${totalCosts.toFixed(2)}€
 BENEFICIO BRUTO: ${(totalRevenuePotential - totalCosts).toFixed(2)}€
-MARGEN MEDIO: ${avgMargin.toFixed(1)}%
-PRODUCTOS CON COGS: ${allCogs.length}/${products.length}
-CAMBIOS DE PRECIO RECIENTES: ${priceHistory.length}
+MARGEN BRUTO MEDIO: ${avgMargin.toFixed(1)}%
+PRODUCTOS CON COGS CONFIGURADOS: ${allCogs.length}/${products.length} (${products.length > 0 ? Math.round(allCogs.length / products.length * 100) : 0}%)
+PRODUCTOS SIN COGS (riesgo de pricing ciego): ${noCogs.length}
+RANGO DE PRECIOS: ${minPrice.toFixed(2)}€ — ${maxPrice.toFixed(2)}€ (mediana: ${medianPrice.toFixed(2)}€)
+CAMBIOS DE PRECIO RECIENTES: ${priceHistory.length} en los últimos 90 días
 
-DETALLE POR PRODUCTO (Top 15):
-${products.slice(0, 15).map(p => {
-  const c = cogsMap.get(p.shopifyProductId);
-  const pr = parseFloat(p.price ?? "0");
-  const m = c && pr > 0 ? ((pr - c.totalCogs) / pr * 100).toFixed(1) : "SIN COGS";
-  return `- "${p.title}" Precio: ${pr.toFixed(2)}€, COGS: ${c ? c.totalCogs.toFixed(2) + "€" : "NO"}, Margen: ${m}%`;
-}).join("\n")}`, project.storeNiche ?? undefined)}`;
+⚠️ PRODUCTOS CON MARGEN BAJO (<20%) — RIESGO:
+${lowMargin.slice(0, 8).map(p => `- "${p.title}" Precio: ${p.price.toFixed(2)}€, COGS: ${p.cogs?.toFixed(2)}€, Margen: ${p.margin?.toFixed(1)}% ${p.margin! < 0 ? "⛔ PIERDE DINERO" : p.margin! < 10 ? "⚠️ MARGEN CRÍTICO" : ""}`).join("\n") || "Ninguno detectado"}
+
+💰 PRODUCTOS ESTRELLA (margen >50%):
+${highMargin.slice(0, 8).map(p => `- "${p.title}" Precio: ${p.price.toFixed(2)}€, COGS: ${p.cogs?.toFixed(2)}€, Margen: ${p.margin?.toFixed(1)}%`).join("\n") || "Ninguno detectado"}
+
+📊 DETALLE COMPLETO (Top 20 por precio):
+${sorted.slice(0, 20).map(p => `- "${p.title}" Precio: ${p.price.toFixed(2)}€, COGS: ${p.cogs !== null ? p.cogs.toFixed(2) + "€" : "❌ SIN DATOS"}, Margen: ${p.margin !== null ? p.margin.toFixed(1) + "%" : "DESCONOCIDO"}`).join("\n")}`;
+})(), project.storeNiche ?? undefined, project.platformType ?? "shopify")}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
@@ -3066,16 +3369,35 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
   }
 
   const consistencyContext = `TIENDA: ${project.name}
+PLATAFORMA: ${project.platformType || "shopify"}
 NICHO: ${project.storeNiche || "No definido"}
-PRODUCTOS: ${products.length}
-CONSISTENCIA VISUAL: ${(avgConsistency * 100).toFixed(0)}%
-ADN VISUAL: Fondo: ${vd?.backgroundStyle || "N/A"}, Iluminación: ${vd?.lightingStyle || "N/A"}, Color: ${vd?.colorTemp || "N/A"}, Composición: ${vd?.composition || "N/A"}, Mood: ${vd?.mood || "N/A"}
-COLORES DE MARCA: ${vd?.brandColors?.join(", ") || "No definidos"}
-PROPS/ACCESORIOS: ${vd?.props?.join(", ") || "No definidos"}
-ADN MARCA: Tipografía: ${bd?.typographyStyle || "N/A"}, Layout: ${bd?.layoutPattern || "N/A"}, Densidad: ${bd?.visualDensity || "N/A"}, Personalidad: ${bd?.brandPersonality || "N/A"}, Posición competitiva: ${bd?.competitivePosition || "N/A"}, Fotografía: ${bd?.photographyStyle || "N/A"}
-PROPUESTAS DE VALOR: ${bd?.valuePropositions?.join(", ") || "No definidas"}`;
+PRODUCTOS ANALIZADOS: ${products.length}
+SCORE DE CONSISTENCIA VISUAL: ${(avgConsistency * 100).toFixed(0)}% ${avgConsistency < 0.5 ? "⚠️ MUY BAJO — urgente mejorar" : avgConsistency < 0.7 ? "⚠️ MEDIO — necesita trabajo" : "✅ ACEPTABLE"}
 
-  const aiConsistencySection = await generateAiRecommendations(projectId, "consistency", consistencyContext, project.storeNiche ?? undefined);
+📷 ADN VISUAL DETECTADO:
+- Estilo de fondo: ${vd?.backgroundStyle || "❌ No analizado"}
+- Iluminación predominante: ${vd?.lightingStyle || "❌ No analizado"}
+- Temperatura de color: ${vd?.colorTemp || "❌ No analizado"}
+- Composición fotográfica: ${vd?.composition || "❌ No analizado"}
+- Mood/Atmósfera: ${vd?.mood || "❌ No analizado"}
+- Presencia humana: ${vd?.humanPresence || "❌ No analizado"}
+
+🎨 PALETA DE COLORES DE MARCA: ${vd?.brandColors?.length ? vd.brandColors.join(", ") : "❌ No definida — esto es CRÍTICO para la consistencia"}
+🎭 PROPS/ACCESORIOS RECURRENTES: ${vd?.props?.length ? vd.props.join(", ") : "No detectados"}
+
+🏷️ ADN DE MARCA:
+- Estilo tipográfico: ${bd?.typographyStyle || "No definido"}
+- Patrón de layout: ${bd?.layoutPattern || "No definido"}
+- Densidad visual: ${bd?.visualDensity || "No definida"}
+- Personalidad de marca: ${bd?.brandPersonality || "No definida"}
+- Posición competitiva: ${bd?.competitivePosition || "No definida"}
+- Estilo fotográfico: ${bd?.photographyStyle || "No definido"}
+- Propuestas de valor: ${bd?.valuePropositions?.join(", ") || "No definidas"}
+- Tácticas de urgencia: ${bd?.urgencyTactics?.join(", ") || "No detectadas"}
+
+CONTEXTO COMPETITIVO: Para el nicho "${project.storeNiche || "e-commerce"}", los líderes del sector mantienen consistencia visual >85%. Un score por debajo de 70% se correlaciona con -15-25% en conversión.`;
+
+  const aiConsistencySection = await generateAiRecommendations(projectId, "consistency", consistencyContext, project.storeNiche ?? undefined, project.platformType ?? "shopify");
 
   const body = `
     <div class="metric-row">
@@ -3162,19 +3484,37 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
       </div>
     </div>` : ""}
 
-    ${await generateAiRecommendations(projectId, "inventory", `TIENDA: ${project.name}
+    ${await generateAiRecommendations(projectId, "inventory", (() => {
+  const healthy = inventory.filter(i => i.status !== "critical" && i.status !== "low");
+  const avgDailySalesAll = inventory.filter(i => i.avgDailySales != null).reduce((s, i) => s + (i.avgDailySales ?? 0), 0);
+  const totalValue = inventory.reduce((s, i) => (s + (i.currentStock ?? 0) * (i.unitCost ?? 0)), 0);
+  const pendingRestocks = restocks.filter(r => !r.adminApproved);
+  return `TIENDA: ${project.name}
+PLATAFORMA: ${project.platformType || "shopify"}
 NICHO: ${project.storeNiche || "No definido"}
 PRODUCTOS RASTREADOS: ${inventory.length}
 STOCK TOTAL: ${totalStock} unidades
-STOCK CRÍTICO: ${critical.length} productos
-STOCK BAJO: ${lowStock.length} productos
-ÓRDENES DE REPOSICIÓN: ${restocks.length}
+VALOR ESTIMADO INVENTARIO: ${totalValue.toFixed(2)}€
+VENTAS DIARIAS TOTALES ESTIMADAS: ${avgDailySalesAll.toFixed(1)} unidades/día
 
-PRODUCTOS EN ESTADO CRÍTICO:
-${critical.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0}, Ventas/día: ${i.avgDailySales?.toFixed(1) ?? "?"}, Días restantes: ${i.daysRemaining ?? "?"}, Proveedor: ${i.supplierEmail || "sin proveedor"}, Lead time: ${i.supplierLeadDays ?? "?"} días`).join("\n")}
+📊 DISTRIBUCIÓN DE ESTADOS:
+- ⛔ CRÍTICO (≤7 días): ${critical.length} productos (${inventory.length > 0 ? Math.round(critical.length / inventory.length * 100) : 0}%)
+- ⚠️ BAJO (7-30 días): ${lowStock.length} productos (${inventory.length > 0 ? Math.round(lowStock.length / inventory.length * 100) : 0}%)
+- ✅ SALUDABLE (>30 días): ${healthy.length} productos (${inventory.length > 0 ? Math.round(healthy.length / inventory.length * 100) : 0}%)
 
-PRODUCTOS CON STOCK BAJO:
-${lowStock.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0}, Días restantes: ${i.daysRemaining ?? "?"}`).join("\n")}`, project.storeNiche ?? undefined)}`;
+ÓRDENES DE REPOSICIÓN: ${restocks.length} total, ${pendingRestocks.length} pendientes de aprobar
+
+⛔ PRODUCTOS EN ESTADO CRÍTICO — REQUIEREN ACCIÓN INMEDIATA:
+${critical.slice(0, 10).map((i, idx) => `${idx + 1}. "${i.productTitle || i.productId}"
+   Stock actual: ${i.currentStock ?? 0} uds | Ventas/día: ${i.avgDailySales?.toFixed(1) ?? "?"} | Días hasta rotura: ${i.daysRemaining ?? "?"}
+   Proveedor: ${i.supplierEmail || "❌ SIN PROVEEDOR ASIGNADO"} | Lead time: ${i.supplierLeadDays ?? "?"} días
+   Coste oportunidad/día sin stock: ~${i.avgDailySales ? (i.avgDailySales * (i.unitCost ?? 10) * 2.5).toFixed(2) : "?"} €`).join("\n") || "Ninguno en estado crítico"}
+
+⚠️ PRODUCTOS CON STOCK BAJO — PLANIFICAR REPOSICIÓN:
+${lowStock.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0} uds, Días restantes: ${i.daysRemaining ?? "?"}, Proveedor: ${i.supplierEmail || "sin proveedor"}`).join("\n") || "Ninguno"}
+
+BENCHMARK SECTOR: Las tiendas top del nicho "${project.storeNiche || "e-commerce"}" mantienen <5% de productos en estado crítico y stock de seguridad de 14-21 días.`;
+})(), project.storeNiche ?? undefined, project.platformType ?? "shopify")}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
@@ -3231,19 +3571,38 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
       </div>
     </div>` : ""}
 
-    ${await generateAiRecommendations(projectId, "redesigns", `TIENDA: ${project.name}
+    ${await generateAiRecommendations(projectId, "redesigns", (() => {
+  const pending = redesigns.filter(r => !r.appliedAt);
+  const withPriceChange = redesigns.filter(r => r.recommendedPrice != null);
+  const productsWithoutRedesign = products.filter(p => !redesigns.some(r => r.shopifyProductId === p.shopifyProductId));
+  return `TIENDA: ${project.name}
+PLATAFORMA: ${project.platformType || "shopify"}
 NICHO: ${project.storeNiche || "No definido"}
-TOTAL REDISEÑOS: ${redesigns.length}
-APLICADOS A SHOPIFY: ${applied.length}
-PENDIENTES: ${redesigns.length - applied.length}
-TOTAL PRODUCTOS: ${products.length}
-COBERTURA: ${products.length > 0 ? ((redesigns.length / products.length) * 100).toFixed(0) : 0}% del catálogo rediseñado
+TOTAL REDISEÑOS GENERADOS: ${redesigns.length}
+APLICADOS A LA TIENDA: ${applied.length} (${redesigns.length > 0 ? Math.round(applied.length / redesigns.length * 100) : 0}% de ejecución)
+PENDIENTES DE APLICAR: ${pending.length}
+TOTAL PRODUCTOS EN CATÁLOGO: ${products.length}
+COBERTURA DE REDISEÑO: ${products.length > 0 ? ((redesigns.length / products.length) * 100).toFixed(0) : 0}% del catálogo
+PRODUCTOS SIN REDISEÑAR: ${productsWithoutRedesign.length}
+REDISEÑOS CON CAMBIO DE PRECIO: ${withPriceChange.length}
 
-ÚLTIMOS REDISEÑOS:
-${redesigns.slice(0, 10).map(r => {
+📋 REDISEÑOS RECIENTES (detalle):
+${redesigns.slice(0, 12).map((r, i) => {
   const prod = productMap.get(r.shopifyProductId ?? "");
-  return `- "${prod?.title || "Desconocido"}" → Nuevo título: "${r.newTitle?.slice(0, 80) || "N/A"}", Precio recomendado: ${r.recommendedPrice ?? "N/A"}€, Estado: ${r.appliedAt ? "APLICADO" : "PENDIENTE"}`;
-}).join("\n")}`, project.storeNiche ?? undefined)}`;
+  const origPrice = prod ? parseFloat(prod.price ?? "0") : 0;
+  const priceChange = r.recommendedPrice && origPrice > 0 ? ((r.recommendedPrice - origPrice) / origPrice * 100).toFixed(1) : null;
+  return `${i + 1}. "${prod?.title || "Desconocido"}"
+   Título propuesto: "${r.newTitle?.slice(0, 100) || "N/A"}"
+   Precio original: ${origPrice.toFixed(2)}€ → Recomendado: ${r.recommendedPrice != null ? r.recommendedPrice + "€" : "sin cambio"} ${priceChange ? `(${Number(priceChange) >= 0 ? "+" : ""}${priceChange}%)` : ""}
+   Estado: ${r.appliedAt ? "✅ APLICADO" : "⏳ PENDIENTE"}
+   Tags propuestos: ${Array.isArray(r.tags) ? (r.tags as string[]).slice(0, 5).join(", ") : "N/A"}`;
+}).join("\n")}
+
+🚫 PRODUCTOS AÚN SIN REDISEÑAR (oportunidad):
+${productsWithoutRedesign.slice(0, 8).map(p => `- "${p.title}" — Precio: ${p.price ?? "?"}€`).join("\n") || "Todos los productos tienen rediseño"}
+
+BENCHMARK: Las tiendas top del nicho "${project.storeNiche || "e-commerce"}" rediseñan fichas cada 3-6 meses. El impacto medio de un rediseño profesional es +15-35% en conversión por producto.`;
+})(), project.storeNiche ?? undefined, project.platformType ?? "shopify")}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
@@ -3317,19 +3676,48 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
       </div>
     </div>` : ""}
 
-    ${await generateAiRecommendations(projectId, "revenue", `TIENDA: ${project.name}
+    ${await generateAiRecommendations(projectId, "revenue", (() => {
+  const recentSnapshots = snapshots.slice(0, 30);
+  const firstHalf = recentSnapshots.slice(Math.floor(recentSnapshots.length / 2));
+  const secondHalf = recentSnapshots.slice(0, Math.floor(recentSnapshots.length / 2));
+  const avgRevenueFirst = firstHalf.length ? firstHalf.reduce((s, r) => s + (r.revenue ?? 0), 0) / firstHalf.length : 0;
+  const avgRevenueSecond = secondHalf.length ? secondHalf.reduce((s, r) => s + (r.revenue ?? 0), 0) / secondHalf.length : 0;
+  const growthRate = avgRevenueFirst > 0 ? ((avgRevenueSecond - avgRevenueFirst) / avgRevenueFirst * 100) : 0;
+  const avgConversion = snapshots.filter(s => s.conversionRate != null).reduce((s, r) => s + (r.conversionRate ?? 0), 0) / (snapshots.filter(s => s.conversionRate != null).length || 1);
+  const bestDay = recentSnapshots.reduce((best, s) => (s.revenue ?? 0) > (best.revenue ?? 0) ? s : best, recentSnapshots[0] || { date: "N/A", revenue: 0 });
+  const worstDay = recentSnapshots.reduce((worst, s) => (s.revenue ?? 0) < (worst.revenue ?? 0) ? s : worst, recentSnapshots[0] || { date: "N/A", revenue: 0 });
+  return `TIENDA: ${project.name}
+PLATAFORMA: ${project.platformType || "shopify"}
 NICHO: ${project.storeNiche || "No definido"}
 PERÍODO DE DATOS: ${snapshots.length} snapshots
-REVENUE TOTAL: ${totalRevenue.toFixed(2)}€
-PEDIDOS TOTALES: ${totalOrders}
-AOV MEDIO: ${avgAov.toFixed(2)}€
-MARGEN BRUTO MEDIO: ${avgMargin.toFixed(1)}%
 
-TENDENCIA ÚLTIMOS SNAPSHOTS:
-${snapshots.slice(0, 15).map(s => `- ${s.date}: Revenue ${s.revenue?.toFixed(2) ?? "?"}€, Pedidos: ${s.orders ?? "?"}, AOV: ${s.aov?.toFixed(2) ?? "?"}€, Conversión: ${s.conversionRate != null ? (s.conversionRate * 100).toFixed(2) + "%" : "?"}, Margen: ${s.grossMargin?.toFixed(1) ?? "?"}%`).join("\n")}
+📊 MÉTRICAS CLAVE:
+- Revenue total acumulado: ${totalRevenue.toFixed(2)}€
+- Pedidos totales: ${totalOrders}
+- AOV medio (Average Order Value): ${avgAov.toFixed(2)}€
+- Margen bruto medio: ${avgMargin.toFixed(1)}%
+- Tasa de conversión media: ${(avgConversion * 100).toFixed(2)}%
+- Tendencia de crecimiento: ${growthRate >= 0 ? "+" : ""}${growthRate.toFixed(1)}% ${growthRate > 5 ? "📈 CRECIENDO" : growthRate < -5 ? "📉 DECRECIENDO" : "➡️ ESTABLE"}
 
-FORECASTS:
-${forecasts.slice(0, 5).map(f => `- ${f.forecastDate}: ${f.forecastType} → ${f.predictedValue?.toFixed(2) ?? "?"}€ (${f.confidencePct ?? "?"}% confianza). ${f.reasoning?.slice(0, 100) ?? ""}`).join("\n")}`, project.storeNiche ?? undefined)}`;
+📈 ANÁLISIS DE TENDENCIA:
+- Revenue medio primera mitad del período: ${avgRevenueFirst.toFixed(2)}€/día
+- Revenue medio segunda mitad: ${avgRevenueSecond.toFixed(2)}€/día
+- Mejor día: ${bestDay?.date || "?"} con ${bestDay?.revenue?.toFixed(2) ?? "?"}€
+- Peor día: ${worstDay?.date || "?"} con ${worstDay?.revenue?.toFixed(2) ?? "?"}€
+
+📅 DETALLE ÚLTIMOS 15 SNAPSHOTS:
+${recentSnapshots.slice(0, 15).map(s => `- ${s.date}: Revenue ${s.revenue?.toFixed(2) ?? "?"}€ | Pedidos: ${s.orders ?? "?"} | AOV: ${s.aov?.toFixed(2) ?? "?"}€ | Conversión: ${s.conversionRate != null ? (s.conversionRate * 100).toFixed(2) + "%" : "?"} | Margen: ${s.grossMargin?.toFixed(1) ?? "?"}%`).join("\n")}
+
+🔮 FORECASTS / PREDICCIONES IA:
+${forecasts.slice(0, 5).map(f => `- ${f.forecastDate}: ${f.forecastType} → ${f.predictedValue?.toFixed(2) ?? "?"}€ (confianza: ${f.confidencePct ?? "?"}%, rango: ${f.confidenceLow?.toFixed(0) ?? "?"}€-${f.confidenceHigh?.toFixed(0) ?? "?"}€)
+  Razonamiento: ${f.reasoning?.slice(0, 150) ?? "N/A"}`).join("\n") || "Sin forecasts generados aún"}
+
+BENCHMARKS DEL SECTOR "${project.storeNiche || "e-commerce"}":
+- Tasa de conversión media del sector: 1.5-3.5%
+- AOV medio del sector: varía por nicho (25-150€)
+- Tasa de crecimiento MoM saludable: 5-15%
+- Customer Acquisition Cost (CAC) recomendado: <30% del AOV`;
+})(), project.storeNiche ?? undefined, project.platformType ?? "shopify")}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);
