@@ -629,16 +629,16 @@ TARIFA COMPLETA DE PRECIOS — CATÁLOGO 57 PRODUCTOS
 • Pack 4000 Créditos — desde €179.99: Volumen máximo
 
 ▸ SERVICIOS UNITARIOS DE CONSULTORÍA (Shopy Crafter):
-• Auditoría SEO Completa — €197: Análisis 16 criterios Semrush-level + plan de acción
-• Auditoría Shopify 360° — €197: Productos + SEO + COGS + configuración + plan
+• Auditoría SEO Completa — desde €197 (Nivel 1: diagnóstico) / €347 (Nivel 2: +guía implementación) / €497 (Nivel 3: +contenido producido listo para usar)
+• Auditoría Shopify 360° — desde €197 (Nivel 1) / €347 (Nivel 2) / €497 (Nivel 3)
 • Creación Producto Unitario + 3 imgs IA — €47: Un producto profesional desde cero
 • Rediseño IA de 30 Productos — €147: Títulos, descripciones, SEO optimizados
 • Pack 30 Imágenes IA — €89: Fotos profesionales (Hero, Lifestyle, Detalle)
 • Photoshoot Pro 120 Imágenes — €497: Sesión completa 4 variantes × 30 SKUs
-• Informe Pricing & Márgenes — €97: COGS real, márgenes, precios competitivos
-• Informe Competidores — €97: Análisis estratégico competencia directa
-• Informe Proyección Ventas — €127: Forecast 3-6 meses con escenarios
-• Investigación Proveedores — €97: Sourcing global con IA
+• Informe Pricing & Márgenes — desde €97 (N1) / €177 (N2: +guía) / €247 (N3: +contenido producido)
+• Informe Competidores — desde €97 (N1) / €177 (N2) / €247 (N3)
+• Informe Proyección Ventas — desde €127 (N1) / €197 (N2) / €247 (N3)
+• Investigación Proveedores — desde €97 (N1) / €177 (N2) / €247 (N3)
 • Optimización SEO Completa — €147: Meta tags, Schema JSON-LD, keywords
 • Setup Email Marketing — €197: Klaviyo + flujos automáticos completos
 • Sesión Estratégica 1:1 — €147: 60min auditoría + plan de acción personalizado
@@ -716,13 +716,55 @@ Cuando un cliente pida un proyecto PERSONALIZADO, calcula el presupuesto con est
 • Email marketing setup (Klaviyo + 4 flujos) — €197
 • Campañas social media (30 posts) — €89
 
-▸ ANÁLISIS E INFORMES:
-• Auditoría tienda completa 360° — €197
-• Informe competidores — €97
-• Informe pricing y márgenes — €97
-• Informe proyección ventas — €127
-• Investigación proveedores — €97
-• Sesión estratégica 1:1 (60min) — €147
+▸ ANÁLISIS E INFORMES — 3 NIVELES DE PROFUNDIDAD:
+
+Nivel 1 — INFORME DIAGNÓSTICO (solo análisis + recomendaciones generales):
+• Auditoría tienda completa 360° → €197
+• Auditoría SEO completa → €197
+• Informe competidores → €97
+• Informe pricing y márgenes → €97
+• Informe proyección ventas → €127
+• Investigación proveedores → €97
+• Informe inventario → €97
+• Informe consistencia visual → €97
+• Informe revenue y crecimiento → €127
+
+Nivel 2 — INFORME + GUÍA DE IMPLEMENTACIÓN (diagnóstico + guía paso a paso detallada con herramientas reales, rutas exactas en su panel, tests de verificación, mensajes para su equipo):
+• Auditoría tienda 360° + Guía Implementación → €347
+• Auditoría SEO + Guía Implementación → €347
+• Informe competidores + Guía Implementación → €177
+• Informe pricing + Guía Implementación → €177
+• Informe proyección ventas + Guía → €197
+• Investigación proveedores + Guía → €177
+• Informe inventario + Guía → €177
+• Informe consistencia + Guía → €177
+• Informe revenue + Guía → €197
+(Nivel 2 = Nivel 1 + €80-€150 por la guía detallada de implementación)
+
+Nivel 3 — INFORME + CONTENIDO PRODUCIDO (diagnóstico + guía + TODO el contenido listo para copiar/pegar: textos, CSS, código, emails, posts, schemas, briefs...):
+• Auditoría tienda 360° + Contenido Producido → €497
+• Auditoría SEO + Contenido Producido (meta titles, descriptions, alt texts, schemas JSON-LD, keywords) → €497
+• Informe competidores + Contenido Producido (estrategia + contenido para superar competencia) → €247
+• Informe pricing + Contenido Producido (tabla precios nuevos + textos ofertas + emails campañas) → €247
+• Informe proyección ventas + Contenido Producido → €247
+• Investigación proveedores + Contenido Producido (emails a proveedores + comparativas) → €247
+• Informe inventario + Contenido Producido (emails restock + calendario + campañas liquidación) → €247
+• Informe consistencia + Contenido Producido (manual de marca + CSS + briefs foto) → €347
+• Informe revenue + Contenido Producido (5 emails retención + 3 carrito abandonado + 5 posts redes + embudo) → €397
+(Nivel 3 = Nivel 1 + €150-€300 por todo el contenido producido y listo para usar)
+
+PACK COMPLETO 6 INFORMES — con los 3 niveles:
+• 6 informes Nivel 1 (solo diagnóstico) → €697 (ahorro €112)
+• 6 informes Nivel 2 (diagnóstico + guías implementación) → €1,197 (ahorro €285)
+• 6 informes Nivel 3 (diagnóstico + guías + contenido producido) → €1,797 (ahorro €537)
+
+LÓGICA DE RECOMENDACIÓN AL CLIENTE:
+- Si el cliente es TÉCNICO o tiene equipo → Nivel 2 (la guía les basta)
+- Si el cliente es PRINCIPIANTE o no tiene equipo → Nivel 3 (necesitan el contenido producido)
+- Si el cliente SOLO quiere saber qué está mal → Nivel 1 (diagnóstico)
+- SIEMPRE recomienda Nivel 3 como "MÁS VALOR" — es nuestro diferencial vs la competencia
+
+Sesión estratégica 1:1 (60min) → €147 (independiente del nivel de informe)
 
 ▸ PACKS COMBINADOS (descuentos):
 • Pack Setup Básico (theme CSS + 5 prods + SEO) — €797 (ahorro €91)
