@@ -496,6 +496,11 @@ Acciones disponibles:
 - delete_variant: Eliminar una variante de un producto. Params: {projectId, productId, variantId}
 - update_stock: Actualizar stock de un producto/variante. Si se pasa productId sin variantId, actualiza TODAS las variantes. Params: {projectId, productId?, variantId?, quantity}
 - bulk_update_stock: Actualizar stock de múltiples productos/variantes a la vez. Params: {projectId, items: [{variantId? o productId?, quantity}]}
+- update_product_price: Actualizar el precio de un producto/variante en Shopify. Params: {projectId, productId?, variantId?, price, compareAtPrice?}. Si solo se da productId, actualiza TODAS las variantes.
+- bulk_update_prices: Actualizar precios de múltiples productos/variantes a la vez. Params: {projectId, items: [{productId? o variantId?, price, compareAtPrice?}]}
+- sync_catalog_prices: Sincronizar TODOS los precios de los productos de Shopify con el catálogo oficial de Shopy Crafter. Analiza todos los productos, detecta discrepancias y actualiza los precios incorrectos automáticamente. Params: {projectId, dryRun? (si true, solo muestra cambios sin aplicar)}
+- price_audit: Auditar los precios de todos los productos de la tienda Shopify, comparándolos con el catálogo oficial. Genera un informe de discrepancias con recomendaciones. Params: {projectId}
+- list_products_with_prices: Listar TODOS los productos de la tienda con sus precios actuales, variantes, SKUs y compare_at_price. Params: {projectId, filter? ("all"|"subscriptions"|"services"|"creative"|"credits")}
 - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
 - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
 - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
@@ -573,6 +578,10 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Quitar de colección / eliminar de colección / sacar de colección → remove_from_collection
 - Variantes / tallas / colores / opciones de producto → list_variants; Añadir variante / nueva talla / nuevo color → add_variant; Editar variante → edit_variant; Eliminar variante → delete_variant
 - Stock / inventario / actualizar stock / cambiar cantidad → update_stock; Stock masivo / actualizar varios stocks → bulk_update_stock
+- Cambiar precio producto / actualizar precio / nuevo precio / poner precio → update_product_price; Precios masivos / actualizar todos los precios / bulk prices → bulk_update_prices
+- Sincronizar precios / sync prices / precios del catálogo / igualar precios / actualizar precios con el catálogo → sync_catalog_prices
+- Auditoría precios / revisar precios / precios correctos / comprobar precios / auditar precios → price_audit
+- Ver precios / listar precios / todos los precios / productos con precios / precios actuales / cuánto cuesta cada producto → list_products_with_prices
 - Generar informe / exportar reporte / report / export → generate_export; Auditoría completa / full audit report → run_full_audit_report; Informe IA / AI report → generate_ai_report
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
@@ -4986,6 +4995,321 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
           result = {
             success: successCount, failed: failCount,
             message: `📦 **Stock actualizado en lote**: ${successCount} exitosos, ${failCount} fallidos\n\n${details.join("\n")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "update_product_price": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        const price = params?.price;
+        if (!price) { result = { error: true, message: "❌ Falta price" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const variantId = params?.variantId;
+          const productIdParam = params?.productId;
+          const compareAtPrice = params?.compareAtPrice;
+
+          if (variantId) {
+            const body: Record<string, unknown> = { price: String(price) };
+            if (compareAtPrice) body.compare_at_price = String(compareAtPrice);
+            const data = await shopifyRequest<{ variant: Record<string, unknown> }>(
+              parseInt(String(projectId)), project.shopDomain,
+              `/variants/${variantId}.json`,
+              { method: "PUT", body: JSON.stringify({ variant: body }) }
+            );
+            result = {
+              message: `💰 **Precio actualizado**\n\n- Variante: ${data.variant.title}\n- Nuevo precio: €${data.variant.price}${compareAtPrice ? `\n- Precio anterior (tachado): €${compareAtPrice}` : ""}\n\n✅ Cambio aplicado en Shopify`,
+            };
+          } else if (productIdParam) {
+            const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
+              parseInt(String(projectId)), project.shopDomain,
+              `/products/${productIdParam}.json?fields=title,variants`
+            );
+            const variants = pData.product.variants as Array<Record<string, unknown>> || [];
+            const updated: string[] = [];
+            for (const v of variants) {
+              const body: Record<string, unknown> = { price: String(price) };
+              if (compareAtPrice) body.compare_at_price = String(compareAtPrice);
+              await shopifyRequest(
+                parseInt(String(projectId)), project.shopDomain,
+                `/variants/${v.id}.json`,
+                { method: "PUT", body: JSON.stringify({ variant: body }) }
+              );
+              updated.push(`✅ ${v.title}: €${price}`);
+            }
+            result = {
+              message: `💰 **Precio actualizado** para "${pData.product.title}"\n\n${updated.join("\n")}\n\n✅ ${updated.length} variantes actualizadas`,
+            };
+          } else {
+            result = { error: true, message: "❌ Necesito productId o variantId para saber qué producto actualizar" };
+          }
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "bulk_update_prices": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        const items = params?.items as Array<{ productId?: string; variantId?: string; price: string; compareAtPrice?: string }> | undefined;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          result = { error: true, message: "❌ Falta items — array de {productId o variantId, price, compareAtPrice?}" }; break;
+        }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          let successCount = 0;
+          let failCount = 0;
+          const details: string[] = [];
+          for (const item of items) {
+            try {
+              let vid = item.variantId;
+              let label = vid || "";
+              if (!vid && item.productId) {
+                const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
+                  parseInt(String(projectId)), project.shopDomain,
+                  `/products/${item.productId}.json?fields=title,variants`
+                );
+                const firstV = (pData.product.variants as Array<Record<string, unknown>>)?.[0];
+                vid = String(firstV?.id || "");
+                label = String(pData.product.title);
+              }
+              if (!vid) { failCount++; details.push(`❌ ${label}: sin variante`); continue; }
+              const body: Record<string, unknown> = { price: String(item.price) };
+              if (item.compareAtPrice) body.compare_at_price = String(item.compareAtPrice);
+              const data = await shopifyRequest<{ variant: Record<string, unknown> }>(
+                parseInt(String(projectId)), project.shopDomain,
+                `/variants/${vid}.json`,
+                { method: "PUT", body: JSON.stringify({ variant: body }) }
+              );
+              successCount++;
+              details.push(`✅ ${data.variant.title || label}: €${item.price}`);
+            } catch { failCount++; details.push(`❌ ${item.variantId || item.productId}: error`); }
+          }
+          result = {
+            success: successCount, failed: failCount,
+            message: `💰 **Precios actualizados en lote**: ${successCount} exitosos, ${failCount} fallidos\n\n${details.join("\n")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "list_products_with_prices": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(String(projectId)), project.shopDomain, "/products.json?limit=250"
+          );
+          const products = data.products || [];
+          const filter = params?.filter as string || "all";
+
+          const categorized: Record<string, Array<{ title: string; price: string; compareAt: string; variantId: string; sku: string }>> = {
+            subscriptions: [], services: [], creative: [], credits: []
+          };
+
+          for (const p of products) {
+            const title = String(p.title || "");
+            const variants = p.variants as Array<Record<string, unknown>> || [];
+            const v = variants[0] || {};
+            const entry = {
+              title: title.substring(0, 70),
+              price: String(v.price || "?"),
+              compareAt: String(v.compare_at_price || ""),
+              variantId: String(v.id || ""),
+              sku: String(v.sku || ""),
+            };
+            const t = title.toLowerCase();
+            if (["starter", "pro —", "agency pro", "growth studio", "performance lab", "enterprise"].some(k => t.includes(k))) {
+              categorized.subscriptions.push(entry);
+            } else if (["pack ilustr", "pack narr", "pack creador", "pack director", "pack estudio", "pack 4000"].some(k => t.includes(k))) {
+              categorized.credits.push(entry);
+            } else if (["auditoría", "informe", "photoshoot", "pack 20", "pack 30 prod", "pack 15", "pack 10", "pack 5", "pack catálogo", "creación prod", "rediseño", "pack 30 imág", "seo shopify", "setup email", "sesión estrat", "pack 30 post", "campañas"].some(k => t.includes(k))) {
+              categorized.services.push(entry);
+            } else {
+              categorized.creative.push(entry);
+            }
+          }
+
+          const sections: string[] = [];
+          const formatList = (items: typeof categorized.subscriptions) =>
+            items.map(i => `  €${i.price.padStart(7)} ${i.compareAt && i.compareAt !== "null" ? `(antes €${i.compareAt})` : "".padEnd(15)} | ${i.title}`).join("\n");
+
+          if (filter === "all" || filter === "subscriptions") {
+            sections.push(`📋 **PLANES SUSCRIPCIÓN (${categorized.subscriptions.length})**\n${formatList(categorized.subscriptions)}`);
+          }
+          if (filter === "all" || filter === "services") {
+            sections.push(`🔧 **SERVICIOS ONE-SHOT (${categorized.services.length})**\n${formatList(categorized.services)}`);
+          }
+          if (filter === "all" || filter === "credits") {
+            sections.push(`🎨 **CRÉDITOS IA (${categorized.credits.length})**\n${formatList(categorized.credits)}`);
+          }
+          if (filter === "all" || filter === "creative") {
+            sections.push(`🎭 **PRODUCTOS CREATIVOS (${categorized.creative.length})**\n${formatList(categorized.creative)}`);
+          }
+
+          result = {
+            total: products.length,
+            message: `💰 **${products.length} productos en Shopify** (filtro: ${filter})\n\n${sections.join("\n\n")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "price_audit": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(String(projectId)), project.shopDomain, "/products.json?limit=250"
+          );
+
+          const catalogPrices: Record<string, { price: number; name: string }> = {
+            "shopy crafter starter": { price: 0, name: "Starter Free" },
+            "shopy crafter pro": { price: 29, name: "Emprendedor" },
+            "shopy crafter agency pro": { price: 149, name: "Agency Pro → Growth" },
+            "growth studio": { price: 149, name: "Growth Studio" },
+            "performance lab": { price: 397, name: "Performance Lab" },
+            "shopy crafter enterprise": { price: 997, name: "Enterprise" },
+            "auditoría seo shopify": { price: 97, name: "Auditoría SEO N1" },
+            "auditoría shopify completa": { price: 97, name: "Auditoría 360° N1" },
+            "informe competidores": { price: 97, name: "Informe Competidores N1" },
+            "informe pricing": { price: 97, name: "Informe Pricing N1" },
+            "informe proyección": { price: 97, name: "Informe Proyección N1" },
+            "investigación de proveedores": { price: 97, name: "Investigación Proveedores N1" },
+            "shopy crafter photoshoot": { price: 297, name: "Photoshoot Pro" },
+            "pack 20 productos": { price: 397, name: "Pack 20 Productos" },
+            "pack 30 productos": { price: 597, name: "Pack 30 Productos" },
+            "pack 15 productos": { price: 297, name: "Pack 15 Productos" },
+            "pack catálogo profesional 10": { price: 197, name: "Pack 10 Productos" },
+            "pack 5 productos": { price: 97, name: "Pack 5 Productos" },
+            "creación producto shopify unitario": { price: 29, name: "Producto Unitario" },
+            "rediseño ia de 30": { price: 97, name: "Rediseño 30 Productos" },
+            "pack 30 imágenes": { price: 49, name: "Pack 30 Imágenes" },
+            "seo shopify experto": { price: 97, name: "SEO Experto" },
+            "setup email marketing": { price: 147, name: "Setup Email" },
+            "sesión estratégica": { price: 97, name: "Sesión Estratégica" },
+            "pack 30 posts": { price: 49, name: "Pack 30 Posts" },
+            "campañas virales": { price: 97, name: "Campañas Virales" },
+          };
+
+          const discrepancies: string[] = [];
+          const correct: string[] = [];
+          for (const p of data.products) {
+            const title = String(p.title || "").toLowerCase();
+            const v = (p.variants as Array<Record<string, unknown>>)?.[0];
+            if (!v) continue;
+            const currentPrice = parseFloat(String(v.price || "0"));
+            for (const [key, catalog] of Object.entries(catalogPrices)) {
+              if (title.includes(key)) {
+                if (Math.abs(currentPrice - catalog.price) > 0.5) {
+                  discrepancies.push(`⚠️ **${catalog.name}**: €${currentPrice} → debería ser **€${catalog.price}** (VID:${v.id})`);
+                } else {
+                  correct.push(`✅ ${catalog.name}: €${currentPrice}`);
+                }
+                break;
+              }
+            }
+          }
+
+          result = {
+            total: data.products.length,
+            discrepancies: discrepancies.length,
+            correct: correct.length,
+            message: discrepancies.length > 0
+              ? `🔍 **Auditoría de precios**: ${discrepancies.length} discrepancias encontradas\n\n${discrepancies.join("\n")}\n\n${correct.length > 0 ? `\n✅ ${correct.length} productos con precios correctos` : ""}\n\n💡 Usa **sync_catalog_prices** para corregir automáticamente`
+              : `✅ **Auditoría de precios perfecta**: todos los ${correct.length} productos del catálogo tienen precios correctos\n\n${correct.join("\n")}`,
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "sync_catalog_prices": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        const dryRun = params?.dryRun === true || params?.dryRun === "true";
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const data = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(String(projectId)), project.shopDomain, "/products.json?limit=250"
+          );
+
+          const catalogPrices: Record<string, { price: string; compareAt?: string }> = {
+            "shopy crafter starter": { price: "0.00", compareAt: "34.99" },
+            "shopy crafter pro": { price: "29.00" },
+            "shopy crafter agency pro": { price: "149.00" },
+            "growth studio": { price: "149.00", compareAt: "297.00" },
+            "performance lab": { price: "397.00", compareAt: "797.00" },
+            "shopy crafter enterprise": { price: "997.00", compareAt: "2497.00" },
+            "auditoría seo shopify": { price: "97.00", compareAt: "197.00" },
+            "auditoría shopify completa": { price: "97.00", compareAt: "197.00" },
+            "informe competidores": { price: "97.00" },
+            "informe pricing": { price: "97.00" },
+            "informe proyección": { price: "97.00", compareAt: "127.00" },
+            "investigación de proveedores": { price: "97.00" },
+            "shopy crafter photoshoot": { price: "297.00", compareAt: "497.00" },
+            "pack 20 productos": { price: "397.00", compareAt: "697.00" },
+            "pack 30 productos": { price: "597.00", compareAt: "997.00" },
+            "pack 15 productos": { price: "297.00", compareAt: "497.00" },
+            "pack catálogo profesional 10": { price: "197.00", compareAt: "347.00" },
+            "pack 5 productos": { price: "97.00", compareAt: "197.00" },
+            "creación producto shopify unitario": { price: "29.00", compareAt: "47.00" },
+            "rediseño ia de 30": { price: "97.00", compareAt: "147.00" },
+            "pack 30 imágenes": { price: "49.00", compareAt: "89.00" },
+            "seo shopify experto": { price: "97.00", compareAt: "147.00" },
+            "setup email marketing": { price: "147.00", compareAt: "197.00" },
+            "sesión estratégica": { price: "97.00", compareAt: "147.00" },
+            "pack 30 posts": { price: "49.00", compareAt: "89.00" },
+            "campañas virales": { price: "97.00", compareAt: "147.00" },
+          };
+
+          const changes: string[] = [];
+          const noChange: string[] = [];
+          let updatedCount = 0;
+
+          for (const p of data.products) {
+            const title = String(p.title || "");
+            const titleLow = title.toLowerCase();
+            const v = (p.variants as Array<Record<string, unknown>>)?.[0];
+            if (!v) continue;
+
+            for (const [key, catalog] of Object.entries(catalogPrices)) {
+              if (titleLow.includes(key)) {
+                const currentPrice = String(v.price || "0");
+                if (Math.abs(parseFloat(currentPrice) - parseFloat(catalog.price)) > 0.5) {
+                  if (!dryRun) {
+                    const body: Record<string, unknown> = { price: catalog.price };
+                    if (catalog.compareAt) body.compare_at_price = catalog.compareAt;
+                    await shopifyRequest(
+                      parseInt(String(projectId)), project.shopDomain,
+                      `/variants/${v.id}.json`,
+                      { method: "PUT", body: JSON.stringify({ variant: body }) }
+                    );
+                    updatedCount++;
+                  }
+                  changes.push(`${dryRun ? "🔄" : "✅"} ${title.substring(0, 50)}: €${currentPrice} → €${catalog.price}`);
+                } else {
+                  noChange.push(`✅ ${title.substring(0, 50)}: €${currentPrice}`);
+                }
+                break;
+              }
+            }
+          }
+
+          result = {
+            mode: dryRun ? "DRY RUN (simulación)" : "APLICADO",
+            changes: changes.length,
+            noChange: noChange.length,
+            message: dryRun
+              ? `🔍 **Simulación de sincronización** (sin cambios aplicados)\n\n${changes.length > 0 ? `**${changes.length} cambios pendientes:**\n${changes.join("\n")}` : "✅ Todos los precios ya están sincronizados"}\n\n${noChange.length > 0 ? `\n✅ ${noChange.length} precios correctos` : ""}\n\n💡 Para aplicar los cambios: "sincronizar precios" (sin dryRun)`
+              : `✅ **Sincronización completada**: ${updatedCount} precios actualizados\n\n${changes.join("\n")}${noChange.length > 0 ? `\n\n✅ ${noChange.length} ya estaban correctos` : ""}`,
           };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
