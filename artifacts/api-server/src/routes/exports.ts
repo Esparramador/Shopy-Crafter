@@ -42,6 +42,127 @@ async function sendHtmlOrPdf(req: Request, res: Response, html: string, filename
   res.send(html);
 }
 
+function sanitizeAiHtmlOutput(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "")
+    .replace(/<input[\s\S]*?>/gi, "")
+    .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
+    .replace(/<button[\s\S]*?<\/button>/gi, "")
+    .replace(/<link[\s\S]*?>/gi, "")
+    .replace(/<meta[\s\S]*?>/gi, "")
+    .replace(/<base[\s\S]*?>/gi, "")
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/data\s*:/gi, "data-blocked:")
+    .replace(/vbscript\s*:/gi, "");
+}
+
+type ReportArea = "seo" | "pricing" | "inventory" | "consistency" | "revenue" | "redesigns" | "financial";
+
+const AI_REPORT_SYSTEM = `Eres el analista senior de Shopy Crafter, agencia independiente de optimización IA para e-commerce. Generas recomendaciones PROFESIONALES, ESPECÍFICAS y ACCIONABLES. 
+
+REGLAS ESTRICTAS:
+- Cada recomendación debe incluir PASOS CONCRETOS de implementación (1, 2, 3...)
+- Nombra productos específicos del catálogo cuando sea posible
+- Incluye métricas de impacto estimado (%, €, tiempo)
+- Usa lenguaje profesional de consultoría
+- Prioriza por impacto/esfuerzo
+- SIEMPRE responde en español
+- Responde en HTML válido (usa <div>, <p>, <strong>, <ol>, <li>, <ul>)
+- NO uses markdown, SOLO HTML`;
+
+async function generateAiRecommendations(
+  projectId: number,
+  area: ReportArea,
+  dataContext: string,
+  niche?: string,
+): Promise<string> {
+  try {
+    const prompt = `Analiza estos datos REALES de un e-commerce y genera recomendaciones profesionales con pasos de implementación específicos.
+
+ÁREA DE ANÁLISIS: ${area.toUpperCase()}
+
+${dataContext}
+
+Genera un análisis con esta estructura HTML (NO JSON, devuelve HTML directo):
+
+<div class="ai-analysis">
+  <div class="ai-diagnosis">
+    <h3>📋 Diagnóstico Profesional</h3>
+    <p>[2-3 párrafos analizando la situación actual con datos concretos del negocio]</p>
+  </div>
+  
+  <div class="ai-actions">
+    <h3>🎯 Plan de Acción Detallado</h3>
+    [Para cada recomendación, genera un bloque así:]
+    <div class="action-item">
+      <div class="action-header">
+        <strong>[Título de la acción]</strong>
+        <span class="action-impact">[ALTO/MEDIO/BAJO impacto]</span>
+      </div>
+      <p><strong>Por qué:</strong> [Razón basada en datos reales del negocio]</p>
+      <p><strong>Cómo implementarlo paso a paso:</strong></p>
+      <ol>
+        <li>[Paso específico 1 con detalles concretos]</li>
+        <li>[Paso específico 2]</li>
+        <li>[Paso específico 3]</li>
+      </ol>
+      <p><strong>Impacto estimado:</strong> [Métrica concreta: +X% conversión, +X€ revenue, etc.]</p>
+      <p><strong>Tiempo estimado:</strong> [Horas/días necesarios]</p>
+    </div>
+  </div>
+  
+  <div class="ai-quick-wins">
+    <h3>⚡ Quick Wins (Implementar Hoy)</h3>
+    <ol>
+      <li>[Acción rápida 1 con instrucciones exactas]</li>
+      <li>[Acción rápida 2]</li>
+      <li>[Acción rápida 3]</li>
+    </ol>
+  </div>
+</div>
+
+IMPORTANTE: 
+- Genera entre 4-6 acciones detalladas en el Plan de Acción
+- Genera 3-5 Quick Wins
+- Nombra productos ESPECÍFICOS del catálogo
+- Cada paso debe ser lo suficientemente detallado para que alguien sin experiencia pueda ejecutarlo
+- Incluye estimaciones numéricas de impacto realistas`;
+
+    const result = await askClaudeWithBrain(
+      projectId,
+      [{ role: "user", content: prompt }],
+      AI_REPORT_SYSTEM,
+      area === "financial" || area === "pricing" || area === "revenue" ? "pricing" : area === "seo" ? "seo" : "general",
+      niche,
+      6144,
+    );
+
+    const sanitized = sanitizeAiHtmlOutput(result);
+    const htmlMatch = sanitized.match(/<div class="ai-analysis">[\s\S]*<\/div>\s*<\/div>\s*<\/div>/);
+    const cleanHtml = htmlMatch ? htmlMatch[0] : `<div class="ai-analysis">${sanitized}</div>`;
+
+    return `
+    <div class="section" style="page-break-before:always;">
+      <div class="section-title">Análisis y Recomendaciones IA</div>
+      <div class="card" style="padding:24px;line-height:1.8;font-size:13px;">
+        ${cleanHtml}
+      </div>
+      <div style="margin-top:12px;padding:10px 16px;background:rgba(200,168,75,.05);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);">
+        Análisis generado por ShopyBrain AI · Basado en datos reales del negocio · ${new Date().toLocaleDateString("es-ES")}
+      </div>
+    </div>`;
+  } catch (err) {
+    logger.warn({ err, area }, "AI recommendations generation failed — report continues without AI section");
+    return "";
+  }
+}
+
 interface CogsEstimation {
   businessType: string;
   location: string;
@@ -500,6 +621,22 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .recommendation-success { border-left-color: ${BRAND.jade}; background: ${BRAND.jadeBg}; }
   .recommendation-info { border-left-color: ${BRAND.blue}; background: ${BRAND.blueBg}; }
 
+  .ai-analysis { line-height: 1.8; }
+  .ai-analysis h3 { font-size: 16px; font-weight: 700; color: ${BRAND.gold}; margin: 0 0 12px 0; }
+  .ai-diagnosis { margin-bottom: 24px; }
+  .ai-diagnosis p { color: rgba(255,255,255,.75); margin-bottom: 8px; }
+  .ai-actions { margin-bottom: 24px; }
+  .action-item { padding: 20px; margin-bottom: 16px; background: ${BRAND.surface}; border: 1px solid ${BRAND.border}; border-radius: 12px; }
+  .action-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .action-header strong { font-size: 14px; color: ${BRAND.white}; }
+  .action-impact { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 3px 10px; border-radius: 6px; background: rgba(200,168,75,.12); color: ${BRAND.gold}; }
+  .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
+  .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
+  .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins h3 { color: ${BRAND.jade}; }
+  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+
   .progress-ring { display: inline-flex; align-items: center; justify-content: center; position: relative; }
   .progress-ring svg { transform: rotate(-90deg); }
 
@@ -762,6 +899,22 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   .recommendation-success { border-left-color: ${ELEGANCE.jade}; background: rgba(52,211,153,.03); }
   .recommendation-info { border-left-color: ${ELEGANCE.accent}; background: rgba(74,144,217,.03); }
 
+  .ai-analysis { line-height: 1.8; }
+  .ai-analysis h3 { font-size: 16px; font-weight: 700; color: ${ELEGANCE.accent}; margin: 0 0 12px 0; }
+  .ai-diagnosis { margin-bottom: 24px; }
+  .ai-diagnosis p { color: rgba(255,255,255,.75); margin-bottom: 8px; }
+  .ai-actions { margin-bottom: 24px; }
+  .action-item { padding: 20px; margin-bottom: 16px; background: ${ELEGANCE.surface}; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; }
+  .action-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .action-header strong { font-size: 14px; color: ${ELEGANCE.white}; }
+  .action-impact { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 3px 10px; border-radius: 6px; background: rgba(74,144,217,.12); color: ${ELEGANCE.accent}; }
+  .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
+  .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
+  .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins h3 { color: ${ELEGANCE.jade}; }
+  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .stat-item { padding: 16px 20px; background: ${ELEGANCE.surface}; border-radius: 10px; border: 1px solid ${ELEGANCE.border}; }
   .stat-item-label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
@@ -998,6 +1151,22 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .recommendation-success { border-left-color: ${PRESTIGE.jade}; background: rgba(52,211,153,.03); }
   .recommendation-info { border-left-color: ${PRESTIGE.blue}; background: rgba(107,168,240,.03); }
 
+  .ai-analysis { line-height: 1.8; }
+  .ai-analysis h3 { font-size: 16px; font-weight: 700; color: ${PRESTIGE.copper}; margin: 0 0 12px 0; }
+  .ai-diagnosis { margin-bottom: 24px; }
+  .ai-diagnosis p { color: rgba(255,255,255,.75); margin-bottom: 8px; }
+  .ai-actions { margin-bottom: 24px; }
+  .action-item { padding: 20px; margin-bottom: 16px; background: ${PRESTIGE.surface}; border: 1px solid ${PRESTIGE.border}; border-radius: 12px; }
+  .action-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .action-header strong { font-size: 14px; color: ${PRESTIGE.white}; }
+  .action-impact { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 3px 10px; border-radius: 6px; background: rgba(196,149,106,.12); color: ${PRESTIGE.copper}; }
+  .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
+  .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
+  .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins h3 { color: ${PRESTIGE.jade}; }
+  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .stat-item { padding: 16px 20px; background: ${PRESTIGE.surface}; border-radius: 10px; border: 1px solid ${PRESTIGE.border}; }
   .stat-item-label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
@@ -1207,6 +1376,25 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   let recommendationsHtml = issues.map(i => `<div class="recommendation">${i}</div>`).join(""); // nosemgrep
   if (issues.length === 0) recommendationsHtml = `<div class="recommendation" style="border-left-color:${BRAND.jade};">✅ Excelente: No se detectaron problemas críticos de SEO.</div>`; // nosemgrep
 
+  const worstProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore < 50).sort((a, b) => (a.seoScore ?? 0) - (b.seoScore ?? 0)).slice(0, 10);
+  const bestProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore >= 80).slice(0, 5);
+  const seoContext = `TIENDA: ${project.name} (${project.shopDomain || "sin dominio"})
+NICHO: ${project.storeNiche || "No definido"}
+TOTAL PRODUCTOS: ${totalProducts}
+SCORE SEO MEDIO: ${Math.round(avgScore)}/100
+CON SCHEMA JSON-LD: ${withSchema}/${totalProducts}
+CON ALT TEXTS: ${withAltTexts}/${totalProducts}
+SIN META TITLE: ${noMeta}/${totalProducts}
+DISTRIBUCIÓN GRADOS: ${Object.entries(gradeDistribution).map(([g, c]) => `${g}:${c}`).join(", ")}
+
+PEORES PRODUCTOS (para mejorar):
+${worstProducts.map(p => `- "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}, MetaTitle: ${p.hasMetaTitle ? "Sí" : "NO"}, MetaDesc: ${p.hasMetaDesc ? "Sí" : "NO"}, Schema: ${p.hasSchema ? "Sí" : "NO"}, AltTexts: ${p.hasAltTexts ? "Sí" : "NO"}`).join("\n")}
+
+MEJORES PRODUCTOS (modelo a seguir):
+${bestProducts.map(p => `- "${p.title}" — Score: ${p.seoScore}/100, Grade: ${p.auditGrade}`).join("\n")}`;
+
+  const aiSection = await generateAiRecommendations(projectId, "seo", seoContext, project.storeNiche ?? undefined);
+
   const body = `
     <div class="metric-row">
       <div class="metric"><div class="value">${totalProducts}</div><div class="label">Productos</div></div><!-- nosemgrep -->
@@ -1221,9 +1409,11 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
     </div>
 
     <div class="section">
-      <div class="section-title">Recomendaciones Estratégicas</div>
+      <div class="section-title">Problemas Detectados</div>
       ${recommendationsHtml}
     </div>
+
+    ${aiSection}
 
     <div class="section">
       ${seoProductCardsHtml}
@@ -1380,7 +1570,25 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
           <tbody>${priceHistoryRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
-    </div>` : ""}`;
+    </div>` : ""}
+
+    ${await generateAiRecommendations(projectId, "financial", `TIENDA: ${project.name}
+NICHO: ${project.storeNiche || "No definido"}
+TOTAL PRODUCTOS: ${products.length}
+REVENUE POTENCIAL: ${totalRevenuePotential.toFixed(2)}€
+COGS TOTAL: ${totalCosts.toFixed(2)}€
+BENEFICIO BRUTO: ${(totalRevenuePotential - totalCosts).toFixed(2)}€
+MARGEN MEDIO: ${avgMargin.toFixed(1)}%
+PRODUCTOS CON COGS: ${allCogs.length}/${products.length}
+CAMBIOS DE PRECIO RECIENTES: ${priceHistory.length}
+
+DETALLE POR PRODUCTO (Top 15):
+${products.slice(0, 15).map(p => {
+  const c = cogsMap.get(p.shopifyProductId);
+  const pr = parseFloat(p.price ?? "0");
+  const m = c && pr > 0 ? ((pr - c.totalCogs) / pr * 100).toFixed(1) : "SIN COGS";
+  return `- "${p.title}" Precio: ${pr.toFixed(2)}€, COGS: ${c ? c.totalCogs.toFixed(2) + "€" : "NO"}, Margen: ${m}%`;
+}).join("\n")}`, project.storeNiche ?? undefined)}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe Financiero y COGS", `${project.name} — ${project.shopDomain || "Sin dominio"}`, body, date);
@@ -2367,25 +2575,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
 
   const reportTitle = "Auditoria Completa";
 
-  const sanitizeAiHtml = (html: string): string => {
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-      .replace(/<object[\s\S]*?<\/object>/gi, "")
-      .replace(/<embed[\s\S]*?>/gi, "")
-      .replace(/<form[\s\S]*?<\/form>/gi, "")
-      .replace(/<input[\s\S]*?>/gi, "")
-      .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
-      .replace(/<button[\s\S]*?<\/button>/gi, "")
-      .replace(/<link[\s\S]*?>/gi, "")
-      .replace(/<meta[\s\S]*?>/gi, "")
-      .replace(/<base[\s\S]*?>/gi, "")
-      .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
-      .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
-      .replace(/javascript\s*:/gi, "")
-      .replace(/data\s*:/gi, "data-blocked:")
-      .replace(/vbscript\s*:/gi, "");
-  };
+  const sanitizeAiHtml = sanitizeAiHtmlOutput;
 
   const aiBlock = (key: string, fallback = "") => {
     if (!aiReport || !aiReport[key]) return fallback;
@@ -2875,6 +3065,18 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
       ${bd.urgencyTactics?.length ? `<div class="card"><p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Tácticas de urgencia</p><div>${bd.urgencyTactics.map(t => `<span class="tag">${t}</span>`).join(" ")}</div></div>` : ""}`; // nosemgrep
   }
 
+  const consistencyContext = `TIENDA: ${project.name}
+NICHO: ${project.storeNiche || "No definido"}
+PRODUCTOS: ${products.length}
+CONSISTENCIA VISUAL: ${(avgConsistency * 100).toFixed(0)}%
+ADN VISUAL: Fondo: ${vd?.backgroundStyle || "N/A"}, Iluminación: ${vd?.lightingStyle || "N/A"}, Color: ${vd?.colorTemp || "N/A"}, Composición: ${vd?.composition || "N/A"}, Mood: ${vd?.mood || "N/A"}
+COLORES DE MARCA: ${vd?.brandColors?.join(", ") || "No definidos"}
+PROPS/ACCESORIOS: ${vd?.props?.join(", ") || "No definidos"}
+ADN MARCA: Tipografía: ${bd?.typographyStyle || "N/A"}, Layout: ${bd?.layoutPattern || "N/A"}, Densidad: ${bd?.visualDensity || "N/A"}, Personalidad: ${bd?.brandPersonality || "N/A"}, Posición competitiva: ${bd?.competitivePosition || "N/A"}, Fotografía: ${bd?.photographyStyle || "N/A"}
+PROPUESTAS DE VALOR: ${bd?.valuePropositions?.join(", ") || "No definidas"}`;
+
+  const aiConsistencySection = await generateAiRecommendations(projectId, "consistency", consistencyContext, project.storeNiche ?? undefined);
+
   const body = `
     <div class="metric-row">
       <div class="metric"><div class="value">${(avgConsistency * 100).toFixed(0)}%</div><div class="label">Consistencia visual</div></div><!-- nosemgrep -->
@@ -2887,7 +3089,8 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
     <div class="section">
       <div class="section-title">ADN de Marca</div>
       ${brandDetails || '<div class="card text-muted">Sin ADN de marca extraído. Usa la herramienta de Intelligence para extraer el ADN.</div>'}<!-- nosemgrep -->
-    </div>`;
+    </div>
+    ${aiConsistencySection}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Consistencia y ADN de Marca", `${project.name} — Identidad Visual`, body, date);
@@ -2957,7 +3160,21 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
           <tbody>${restockRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
-    </div>` : ""}`;
+    </div>` : ""}
+
+    ${await generateAiRecommendations(projectId, "inventory", `TIENDA: ${project.name}
+NICHO: ${project.storeNiche || "No definido"}
+PRODUCTOS RASTREADOS: ${inventory.length}
+STOCK TOTAL: ${totalStock} unidades
+STOCK CRÍTICO: ${critical.length} productos
+STOCK BAJO: ${lowStock.length} productos
+ÓRDENES DE REPOSICIÓN: ${restocks.length}
+
+PRODUCTOS EN ESTADO CRÍTICO:
+${critical.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0}, Ventas/día: ${i.avgDailySales?.toFixed(1) ?? "?"}, Días restantes: ${i.daysRemaining ?? "?"}, Proveedor: ${i.supplierEmail || "sin proveedor"}, Lead time: ${i.supplierLeadDays ?? "?"} días`).join("\n")}
+
+PRODUCTOS CON STOCK BAJO:
+${lowStock.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0}, Días restantes: ${i.daysRemaining ?? "?"}`).join("\n")}`, project.storeNiche ?? undefined)}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Inventario", `${project.name} — Control de Stock`, body, date);
@@ -3012,7 +3229,21 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
         <div class="blog-content" style="font-size:13px;">${redesigns[0].newDescription?.slice(0, 500) ?? ""}${(redesigns[0].newDescription?.length ?? 0) > 500 ? "..." : ""}</div><!-- nosemgrep -->
         ${redesigns[0].tags ? `<div style="margin-top:12px;">${(redesigns[0].tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}<!-- nosemgrep -->
       </div>
-    </div>` : ""}`;
+    </div>` : ""}
+
+    ${await generateAiRecommendations(projectId, "redesigns", `TIENDA: ${project.name}
+NICHO: ${project.storeNiche || "No definido"}
+TOTAL REDISEÑOS: ${redesigns.length}
+APLICADOS A SHOPIFY: ${applied.length}
+PENDIENTES: ${redesigns.length - applied.length}
+TOTAL PRODUCTOS: ${products.length}
+COBERTURA: ${products.length > 0 ? ((redesigns.length / products.length) * 100).toFixed(0) : 0}% del catálogo rediseñado
+
+ÚLTIMOS REDISEÑOS:
+${redesigns.slice(0, 10).map(r => {
+  const prod = productMap.get(r.shopifyProductId ?? "");
+  return `- "${prod?.title || "Desconocido"}" → Nuevo título: "${r.newTitle?.slice(0, 80) || "N/A"}", Precio recomendado: ${r.recommendedPrice ?? "N/A"}€, Estado: ${r.appliedAt ? "APLICADO" : "PENDIENTE"}`;
+}).join("\n")}`, project.storeNiche ?? undefined)}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Rediseños IA", `${project.name} — Optimización de Fichas`, body, date);
@@ -3084,7 +3315,21 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
           <tbody>${forecastRows}</tbody><!-- nosemgrep -->
         </table>
       </div>
-    </div>` : ""}`;
+    </div>` : ""}
+
+    ${await generateAiRecommendations(projectId, "revenue", `TIENDA: ${project.name}
+NICHO: ${project.storeNiche || "No definido"}
+PERÍODO DE DATOS: ${snapshots.length} snapshots
+REVENUE TOTAL: ${totalRevenue.toFixed(2)}€
+PEDIDOS TOTALES: ${totalOrders}
+AOV MEDIO: ${avgAov.toFixed(2)}€
+MARGEN BRUTO MEDIO: ${avgMargin.toFixed(1)}%
+
+TENDENCIA ÚLTIMOS SNAPSHOTS:
+${snapshots.slice(0, 15).map(s => `- ${s.date}: Revenue ${s.revenue?.toFixed(2) ?? "?"}€, Pedidos: ${s.orders ?? "?"}, AOV: ${s.aov?.toFixed(2) ?? "?"}€, Conversión: ${s.conversionRate != null ? (s.conversionRate * 100).toFixed(2) + "%" : "?"}, Margen: ${s.grossMargin?.toFixed(1) ?? "?"}%`).join("\n")}
+
+FORECASTS:
+${forecasts.slice(0, 5).map(f => `- ${f.forecastDate}: ${f.forecastType} → ${f.predictedValue?.toFixed(2) ?? "?"}€ (${f.confidencePct ?? "?"}% confianza). ${f.reasoning?.slice(0, 100) ?? ""}`).join("\n")}`, project.storeNiche ?? undefined)}`;
 
   const tpl = (req.query.template as ReportTemplate) || "prestige";
   const html = getReportShell(tpl)("Informe de Revenue y Forecast", `${project.name} — Análisis Financiero`, body, date);

@@ -24,6 +24,9 @@ An extensible connector abstraction layer (`IPlatformConnector`) supports variou
 ### Product Enrichment and Audit Systems
 The platform includes a Product Enrichment System that uses AI to generate SEO meta titles/descriptions, assign Shopify Standard Product Taxonomy categories, and manage custom metafields and digital product inventory. A Comprehensive Product Audit System fetches all product data via GraphQL and performs a 7-criteria weighted scoring (Title, Description, Price, Images, SEO, Content Quality, Trust). All product-related code paths ensure SEO metafields are passed and audited.
 
+### AI-Powered Report Recommendations
+All 6 individual reports (SEO, Financial, Consistency, Inventory, Redesigns, Revenue) now include Claude-powered professional recommendations via `generateAiRecommendations()` in `exports.ts`. Each report sends real store data (products, metrics, scores) to Claude and receives a structured HTML analysis with: Professional Diagnosis, Detailed Action Plan (4-6 items with step-by-step implementation), and Quick Wins. AI sections have dedicated CSS in all 3 report shells (Classic/gold, Elegance/silver, Prestige/copper). If AI fails, reports generate gracefully without the AI section.
+
 ### Chatbot Capabilities
 The chatbot supports extensive AI responses (`maxTokens` of 16384), file uploads (images, videos, documents), and includes a document absorption feature for ShopyBrain memory. Display truncations are removed or increased, and three report templates (classic, elegance, prestige) are available for all exports.
 
