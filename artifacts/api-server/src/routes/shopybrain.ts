@@ -614,13 +614,20 @@ MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas
 TARIFA COMPLETA DE PRECIOS — CATÁLOGO 57 PRODUCTOS
 ═══════════════════════════════════════════════════
 
-▸ PLANES SaaS SHOPY CRAFTER (suscripciones mensuales):
-• Starter — desde €19/mes: Automatización IA básica, 5 productos/mes, 10 imágenes IA, SEO básico
-• Pro — desde €89/mes: Hasta 20 productos/mes, 50 imágenes, A/B testing, pricing financiero
-• Agency Pro — desde €149/mes: Multi-tienda (hasta 15), 200 imágenes, gestión de clientes, white-label parcial
-• Enterprise — desde €2,497/mes: Multi-tienda ilimitado, API privada, SSO, account manager, SLA
-• Growth Studio — €297/mes + €197 setup: Imágenes ilimitadas, A/B testing, SEO 100 URLs/mes, auto-pilot
-• Performance Lab — €797/mes + €397 setup (MÁS POPULAR): Todo de Growth + A/B ilimitado, pricing predictivo, SEO ilimitado, custom AI
+▸ PLANES SHOPY CRAFTER — ACCESIBLES PARA TODOS (sin permanencia, cancela cuando quieras):
+• Starter Free — €0/mes GRATIS PARA SIEMPRE: 1 tienda, auditoría básica, chatbot IA ilimitado, 3 productos demo, dashboard básico, calculadora presupuestos
+• Emprendedor — €29/mes (ideal pymes, autónomos, emprendedores): 10 productos/mes, 30 imágenes IA, SEO básico (meta tags + alt texts), 1 informe Nivel 1/mes, presupuestos ilimitados, soporte email <48h
+• Growth Studio — €149/mes + €97 setup (MÁS POPULAR): Productos e imágenes ilimitadas, SEO técnico completo, 3 informes Nivel 2/mes, A/B testing 3 productos, dashboard analytics, soporte <24h
+• Performance Lab — €397/mes setup incluido (agencias): Todo de Growth + A/B ilimitado, auto-pilot 24/7, 6 informes Nivel 3/mes, pricing predictivo, Klaviyo, custom AI, soporte <4h
+• Enterprise — desde €997/mes personalizado: Todo de Performance + account manager, multi-tienda, API privada, white-label, formación equipo, soporte 24/7, facturación a medida
+
+FLEXIBILIDAD DE PAGO:
+• Todos los planes SIN PERMANENCIA — cancela cuando quieras
+• Pago mensual o anual (anual = 2 meses gratis)
+• Para emprendedores y pymes: pago fraccionado disponible (consultar)
+• Servicios one-shot: se pueden contratar SIN suscripción
+• Descuentos por volumen automáticos en productos y servicios
+• Plan Free genuino: chatbot + auditoría básica sin coste, sin tarjeta de crédito
 
 ▸ PACKS DE CRÉDITOS IA (Comic Crafter):
 • Pack Ilustrador 110 Créditos — desde €9.99: Generación básica cómics y arte digital
