@@ -411,6 +411,7 @@ Acciones disponibles:
 - reset_cms: Resetear TODO el CMS a valores por defecto. Params: {} (sin params)
 - generate_competitive_pricing: Investigar mercado real, generar catálogo de precios competitivos, actualizar CMS Y crear productos en Shopify. Params: {projectId? (para sync con Shopify), numPlans? (3-8, default 6), industry? (default "Shopify agency / eCommerce SaaS"), syncToShopify? (default true)}
 - audit_app_offerings: Auditar la oferta de la app, features, pricing actual, y generar recomendaciones. Params: {} (sin params)
+- generate_platform_report: Generar un informe COMPLETO de todas las capacidades, herramientas, acciones, informes, servicios y pricing de la plataforma Shopy Crafter. Documento profesional descargable con TODO lo que la plataforma puede hacer. Params: {projectId?, clientName? (nombre del destinatario)}
 - copyright_audit: Auditoría de copyright, marcas registradas y propiedad intelectual de todos los productos. Detecta infracciones y sugiere nombres alternativos seguros. Params: {projectId}
 - modify_ui: Aplicar cambios visuales/UI/CSS/layout a la app (scroll horizontal, animaciones, responsive, colores, etc.). Params: {target (qué cambiar, ej: "pricing carousel", "hero section", "sidebar"), change (qué hacer, ej: "hacer scroll horizontal en móvil", "añadir animación fade-in")}
 - list_themes: Listar todos los themes de la tienda Shopify. Params: {projectId}
@@ -531,6 +532,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Borrar producto → delete_product; Buscar → search_product; Pedidos → get_orders
 - Editar CMS (textos, landing, admin) → update_cms o update_cms_batch; Leer CMS → read_cms; Resetear → reset_cms
 - Generar/comparar precios → generate_competitive_pricing; Auditar oferta → audit_app_offerings; Auditoría copyright/marcas → copyright_audit
+- Informe de capacidades / qué puede hacer la plataforma / herramientas disponibles / servicios que ofrecemos / auditoría de la plataforma / qué hacemos / catálogo de servicios / dossier → generate_platform_report
 - Preguntar nuestros precios/catálogo → responde directamente con TODOS los precios de memoria, SIN ejecutar acción
 - Crear productos de suscripción en Shopify → create_product por cada plan (múltiples :::ACTION:::)
 - Cambiar diseño/UI/CSS de la APP → modify_ui
@@ -553,7 +555,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
 - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
 - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history; Informe ventas y stock / report ventas stock / cuantos se han vendido / ventas por variante talla color → sales_report
-- Presupuesto / cotización / quote / budget → generate_budget. Params: {clientName?, services: [{name, quantity, unitPrice, subtotal, recurring?}], discount?, notes?, deliveryDays?, projectName?}. Genera un documento HTML profesional de presupuesto.
+- Presupuesto / cotización / quote / budget → generate_budget. Params: {clientName?, clientEmail?, clientPhone?, clientCompany?, projectName?, services: [{name, quantity, unitPrice, category? (ej: "Diseño Web", "SEO", "Productos", "Informes"), description? (breve desc del servicio), recurring? (boolean), level? (ej: "Nivel 1", "Nivel 2 — Guía", "Nivel 3 — Producido", "Premium")}], discount?, notes?, deliveryDays?, validDays?, paymentTerms?, projectId?}. Genera un documento HTML hiper-profesional de presupuesto con portada, categorías agrupadas, niveles visuales, condiciones, CTA y se guarda en el Vault para descarga HTML/PDF.
 - Cuánto cobro / cuánto cuesta / precio de / tarifa / qué le cobro / me piden que / un cliente quiere / cuánto cobraría por → PRIMERO calcula el desglose con el catálogo de precios (SIEMPRE con IVA 21%), luego pregunta si quiere generar el presupuesto formal con generate_budget.
 - Propuesta comercial / proposal → agency_proposal
 - Montar tienda / setup completo / crear tienda desde cero / configurar todo → setup_full_store
@@ -7341,27 +7343,45 @@ Responde SOLO con JSON válido (sin markdown):
           const services = params?.services || [];
           const clientName = escHtml(String(params?.clientName || "Cliente").slice(0, 200));
           const projectName = escHtml(String(params?.projectName || "Proyecto Shopify").slice(0, 200));
+          const clientEmail = escHtml(String(params?.clientEmail || "").slice(0, 200));
+          const clientPhone = escHtml(String(params?.clientPhone || "").slice(0, 200));
+          const clientCompany = escHtml(String(params?.clientCompany || "").slice(0, 200));
           const discount = clampNum(params?.discount, 0, 100, 0);
-          const notes = escHtml(String(params?.notes || "").slice(0, 500));
+          const notes = escHtml(String(params?.notes || "").slice(0, 1000));
           const deliveryDays = clampNum(params?.deliveryDays, 1, 365, 7);
+          const paymentTerms = escHtml(String(params?.paymentTerms || "50% al inicio, 50% a la entrega").slice(0, 300));
+          const validDays = clampNum(params?.validDays, 1, 365, 30);
           const budgetDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
           const budgetId = `SC-${Date.now().toString(36).toUpperCase()}`;
 
-          let subtotalOneTime = 0;
-          let subtotalRecurring = 0;
-          const serviceRows = (services as Array<{name: string, quantity: number, unitPrice: number, subtotal: number, recurring?: boolean}>).map((s) => {
+          interface BudgetCategory { name: string; services: typeof parsedServices; subtotal: number }
+          const parsedServices = (services as Array<{name: string, quantity: number, unitPrice: number, category?: string, description?: string, recurring?: boolean, level?: string}>).map((s) => {
             const sName = escHtml(String(s.name || "Servicio").slice(0, 200));
             const qty = clampNum(s.quantity, 0, 9999, 1);
             const price = clampNum(s.unitPrice, 0, 999999, 0);
             const sub = qty * price;
-            if (s.recurring) { subtotalRecurring += sub; } else { subtotalOneTime += sub; }
-            return `<tr>
-              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);color:#e0e0e0;">${sName}</td>
-              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:center;color:#ccc;">${qty}</td>
-              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:right;color:#ccc;">€${price.toFixed(2)}</td>
-              <td style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08);text-align:right;color:#c8a84b;font-weight:600;">€${sub.toFixed(2)}${s.recurring ? '<small>/mes</small>' : ''}</td>
-            </tr>`;
-          }).join("\n");
+            return {
+              name: sName,
+              qty,
+              price,
+              sub,
+              category: String(s.category || "Servicios").slice(0, 100),
+              description: escHtml(String(s.description || "").slice(0, 300)),
+              recurring: !!s.recurring,
+              level: escHtml(String(s.level || "").slice(0, 50)),
+            };
+          });
+
+          const categories: Record<string, BudgetCategory> = {};
+          let subtotalOneTime = 0;
+          let subtotalRecurring = 0;
+          for (const s of parsedServices) {
+            const catKey = s.category;
+            if (!categories[catKey]) { categories[catKey] = { name: catKey, services: [], subtotal: 0 }; }
+            categories[catKey].services.push(s);
+            categories[catKey].subtotal += s.sub;
+            if (s.recurring) { subtotalRecurring += s.sub; } else { subtotalOneTime += s.sub; }
+          }
 
           const totalBeforeDiscount = subtotalOneTime + subtotalRecurring;
           const discountAmount = totalBeforeDiscount * (discount / 100);
@@ -7369,69 +7389,180 @@ Responde SOLO con JSON válido (sin markdown):
           const iva = totalAfterDiscount * 0.21;
           const totalFinal = totalAfterDiscount + iva;
 
+          const categoryBlocks = Object.values(categories).map((cat) => `
+            <div class="cat-block">
+              <div class="cat-header">
+                <span class="cat-icon">${cat.name.includes("SEO") ? "🔍" : cat.name.includes("Diseño") || cat.name.includes("Theme") ? "🎨" : cat.name.includes("Producto") ? "📦" : cat.name.includes("Email") || cat.name.includes("Marketing") ? "📧" : cat.name.includes("Informe") || cat.name.includes("Análisis") || cat.name.includes("Auditoría") ? "📊" : cat.name.includes("Imagen") || cat.name.includes("Foto") ? "📸" : "⚡"}</span>
+                <span class="cat-title">${escHtml(cat.name)}</span>
+                <span class="cat-total">€${cat.subtotal.toFixed(2)}</span>
+              </div>
+              <table>
+                <thead><tr>
+                  <th style="width:40%">Servicio</th>
+                  <th style="width:15%;text-align:center">Nivel</th>
+                  <th style="width:10%;text-align:center">Cant.</th>
+                  <th style="width:15%;text-align:right">Precio/ud</th>
+                  <th style="width:20%;text-align:right">Subtotal</th>
+                </tr></thead>
+                <tbody>
+                  ${cat.services.map((s) => `<tr>
+                    <td>
+                      <div class="svc-name">${s.name}</div>
+                      ${s.description ? `<div class="svc-desc">${s.description}</div>` : ""}
+                    </td>
+                    <td style="text-align:center">${s.level ? `<span class="level-badge ${s.level.includes("3") || s.level.includes("Premium") ? "level-3" : s.level.includes("2") || s.level.includes("Guía") ? "level-2" : "level-1"}">${s.level}</span>` : '<span class="level-badge level-1">Estándar</span>'}</td>
+                    <td style="text-align:center">${s.qty}</td>
+                    <td style="text-align:right">€${s.price.toFixed(2)}</td>
+                    <td style="text-align:right;font-weight:600;color:#c8a84b">€${s.sub.toFixed(2)}${s.recurring ? '<small class="recur">/mes</small>' : ''}</td>
+                  </tr>`).join("\n")}
+                </tbody>
+              </table>
+            </div>`).join("\n");
+
           const budgetHtml = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Presupuesto ${budgetId} — Shopy Crafter</title>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presupuesto ${budgetId} — Shopy Crafter</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0a0a14;color:#e0e0e0;padding:40px}
-.budget{max-width:800px;margin:0 auto;background:linear-gradient(135deg,#0c0c18,#12121e);border:1px solid rgba(200,168,75,0.15);border-radius:16px;overflow:hidden}
-.header{padding:40px;background:linear-gradient(135deg,#0f0f1a,#1a1a2e);border-bottom:2px solid rgba(200,168,75,0.3)}
-.logo{font-size:28px;font-weight:700;color:#c8a84b;letter-spacing:-0.5px}
-.logo span{color:#fff;font-weight:300}
-.badge{display:inline-block;background:rgba(200,168,75,0.15);color:#c8a84b;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
-.client-info{padding:32px 40px;display:flex;justify-content:space-between;border-bottom:1px solid rgba(200,168,75,0.08)}
-.info-block h4{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-.info-block p{color:#e0e0e0;font-size:14px}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#08080e;color:#e0e0e0}
+.budget-doc{max-width:900px;margin:0 auto;background:#0a0a14}
+.doc-header{padding:48px 56px 40px;background:linear-gradient(135deg,#0c0c1a 0%,#141428 50%,#0c0c1a 100%);border-bottom:3px solid #c8a84b;position:relative;overflow:hidden}
+.doc-header::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(200,168,75,0.08) 0%,transparent 70%);border-radius:50%}
+.doc-header::after{content:'';position:absolute;bottom:-40px;left:-40px;width:150px;height:150px;background:radial-gradient(circle,rgba(200,168,75,0.05) 0%,transparent 70%);border-radius:50%}
+.brand-row{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1}
+.brand-logo{font-size:32px;font-weight:800;color:#c8a84b;letter-spacing:-1px}
+.brand-logo span{color:#ffffff;font-weight:300}
+.brand-tag{font-size:11px;color:#8b8b9e;margin-top:4px;letter-spacing:2px;text-transform:uppercase}
+.budget-badge{background:linear-gradient(135deg,#c8a84b,#dfc06a);color:#0a0a14;padding:8px 20px;border-radius:24px;font-size:12px;font-weight:700;letter-spacing:1px}
+.doc-title{margin-top:32px;position:relative;z-index:1}
+.doc-title h1{font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px}
+.doc-title .subtitle{font-size:14px;color:#8b8b9e;margin-top:6px}
+.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;padding:36px 56px;background:#0c0c18;border-bottom:1px solid rgba(200,168,75,0.1)}
+.client-card{background:#111120;border:1px solid rgba(200,168,75,0.1);border-radius:12px;padding:20px 24px}
+.client-card h4{font-size:10px;color:#c8a84b;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;font-weight:700}
+.client-card .field{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px}
+.client-card .field:last-child{border-bottom:none}
+.client-card .label{color:#8b8b9e}
+.client-card .value{color:#e0e0e0;font-weight:500}
+.services-section{padding:36px 56px}
+.section-title{font-size:18px;font-weight:700;color:#ffffff;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(200,168,75,0.3),transparent)}
+.cat-block{margin-bottom:28px;background:#0e0e1c;border:1px solid rgba(200,168,75,0.08);border-radius:14px;overflow:hidden}
+.cat-header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:rgba(200,168,75,0.04);border-bottom:1px solid rgba(200,168,75,0.08)}
+.cat-icon{font-size:18px}
+.cat-title{font-size:14px;font-weight:700;color:#e0e0e0;flex:1}
+.cat-total{font-size:15px;font-weight:700;color:#c8a84b}
 table{width:100%;border-collapse:collapse}
-thead th{background:rgba(200,168,75,0.08);padding:12px 16px;text-align:left;color:#c8a84b;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
-.totals{padding:24px 40px;background:rgba(200,168,75,0.03);border-top:1px solid rgba(200,168,75,0.1)}
-.total-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
-.total-row.final{font-size:22px;font-weight:700;color:#c8a84b;padding:16px 0 0;border-top:2px solid rgba(200,168,75,0.3);margin-top:12px}
-.conditions{padding:32px 40px;border-top:1px solid rgba(200,168,75,0.08);font-size:12px;color:#888;line-height:1.8}
-.footer{padding:24px 40px;background:rgba(200,168,75,0.05);text-align:center;font-size:11px;color:#666}
+thead th{padding:10px 16px;text-align:left;color:#8b8b9e;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;border-bottom:1px solid rgba(200,168,75,0.06)}
+tbody td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.02);font-size:13px;color:#d0d0d8}
+tbody tr:hover td{background:rgba(200,168,75,0.02)}
+.svc-name{font-weight:600;color:#e0e0e0}
+.svc-desc{font-size:11px;color:#8b8b9e;margin-top:3px}
+.level-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.level-1{background:rgba(200,168,75,0.1);color:#c8a84b}
+.level-2{background:rgba(59,130,246,0.1);color:#60a5fa}
+.level-3{background:rgba(168,85,247,0.1);color:#c084fc}
+.recur{color:#8b8b9e;font-weight:400;margin-left:2px}
+.totals-section{padding:32px 56px;background:linear-gradient(135deg,#0e0e1c,#12122a);border-top:2px solid rgba(200,168,75,0.15)}
+.totals-grid{max-width:400px;margin-left:auto}
+.total-line{display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#d0d0d8}
+.total-line.discount{color:#4ade80}
+.total-line.iva{color:#8b8b9e;font-size:13px}
+.total-line.grand{font-size:26px;font-weight:800;color:#c8a84b;padding:16px 0 0;margin-top:12px;border-top:3px solid #c8a84b}
+.savings-note{background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.15);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:12px;color:#4ade80;text-align:center}
+.conditions-section{padding:36px 56px;background:#0c0c18;border-top:1px solid rgba(200,168,75,0.08)}
+.cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cond-item{display:flex;gap:10px;padding:12px 16px;background:#111120;border-radius:10px;border:1px solid rgba(200,168,75,0.06)}
+.cond-icon{font-size:18px;flex-shrink:0}
+.cond-text{font-size:12px;color:#8b8b9e;line-height:1.5}
+.cond-text strong{color:#d0d0d8;display:block;margin-bottom:2px;font-size:12px}
+${notes ? `.notes-box{margin-top:20px;background:rgba(200,168,75,0.04);border:1px solid rgba(200,168,75,0.1);border-radius:10px;padding:16px 20px;font-size:13px;color:#d0d0d8;line-height:1.6}` : ""}
+.cta-section{padding:36px 56px;text-align:center;background:linear-gradient(135deg,#0c0c1a,#141428)}
+.cta-box{background:linear-gradient(135deg,rgba(200,168,75,0.08),rgba(200,168,75,0.02));border:2px solid rgba(200,168,75,0.2);border-radius:16px;padding:32px;max-width:500px;margin:0 auto}
+.cta-box h3{font-size:18px;font-weight:700;color:#c8a84b;margin-bottom:8px}
+.cta-box p{font-size:13px;color:#8b8b9e;margin-bottom:16px}
+.cta-btn{display:inline-block;background:linear-gradient(135deg,#c8a84b,#dfc06a);color:#0a0a14;padding:12px 32px;border-radius:24px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.5px}
+.doc-footer{padding:24px 56px;background:#08080e;border-top:1px solid rgba(200,168,75,0.08);text-align:center;font-size:11px;color:#666}
+.doc-footer .brand-foot{color:#c8a84b;font-weight:600}
+@media print{body{background:white;color:#111}.budget-doc{background:white}.doc-header{background:#f8f6f0!important;border-color:#c8a84b}.doc-header::before,.doc-header::after{display:none}.brand-logo{color:#c8a84b}.brand-logo span{color:#333}.budget-badge{background:#c8a84b}.client-grid{background:#fafafa}.client-card{background:#f5f5f5;border-color:#eee}.services-section{background:white}.cat-block{background:#fafafa;border-color:#eee}.cat-header{background:#f5f5f5}.totals-section{background:#f8f6f0}thead th{color:#666;border-color:#ddd}tbody td{color:#333;border-color:#eee}.svc-name{color:#111}.total-line{color:#333}.total-line.grand{color:#c8a84b;border-color:#c8a84b}.conditions-section{background:#fafafa}.cond-item{background:#f5f5f5;border-color:#eee}.doc-footer{background:#fafafa}}
 </style></head><body>
-${buildCoverPage({ reportTitle: `Presupuesto ${budgetId}`, reportSubtitle: "Shopy Crafter — Agencia de Optimización IA", companyName: clientName, date: budgetDate, template: "prestige" })}
-<div class="budget">
-  <div class="header">
-    <div class="logo">Shopy <span>Crafter</span></div>
-    <div class="badge">PRESUPUESTO ${budgetId}</div>
-    <p style="color:#888;font-size:13px;margin-top:12px">Agencia de Optimización IA para Shopify</p>
+${buildCoverPage({ reportTitle: `Presupuesto Profesional`, reportSubtitle: `${budgetId} — ${projectName}`, companyName: clientName, date: budgetDate, template: "prestige" })}
+<div class="budget-doc">
+  <div class="doc-header">
+    <div class="brand-row">
+      <div>
+        <div class="brand-logo">Shopy <span>Crafter</span></div>
+        <div class="brand-tag">Agencia de Optimización IA para Shopify</div>
+      </div>
+      <div class="budget-badge">PRESUPUESTO ${budgetId}</div>
+    </div>
+    <div class="doc-title">
+      <h1>${projectName}</h1>
+      <div class="subtitle">Presupuesto personalizado · ${budgetDate} · Válido ${validDays} días</div>
+    </div>
   </div>
-  <div class="client-info">
-    <div class="info-block"><h4>Cliente</h4><p>${clientName}</p></div>
-    <div class="info-block"><h4>Proyecto</h4><p>${projectName}</p></div>
-    <div class="info-block"><h4>Fecha</h4><p>${budgetDate}</p></div>
-    <div class="info-block"><h4>Validez</h4><p>30 días</p></div>
+
+  <div class="client-grid">
+    <div class="client-card">
+      <h4>Datos del Cliente</h4>
+      <div class="field"><span class="label">Nombre</span><span class="value">${clientName}</span></div>
+      ${clientCompany ? `<div class="field"><span class="label">Empresa</span><span class="value">${clientCompany}</span></div>` : ""}
+      ${clientEmail ? `<div class="field"><span class="label">Email</span><span class="value">${clientEmail}</span></div>` : ""}
+      ${clientPhone ? `<div class="field"><span class="label">Teléfono</span><span class="value">${clientPhone}</span></div>` : ""}
+    </div>
+    <div class="client-card">
+      <h4>Detalles del Presupuesto</h4>
+      <div class="field"><span class="label">Referencia</span><span class="value">${budgetId}</span></div>
+      <div class="field"><span class="label">Fecha</span><span class="value">${budgetDate}</span></div>
+      <div class="field"><span class="label">Entrega estimada</span><span class="value">${deliveryDays} días laborables</span></div>
+      <div class="field"><span class="label">Validez</span><span class="value">${validDays} días</span></div>
+    </div>
   </div>
-  <div style="padding:0 40px 24px">
-    <table>
-      <thead><tr>
-        <th style="width:45%">Servicio</th><th style="text-align:center">Cantidad</th>
-        <th style="text-align:right">Precio/ud</th><th style="text-align:right">Subtotal</th>
-      </tr></thead>
-      <tbody>${serviceRows}</tbody>
-    </table>
+
+  <div class="services-section">
+    <div class="section-title">Servicios Contratados</div>
+    ${categoryBlocks}
   </div>
-  <div class="totals">
-    ${subtotalOneTime > 0 ? `<div class="total-row"><span>Servicios puntuales</span><span>€${subtotalOneTime.toFixed(2)}</span></div>` : ''}
-    ${subtotalRecurring > 0 ? `<div class="total-row"><span>Servicios recurrentes</span><span>€${subtotalRecurring.toFixed(2)}/mes</span></div>` : ''}
-    ${(discount as number) > 0 ? `<div class="total-row" style="color:#4ade80"><span>Descuento (${discount}%)</span><span>-€${discountAmount.toFixed(2)}</span></div>` : ''}
-    <div class="total-row"><span>Subtotal sin IVA</span><span>€${totalAfterDiscount.toFixed(2)}</span></div>
-    <div class="total-row"><span>IVA (21%)</span><span>€${iva.toFixed(2)}</span></div>
-    <div class="total-row final"><span>TOTAL</span><span>€${totalFinal.toFixed(2)}</span></div>
+
+  <div class="totals-section">
+    <div class="section-title">Resumen Económico</div>
+    <div class="totals-grid">
+      ${subtotalOneTime > 0 ? `<div class="total-line"><span>Servicios puntuales</span><span>€${subtotalOneTime.toFixed(2)}</span></div>` : ''}
+      ${subtotalRecurring > 0 ? `<div class="total-line"><span>Servicios recurrentes</span><span>€${subtotalRecurring.toFixed(2)}/mes</span></div>` : ''}
+      ${(discount as number) > 0 ? `<div class="total-line discount"><span>Descuento especial (${discount}%)</span><span>-€${discountAmount.toFixed(2)}</span></div>` : ''}
+      <div class="total-line"><span>Subtotal sin IVA</span><span>€${totalAfterDiscount.toFixed(2)}</span></div>
+      <div class="total-line iva"><span>IVA (21%)</span><span>€${iva.toFixed(2)}</span></div>
+      <div class="total-line grand"><span>TOTAL</span><span>€${totalFinal.toFixed(2)}</span></div>
+      ${(discount as number) > 0 ? `<div class="savings-note">💰 Ahorro total aplicado: €${discountAmount.toFixed(2)}</div>` : ''}
+    </div>
   </div>
-  <div class="conditions">
-    <strong style="color:#c8a84b">Condiciones:</strong><br>
-    • Plazo de entrega estimado: ${deliveryDays} días laborables<br>
-    • Forma de pago: 50% al inicio, 50% a la entrega<br>
-    • Presupuesto válido durante 30 días desde la fecha de emisión<br>
-    • Incluye 1 ronda de revisiones. Revisiones adicionales: €47/hora<br>
-    • Todos los precios en EUR. IVA incluido en el total final<br>
-    ${notes ? `• Notas: ${notes}<br>` : ''}
+
+  <div class="conditions-section">
+    <div class="section-title">Condiciones</div>
+    <div class="cond-grid">
+      <div class="cond-item"><span class="cond-icon">💳</span><div class="cond-text"><strong>Forma de pago</strong>${paymentTerms}</div></div>
+      <div class="cond-item"><span class="cond-icon">⏱️</span><div class="cond-text"><strong>Plazo de entrega</strong>${deliveryDays} días laborables desde la aceptación</div></div>
+      <div class="cond-item"><span class="cond-icon">🔄</span><div class="cond-text"><strong>Revisiones incluidas</strong>1 ronda de revisiones. Adicionales: €47/hora</div></div>
+      <div class="cond-item"><span class="cond-icon">📋</span><div class="cond-text"><strong>Validez</strong>Presupuesto válido durante ${validDays} días desde ${budgetDate}</div></div>
+      <div class="cond-item"><span class="cond-icon">🔒</span><div class="cond-text"><strong>Confidencialidad</strong>Este documento es confidencial entre las partes</div></div>
+      <div class="cond-item"><span class="cond-icon">💶</span><div class="cond-text"><strong>Moneda</strong>Todos los importes en EUR. IVA 21% incluido en total</div></div>
+    </div>
+    ${notes ? `<div class="notes-box"><strong style="color:#c8a84b">📝 Notas:</strong><br>${notes}</div>` : ""}
   </div>
-  <div class="footer">
-    Shopy Crafter · shopycrafter.com · craftershopy@gmail.com<br>
-    Agencia de Optimización IA para Shopify · © ${new Date().getFullYear()}
+
+  <div class="cta-section">
+    <div class="cta-box">
+      <h3>¿Listo para empezar?</h3>
+      <p>Acepta este presupuesto para comenzar a trabajar en tu proyecto</p>
+      <a class="cta-btn" href="mailto:craftershopy@gmail.com?subject=Acepto presupuesto ${budgetId}">Aceptar Presupuesto</a>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span class="brand-foot">Shopy Crafter</span> · shopycrafter.com · craftershopy@gmail.com<br>
+    Agencia de Optimización IA para Shopify · NIF: [A completar] · © ${new Date().getFullYear()}<br>
+    <span style="color:#444;font-size:10px">Documento generado automáticamente · ${budgetId}</span>
   </div>
 </div></body></html>`;
 
@@ -7445,8 +7576,7 @@ ${buildCoverPage({ reportTitle: `Presupuesto ${budgetId}`, reportSubtitle: "Shop
                 body: JSON.stringify({
                   title: `Presupuesto ${budgetId} — ${clientName}`,
                   content: budgetHtml,
-                  type: "budget",
-                  format: "html",
+                  fileType: "budget",
                 }),
               });
             } catch {}
@@ -7461,19 +7591,295 @@ ${buildCoverPage({ reportTitle: `Presupuesto ${budgetId}`, reportSubtitle: "Shop
             totalFinal: totalFinal.toFixed(2),
             html: budgetHtml,
             message: `💼 **Presupuesto ${budgetId} generado**\n\n` +
-              `**Cliente:** ${clientName}\n**Proyecto:** ${projectName}\n\n` +
-              `| Servicio | Cant. | Precio/ud | Subtotal |\n|---|---|---|---|\n` +
-              (services as Array<{name: string, quantity: number, unitPrice: number}>).map((s) => {
-                const n = String(s.name || "Servicio").slice(0, 200).replace(/[|]/g, "\\|");
-                const q = clampNum(s.quantity, 0, 9999, 1);
-                const p = clampNum(s.unitPrice, 0, 999999, 0);
-                return `| ${n} | ${q} | €${p.toFixed(2)} | €${(q * p).toFixed(2)} |`;
+              `**Cliente:** ${clientName}${clientCompany ? ` (${clientCompany})` : ""}\n**Proyecto:** ${projectName}\n\n` +
+              `| Servicio | Nivel | Cant. | Precio/ud | Subtotal |\n|---|---|---|---|---|\n` +
+              parsedServices.map((s) => {
+                return `| ${s.name.replace(/[|]/g, "\\|")} | ${s.level || "Estándar"} | ${s.qty} | €${s.price.toFixed(2)} | €${s.sub.toFixed(2)}${s.recurring ? "/mes" : ""} |`;
               }).join("\n") +
-              `\n\n${discount > 0 ? `**Descuento ${discount}%:** -€${discountAmount.toFixed(2)}\n` : ''}` +
-              `**Subtotal:** €${totalAfterDiscount.toFixed(2)}\n**IVA (21%):** €${iva.toFixed(2)}\n**TOTAL:** €${totalFinal.toFixed(2)}\n\n` +
-              `📄 Presupuesto guardado en el Vault como documento descargable.\n⏱️ Entrega: ${deliveryDays} días laborables · Validez: 30 días`
+              `\n\n${discount > 0 ? `🏷️ **Descuento ${discount}%:** -€${discountAmount.toFixed(2)}\n` : ''}` +
+              `**Subtotal:** €${totalAfterDiscount.toFixed(2)}\n**IVA (21%):** €${iva.toFixed(2)}\n**💰 TOTAL:** €${totalFinal.toFixed(2)}\n\n` +
+              `📄 Presupuesto guardado en el Vault — descargable en HTML y PDF.\n⏱️ Entrega: ${deliveryDays} días laborables · Validez: ${validDays} días`
           };
         } catch (err) { result = { error: true, message: `❌ Error generando presupuesto: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "generate_platform_report": {
+        try {
+          const escHtml = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+          const clientName = escHtml(String(params?.clientName || "Shopy Crafter").slice(0, 200));
+          const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+          const reportId = `CAP-${Date.now().toString(36).toUpperCase()}`;
+
+          const platformReportHtml = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Informe de Capacidades — Shopy Crafter</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#08080e;color:#e0e0e0}
+.report{max-width:900px;margin:0 auto;background:#0a0a14}
+.r-header{padding:48px 56px;background:linear-gradient(135deg,#0c0c1a,#141428);border-bottom:3px solid #c8a84b;position:relative;overflow:hidden}
+.r-header::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(200,168,75,0.08),transparent 70%);border-radius:50%}
+.r-brand{font-size:32px;font-weight:800;color:#c8a84b;letter-spacing:-1px;position:relative;z-index:1}
+.r-brand span{color:#fff;font-weight:300}
+.r-tag{font-size:11px;color:#8b8b9e;letter-spacing:2px;text-transform:uppercase;margin-top:4px;position:relative;z-index:1}
+.r-title{margin-top:28px;position:relative;z-index:1}
+.r-title h1{font-size:26px;font-weight:800;color:#fff}
+.r-title .sub{font-size:13px;color:#8b8b9e;margin-top:6px}
+.section{padding:36px 56px;border-bottom:1px solid rgba(200,168,75,0.06)}
+.s-title{font-size:18px;font-weight:700;color:#c8a84b;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.s-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(200,168,75,0.3),transparent)}
+.cap-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cap-card{background:#0e0e1c;border:1px solid rgba(200,168,75,0.08);border-radius:12px;padding:18px 20px;transition:border-color .2s}
+.cap-card:hover{border-color:rgba(200,168,75,0.2)}
+.cap-card .icon{font-size:22px;margin-bottom:8px}
+.cap-card h4{font-size:14px;font-weight:700;color:#e0e0e0;margin-bottom:4px}
+.cap-card p{font-size:12px;color:#8b8b9e;line-height:1.5}
+.cap-card .price{display:inline-block;margin-top:8px;background:rgba(200,168,75,0.1);color:#c8a84b;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.full-table{width:100%;border-collapse:collapse;margin-top:12px}
+.full-table thead th{padding:10px 14px;text-align:left;color:#c8a84b;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid rgba(200,168,75,0.15);font-weight:700}
+.full-table tbody td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.02);font-size:12px;color:#d0d0d8}
+.full-table tbody tr:hover td{background:rgba(200,168,75,0.02)}
+.tier-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.t1{background:rgba(200,168,75,0.1);color:#c8a84b}
+.t2{background:rgba(59,130,246,0.1);color:#60a5fa}
+.t3{background:rgba(168,85,247,0.1);color:#c084fc}
+.highlight-box{background:rgba(200,168,75,0.04);border:1px solid rgba(200,168,75,0.12);border-radius:12px;padding:20px 24px;margin:16px 0}
+.highlight-box h4{color:#c8a84b;font-size:14px;margin-bottom:8px}
+.highlight-box ul{list-style:none;padding:0}
+.highlight-box li{padding:4px 0;font-size:13px;color:#d0d0d8}
+.highlight-box li::before{content:'✓ ';color:#4ade80;font-weight:700}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:16px 0}
+.stat-card{background:#111120;border:1px solid rgba(200,168,75,0.08);border-radius:10px;padding:16px;text-align:center}
+.stat-card .num{font-size:28px;font-weight:800;color:#c8a84b}
+.stat-card .lab{font-size:10px;color:#8b8b9e;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.r-footer{padding:24px 56px;background:#08080e;border-top:1px solid rgba(200,168,75,0.08);text-align:center;font-size:11px;color:#666}
+@media print{body{background:white;color:#111}.report{background:white}.r-header{background:#f8f6f0!important;border-color:#c8a84b}.r-brand{color:#c8a84b}.r-brand span{color:#333}.section{background:white}.cap-card{background:#fafafa;border-color:#eee}.full-table thead th{color:#666;border-color:#ddd}.full-table tbody td{color:#333;border-color:#eee}.highlight-box{background:#f9f9f9;border-color:#ddd}.stat-card{background:#f5f5f5;border-color:#eee}}
+</style></head><body>
+${buildCoverPage({ reportTitle: "Informe de Capacidades", reportSubtitle: "Catálogo Completo de Servicios y Herramientas IA", companyName: clientName, date: reportDate, template: "prestige" })}
+<div class="report">
+  <div class="r-header">
+    <div class="r-brand">Shopy <span>Crafter</span></div>
+    <div class="r-tag">Agencia de Optimización IA para Shopify</div>
+    <div class="r-title">
+      <h1>Informe Completo de Capacidades</h1>
+      <div class="sub">Todos los servicios, herramientas y precios · ${reportDate} · Ref: ${reportId}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">Resumen de la Plataforma</div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">130+</div><div class="lab">Acciones IA</div></div>
+      <div class="stat-card"><div class="num">6</div><div class="lab">Informes Especializados</div></div>
+      <div class="stat-card"><div class="num">57+</div><div class="lab">Servicios en Catálogo</div></div>
+      <div class="stat-card"><div class="num">3</div><div class="lab">Niveles de Profundidad</div></div>
+    </div>
+    <div class="highlight-box">
+      <h4>¿Qué es Shopy Crafter?</h4>
+      <p style="font-size:13px;color:#d0d0d8;line-height:1.6;margin-bottom:12px">
+        Shopy Crafter es una agencia de optimización IA especializada en tiendas Shopify. Combinamos inteligencia artificial avanzada (Claude AI, DALL-E 3, análisis de datos) con experiencia en eCommerce para ofrecer servicios que PRODUCEN resultados listos para usar — no solo recomendaciones.
+      </p>
+      <ul>
+        <li>IA que produce contenido TERMINADO: textos, CSS, emails, schemas</li>
+        <li>Integración directa con Shopify API para aplicar cambios al instante</li>
+        <li>Informes profesionales descargables en HTML y PDF</li>
+        <li>Chatbot IA con 130+ acciones especializadas</li>
+        <li>Sistema de aprendizaje continuo 24/7</li>
+        <li>Presupuestos automáticos con IVA español</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">🎨 Servicios de Diseño Web / Theme Shopify</div>
+    <div class="cap-grid">
+      <div class="cap-card"><div class="icon">🖌️</div><h4>Diseño CSS Completo del Theme</h4><p>Rediseño total del CSS/SCSS de la tienda Shopify con estilo profesional y responsive</p><div class="price">€497 — €997</div></div>
+      <div class="cap-card"><div class="icon">🏠</div><h4>Rediseño Homepage</h4><p>Hero section, secciones de contenido, footer, navegación y CTA</p><div class="price">€347</div></div>
+      <div class="cap-card"><div class="icon">📐</div><h4>Secciones Liquid Custom</h4><p>Diseño y desarrollo de secciones personalizadas para Shopify</p><div class="price">€97/sección</div></div>
+      <div class="cap-card"><div class="icon">📱</div><h4>Responsive Fixes</h4><p>Optimización móvil/tablet completa de la tienda</p><div class="price">€147</div></div>
+      <div class="cap-card"><div class="icon">📄</div><h4>Páginas Personalizadas</h4><p>About Us, FAQ, Contact, Landing pages</p><div class="price">€97/página</div></div>
+      <div class="cap-card"><div class="icon">⚙️</div><h4>Configuración Theme</h4><p>Settings completos: colores, tipografía, logo, menús, footer</p><div class="price">€97</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">📦 Servicios de Productos</div>
+    <table class="full-table">
+      <thead><tr><th>Servicio</th><th>Descripción</th><th style="text-align:right">Precio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Producto completo desde cero</strong></td><td>Título SEO + descripción 800-1200 palabras + tags + categoría + variantes + 3 imágenes IA</td><td style="text-align:right;color:#c8a84b;font-weight:600">€47/ud</td></tr>
+        <tr><td><strong>Rediseño TOTAL producto</strong></td><td>Título + descripción + SEO + imágenes nuevas + categoría + variantes + stock</td><td style="text-align:right;color:#c8a84b;font-weight:600">€29/ud</td></tr>
+        <tr><td><strong>Rediseño PARCIAL</strong></td><td>Solo título + descripción + SEO (sin imágenes)</td><td style="text-align:right;color:#c8a84b;font-weight:600">€14.90/ud</td></tr>
+        <tr><td><strong>Solo imágenes nuevas</strong></td><td>3 imágenes IA profesionales por producto</td><td style="text-align:right;color:#c8a84b;font-weight:600">€9.90/ud</td></tr>
+        <tr><td><strong>Solo SEO</strong></td><td>Meta title + meta description + alt texts + tags</td><td style="text-align:right;color:#c8a84b;font-weight:600">€9.90/ud</td></tr>
+        <tr><td><strong>Pack 5 Productos</strong></td><td>5 productos completos con todo incluido</td><td style="text-align:right;color:#c8a84b;font-weight:600">€197</td></tr>
+        <tr><td><strong>Pack 10 Productos</strong></td><td>10 productos + SEO + copywriting + imágenes</td><td style="text-align:right;color:#c8a84b;font-weight:600">€347</td></tr>
+        <tr><td><strong>Pack 20 Productos</strong></td><td>Catálogo completo profesional</td><td style="text-align:right;color:#c8a84b;font-weight:600">€697</td></tr>
+        <tr><td><strong>Pack 30 Productos</strong></td><td>Catálogo enterprise completo</td><td style="text-align:right;color:#c8a84b;font-weight:600">€997</td></tr>
+        <tr><td><strong>Pack 50 Productos</strong></td><td>Gran catálogo con descuento volumen</td><td style="text-align:right;color:#c8a84b;font-weight:600">€1,497</td></tr>
+      </tbody>
+    </table>
+    <div class="highlight-box" style="margin-top:16px">
+      <h4>Descuentos automáticos por volumen</h4>
+      <ul>
+        <li>+20 productos → 15% descuento en creación/rediseño</li>
+        <li>+50 productos → 25% descuento en creación/rediseño</li>
+        <li>+100 productos → 35% descuento en creación/rediseño</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">📊 Informes Especializados — 3 Niveles</div>
+    <table class="full-table">
+      <thead><tr><th>Informe</th><th style="text-align:center"><span class="tier-badge t1">Nivel 1</span><br>Diagnóstico</th><th style="text-align:center"><span class="tier-badge t2">Nivel 2</span><br>+ Guía Impl.</th><th style="text-align:center"><span class="tier-badge t3">Nivel 3</span><br>+ Contenido Prod.</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Auditoría SEO Completa</strong><br><small style="color:#8b8b9e">16 criterios Semrush-level</small></td><td style="text-align:center">€197</td><td style="text-align:center;color:#60a5fa">€347</td><td style="text-align:center;color:#c084fc">€497</td></tr>
+        <tr><td><strong>Auditoría Shopify 360°</strong><br><small style="color:#8b8b9e">Productos + SEO + COGS + configuración</small></td><td style="text-align:center">€197</td><td style="text-align:center;color:#60a5fa">€347</td><td style="text-align:center;color:#c084fc">€497</td></tr>
+        <tr><td><strong>Informe Competidores</strong><br><small style="color:#8b8b9e">Análisis estratégico competencia</small></td><td style="text-align:center">€97</td><td style="text-align:center;color:#60a5fa">€177</td><td style="text-align:center;color:#c084fc">€247</td></tr>
+        <tr><td><strong>Informe Pricing y Márgenes</strong><br><small style="color:#8b8b9e">COGS real, márgenes, precios</small></td><td style="text-align:center">€97</td><td style="text-align:center;color:#60a5fa">€177</td><td style="text-align:center;color:#c084fc">€247</td></tr>
+        <tr><td><strong>Informe Inventario</strong><br><small style="color:#8b8b9e">Stock, rotación, proveedores</small></td><td style="text-align:center">€97</td><td style="text-align:center;color:#60a5fa">€177</td><td style="text-align:center;color:#c084fc">€247</td></tr>
+        <tr><td><strong>Informe Consistencia Visual</strong><br><small style="color:#8b8b9e">Marca, colores, tipografía</small></td><td style="text-align:center">€97</td><td style="text-align:center;color:#60a5fa">€177</td><td style="text-align:center;color:#c084fc">€347</td></tr>
+        <tr><td><strong>Informe Revenue y Crecimiento</strong><br><small style="color:#8b8b9e">Retención, email, funnels</small></td><td style="text-align:center">€127</td><td style="text-align:center;color:#60a5fa">€197</td><td style="text-align:center;color:#c084fc">€397</td></tr>
+        <tr><td><strong>Informe Proyección Ventas</strong><br><small style="color:#8b8b9e">Forecast 3-6 meses</small></td><td style="text-align:center">€127</td><td style="text-align:center;color:#60a5fa">€197</td><td style="text-align:center;color:#c084fc">€247</td></tr>
+      </tbody>
+    </table>
+    <div class="highlight-box" style="margin-top:16px">
+      <h4>Packs de 6 informes completos</h4>
+      <ul>
+        <li>Pack 6 informes Nivel 1 (solo diagnóstico): €697 <small style="color:#4ade80">(ahorro €112)</small></li>
+        <li>Pack 6 informes Nivel 2 (+ guías implementación): €1,197 <small style="color:#4ade80">(ahorro €285)</small></li>
+        <li>Pack 6 informes Nivel 3 (+ contenido producido): €1,797 <small style="color:#4ade80">(ahorro €537)</small></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">📸 Servicios de Imágenes IA</div>
+    <div class="cap-grid">
+      <div class="cap-card"><div class="icon">🎨</div><h4>Imágenes IA por Producto</h4><p>3 imágenes profesionales (Hero, Lifestyle, Detalle) generadas con DALL-E 3</p><div class="price">€9.90/producto</div></div>
+      <div class="cap-card"><div class="icon">📷</div><h4>Pack 30 Imágenes</h4><p>Sesión completa de 30 fotos profesionales IA</p><div class="price">€89</div></div>
+      <div class="cap-card"><div class="icon">🌟</div><h4>Photoshoot Pro 120 imgs</h4><p>Sesión completa: 4 variantes × 30 SKUs</p><div class="price">€497</div></div>
+      <div class="cap-card"><div class="icon">👗</div><h4>Virtual Try-On</h4><p>Probador virtual con modelo IA para ropa y accesorios</p><div class="price">€14.90/imagen</div></div>
+      <div class="cap-card"><div class="icon">🔄</div><h4>Imágenes desde Referencia</h4><p>Mejorar/regenerar imágenes a partir de foto real del producto</p><div class="price">€14.90/imagen</div></div>
+      <div class="cap-card"><div class="icon">⚡</div><h4>Generación Masiva</h4><p>Bulk: imágenes para todos los productos de una vez</p><div class="price">€9.90/producto</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">🔍 Servicios SEO y Marketing</div>
+    <table class="full-table">
+      <thead><tr><th>Servicio</th><th>Qué incluye</th><th style="text-align:right">Precio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Implementación SEO Completa</strong></td><td>Meta tags + Schema JSON-LD + keywords + alt texts para toda la tienda</td><td style="text-align:right;color:#c8a84b;font-weight:600">€147</td></tr>
+        <tr><td><strong>Blog Strategy + 5 Artículos</strong></td><td>Estrategia de contenido + 5 artículos SEO optimizados</td><td style="text-align:right;color:#c8a84b;font-weight:600">€247</td></tr>
+        <tr><td><strong>Keyword Intelligence Report</strong></td><td>Investigación de palabras clave con volumen y dificultad</td><td style="text-align:right;color:#c8a84b;font-weight:600">€97</td></tr>
+        <tr><td><strong>Setup Google Analytics + Pixel</strong></td><td>Configuración GA4 + Meta Pixel + eventos</td><td style="text-align:right;color:#c8a84b;font-weight:600">€97</td></tr>
+        <tr><td><strong>Email Marketing Setup</strong></td><td>Klaviyo + 4 flujos automáticos completos</td><td style="text-align:right;color:#c8a84b;font-weight:600">€197</td></tr>
+        <tr><td><strong>30 Posts Redes Sociales</strong></td><td>Contenido profesional para Instagram/TikTok</td><td style="text-align:right;color:#c8a84b;font-weight:600">€89</td></tr>
+        <tr><td><strong>Campañas Virales 360°</strong></td><td>Instagram + TikTok marketing automatizado</td><td style="text-align:right;color:#c8a84b;font-weight:600">desde €147</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="s-title">🤖 Acciones del Chatbot IA (130+)</div>
+    <div class="cap-grid">
+      <div class="cap-card"><div class="icon">📦</div><h4>Gestión de Productos</h4><p>Crear, editar, rediseñar, eliminar, buscar productos. Importación masiva, variantes, precios, tags, colecciones.</p></div>
+      <div class="cap-card"><div class="icon">🎨</div><h4>Diseño y Theme</h4><p>Editar CSS, Liquid, secciones, settings del theme. Crear secciones custom. Auditoría de theme.</p></div>
+      <div class="cap-card"><div class="icon">📊</div><h4>Análisis e Informes</h4><p>Generar auditorías, informes de competidores, pricing, proyecciones, inventario, revenue.</p></div>
+      <div class="cap-card"><div class="icon">📸</div><h4>Imágenes y Media</h4><p>Generar imágenes IA, virtual try-on, bulk images, imágenes desde referencia, optimización alt texts.</p></div>
+      <div class="cap-card"><div class="icon">📧</div><h4>Email Marketing</h4><p>Generar emails, newsletters, campañas, flujos automáticos, secuencias de retención.</p></div>
+      <div class="cap-card"><div class="icon">💰</div><h4>Presupuestos y Pricing</h4><p>Calcular precios, generar presupuestos PDF, propuestas comerciales, auditar oferta.</p></div>
+      <div class="cap-card"><div class="icon">📦</div><h4>Inventario y Ventas</h4><p>Sync stock, alertas, analytics ventas, historial clientes, informes por variante/talla/color.</p></div>
+      <div class="cap-card"><div class="icon">🔍</div><h4>SEO Avanzado</h4><p>Meta tags, schemas JSON-LD, keywords, PageSpeed, análisis competencia, bulk optimize.</p></div>
+      <div class="cap-card"><div class="icon">🏪</div><h4>Análisis Externo</h4><p>Analizar tiendas de competidores sin conexión Shopify. Pre-informes para captación de clientes.</p></div>
+      <div class="cap-card"><div class="icon">📋</div><h4>CMS y Contenido</h4><p>Editar textos de la landing, hero, pricing, testimonios, features. Batch updates.</p></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="s-title">🎯 Packs Combinados</div>
+    <table class="full-table">
+      <thead><tr><th>Pack</th><th>Incluye</th><th style="text-align:right">Precio</th><th style="text-align:right;color:#4ade80">Ahorro</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Pack Setup Básico</strong></td><td>Theme CSS + 5 productos + SEO</td><td style="text-align:right;color:#c8a84b;font-weight:600">€797</td><td style="text-align:right;color:#4ade80">€91</td></tr>
+        <tr><td><strong>Pack Lanzamiento</strong></td><td>Theme + 10 productos + SEO + Email</td><td style="text-align:right;color:#c8a84b;font-weight:600">€1,247</td><td style="text-align:right;color:#4ade80">€184</td></tr>
+        <tr><td><strong>Pack Profesional</strong></td><td>Theme + 20 prods + SEO + Email + Auditoría + Competidores</td><td style="text-align:right;color:#c8a84b;font-weight:600">€1,997</td><td style="text-align:right;color:#4ade80">€387</td></tr>
+        <tr><td><strong>Pack Enterprise</strong></td><td>Theme custom + 30 prods + SEO completo + Email + Auditoría + 3 informes</td><td style="text-align:right;color:#c8a84b;font-weight:600">€2,997</td><td style="text-align:right;color:#4ade80">€594</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="s-title">⏱️ Tarifas Horarias (Servicios No Catalogados)</div>
+    <table class="full-table">
+      <thead><tr><th>Tipo de Trabajo</th><th>Descripción</th><th style="text-align:right">Tarifa/hora</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Trabajo IA Automatizado</strong></td><td>Generación de contenido, imágenes, SEO con IA</td><td style="text-align:right;color:#c8a84b;font-weight:600">€47/h</td></tr>
+        <tr><td><strong>Consultoría Estratégica</strong></td><td>Análisis, planificación, informes personalizados</td><td style="text-align:right;color:#c8a84b;font-weight:600">€97/h</td></tr>
+        <tr><td><strong>Diseño Web/Theme</strong></td><td>CSS, Liquid, secciones, diseño visual</td><td style="text-align:right;color:#c8a84b;font-weight:600">€97/h</td></tr>
+        <tr><td><strong>Desarrollo Custom</strong></td><td>APIs, integraciones, código personalizado</td><td style="text-align:right;color:#c8a84b;font-weight:600">€127/h</td></tr>
+        <tr><td><strong>Dirección Creativa</strong></td><td>Branding, fotografía, vídeo, dirección artística</td><td style="text-align:right;color:#c8a84b;font-weight:600">€77/h</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" style="background:linear-gradient(135deg,#0c0c1a,#141428)">
+    <div class="s-title">💶 Política de Precios</div>
+    <div class="highlight-box">
+      <h4>Información Fiscal</h4>
+      <ul>
+        <li>Todos los precios están expresados en EUR (€)</li>
+        <li>IVA 21% (España) se añade al subtotal en todos los presupuestos</li>
+        <li>Clientes fuera de la UE: posible exención IVA (intracomunitario/exportación)</li>
+        <li>Forma de pago estándar: 50% al inicio, 50% a la entrega</li>
+        <li>Presupuestos válidos 30 días desde la fecha de emisión</li>
+        <li>Descuento fidelización -5% en proyectos superiores a €2,000</li>
+        <li>Pack de 3+ informes: descuento automático -10%</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="r-footer">
+    <span style="color:#c8a84b;font-weight:600">Shopy Crafter</span> · shopycrafter.com · craftershopy@gmail.com<br>
+    Agencia de Optimización IA para Shopify · © ${new Date().getFullYear()}<br>
+    <span style="color:#444;font-size:10px">Informe de capacidades ${reportId} · Generado el ${reportDate}</span>
+  </div>
+</div></body></html>`;
+
+          const activeProjectId = params?.projectId || null;
+          if (activeProjectId) {
+            try {
+              const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+              await fetch(`${baseUrl}/api/projects/${activeProjectId}/vault/save-report`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+                body: JSON.stringify({
+                  title: `Informe de Capacidades — ${reportId}`,
+                  content: platformReportHtml,
+                  fileType: "platform_report",
+                }),
+              });
+            } catch {}
+          }
+
+          result = {
+            reportId,
+            html: platformReportHtml,
+            message: `📋 **Informe de Capacidades de la Plataforma generado** (${reportId})\n\n` +
+              `El informe incluye:\n` +
+              `• 🤖 **130+ acciones del chatbot IA** documentadas\n` +
+              `• 📊 **6 informes especializados** con 3 niveles de profundidad\n` +
+              `• 💰 **57+ servicios** con precios reales del catálogo\n` +
+              `• 📦 Packs combinados con ahorros\n` +
+              `• ⏱️ Tarifas horarias para servicios custom\n` +
+              `• 💶 Política de precios, IVA y descuentos\n\n` +
+              `📄 Guardado en el Vault — descargable en HTML y PDF.`
+          };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
 
