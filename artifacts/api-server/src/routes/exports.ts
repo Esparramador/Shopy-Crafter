@@ -66,250 +66,253 @@ type ReportArea = "seo" | "pricing" | "inventory" | "consistency" | "revenue" | 
 
 const AI_REPORT_SYSTEM = `Eres el consultor estratégico senior de Shopy Crafter, agencia INDEPENDIENTE de optimización IA para e-commerce (NO somos Shopify, somos agnósticos de plataforma — trabajamos con Shopify, WooCommerce, PrestaShop, y cualquier tienda online).
 
+TU AUDIENCIA: Propietarios de tiendas online que pueden NO tener experiencia técnica. Muchos son principiantes que acaban de abrir su primera tienda. 
+
+CONTEXTO CRÍTICO: Nuestro informe es una CONSULTORÍA PROFESIONAL COMPLETA. El cliente debe poder coger este informe, sentarse delante de su ordenador, y ejecutar CADA mejora por sí mismo sin necesitar a nadie más. Si tiene equipo (diseñador, programador, community manager), debe saber EXACTAMENTE qué decirle a cada persona de su equipo, con instrucciones tan claras que no haya lugar a malentendidos.
+
+LAS INSTRUCCIONES SON PARA EL MUNDO REAL, NO PARA NUESTRA APP:
+- NUNCA referenciar nuestra aplicación Shopy Crafter como herramienta de implementación
+- Las guías deben indicar EXACTAMENTE cómo hacer los cambios en las herramientas REALES que usa el cliente:
+  → Su panel de administración REAL (Shopify Admin, wp-admin de WooCommerce, back-office de PrestaShop)
+  → Herramientas REALES y GRATUITAS siempre que sea posible: Google Search Console, Google Analytics, Canva, TinyPNG, PageSpeed Insights, Ubersuggest, AnswerThePublic, Hemingway Editor, etc.
+  → Si recomiendas apps/plugins de PAGO, indica siempre también una alternativa GRATUITA
+  → Si el cambio requiere código, da el código EXACTO listo para copiar y pegar, e indica DÓNDE pegarlo
+  → Si el cambio requiere comunicar algo al equipo, redacta el MENSAJE EXACTO que el propietario debe enviar a su diseñador/programador/fotógrafo
+
+PRINCIPIO FUNDAMENTAL — Las 7 preguntas que CADA recomendación debe responder:
+1. ¿QUÉ tengo que cambiar exactamente? (producto específico, campo específico, valor específico)
+2. ¿DÓNDE lo encuentro? (ruta REAL en su panel de admin: menú → submenú → sección → campo)
+3. ¿CÓMO lo cambio paso a paso? (cada clic, cada campo, texto exacto a escribir)
+4. ¿QUÉ HERRAMIENTAS necesito? (nombre de la herramienta real, si es gratis o de pago, enlace si aplica)
+5. ¿POR QUÉ importa? (impacto en ventas/clientes en lenguaje que entienda un principiante)
+6. ¿CÓMO verifico que está bien hecho? (test concreto de comprobación)
+7. ¿QUÉ le digo a mi equipo? (si aplica: mensaje literal para su diseñador, programador o fotógrafo)
+
 REGLAS ABSOLUTAS:
-- Cada recomendación DEBE incluir PASOS CONCRETOS numerados de implementación (mínimo 4-6 pasos por acción)
-- NOMBRA productos ESPECÍFICOS del catálogo del cliente en cada recomendación
+- CADA recomendación DEBE incluir PASOS CONCRETOS numerados (mínimo 5-8 pasos por acción)
+- Los pasos deben ser EN LA VIDA REAL: en su panel de Shopify/WooCommerce/PrestaShop, en Google, en herramientas externas
+- CADA paso debe indicar EXACTAMENTE qué escribir, qué seleccionar, qué botón pulsar — en la herramienta REAL
+- NOMBRA productos ESPECÍFICOS del catálogo del cliente en CADA recomendación
+- Incluye el TEXTO LITERAL que deben copiar y pegar (meta títulos, descripciones, alt texts, etc.)
 - Incluye MÉTRICAS DE IMPACTO ESTIMADO concretas (%, €, tiempo, ROI)
-- NUNCA des recomendaciones genéricas tipo "mejorar el SEO" — sé ULTRAESPECÍFICO
-- Prioriza SIEMPRE por ratio impacto/esfuerzo (matriz Eisenhower)
-- SIEMPRE responde en español profesional de consultoría
+- NUNCA des recomendaciones genéricas — sé ULTRAESPECÍFICO con nombres de productos y valores exactos
+- Después de cada acción, añade "✅ Comprobación:" con un test real para verificar
+- Si el cliente necesita pedir algo a un proveedor, diseñador o programador, REDACTA el mensaje/email/brief que debe enviarle
+- SIEMPRE responde en español profesional pero ACCESIBLE — explica TODO como si fuera la primera vez
+- Cuando uses un término técnico, añade entre paréntesis una explicación simple
 - Responde en HTML válido (usa <div>, <p>, <strong>, <ol>, <li>, <ul>, <table>)
 - NO uses markdown, SOLO HTML
 - Incluye datos numéricos del negocio en CADA párrafo
-- Si detectas que la plataforma NO es Shopify, adapta las instrucciones a la plataforma correcta (WooCommerce, PrestaShop, custom, etc.)
-- Incluye SIEMPRE una sección de "Instrucciones por Plataforma" al final indicando cómo implementar en Shopify, WooCommerce Y PrestaShop`;
+- INCLUYE ejemplos textuales LITERALES: no digas "escribe un buen meta título", escribe EXACTAMENTE el meta título que deben copiar y pegar
+- Si recomiendas una herramienta, indica: nombre, si es gratis o de pago, y para qué sirve en 1 frase`;
 
 const AREA_SPECIFIC_PROMPTS: Record<ReportArea, string> = {
-  seo: `FRAMEWORK DE ANÁLISIS SEO PROFUNDO:
+  seo: `FRAMEWORK DE ANÁLISIS SEO PROFUNDO — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Analiza CADA UNO de estos vectores y da instrucciones PASO A PASO para solucionar CADA problema:
+Analiza CADA vector y da instrucciones que el propietario pueda ejecutar ÉL MISMO en su panel de admin y herramientas REALES:
 
 1. **ANÁLISIS ON-PAGE COMPLETO**:
-   - Meta titles: ¿Siguen la fórmula óptima "[Keyword Principal] - [Beneficio] | [Marca]"? ¿Longitud 50-60 chars? ¿Incluyen keyword transaccional?
-   - Meta descriptions: ¿150-160 chars? ¿Incluyen CTA? ¿Tienen keyword + propuesta de valor?
-   - H1/H2 structure: ¿Cada producto tiene H1 único? ¿Hay keyword stuffing o keyword cannibalización?
-   - URL slugs: ¿Son limpios y contienen keywords? ¿Hay parámetros innecesarios?
+   - Meta titles: ¿Siguen la fórmula óptima "[Keyword Principal] - [Beneficio] | [Marca]"? ¿Longitud 50-60 chars?
+   - Para CADA producto con meta title malo, ESCRIBE el meta title exacto que deben copiar y pegar
+   - Meta descriptions: ¿150-160 chars? ¿Incluyen CTA? Para CADA producto, ESCRIBE la meta description exacta optimizada
+   - INDICA EXACTAMENTE cómo cambiar esto en el panel: "En Shopify: tutienda.myshopify.com/admin → Productos → [nombre] → 'Editar SEO del sitio web' → campo 'Meta título'"
+   - H1/H2 structure, URL slugs: problemas concretos y solución exacta
 
-2. **SCHEMA MARKUP / STRUCTURED DATA**:
-   - Product Schema (JSON-LD): ¿Incluye price, availability, reviewRating, brand, sku, gtin?
-   - BreadcrumbList Schema: ¿Implementado correctamente?
-   - Organization Schema en homepage
-   - FAQ Schema donde aplique
-   - DA EL CÓDIGO JSON-LD EXACTO que deben añadir para los productos que faltan
+2. **SCHEMA MARKUP / STRUCTURED DATA** (explicar como "código especial que hace que Google muestre tu producto con estrellas, precio y disponibilidad"):
+   - DA EL CÓDIGO JSON-LD EXACTO listo para copiar y pegar para CADA producto que lo necesite
+   - Explica DÓNDE pegarlo: "En Shopify: Online Store → Themes → Actions → Edit code → product.liquid → justo antes de </head> pega este código:"
+   - Si es demasiado técnico para el propietario, REDACTA el mensaje para su programador: "Hola, necesito que añadas este Schema markup a los productos X, Y, Z. Aquí tienes el código..."
 
 3. **CONTENIDO Y AUTORIDAD**:
-   - ¿Longitud de descripción adecuada (mín. 300 palabras para productos core)?
-   - ¿Hay contenido duplicado entre productos similares?
-   - ¿Internal linking entre productos relacionados?
-   - ¿Hay blog/contenido informacional que apoye keywords transaccionales?
+   - ¿Longitud de descripción adecuada? Para productos con descripciones cortas, DA un EJEMPLO de descripción completa optimizada
+   - Herramientas REALES para mejorar descripciones: Hemingway Editor (hemingwayapp.com, gratis) para legibilidad, AnswerThePublic (answerthepublic.com, gratis) para ideas de contenido
+   - ¿Internal linking? Explica paso a paso: "Abre el producto X → en la descripción, selecciona la palabra 'accesorio' → haz clic en el icono de enlace → pega la URL del producto relacionado"
 
 4. **TECHNICAL SEO**:
-   - Alt texts de imágenes: ¿Descriptivos con keyword? Da ejemplos exactos de alt texts para cada producto que falta
-   - Image optimization: ¿WebP? ¿Lazy loading? ¿Dimensiones especificadas?
-   - Mobile-first: ¿Contenido visible sin scroll? ¿Botones CTA accesibles?
-   - Core Web Vitals implications de cada cambio propuesto
+   - Alt texts: Para CADA imagen sin alt text, ESCRIBE el alt text exacto optimizado con keyword
+   - Cómo cambiarlo: "En Shopify: Productos → [nombre] → haz clic en la imagen → campo 'Texto alternativo' → escribe: [texto exacto]"
+   - Compresión de imágenes: "Ve a tinypng.com (gratis) → arrastra tus imágenes → descárgalas comprimidas → súbelas de nuevo a tu producto"
+   - Velocidad: "Ve a pagespeed.web.dev → escribe la URL de tu tienda → te dará una puntuación y consejos específicos"
 
-5. **KEYWORD STRATEGY**:
-   - ¿Los productos atacan keywords transaccionales o informacionales?
-   - ¿Hay oportunidades de long-tail keywords sin explotar?
-   - ¿Hay canibalization entre productos que compiten por la misma keyword?
-   - Sugiere 3-5 keywords específicas por cada producto problemático
+5. **KEYWORD STRATEGY** (explicar como "las palabras que tus clientes escriben en Google para encontrar productos como los tuyos"):
+   - Para CADA producto, sugiere 3-5 keywords específicas y DÓNDE incluirlas (título, descripción, alt text, URL)
+   - Herramientas gratuitas: "Ve a ubersuggest.com → escribe [keyword] → mira las sugerencias → las de mayor volumen y menor competencia son las mejores"
+   - Explica keyword cannibalization con un ejemplo simple: "Si dos productos compiten por la misma palabra en Google, es como tener dos empleados compitiendo entre sí"
 
 6. **COMPETENCIA Y SERP**:
-   - ¿Qué tipo de resultados aparecen en SERP para los productos del catálogo?
-   - ¿Hay oportunidad de Featured Snippets, Image Pack, Shopping Results?
-   - ¿Qué hacen los competidores directos mejor a nivel SEO?`,
+   - Cómo espiar a la competencia: "Abre Google → busca [keyword del producto] → mira los 3 primeros resultados → fíjate en sus títulos y descripciones, esos son tu referencia"
+   - ¿Hay oportunidad de Rich Snippets? Explica qué son visualmente: "Son los resultados con estrellas y precios que ves en Google — ocupan más espacio y atraen más clics"`,
 
-  financial: `FRAMEWORK DE ANÁLISIS FINANCIERO EXHAUSTIVO:
+  financial: `FRAMEWORK DE ANÁLISIS FINANCIERO — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Realiza un análisis financiero de nivel consultoría estratégica cubriendo TODOS estos puntos:
+Realiza un análisis financiero claro y accionable. El propietario debe poder hacer CADA cambio de precio él mismo:
 
-1. **ANÁLISIS DE MÁRGENES POR PRODUCTO**:
-   - Clasificación ABC de productos por contribución al margen bruto
-   - Identifica los "margin killers" (productos con margen <15%) y los "cash cows" (margen >50%)
-   - ¿Hay productos con precio por debajo de su COGS? ¿Cuáles y por cuánto?
-   - Calcula el margen de contribución ponderado por volumen estimado
+1. **ANÁLISIS DE MÁRGENES POR PRODUCTO** (explicar como "cuánto dinero te queda REALMENTE después de pagar lo que cuesta el producto"):
+   - Clasifica productos: los que dan más beneficio ("productos estrella") vs los que casi no dejan margen ("productos problemáticos")
+   - Para CADA producto problemático, indica: precio actual, coste, margen actual, y el PRECIO NUEVO EXACTO recomendado
+   - Cómo cambiarlo: "En Shopify: Productos → [nombre] → campo 'Precio' → cambia de X€ a Y€ → Guardar"
 
-2. **ESTRATEGIA DE PRICING PSICOLÓGICO**:
-   - ¿Se están usando precios psicológicos (X.99, X.95)? ¿Cuáles no y deberían?
-   - ¿Hay oportunidad de price anchoring (compare-at-price)?
-   - ¿Hay productos que podrían venderse en bundles para mejorar ticket medio?
-   - Calcula el precio óptimo usando elasticidad precio-demanda estimada del nicho
+2. **ESTRATEGIA DE PRICING PSICOLÓGICO** (explicar como "trucos de precios que hacen que los clientes perciban más valor"):
+   - Para CADA producto, indica si el precio actual es óptimo y cuál debería ser (ej: "Cambia 20€ a 19.99€ — los estudios muestran que venderás un 8% más")
+   - Compare-at-price: "En Shopify: Productos → [nombre] → campo 'Precio de comparación' → escribe el precio ANTIGUO más alto → esto muestra un tachado que genera urgencia"
+   - Bundles: sugiere combinaciones concretas de productos: "Crea un pack con [producto A] + [producto B] a [precio bundle] (ahorro percibido de X€)"
 
-3. **ESTRUCTURA DE COSTES Y PUNTO DE EQUILIBRIO**:
-   - ¿Cuántas unidades necesitan vender al mes para cubrir costes fijos estimados del sector?
-   - Break-even analysis por producto individual
-   - ¿Los COGS incluyen TODOS los costes variables (envío, packaging, pasarela pago, fees plataforma)?
-   - Si faltan COGS, estima rangos realistas basados en el sector/nicho
+3. **ESTRUCTURA DE COSTES Y PUNTO DE EQUILIBRIO** (explicar como "cuántos productos necesitas vender para empezar a ganar dinero"):
+   - Para el propietario: "Con tus costes actuales, necesitas vender mínimo X unidades/mes para cubrir gastos"
+   - Si faltan COGS, explica: "No tienes registrados los costes de X productos. Es URGENTE que apuntes cuánto te cuesta cada producto (incluyendo envío del proveedor, packaging, y la comisión de la plataforma)"
+   - Herramienta: "Usa una hoja de cálculo gratuita en Google Sheets para calcular tus costes. Crea columnas: Producto | Precio de compra | Envío proveedor | Packaging | Comisión plataforma | TOTAL COSTE"
 
 4. **OPTIMIZACIÓN FISCAL Y OPERATIVA**:
-   - ¿Están maximizando deducciones aplicables a e-commerce (amortización, gastos de marketing)?
-   - ¿Frecuencia óptima de revisión de precios según sector?
-   - ¿Impacto de variaciones estacionales en el cash flow?
+   - Consejos prácticos: "Consulta con tu gestoría si estás deduciendo los gastos de hosting, apps, publicidad y material de embalaje — muchos propietarios no lo hacen y pagan más impuestos de los necesarios"
+   - "Revisa tus precios al menos una vez al mes. Pon una alarma en tu calendario para el día 1 de cada mes"
 
-5. **PROYECCIONES Y ESCENARIOS**:
-   - Escenario conservador, realista y optimista a 90 días
-   - ¿Qué pasaría si suben precios un 5%, 10%, 15%? Impacto estimado en volumen vs margen
-   - ¿Dónde está el "sweet spot" de precio para maximizar beneficio total?
+5. **PROYECCIONES Y ESCENARIOS** (explicar como "qué pasaría si..."):
+   - "Si subes todos los precios un 5%, estimas perder un 2-3% de ventas pero GANAR un 12-15% más de beneficio"
+   - Proyecciones claras: "A este ritmo, en 90 días tu facturación debería estar entre X€ y Y€"
 
-6. **INSTRUCCIONES DE IMPLEMENTACIÓN POR PLATAFORMA**:
-   - Shopify: Cómo cambiar precios, compare-at-price, descuentos automáticos
-   - WooCommerce: Cómo usar plugins de dynamic pricing, sale prices
-   - PrestaShop: Reglas de precios específicas, gestión de impuestos`,
+6. **CÓMO CAMBIAR LOS PRECIOS — PASO A PASO**:
+   - "En Shopify: Ve a tutienda.myshopify.com/admin → Productos → haz clic en [producto] → campo 'Precio' → cambia a [nuevo precio] → Guardar"
+   - Para cambios masivos: "Shopify permite editar precios en masa: Productos → selecciona varios → 'Editar productos' → columna Precio"
+   - "En WooCommerce: wp-admin → Productos → Quick Edit → campo Precio"
+   - Si tiene equipo: "Mensaje para tu encargado de tienda: 'Necesito que cambies los precios de estos productos: [lista con precio actual → precio nuevo]. Hazlo mañana a primera hora cuando hay menos tráfico.'"`,
 
-  inventory: `FRAMEWORK DE ANÁLISIS DE INVENTARIO Y CADENA DE SUMINISTRO:
+  inventory: `FRAMEWORK DE ANÁLISIS DE INVENTARIO — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Analiza con nivel de director de operaciones cubriendo ABSOLUTAMENTE TODO:
+Analiza el inventario y da instrucciones que el propietario pueda ejecutar DESDE SU PANEL DE ADMIN y con herramientas REALES:
 
-1. **ANÁLISIS ABC DEL INVENTARIO**:
-   - Clasifica CADA producto en categoría A (20% productos = 80% ventas), B (30% = 15%) y C (50% = 5%)
-   - ¿Hay productos categoría C que consumen demasiado capital inmovilizado?
-   - ¿Los productos A tienen suficiente stock de seguridad?
-   - Calcula el stock óptimo por producto usando fórmula EOQ (Economic Order Quantity)
+1. **ANÁLISIS ABC DEL INVENTARIO** (explicar como "clasificar tus productos según cuánto dinero te generan"):
+   - Clasifica los productos: A (los que más venden), B (venta media), C (apenas se venden)
+   - Para los de categoría C: "Considera hacer una oferta flash o pack para liberar ese dinero invertido. Ve a tu panel → Descuentos → Crear descuento → aplica a [productos C]"
+   - Explica con euros: "Tienes X€ 'dormidos' en productos que apenas se venden. Ese dinero podría invertirse en más stock de tus productos estrella"
 
-2. **GESTIÓN DE STOCK CRÍTICO**:
-   - Para CADA producto en stock crítico, calcula: días hasta rotura, coste de oportunidad perdida/día, urgencia de reposición
-   - ¿Hay productos con sobrestock? ¿Cuánto capital tienen inmovilizado innecesariamente?
-   - ¿Los niveles de stock de seguridad están calibrados correctamente para la variabilidad de demanda?
-   - Define punto de reorden automático exacto para cada producto
+2. **GESTIÓN DE STOCK CRÍTICO** (explicar como "productos que se van a agotar pronto y perderás ventas"):
+   - Para CADA producto crítico: "Tu producto '[nombre]' tiene X unidades y vendes ~Y al día. Se agotará en Z días. DEBES hacer el pedido al proveedor AHORA"
+   - Mensaje LITERAL para enviar al proveedor: "Hola [proveedor], necesito un pedido urgente de [cantidad] unidades de [producto/referencia]. ¿Cuál es el plazo de entrega? Necesito recibirlo antes del [fecha]."
+   - Coste de no actuar: "Si se agota, pierdes ~X€/día en ventas no realizadas"
 
 3. **CADENA DE SUMINISTRO Y PROVEEDORES**:
-   - ¿Los lead times de proveedores están alineados con la velocidad de ventas?
-   - ¿Hay proveedores alternativos que deberían considerar? ¿Por qué?
-   - ¿Se están negociando descuentos por volumen? ¿A partir de qué cantidad tiene sentido?
-   - Plan de contingencia si un proveedor falla
+   - Si el lead time es largo: "Tu proveedor tarda X días. Con tus ventas actuales, debes hacer el pedido cuando te queden Y unidades — no esperes a quedarte sin stock"
+   - Negociación: "Si compras más de X unidades, pide un descuento del 5-10%. Mensaje: 'Estamos aumentando nuestro volumen de pedidos y nos gustaría negociar condiciones para pedidos de X+ unidades'"
+   - Plan B: "Busca un proveedor alternativo para tus productos estrella. Usa Alibaba.com o proveedores locales como plan de contingencia"
 
-4. **DEMANDA ESTACIONAL Y FORECASTING**:
-   - ¿Qué patrones estacionales se observan en los datos?
-   - ¿Están preparados para picos de demanda (Black Friday, Navidad, rebajas)?
-   - Modelo de forecasting simple que pueden implementar con los datos que tienen
+4. **PREPARACIÓN ESTACIONAL**:
+   - Calendario práctico: "En septiembre, haz el pedido extra para Black Friday. En octubre, para Navidad. Calcula un 30-50% más que tus ventas normales del mes"
+   - "Pon estas fechas en tu calendario de Google/Outlook ahora mismo para no olvidarlo"
 
-5. **COSTES DE INVENTARIO OCULTOS**:
-   - Coste de almacenamiento estimado por producto/mes
-   - Coste de obsolescencia: ¿hay productos que podrían quedarse obsoletos?
-   - Coste de rotura de stock: ventas perdidas + daño reputacional
-   - ¿Están usando dropshipping para productos de baja rotación? ¿Deberían?
+5. **COSTES OCULTOS DEL INVENTARIO** (explicar como "dinero que pierdes sin darte cuenta"):
+   - "Cada producto en tu almacén te cuesta ~X€/mes en almacenamiento. Si un producto lleva más de 90 días sin venderse, te está costando dinero"
+   - "¿Has pensado en dropshipping (que el proveedor envíe directamente al cliente) para productos de baja rotación? Así no necesitas tener stock"
 
-6. **AUTOMATIZACIÓN Y HERRAMIENTAS**:
-   - Instrucciones exactas para configurar alertas automáticas de stock bajo
-   - Cómo implementar reorder automático según plataforma (Shopify, WooCommerce, PrestaShop)
-   - Apps/plugins recomendados para gestión de inventario por plataforma`,
+6. **HERRAMIENTAS REALES Y AUTOMATIZACIÓN**:
+   - Alertas: "En Shopify: Configuración → Notificaciones → activa 'Notificación de stock bajo'. También: instala la app gratuita 'Stocky' desde la App Store de Shopify"
+   - En WooCommerce: "Instala el plugin gratuito 'ATUM Inventory Management' desde wp-admin → Plugins → Añadir nuevo → busca 'ATUM'"
+   - Hoja de control: "Crea una hoja de Google Sheets con columnas: Producto | Stock actual | Ventas/semana | Semanas de stock restante | Fecha de pedido al proveedor | Cantidad a pedir"
+   - Mensaje para el equipo: "Si tienes un encargado de almacén, envíale esto: 'Necesito que revises el stock de [productos críticos] y me confirmes las cantidades exactas hoy. Si alguno tiene menos de X unidades, avísame inmediatamente.'"`,
 
-  consistency: `FRAMEWORK DE ANÁLISIS DE IDENTIDAD VISUAL Y CONSISTENCIA DE MARCA:
+  consistency: `FRAMEWORK DE ANÁLISIS DE IDENTIDAD VISUAL — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Analiza como director creativo senior cubriendo CADA detalle:
+Analiza la identidad visual y da instrucciones que el propietario pueda ejecutar ÉL MISMO o comunicar a su fotógrafo/diseñador:
 
-1. **AUDITORÍA DE CONSISTENCIA VISUAL**:
-   - ¿Las fotos de producto siguen un estilo uniforme (fondo, iluminación, ángulos)?
-   - ¿Hay productos con fotografías que rompen completamente el estilo visual?
-   - ¿La paleta de colores es coherente en todo el catálogo?
-   - Identifica EXACTAMENTE qué productos necesitan re-fotografiar y por qué
+1. **AUDITORÍA DE CONSISTENCIA VISUAL** (explicar como "si tu tienda parece que cada foto la hizo una persona diferente, los clientes desconfían"):
+   - Identifica EXACTAMENTE qué productos tienen fotos que "desentona" y por qué
+   - Para cada uno: "Tu producto '[nombre]' tiene un fondo gris mientras el resto usa fondo blanco. Esto rompe la coherencia y hace que tu tienda se vea poco profesional"
+   - Solución DIY: "Puedes arreglar el fondo tú mismo con remove.bg (gratis, 1 imagen gratis/día) o con Canva (canva.com, gratis) → sube la foto → 'Editar imagen' → 'Eliminar fondo' → añade fondo blanco"
 
-2. **IDENTIDAD DE MARCA PROFUNDA**:
-   - ¿La tipografía transmite los valores de marca correctos para el nicho?
-   - ¿El tono de voz es consistente entre descripciones de productos?
-   - ¿Hay disonancia entre el posicionamiento premium y los materiales visuales?
-   - ¿Los elementos de confianza (sellos, garantías, reviews) están bien integrados?
+2. **IDENTIDAD DE MARCA** (explicar como "la personalidad de tu tienda — debe ser la misma en todos lados"):
+   - Tono de voz: "Tus productos [A] y [B] usan un tono informal y divertido, pero [C] suena corporativo. Decide un estilo y aplícalo a todo"
+   - Si tiene equipo de redacción: "Mensaje para tu redactor: 'Necesito que reescribas las descripciones de estos productos para que TODOS tengan el mismo tono [informal/profesional/técnico]. Aquí tienes un ejemplo de referencia: [producto que sí suena bien]'"
 
-3. **EXPERIENCIA DE COMPRA VISUAL**:
-   - ¿El layout de la tienda guía el ojo del usuario correctamente?
-   - ¿Las imágenes hero comunican la propuesta de valor en <3 segundos?
-   - ¿Hay suficientes lifestyle photos vs product-only photos?
-   - ¿Las imágenes de producto muestran escala, textura, detalle y contexto de uso?
+3. **EXPERIENCIA DE COMPRA VISUAL** (explicar como "cómo ve tu tienda un cliente que entra por primera vez"):
+   - "Las fotos de producto deben mostrar 4 cosas: el producto completo, un zoom al detalle, el producto en uso (alguien usándolo), y el packaging/caja"
+   - Para CADA producto que falta fotos: "Tu producto '[nombre]' solo tiene 1 foto. Necesita al menos 4. Si no puedes hacer fotos profesionales, usa tu móvil con luz natural junto a una ventana"
 
-4. **BENCHMARK COMPETITIVO VISUAL**:
-   - ¿Cómo se compara la calidad visual con los líderes del nicho?
-   - ¿Qué estándares de imagen impone cada marketplace/plataforma?
-   - ¿Están aprovechando las tendencias visuales actuales del sector?
+4. **BRIEF FOTOGRÁFICO LISTO PARA ENVIAR** (el propietario puede enviarlo tal cual a su fotógrafo):
+   - "Copia y envía este mensaje a tu fotógrafo: 'Necesito [X] fotos de estos productos: [lista]. Especificaciones: fondo blanco puro, iluminación natural o softbox, ángulo frontal a 45°, resolución mínima 2048x2048px, formato JPG o PNG. Por cada producto necesito: 1 foto frontal, 1 lateral, 1 detalle/textura, 1 lifestyle/en uso. Plazo: [fecha]. Presupuesto: [rango €].'"
+   - Si no tiene fotógrafo: "Puedes hacer fotos profesionales con tu móvil: busca en Amazon 'caja de luz fotográfica' (~20-30€) → coloca el producto dentro → fotografía con la cámara trasera del móvil → edita con Snapseed (app gratuita)"
 
-5. **PLAN DE MEJORA VISUAL CONCRETO**:
-   - Para CADA producto con baja consistencia: qué exactamente cambiar, cómo fotografiarlo, qué fondo usar, qué iluminación
-   - Template de brief fotográfico para nuevos productos
-   - Guía de estilo visual completa que pueden seguir internamente
-   - Herramientas de edición gratuitas y de pago recomendadas con pasos exactos
+5. **HERRAMIENTAS REALES PARA MEJORAR TUS FOTOS**:
+   - "Canva (canva.com, gratis): para crear banners, redimensionar imágenes y añadir texto"
+   - "Remove.bg (remove.bg, gratis limitado): para quitar fondos de fotos"
+   - "TinyPNG (tinypng.com, gratis): para comprimir imágenes sin perder calidad antes de subirlas"
+   - "Snapseed (app móvil, gratis): para retocar fotos directamente desde el móvil"
+   - Cómo subir las fotos mejoradas: "En Shopify: Productos → [nombre] → arrastra las nuevas fotos al área de imágenes → elimina las antiguas → Guardar"
 
-6. **IMPLEMENTACIÓN POR PLATAFORMA**:
-   - Requisitos de imagen por plataforma (Shopify: 2048x2048, WooCommerce: variable, PrestaShop: configurable)
-   - Cómo implementar zoom, gallery, video en cada plataforma
-   - Plugins/apps de optimización de imagen por plataforma`,
+6. **REQUISITOS DE IMAGEN POR PLATAFORMA** (explicar como "cada plataforma tiene reglas sobre cómo deben ser tus fotos"):
+   - "Shopify: Tamaño recomendado 2048x2048 píxeles, formato JPG o PNG, máximo 20MB. Cómo subirlas: Productos → [nombre] → sección 'Multimedia' → arrastra las fotos"
+   - "WooCommerce: Ve a wp-admin → Productos → Editar → 'Imagen del producto' (la principal) + 'Galería del producto' (las adicionales)"
+   - "PrestaShop: Catálogo → Productos → [nombre] → pestaña 'Imágenes'"`,
 
-  redesigns: `FRAMEWORK DE ANÁLISIS DE REDISEÑOS Y OPTIMIZACIÓN DE FICHAS DE PRODUCTO:
+  redesigns: `FRAMEWORK DE ANÁLISIS DE REDISEÑOS — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Analiza como consultor de conversión (CRO) senior:
+Analiza las fichas de producto y da instrucciones que el propietario pueda ejecutar ÉL MISMO editando las fichas en su panel:
 
-1. **ANÁLISIS DE CALIDAD DE FICHAS ACTUALES**:
-   - ¿Los títulos de producto siguen la fórmula óptima "[Marca] + [Producto] + [Atributo Clave] + [Beneficio]"?
-   - ¿Las descripciones usan storytelling, bullet points y formato scannable?
-   - ¿Hay CTAs claros y urgencia (stock limitado, oferta temporal)?
-   - ¿Se están usando todos los campos disponibles (especificaciones, tabla de tallas, FAQ)?
+1. **ANÁLISIS DE CALIDAD DE FICHAS ACTUALES** (explicar como "la ficha de producto es tu vendedor online — si no convence, el cliente se va"):
+   - Para CADA producto con ficha mejorable, ESCRIBE el título optimizado EXACTO: "Tu producto '[nombre actual]' debería llamarse '[título nuevo optimizado]' porque incluye las palabras que los clientes buscan"
+   - ESCRIBE una descripción de ejemplo completa (mín 100 palabras) con bullet points, storytelling y CTA para el producto más problemático
+   - Cómo cambiarlo: "En Shopify: Productos → [nombre] → campo 'Título' → borra y escribe: [título nuevo] → campo 'Descripción' → pega esto: [descripción completa]"
 
-2. **IMPACTO DE REDISEÑOS APLICADOS vs PENDIENTES**:
-   - De los rediseños ya aplicados, ¿qué cambios específicos se hicieron?
-   - ¿Hay patrones en los rediseños más exitosos que replicar?
-   - ¿Cuáles de los pendientes tienen MAYOR potencial de impacto? Priorízalos
-   - Estima % de mejora en conversión por cada rediseño pendiente
+2. **REDISEÑOS APLICADOS vs PENDIENTES** (explicar como "cambios que ya hicimos vs cambios que aún faltan"):
+   - De los pendientes, ordénalos: "Empieza por '[producto]' porque es el que más visitas tiene y mayor impacto tendrá el cambio"
+   - Para cada pendiente: "Ve a tu panel → Productos → [nombre] → cambia el título por: [nuevo título] → cambia la descripción por: [nueva descripción] → Guardar"
 
-3. **OPTIMIZACIÓN DE CONVERSIÓN (CRO) POR PRODUCTO**:
-   - ¿Se están usando técnicas de persuasión (escasez, prueba social, autoridad)?
-   - ¿Las imágenes complementan la descripción? ¿Hay gap informacional?
-   - ¿El precio está posicionado correctamente (antes/después del valor percibido)?
-   - ¿Los productos tienen suficientes variantes y opciones de personalización?
+3. **MEJORAS DE CONVERSIÓN POR PRODUCTO** (explicar como "trucos para que más visitantes compren"):
+   - Escasez: "Añade en la descripción de [producto]: '⚡ Solo quedan X unidades en stock' — esto crea urgencia"
+   - Prueba social: "Si tienes reseñas de clientes, añádelas. En Shopify instala la app gratuita 'Judge.me Product Reviews'"
+   - Para CADA producto: "Tu producto '[nombre]' le falta [X] para convertir mejor. Solución: [instrucción específica]"
 
-4. **CONTENIDO AVANZADO POR PRODUCTO**:
-   - ¿Hay FAQ section en cada producto? Da 5 FAQ específicas para cada producto problemático
-   - ¿Se usan comparison tables entre productos similares?
-   - ¿Hay video de producto? ¿User-generated content?
-   - ¿Los productos tienen cross-sell/upsell configurados?
+4. **CONTENIDO QUE DEBES AÑADIR A CADA PRODUCTO**:
+   - Para CADA producto problemático, REDACTA 5 preguntas frecuentes (FAQ) listas para copiar y pegar
+   - "Cómo añadirlas en Shopify: Instala la app gratuita 'Easy FAQ' o añádelas al final de la descripción con formato de pregunta en negrita y respuesta normal"
+   - Si tiene equipo: "Mensaje para tu redactor/copywriter: 'Necesito que escribas descripciones nuevas para estos productos: [lista]. Cada descripción debe tener: 1) Un gancho emocional en la primera frase, 2) 4-5 bullet points con beneficios, 3) Una FAQ con 3-5 preguntas, 4) Un cierre con urgencia. Tono: [especificar]. Referencia: [producto que ya está bien escrito]'"
 
-5. **A/B TESTING Y MEDICIÓN**:
-   - ¿Qué elementos deberían testear primero? (título vs descripción vs precio vs imagen)
-   - Diseña 3 tests A/B específicos con hipótesis, métrica principal y duración estimada
-   - ¿Cómo medir el impacto real de cada rediseño? Setup de tracking recomendado
+5. **A/B TESTING PARA PRINCIPIANTES** (explicar como "probar dos versiones diferentes y quedarse con la que funcione mejor"):
+   - "No necesitas herramientas caras. Haz esto: cambia el título del producto [X] durante 2 semanas → anota cuántas ventas hace → cámbialo a la versión B otras 2 semanas → compara. La versión con más ventas gana"
+   - Herramientas gratuitas: "Google Analytics (analytics.google.com, gratis) te dice cuánta gente visita cada producto y cuántos compran"
 
-6. **IMPLEMENTACIÓN MULTI-PLATAFORMA**:
-   - Shopify: Cómo editar fichas, usar metafields, implementar tabs/accordion
-   - WooCommerce: Plugins de product tabs, custom fields, ACF integration
-   - PrestaShop: Módulos de fichas avanzadas, combinaciones, personalización`,
+6. **CÓMO EDITAR FICHAS EN TU PLATAFORMA**:
+   - "En Shopify: tutienda.myshopify.com/admin → Productos → [producto] → edita todos los campos → Guardar. Para edición en masa: Productos → marca la casilla de varios → botón 'Editar productos'"
+   - "En WooCommerce: tutienda.com/wp-admin → Productos → haz clic en [producto] → edita → pestaña 'Datos del producto' para precio/inventario, editor principal para descripción"
+   - "En PrestaShop: tutienda.com/admin → Catálogo → Productos → [producto] → pestañas: 'Configuración básica', 'Cantidades', 'Transporte', 'Precios', 'SEO'"`,
 
-  revenue: `FRAMEWORK DE ANÁLISIS DE REVENUE Y CRECIMIENTO:
+  revenue: `FRAMEWORK DE ANÁLISIS DE REVENUE — CON INSTRUCCIONES REALES PARA EL PROPIETARIO:
 
-Analiza como CFO y growth strategist senior:
+Analiza el revenue y crecimiento con instrucciones que el propietario pueda implementar HOY con herramientas REALES:
 
-1. **ANÁLISIS DE TENDENCIAS DE REVENUE**:
-   - ¿La tendencia es ascendente, estable o descendente? Calcula tasa de crecimiento MoM
-   - ¿Hay estacionalidad clara? ¿Qué meses son fuertes vs débiles?
-   - ¿El AOV está subiendo o bajando? ¿Correlaciona con número de pedidos?
-   - ¿La tasa de conversión es competitiva para el sector? (benchmark por nicho)
-   - Identifica puntos de inflexión y qué los causó
+1. **ANÁLISIS DE TENDENCIAS DE REVENUE** (explicar como "¿tu negocio crece, se estanca o cae? Y por qué"):
+   - Explica la tendencia en lenguaje claro: "En el último mes, tu tienda ha facturado X€ más/menos que el anterior. Esto significa que..."
+   - AOV (explicar como "cuánto gasta cada cliente de media en cada compra"): "Tus clientes gastan de media X€ por compra. En tu sector, lo normal es Y€. Si subimos tu AOV un 10%, ganarías Z€ más al mes sin necesitar más clientes"
+   - Cómo verificar tú mismo: "En Shopify: ve a Analíticas → Panel de control → verás 'Valor medio de pedido'. En Google Analytics: Conversiones → E-commerce → Visión general"
 
-2. **ANÁLISIS DE COHORTES Y RETENCIÓN**:
-   - ¿Qué % de revenue viene de clientes recurrentes vs nuevos? (estimación por datos)
-   - ¿El customer lifetime value justifica el coste de adquisición estimado?
-   - ¿Hay oportunidades de subscription/recurrencia para algún producto?
-   - Estrategias de retención específicas para el nicho
+2. **RETENCIÓN DE CLIENTES** (explicar como "conseguir que tus clientes vuelvan a comprar cuesta 5 veces menos que encontrar clientes nuevos"):
+   - "¿Tienes una lista de email de tus clientes? Si no, empieza HOY: instala Mailchimp (mailchimp.com, gratis hasta 500 contactos) o Klaviyo (klaviyo.com, gratis hasta 250 contactos)"
+   - "Crea un email automático de 'Gracias por tu compra' con un cupón del 10% para la siguiente compra. En Shopify: Marketing → Automatizaciones → 'Primera compra' → configura un email con cupón"
+   - Si tiene equipo: "Mensaje para tu community manager: 'Necesito que creemos una secuencia de 3 emails post-compra: 1) Agradecimiento + cupón a las 24h, 2) Pedir reseña a los 7 días, 3) Productos relacionados a los 14 días. ¿Puedes tenerlo listo esta semana?'"
 
-3. **OPTIMIZACIÓN DE EMBUDO DE CONVERSIÓN**:
-   - ¿Dónde se pierden más ventas? (estimación por sector: homepage → producto → carrito → checkout)
-   - ¿La tasa de abandono de carrito está por encima del benchmark del sector?
-   - ¿Se están recuperando carritos abandonados? ¿Con qué frecuencia?
-   - Email sequence exacto de recuperación de carrito (3 emails, timing, copy)
+3. **RECUPERACIÓN DE CARRITOS ABANDONADOS** (explicar como "gente que metió productos en el carrito pero se fue sin pagar — eso es dinero que casi tenías"):
+   - "El 70% de los carritos se abandonan. Esto significa que puedes estar perdiendo hasta X€/mes"
+   - Cómo activarlo: "En Shopify: Configuración → Checkout → Sección 'Abandonos de carrito' → activa 'Enviar emails automáticamente'. Selecciona: enviar después de 1 hora"
+   - REDACTA los 3 emails literales de recuperación:
+     * Email 1 (1h después): Asunto y body listos para copiar
+     * Email 2 (24h después): Con urgencia y posible descuento
+     * Email 3 (72h después): Último recordatorio con oferta final
+   - "En WooCommerce: instala el plugin gratuito 'WooCommerce Cart Abandonment Recovery' desde Plugins → Añadir nuevo"
 
-4. **ESTRATEGIAS DE CRECIMIENTO CONCRETAS**:
-   - ¿Qué canales de adquisición deberían priorizar? (SEO orgánico, paid, social, email, marketplace)
-   - ¿Hay oportunidad de expandir a nuevos mercados/idiomas?
-   - ¿Se están aprovechando fechas comerciales (BFCM, día madre, Navidad)?
-   - Calcula el budget óptimo de marketing como % del revenue
+4. **ESTRATEGIAS DE CRECIMIENTO QUE PUEDES HACER HOY**:
+   - "Crea una cuenta en Google Merchant Center (merchants.google.com, gratis) para que tus productos aparezcan en Google Shopping"
+   - "Si no tienes Instagram de la tienda, créalo HOY. Publica 3 fotos de productos esta semana"
+   - "Crea un cupón de primera compra del 10%: En Shopify: Descuentos → Crear descuento → código 'BIENVENIDO10' → 10% → Guardar"
+   - Presupuesto: "Si puedes invertir en publicidad, empieza con 5€/día en Instagram/Facebook Ads. Configúralo en business.facebook.com"
 
-5. **PREDICCIONES Y ESCENARIOS**:
-   - Proyección a 30/60/90/180 días con 3 escenarios (pesimista, realista, optimista)
-   - ¿Qué acciones moverían más la aguja del revenue con menos esfuerzo?
-   - ¿Cuál es el techo de revenue con el catálogo actual? ¿Se necesitan más productos?
-   - Plan de escalado: ¿a qué revenue necesitan contratar, automatizar, externalizar?
+5. **PREDICCIONES Y PRÓXIMOS PASOS** (explicar como "qué puedes esperar si haces todo lo que recomendamos"):
+   - Proyecciones claras: "Si implementas las mejoras de este informe: en 30 días deberías ver un +X% de visitas, en 60 días un +Y% de ventas"
+   - Calendario de acción: "Semana 1: [X]. Semana 2: [Y]. Semana 3: [Z]. Mes 2: [A]"
 
-6. **IMPLEMENTACIÓN POR PLATAFORMA**:
-   - Shopify: Apps de upsell, cross-sell, email marketing, analytics
-   - WooCommerce: Plugins de recovery, analytics, marketing automation
-   - PrestaShop: Módulos de estadísticas avanzadas, remarketing, fidelización`,
+6. **HERRAMIENTAS REALES PARA CRECER TU REVENUE**:
+   - Analytics: "Google Analytics (analytics.google.com, GRATIS): instálalo si no lo tienes. En Shopify: Online Store → Preferences → Google Analytics → pega tu código de seguimiento"
+   - Email marketing: "Mailchimp (gratis hasta 500 contactos) o Klaviyo (gratis hasta 250). Ambos se conectan directo con Shopify desde la App Store"
+   - Upsell: "En Shopify: instala la app 'ReConvert' (gratis hasta 49 pedidos/mes) o 'Frequently Bought Together' para sugerir productos relacionados"
+   - "En WooCommerce: plugin gratuito 'WooCommerce Boost Sales' para upsell/cross-sell automático"
+   - Redes sociales: "Buffer (buffer.com, gratis 3 canales): programa publicaciones de productos automáticamente"`,
 
   pricing: `FRAMEWORK DE ANÁLISIS DE PRICING ESTRATÉGICO:
 
@@ -345,61 +348,100 @@ GENERA el análisis con esta estructura HTML (NO JSON, devuelve HTML directo):
 
 <div class="ai-analysis">
   <div class="ai-diagnosis">
-    <h3>📋 Diagnóstico Ejecutivo</h3>
-    <p>[4-5 párrafos EXTENSOS analizando la situación con CADA dato concreto del negocio. Menciona productos específicos, números exactos, y compara con benchmarks del sector. NO seas genérico.]</p>
+    <h3>📋 Diagnóstico Ejecutivo — Resumen para el Propietario</h3>
+    <p>[4-5 párrafos EXTENSOS explicando la situación en LENGUAJE CLARO que cualquier persona entienda. Usa analogías del mundo físico para conceptos técnicos (ej: "El meta título es como el rótulo de tu tienda física — es lo primero que la gente ve cuando pasa por delante en Google"). Menciona productos ESPECÍFICOS por nombre, números exactos, y compara con lo que hacen las mejores tiendas de su sector. Explica QUÉ SIGNIFICA cada dato para su negocio en euros perdidos o ganados.]</p>
   </div>
   
   <div class="ai-actions">
-    <h3>🎯 Plan de Acción Estratégico</h3>
+    <h3>🎯 Plan de Acción — Guía Completa para Implementar Tú Mismo</h3>
+    <p><em>Hemos ordenado las acciones de mayor a menor impacto. Cada acción incluye instrucciones exactas para que puedas realizarla tú mismo desde tu ordenador, o sepas exactamente qué pedir a tu equipo.</em></p>
     [GENERA 6-8 acciones detalladas, cada una así:]
     <div class="action-item">
       <div class="action-header">
-        <strong>[Título de la acción — ESPECÍFICO, no genérico]</strong>
+        <strong>[Título de la acción — ESPECÍFICO con nombre de producto, no genérico]</strong>
         <span class="action-impact">[CRÍTICO/ALTO/MEDIO impacto]</span>
       </div>
-      <p><strong>Diagnóstico:</strong> [Qué problema exacto resuelve, con datos concretos del negocio]</p>
-      <p><strong>Implementación paso a paso:</strong></p>
+      <p><strong>❓ ¿Qué es esto y por qué importa?</strong> [Explicación en lenguaje simple usando una analogía del mundo real. Ej: "Imagina que tienes una tienda física pero el cartel de la puerta está en blanco — la gente pasa de largo porque no sabe qué vendes. Eso es exactamente lo que pasa cuando tus meta títulos están vacíos."]</p>
+      <p><strong>📊 Tu situación actual:</strong> [Datos CONCRETOS de su tienda con nombres de productos: "Tu producto 'Camiseta X' tiene el meta título 'Camiseta' que solo tiene 8 caracteres. Lo ideal es entre 50-60 caracteres. Esto significa que Google muestra tu producto con un título incompleto y los compradores no hacen clic."]</p>
+      <p><strong>🛠️ Cómo solucionarlo — Paso a paso en tu panel de administración:</strong></p>
       <ol>
-        <li>[Paso 1: Instrucción EXACTA con detalles técnicos concretos. Si es código, da el código. Si es configuración, da la ruta exacta en el panel de admin.]</li>
-        <li>[Paso 2: Igual de específico]</li>
-        <li>[Paso 3]</li>
-        <li>[Paso 4]</li>
-        <li>[Paso 5 si aplica]</li>
+        <li><strong>Paso 1:</strong> Abre tu navegador y ve a [URL REAL del panel de admin de la plataforma del cliente, ej: "tutienda.myshopify.com/admin" o "tutienda.com/wp-admin"]. Inicia sesión con tu usuario y contraseña habituales.</li>
+        <li><strong>Paso 2:</strong> En el menú de la izquierda, haz clic en "[nombre REAL de la sección, ej: Productos]". Verás la lista de todos tus productos.</li>
+        <li><strong>Paso 3:</strong> Busca el producto "[NOMBRE EXACTO del producto del cliente]" y haz clic en él para abrirlo.</li>
+        <li><strong>Paso 4:</strong> Baja por la página hasta encontrar la sección "[nombre REAL de la sección en la plataforma]". Haz clic en "[nombre del botón o enlace REAL]" para expandirla.</li>
+        <li><strong>Paso 5:</strong> En el campo "[nombre EXACTO del campo]", BORRA todo lo que hay escrito y copia y pega EXACTAMENTE este texto: <code>[TEXTO LITERAL LISTO PARA COPIAR Y PEGAR, ya redactado y optimizado para el producto concreto]</code></li>
+        <li><strong>Paso 6:</strong> Haz clic en el botón "[nombre REAL del botón: ej. Guardar]" en la [posición: ej. esquina superior derecha].</li>
+        <li><strong>Paso 7:</strong> Repite los pasos 3-6 para estos otros productos que también necesitan el cambio: [lista de 2-3 productos más con el texto EXACTO que deben pegar en cada uno]</li>
       </ol>
-      <p><strong>Impacto estimado:</strong> [Métrica concreta con rango: ej. "+12-18% CTR orgánico", "+450-800€/mes revenue adicional"]</p>
-      <p><strong>Tiempo de implementación:</strong> [Horas concretas: ej. "2-3 horas de trabajo técnico"]</p>
-      <p><strong>Prioridad:</strong> [P1/P2/P3 con justificación]</p>
+      <p><strong>🔧 Herramientas que necesitas:</strong> [Nombre de herramientas REALES, ej: "Ninguna especial — solo tu panel de Shopify" o "Descarga gratis TinyPNG (tinypng.com) para comprimir las imágenes antes de subirlas" o "Usa Canva (canva.com, gratis) para crear las imágenes"]</p>
+      <p><strong>👥 Si tienes equipo — Qué decirle a tu [diseñador/programador/fotógrafo]:</strong> [Mensaje LITERAL listo para enviar por WhatsApp o email: <em>"Hola [nombre], necesito que [instrucción exacta]. Los productos que necesitan este cambio son: [lista]. El resultado debe quedar así: [descripción]. ¿Puedes tenerlo para el [plazo]?"</em>]</p>
+      <p><strong>✅ Comprobación — ¿Lo has hecho bien?</strong> [Test concreto en la VIDA REAL: "Abre una pestaña nueva de incógnito en tu navegador → Escribe la dirección de tu tienda → Ve al producto que acabas de cambiar → Debería aparecer [X]. Si ves [Y], está correcto. Si ves [Z], revisa el paso 5." O: "Ve a Google y escribe site:tutienda.com + nombre del producto. En 2-5 días deberías ver el nuevo texto."]</p>
+      <p><strong>📈 Impacto estimado:</strong> [En lenguaje que entienda: ej. "Esto debería traerte entre 10 y 25 visitantes más al día desde Google, lo que puede suponer ~450-800€/mes de ventas adicionales basándonos en tu tasa de conversión actual"]</p>
+      <p><strong>⏱️ Tiempo necesario:</strong> [Tiempo realista: ej. "15-20 minutos si lo haces tú" o "5 minutos si se lo pides a tu programador"]</p>
+      <p><strong>🔢 Prioridad:</strong> P1 (URGENTE — hacerlo hoy o mañana) / P2 (IMPORTANTE — hacerlo esta semana) / P3 (RECOMENDADO — hacerlo este mes)</p>
     </div>
   </div>
   
   <div class="ai-quick-wins">
-    <h3>⚡ Quick Wins — Implementar en las próximas 24 horas</h3>
+    <h3>⚡ Mejoras Rápidas — Haz esto HOY MISMO (menos de 10 minutos cada una)</h3>
+    <p><em>Estas son mejoras que puedes hacer ahora mismo, sentándote 10 minutos delante de tu ordenador. No necesitas ningún conocimiento técnico.</em></p>
     <ol>
-      <li><strong>[Acción]:</strong> [Instrucciones EXACTAS que alguien sin experiencia pueda seguir paso a paso. Incluye rutas de menú, nombres de campos, y valores exactos a introducir.]</li>
+      <li><strong>[Acción concreta con nombre de producto]:</strong>
+        <br>📍 <strong>Dónde:</strong> [Ruta en tu panel REAL: "Entra en tutienda.myshopify.com/admin → Productos → [nombre] → sección [X]"]
+        <br>📝 <strong>Qué hacer:</strong> [Instrucción exacta: "En el campo 'Meta descripción', borra lo que hay y escribe:"]
+        <br>📋 <strong>Texto exacto a copiar y pegar:</strong> <code>[EL TEXTO LITERAL optimizado y listo]</code>
+        <br>💾 <strong>Guardar:</strong> "Haz clic en el botón 'Guardar' arriba a la derecha"
+        <br>✅ <strong>Verificación:</strong> ["Recarga la página del producto — si ves tu nuevo texto en el campo, está bien hecho"]
+      </li>
       <li>[Igual de detallado - mínimo 5 quick wins]</li>
     </ol>
   </div>
 
+  <div class="ai-glossary">
+    <h3>📖 Glosario — Términos que usamos en este informe (explicados de forma sencilla)</h3>
+    <p><em>Aquí explicamos todos los términos técnicos de forma simple para que entiendas cada detalle:</em></p>
+    <ul>
+      <li><strong>[TÉRMINO]:</strong> [Explicación con analogía del mundo real. Ej: "<strong>Meta título</strong>: Es el título que Google muestra cuando alguien busca tus productos. Piensa en él como el rótulo de tu tienda — si es atractivo y claro, la gente entra; si está en blanco o es confuso, pasan de largo."]</li>
+      <li>[Incluir 8-12 términos usados en el informe, cada uno explicado como si hablaras con alguien que no sabe nada de tecnología]</li>
+    </ul>
+  </div>
+
   <div class="ai-platform-guide">
-    <h3>🔧 Guía de Implementación Multi-Plataforma</h3>
-    <p>[Para CADA acción clave del plan, indica cómo implementarla en:]</p>
+    <h3>🔧 Cómo hacer estos cambios según tu plataforma</h3>
+    <p><em>Las instrucciones anteriores están escritas para ${platform}. Si usas otra plataforma o estás pensando en cambiar, aquí tienes cómo hacer lo mismo en cada una:</em></p>
     <div class="action-item">
-      <p><strong>En Shopify:</strong> [Ruta exacta en admin, apps recomendadas, liquid code si aplica]</p>
-      <p><strong>En WooCommerce:</strong> [Plugin específico, configuración en wp-admin, hooks/filters si aplica]</p>
-      <p><strong>En PrestaShop:</strong> [Módulo específico, ruta en back-office, override si aplica]</p>
-      <p><strong>En tienda custom/headless:</strong> [Approach técnico general, APIs/SDKs recomendados]</p>
+      <p><strong>🟢 En Shopify:</strong> [Ruta EXACTA en el admin real de Shopify, con nombres de menú tal como aparecen. Apps recomendadas: nombre exacto, si es GRATIS o de pago (precio/mes), y una frase de para qué sirve]</p>
+      <p><strong>🔵 En WooCommerce (WordPress):</strong> [Ruta real en wp-admin. Plugins: nombre exacto + si es gratuito + cómo instalarlo: "Ve a tutienda.com/wp-admin → Plugins → Añadir nuevo → Busca '[nombre]' → Instalar → Activar"]</p>
+      <p><strong>🟣 En PrestaShop:</strong> [Ruta real en el back-office. Módulos necesarios con nombre exacto]</p>
+      <p><strong>⚪ Tienda personalizada:</strong> ["Si tu tienda está hecha a medida por un programador, envíale este mensaje: [MENSAJE LITERAL para el desarrollador con las especificaciones técnicas]"]</p>
+    </div>
+  </div>
+
+  <div class="ai-team-briefs">
+    <h3>📨 Mensajes listos para enviar a tu equipo</h3>
+    <p><em>Si tienes un equipo que te ayuda con la tienda, aquí tienes mensajes que puedes copiar y enviar directamente por WhatsApp, email o como prefieras:</em></p>
+    <div class="action-item">
+      <p><strong>📸 Para tu fotógrafo/diseñador:</strong> <em>"[MENSAJE LITERAL listo para enviar con las instrucciones exactas de lo que necesitas: qué productos fotografiar, qué estilo, qué fondo, qué medidas, cuántas fotos por producto, para cuándo lo necesitas]"</em></p>
+      <p><strong>💻 Para tu programador/técnico:</strong> <em>"[MENSAJE LITERAL con las tareas técnicas: código a implementar, dónde insertarlo, qué resultado esperas ver, plazo]"</em></p>
+      <p><strong>✍️ Para tu copywriter/redactor:</strong> <em>"[MENSAJE LITERAL con lo que necesitas: qué textos reescribir, tono de voz, longitud, keywords a incluir, productos prioritarios]"</em></p>
+      <p>[Solo incluir los roles que apliquen según las acciones recomendadas]</p>
     </div>
   </div>
 </div>
 
 REGLAS OBLIGATORIAS: 
-- MÍNIMO 6 acciones detalladas en el Plan de Acción (idealmente 8)
-- MÍNIMO 5 Quick Wins con instrucciones paso a paso
-- NOMBRA productos ESPECÍFICOS del catálogo del cliente en CADA recomendación
-- CADA paso debe ser lo suficientemente detallado para que un becario sin experiencia pueda ejecutarlo
+- MÍNIMO 6 acciones detalladas en el Plan de Acción (idealmente 8), CADA UNA con TODOS los campos (¿Qué es?, Situación actual, Pasos reales, Herramientas, Mensaje al equipo, Comprobación, Impacto, Tiempo, Prioridad)
+- MÍNIMO 5 Quick Wins con instrucciones paso a paso + texto LITERAL para copiar/pegar
+- INCLUYE la sección de Glosario OBLIGATORIAMENTE con 8-12 términos explicados con analogías
+- INCLUYE la sección de Mensajes para el equipo OBLIGATORIAMENTE
+- NOMBRA productos ESPECÍFICOS del catálogo del cliente en CADA recomendación — NUNCA digas "tus productos" en genérico
+- CADA paso refiere a herramientas REALES (Shopify Admin, wp-admin, Google Search Console, Canva, etc.) — NUNCA a nuestra app
+- El informe debe ser 100% AUTOSUFICIENTE: con solo este documento, el cliente debe poder implementar TODO
 - Incluye estimaciones NUMÉRICAS y RANGOS de impacto realistas basados en benchmarks del sector
-- INCLUYE la sección de Guía Multi-Plataforma OBLIGATORIAMENTE
-- NO seas genérico: si dices "optimizar el SEO", especifica EXACTAMENTE qué optimizar, cómo, dónde y con qué herramienta`;
+- INCLUYE la sección Multi-Plataforma OBLIGATORIAMENTE
+- Si recomiendas una herramienta, indica: nombre, URL, si es GRATIS o de pago (y precio), para qué sirve
+- Cuando el cambio requiere TEXTO (meta título, descripción, alt text...), ESCRIBE EL TEXTO EXACTO ya optimizado para ese producto concreto — listo para copiar y pegar
+- CADA ACCIÓN incluye "✅ Comprobación" con un test que el cliente puede hacer en su navegador para verificar`;
 
     const result = await askClaudeWithBrain(
       projectId,
@@ -407,7 +449,7 @@ REGLAS OBLIGATORIAS:
       AI_REPORT_SYSTEM,
       area === "financial" || area === "pricing" || area === "revenue" ? "pricing" : area === "seo" ? "seo" : "general",
       niche,
-      8192,
+      12000,
     );
 
     const sanitized = sanitizeAiHtmlOutput(result);
@@ -900,9 +942,19 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
   .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
   .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
-  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; margin-bottom: 24px; }
   .ai-quick-wins h3 { color: ${BRAND.jade}; }
-  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
+  .ai-quick-wins code { background: rgba(200,168,75,.1); color: ${BRAND.gold}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .ai-glossary { padding: 20px; background: rgba(99,102,241,.04); border: 1px solid rgba(99,102,241,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-glossary h3 { color: ${BRAND.blue}; }
+  .ai-glossary li { margin-bottom: 10px; color: rgba(255,255,255,.7); line-height: 1.6; font-size: 13px; }
+  .ai-glossary li strong { color: ${BRAND.white}; }
+  .ai-platform-guide { margin-bottom: 24px; }
+  .ai-team-briefs { padding: 20px; background: rgba(200,168,75,.04); border: 1px solid rgba(200,168,75,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-team-briefs h3 { color: ${BRAND.gold}; }
+  .ai-team-briefs em { display: block; padding: 12px 16px; background: ${BRAND.surface}; border-radius: 8px; margin: 8px 0; font-style: italic; color: rgba(255,255,255,.75); line-height: 1.6; font-size: 13px; border-left: 3px solid ${BRAND.gold}; }
+  .action-item code { background: rgba(200,168,75,.1); color: ${BRAND.gold}; padding: 2px 8px; border-radius: 4px; font-size: 12px; display: inline-block; margin: 4px 0; word-break: break-all; }
 
   .progress-ring { display: inline-flex; align-items: center; justify-content: center; position: relative; }
   .progress-ring svg { transform: rotate(-90deg); }
@@ -1178,9 +1230,19 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
   .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
   .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
-  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; margin-bottom: 24px; }
   .ai-quick-wins h3 { color: ${ELEGANCE.jade}; }
-  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
+  .ai-quick-wins code { background: rgba(74,144,217,.1); color: ${ELEGANCE.accent}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .ai-glossary { padding: 20px; background: rgba(99,102,241,.04); border: 1px solid rgba(99,102,241,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-glossary h3 { color: ${ELEGANCE.accent}; }
+  .ai-glossary li { margin-bottom: 10px; color: rgba(255,255,255,.7); line-height: 1.6; font-size: 13px; }
+  .ai-glossary li strong { color: ${ELEGANCE.white}; }
+  .ai-platform-guide { margin-bottom: 24px; }
+  .ai-team-briefs { padding: 20px; background: rgba(74,144,217,.04); border: 1px solid rgba(74,144,217,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-team-briefs h3 { color: ${ELEGANCE.accent}; }
+  .ai-team-briefs em { display: block; padding: 12px 16px; background: ${ELEGANCE.surface}; border-radius: 8px; margin: 8px 0; font-style: italic; color: rgba(255,255,255,.75); line-height: 1.6; font-size: 13px; border-left: 3px solid ${ELEGANCE.accent}; }
+  .action-item code { background: rgba(74,144,217,.1); color: ${ELEGANCE.accent}; padding: 2px 8px; border-radius: 4px; font-size: 12px; display: inline-block; margin: 4px 0; word-break: break-all; }
 
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .stat-item { padding: 16px 20px; background: ${ELEGANCE.surface}; border-radius: 10px; border: 1px solid ${ELEGANCE.border}; }
@@ -1430,9 +1492,19 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .action-item p { margin: 6px 0; font-size: 13px; color: rgba(255,255,255,.65); }
   .action-item ol, .action-item ul { margin: 8px 0; padding-left: 20px; }
   .action-item li { margin-bottom: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
-  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; }
+  .ai-quick-wins { padding: 20px; background: rgba(72,187,120,.04); border: 1px solid rgba(72,187,120,.15); border-radius: 12px; margin-bottom: 24px; }
   .ai-quick-wins h3 { color: ${PRESTIGE.jade}; }
-  .ai-quick-wins li { margin-bottom: 8px; color: rgba(255,255,255,.7); }
+  .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
+  .ai-quick-wins code { background: rgba(196,149,106,.1); color: ${PRESTIGE.copper}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .ai-glossary { padding: 20px; background: rgba(99,102,241,.04); border: 1px solid rgba(99,102,241,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-glossary h3 { color: ${PRESTIGE.copper}; }
+  .ai-glossary li { margin-bottom: 10px; color: rgba(255,255,255,.7); line-height: 1.6; font-size: 13px; }
+  .ai-glossary li strong { color: ${PRESTIGE.white}; }
+  .ai-platform-guide { margin-bottom: 24px; }
+  .ai-team-briefs { padding: 20px; background: rgba(196,149,106,.04); border: 1px solid rgba(196,149,106,.15); border-radius: 12px; margin-bottom: 24px; }
+  .ai-team-briefs h3 { color: ${PRESTIGE.copper}; }
+  .ai-team-briefs em { display: block; padding: 12px 16px; background: ${PRESTIGE.surface}; border-radius: 8px; margin: 8px 0; font-style: italic; color: rgba(255,255,255,.75); line-height: 1.6; font-size: 13px; border-left: 3px solid ${PRESTIGE.copper}; }
+  .action-item code { background: rgba(196,149,106,.1); color: ${PRESTIGE.copper}; padding: 2px 8px; border-radius: 4px; font-size: 12px; display: inline-block; margin: 4px 0; word-break: break-all; }
 
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .stat-item { padding: 16px 20px; background: ${PRESTIGE.surface}; border-radius: 10px; border: 1px solid ${PRESTIGE.border}; }
