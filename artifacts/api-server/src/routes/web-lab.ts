@@ -21,18 +21,25 @@ interface ExtractedWebContent {
 }
 
 async function extractFullWebContent(url: string): Promise<ExtractedWebContent> {
-  await validateUrlWithDnsCheck(url);
-
-  const resp = await fetch(url, {
-    headers: { "User-Agent": BROWSER_UA, Accept: "text/html,application/xhtml+xml" },
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  const finalUrl = resp.url;
-  if (finalUrl !== url) {
-    await validateUrlWithDnsCheck(finalUrl);
+  let currentUrl = url;
+  let resp: globalThis.Response | null = null;
+  for (let hops = 0; hops < 5; hops++) {
+    await validateUrlWithDnsCheck(currentUrl);
+    resp = await fetch(currentUrl, {
+      headers: { "User-Agent": BROWSER_UA, Accept: "text/html,application/xhtml+xml" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (resp.status >= 300 && resp.status < 400) {
+      const location = resp.headers.get("location");
+      if (!location) break;
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+    break;
   }
+  if (!resp) throw new Error("No response received");
+  const finalUrl = currentUrl;
 
   const html = await resp.text();
 
