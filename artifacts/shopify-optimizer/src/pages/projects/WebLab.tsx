@@ -301,7 +301,7 @@ export default function WebLab() {
               return (
                 <div
                   key={h.id}
-                  onClick={() => downloadFromVault(`web-lab/download-report/${h.id}`)}
+                  onClick={() => downloadFromVault(`web-lab/download-report/${h.id}?template=${template}`)}
                   style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                     padding: "10px 14px", background: "#0a0a14", borderRadius: 8, cursor: "pointer",
@@ -652,7 +652,7 @@ export default function WebLab() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {result.vaultIds?.report && (
               <button
-                onClick={() => downloadFromVault(`web-lab/download-report/${result.vaultIds.report}`)}
+                onClick={() => downloadFromVault(`web-lab/download-report/${result.vaultIds.report}?template=${template}`)}
                 style={{
                   padding: "10px 20px",
                   background: "linear-gradient(135deg, #d4a843, #b8860b)",

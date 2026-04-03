@@ -52,13 +52,14 @@ async function extractFullWebContent(url: string): Promise<ExtractedWebContent> 
     let m: RegExpExecArray | null;
     while ((m = re.exec(html)) !== null) {
       let href = m[1];
+      const resolveBase = finalUrl || url;
       if (href.startsWith("//")) href = "https:" + href;
       else if (href.startsWith("/")) {
-        const base = new URL(url);
+        const base = new URL(resolveBase);
         href = base.origin + href;
       } else if (!href.startsWith("http")) {
         try {
-          href = new URL(href, url).toString();
+          href = new URL(href, resolveBase).toString();
         } catch { continue; }
       }
       if (!seen.has(href)) {
