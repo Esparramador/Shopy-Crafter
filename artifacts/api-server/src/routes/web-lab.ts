@@ -245,7 +245,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
 
     const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
-    const tpl: ReportTemplate = template ?? "prestige";
+    const tpl: ReportTemplate = (template && VALID_TEMPLATES.has(template)) ? template : "prestige";
     const reportBody = buildReportBody(analysis, url, pageSpeed, pageSpeedDesktop, scraperData);
     const reportHtml = getReportShell(tpl)(
       "Lab Web — Análisis de Diseño",
@@ -620,7 +620,7 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   }
 
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-  const tpl: ReportTemplate = template ?? "prestige";
+  const tpl: ReportTemplate = (template && VALID_TEMPLATES.has(template)) ? template : "prestige";
   const reportBody = buildReportBody(analysis, url, pageSpeed, pageSpeedDesktop, scraperData);
   const reportHtml = getReportShell(tpl)(
     "Lab Web — Análisis de Diseño",
