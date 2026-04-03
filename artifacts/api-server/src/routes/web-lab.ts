@@ -266,7 +266,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
           mimeType: "text/html",
           generatedBy: "web-lab",
           content: reportHtml,
-          metadata: { url, score: analysis.overallScore, categories: analysis.categories, template: tpl, tags },
+          metadata: { url, score: analysis.overallScore, categories: analysis.categories, template: tpl, tags, analysis: JSON.stringify(analysis) },
         }),
         saveToVault({
           projectId: pid,
@@ -435,23 +435,9 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
         const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
         const tpl = requestedTpl as ReportTemplate;
 
-        const cssFiles = await db.select().from(projectFilesTable).where(
-          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-css"), eq(projectFilesTable.originalUrl, meta.url))
-        );
-        const htmlFiles = await db.select().from(projectFilesTable).where(
-          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-html"), eq(projectFilesTable.originalUrl, meta.url))
-        );
-
-        const analysis: WebLabAnalysis = {
-          overallScore: meta.score ?? 50,
-          categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 },
-          summary: file.description ?? "",
-          issues: [],
-          improvedCss: cssFiles[0]?.content ?? "",
-          improvedHtmlFragments: [],
-          colorPalette: { current: [], improved: [] },
-          typography: { current: [], improved: [] },
-        };
+        const analysis: WebLabAnalysis = meta.analysis
+          ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis)
+          : { overallScore: meta.score ?? 50, categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } };
 
         const reportBody = buildReportBody(analysis, meta.url, null, null, null);
         const reportHtml = getReportShell(tpl)(
@@ -507,23 +493,9 @@ router.post("/web-lab/download-report", async (req: Request, res: Response) => {
     const url = meta?.url ?? "URL desconocida";
     const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
-    const cssFiles = await db.select().from(projectFilesTable).where(
-      and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-css"), eq(projectFilesTable.originalUrl, url))
-    );
-    const htmlFiles = await db.select().from(projectFilesTable).where(
-      and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-html"), eq(projectFilesTable.originalUrl, url))
-    );
-
-    const analysis: WebLabAnalysis = {
-      overallScore: meta?.score ?? 50,
-      categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 },
-      summary: file.description ?? "",
-      issues: [],
-      improvedCss: cssFiles[0]?.content ?? "",
-      improvedHtmlFragments: [],
-      colorPalette: { current: [], improved: [] },
-      typography: { current: [], improved: [] },
-    };
+    const analysis: WebLabAnalysis = meta?.analysis
+      ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis)
+      : { overallScore: meta?.score ?? 50, categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } };
 
     const reportBody = buildReportBody(analysis, url, null, null, null);
     const reportHtml = getReportShell(tpl)(
@@ -663,7 +635,7 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
       mimeType: "text/html",
       generatedBy: "web-lab",
       content: reportHtml,
-      metadata: { url, score: analysis.overallScore, categories: analysis.categories, template: tpl, tags },
+      metadata: { url, score: analysis.overallScore, categories: analysis.categories, template: tpl, tags, analysis: JSON.stringify(analysis) },
     }),
     saveToVault({
       projectId,
