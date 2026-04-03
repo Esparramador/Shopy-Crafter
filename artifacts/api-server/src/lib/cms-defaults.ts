@@ -247,6 +247,11 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "calc-brand-social", name: "Kit Redes Sociales", description: "Templates + colores + tipografías + guía de estilo para posts de Instagram, TikTok, Facebook", price: 147, icon: "📱" },
       { id: "calc-email-templates", name: "Templates Email Marketing", description: "5 templates HTML de email personalizados: bienvenida, carrito abandonado, post-compra, newsletter, oferta", price: 197, icon: "📧" },
       { id: "calc-landing-design", name: "Diseño Landing Page", description: "Landing page completa: wireframe + CSS + textos + secciones — lista para implementar", price: 397, icon: "🖥️" },
+      { id: "calc-lab-web", name: "Lab Web - Análisis Completo Diseño", description: "Extracción HTML/CSS + análisis UX/UI + PageSpeed + competencia", price: 97, icon: "🔬" },
+      { id: "calc-generator", name: "Generador Universal (10 contenidos)", description: "Genera cualquiera de 41 tipos de contenido: blogs, emails, landing copy, producto, social media", price: 47, icon: "✨" },
+      { id: "calc-ab-testing", name: "A/B Testing Inteligente", description: "Diseña y analiza tests A/B de títulos, imágenes, precios con predicción IA", price: 97, icon: "🧪" },
+      { id: "calc-consistency", name: "Auditoría Consistencia Visual", description: "Análisis de coherencia visual entre todos los productos de la tienda", price: 97, icon: "🎯" },
+      { id: "calc-inventory", name: "Gestión Inventario IA", description: "Predicción de stock, alertas de reposición, análisis de rotación", price: 97, icon: "📦" },
     ],
     recurringServices: [
       { id: "calc-rec-free", name: "Starter Free", description: "Auditoría básica + chatbot IA + 3 productos demo + dashboard", price: 0, icon: "🆓" },
@@ -255,6 +260,15 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "calc-rec-performance", name: "Performance Lab", description: "Todo ilimitado + auto-pilot 24/7 + 6 informes Nivel 3 + Klaviyo", price: 397, icon: "⚡" },
       { id: "calc-rec-mant-basico", name: "Mantenimiento Básico", description: "Monitorización + updates menores + soporte email mensual", price: 49, icon: "🔧" },
       { id: "calc-rec-gestion", name: "Gestión Activa", description: "Optimización activa + nuevos productos + campañas mensuales", price: 149, icon: "🎯" },
+    ],
+    categories: [
+      { key: "all", icon: "🔥", label: "Todos", ids: [] as string[] },
+      { key: "products", icon: "📦", label: "Productos", ids: ["calc-product-1", "calc-redesign-1", "calc-redesign-partial", "calc-images-product", "calc-seo-product"] },
+      { key: "packs", icon: "🎁", label: "Packs", ids: ["calc-pack-5", "calc-pack-10", "calc-pack-20", "calc-pack-30", "calc-images-30", "calc-photoshoot"] },
+      { key: "design", icon: "🎨", label: "Diseño", ids: ["calc-theme-css", "calc-theme-section", "calc-homepage", "calc-product-page", "calc-responsive", "calc-brand-kit", "calc-brand-guide", "calc-lab-web"] },
+      { key: "seo", icon: "🔍", label: "SEO", ids: ["calc-seo-full", "calc-blog-5"] },
+      { key: "reports", icon: "📊", label: "Informes", ids: ["calc-audit", "calc-pricing-report", "calc-competitor", "calc-projection", "calc-consistency", "calc-ab-testing"] },
+      { key: "tools", icon: "🛠️", label: "Herramientas", ids: ["calc-generator", "calc-inventory", "calc-email-setup", "calc-supplier", "calc-session", "calc-posts-30", "calc-app-install"] },
     ],
   },
   results: {

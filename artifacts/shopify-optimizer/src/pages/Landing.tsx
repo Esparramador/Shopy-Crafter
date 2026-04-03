@@ -442,13 +442,16 @@ export default function Landing() {
   const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
   const calcActiveServices = calc.oneTimeServices.filter(s => (calcQuantities[s.id] || 0) > 0);
 
-  const calcCategories: { key: string; label: string; icon: string; ids: string[] }[] = [
+  const calcCategories: { key: string; label: string; icon: string; ids: string[] }[] = (calc as Record<string,unknown>).categories && Array.isArray((calc as Record<string,unknown>).categories) && ((calc as Record<string,unknown>).categories as unknown[]).length > 0
+    ? (calc as Record<string,unknown>).categories as { key: string; label: string; icon: string; ids: string[] }[]
+    : [
     { key: "all", label: "Todos", icon: "🔥", ids: [] },
     { key: "products", label: "Productos", icon: "📦", ids: ["calc-product-1", "calc-redesign-1", "calc-redesign-partial", "calc-images-product", "calc-seo-product"] },
     { key: "packs", label: "Packs", icon: "🎁", ids: ["calc-pack-5", "calc-pack-10", "calc-pack-20", "calc-pack-30", "calc-images-30", "calc-photoshoot"] },
-    { key: "design", label: "Diseño", icon: "🎨", ids: ["calc-theme-css", "calc-theme-section", "calc-homepage", "calc-product-page", "calc-responsive", "calc-brand-css", "calc-brand-kit", "calc-brand-guide", "calc-css-section", "calc-landing-design"] },
-    { key: "seo", label: "SEO & Marketing", icon: "🔍", ids: ["calc-seo-full", "calc-email-setup", "calc-posts-30", "calc-blog-5", "calc-brand-social", "calc-email-templates"] },
-    { key: "reports", label: "Informes", icon: "📊", ids: ["calc-audit", "calc-pricing-report", "calc-competitor", "calc-projection", "calc-supplier", "calc-session", "calc-app-install", "calc-photo-brief"] },
+    { key: "design", label: "Diseño", icon: "🎨", ids: ["calc-theme-css", "calc-theme-section", "calc-homepage", "calc-product-page", "calc-responsive", "calc-brand-kit", "calc-brand-guide", "calc-lab-web"] },
+    { key: "seo", label: "SEO", icon: "🔍", ids: ["calc-seo-full", "calc-blog-5"] },
+    { key: "reports", label: "Informes", icon: "📊", ids: ["calc-audit", "calc-pricing-report", "calc-competitor", "calc-projection", "calc-consistency", "calc-ab-testing"] },
+    { key: "tools", label: "Herramientas", icon: "🛠️", ids: ["calc-generator", "calc-inventory", "calc-email-setup", "calc-supplier", "calc-session", "calc-posts-30", "calc-app-install"] },
   ];
   const filteredOneTimeServices = calcCategory === "all"
     ? calc.oneTimeServices
