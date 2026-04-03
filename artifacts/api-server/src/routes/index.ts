@@ -43,6 +43,7 @@ import actionButtonsRouter from "./action-buttons.js";
 import auditRouter from "./audit.js";
 import enrichmentRouter from "./enrichment.js";
 import generatorRouter from "./generator.js";
+import webLabRouter from "./web-lab.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -96,5 +97,6 @@ router.use(actionButtonsRouter);
 router.use(auditRouter);
 router.use("/enrichment", enrichmentRouter);
 router.use(generatorRouter);
+router.use(webLabRouter);
 
 export default router;

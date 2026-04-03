@@ -42,6 +42,9 @@ PostgreSQL with Drizzle ORM manages over 44 tables, including a `platform_type` 
 ### AI Stack (Single Brain Architecture)
 The "ShopyBrain" is a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions for e-commerce operations. All AI interactions pass through ShopyBrain for continuous learning via `learnFromOperation` and `learnFromConversation`, supported by a knowledge search engine, brain sync, and retroactive learning.
 
+### Lab Web (`/projects/:id/web-lab`)
+A deep web design analysis tool that extracts real HTML+CSS from any URL (inline `<style>` + external `.css` files), runs PageSpeed + scraper analysis, and sends the actual code to Claude for professional design review. Outputs: improved CSS (copy-paste-ready .css file), improved HTML fragments, professional report with template selection (Classic/Elegance/Prestige), and before/after visual preview. Everything saves to Vault + ShopyBrain learns from each analysis. Backend: `web-lab.ts` with `extractFullWebContent()`, `runWebLabAnalysis()`. Frontend: `WebLab.tsx` with 4 tabs (Summary, CSS, HTML, Preview). Chatbot action: `analyze_web_design`. Download endpoints: CSS, HTML, report, ZIP pack.
+
 ### Universal Generator (`/projects/:id/generator`)
 A comprehensive content generation tool with 41 types across 9 categories: SEO (8), Informes (7), Marca & Diseño (7), Competencia (3), Finanzas (3), Contenido (5), Datos (4), Análisis Externo (2), Agencia (2). Every generation: (1) produces professional downloadable content, (2) saves to Vault, (3) triggers `learnFromOperation` for ShopyBrain. Supports external URLs for competitive analysis. API: `POST /api/generator/run`, `GET /api/generator/types`, `GET /api/generator/history/:id`, `GET /api/generator/download/:vaultId`. Chatbot action: `run_universal_generator`. Frontend: `UniversalGenerator.tsx`.
 

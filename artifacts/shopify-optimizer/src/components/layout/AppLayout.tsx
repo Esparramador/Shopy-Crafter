@@ -23,6 +23,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "vault",       label: "Repositorio",  icon: "🗄️" },
   { id: "exports",     label: "Exportar",     icon: "📥" },
   { id: "generator",   label: "Generador IA", icon: "✨" },
+  { id: "web-lab",     label: "Lab Web",      icon: "🔬" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
@@ -37,6 +38,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
   { label: "Generador Universal IA", icon: "✨", href: "/projects/2/generator" },
+  { label: "Lab Web", icon: "🔬", href: "/projects/2/web-lab" },
   { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
 ];

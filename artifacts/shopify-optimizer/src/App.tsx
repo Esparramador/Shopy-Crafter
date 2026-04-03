@@ -35,6 +35,7 @@ import ProjectVault from "@/pages/admin/ProjectVault";
 import GlobalVault from "@/pages/admin/GlobalVault";
 import ExportCenter from "@/pages/projects/ExportCenter";
 import UniversalGenerator from "@/pages/projects/UniversalGenerator";
+import WebLab from "@/pages/projects/WebLab";
 import ForgotPassword from "@/pages/ForgotPassword";
 import OAuthSuccess from "@/pages/OAuthSuccess";
 import AuditPage from "@/pages/projects/Audit";
@@ -470,6 +471,14 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><UniversalGenerator /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+
+        <Route path="/projects/:id/web-lab">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><WebLab /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

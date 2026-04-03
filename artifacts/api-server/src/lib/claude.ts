@@ -510,6 +510,8 @@ export function learnFromOperation(params: {
     chatbot_action_list_all_products: "general",
     chatbot_action_search_suppliers: "competitor_intel",
     chatbot_action_modify_audit_filter: "general",
+    web_lab_design_analysis: "general",
+    web_lab_css_patterns: "general",
     chatbot_action_diagnose_app: "general",
     chatbot_action_list_source_files: "general",
     chatbot_action_inspect_code: "general",
