@@ -206,18 +206,18 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
     contextParts.push(`\n--- CSS REAL (inline + ${extraction.stylesheetUrls.length} archivos externos, primeros ${cssForClaude.length} chars) ---\n${cssForClaude}`);
 
     if (pageSpeed) {
-      contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performance}/100 | SEO: ${pageSpeed.seo}/100 | Accessibility: ${pageSpeed.accessibility}/100 | Best Practices: ${pageSpeed.bestPractices}/100`);
+      contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performanceScore}/100 | SEO: ${pageSpeed.seoScore}/100 | Accessibility: ${pageSpeed.accessibilityScore}/100 | Best Practices: ${pageSpeed.bestPracticesScore}/100`);
       if (pageSpeed.coreWebVitals) {
         const cwv = pageSpeed.coreWebVitals;
         contextParts.push(`Core Web Vitals — LCP: ${cwv.lcp?.value}${cwv.lcp?.unit} (${cwv.lcp?.status}) | CLS: ${cwv.cls?.value} (${cwv.cls?.status}) | FCP: ${cwv.fcp?.value}${cwv.fcp?.unit} (${cwv.fcp?.status})`);
       }
     }
     if (pageSpeedDesktop) {
-      contextParts.push(`\n--- PAGESPEED DESKTOP ---\nPerformance: ${pageSpeedDesktop.performance}/100 | SEO: ${pageSpeedDesktop.seo}/100 | Accessibility: ${pageSpeedDesktop.accessibility}/100`);
+      contextParts.push(`\n--- PAGESPEED DESKTOP ---\nPerformance: ${pageSpeedDesktop.performanceScore}/100 | SEO: ${pageSpeedDesktop.seoScore}/100 | Accessibility: ${pageSpeedDesktop.accessibilityScore}/100`);
     }
 
     if (scraperData) {
-      contextParts.push(`\n--- SCRAPER DATA ---\nTitle: ${scraperData.title}\nMeta Description: ${scraperData.metaDescription}\nH1s: ${scraperData.h1s?.join(", ")}\nTotal Images: ${scraperData.totalImages} | Missing Alt: ${scraperData.imagesMissingAlt?.length ?? 0}\nInternal Links: ${scraperData.internalLinks} | External Links: ${scraperData.externalLinks}`);
+      contextParts.push(`\n--- SCRAPER DATA ---\nTitle: ${scraperData.title}\nMeta Description: ${scraperData.metaDescription}\nH1s: ${scraperData.headings?.h1?.join(", ")}\nTotal Images: ${scraperData.images?.total} | Missing Alt: ${scraperData.images?.withoutAlt ?? 0}\nInternal Links: ${scraperData.links?.internal} | External Links: ${scraperData.links?.external}`);
     }
 
     const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES extraídos directamente del sitio.\n\n${contextParts.join("\n")}`;
@@ -324,16 +324,16 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       analysis,
       vaultIds: { report: vaultReportId, css: vaultCssId, html: vaultHtmlId },
       pageSpeed: pageSpeed ? {
-        mobile: { performance: pageSpeed.performance, seo: pageSpeed.seo, accessibility: pageSpeed.accessibility, bestPractices: pageSpeed.bestPractices },
-        desktop: pageSpeedDesktop ? { performance: pageSpeedDesktop.performance, seo: pageSpeedDesktop.seo, accessibility: pageSpeedDesktop.accessibility } : null,
+        mobile: { performance: pageSpeed.performanceScore, seo: pageSpeed.seoScore, accessibility: pageSpeed.accessibilityScore, bestPractices: pageSpeed.bestPracticesScore },
+        desktop: pageSpeedDesktop ? { performance: pageSpeedDesktop.performanceScore, seo: pageSpeedDesktop.seoScore, accessibility: pageSpeedDesktop.accessibilityScore } : null,
         coreWebVitals: pageSpeed.coreWebVitals,
       } : null,
       scraperData: scraperData ? {
         title: scraperData.title,
         metaDescription: scraperData.metaDescription,
-        h1s: scraperData.h1s,
-        totalImages: scraperData.totalImages,
-        imagesMissingAlt: scraperData.imagesMissingAlt?.length ?? 0,
+        h1s: scraperData.headings?.h1,
+        totalImages: scraperData.images?.total,
+        imagesMissingAlt: scraperData.images?.withoutAlt ?? 0,
       } : null,
       url,
       template: tpl,
@@ -615,13 +615,13 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   contextParts.push(`\n--- CSS REAL (${extraction.stylesheetUrls.length} archivos) ---\n${cssForClaude}`);
 
   if (pageSpeed) {
-    contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performance}/100 | SEO: ${pageSpeed.seo}/100 | Accessibility: ${pageSpeed.accessibility}/100`);
+    contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performanceScore}/100 | SEO: ${pageSpeed.seoScore}/100 | Accessibility: ${pageSpeed.accessibilityScore}/100`);
   }
   if (pageSpeedDesktop) {
-    contextParts.push(`\n--- PAGESPEED DESKTOP ---\nPerformance: ${pageSpeedDesktop.performance}/100 | SEO: ${pageSpeedDesktop.seo}/100 | Accessibility: ${pageSpeedDesktop.accessibility}/100`);
+    contextParts.push(`\n--- PAGESPEED DESKTOP ---\nPerformance: ${pageSpeedDesktop.performanceScore}/100 | SEO: ${pageSpeedDesktop.seoScore}/100 | Accessibility: ${pageSpeedDesktop.accessibilityScore}/100`);
   }
   if (scraperData) {
-    contextParts.push(`\n--- SCRAPER ---\nTitle: ${scraperData.title}\nH1s: ${scraperData.h1s?.join(", ")}\nImages: ${scraperData.totalImages}`);
+    contextParts.push(`\n--- SCRAPER ---\nTitle: ${scraperData.title}\nH1s: ${scraperData.headings?.h1?.join(", ")}\nImages: ${scraperData.images?.total}`);
   }
 
   const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES.\n\n${contextParts.join("\n")}`;
@@ -835,19 +835,19 @@ function buildReportBody(
   <h3 style="margin-top:32px;margin-bottom:12px;">⚡ PageSpeed Insights</h3>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
     <div style="background:#1a1a2e;padding:12px;border-radius:8px;text-align:center;">
-      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.performance)};">${pageSpeedMobile.performance}</div>
+      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.performanceScore)};">${pageSpeedMobile.performanceScore}</div>
       <div style="font-size:11px;color:#888;">Performance</div>
     </div>
     <div style="background:#1a1a2e;padding:12px;border-radius:8px;text-align:center;">
-      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.seo)};">${pageSpeedMobile.seo}</div>
+      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.seoScore)};">${pageSpeedMobile.seoScore}</div>
       <div style="font-size:11px;color:#888;">SEO</div>
     </div>
     <div style="background:#1a1a2e;padding:12px;border-radius:8px;text-align:center;">
-      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.accessibility)};">${pageSpeedMobile.accessibility}</div>
+      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.accessibilityScore)};">${pageSpeedMobile.accessibilityScore}</div>
       <div style="font-size:11px;color:#888;">Accesibilidad</div>
     </div>
     <div style="background:#1a1a2e;padding:12px;border-radius:8px;text-align:center;">
-      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.bestPractices)};">${pageSpeedMobile.bestPractices}</div>
+      <div style="font-size:24px;font-weight:700;color:${scoreColor(pageSpeedMobile.bestPracticesScore)};">${pageSpeedMobile.bestPracticesScore}</div>
       <div style="font-size:11px;color:#888;">Best Practices</div>
     </div>
   </div>`;
