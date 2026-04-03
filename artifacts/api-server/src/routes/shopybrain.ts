@@ -17,6 +17,13 @@ import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import * as fs from "fs";
 import * as path from "path";
 
+type ReportTemplate = "classic" | "elegance" | "prestige";
+const VALID_TEMPLATES = new Set<ReportTemplate>(["classic", "elegance", "prestige"]);
+function parseTemplate(val: unknown): ReportTemplate {
+  if (typeof val === "string" && VALID_TEMPLATES.has(val as ReportTemplate)) return val as ReportTemplate;
+  return "prestige";
+}
+
 function findWorkspaceRoot(): string {
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
@@ -5447,7 +5454,7 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
             projectId: parseInt(String(projectId)),
             url: params?.url,
             format: "html",
-            template: (params?.template as any) || "prestige",
+            template: parseTemplate(params?.template),
             extraParams: {},
           });
           result = {
@@ -5485,7 +5492,7 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
           const labResult = await runWebLabAnalysis(
             String(targetUrl),
             parseInt(String(projectId)),
-            (params?.template as any) || "prestige"
+            parseTemplate(params?.template)
           );
           const a = labResult.analysis;
           const cats = a.categories;

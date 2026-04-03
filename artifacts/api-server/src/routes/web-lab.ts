@@ -12,6 +12,7 @@ import archiver from "archiver";
 const router = Router();
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const VALID_TEMPLATES = new Set<ReportTemplate>(["classic", "elegance", "prestige"]);
 
 interface ExtractedWebContent {
   html: string;
@@ -307,6 +308,14 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
         confidence: 0.8,
         tags: ["web-lab", "css-patterns", "design-tokens"],
       });
+
+      learnFromOperation({
+        operationType: "web_lab_ux_insights",
+        title: `UX/Accesibilidad insights: ${url}`,
+        content: `UX Score: ${analysis.categories.ux}/100. Accesibilidad: ${analysis.categories.accessibility}/100. Responsive: ${analysis.categories.responsive}/100. Issues UX/a11y: ${analysis.issues.filter(i => ["accessibility", "ux", "responsive"].some(k => i.property?.toLowerCase().includes(k) || i.selector?.toLowerCase().includes(k))).length}. Resumen: ${analysis.summary}`,
+        confidence: 0.8,
+        tags: ["web-lab", "ux-insights", "accessibility"],
+      });
     }
 
     res.json({
@@ -411,9 +420,122 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
     );
     if (!file?.content) return res.status(404).json({ error: "Informe no encontrado" });
 
+    const requestedTpl = req.query.template;
+    if (requestedTpl && VALID_TEMPLATES.has(requestedTpl as ReportTemplate)) {
+      const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+      const storedTpl = meta?.template ?? "prestige";
+      if (requestedTpl !== storedTpl && meta?.url) {
+        const projectId = file.projectId;
+        let projectName = "Análisis externo";
+        if (projectId) {
+          const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+          if (proj) projectName = proj.name ?? projectName;
+        }
+        const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+        const tpl = requestedTpl as ReportTemplate;
+
+        const cssFiles = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-css"), eq(projectFilesTable.originalUrl, meta.url))
+        );
+        const htmlFiles = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-html"), eq(projectFilesTable.originalUrl, meta.url))
+        );
+
+        const analysis: WebLabAnalysis = {
+          overallScore: meta.score ?? 50,
+          categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 },
+          summary: file.description ?? "",
+          issues: [],
+          improvedCss: cssFiles[0]?.content ?? "",
+          improvedHtmlFragments: [],
+          colorPalette: { current: [], improved: [] },
+          typography: { current: [], improved: [] },
+        };
+
+        const reportBody = buildReportBody(analysis, meta.url, null, null, null);
+        const reportHtml = getReportShell(tpl)(
+          "Lab Web — Análisis de Diseño",
+          `${projectName} — ${meta.url}`,
+          reportBody,
+          date,
+          projectName
+        );
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="web-lab-report-${tpl}.html"`);
+        return res.send(reportHtml);
+      }
+    }
+
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="web-lab-report.html"`);
     res.send(file.content);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/web-lab/download-report", async (req: Request, res: Response) => {
+  try {
+    const { vaultId, template: rawTemplate } = req.body;
+    if (!vaultId) return res.status(400).json({ error: "vaultId requerido" });
+
+    const tpl: ReportTemplate = VALID_TEMPLATES.has(rawTemplate) ? rawTemplate : "prestige";
+    const vid = parseInt(String(vaultId));
+    const [file] = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.id, vid), eq(projectFilesTable.fileType, "web-lab-report"))
+    );
+    if (!file?.content) return res.status(404).json({ error: "Informe no encontrado" });
+
+    const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+    const storedTpl = meta?.template ?? "prestige";
+
+    if (tpl === storedTpl) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="web-lab-report-${tpl}.html"`);
+      return res.send(file.content);
+    }
+
+    const projectId = file.projectId;
+    let projectName = "Análisis externo";
+    if (projectId) {
+      const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (proj) projectName = proj.name ?? projectName;
+    }
+
+    const url = meta?.url ?? "URL desconocida";
+    const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+    const cssFiles = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-css"), eq(projectFilesTable.originalUrl, url))
+    );
+    const htmlFiles = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "web-lab-html"), eq(projectFilesTable.originalUrl, url))
+    );
+
+    const analysis: WebLabAnalysis = {
+      overallScore: meta?.score ?? 50,
+      categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 },
+      summary: file.description ?? "",
+      issues: [],
+      improvedCss: cssFiles[0]?.content ?? "",
+      improvedHtmlFragments: [],
+      colorPalette: { current: [], improved: [] },
+      typography: { current: [], improved: [] },
+    };
+
+    const reportBody = buildReportBody(analysis, url, null, null, null);
+    const reportHtml = getReportShell(tpl)(
+      "Lab Web — Análisis de Diseño",
+      `${projectName} — ${url}`,
+      reportBody,
+      date,
+      projectName
+    );
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="web-lab-report-${tpl}.html"`);
+    res.send(reportHtml);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -470,9 +592,10 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   analysis: WebLabAnalysis;
   vaultIds: { report: number | null; css: number | null; html: number | null };
 }> {
-  const [extraction, pageSpeed, scraperData] = await Promise.all([
+  const [extraction, pageSpeed, pageSpeedDesktop, scraperData] = await Promise.all([
     extractFullWebContent(url),
     runPageSpeedAudit(url, "mobile").catch(() => null),
+    runPageSpeedAudit(url, "desktop").catch(() => null),
     scrapeWebsite(url).catch(() => null),
   ]);
 
@@ -491,7 +614,10 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   contextParts.push(`\n--- CSS REAL (${extraction.stylesheetUrls.length} archivos) ---\n${cssForClaude}`);
 
   if (pageSpeed) {
-    contextParts.push(`\n--- PAGESPEED ---\nPerformance: ${pageSpeed.performance}/100 | SEO: ${pageSpeed.seo}/100 | Accessibility: ${pageSpeed.accessibility}/100`);
+    contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performance}/100 | SEO: ${pageSpeed.seo}/100 | Accessibility: ${pageSpeed.accessibility}/100`);
+  }
+  if (pageSpeedDesktop) {
+    contextParts.push(`\n--- PAGESPEED DESKTOP ---\nPerformance: ${pageSpeedDesktop.performance}/100 | SEO: ${pageSpeedDesktop.seo}/100 | Accessibility: ${pageSpeedDesktop.accessibility}/100`);
   }
   if (scraperData) {
     contextParts.push(`\n--- SCRAPER ---\nTitle: ${scraperData.title}\nH1s: ${scraperData.h1s?.join(", ")}\nImages: ${scraperData.totalImages}`);
@@ -515,7 +641,7 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
 
   const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const tpl: ReportTemplate = template ?? "prestige";
-  const reportBody = buildReportBody(analysis, url, pageSpeed, null, scraperData);
+  const reportBody = buildReportBody(analysis, url, pageSpeed, pageSpeedDesktop, scraperData);
   const reportHtml = getReportShell(tpl)(
     "Lab Web — Análisis de Diseño",
     `${projectName} — ${url}`,
@@ -567,9 +693,25 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   learnFromOperation({
     operationType: "web_lab_design_analysis",
     title: `Análisis diseño web: ${url} — Score ${analysis.overallScore}/100`,
-    content: `Score: ${analysis.overallScore}/100. Issues: ${analysis.issues.length}. ${analysis.summary}`,
+    content: `Score: ${analysis.overallScore}/100. Categorías: Diseño ${analysis.categories.design}, UX ${analysis.categories.ux}, Responsive ${analysis.categories.responsive}, Accesibilidad ${analysis.categories.accessibility}, Performance ${analysis.categories.performance}, Consistencia ${analysis.categories.consistency}. Issues: ${analysis.issues.length}. ${analysis.summary}`,
     confidence: 0.85,
     tags: ["web-lab", "design-analysis", url],
+  });
+
+  learnFromOperation({
+    operationType: "web_lab_css_patterns",
+    title: `Patrones CSS detectados en ${url}`,
+    content: `Paleta actual: ${analysis.colorPalette?.current?.join(", ")}. Paleta mejorada: ${analysis.colorPalette?.improved?.join(", ")}. Tipografía actual: ${analysis.typography?.current?.join(", ")}. Recomendada: ${analysis.typography?.improved?.join(", ")}. Issues CSS principales: ${analysis.issues.slice(0, 5).map(i => `${i.selector} → ${i.property}: ${i.current} → ${i.improved}`).join("; ")}`,
+    confidence: 0.8,
+    tags: ["web-lab", "css-patterns", "design-tokens"],
+  });
+
+  learnFromOperation({
+    operationType: "web_lab_ux_insights",
+    title: `UX/Accesibilidad insights: ${url}`,
+    content: `UX Score: ${analysis.categories.ux}/100. Accesibilidad: ${analysis.categories.accessibility}/100. Responsive: ${analysis.categories.responsive}/100. Issues UX/a11y: ${analysis.issues.filter(i => ["accessibility", "ux", "responsive"].some(k => i.property?.toLowerCase().includes(k) || i.selector?.toLowerCase().includes(k))).length}. Resumen: ${analysis.summary}`,
+    confidence: 0.8,
+    tags: ["web-lab", "ux-insights", "accessibility"],
   });
 
   return {
