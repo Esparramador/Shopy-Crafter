@@ -1015,7 +1015,7 @@ router.get("/lead-reports/:fileId/download", requireAdmin, async (req, res): Pro
   }
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+  res.setHeader("Content-Disposition", `inline; filename="${filename}.html"`);
   res.send(file.content);
 });
 

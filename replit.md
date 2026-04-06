@@ -31,7 +31,10 @@ All 6 individual reports (SEO, Financial, Consistency, Inventory, Redesigns, Rev
 The chatbot supports extensive AI responses (`maxTokens` of 16384), file uploads (images, videos, documents), and includes a document absorption feature for ShopyBrain memory. Display truncations are removed or increased, and three report templates (classic, elegance, prestige) are available for all exports.
 
 ### Global Vault
-A centralized "Bóveda Global" stores reports, images, and research from projects and external entities, managed via a `project_files` database table and accessible through API routes and a dedicated frontend page (`/admin/vault`).
+A centralized "Bóveda Global" stores reports, images, and research from projects and external entities, managed via a `project_files` database table and accessible through API routes and a dedicated frontend page (`/admin/vault`). Pre-informes (lead_prereport) appear as external entities with full View/PDF/Download actions. File types: image, seo_report, seo_audit, redesign, ab_test, email, pricing_report, audit, consistency, bulk_export, product_card, research, competitor, report, lead_prereport, generator, web_lab.
+
+### Universal Search (`/admin/search`)
+A standalone search and audit tool accessible from the sidebar ("Buscador Universal"). Allows searching/analyzing any URL, Shopify store, Instagram account, or brand name without requiring a project context. Auto-detects input type (Instagram, Shopify, URL, Brand). Uses `POST /api/shopybrain/research-entity-sync` for deep AI research (8 dimensions via Google). Results saved to vault as external entities. Recent searches persisted in localStorage.
 
 ### Universal Web Audit System
 This system audits any website using the Google PageSpeed Insights API, an internal web scraper, and Claude AI for analysis, storing detailed results in the `audit_results` table. Each audit contributes to ShopyBrain's learning via `learnFromOperation()`.

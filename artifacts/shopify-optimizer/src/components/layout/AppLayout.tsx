@@ -41,6 +41,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
   { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
+  { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
 ];
 
 const DEFAULT_ADMIN_NAV = [

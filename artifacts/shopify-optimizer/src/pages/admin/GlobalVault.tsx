@@ -27,12 +27,17 @@ const FILE_TYPE_CONFIG: Record<string, { label: string; icon: typeof Image; colo
   product_card:   { label: "Productos",          icon: Package,               color: "#c8a84b" },
   research:       { label: "Investigación",      icon: Globe,                 color: "#3498db" },
   competitor:     { label: "Competencia",        icon: BarChart2,             color: "#e74c3c" },
+  report:         { label: "Pre-Informes",       icon: FileText,              color: "#c4956a" },
+  lead_prereport: { label: "Pre-Informes Lead",  icon: FileText,              color: "#c4956a" },
+  generator:      { label: "Generador IA",       icon: Wand2,                 color: "#8e44ad" },
+  web_lab:        { label: "Lab Web",            icon: Globe,                 color: "#16a085" },
 };
 
 const FOLDER_ORDER = [
-  "audit", "seo_report", "seo_audit", "image", "redesign", "research",
-  "competitor", "ab_test", "ab_testing", "consistency", "pricing_report",
-  "financial", "product_card", "email", "bulk_export",
+  "report", "lead_prereport", "audit", "seo_report", "seo_audit", "image",
+  "redesign", "research", "competitor", "ab_test", "ab_testing", "consistency",
+  "pricing_report", "financial", "product_card", "email", "generator",
+  "web_lab", "bulk_export",
 ];
 
 interface Entity {
@@ -547,11 +552,35 @@ export default function GlobalVault() {
                     </div>
 
                     <div style={{ display: "flex", gap: 6 }}>
+                      {file.category === "lead_prereport" && (
+                        <button
+                          onClick={() => window.open(`${API_BASE}/api/lead-reports/${file.id}/download`, "_blank")}
+                          title="Ver en navegador"
+                          style={{
+                            background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)",
+                            borderRadius: 8, padding: 7, cursor: "pointer", color: "#3b82f6",
+                          }}
+                        >
+                          <Eye size={15} />
+                        </button>
+                      )}
+                      {file.category === "lead_prereport" && (
+                        <button
+                          onClick={() => window.open(`${API_BASE}/api/lead-reports/${file.id}/download?format=pdf`, "_blank")}
+                          title="Descargar PDF"
+                          style={{
+                            background: "rgba(196,149,106,0.1)", border: "1px solid rgba(196,149,106,0.2)",
+                            borderRadius: 8, padding: 7, cursor: "pointer", color: "#c4956a",
+                          }}
+                        >
+                          <FileText size={15} />
+                        </button>
+                      )}
                       {file.downloadUrl && (
                         <button
                           onClick={() => handleDownload(file)}
                           disabled={downloading === file.id}
-                          title="Descargar"
+                          title="Descargar HTML"
                           style={{
                             background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.2)",
                             borderRadius: 8, padding: 7, cursor: "pointer", color: "#c8a84b",

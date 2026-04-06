@@ -33,6 +33,7 @@ import Emails from "@/pages/admin/Emails";
 import EmailTemplates from "@/pages/admin/EmailTemplates";
 import ProjectVault from "@/pages/admin/ProjectVault";
 import GlobalVault from "@/pages/admin/GlobalVault";
+import UniversalSearch from "@/pages/admin/UniversalSearch";
 import ExportCenter from "@/pages/projects/ExportCenter";
 import UniversalGenerator from "@/pages/projects/UniversalGenerator";
 import WebLab, { WebLabStandalone } from "@/pages/projects/WebLab";
@@ -303,6 +304,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><GlobalVault /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/search">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><UniversalSearch /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>
