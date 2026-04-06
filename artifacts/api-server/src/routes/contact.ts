@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { db, auditLogTable } from "@workspace/db";
+import { projectFilesTable } from "@workspace/db/schema";
+import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
@@ -10,6 +12,7 @@ import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { requireAdmin } from "../lib/auth.js";
 import { getReportShell } from "./exports.js";
+import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 
 const router = Router();
 
@@ -54,6 +57,15 @@ interface ProductSample {
   variants?: { option: string; values: string[] }[];
   priceStrategy: string;
   improvementNotes: string;
+  handle: string;
+  vendor: string;
+  seoKeywords: string[];
+  schemaJsonLd: string;
+  ogTitle: string;
+  ogDescription: string;
+  altText: string;
+  faqItems?: { question: string; answer: string }[];
+  generatedImagePrompt?: string;
 }
 
 function sanitizeAiHtml(html: string): string {
@@ -197,24 +209,63 @@ async function generateProductSample(lead: LeadData): Promise<ProductSample | nu
       ? `El cliente ha proporcionado una imagen de producto: ${lead.productImageUrl}`
       : `Analiza la tienda ${lead.storeUrl} y elige un producto representativo para optimizar.`;
 
+    const isServiceBusiness = !lead.productImageUrl && (
+      nicheInfo.toLowerCase().includes("servicio") ||
+      nicheInfo.toLowerCase().includes("consultor") ||
+      nicheInfo.toLowerCase().includes("agencia") ||
+      nicheInfo.toLowerCase().includes("coaching") ||
+      nicheInfo.toLowerCase().includes("formacion") ||
+      nicheInfo.toLowerCase().includes("software") ||
+      nicheInfo.toLowerCase().includes("saas") ||
+      nicheInfo.toLowerCase().includes("digital") ||
+      nicheInfo.toLowerCase().includes("marketing") ||
+      nicheInfo.toLowerCase().includes("diseno") ||
+      nicheInfo.toLowerCase().includes("fotograf") ||
+      nicheInfo.toLowerCase().includes("limpieza") ||
+      nicheInfo.toLowerCase().includes("reparacion") ||
+      nicheInfo.toLowerCase().includes("salud") ||
+      nicheInfo.toLowerCase().includes("belleza") ||
+      nicheInfo.toLowerCase().includes("peluquer") ||
+      nicheInfo.toLowerCase().includes("fitness") ||
+      nicheInfo.toLowerCase().includes("yoga") ||
+      nicheInfo.toLowerCase().includes("clinica") ||
+      nicheInfo.toLowerCase().includes("abogad") ||
+      nicheInfo.toLowerCase().includes("legal") ||
+      nicheInfo.toLowerCase().includes("contab") ||
+      nicheInfo.toLowerCase().includes("inmobiliar")
+    );
+
+    const imageGenInstruction = isServiceBusiness
+      ? `\n- generatedImagePrompt: Prompt DETALLADO en ingles (100-150 palabras) para generar una imagen profesional de marketing que represente este servicio/negocio. Incluir: estilo fotografico (profesional, minimalista, corporativo), elementos visuales clave, paleta de colores sugerida, composicion, ambiente. Ejemplo: "Professional minimalist photograph of a modern coworking space with natural lighting, clean white desks, laptop computers, potted plants, soft warm tones, bokeh background, corporate branding style, high-end commercial photography"`
+      : `\n- generatedImagePrompt: Prompt DETALLADO en ingles (100-150 palabras) para generar una imagen de producto profesional para ecommerce. Incluir: tipo de fotografia (producto aislado, lifestyle, flatlay), fondo, iluminacion, angulo, estilo visual. Ejemplo: "Professional product photography of premium organic cotton t-shirt, clean white background, studio lighting, 45-degree angle, folded neatly, lifestyle elements, high-end ecommerce style"`;
+
     const sample = await askClaudeJsonWithBrain(
-      2,
+      0,
       `${imageContext}
 Nicho: ${nicheInfo}. Facturacion: ${lead.revenue || "No especificada"}.${extraContext}
+${isServiceBusiness ? "IMPORTANTE: Este negocio vende SERVICIOS, no productos fisicos. Adapta el producto como un 'paquete de servicio' o 'plan' con estructura profesional de pricing." : ""}
 
-Genera un producto de muestra COMPLETAMENTE OPTIMIZADO para esta tienda. Incluye:
-- title: Titulo SEO optimizado (60-70 chars, keywords naturales)
-- description: Descripcion de venta persuasiva (150-300 palabras con beneficios, caracteristicas tecnicas, materiales, casos de uso)
-- seoTitle: Meta title para Google (max 60 chars)
-- seoDescription: Meta description para Google (max 155 chars, con CTA)
-- tags: Array de 8-12 tags relevantes (incluir nicho, material, uso, estilo, temporada)
-- productType: Tipo de producto
-- variants: Array de variantes relevantes segun el nicho. Para ROPA incluir [{option:"Talla",values:["XS","S","M","L","XL","XXL"]},{option:"Color",values:["Negro","Blanco","Azul Marino"]},{option:"Material",values:["Algodon organico","Poliester reciclado"]}]. Para CALZADO incluir tallas de pie (36-46). Para JOYERIA incluir tallas de anillo, tipo de metal. Para ALIMENTACION incluir peso/formato. Adaptar 100% al nicho real.
-- priceStrategy: Estrategia de precio recomendada con margen estimado
-- improvementNotes: 3-5 mejoras concretas que aplicariamos con datos de impacto estimado en ventas
+Genera un producto/servicio de muestra COMPLETAMENTE OPTIMIZADO para Shopify con TODOS los campos SEO al 100%. Incluye:
+- title: Titulo SEO optimizado (50-65 chars, keywords naturales, incluir marca si aplica)
+- description: Descripcion de venta persuasiva (200-400 palabras con beneficios, caracteristicas, materiales/metodologia, casos de uso, storytelling, bullet points HTML)
+- seoTitle: Meta title para Google (max 60 chars, keyword principal al inicio, marca al final)
+- seoDescription: Meta description para Google (max 155 chars, con CTA, keyword, beneficio principal)
+- handle: URL slug optimizado SEO (kebab-case, sin acentos, keywords, max 60 chars). Ejemplo: "camiseta-algodon-organico-premium"
+- vendor: Nombre de marca/empresa del lead
+- tags: Array de 10-15 tags relevantes (nicho, material, uso, estilo, temporada, ubicacion, tipo)
+- productType: Tipo de producto/servicio
+- seoKeywords: Array de 8-10 keywords de cola larga que deberia posicionar este producto (con volumen estimado)
+- variants: Array de variantes segun nicho. ROPA: [{option:"Talla",values:["XS","S","M","L","XL","XXL"]},{option:"Color",values:["Negro","Blanco","Azul Marino"]}]. CALZADO: tallas 36-46. SERVICIOS: [{option:"Plan",values:["Basico","Profesional","Premium"]},{option:"Duracion",values:["1 mes","3 meses","6 meses"]}]
+- priceStrategy: Estrategia de precio con margen estimado, pricing psicologico, y comparativa sector
+- improvementNotes: 5 mejoras concretas con impacto estimado en conversion/ventas
+- schemaJsonLd: Codigo Schema.org JSON-LD COMPLETO para este producto (Product o Service schema con name, description, offers, aggregateRating, brand, sku). Devuelve como STRING.
+- ogTitle: Titulo Open Graph para redes sociales (max 65 chars, atractivo, con emoji si aplica)
+- ogDescription: Descripcion Open Graph (max 200 chars, con CTA y beneficio)
+- altText: Alt text optimizado para la imagen principal (descriptivo, con keyword, max 125 chars)
+- faqItems: Array de 3-5 preguntas frecuentes [{question:"...", answer:"..."}] relevantes para este producto/servicio (para FAQ Schema)${imageGenInstruction}
 
 Responde SOLO con JSON valido.`,
-      `Eres el motor de inteligencia artificial de Shopy Crafter. Generas productos Shopify optimizados profesionalmente. Cada campo debe ser de calidad profesional lista para publicar. Los variantes deben ser especificos del nicho (tallas para ropa, numeros de pie para calzado, colores reales, materiales reales, pesos para alimentacion, etc). Responde en espanol.`,
+      `Eres el motor de inteligencia artificial de Shopy Crafter. Generas productos Shopify optimizados profesionalmente al 100/100 en SEO score. Cada campo debe ser de calidad profesional lista para publicar. Incluye TODOS los campos de metadatos SEO de Shopify: meta title, meta description, handle, Schema JSON-LD, Open Graph, alt texts, FAQ schema. Los variantes deben ser especificos del nicho. Para negocios de SERVICIOS, crea paquetes/planes con pricing estructurado. Responde en espanol.`,
       "general",
       nicheInfo,
     );
@@ -434,60 +485,132 @@ function buildReportHtml(
     ? research.sources.map(s => `<li><a href="${safeUrl(s)}" class="link" style="word-break:break-all;">${esc(s)}</a></li>`).join("")
     : "<li class=\"muted\">Sin fuentes verificadas</li>";
 
-  const productSampleHtml = research.productSample ? `
-    <div class="section">
-      <div class="section-title">Producto Optimizado por Shopy Crafter (Muestra)</div>
-      <div class="ai-deliverable">
-        <div class="ai-deliverable-header">Ejemplo de optimizacion completa aplicada a tu nicho</div>
+  const ps = research.productSample;
+  const productSampleHtml = ps ? `
+    <div class="section" style="page-break-before:always;">
+      <div class="section-title">Producto Optimizado por Shopy Crafter — Score SEO 100/100</div>
+      <div class="card" style="padding:28px;">
+        <div class="ai-deliverable">
+          <div class="ai-deliverable-header">Producto/Servicio de muestra optimizado al 100% para tu nicho</div>
 
-        <div class="ai-field">
-          <div class="ai-field-label">Titulo Optimizado</div>
-          <div class="ai-field-value" style="font-size:17px;font-weight:700;">${esc(research.productSample.title)}</div>
-        </div>
-
-        <div class="ai-field">
-          <div class="ai-field-label">Descripcion de Venta</div>
-          <div class="ai-field-value">${esc(research.productSample.description)}</div>
-        </div>
-
-        <div class="highlight-box highlight-success">
-          <div class="ai-field" style="margin-bottom:12px;">
-            <div class="ai-field-label">SEO Title (Google)</div>
-            <div class="ai-field-value" style="font-weight:600;">${esc(research.productSample.seoTitle)}</div>
+          <div class="ai-field">
+            <div class="ai-field-label">Titulo Optimizado (Shopify Title)</div>
+            <div class="ai-field-value" style="font-size:17px;font-weight:700;">${esc(ps.title)}</div>
           </div>
-          <div class="ai-field" style="margin-bottom:0;">
-            <div class="ai-field-label">SEO Description (Google)</div>
-            <div class="ai-field-value">${esc(research.productSample.seoDescription)}</div>
+
+          <div class="ai-field">
+            <div class="ai-field-label">URL Handle (Slug SEO)</div>
+            <div class="ai-field-value"><code style="background:rgba(196,149,106,.1);color:#c4956a;padding:4px 10px;border-radius:4px;font-size:13px;">/${esc(ps.handle || "producto-optimizado")}</code></div>
           </div>
-        </div>
 
-        ${research.productSample.variants && research.productSample.variants.length > 0 ? `
-        <div class="ai-field">
-          <div class="ai-field-label">Variantes Configuradas</div>
-          <div class="ai-field-value">
-            ${research.productSample.variants.map(v =>
-              `<span class="tag">${esc(v.option)}</span> <span class="muted">${v.values.map(val => esc(val)).join(" | ")}</span>`
-            ).join("<br/>")}
+          <div class="ai-field">
+            <div class="ai-field-label">Descripcion de Venta (Shopify Body HTML)</div>
+            <div class="ai-field-value" style="line-height:1.8;">${esc(ps.description)}</div>
           </div>
-        </div>` : ""}
 
-        <div class="ai-field">
-          <div class="ai-field-label">Tags SEO</div>
-          <div class="ai-field-value">${(research.productSample.tags || []).map(t => `<span class="tag tag-blue">${esc(t)}</span>`).join(" ")}</div>
-        </div>
+          <div class="highlight-box highlight-success" style="margin:16px 0;">
+            <div style="font-size:11px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Metadatos SEO — Google Search</div>
+            <div class="ai-field" style="margin-bottom:12px;">
+              <div class="ai-field-label">Meta Title (max 60 chars)</div>
+              <div class="ai-field-value" style="font-weight:600;color:#34d399;">${esc(ps.seoTitle)}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;">${(ps.seoTitle || "").length} caracteres</div>
+            </div>
+            <div class="ai-field" style="margin-bottom:12px;">
+              <div class="ai-field-label">Meta Description (max 155 chars)</div>
+              <div class="ai-field-value" style="color:#34d399;">${esc(ps.seoDescription)}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;">${(ps.seoDescription || "").length} caracteres</div>
+            </div>
+            <div class="ai-field" style="margin-bottom:0;">
+              <div class="ai-field-label">Alt Text Imagen Principal</div>
+              <div class="ai-field-value" style="color:#34d399;">${esc(ps.altText || "")}</div>
+            </div>
+          </div>
 
-        <div class="ai-field">
-          <div class="ai-field-label">Estrategia de Precio</div>
-          <div class="ai-field-value">${esc(research.productSample.priceStrategy)}</div>
-        </div>
+          <div class="highlight-box" style="background:rgba(107,168,240,.06);border:1px solid rgba(107,168,240,.2);margin:16px 0;">
+            <div style="font-size:11px;font-weight:700;color:#6ba8f0;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Open Graph — Redes Sociales</div>
+            <div class="ai-field" style="margin-bottom:8px;">
+              <div class="ai-field-label">OG Title</div>
+              <div class="ai-field-value" style="color:#6ba8f0;">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
+            </div>
+            <div class="ai-field" style="margin-bottom:0;">
+              <div class="ai-field-label">OG Description</div>
+              <div class="ai-field-value" style="color:#6ba8f0;">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
+            </div>
+          </div>
 
-        <div class="ai-field">
-          <div class="ai-field-label">Mejoras que Aplicariamos (Impacto Estimado)</div>
-          <div class="ai-field-value">${esc(research.productSample.improvementNotes)}</div>
-        </div>
+          ${ps.variants && ps.variants.length > 0 ? `
+          <div class="ai-field">
+            <div class="ai-field-label">Variantes Configuradas (Shopify Variants)</div>
+            <div class="ai-field-value">
+              ${ps.variants.map(v =>
+                `<span class="tag">${esc(v.option)}</span> <span class="muted">${v.values.map(val => esc(val)).join(" | ")}</span>`
+              ).join("<br/>")}
+            </div>
+          </div>` : ""}
 
-        <div class="highlight-box highlight-gold" style="text-align:center;margin-top:16px;">
-          <strong>Este es solo 1 producto de muestra.</strong> Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente.
+          <div class="ai-field">
+            <div class="ai-field-label">Vendor / Marca</div>
+            <div class="ai-field-value">${esc(ps.vendor || lead.name)}</div>
+          </div>
+
+          <div class="ai-field">
+            <div class="ai-field-label">Product Type</div>
+            <div class="ai-field-value">${esc(ps.productType)}</div>
+          </div>
+
+          <div class="ai-field">
+            <div class="ai-field-label">Tags SEO (Shopify Tags)</div>
+            <div class="ai-field-value">${(ps.tags || []).map(t => `<span class="tag tag-blue">${esc(t)}</span>`).join(" ")}</div>
+          </div>
+
+          ${ps.seoKeywords && ps.seoKeywords.length > 0 ? `
+          <div class="ai-field">
+            <div class="ai-field-label">Keywords de Cola Larga (Target SEO)</div>
+            <div class="ai-field-value">${ps.seoKeywords.map(k => `<span class="tag" style="background:rgba(52,211,153,.08);color:#34d399;border-color:rgba(52,211,153,.15);">${esc(k)}</span>`).join(" ")}</div>
+          </div>` : ""}
+
+          <div class="ai-field">
+            <div class="ai-field-label">Estrategia de Precio</div>
+            <div class="ai-field-value">${esc(ps.priceStrategy)}</div>
+          </div>
+
+          <div class="ai-field">
+            <div class="ai-field-label">Mejoras que Aplicariamos (Impacto Estimado)</div>
+            <div class="ai-field-value">${esc(ps.improvementNotes)}</div>
+          </div>
+
+          ${ps.schemaJsonLd ? `
+          <div class="ai-field">
+            <div class="ai-field-label">Schema JSON-LD (Structured Data para Google)</div>
+            <div class="ai-field-value">
+              <code>${esc(typeof ps.schemaJsonLd === "string" ? ps.schemaJsonLd : JSON.stringify(ps.schemaJsonLd, null, 2))}</code>
+            </div>
+          </div>` : ""}
+
+          ${ps.faqItems && ps.faqItems.length > 0 ? `
+          <div class="ai-field">
+            <div class="ai-field-label">FAQ Schema (Preguntas Frecuentes)</div>
+            <div class="ai-field-value">
+              ${ps.faqItems.map(faq => `
+                <div style="margin-bottom:12px;padding:12px 16px;background:rgba(196,149,106,.04);border-radius:8px;border-left:3px solid rgba(196,149,106,.3);">
+                  <div style="font-weight:600;color:rgba(255,255,255,.9);margin-bottom:4px;">Q: ${esc(faq.question)}</div>
+                  <div style="color:rgba(255,255,255,.7);font-size:13px;">A: ${esc(faq.answer)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>` : ""}
+
+          ${ps.generatedImagePrompt ? `
+          <div class="highlight-box" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);margin-top:16px;">
+            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Imagen AI Generada para este Producto/Servicio</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;">Prompt de generacion: <em>"${esc(ps.generatedImagePrompt)}"</em></div>
+            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:8px;">Con Shopy Crafter generamos imagenes profesionales AI para cada producto de tu catalogo</div>
+          </div>` : ""}
+
+          <div class="highlight-box highlight-gold" style="text-align:center;margin-top:20px;">
+            <strong>Este es solo 1 producto de muestra optimizado al 100/100.</strong><br/>
+            <span style="font-size:12px;">Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente con IA: meta titles, descriptions, Schema JSON-LD, Open Graph, alt texts, variantes y keywords.</span>
+          </div>
         </div>
       </div>
     </div>` : "";
@@ -637,6 +760,45 @@ router.post("/contact", async (req, res): Promise<void> => {
         });
       }
 
+      let savedFileId: number | null = null;
+      try {
+        const htmlBuffer = Buffer.from(reportHtml, "utf-8");
+        const dateStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+        const timeStr = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        const [saved] = await db.insert(projectFilesTable).values({
+          projectId: null,
+          fileType: "report",
+          category: "lead_prereport",
+          title: `Pre-Informe AI — ${leadData.name} — ${leadData.niche || "eCommerce"}`,
+          description: `Pre-informe generado automáticamente el ${dateStr} a las ${timeStr} para el lead ${leadData.name} (${leadData.email})`,
+          objectPath: null,
+          originalUrl: null,
+          mimeType: "text/html",
+          fileSizeBytes: htmlBuffer.length,
+          productId: null,
+          productTitle: null,
+          generatedBy: "lead_contact_form",
+          metadata: JSON.stringify({
+            generatedAt: new Date().toISOString(),
+            leadEmail: leadData.email,
+            leadName: leadData.name,
+            leadNiche: leadData.niche,
+            leadRevenue: leadData.revenue,
+            leadStoreUrl: leadData.storeUrl,
+            leadPhone: leadData.phone,
+            leadServices: leadData.services,
+          }),
+          content: reportHtml,
+          isPublic: 0,
+          entityName: leadData.name,
+          entityUrl: leadData.storeUrl || leadData.email,
+        }).returning();
+        savedFileId = saved.id;
+        logger.info({ fileId: saved.id, leadName: leadData.name, sizeKB: Math.round(htmlBuffer.length / 1024) }, "Pre-report saved to vault");
+      } catch (saveErr) {
+        logger.error({ err: saveErr }, "Failed to save pre-report to vault (non-critical)");
+      }
+
       if (isGmailAvailable()) {
         const subject = `Nuevo Lead: ${leadData.name} — ${leadData.niche || "eCommerce"} — Pre-Informe AI`;
         const sent = await sendEmail(ADMIN_EMAIL, subject, reportHtml);
@@ -658,6 +820,7 @@ router.post("/contact", async (req, res): Promise<void> => {
           leadName: leadData.name,
           emailSent: isGmailAvailable(),
           geminiUsed: isGeminiAvailable(),
+          savedFileId,
           generatedAt: new Date().toISOString(),
         }),
         ipAddress: "system",
@@ -718,6 +881,69 @@ router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
     createdAt: r.created_at,
   }));
   res.json(leads);
+});
+
+router.get("/lead-reports", requireAdmin, async (req, res): Promise<void> => {
+  const reports = await db.select({
+    id: projectFilesTable.id,
+    title: projectFilesTable.title,
+    description: projectFilesTable.description,
+    fileSizeBytes: projectFilesTable.fileSizeBytes,
+    entityName: projectFilesTable.entityName,
+    entityUrl: projectFilesTable.entityUrl,
+    metadata: projectFilesTable.metadata,
+    createdAt: projectFilesTable.createdAt,
+  })
+    .from(projectFilesTable)
+    .where(and(
+      eq(projectFilesTable.category, "lead_prereport"),
+      isNull(projectFilesTable.projectId),
+    ))
+    .orderBy(desc(projectFilesTable.createdAt))
+    .limit(200);
+
+  const parsed = reports.map(r => ({
+    ...r,
+    metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    downloadUrl: `/api/lead-reports/${r.id}/download`,
+    downloadPdfUrl: `/api/lead-reports/${r.id}/download?format=pdf`,
+  }));
+  res.json(parsed);
+});
+
+router.get("/lead-reports/:fileId/download", requireAdmin, async (req, res): Promise<void> => {
+  const fileId = parseInt(String(req.params.fileId), 10);
+  if (isNaN(fileId)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [file] = await db.select().from(projectFilesTable)
+    .where(and(
+      eq(projectFilesTable.id, fileId),
+      eq(projectFilesTable.category, "lead_prereport"),
+      isNull(projectFilesTable.projectId),
+    ))
+    .limit(1);
+
+  if (!file) { res.status(404).json({ error: "Pre-informe no encontrado" }); return; }
+
+  if (!file.content) { res.status(410).json({ error: "Contenido no disponible" }); return; }
+
+  const safeName = (file.entityName || "Lead").replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "").replace(/\s+/g, "_").slice(0, 80);
+  const dateSlug = new Date(file.createdAt || Date.now()).toISOString().split("T")[0];
+  const filename = `PreInforme_${safeName}_${dateSlug}`;
+
+  const format = (req.query.format as string || "").toLowerCase();
+  if (format === "pdf") {
+    try {
+      await generatePdfFromHtml(file.content, filename, res);
+    } catch (e: any) {
+      res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+    }
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+  res.send(file.content);
 });
 
 export default router;
