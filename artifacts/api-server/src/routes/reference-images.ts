@@ -363,10 +363,11 @@ router.post("/projects/:projectId/products/:productId/images/generate-from-refer
             title: `${scene.label} — ${productTitle} (desde referencia)`,
             description: altText.slice(0, 125),
             mimeType: "image/png",
+            content: generatedBuffer.toString("base64"),
             productId: shopifyProductId,
             productTitle: productTitle,
             generatedBy: "reference_image_engine",
-            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id },
+            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id, encoding: "base64" },
           }).catch(() => {});
 
           results.push({ scene: scene.key, label: scene.label, success: true, shopifyImageId });
@@ -622,10 +623,11 @@ router.post(
             title: `Virtual Try-On: ${scene.label} — ${productTitle}`,
             description: altText,
             mimeType: "image/png",
+            content: generatedBuffer.toString("base64"),
             productId: shopifyProductId,
             productTitle,
             generatedBy: "virtual_tryon_engine",
-            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id },
+            metadata: { model: "gpt-image-1", sceneKey: scene.key, jobId: job.id, encoding: "base64" },
           }).catch(() => {});
 
           results.push({ scene: scene.key, label: scene.label, success: true, shopifyImageId });

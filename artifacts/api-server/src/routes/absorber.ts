@@ -195,9 +195,19 @@ async function fetchUrlContent(url: string): Promise<{ text: string; title: stri
     .trim()
     .slice(0, 30000);
   
-  // Extract image URLs
-  const imgMatches = html.matchAll(/<img[^>]+src="([^"]+)"/gi);
-  const imageUrls = [ogImage, ...[...imgMatches].map(m => m[1]).filter(s => s.startsWith("http"))].filter(Boolean).slice(0, 5);
+  const baseUrl = (() => { try { return new URL(url); } catch { return null; } })();
+  const imgMatches = html.matchAll(/<img[^>]+(?:src|data-src)=['"]([^'">\s]+)['"]/gi);
+  const rawImgUrls = [ogImage, ...[...imgMatches].map(m => m[1])];
+  const imageUrls = rawImgUrls
+    .map(u => {
+      if (!u) return "";
+      if (u.startsWith("http")) return u;
+      if (baseUrl) { try { return new URL(u, baseUrl).toString(); } catch { return ""; } }
+      return "";
+    })
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 20);
   
   return {
     text: cleanText,

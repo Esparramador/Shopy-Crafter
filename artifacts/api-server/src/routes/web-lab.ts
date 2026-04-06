@@ -101,8 +101,8 @@ async function extractFullWebContent(url: string): Promise<ExtractedWebContent> 
   const allCss = [...inlineStyles, ...externalCss].join("\n\n");
 
   return {
-    html: html.substring(0, 60_000),
-    css: allCss.substring(0, 40_000),
+    html: html.substring(0, 200_000),
+    css: allCss.substring(0, 120_000),
     stylesheetUrls,
   };
 }
@@ -204,13 +204,17 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       if (proj) projectName = proj.name ?? projectName;
     }
 
-    const htmlForClaude = extraction.html.substring(0, 30_000);
-    const cssForClaude = extraction.css.substring(0, 20_000);
+    const htmlForClaude = extraction.html.length > 80_000
+      ? `${extraction.html.slice(0, 50_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-30_000)}`
+      : extraction.html;
+    const cssForClaude = extraction.css.length > 60_000
+      ? `${extraction.css.slice(0, 40_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-20_000)}`
+      : extraction.css;
 
     let contextParts: string[] = [];
     contextParts.push(`URL ANALIZADA: ${url}`);
-    contextParts.push(`\n--- HTML REAL DE LA PÁGINA (primeros ${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
-    contextParts.push(`\n--- CSS REAL (inline + ${extraction.stylesheetUrls.length} archivos externos, primeros ${cssForClaude.length} chars) ---\n${cssForClaude}`);
+    contextParts.push(`\n--- HTML REAL DE LA PÁGINA (${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
+    contextParts.push(`\n--- CSS REAL (inline + ${extraction.stylesheetUrls.length} archivos externos, ${cssForClaude.length} chars) ---\n${cssForClaude}`);
 
     if (pageSpeed) {
       contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performanceScore}/100 | SEO: ${pageSpeed.seoScore}/100 | Accessibility: ${pageSpeed.accessibilityScore}/100 | Best Practices: ${pageSpeed.bestPracticesScore}/100`);
@@ -586,13 +590,17 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
     if (proj) projectName = proj.name ?? projectName;
   }
 
-  const htmlForClaude = extraction.html.substring(0, 30_000);
-  const cssForClaude = extraction.css.substring(0, 20_000);
+  const htmlForClaude = extraction.html.length > 80_000
+    ? `${extraction.html.slice(0, 50_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-30_000)}`
+    : extraction.html;
+  const cssForClaude = extraction.css.length > 60_000
+    ? `${extraction.css.slice(0, 40_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-20_000)}`
+    : extraction.css;
 
   let contextParts: string[] = [];
   contextParts.push(`URL ANALIZADA: ${url}`);
-  contextParts.push(`\n--- HTML REAL ---\n${htmlForClaude}`);
-  contextParts.push(`\n--- CSS REAL (${extraction.stylesheetUrls.length} archivos) ---\n${cssForClaude}`);
+  contextParts.push(`\n--- HTML REAL (${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
+  contextParts.push(`\n--- CSS REAL (${extraction.stylesheetUrls.length} archivos, ${cssForClaude.length} chars) ---\n${cssForClaude}`);
 
   if (pageSpeed) {
     contextParts.push(`\n--- PAGESPEED MOBILE ---\nPerformance: ${pageSpeed.performanceScore}/100 | SEO: ${pageSpeed.seoScore}/100 | Accessibility: ${pageSpeed.accessibilityScore}/100`);

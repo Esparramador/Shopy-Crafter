@@ -57,7 +57,7 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
       signal: AbortSignal.timeout(30_000),
     });
     const raw = await resp.text();
-    htmlContent = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 6000);
+    htmlContent = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 40000);
   } catch (e: any) {
     fetchError = e.message ?? "fetch failed";
   }
