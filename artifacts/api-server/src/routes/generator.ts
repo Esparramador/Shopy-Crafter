@@ -103,8 +103,8 @@ router.post("/generator/run", async (req: Request, res: Response) => {
   const genType = GENERATOR_TYPES.find(t => t.id === type);
   if (!genType) return res.status(400).json({ error: `Tipo de generación desconocido: ${type}` });
 
-  if (genType.requiresProject && !projectId && !url) {
-    return res.status(400).json({ error: "Se requiere projectId o URL para este tipo de generación" });
+  if (genType.requiresProject && !projectId) {
+    return res.status(400).json({ error: "Se requiere un proyecto asociado para este tipo de generación" });
   }
   if (!genType.requiresProject && genType.acceptsUrl && !url && !projectId) {
     return res.status(400).json({ error: "Se requiere una URL o projectId" });

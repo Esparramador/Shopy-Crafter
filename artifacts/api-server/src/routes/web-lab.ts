@@ -329,6 +329,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
     res.json({
       success: true,
       analysis,
+      reportHtml: pid === 0 ? reportHtml : undefined,
       vaultIds: { report: vaultReportId, css: vaultCssId, html: vaultHtmlId },
       pageSpeed: pageSpeed ? {
         mobile: { performance: pageSpeed.performanceScore, seo: pageSpeed.seoScore, accessibility: pageSpeed.accessibilityScore, bestPractices: pageSpeed.bestPracticesScore },

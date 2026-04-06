@@ -15,6 +15,19 @@ const router = Router();
 
 const ADMIN_EMAIL = "craftershopy@gmail.com";
 
+const contactRateMap = new Map<string, { count: number; resetAt: number }>();
+function checkContactRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = contactRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    contactRateMap.set(ip, { count: 1, resetAt: now + 3600_000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 interface LeadData {
   name: string;
   email: string;
@@ -390,6 +403,12 @@ router.post("/contact", async (req, res): Promise<void> => {
     socialMedia?: string; message?: string; extraInfo?: string;
     productImageUrl?: string;
   };
+
+  const ip = req.ip ?? "unknown";
+  if (!checkContactRateLimit(ip)) {
+    res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });
+    return;
+  }
 
   if (!name?.trim() || !email?.trim()) {
     res.status(400).json({ error: "Nombre y email son obligatorios" });

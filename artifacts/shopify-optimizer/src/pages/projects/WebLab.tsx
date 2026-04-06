@@ -38,6 +38,7 @@ interface WebLabAnalysis {
 
 interface AnalysisResult {
   analysis: WebLabAnalysis;
+  reportHtml?: string;
   vaultIds: { report: number | null; css: number | null; html: number | null };
   pageSpeed: any;
   scraperData: any;
@@ -662,6 +663,18 @@ function WebLabInner({ projectId }: { projectId: number }) {
             {result.vaultIds?.report ? (
               <button
                 onClick={() => downloadFromVault(`web-lab/download-report/${result.vaultIds.report}?template=${template}`)}
+                style={{
+                  padding: "10px 20px",
+                  background: "linear-gradient(135deg, #d4a843, #b8860b)",
+                  border: "none", borderRadius: 10, color: "#000",
+                  fontWeight: 700, cursor: "pointer", fontSize: 13,
+                }}
+              >
+                📄 Descargar Informe ({template})
+              </button>
+            ) : result.reportHtml ? (
+              <button
+                onClick={() => downloadFile(result.reportHtml!, "web-lab-report.html", "text/html")}
                 style={{
                   padding: "10px 20px",
                   background: "linear-gradient(135deg, #d4a843, #b8860b)",

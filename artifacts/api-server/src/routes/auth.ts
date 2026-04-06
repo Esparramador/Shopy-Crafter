@@ -56,7 +56,11 @@ async function cleanupExpiredRateLimits(): Promise<void> {
 setInterval(() => { cleanupExpiredRateLimits().catch(() => {}); }, 5 * 60 * 1000);
 
 router.post("/login", async (req, res): Promise<void> => {
-  const { email, password } = req.body as { email: string; password: string };
+  const { email, password } = req.body ?? {};
+  if (!email || typeof email !== "string" || !password || typeof password !== "string") {
+    res.status(400).json({ error: "Email y contraseña son obligatorios" });
+    return;
+  }
   const ip = req.ip ?? "unknown";
   const rateLimitKey = `login:${ip}`;
 
@@ -274,8 +278,8 @@ router.post("/change-password", requireAuth, async (req, res): Promise<void> => 
 });
 
 router.post("/forgot-password", async (req, res): Promise<void> => {
-  const { email } = req.body as { email: string };
-  if (!email) { res.status(400).json({ error: "Email requerido" }); return; }
+  const { email } = req.body ?? {};
+  if (!email || typeof email !== "string") { res.status(400).json({ error: "Email requerido" }); return; }
 
   const [user] = await db.select().from(usersTable)
     .where(eq(usersTable.email, email.toLowerCase().trim()));
@@ -324,9 +328,9 @@ router.post("/forgot-password", async (req, res): Promise<void> => {
 });
 
 router.post("/reset-password", async (req, res): Promise<void> => {
-  const { token, password } = req.body as { token: string; password: string };
+  const { token, password } = req.body ?? {};
 
-  if (!token || !password) {
+  if (!token || typeof token !== "string" || !password || typeof password !== "string") {
     res.status(400).json({ error: "Token y contraseña requeridos" });
     return;
   }
