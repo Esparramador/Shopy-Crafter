@@ -327,7 +327,10 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     ...((businessResearch as any)?.sources || []),
     ...((marketResearch as any)?.sources || []),
     ...((seoResearch as any)?.sources || []),
-  ].filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).slice(0, 20);
+  ]
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+    .filter((url: string) => !url.includes("vertexaisearch.cloud.google.com") && !url.includes("grounding-api-redirect") && url.length < 300)
+    .slice(0, 15);
 
   try {
     learnFromOperation({
@@ -383,9 +386,15 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     }
   } catch {};
 
-  const rawBusiness = (businessResearch as any)?.text || "";
-  const rawMarket = (marketResearch as any)?.text || "";
-  const rawSeo = (seoResearch as any)?.text || "";
+  const stripGroundingUrls = (text: string): string =>
+    text
+      .replace(/\[?\(?\s*https?:\/\/vertexaisearch\.cloud\.google\.com\/grounding-api-redirect\/[^\s)\]<>]+\s*\)?\]?/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+  const rawBusiness = stripGroundingUrls((businessResearch as any)?.text || "");
+  const rawMarket = stripGroundingUrls((marketResearch as any)?.text || "");
+  const rawSeo = stripGroundingUrls((seoResearch as any)?.text || "");
 
   let structuredResearch: { business: string; market: string; seo: string };
   try {
