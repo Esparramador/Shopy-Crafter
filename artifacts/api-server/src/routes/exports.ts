@@ -1131,6 +1131,45 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .footer-sub { font-size: 11px; color: ${BRAND.muted}; margin-top: 6px; }
   .footer-line { width: 40px; height: 2px; background: ${BRAND.gold}; margin: 12px auto; border-radius: 1px; }
 
+  @media (max-width: 768px) {
+    .page { max-width: 100%; }
+    .body-content { padding: 20px 16px 24px; }
+    .cover { padding: 40px 20px; min-height: 600px; }
+    .cover-title h1 { font-size: 28px; }
+    .metric-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric .value { font-size: 20px; }
+    .metric .label { font-size: 9px; }
+    .card { padding: 16px; border-radius: 10px; }
+    .section-title { font-size: 18px; }
+    table { font-size: 12px; }
+    td, th { padding: 8px 10px; }
+    .tag { font-size: 10px; padding: 2px 7px; }
+    .ai-deliverable { padding: 14px 16px; }
+    .ai-field-label { font-size: 9px; }
+    .ai-field-value { font-size: 13px; word-wrap: break-word; overflow-wrap: break-word; }
+    .ai-deliverable code { font-size: 10px; padding: 8px 10px; word-break: break-all; }
+    .highlight-box { padding: 12px 14px; }
+    .action-item { padding: 14px; }
+    .action-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .stat-grid { grid-template-columns: 1fr; }
+    .footer { padding: 20px 16px; }
+    .sc-cover-page { min-height: 80vh !important; }
+    .sc-toc-page { padding: 30px 20px !important; min-height: auto !important; }
+  }
+  @media (max-width: 480px) {
+    .body-content { padding: 14px 10px 18px; }
+    .cover { padding: 28px 14px; min-height: 500px; }
+    .cover-title h1 { font-size: 22px; }
+    .metric-row { grid-template-columns: 1fr; }
+    .metric .value { font-size: 18px; }
+    .section-title { font-size: 16px; }
+    .ai-analysis h3 { font-size: 14px; }
+    .sc-cover-page { min-height: 70vh !important; }
+    .sc-toc-page { padding: 20px 14px !important; }
+  }
+  * { word-wrap: break-word; overflow-wrap: break-word; }
+  code { white-space: pre-wrap; word-break: break-all; }
+
   @media print {
     body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page { max-width: 100%; }
@@ -1438,6 +1477,53 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   .footer-sub { font-size: 11px; color: ${ELEGANCE.muted}; margin-top: 6px; }
   .footer-line { width: 40px; height: 2px; background: ${ELEGANCE.accent}; margin: 12px auto; border-radius: 1px; }
 
+  @media (max-width: 768px) {
+    .page { max-width: 100%; }
+    .body-content { padding: 20px 16px 24px; }
+    .cover-portfolio { padding: 40px 20px 32px; min-height: 600px; }
+    .cover-main-title { font-size: 28px; }
+    .cover-main-subtitle { font-size: 13px; }
+    .cover-client-box { padding: 16px 24px; }
+    .cover-client-name { font-size: 20px; }
+    .cover-meta-row { flex-wrap: wrap; gap: 16px; }
+    .cover-frame { inset: 16px; }
+    .metric-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric .value { font-size: 20px; }
+    .metric .label { font-size: 9px; }
+    .card { padding: 16px; border-radius: 10px; }
+    .section-title { font-size: 18px; }
+    table { font-size: 12px; }
+    td, th { padding: 8px 10px; }
+    .tag { font-size: 10px; padding: 2px 7px; }
+    .ai-deliverable { padding: 14px 16px; }
+    .ai-field-label { font-size: 9px; }
+    .ai-field-value { font-size: 13px; word-wrap: break-word; overflow-wrap: break-word; }
+    .ai-deliverable code { font-size: 10px; padding: 8px 10px; word-break: break-all; }
+    .highlight-box { padding: 12px 14px; }
+    .action-item { padding: 14px; }
+    .action-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .stat-grid { grid-template-columns: 1fr; }
+    .footer { padding: 20px 16px; }
+    .sc-cover-page { min-height: 80vh !important; }
+    .sc-toc-page { padding: 30px 20px !important; min-height: auto !important; }
+  }
+  @media (max-width: 480px) {
+    .body-content { padding: 14px 10px 18px; }
+    .cover-portfolio { padding: 28px 14px 24px; min-height: 500px; }
+    .cover-main-title { font-size: 22px; }
+    .cover-agency-name { font-size: 10px; letter-spacing: 3px; }
+    .cover-logo-circle { width: 72px; height: 72px; }
+    .cover-doc-type { font-size: 9px; }
+    .metric-row { grid-template-columns: 1fr; }
+    .metric .value { font-size: 18px; }
+    .section-title { font-size: 16px; }
+    .ai-analysis h3 { font-size: 14px; }
+    .sc-cover-page { min-height: 70vh !important; }
+    .sc-toc-page { padding: 20px 14px !important; }
+  }
+  * { word-wrap: break-word; overflow-wrap: break-word; }
+  code { white-space: pre-wrap; word-break: break-all; }
+
   @media print {
     body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .cover-portfolio { background: #f0f4f8 !important; min-height: 100vh; page-break-after: always; }
@@ -1728,6 +1814,63 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .footer-brand { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 700; color: ${PRESTIGE.copper}; letter-spacing: 2px; }
   .footer-sub { font-size: 11px; color: ${PRESTIGE.muted}; margin-top: 6px; }
   .footer-line { width: 40px; height: 2px; background: linear-gradient(90deg, ${PRESTIGE.copperDark}, ${PRESTIGE.copper}); margin: 12px auto; border-radius: 1px; }
+
+  @media (max-width: 768px) {
+    .page { max-width: 100%; }
+    .body-content { padding: 20px 16px 24px; }
+    .cover-portfolio { padding: 40px 20px 32px; min-height: 600px; }
+    .cover-main-title { font-size: 28px; }
+    .cover-main-subtitle { font-size: 13px; }
+    .cover-client-box { padding: 16px 24px; }
+    .cover-client-name { font-size: 20px; }
+    .cover-meta-row { flex-wrap: wrap; gap: 16px; }
+    .cover-frame { inset: 16px; }
+    .metric-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric .value { font-size: 20px; }
+    .metric .label { font-size: 9px; }
+    .card { padding: 16px; border-radius: 10px; }
+    .section-title { font-size: 18px; }
+    table { font-size: 12px; }
+    td, th { padding: 8px 10px; }
+    .table-label { width: 100px; padding: 10px 12px; font-size: 9px; }
+    .table-value { padding: 10px 12px; font-size: 13px; }
+    .tag { font-size: 10px; padding: 2px 7px; }
+    .ai-deliverable { padding: 14px 16px; }
+    .ai-field-label { font-size: 9px; }
+    .ai-field-value { font-size: 13px; word-wrap: break-word; overflow-wrap: break-word; }
+    .ai-deliverable code { font-size: 10px; padding: 8px 10px; word-break: break-all; }
+    .highlight-box { padding: 12px 14px; }
+    .action-item { padding: 14px; }
+    .action-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .stat-grid { grid-template-columns: 1fr; }
+    .footer { padding: 20px 16px; }
+    .recommendation { padding: 12px 14px; }
+    .sc-cover-page { min-height: 80vh !important; }
+    .sc-toc-page { padding: 30px 20px !important; min-height: auto !important; }
+  }
+
+  @media (max-width: 480px) {
+    .body-content { padding: 14px 10px 18px; }
+    .cover-portfolio { padding: 28px 14px 24px; min-height: 500px; }
+    .cover-main-title { font-size: 22px; }
+    .cover-agency-name { font-size: 10px; letter-spacing: 3px; }
+    .cover-logo-circle { width: 72px; height: 72px; }
+    .cover-doc-type { font-size: 9px; }
+    .cover-meta-row { gap: 12px; }
+    .cover-meta-label { font-size: 8px; }
+    .cover-meta-value { font-size: 11px; }
+    .metric-row { grid-template-columns: 1fr; }
+    .metric .value { font-size: 18px; }
+    .section-title { font-size: 16px; }
+    .ai-analysis h3 { font-size: 14px; }
+    .action-header strong { font-size: 13px; }
+    .ai-deliverable-header { font-size: 10px; }
+    .sc-cover-page { min-height: 70vh !important; }
+    .sc-toc-page { padding: 20px 14px !important; }
+  }
+
+  * { word-wrap: break-word; overflow-wrap: break-word; }
+  code { white-space: pre-wrap; word-break: break-all; }
 
   @media print {
     body { background: #faf8f5; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
