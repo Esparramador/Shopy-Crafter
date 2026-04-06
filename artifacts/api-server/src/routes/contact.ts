@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
-import { askClaudeJsonWithBrain } from "../lib/claude.js";
+import { askClaudeJsonWithBrain, askClaudeWithBrain } from "../lib/claude.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
@@ -56,6 +56,138 @@ interface ProductSample {
   improvementNotes: string;
 }
 
+function sanitizeAiHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "")
+    .replace(/<input[\s\S]*?>/gi, "")
+    .replace(/<textarea[\s\S]*?<\/textarea>/gi, "")
+    .replace(/<button[\s\S]*?<\/button>/gi, "")
+    .replace(/<link[\s\S]*?>/gi, "")
+    .replace(/<meta[\s\S]*?>/gi, "")
+    .replace(/<base[\s\S]*?>/gi, "")
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/data\s*:/gi, "data-blocked:")
+    .replace(/vbscript\s*:/gi, "");
+}
+
+async function structureResearchWithClaude(
+  lead: LeadData,
+  research: { business: string; market: string; seo: string },
+): Promise<{ business: string; market: string; seo: string }> {
+  const niche = lead.niche || "ecommerce general";
+  const entityName = lead.storeUrl || lead.name;
+
+  const structurePrompt = (sectionTitle: string, sectionIcon: string, rawText: string, specificInstructions: string) => `Eres el consultor estratégico senior de Shopy Crafter, agencia de optimización IA para e-commerce.
+
+TIENES datos de investigación REALES sobre el negocio "${entityName}" (nicho: ${niche}).
+Tu trabajo es REESTRUCTURAR estos datos en un informe de consultoría PROFESIONAL con HTML formateado.
+
+DATOS DE INVESTIGACIÓN EN BRUTO:
+${rawText.slice(0, 25000)}
+
+${specificInstructions}
+
+GENERA HTML profesional con EXACTAMENTE esta estructura (NO JSON, devuelve HTML directo):
+
+<div class="ai-analysis">
+  <div class="ai-diagnosis">
+    <h3>${sectionIcon} ${sectionTitle} — Resumen Ejecutivo</h3>
+    <p>[2-3 párrafos CONCISOS resumiendo los hallazgos clave. Usa datos CONCRETOS encontrados en la investigación. Menciona nombres reales de empresas, productos, URLs cuando los haya. Explica en lenguaje claro que cualquier persona entienda.]</p>
+  </div>
+
+  <div class="ai-actions">
+    <h3>🎯 Hallazgos Clave y Oportunidades</h3>
+    [GENERA 3-5 hallazgos, cada uno así:]
+    <div class="action-item">
+      <div class="action-header">
+        <strong>[Hallazgo específico con datos concretos]</strong>
+        <span class="action-impact">[CRÍTICO/ALTO/MEDIO]</span>
+      </div>
+      <p>[Explicación detallada del hallazgo con datos reales de la investigación]</p>
+      <div class="ai-deliverable">
+        [Recomendación concreta y accionable basada en este hallazgo — qué hacer exactamente]
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-quick-wins">
+    <h3>⚡ Oportunidades Inmediatas Detectadas</h3>
+    <ol>
+      <li><strong>[Oportunidad 1]:</strong> [Descripción concreta con datos]</li>
+      <li><strong>[Oportunidad 2]:</strong> [Descripción concreta con datos]</li>
+      <li><strong>[Oportunidad 3]:</strong> [Descripción concreta con datos]</li>
+    </ol>
+  </div>
+</div>
+
+REGLAS:
+- USA SOLO datos REALES de la investigación proporcionada — NO inventes datos
+- Mantén TODOS los nombres de empresas, URLs, cifras y datos concretos del texto original
+- ESTRUCTURA la información — no la pierdas
+- Usa las clases CSS exactas indicadas (action-item, action-header, action-impact, ai-deliverable, ai-diagnosis, ai-quick-wins)
+- Responde en español
+- NO incluyas texto fuera de las etiquetas HTML
+- NO uses markdown, SOLO HTML con las clases indicadas`;
+
+  const [businessResult, marketResult, seoResult] = await Promise.allSettled([
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: structurePrompt(
+        "Análisis del Negocio", "🏢",
+        research.business,
+        `FOCO: Analiza la presencia online, productos, precios, tecnología, reputación y fortalezas/debilidades del negocio "${entityName}".`
+      )}],
+      "Eres un consultor de inteligencia empresarial de Shopy Crafter. Reestructuras datos de investigación en informes profesionales con HTML formateado. Responde SOLO con HTML usando las clases CSS indicadas.",
+      "general",
+      niche,
+      16000,
+    ),
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: structurePrompt(
+        "Análisis de Mercado y Competencia", "📊",
+        research.market,
+        `FOCO: Analiza competidores, tendencias del mercado, oportunidades, pricing del sector y posicionamiento competitivo en el nicho "${niche}".`
+      )}],
+      "Eres un analista de mercado y competencia de Shopy Crafter. Reestructuras datos de investigación en informes profesionales con HTML formateado. Responde SOLO con HTML usando las clases CSS indicadas.",
+      "general",
+      niche,
+      16000,
+    ),
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: structurePrompt(
+        "Auditoría SEO y Presencia Digital", "🔍",
+        research.seo,
+        `FOCO: Analiza posicionamiento SEO, keywords, velocidad de carga, indexación, backlinks, Core Web Vitals y oportunidades de contenido para "${entityName}".`
+      )}],
+      "Eres un experto SEO técnico de Shopy Crafter. Reestructuras datos de investigación en informes profesionales con HTML formateado. Responde SOLO con HTML usando las clases CSS indicadas.",
+      "seo",
+      niche,
+      16000,
+    ),
+  ]);
+
+  const extractHtml = (result: PromiseSettledResult<string>, fallbackText: string): string => {
+    if (result.status !== "fulfilled" || !result.value) return fallbackText;
+    const sanitized = sanitizeAiHtml(result.value);
+    const match = sanitized.match(/<div class="ai-analysis">[\s\S]*$/);
+    return match ? match[0] : `<div class="ai-analysis">${sanitized}</div>`;
+  };
+
+  return {
+    business: extractHtml(businessResult, research.business),
+    market: extractHtml(marketResult, research.market),
+    seo: extractHtml(seoResult, research.seo),
+  };
+}
+
 async function generateProductSample(lead: LeadData): Promise<ProductSample | null> {
   if (!lead.productImageUrl && !lead.storeUrl) return null;
   try {
@@ -82,7 +214,7 @@ Genera un producto de muestra COMPLETAMENTE OPTIMIZADO para esta tienda. Incluye
 - improvementNotes: 3-5 mejoras concretas que aplicariamos con datos de impacto estimado en ventas
 
 Responde SOLO con JSON valido.`,
-      `Eres ShopyBrain, el motor de inteligencia artificial de Shopy Crafter. Generas productos Shopify optimizados profesionalmente. Cada campo debe ser de calidad profesional lista para publicar. Los variantes deben ser especificos del nicho (tallas para ropa, numeros de pie para calzado, colores reales, materiales reales, pesos para alimentacion, etc). Responde en espanol.`,
+      `Eres el motor de inteligencia artificial de Shopy Crafter. Generas productos Shopify optimizados profesionalmente. Cada campo debe ser de calidad profesional lista para publicar. Los variantes deben ser especificos del nicho (tallas para ropa, numeros de pie para calzado, colores reales, materiales reales, pesos para alimentacion, etc). Responde en espanol.`,
       "general",
       nicheInfo,
     );
@@ -199,18 +331,47 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     }
   } catch {};
 
+  const rawBusiness = (businessResearch as any)?.text || "";
+  const rawMarket = (marketResearch as any)?.text || "";
+  const rawSeo = (seoResearch as any)?.text || "";
+
+  let structuredResearch: { business: string; market: string; seo: string };
+  try {
+    if (rawBusiness || rawMarket || rawSeo) {
+      structuredResearch = await structureResearchWithClaude(lead, {
+        business: rawBusiness || "No se pudo investigar la empresa.",
+        market: rawMarket || "No se pudo analizar el mercado.",
+        seo: rawSeo || "No se pudo realizar la auditoría SEO.",
+      });
+    } else {
+      structuredResearch = {
+        business: "No se pudo investigar la empresa (Gemini no disponible).",
+        market: "No se pudo analizar el mercado.",
+        seo: "No se pudo realizar la auditoría SEO.",
+      };
+    }
+  } catch (err) {
+    logger.warn({ err }, "Claude restructuring failed, using raw Gemini text");
+    structuredResearch = {
+      business: rawBusiness || "No se pudo investigar la empresa.",
+      market: rawMarket || "No se pudo analizar el mercado.",
+      seo: rawSeo || "No se pudo realizar la auditoría SEO.",
+    };
+  }
+
   return buildReportHtml(lead, {
-    business: (businessResearch as any)?.text || "No se pudo investigar la empresa (Gemini no disponible).",
-    market: (marketResearch as any)?.text || "No se pudo analizar el mercado.",
-    seo: (seoResearch as any)?.text || "No se pudo realizar la auditoria SEO.",
+    business: structuredResearch.business,
+    market: structuredResearch.market,
+    seo: structuredResearch.seo,
     sources: allSources,
     productSample,
+    isStructuredHtml: !!(rawBusiness || rawMarket || rawSeo),
   });
 }
 
 function buildReportHtml(
   lead: LeadData,
-  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null },
+  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean },
 ): string {
   const esc = sanitizeHtml;
 
@@ -235,6 +396,13 @@ function buildReportHtml(
       .replace(/\n\n/g, "<br/><br/>")
       .replace(/\n/g, "<br/>");
   }
+
+  const renderContent = (text: string): string => {
+    if (research.isStructuredHtml && text.includes('class="ai-')) {
+      return text;
+    }
+    return mdToHtml(text);
+  };
 
   const servicesHtml = lead.services.length > 0
     ? lead.services.map(s => `<span class="tag">${esc(s)}</span>`).join("")
@@ -341,27 +509,33 @@ function buildReportHtml(
       </div>
     </div>
 
-    <div class="section">
+    <div class="section" style="page-break-before:always;">
       <div class="section-title">Investigacion del Negocio</div>
-      <div class="card ai-deliverable">
-        <div class="ai-deliverable-header">Analisis automatico con IA — datos reales verificados</div>
-        ${mdToHtml(research.business)}
+      <div class="card" style="padding:28px;line-height:1.85;font-size:13px;">
+        ${renderContent(research.business)}
+      </div>
+      <div style="margin-top:8px;padding:8px 16px;background:rgba(196,149,106,.04);border-radius:8px;font-size:11px;color:rgba(255,255,255,.35);">
+        Analisis generado por Shopy Crafter AI · Datos reales verificados con fuentes publicas
       </div>
     </div>
 
-    <div class="section">
+    <div class="section" style="page-break-before:always;">
       <div class="section-title">Analisis de Mercado y Competencia</div>
-      <div class="card ai-deliverable">
-        <div class="ai-deliverable-header">Estudio del sector y posicionamiento competitivo</div>
-        ${mdToHtml(research.market)}
+      <div class="card" style="padding:28px;line-height:1.85;font-size:13px;">
+        ${renderContent(research.market)}
+      </div>
+      <div style="margin-top:8px;padding:8px 16px;background:rgba(196,149,106,.04);border-radius:8px;font-size:11px;color:rgba(255,255,255,.35);">
+        Estudio de mercado por Shopy Crafter AI · Sector y posicionamiento competitivo
       </div>
     </div>
 
-    <div class="section">
+    <div class="section" style="page-break-before:always;">
       <div class="section-title">Auditoria SEO y Presencia Digital</div>
-      <div class="card ai-deliverable">
-        <div class="ai-deliverable-header">Rastreo de presencia digital, indexacion y keywords</div>
-        ${mdToHtml(research.seo)}
+      <div class="card" style="padding:28px;line-height:1.85;font-size:13px;">
+        ${renderContent(research.seo)}
+      </div>
+      <div style="margin-top:8px;padding:8px 16px;background:rgba(196,149,106,.04);border-radius:8px;font-size:11px;color:rgba(255,255,255,.35);">
+        Auditoria SEO por Shopy Crafter AI · Presencia digital y oportunidades de posicionamiento
       </div>
     </div>
 
