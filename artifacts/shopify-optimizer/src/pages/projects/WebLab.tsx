@@ -5,6 +5,11 @@ const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type ReportTemplate = "classic" | "elegance" | "prestige";
 
+export function WebLabStandalone() {
+  return <WebLabInner projectId={0} />;
+}
+
+
 interface WebLabAnalysis {
   overallScore: number;
   categories: {
@@ -91,7 +96,10 @@ function scoreColor(s: number): string {
 export default function WebLab() {
   const [, params] = useRoute("/projects/:id/web-lab");
   const projectId = params?.id ? parseInt(params.id) : 0;
+  return <WebLabInner projectId={projectId} />;
+}
 
+function WebLabInner({ projectId }: { projectId: number }) {
   const [url, setUrl] = useState("");
   const [template, setTemplate] = useState<ReportTemplate>("prestige");
   const [loading, setLoading] = useState(false);
@@ -182,7 +190,8 @@ export default function WebLab() {
           🔬 Lab Web
         </h1>
         <p style={{ color: "var(--t2, #aaa)", fontSize: 14 }}>
-          Analiza cualquier página web en profundidad — extrae el código real, genera CSS/HTML mejorado listo para tu equipo
+          Analiza cualquier página web — Shopify, WooCommerce, WordPress, custom o cualquier CMS.
+          Extrae el código real y genera CSS/HTML mejorado listo para tu equipo de desarrollo.
         </p>
       </div>
 
@@ -246,7 +255,7 @@ export default function WebLab() {
           >
             {loading ? "Analizando..." : "🔬 Analizar"}
           </button>
-          <button
+          {projectId > 0 && <button
             onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
             style={{
               padding: "12px 16px",
@@ -259,7 +268,7 @@ export default function WebLab() {
             }}
           >
             📜 Historial
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -650,7 +659,7 @@ export default function WebLab() {
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {result.vaultIds?.report && (
+            {result.vaultIds?.report ? (
               <button
                 onClick={() => downloadFromVault(`web-lab/download-report/${result.vaultIds.report}?template=${template}`)}
                 style={{
@@ -662,8 +671,8 @@ export default function WebLab() {
               >
                 📄 Descargar Informe ({template})
               </button>
-            )}
-            {result.vaultIds?.css && (
+            ) : null}
+            {result.vaultIds?.css ? (
               <button
                 onClick={() => downloadFromVault(`web-lab/download-css/${result.vaultIds.css}`)}
                 style={{
@@ -674,8 +683,20 @@ export default function WebLab() {
               >
                 📋 Descargar CSS
               </button>
-            )}
-            {result.vaultIds?.html && (
+            ) : a?.improvedCss ? (
+              <button
+                onClick={() => downloadFile(a.improvedCss, "improved-styles.css", "text/css")}
+                style={{
+                  padding: "10px 20px",
+                  background: "linear-gradient(135deg, #d4a843, #b8860b)",
+                  border: "none", borderRadius: 10, color: "#000",
+                  fontWeight: 700, cursor: "pointer", fontSize: 13,
+                }}
+              >
+                📋 Descargar CSS Mejorado
+              </button>
+            ) : null}
+            {result.vaultIds?.html ? (
               <button
                 onClick={() => downloadFromVault(`web-lab/download-html/${result.vaultIds.html}`)}
                 style={{
@@ -686,7 +707,21 @@ export default function WebLab() {
               >
                 🏗️ Descargar HTML
               </button>
-            )}
+            ) : a?.improvedHtmlFragments?.length ? (
+              <button
+                onClick={() => downloadFile(
+                  a.improvedHtmlFragments.map(f => `<!-- ${f.section} -->\n${f.improved}`).join("\n\n"),
+                  "improved-fragments.html", "text/html"
+                )}
+                style={{
+                  padding: "10px 20px",
+                  background: "#1a1a2e", border: "1px solid #333",
+                  borderRadius: 10, color: "#ccc", cursor: "pointer", fontSize: 13,
+                }}
+              >
+                🏗️ Descargar HTML Mejorado
+              </button>
+            ) : null}
             {result.vaultIds?.report && (
               <button
                 onClick={() => downloadFromVault(`web-lab/download-pack/${result.vaultIds.report}`)}
