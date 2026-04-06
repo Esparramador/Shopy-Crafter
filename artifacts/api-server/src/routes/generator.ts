@@ -278,7 +278,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       if (!project) return { message: "❌ Proyecto no encontrado" };
       const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId)).limit(30);
       const brandCtx = await buildBrandDnaContext(projectId);
-      const brainCtx = await buildShopyBrainContext(projectId, `Genera ${type} profesional`);
+      const brainCtx = await buildShopyBrainContext(project.storeNiche || undefined, "general", `Genera ${type} profesional`);
 
       const prompts: Record<string, string> = {
         "seo-metas": `Genera meta titles (máx 60 chars) y meta descriptions (máx 155 chars) SEO optimizados para CADA uno de estos ${products.length} productos de la tienda "${project.shopDomain}". Incluye keywords investigados. Formato: tabla HTML profesional con columnas: Producto | Meta Title | Meta Description | Keywords Target.\n\nProductos:\n${products.map(p => `- ${p.title} (${p.productType || "General"}) — ${p.price}€`).join("\n")}`,
@@ -291,11 +291,14 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       };
 
       const prompt = prompts[type] || `Genera contenido ${type} profesional para ${project.shopDomain}`;
-      const aiContent = await askClaudeWithBrain({
+      const aiContent = await askClaudeWithBrain(
         projectId,
-        userMessage: prompt,
-        systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Todo el HTML debe estar dentro de <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente en cualquier CSS.`,
-      });
+        [{ role: "user" as const, content: prompt }],
+        `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Todo el HTML debe estar dentro de <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente en cualquier CSS.\n\nIMPORTANTE: Para CADA mejora, explica EXACTAMENTE CÓMO implementarla en la vida real — paso a paso, con capturas de pantalla textuales de dónde hacer clic en el panel de administración, qué texto copiar y pegar, y cómo verificar que funciona. El informe debe ser 100% autosuficiente.`,
+        "general",
+        project.storeNiche || undefined,
+        16000,
+      );
 
       const genLabel = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
       const date = new Date().toLocaleDateString("es-ES");
@@ -436,7 +439,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       if (!project) return { message: "❌ Proyecto no encontrado" };
       const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId)).limit(20);
       const brandCtx = await buildBrandDnaContext(projectId);
-      const brainCtx = await buildShopyBrainContext(projectId, `Genera ${type}`);
+      const brainCtx = await buildShopyBrainContext(project.storeNiche || undefined, "general", `Genera ${type}`);
 
       const contentPrompts: Record<string, string> = {
         "photo-brief": `Genera un BRIEF FOTOGRÁFICO PROFESIONAL para la marca "${project.shopName}". Incluye:\n- Estilo visual (minimalista/lifestyle/editorial)\n- Paleta de colores de fondo\n- Tipo de iluminación (natural/estudio/dramática)\n- Ángulos de cámara recomendados\n- Props y escenografía\n- Mood board descriptivo\n- Especificaciones técnicas (resolución, ratio, formato)\n- 8 tipos de foto por producto (Hero, Lifestyle, Detalle, Escala, Proceso, UGC, Packaging, Variante)\n\nProductos a fotografiar:\n${products.map(p => `- ${p.title}`).join("\n")}`,
@@ -454,11 +457,14 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       };
 
       const prompt = contentPrompts[type] || `Genera contenido profesional tipo ${type}`;
-      const aiContent = await askClaudeWithBrain({
+      const aiContent = await askClaudeWithBrain(
         projectId,
-        userMessage: prompt,
-        systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Envuelve todo en <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente.`,
-      });
+        [{ role: "user" as const, content: prompt }],
+        `${SHOPIFY_EXPERT_SYSTEM}\n\n${brandCtx}\n\nCONTEXTO BRAIN:\n${brainCtx}\n\nGenera contenido PROFESIONAL, TERMINADO y LISTO PARA USAR. Envuelve todo en <div class="ai-deliverable">. Usa los colores y tipografías de la marca del cliente.\n\nIMPORTANTE: Para CADA mejora, explica EXACTAMENTE CÓMO implementarla en la vida real — paso a paso, dónde hacer clic, qué copiar y pegar, y cómo verificar que funciona. PRODUCE el contenido terminado, no recomendaciones.`,
+        "general",
+        project.storeNiche || undefined,
+        16000,
+      );
 
       const genLabel2 = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
       const date2 = new Date().toLocaleDateString("es-ES");
@@ -527,11 +533,14 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       };
 
       const prompt = externalPrompts[type] || `Analiza ${targetUrl}`;
-      const aiContent = await askClaudeWithBrain({
-        projectId: projectId || 0,
-        userMessage: prompt,
-        systemPrompt: `${SHOPIFY_EXPERT_SYSTEM}\n\nEres un analista experto en e-commerce. Analiza la URL/tienda proporcionada y genera un informe PROFESIONAL y DETALLADO. Todo en HTML dentro de <div class="ai-deliverable">.`,
-      });
+      const aiContent = await askClaudeWithBrain(
+        projectId || 0,
+        [{ role: "user" as const, content: prompt }],
+        `${SHOPIFY_EXPERT_SYSTEM}\n\nEres un analista experto en e-commerce. Analiza la URL/tienda proporcionada y genera un informe PROFESIONAL y DETALLADO. Todo en HTML dentro de <div class="ai-deliverable">.\n\nIMPORTANTE: Para CADA hallazgo, explica EXACTAMENTE CÓMO implementar la mejora en la vida real — con pasos concretos, herramientas específicas, código listo para copiar, y verificación paso a paso.`,
+        "general",
+        undefined,
+        16000,
+      );
 
       const genLabel3 = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
       const date3 = new Date().toLocaleDateString("es-ES");

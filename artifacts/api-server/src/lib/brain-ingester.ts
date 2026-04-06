@@ -104,7 +104,7 @@ Responde exactamente con este JSON:
     const resp = await anthropic.messages.create(
       {
         model: "claude-sonnet-4-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         system,
         messages: [{ role: "user", content: prompt }],
       },

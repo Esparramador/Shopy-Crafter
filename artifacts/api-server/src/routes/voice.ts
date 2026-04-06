@@ -67,7 +67,7 @@ Si confidence < 0.6, pide aclaración. Nunca inventes datos.`;
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 4096,
+      max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: "user", content: transcript }],
     });

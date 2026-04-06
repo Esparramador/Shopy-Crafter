@@ -161,7 +161,7 @@ Sé específico y concreto — nada de respuestas genéricas. Este análisis deb
     const response = await client.messages.create(
       {
         model: "claude-sonnet-4-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         system: intelligenceSystem,
         messages: [{ role: "user", content: prompt }],
       },
@@ -277,7 +277,7 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
       mode: "gemini_research_claude_redact",
       claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are a senior Shopify growth consultant building a complete strategic intelligence profile. Use all accumulated agency knowledge about market positioning, SEO, conversion optimization, and brand development to produce elite-level recommendations. When PageSpeed data is provided, integrate it into your analysis with specific performance recommendations.`,
       geminiUseSearch: true,
-      maxTokens: 4096,
+      maxTokens: 16000,
       niche: project.storeNiche ?? undefined,
       useCase: "intelligence",
     });

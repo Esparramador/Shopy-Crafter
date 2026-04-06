@@ -113,7 +113,7 @@ Análisis el posicionamiento de precios, márgenes y oportunidades de mejora.`;
 
   const aiRes = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 8192,
+    max_tokens: 16000,
     system: systemPrompt,
     messages: [{ role: "user", content: userMsg }],
   });
@@ -185,7 +185,7 @@ Catálogo servicios: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceNa
 
   const aiRes = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 8192,
+    max_tokens: 16000,
     system: systemPrompt,
     messages: [{ role: "user", content: userMsg }],
   });
@@ -294,7 +294,7 @@ ${(budgetItems ?? []).map((s: any) => `- ${s.name}: ${s.description || ""} (qty:
   try {
     const aiRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 8192,
+      max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: "user", content: userMsg }],
     });
@@ -336,7 +336,7 @@ ${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`
 
   const aiRes = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 8192,
+    max_tokens: 16000,
     system: systemPrompt,
     messages: [{ role: "user", content: userMsg }],
   });

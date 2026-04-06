@@ -1059,7 +1059,7 @@ Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de 
 
     const aiRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 4096,
+      max_tokens: 16000,
       system: sysPrompt,
       messages: [{ role: "user", content: userContent }],
     });
@@ -4282,7 +4282,7 @@ REGLAS CRÍTICAS:
           claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
           useCase: "seo",
           niche: project.storeNiche || undefined,
-          maxTokens: 8192,
+          maxTokens: 16000,
         });
         const optimized = dualResult.data;
 
@@ -4554,7 +4554,7 @@ JSON RESPUESTA (SOLO JSON):
                 claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
                 useCase: "seo",
                 niche: pNiche,
-                maxTokens: 8192,
+                maxTokens: 16000,
               });
               const batchOptimized = batchDualResult.data;
 
@@ -5766,7 +5766,7 @@ Responde SOLO el HTML, sin envolver en \`\`\`html.`;
           mode: "gemini_research_claude_redact",
           claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM,
           geminiUseSearch: true,
-          maxTokens: 8192,
+          maxTokens: 16000,
           useCase: "ecommerce",
           niche: project.storeNiche || undefined,
         });
@@ -5971,7 +5971,7 @@ Genera un alt text descriptivo y SEO para cada imagen. Los alt texts deben:
 
 JSON: {"alts":["alt text imagen 1","alt text imagen 2",...]}
 Genera exactamente ${images.length} alt texts.`,
-              { claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM, useCase: "images", niche: project.storeNiche || undefined, maxTokens: 8192 }
+              { claudeSystemPrompt: CLAUDE_EXPERT_SYSTEM, useCase: "images", niche: project.storeNiche || undefined, maxTokens: 16000 }
             );
             const altTexts = imgDual.data;
 
@@ -6120,7 +6120,7 @@ RESPONDE SOLO JSON válido con un array "plans":
             claudeSystemPrompt: "Eres un consultor de pricing SaaS con 15 años de experiencia en agencias Shopify. Generas catálogos de precios que maximizan conversión y revenue. Responde SOLO JSON válido.",
             geminiUseSearch: true,
             useCase: "pricing",
-            maxTokens: 8192,
+            maxTokens: 16000,
           });
           const plansResult = dualPricing.data;
 
@@ -6714,7 +6714,7 @@ Genera un informe con: puntuación global /100, resumen ejecutivo, problemas cr�
             mode: "gemini_research_claude_redact",
             claudeSystemPrompt: "Eres un auditor experto de themes Shopify con 10+ años de experiencia. Genera informes detallados y accionables.",
             geminiUseSearch: true,
-            maxTokens: 8192,
+            maxTokens: 16000,
             useCase: "intelligence",
           });
           aiAudit = dualResult.final;

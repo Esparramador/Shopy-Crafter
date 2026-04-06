@@ -53,7 +53,7 @@ export async function getClaudeClient(projectId: number): Promise<Anthropic> {
 
 export const SHOPIFY_EXPERT_SYSTEM = `You are ShopifyAI Expert — world-class Shopify consultant, expert in: product SEO, conversion copywriting, pricing psychology, Liquid templating, email marketing, UX/CRO. You always know which store you're working on via the context provided. Generate complete, production-ready content — never truncate with '...' or 'rest goes here'. Always respond in Spanish unless specifically asked otherwise.`;
 
-const MAX_PROMPT_CHARS = 180000;
+const MAX_PROMPT_CHARS = 500000;
 
 function enforcePromptBudget(systemPrompt: string, userContent: string, reserveForOutput = 16000): { system: string; user: string } {
   const charsPerToken = 3.5;
@@ -445,7 +445,7 @@ export async function askClaudeWithBrain(
   systemPrompt?: string,
   useCase: "redesign" | "seo" | "pricing" | "images" | "general" = "general",
   niche?: string,
-  maxTokens = 4096
+  maxTokens = 16000
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const platform = await resolvePlatformType(projectId);
@@ -466,7 +466,7 @@ export async function askClaudeJsonWithBrain<T>(
   systemPrompt: string,
   useCase: "redesign" | "seo" | "pricing" | "images" | "general",
   niche?: string,
-  maxTokens = 4096
+  maxTokens = 16000
 ): Promise<T> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([

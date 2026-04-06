@@ -238,7 +238,7 @@ async function analyzeImageWithClaude(
   
   const res = await anthropic.messages.create({
     model: "claude-opus-4-5",
-    max_tokens: 8192,
+    max_tokens: 16000,
     messages: [{
       role: "user",
       content: [
@@ -644,7 +644,7 @@ router.post("/shopybrain/create-product-from-image",
 
       const visionRes = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         messages: [{
           role: "user",
           content: [
@@ -755,7 +755,7 @@ Responde en este formato JSON exacto:
 
       const copyRes = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
 Tienda: ${project.storeName || "Shopify Store"}
 Nicho: ${project.storeNiche || "general"}
@@ -1059,7 +1059,7 @@ Responde en JSON:
     const anthropic = await getClaudeClient(0);
     const synthesisRes = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 8192,
+      max_tokens: 16000,
       system: "Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.",
       messages: [{
         role: "user",

@@ -353,7 +353,7 @@ export async function runOmniCoreMicroLearning() {
         const text = await aiGenerate({
           system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
           prompt,
-          maxTokens: 4096,
+          maxTokens: 8192,
         });
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
@@ -485,7 +485,7 @@ export async function runOmniCoreCrossConnections() {
     const text = await aiGenerate({
       system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
       prompt,
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
@@ -850,7 +850,7 @@ ${insightsSummary}
 
 Return ONLY valid JSON:
 {"evaluations":[{"index":1,"newConfidence":0.85,"stillValid":true,"notes":"Brief explanation of changes"}]}`,
-          maxTokens: 4096,
+          maxTokens: 8192,
         });
 
         const match = text.match(/\{[\s\S]*\}/);
