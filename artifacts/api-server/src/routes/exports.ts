@@ -1791,10 +1791,30 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .muted { color: ${PRESTIGE.muted}; }
   .link { color: ${PRESTIGE.copper}; text-decoration: none; }
   .link:hover { text-decoration: underline; }
-  .ai-heading { color: ${PRESTIGE.copper}; margin: 20px 0 10px; font-size: 16px; font-weight: 700; }
-  .ai-sub-heading { color: ${PRESTIGE.copper}; margin: 16px 0 8px; font-size: 14px; font-weight: 600; }
-  .ai-list { margin: 8px 0; padding-left: 20px; }
-  .ai-list li { margin-bottom: 6px; color: rgba(255,255,255,.75); line-height: 1.7; font-size: 13px; }
+  .ai-heading { color: ${PRESTIGE.copper}; margin: 24px 0 12px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+  .ai-heading:first-child { margin-top: 0; }
+  .ai-sub-heading { color: ${PRESTIGE.copperLight}; margin: 20px 0 10px; font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .ai-paragraph { margin: 0 0 12px; color: rgba(255,255,255,.78); line-height: 1.85; font-size: 13px; }
+  .ai-paragraph:last-child { margin-bottom: 0; }
+  .ai-list { margin: 10px 0 16px; padding-left: 22px; }
+  .ai-list li { margin-bottom: 8px; color: rgba(255,255,255,.75); line-height: 1.75; font-size: 13px; }
+  .ai-list li:last-child { margin-bottom: 0; }
+  .ai-list-ordered { list-style-type: decimal; }
+  .ai-list-ordered li { padding-left: 4px; }
+
+  .product-img-cell { display: flex; flex-direction: column; gap: 8px; }
+  .product-img-thumb { max-width: 180px; max-height: 140px; border-radius: 10px; border: 1px solid ${PRESTIGE.border}; object-fit: cover; background: ${PRESTIGE.surface}; }
+  .product-img-link { font-size: 11px; word-break: break-all; opacity: .7; }
+
+  .schema-code-block { background: rgba(0,0,0,.45); border: 1px solid ${PRESTIGE.border}; border-left: 3px solid ${PRESTIGE.copper}; border-radius: 10px; overflow: hidden; margin: 8px 0; }
+  .schema-code-block pre { margin: 0; padding: 16px 20px; overflow-x: auto; }
+  .schema-code-block code { display: block; font-family: 'Courier New', 'Fira Code', monospace; font-size: 11px; line-height: 1.65; color: ${PRESTIGE.copperLight}; white-space: pre; word-break: normal; background: none; border: none; padding: 0; }
+
+  .ai-image-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(245,158,11,.04); border: 2px dashed rgba(245,158,11,.2); border-radius: 12px; padding: 28px 20px; margin-bottom: 14px; min-height: 120px; }
+  .ai-image-placeholder-icon { margin-bottom: 10px; opacity: .6; }
+  .ai-image-placeholder-label { font-size: 11px; color: rgba(245,158,11,.5); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; }
+  .ai-image-brief { background: rgba(0,0,0,.2); border-radius: 8px; padding: 14px 18px; }
+
   .data-table { border-collapse: collapse; }
   .data-table tr { border-bottom: 1px solid ${PRESTIGE.border}; }
   .data-table tr:last-child { border-bottom: none; }
@@ -1845,6 +1865,10 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
     .stat-grid { grid-template-columns: 1fr; }
     .footer { padding: 20px 16px; }
     .recommendation { padding: 12px 14px; }
+    .product-img-thumb { max-width: 120px; max-height: 100px; }
+    .schema-code-block pre { padding: 12px 14px; }
+    .schema-code-block code { font-size: 10px; }
+    .ai-image-placeholder { padding: 20px 14px; min-height: 90px; }
     .sc-cover-page { min-height: 80vh !important; }
     .sc-toc-page { padding: 30px 20px !important; min-height: auto !important; }
   }

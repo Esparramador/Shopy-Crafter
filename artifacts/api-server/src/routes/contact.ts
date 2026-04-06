@@ -436,17 +436,67 @@ function buildReportHtml(
   }
 
   function mdToHtml(text: string): string {
-    const escaped = esc(text);
-    return escaped
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/^### (.+)$/gm, '<h4 class="ai-sub-heading">$1</h4>')
-      .replace(/^## (.+)$/gm, '<h3 class="ai-heading">$1</h3>')
-      .replace(/^# (.+)$/gm, '<h2 class="ai-heading">$1</h2>')
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul class="ai-list">${match}</ul>`)
-      .replace(/\n\n/g, "<br/><br/>")
-      .replace(/\n/g, "<br/>");
+    const lines = text.split("\n");
+    const blocks: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!trimmed) { i++; continue; }
+
+      const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length + 1;
+        const cls = level === 2 ? "ai-heading" : level === 3 ? "ai-heading" : "ai-sub-heading";
+        blocks.push(`<h${level} class="${cls}">${inlineFormat(esc(headingMatch[2]))}</h${level}>`);
+        i++; continue;
+      }
+
+      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        const items: string[] = [];
+        while (i < lines.length) {
+          const m = lines[i].trim().match(/^\d+\.\s+(.+)$/);
+          if (!m) break;
+          items.push(`<li>${inlineFormat(esc(m[1]))}</li>`);
+          i++;
+        }
+        blocks.push(`<ol class="ai-list ai-list-ordered">${items.join("")}</ol>`);
+        continue;
+      }
+
+      const ulMatch = trimmed.match(/^[-•]\s+(.+)$/);
+      if (ulMatch) {
+        const items: string[] = [];
+        while (i < lines.length) {
+          const m = lines[i].trim().match(/^[-•]\s+(.+)$/);
+          if (!m) break;
+          items.push(`<li>${inlineFormat(esc(m[1]))}</li>`);
+          i++;
+        }
+        blocks.push(`<ul class="ai-list">${items.join("")}</ul>`);
+        continue;
+      }
+
+      const paraLines: string[] = [];
+      while (i < lines.length) {
+        const t = lines[i].trim();
+        if (!t || t.match(/^#{1,3}\s/) || t.match(/^\d+\.\s/) || t.match(/^[-•]\s/)) break;
+        paraLines.push(inlineFormat(esc(t)));
+        i++;
+      }
+      if (paraLines.length > 0) {
+        blocks.push(`<p class="ai-paragraph">${paraLines.join("<br/>")}</p>`);
+      }
+    }
+    return blocks.join("");
+
+    function inlineFormat(s: string): string {
+      return s
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>");
+    }
   }
 
   const renderContent = (text: string): string => {
@@ -476,7 +526,7 @@ function buildReportHtml(
     ["Mensaje", `<em>"${esc(lead.message || "—")}"</em>`],
   ];
   if (lead.extraInfo) leadRows.push(["Info Adicional", esc(lead.extraInfo)]);
-  if (lead.productImageUrl) leadRows.push(["Imagen Producto", `<a href="${safeUrl(lead.productImageUrl)}" class="link">${esc(lead.productImageUrl)}</a>`]);
+  if (lead.productImageUrl) leadRows.push(["Imagen Producto", `<div class="product-img-cell"><img src="${safeUrl(lead.productImageUrl)}" alt="Producto" class="product-img-thumb" onerror="this.style.display='none'" /><a href="${safeUrl(lead.productImageUrl)}" class="link product-img-link">${esc(lead.productImageUrl)}</a></div>`]);
 
   const leadTableHtml = leadRows.map(([label, value]) =>
     `<tr><td class="table-label">${label}</td><td class="table-value">${value}</td></tr>`
@@ -584,7 +634,7 @@ function buildReportHtml(
           <div class="ai-field">
             <div class="ai-field-label">Schema JSON-LD (Structured Data para Google)</div>
             <div class="ai-field-value">
-              <code>${esc(typeof ps.schemaJsonLd === "string" ? ps.schemaJsonLd : JSON.stringify(ps.schemaJsonLd, null, 2))}</code>
+              <div class="schema-code-block"><pre><code>${esc(typeof ps.schemaJsonLd === "string" ? ((() => { try { return JSON.stringify(JSON.parse(ps.schemaJsonLd), null, 2); } catch { return ps.schemaJsonLd; } })()) : JSON.stringify(ps.schemaJsonLd, null, 2))}</code></pre></div>
             </div>
           </div>` : ""}
 
@@ -602,10 +652,19 @@ function buildReportHtml(
           </div>` : ""}
 
           ${ps.generatedImagePrompt ? `
-          <div class="highlight-box" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);margin-top:16px;">
-            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Imagen AI Generada para este Producto/Servicio</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;">Prompt de generacion: <em>"${esc(ps.generatedImagePrompt)}"</em></div>
-            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:8px;">Con Shopy Crafter generamos imagenes profesionales AI para cada producto de tu catalogo</div>
+          <div class="highlight-box ai-image-prompt-box" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);margin-top:16px;">
+            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Imagen AI — Brief de Produccion Visual</div>
+            <div class="ai-image-placeholder">
+              <div class="ai-image-placeholder-icon">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <div class="ai-image-placeholder-label">Imagen Generada por IA</div>
+            </div>
+            <div class="ai-image-brief">
+              <div style="font-size:10px;font-weight:600;color:rgba(245,158,11,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Brief creativo</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.7;font-style:italic;">"${esc(ps.generatedImagePrompt)}"</div>
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:12px;padding-top:10px;border-top:1px solid rgba(245,158,11,.1);">Con Shopy Crafter generamos imagenes profesionales AI para cada producto de tu catalogo.</div>
           </div>` : ""}
 
           <div class="highlight-box highlight-gold" style="text-align:center;margin-top:20px;">
