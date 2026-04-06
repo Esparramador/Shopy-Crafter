@@ -515,7 +515,7 @@ function Router() {
           <RequireClient><ClientReports /></RequireClient>
         </Route>
 
-        <Route component={NotFound} />
+        <Route component={NotFound as any} />
       </Switch>
     </>
   );

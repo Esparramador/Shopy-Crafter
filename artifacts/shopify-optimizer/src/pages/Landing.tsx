@@ -80,7 +80,7 @@ type CMSContent = {
   stats: { id: string; num: string; label: string }[];
   how: { pill: string; headline: string; headlineHighlight: string; steps: { num: string; title: string; desc: string }[] };
   results?: { pill: string; headline: string; headlineHighlight: string; stats: { prefix: string; num: string; suffix: string; label: string; color: string }[]; techBadges: { icon: string; label: string }[] };
-  pricing: { pill: string; headline: string; subheadline: string; plans: { id: string; name: string; price: string; currency: string; period: string; featured: boolean; badge: string | null; features: { text: string; included: boolean }[]; cta: { label: string; style: string } }[] };
+  pricing: { pill: string; headline: string; subheadline: string; plans: { id: string; name: string; price: string; currency: string; period: string; featured: boolean; badge: string | null; features: { text: string; included: boolean }[]; cta: { label: string; style: string; href?: string } }[] };
   testimonials: { pill: string; headline: string; headlineHighlight: string; items: { id: string; stars: number; text: string; metric: string; author: string; role: string; initials: string; avatarColor: string; avatarTextColor: string; avatarUrl?: string | null }[] };
   contact?: { pill: string; headline: string; headlineHighlight: string; subheadline: string; buttonLabel: string; successTitle: string; successText: string; successSubtext: string; finePrint: string; labels: Record<string, string>; placeholders: Record<string, string>; nicheOptions: string[]; revenueOptions: string[]; socialLabel?: string; socialPlaceholder?: string; servicesLabel?: string; serviceOptions?: string[] };
   cta: { pill: string; headline: string; headlineHighlight: string; subheadline: string; placeholder: string; buttonLabel: string; finePrint: string };
@@ -248,19 +248,21 @@ export default function Landing() {
 
     const sections = [...container.querySelectorAll<HTMLElement>(".fp-section")];
     const obs = new IntersectionObserver(entries => {
-      let best: { idx: number; ratio: number } | null = null;
+      let bestIdx = -1;
+      let bestRatio = 0;
       entries.forEach(e => {
         if (e.isIntersecting) {
           const idx = sections.indexOf(e.target as HTMLElement);
-          if (idx !== -1 && (!best || e.intersectionRatio > best.ratio)) {
-            best = { idx, ratio: e.intersectionRatio };
+          if (idx !== -1 && e.intersectionRatio > bestRatio) {
+            bestIdx = idx;
+            bestRatio = e.intersectionRatio;
           }
         }
       });
-      if (best) {
-        currentRef.current = best.idx;
-        setCurrentSection(best.idx);
-        setAnimatedSections(prev => new Set([...prev, sections[best!.idx].id]));
+      if (bestIdx >= 0) {
+        currentRef.current = bestIdx;
+        setCurrentSection(bestIdx);
+        setAnimatedSections(prev => new Set([...prev, sections[bestIdx].id]));
       }
     }, { threshold: [0.3, 0.5, 0.7] });
 
@@ -834,7 +836,7 @@ export default function Landing() {
             </div>
             <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               {content.pricing.plans.map((plan, planIdx) => (
-                <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured === true || plan.featured === "true" ? " l-pricing-featured" : ""}`}>
+                <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
                   {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
                   <div className="l-pricing-plan" {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
                   <div className="l-pricing-price" {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
@@ -843,8 +845,8 @@ export default function Landing() {
                   <ul className="l-pricing-features">
                     {plan.features.map((f, fi) => (
                       <li key={fi} className="l-pricing-feature">
-                        <div className={(f.included === true || f.included === "true") ? "l-pricing-check" : "l-pricing-x"}>{(f.included === true || f.included === "true") ? "✓" : "✕"}</div>
-                        <span style={(f.included === true || f.included === "true") ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
+                        <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
+                        <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
                       </li>
                     ))}
                   </ul>

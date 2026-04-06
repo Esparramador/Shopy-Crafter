@@ -53,6 +53,7 @@ export function CoachMarks() {
       const timer = setTimeout(() => setVisible(true), 1500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, []);
 
   const updateRect = useCallback(() => {

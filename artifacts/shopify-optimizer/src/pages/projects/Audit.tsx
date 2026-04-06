@@ -893,7 +893,7 @@ export default function AuditPage() {
   const isScanning = scanStatus !== "idle";
   const allProducts = data?.products || [];
   const products = filterStatus
-    ? allProducts.filter((p: Record<string, unknown>) => p.status === filterStatus)
+    ? allProducts.filter((p: any) => p.status === filterStatus)
     : allProducts;
 
   const needImprovement =
@@ -1185,10 +1185,10 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                 className="bg-card border border-white/10 rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
               >
                 <option value="">Todos los estados</option>
-                <option value="active">Activos ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.active || 0})</option>
-                <option value="unlisted">No listados ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.unlisted || 0})</option>
-                <option value="draft">Borradores ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.draft || 0})</option>
-                <option value="archived">Archivados ({(data as Record<string, unknown>)?.statusCounts && ((data as Record<string, unknown>).statusCounts as Record<string, number>)?.archived || 0})</option>
+                <option value="active">Activos ({(data as unknown as Record<string, any>)?.statusCounts?.active || 0})</option>
+                <option value="unlisted">No listados ({(data as unknown as Record<string, any>)?.statusCounts?.unlisted || 0})</option>
+                <option value="draft">Borradores ({(data as unknown as Record<string, any>)?.statusCounts?.draft || 0})</option>
+                <option value="archived">Archivados ({(data as unknown as Record<string, any>)?.statusCounts?.archived || 0})</option>
               </select>
               <select
                 value={filterGrade}
@@ -1236,13 +1236,13 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                       <h3 className="text-base font-bold text-foreground line-clamp-2">{product.title}</h3>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
-                          onClick={() => optimizeProduct(String(product.shopifyProductId || product.id))}
-                          disabled={optimizingId === String(product.shopifyProductId || product.id) || bulkOptimizing}
+                          onClick={() => optimizeProduct(String((product as any).shopifyProductId || product.id))}
+                          disabled={optimizingId === String((product as any).shopifyProductId || product.id) || bulkOptimizing}
                           className="p-2.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50 min-w-[36px] min-h-[36px] flex items-center justify-center"
                           title="Optimizar con Shopy Crafter IA"
                           aria-label="Optimizar producto con IA"
                         >
-                          {optimizingId === String(product.shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
+                          {optimizingId === String((product as any).shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
                         </button>
                         <button
                           onClick={() => setEditProduct(product as unknown as EditableProduct)}
@@ -1264,9 +1264,9 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                         {product.status === "active" ? "Activo" : product.status === "unlisted" ? "No listado" : product.status === "draft" ? "Borrador" : "Archivado"}
                       </span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
-                        product.publishedAt ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                        (product as any).publishedAt ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-orange-500/10 text-orange-400 border-orange-500/20"
                       }`}>
-                        {product.publishedAt ? "Publicado" : "No publicado"}
+                        {(product as any).publishedAt ? "Publicado" : "No publicado"}
                       </span>
                     </div>
                     <p className="text-primary font-medium text-sm">

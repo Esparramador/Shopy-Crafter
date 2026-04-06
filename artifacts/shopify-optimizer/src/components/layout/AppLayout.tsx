@@ -80,14 +80,14 @@ export function AppLayout({ children }: AppLayoutProps) {
   const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
   const rawShopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
   const firstProjectId = projects?.[0]?.id ?? 2;
-  const shopybrainNav = rawShopybrainNav.map(item =>
+  const shopybrainNav = rawShopybrainNav.map((item: any) =>
     item.href.includes("/projects/2/") ? { ...item, href: item.href.replace("/projects/2/", `/projects/${firstProjectId}/`) } : item
   );
-  const adminNav = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
+  const adminNav: any[] = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
   const ap = cmsPanel ?? {};
 
   const pageLabels: Record<string, string> = {};
-  moduleNav.forEach(m => { pageLabels[m.id] = m.label; });
+  moduleNav.forEach((m: any) => { pageLabels[m.id] = m.label; });
   pageLabels["settings"] = "Configuración";
 
   const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
@@ -198,7 +198,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
             🧠 Shopy Crafter
           </span>
-          {shopybrainNav.map(item => (
+          {shopybrainNav.map((item: any) => (
             <Link key={item.href} href={item.href}>
               <div
                 className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
@@ -483,7 +483,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Module tab nav (only when a project is active) */}
         {activeProject && (
           <div className="module-tabs" role="tablist">
-            {moduleNav.map((item) => {
+            {moduleNav.map((item: any) => {
               const isActive = currentPage === item.id;
               return (
                 <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>

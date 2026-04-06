@@ -2,14 +2,15 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-interface GlassCardProps {
+export interface GlassCardProps {
   children: ReactNode;
   className?: string;
   hoverEffect?: boolean;
   delay?: number;
+  style?: React.CSSProperties;
 }
 
-export function GlassCard({ children, className, hoverEffect = false, delay = 0 }: GlassCardProps) {
+export function GlassCard({ children, className, hoverEffect = false, delay = 0, style }: GlassCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -20,6 +21,7 @@ export function GlassCard({ children, className, hoverEffect = false, delay = 0 
         hoverEffect && "card-hover",
         className
       )}
+      style={style}
     >
       {children}
     </motion.div>

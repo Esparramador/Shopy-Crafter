@@ -1032,7 +1032,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     }
   };
 
-  const formatActionResult = (action: string, result: Record<string, unknown>): string => {
+  const formatActionResult = (action: string, result: any): string => {
     if (result.error) return `❌ ${result.message}`;
 
     switch (action) {
@@ -1659,7 +1659,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           if (isDocument) {
             const docAnalysis = typeof result.analysis === "string" ? result.analysis : JSON.stringify(result.analysis, null, 2);
             assistantContent += `📄 **Documento analizado:** ${attachName}\n`;
-            assistantContent += `📊 **Tamaño:** ${(result as Record<string, unknown>).contentLength ?? "?"} caracteres\n\n`;
+            assistantContent += `📊 **Tamaño:** ${(result as any).contentLength ?? "?"} caracteres\n\n`;
             assistantContent += `**Análisis:**\n${docAnalysis}\n\n`;
           } else {
             const a = result.analysis as Record<string, Record<string, string[]>>;

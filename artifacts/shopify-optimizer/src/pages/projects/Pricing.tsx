@@ -272,7 +272,7 @@ function CogsModal({
     data.notes = notes;
     data.finalPrice = product.price ?? 0;
     saveCogs.mutate(
-      { projectId, productId: product.id, data },
+      { projectId, productId: product.id, data: data as any },
       {
         onSuccess: () => toast({ title: "Costes guardados correctamente" }),
         onError: () => toast({ title: "Error guardando costes", variant: "destructive" }),

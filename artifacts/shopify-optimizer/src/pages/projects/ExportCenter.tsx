@@ -415,7 +415,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   };
 
   const formatBadge = (format: ExportFormat) => {
-    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346" };
+    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346", CSS: "#9b59b6" };
     return (
       <span
         className="text-[10px] font-bold px-1.5 py-0.5 rounded"

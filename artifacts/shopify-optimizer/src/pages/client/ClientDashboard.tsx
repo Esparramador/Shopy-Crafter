@@ -123,7 +123,7 @@ export default function ClientDashboard() {
               <span style={{ fontWeight: 700, fontSize: 14 }}>{t("engineStatus", "Motores IA — Estado")}</span>
             </div>
             <div>
-              {Object.entries(ENGINE_NAMES).map(([key, name], i) => (
+              {Object.entries(ENGINE_NAMES).map(([key, name]: [string, any], i) => (
                 <div key={key} className="feed-item">
                   <div className="feed-icon" style={{ background: "rgba(200,168,75,0.08)", fontSize: 13 }}>
                     {ENGINE_ICONS[i]}

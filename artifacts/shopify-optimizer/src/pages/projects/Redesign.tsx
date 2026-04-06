@@ -212,7 +212,7 @@ export default function RedesignPage() {
     setShowPartialFor(null);
     const parts = getSelectedParts(productId);
     redesign.mutate(
-      { projectId, productId, data: { parts } as any },
+      { projectId, productId, ...({ data: { parts } } as any) },
       {
         onSuccess: (res) => {
           setRedesignResults((prev) => ({ ...prev, [productId]: res as unknown as RedesignResult }));
@@ -310,7 +310,7 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
   <h3>${r?.title || (p as any).title}</h3>
   ${r?.shortDescription ? `<p style="color:#aaa">${r.shortDescription}</p>` : ""}
   ${r?.price ? `<p><strong>Precio sugerido:</strong> ${r.price}€</p>` : ""}
-  ${r?.tags?.length ? `<p><strong>Tags:</strong> ${r.tags.join(", ")}</p>` : ""}
+  ${r?.tags?.length ? `<p><strong>Tags:</strong> ${Array.isArray(r.tags) ? r.tags.join(", ") : r.tags}</p>` : ""}
   ${r?.photoBriefs?.length ? `<h4>Photo Briefs</h4><ol>${r.photoBriefs.map(b => `<li>${b}</li>`).join("")}</ol>` : ""}
 </div>`;
 }).join("")}` : "<p>Aún no se han generado rediseños en esta sesión.</p>"}`;

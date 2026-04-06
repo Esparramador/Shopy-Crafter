@@ -311,10 +311,10 @@ export default function GeminiIntelligence() {
             <p style={{ margin: 0, fontSize: 12, color: "var(--t3)" }}>Investigación → Análisis → Aprendizaje Continuo</p>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            {state.data && (
+            {!!state.data && (
               <SaveToVaultButton
                 title={`Gemini Research: ${activeTab} — ${auditForm.businessName || auditForm.domain || bizForm.businessName || "General"}`}
-                content={typeof state.data === "string" ? state.data : JSON.stringify(state.data, null, 2)}
+                content={typeof state.data === "string" ? state.data : JSON.stringify(state.data as any, null, 2)}
                 fileType="research"
                 entityName={auditForm.businessName || bizForm.businessName || auditForm.domain || "General"}
                 entityUrl={auditForm.domain || bizForm.domain || compForm.domain || undefined}
