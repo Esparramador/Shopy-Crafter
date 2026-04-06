@@ -13,6 +13,7 @@ import { sanitizeHtml } from "../lib/html-escape.js";
 import { requireAdmin } from "../lib/auth.js";
 import { getReportShell } from "./exports.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
+import juice from "juice";
 
 const router = Router();
 
@@ -801,9 +802,22 @@ router.post("/contact", async (req, res): Promise<void> => {
 
       if (isGmailAvailable()) {
         const subject = `Nuevo Lead: ${leadData.name} — ${leadData.niche || "eCommerce"} — Pre-Informe AI`;
-        const sent = await sendEmail(ADMIN_EMAIL, subject, reportHtml);
+        let emailHtml: string;
+        try {
+          emailHtml = juice(reportHtml, {
+            removeStyleTags: true,
+            preserveMediaQueries: false,
+            preserveFontFaces: false,
+            applyStyleTags: true,
+            insertPreservedExtraCss: false,
+          });
+        } catch (juiceErr) {
+          logger.warn({ err: juiceErr }, "CSS inlining failed, sending raw HTML");
+          emailHtml = reportHtml;
+        }
+        const sent = await sendEmail(ADMIN_EMAIL, subject, emailHtml);
         if (sent) {
-          logger.info({ to: ADMIN_EMAIL, lead: leadData.email }, "Pre-report email sent to admin");
+          logger.info({ to: ADMIN_EMAIL, lead: leadData.email }, "Pre-report email sent to admin (CSS inlined)");
         } else {
           logger.error({ to: ADMIN_EMAIL }, "Failed to send pre-report email");
         }
