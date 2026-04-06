@@ -9,7 +9,7 @@ import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { requireAdmin } from "../lib/auth.js";
-import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { getReportShell } from "./exports.js";
 
 const router = Router();
 
@@ -209,248 +209,175 @@ function buildReportHtml(
     return "#";
   }
 
-  const servicesHtml = lead.services.length > 0
-    ? lead.services.map(s => `<span style="display:inline-block;background:rgba(200,168,75,.06);color:#c8a84b;padding:4px 12px;border-radius:6px;font-size:12px;margin:2px 4px;border:1px solid rgba(200,168,75,.15);font-weight:600;">${esc(s)}</span>`).join("")
-    : '<span style="color:#6b6b80;">No especificados</span>';
-
-  const sourcesHtml = research.sources.length > 0
-    ? research.sources.map(s => `<li style="margin-bottom:4px;"><a href="${safeUrl(s)}" style="color:#4a9eff;font-size:12px;word-break:break-all;">${esc(s)}</a></li>`).join("")
-    : "<li>Sin fuentes verificadas</li>";
-
   function mdToHtml(text: string): string {
     const escaped = esc(text);
     return escaped
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/^### (.+)$/gm, '<h4 style="color:#e6c668;margin:16px 0 8px;">$1</h4>')
-      .replace(/^## (.+)$/gm, '<h3 style="color:#e6c668;margin:20px 0 10px;">$1</h3>')
-      .replace(/^# (.+)$/gm, '<h2 style="color:#e6c668;margin:24px 0 12px;">$1</h2>')
-      .replace(/^- (.+)$/gm, '<li style="margin-bottom:4px;">$1</li>')
-      .replace(/(<li.*<\/li>\n?)+/g, (match) => `<ul style="margin:8px 0;padding-left:20px;">${match}</ul>`)
+      .replace(/^### (.+)$/gm, '<h4 class="ai-sub-heading">$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3 class="ai-heading">$1</h3>')
+      .replace(/^# (.+)$/gm, '<h2 class="ai-heading">$1</h2>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul class="ai-list">${match}</ul>`)
       .replace(/\n\n/g, "<br/><br/>")
       .replace(/\n/g, "<br/>");
   }
 
+  const servicesHtml = lead.services.length > 0
+    ? lead.services.map(s => `<span class="tag">${esc(s)}</span>`).join("")
+    : '<span class="muted">No especificados</span>';
+
   const storeLink = lead.storeUrl
-    ? `<a href="${safeUrl(lead.storeUrl)}" style="color:#4a9eff;text-decoration:none;">${esc(lead.storeUrl)}</a>`
+    ? `<a href="${safeUrl(lead.storeUrl)}" class="link">${esc(lead.storeUrl)}</a>`
     : "—";
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#08080e;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
-${buildCoverPage({ reportTitle: "Pre-Informe AI de Lead", reportSubtitle: esc(lead.name), companyName: esc(lead.name), template: "elegance" })}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#08080e;padding:24px 0;">
-<tr><td align="center">
-<table width="680" cellpadding="0" cellspacing="0" style="background:#101018;border-radius:16px;overflow:hidden;">
+  const leadRows = [
+    ["Nombre", esc(lead.name)],
+    ["Email", `<a href="mailto:${esc(lead.email)}" class="link">${esc(lead.email)}</a>`],
+    ["Telefono", esc(lead.phone || "—")],
+    ["Tienda", storeLink],
+    ["Nicho", esc(lead.niche || "—")],
+    ["Facturacion", esc(lead.revenue || "—")],
+    ["Redes Sociales", esc(lead.socialMedia || "—")],
+    ["Servicios Solicitados", servicesHtml],
+    ["Mensaje", `<em>"${esc(lead.message || "—")}"</em>`],
+  ];
+  if (lead.extraInfo) leadRows.push(["Info Adicional", esc(lead.extraInfo)]);
+  if (lead.productImageUrl) leadRows.push(["Imagen Producto", `<a href="${safeUrl(lead.productImageUrl)}" class="link">${esc(lead.productImageUrl)}</a>`]);
 
-<!-- HEADER -->
-<tr><td style="background:linear-gradient(160deg,#0e0e18,#12121f,#0a0a14);padding:40px 48px 36px;position:relative;">
-  <table width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td width="44" valign="top"><div style="width:40px;height:40px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:10px;text-align:center;line-height:40px;font-size:20px;font-weight:900;color:#0a0a0f;">S</div></td>
-    <td style="padding-left:12px;" valign="middle"><span style="font-size:20px;font-weight:800;color:#c8a84b;letter-spacing:-0.3px;">Shopy Crafter</span></td>
-    <td align="right" valign="top">
-      <div style="background:#16161f;border:1px solid #24243a;border-radius:8px;padding:8px 16px;display:inline-block;">
-        <div style="font-size:9px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;">Pre-Informe AI</div>
-        <div style="font-size:12px;color:#f0f0f5;font-weight:600;margin-top:2px;">${new Date().toLocaleString("es-ES", { dateStyle: "long" })}</div>
-      </div>
-    </td>
-  </tr></table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;"><tr><td>
-    <h1 style="color:#f0f0f5;font-size:26px;font-weight:900;margin:0 0 4px;letter-spacing:-0.5px;">Nuevo Lead: ${esc(lead.name)}</h1>
-    <p style="color:#9494a8;font-size:14px;margin:0;">${esc(lead.company || lead.niche || "Shopify Store")}</p>
-  </td></tr></table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;"><tr>
-    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Generado por IA</span></td>
-    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Datos verificados</span></td>
-    <td><span style="font-size:11px;color:#6b6b80;">&#9679; Confidencial</span></td>
-  </tr></table>
-</td></tr>
+  const leadTableHtml = leadRows.map(([label, value]) =>
+    `<tr><td class="table-label">${label}</td><td class="table-value">${value}</td></tr>`
+  ).join("");
 
-<!-- LEAD DATA CARD -->
-<tr><td style="padding:32px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128100;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">Datos del Lead</span>
-  </td></tr></table>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#16161f;border:1px solid #1a1a28;border-radius:12px;overflow:hidden;">
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;width:130px;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Nombre</td>
-      <td style="color:#f0f0f5;font-size:14px;font-weight:600;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.name)}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Email</td>
-      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;"><a href="mailto:${esc(lead.email)}" style="color:#3b82f6;text-decoration:none;font-size:14px;font-weight:500;">${esc(lead.email)}</a></td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Telefono</td>
-      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.phone || "—")}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Tienda</td>
-      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;">${storeLink}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Nicho</td>
-      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.niche || "—")}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Facturacion</td>
-      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.revenue || "—")}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Redes</td>
-      <td style="color:#f0f0f5;font-size:14px;padding:14px 20px;border-bottom:1px solid #1a1a28;">${esc(lead.socialMedia || "—")}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-bottom:1px solid #1a1a28;">Servicios</td>
-      <td style="padding:14px 20px;border-bottom:1px solid #1a1a28;">${servicesHtml}</td>
-    </tr>
-    <tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;">Mensaje</td>
-      <td style="color:#9494a8;font-size:14px;padding:14px 20px;line-height:1.6;font-style:italic;">"${esc(lead.message || "—")}"</td>
-    </tr>
-    ${lead.extraInfo ? `<tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-top:1px solid #1a1a28;">Info Extra</td>
-      <td style="color:#d0d0dd;font-size:13px;padding:14px 20px;line-height:1.6;border-top:1px solid #1a1a28;">${esc(lead.extraInfo)}</td>
-    </tr>` : ""}
-    ${lead.productImageUrl ? `<tr>
-      <td style="color:#6b6b80;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:14px 20px;vertical-align:top;border-top:1px solid #1a1a28;">Img Producto</td>
-      <td style="padding:14px 20px;border-top:1px solid #1a1a28;"><a href="${safeUrl(lead.productImageUrl)}" style="color:#3b82f6;font-size:12px;word-break:break-all;">${esc(lead.productImageUrl)}</a></td>
-    </tr>` : ""}
-  </table>
-</td></tr>
+  const sourcesHtml = research.sources.length > 0
+    ? research.sources.map(s => `<li><a href="${safeUrl(s)}" class="link" style="word-break:break-all;">${esc(s)}</a></li>`).join("")
+    : "<li class=\"muted\">Sin fuentes verificadas</li>";
 
-<!-- SECTION 1: Business Research -->
-<tr><td style="padding:32px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128269;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">1. Investigacion del Negocio</span>
-  </td></tr></table>
-  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
-    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.business)}</div>
-  </div>
-</td></tr>
+  const productSampleHtml = research.productSample ? `
+    <div class="section">
+      <div class="section-title">Producto Optimizado por Shopy Crafter (Muestra)</div>
+      <div class="ai-deliverable">
+        <div class="ai-deliverable-header">Ejemplo de optimizacion completa aplicada a tu nicho</div>
 
-<!-- SECTION 2: Market Analysis -->
-<tr><td style="padding:28px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128200;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">2. Analisis de Mercado y Competencia</span>
-  </td></tr></table>
-  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
-    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.market)}</div>
-  </div>
-</td></tr>
-
-<!-- SECTION 3: SEO Audit -->
-<tr><td style="padding:28px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128640;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">3. Auditoria SEO y Presencia Digital</span>
-  </td></tr></table>
-  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:28px 28px;">
-    <div style="color:#d0d0dd;font-size:14px;line-height:1.8;">${mdToHtml(research.seo)}</div>
-  </div>
-</td></tr>
-
-${research.productSample ? `
-<!-- SECTION 4: Product Sample by Shopy Crafter -->
-<tr><td style="padding:28px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.3);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#10024;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">4. Producto Optimizado por Shopy Crafter (Muestra)</span>
-  </td></tr></table>
-  <div style="background:linear-gradient(135deg,#101018,#14141f);border:1px solid rgba(200,168,75,.2);border-radius:12px;padding:28px;overflow:hidden;">
-    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Titulo optimizado</div>
-      <div style="font-size:18px;font-weight:700;color:#f0f0f5;line-height:1.3;">${esc(research.productSample.title)}</div>
-    </div>
-    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Descripcion de venta</div>
-      <div style="font-size:14px;color:#d0d0dd;line-height:1.7;">${esc(research.productSample.description)}</div>
-    </div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:8px;overflow:hidden;margin-bottom:20px;">
-      <tr>
-        <td style="padding:12px 16px;border-bottom:1px solid rgba(52,211,153,.1);">
-          <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1px;">SEO Title (Google)</div>
-          <div style="font-size:13px;color:#34d399;font-weight:600;margin-top:4px;">${esc(research.productSample.seoTitle)}</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:12px 16px;">
-          <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1px;">SEO Description (Google)</div>
-          <div style="font-size:13px;color:#34d399;margin-top:4px;">${esc(research.productSample.seoDescription)}</div>
-        </td>
-      </tr>
-    </table>
-    ${research.productSample.variants && research.productSample.variants.length > 0 ? `
-    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Variantes configuradas</div>
-      ${research.productSample.variants.map(v => `
-        <div style="margin-bottom:8px;">
-          <span style="display:inline-block;background:rgba(200,168,75,.1);color:#e6c668;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:8px;border:1px solid rgba(200,168,75,.2);">${esc(v.option)}</span>
-          <span style="font-size:12px;color:#9494a8;">${v.values.map(val => esc(val)).join(" | ")}</span>
+        <div class="ai-field">
+          <div class="ai-field-label">Titulo Optimizado</div>
+          <div class="ai-field-value" style="font-size:17px;font-weight:700;">${esc(research.productSample.title)}</div>
         </div>
-      `).join("")}
+
+        <div class="ai-field">
+          <div class="ai-field-label">Descripcion de Venta</div>
+          <div class="ai-field-value">${esc(research.productSample.description)}</div>
+        </div>
+
+        <div class="highlight-box highlight-success">
+          <div class="ai-field" style="margin-bottom:12px;">
+            <div class="ai-field-label">SEO Title (Google)</div>
+            <div class="ai-field-value" style="font-weight:600;">${esc(research.productSample.seoTitle)}</div>
+          </div>
+          <div class="ai-field" style="margin-bottom:0;">
+            <div class="ai-field-label">SEO Description (Google)</div>
+            <div class="ai-field-value">${esc(research.productSample.seoDescription)}</div>
+          </div>
+        </div>
+
+        ${research.productSample.variants && research.productSample.variants.length > 0 ? `
+        <div class="ai-field">
+          <div class="ai-field-label">Variantes Configuradas</div>
+          <div class="ai-field-value">
+            ${research.productSample.variants.map(v =>
+              `<span class="tag">${esc(v.option)}</span> <span class="muted">${v.values.map(val => esc(val)).join(" | ")}</span>`
+            ).join("<br/>")}
+          </div>
+        </div>` : ""}
+
+        <div class="ai-field">
+          <div class="ai-field-label">Tags SEO</div>
+          <div class="ai-field-value">${(research.productSample.tags || []).map(t => `<span class="tag tag-blue">${esc(t)}</span>`).join(" ")}</div>
+        </div>
+
+        <div class="ai-field">
+          <div class="ai-field-label">Estrategia de Precio</div>
+          <div class="ai-field-value">${esc(research.productSample.priceStrategy)}</div>
+        </div>
+
+        <div class="ai-field">
+          <div class="ai-field-label">Mejoras que Aplicariamos (Impacto Estimado)</div>
+          <div class="ai-field-value">${esc(research.productSample.improvementNotes)}</div>
+        </div>
+
+        <div class="highlight-box highlight-gold" style="text-align:center;margin-top:16px;">
+          <strong>Este es solo 1 producto de muestra.</strong> Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente.
+        </div>
+      </div>
+    </div>` : "";
+
+  const body = `
+    <div class="metric-row">
+      <div class="metric"><div class="value">${esc(lead.niche || "E-commerce")}</div><div class="label">Sector / Nicho</div></div>
+      <div class="metric"><div class="value">${esc(lead.revenue || "—")}</div><div class="label">Facturacion</div></div>
+      <div class="metric"><div class="value">${lead.services.length}</div><div class="label">Servicios Solicitados</div></div>
+      <div class="metric"><div class="value">${research.sources.length}</div><div class="label">Fuentes Verificadas</div></div>
     </div>
-    ` : ""}
-    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Tags SEO</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;">
-        ${(research.productSample.tags || []).map(t => `<span style="display:inline-block;background:rgba(74,158,221,.08);color:#4a9eff;padding:3px 10px;border-radius:12px;font-size:11px;border:1px solid rgba(74,158,221,.15);">${esc(t)}</span>`).join("")}
+
+    <div class="section">
+      <div class="section-title">Datos del Lead</div>
+      <div class="card">
+        <table class="data-table" width="100%">
+          ${leadTableHtml}
+        </table>
       </div>
     </div>
-    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(200,168,75,.1);">
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Estrategia de precio</div>
-      <div style="font-size:13px;color:#d0d0dd;line-height:1.6;">${esc(research.productSample.priceStrategy)}</div>
+
+    <div class="section">
+      <div class="section-title">Investigacion del Negocio</div>
+      <div class="card ai-deliverable">
+        <div class="ai-deliverable-header">Analisis automatico con IA — datos reales verificados</div>
+        ${mdToHtml(research.business)}
+      </div>
     </div>
-    <div>
-      <div style="font-size:10px;color:#6b6b80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Mejoras que aplicariamos (impacto estimado)</div>
-      <div style="font-size:13px;color:#d0d0dd;line-height:1.7;">${esc(research.productSample.improvementNotes)}</div>
+
+    <div class="section">
+      <div class="section-title">Analisis de Mercado y Competencia</div>
+      <div class="card ai-deliverable">
+        <div class="ai-deliverable-header">Estudio del sector y posicionamiento competitivo</div>
+        ${mdToHtml(research.market)}
+      </div>
     </div>
-    <div style="margin-top:20px;background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.15);border-radius:8px;padding:14px;text-align:center;">
-      <div style="font-size:11px;color:#c8a84b;font-weight:600;">Este es solo 1 producto de muestra. Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente.</div>
+
+    <div class="section">
+      <div class="section-title">Auditoria SEO y Presencia Digital</div>
+      <div class="card ai-deliverable">
+        <div class="ai-deliverable-header">Rastreo de presencia digital, indexacion y keywords</div>
+        ${mdToHtml(research.seo)}
+      </div>
     </div>
-  </div>
-</td></tr>
-` : ""}
 
-<!-- SOURCES -->
-<tr><td style="padding:28px 48px 0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;"><tr><td>
-    <div style="display:inline-block;width:28px;height:28px;background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.2);border-radius:7px;text-align:center;line-height:28px;font-size:14px;vertical-align:middle;">&#128279;</div>
-    <span style="font-size:16px;font-weight:700;color:#f0f0f5;vertical-align:middle;margin-left:10px;">Fuentes Verificadas</span>
-  </td></tr></table>
-  <div style="background:#101018;border:1px solid #1a1a28;border-radius:12px;padding:20px 28px;">
-    <ul style="margin:0;padding-left:16px;list-style:none;">${research.sources.length > 0
-      ? research.sources.map(s => `<li style="margin-bottom:6px;padding:4px 0;"><span style="color:#c8a84b;margin-right:8px;">&#8594;</span><a href="${safeUrl(s)}" style="color:#3b82f6;font-size:12px;word-break:break-all;text-decoration:none;">${esc(s)}</a></li>`).join("")
-      : '<li style="color:#6b6b80;">Sin fuentes verificadas</li>'}</ul>
-  </div>
-</td></tr>
+    ${productSampleHtml}
 
-<!-- AI BADGE -->
-<tr><td style="padding:32px 48px;">
-  <div style="background:rgba(200,168,75,0.04);border:1px solid rgba(200,168,75,0.15);border-radius:12px;padding:24px;text-align:center;">
-    <div style="width:36px;height:36px;background:linear-gradient(135deg,#c8a84b,#8b6914);border-radius:8px;margin:0 auto 12px;text-align:center;line-height:36px;font-size:18px;font-weight:900;color:#0a0a0f;">S</div>
-    <p style="color:#c8a84b;font-size:14px;font-weight:700;margin:0 0 4px;">Pre-informe generado por Shopy Crafter AI</p>
-    <p style="color:#6b6b80;font-size:11px;margin:0;">Dual AI Engine (Gemini + Claude) &middot; Datos reales verificados</p>
-  </div>
-</td></tr>
+    <div class="section">
+      <div class="section-title">Fuentes Verificadas</div>
+      <div class="card">
+        <ul class="ai-list">${sourcesHtml}</ul>
+      </div>
+    </div>
 
-<!-- FOOTER -->
-<tr><td style="background:#0c0c14;padding:24px 48px;border-top:1px solid #1a1a28;">
-  <table width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td><span style="color:#c8a84b;font-size:12px;font-weight:700;">Shopy Crafter</span></td>
-    <td align="right"><span style="color:#6b6b80;font-size:10px;">&copy; ${new Date().getFullYear()} &middot; Confidencial</span></td>
-  </tr></table>
-</td></tr>
+    <div class="section">
+      <div class="card" style="text-align:center;padding:28px;">
+        <p class="muted" style="margin:0 0 4px;font-size:11px;">Generado por</p>
+        <p style="margin:0;font-weight:700;font-size:15px;">Shopy Crafter AI</p>
+        <p class="muted" style="margin:4px 0 0;font-size:11px;">Dual AI Engine (Gemini + Claude) &middot; Datos reales verificados</p>
+      </div>
+    </div>`;
 
-</table>
-</td></tr>
-</table>
-</body>
-</html>`;
+  const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const shell = getReportShell("prestige");
+  return shell(
+    "Pre-Informe AI de Lead",
+    `${esc(lead.name)} — ${esc(lead.niche || "Shopify Store")}`,
+    body,
+    date,
+    esc(lead.name),
+  );
 }
 
 router.post("/contact", async (req, res): Promise<void> => {
