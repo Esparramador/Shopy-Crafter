@@ -502,15 +502,15 @@ router.post("/projects/:projectId/seo/keyword-intelligence", async (req, res): P
 
 === DATOS REALES DE BÚSQUEDAS EN GOOGLE (investigación actual) ===
 --- Búsqueda 1: Keywords y autocompletado de Google ---
-${searchResults[0].text.slice(0, 3000)}
+${searchResults[0].text.slice(0, 12000)}
 
 --- Búsqueda 2: Competidores reales y sus listings ---
-${searchResults[1].text.slice(0, 3000)}
+${searchResults[1].text.slice(0, 12000)}
 
 --- Búsqueda 3: Tendencias y dificultad SEO ---
-${searchResults[2].text.slice(0, 3000)}
+${searchResults[2].text.slice(0, 12000)}
 
-=== Fuentes verificadas: ${allSources.slice(0, 10).join(", ")} ===
+=== Fuentes verificadas: ${allSources.slice(0, 20).join(", ")} ===
 
 INSTRUCCIONES CRÍTICAS:
 - Basa tus keywords en los DATOS REALES de Google de arriba, NO en suposiciones
@@ -549,7 +549,7 @@ Devuelve JSON con:
     operationType: "seo_keywords",
     niche: project?.storeNiche ?? null,
     title: `Keywords: ${productName} — ${result?.primaryKeyword ?? ""}`,
-    content: `Keyword strategy para "${productName}" con datos reales de Google Search. Primary: ${result?.primaryKeyword ?? ""}. Secondary: ${JSON.stringify(result?.secondaryKeywords ?? []).slice(0, 300)}. Semantic: ${JSON.stringify(result?.semanticKeywords ?? []).slice(0, 300)}. Difficulty: ${result?.difficulty ?? "N/A"}. Sources: ${allSources.slice(0, 5).join(", ")}`,
+    content: `Keyword strategy para "${productName}" con datos reales de Google Search. Primary: ${result?.primaryKeyword ?? ""}. Secondary: ${JSON.stringify(result?.secondaryKeywords ?? [])}.  Semantic: ${JSON.stringify(result?.semanticKeywords ?? [])}. Difficulty: ${result?.difficulty ?? "N/A"}. Sources: ${allSources.slice(0, 10).join(", ")}. FAQ: ${JSON.stringify((result?.faqSchema ?? []).slice(0, 3))}`,
     confidence: 0.85,
     tags: ["seo", "keywords", "google_grounded", project?.storeNiche ?? "ecommerce"].filter(Boolean),
   });

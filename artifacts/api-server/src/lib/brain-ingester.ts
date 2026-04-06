@@ -81,7 +81,7 @@ Responde SOLO con JSON válido, sin texto adicional.`;
   const prompt = `Del siguiente análisis de ${sourceLabel}, extrae 3-6 insights de alto valor para ShopyBrain.
 
 ANÁLISIS:
-${rawIntelligence.slice(0, 3000)}
+${rawIntelligence.slice(0, 12000)}
 
 Nicho/contexto: ${niche ?? "general ecommerce"}
 
@@ -200,7 +200,7 @@ export function ingestToShopyBrain(params: IngestParams): void {
     productType: productType ?? null,
     market: "es",
     title: resolvedTitle,
-    content: rawIntelligence.slice(0, 3000),
+    content: rawIntelligence.slice(0, 10000),
     confidence,
     sourceType: `ingest_${sourceType}`,
     tags: JSON.stringify(domains),

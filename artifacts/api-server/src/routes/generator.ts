@@ -317,7 +317,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         learnFromOperation({
           operationType: `generator_${type}`,
           title: `Generado ${type} para "${project.shopName}" [${template}]`,
-          content: aiContent.substring(0, 2000),
+          content: aiContent.substring(0, 8000),
         });
       }
 
@@ -553,7 +553,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         learnFromOperation({
           operationType: `generator_${type}`,
           title: `Análisis externo de ${targetUrl} [${template}]`,
-          content: aiContent.substring(0, 2000),
+          content: aiContent.substring(0, 8000),
         });
       }
 

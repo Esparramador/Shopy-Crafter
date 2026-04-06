@@ -159,7 +159,7 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
         operationType: "lead_business_intel",
         niche: lead.niche || undefined,
         title: `Intel empresa: ${entityName} (${lead.niche || "general"})`,
-        content: ((businessResearch as any).text as string).slice(0, 2000),
+        content: ((businessResearch as any).text as string).slice(0, 6000),
         confidence: 0.82,
         tags: ["lead_research", "business_intel", lead.niche || "general", entityName],
       });
@@ -170,7 +170,7 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
         operationType: "lead_market_intel",
         niche: lead.niche || undefined,
         title: `Intel mercado: nicho ${lead.niche || "general"} — fuentes lead ${lead.name}`,
-        content: ((marketResearch as any).text as string).slice(0, 2000),
+        content: ((marketResearch as any).text as string).slice(0, 6000),
         confidence: 0.82,
         tags: ["lead_research", "market_intel", lead.niche || "general"],
       });
@@ -181,7 +181,7 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
         operationType: "seo",
         niche: lead.niche || undefined,
         title: `SEO audit lead: ${entityName} (${lead.storeUrl || "sin URL"})`,
-        content: ((seoResearch as any).text as string).slice(0, 2000),
+        content: ((seoResearch as any).text as string).slice(0, 6000),
         confidence: 0.80,
         tags: ["lead_research", "seo_audit", lead.niche || "general"],
       });

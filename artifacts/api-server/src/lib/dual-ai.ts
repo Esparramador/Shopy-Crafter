@@ -115,7 +115,7 @@ export async function dualAI(
       : "";
 
     const claudePrompt = geminiText
-      ? `INVESTIGACIÓN PREVIA (datos reales de búsqueda web por Gemini AI):\n${geminiText.slice(0, 8000)}${sourcesBlock}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nUsando esa investigación como base factual, ${prompt}\n\nINSTRUCCIONES:\n- Usa los datos de la investigación como fuente factual verificada\n- Añade tu expertise en redacción, copywriting y estrategia\n- Genera contenido profesional, completo y listo para producción\n- No inventes datos — usa los que se investigaron\n- Enriquece con insights estratégicos y recomendaciones de experto`
+      ? `INVESTIGACIÓN PREVIA (datos reales de búsqueda web por Gemini AI):\n${geminiText.slice(0, 30000)}${sourcesBlock}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nUsando esa investigación como base factual, ${prompt}\n\nINSTRUCCIONES:\n- Usa los datos de la investigación como fuente factual verificada\n- Añade tu expertise en redacción, copywriting y estrategia\n- Genera contenido profesional, completo y listo para producción\n- No inventes datos — usa los que se investigaron\n- Enriquece con insights estratégicos y recomendaciones de experto`
       : prompt;
 
     const t0c = Date.now();
@@ -135,7 +135,7 @@ export async function dualAI(
   const brainCtx = await buildShopyBrainContext(niche, useCase, prompt);
   const geminiPromptText = opts.geminiSystemPrompt
     ? prompt
-    : `${prompt}\n\nContexto del cerebro de la agencia (46,000+ insights):\n${brainCtx.slice(0, 3000)}`;
+    : `${prompt}\n\nContexto del cerebro de la agencia (46,000+ insights):\n${brainCtx.slice(0, 10000)}`;
 
   const [claudeSettled, geminiSettled] = await Promise.allSettled([
     (async () => {
@@ -180,10 +180,10 @@ export async function dualAI(
     `Eres el Director Estratégico de ShopyBrain. Tienes DOS análisis independientes del mismo tema, uno de cada motor de IA. Tu misión: sintetizar lo MEJOR de ambos en un resultado SUPERIOR a cualquiera por separado.
 
 ANÁLISIS A (Claude — expertise en redacción, copywriting y estrategia):
-${claudeResult!.slice(0, 6000)}
+${claudeResult!.slice(0, 20000)}
 
 ANÁLISIS B (Gemini — expertise en datos, búsqueda web y análisis de mercado):
-${geminiResult!.slice(0, 6000)}${sourcesRef}
+${geminiResult!.slice(0, 20000)}${sourcesRef}
 
 INSTRUCCIONES DE SÍNTESIS:
 1. Combina los datos factuales de ambos análisis
@@ -262,7 +262,7 @@ export async function dualAIJson<T>(
     const { askClaudeJsonWithBrain } = await import("./claude.js");
     const t0c = Date.now();
     const claudePrompt = geminiText
-      ? `INVESTIGACIÓN PREVIA (datos reales de Gemini):\n${geminiText.slice(0, 6000)}\n\nFuentes: ${geminiSources.slice(0, 5).join(", ")}\n\n━━━━━━━━━━━━\n\nUsando esa investigación, ${prompt}`
+      ? `INVESTIGACIÓN PREVIA (datos reales de Gemini):\n${geminiText.slice(0, 25000)}\n\nFuentes: ${geminiSources.slice(0, 15).join(", ")}\n\n━━━━━━━━━━━━\n\nUsando esa investigación, ${prompt}`
       : prompt;
     const data = await askClaudeJsonWithBrain<T>(
       projectId,

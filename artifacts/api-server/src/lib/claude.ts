@@ -53,6 +53,31 @@ export async function getClaudeClient(projectId: number): Promise<Anthropic> {
 
 export const SHOPIFY_EXPERT_SYSTEM = `You are ShopifyAI Expert — world-class Shopify consultant, expert in: product SEO, conversion copywriting, pricing psychology, Liquid templating, email marketing, UX/CRO. You always know which store you're working on via the context provided. Generate complete, production-ready content — never truncate with '...' or 'rest goes here'. Always respond in Spanish unless specifically asked otherwise.`;
 
+const MAX_PROMPT_CHARS = 180000;
+
+function enforcePromptBudget(systemPrompt: string, userContent: string, reserveForOutput = 16000): { system: string; user: string } {
+  const charsPerToken = 3.5;
+  const maxInputChars = MAX_PROMPT_CHARS - (reserveForOutput * charsPerToken);
+  const totalChars = systemPrompt.length + userContent.length;
+
+  if (totalChars <= maxInputChars) {
+    return { system: systemPrompt, user: userContent };
+  }
+
+  const systemBudget = Math.floor(maxInputChars * 0.35);
+  const userBudget = Math.floor(maxInputChars * 0.65);
+
+  const trimmedSystem = systemPrompt.length > systemBudget
+    ? systemPrompt.slice(0, systemBudget) + "\n[... context trimmed for token budget]"
+    : systemPrompt;
+
+  const trimmedUser = userContent.length > userBudget
+    ? userContent.slice(0, Math.floor(userBudget * 0.7)) + "\n\n[... middle section trimmed ...]\n\n" + userContent.slice(-Math.floor(userBudget * 0.3))
+    : userContent;
+
+  return { system: trimmedSystem, user: trimmedUser };
+}
+
 export async function askClaude(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
@@ -350,23 +375,23 @@ export async function buildShopyBrainContext(
 
     if (nicheMemories.length > 0) {
       lines.push(`\n📌 Conocimiento específico del nicho (${niche}):`);
-      for (const m of nicheMemories.slice(0, 5)) {
-        lines.push(`  [${m.memoryType}] ${m.title ?? ""}: ${(m.content ?? "").slice(0, 800)}`);
+      for (const m of nicheMemories.slice(0, 10)) {
+        lines.push(`  [${m.memoryType}] ${m.title ?? ""}: ${(m.content ?? "").slice(0, 2000)}`);
       }
     }
 
     if (imagePatternMemories.length > 0) {
       lines.push("\n🖼 Patrones visuales de referencias analizadas:");
-      for (const m of imagePatternMemories.slice(0, 4)) {
-        lines.push(`  ${m.title ?? ""}: ${(m.content ?? "").slice(0, 800)}`);
+      for (const m of imagePatternMemories.slice(0, 8)) {
+        lines.push(`  ${m.title ?? ""}: ${(m.content ?? "").slice(0, 2000)}`);
       }
     }
 
     if (generalMemories.length > 0) {
       lines.push("\n💡 Memorias y patrones de la agencia:");
-      for (const m of generalMemories.slice(0, 6)) {
+      for (const m of generalMemories.slice(0, 12)) {
         const nicheTag = m.niche ? ` [${m.niche}]` : "";
-        lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 800)}`);
+        lines.push(`  [${m.memoryType}${nicheTag}] ${(m.content ?? "").slice(0, 2000)}`);
       }
     }
 
@@ -376,8 +401,8 @@ export async function buildShopyBrainContext(
 
     if (useCasePrompts.length > 0) {
       lines.push("\n✅ Patrones de prompt probados:");
-      for (const p of useCasePrompts.slice(0, 3)) {
-        lines.push(`  [${p.useCase}] ${p.promptTemplate.slice(0, 180)}...`);
+      for (const p of useCasePrompts.slice(0, 5)) {
+        lines.push(`  [${p.useCase}] ${p.promptTemplate.slice(0, 500)}...`);
       }
     }
 
@@ -430,7 +455,9 @@ export async function askClaudeWithBrain(
   ]);
   const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
   const enrichedSystem = base + (brainContext || "") + (brandDna || "");
-  return askClaude(projectId, messages, enrichedSystem, maxTokens);
+  const totalUserContent = messages.map(m => m.content).join("\n");
+  const budget = enforcePromptBudget(enrichedSystem, totalUserContent, maxTokens);
+  return askClaude(projectId, messages, budget.system, maxTokens);
 }
 
 export async function askClaudeJsonWithBrain<T>(
@@ -447,7 +474,8 @@ export async function askClaudeJsonWithBrain<T>(
     buildBrandDnaContext(projectId),
   ]);
   const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");
-  return askClaudeJson<T>(projectId, prompt, enrichedSystem, maxTokens);
+  const budget = enforcePromptBudget(enrichedSystem, prompt, maxTokens);
+  return askClaudeJson<T>(projectId, budget.user, budget.system, maxTokens);
 }
 
 /**

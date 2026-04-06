@@ -295,7 +295,7 @@ export async function scrapeWebsite(rawUrl: string): Promise<WebScrapingResult> 
     viewportMeta,
     ssl,
     wordCount,
-    textContent: textContent.slice(0, 5000),
+    textContent: textContent.slice(0, 25000),
   };
 }
 
@@ -307,7 +307,7 @@ async function fetchRobotsTxt(baseUrl: string): Promise<{ exists: boolean; conte
     });
     if (resp.ok) {
       const text = await resp.text();
-      return { exists: true, content: text.slice(0, 2000) };
+      return { exists: true, content: text.slice(0, 8000) };
     }
     return { exists: false, content: null };
   } catch {

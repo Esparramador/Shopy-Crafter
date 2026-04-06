@@ -396,7 +396,7 @@ export async function deepEntityResearch(
   // on what dimensions are already covered vs what's weak/missing
   let knowledgeCtx = "";
   if (existingKnowledge) {
-    knowledgeCtx = `\n\n[⚠️ CONOCIMIENTO PREVIO EN SHOPYBRAIN — LEE CON ATENCIÓN]:\n${existingKnowledge.slice(0, 3000)}\n\n🎯 INSTRUCCIONES CRÍTICAS:
+    knowledgeCtx = `\n\n[⚠️ CONOCIMIENTO PREVIO EN SHOPYBRAIN — LEE CON ATENCIÓN]:\n${existingKnowledge.slice(0, 12000)}\n\n🎯 INSTRUCCIONES CRÍTICAS:
 - NO repitas información que ya aparece arriba — ShopyBrain ya lo sabe.
 - Busca ÚNICAMENTE datos NUEVOS, MÁS RECIENTES, o desde FUENTES DIFERENTES.
 - Si ya tenemos precios de una fuente, busca precios en OTRA fuente o tienda para comparar.

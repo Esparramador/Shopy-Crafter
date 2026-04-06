@@ -8612,10 +8612,10 @@ ${buildCoverPage({ reportTitle: "Informe de Capacidades", reportSubtitle: "Catá
                 signal: AbortSignal.timeout(20_000),
               });
               const raw = await resp.text();
-              const cleaned = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 8000);
+              const cleaned = raw.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 30000);
               const titleMatch = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
               const metaDescMatch = raw.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-              sections.webContent = `🌐 Web: ${titleMatch?.[1]?.trim() ?? "Sin título"}\nMeta: ${metaDescMatch?.[1]?.trim() ?? "Sin meta descripción"}\nContenido: ${cleaned.slice(0, 3000)}`;
+              sections.webContent = `🌐 Web: ${titleMatch?.[1]?.trim() ?? "Sin título"}\nMeta: ${metaDescMatch?.[1]?.trim() ?? "Sin meta descripción"}\nContenido: ${cleaned.slice(0, 15000)}`;
               const isShopify = raw.includes("cdn.shopify.com") || raw.includes("Shopify.theme") || raw.includes("myshopify");
               sections.platform = isShopify ? "🛒 Plataforma: Shopify detectado" : "🛒 Plataforma: No-Shopify (posible WooCommerce/Wix/custom)";
             } catch (e) { errors.push(`Scraping: ${e instanceof Error ? e.message : String(e)}`); }
@@ -8631,10 +8631,10 @@ ${buildCoverPage({ reportTitle: "Informe de Capacidades", reportSubtitle: "Catá
                 askGeminiWithSearch(`Social media presence, followers, engagement, and content strategy of: ${geminiInput}. Check Instagram, TikTok, Facebook, YouTube, Twitter/X.`, "social media"),
                 askGeminiWithSearch(`Pricing strategy, price range, promotions, and offers of: ${geminiInput}. Include real prices.`, "pricing"),
               ]);
-              if (brandRes.status === "fulfilled") sections.brand = `🏢 Marca:\n${brandRes.value.text.slice(0, 3000)}`;
-              if (productsRes.status === "fulfilled") sections.products = `📦 Productos:\n${productsRes.value.text.slice(0, 3000)}`;
-              if (socialRes.status === "fulfilled") sections.social = `📱 Redes Sociales:\n${socialRes.value.text.slice(0, 2000)}`;
-              if (pricingRes.status === "fulfilled") sections.pricing = `💰 Precios:\n${pricingRes.value.text.slice(0, 2000)}`;
+              if (brandRes.status === "fulfilled") sections.brand = `🏢 Marca:\n${brandRes.value.text.slice(0, 12000)}`;
+              if (productsRes.status === "fulfilled") sections.products = `📦 Productos:\n${productsRes.value.text.slice(0, 12000)}`;
+              if (socialRes.status === "fulfilled") sections.social = `📱 Redes Sociales:\n${socialRes.value.text.slice(0, 8000)}`;
+              if (pricingRes.status === "fulfilled") sections.pricing = `💰 Precios:\n${pricingRes.value.text.slice(0, 8000)}`;
             } catch (e) { errors.push(`Gemini research: ${e instanceof Error ? e.message : String(e)}`); }
           }
 

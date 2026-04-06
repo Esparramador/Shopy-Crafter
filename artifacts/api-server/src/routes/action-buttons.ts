@@ -387,7 +387,7 @@ router.post("/projects/:projectId/actions/save", async (req, res): Promise<void>
   learnFromOperation({
     operationType: `action_save_${actionName}`,
     title: `Acción guardada: ${reportTitle}`,
-    content: typeof content === "string" ? content.slice(0, 2000) : JSON.stringify(content).slice(0, 2000),
+    content: typeof content === "string" ? content.slice(0, 8000) : JSON.stringify(content).slice(0, 8000),
     tags: ["action_save", actionName],
   });
 

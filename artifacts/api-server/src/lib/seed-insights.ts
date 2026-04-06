@@ -190,7 +190,7 @@ export async function loadSeedInsights(): Promise<number> {
           memoryType: "general",
           niche: "general",
           title: `[Seed·${seed.domain}] ${seed.title}`,
-          content: seed.insight.slice(0, 800),
+          content: seed.insight.slice(0, 4000),
           confidence: seed.confidence,
           sourceType: "seed_data",
         }).onConflictDoNothing();
