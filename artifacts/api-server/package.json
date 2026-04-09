@@ -26,6 +26,7 @@
     "@workspace/db": "workspace:*",
     "@workspace/integrations-gemini-ai": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
+    "adm-zip": "^0.5.17",
     "archiver": "^7.0.1",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
@@ -55,6 +56,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

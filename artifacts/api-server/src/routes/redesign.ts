@@ -282,15 +282,26 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     return;
   }
 
-  const updateData: Record<string, unknown> = {};
+  const connectorData: Record<string, unknown> = {};
+  const shopifyFallbackData: Record<string, unknown> = {};
 
-  if (fields.includes("title")) updateData.title = redesign.newTitle;
-  if (fields.includes("description")) updateData.body_html = redesign.newBodyHtml;
-  if (fields.includes("tags")) updateData.tags = redesign.newTags;
+  if (fields.includes("title")) {
+    connectorData.title = redesign.newTitle;
+    shopifyFallbackData.title = redesign.newTitle;
+  }
+  if (fields.includes("description")) {
+    connectorData.bodyHtml = redesign.newBodyHtml;
+    shopifyFallbackData.body_html = redesign.newBodyHtml;
+  }
+  if (fields.includes("tags")) {
+    connectorData.tags = redesign.newTags;
+    shopifyFallbackData.tags = redesign.newTags;
+  }
   if (fields.includes("meta")) {
-    if (redesign.metaTitle) updateData.metafields_global_title_tag = redesign.metaTitle;
-    if (redesign.metaDescription) updateData.metafields_global_description_tag = redesign.metaDescription;
     if (redesign.metaTitle || redesign.metaDescription) {
+      connectorData.seo = { metaTitle: redesign.metaTitle, metaDescription: redesign.metaDescription };
+      shopifyFallbackData.metafields_global_title_tag = redesign.metaTitle;
+      shopifyFallbackData.metafields_global_description_tag = redesign.metaDescription;
       const { seoDataTable } = await import("@workspace/db");
       await db.insert(seoDataTable).values({
         projectId,
@@ -306,34 +317,26 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
   }
 
   if (fields.includes("category") && redesign.newCategory) {
-    updateData.product_type = redesign.newCategory;
+    connectorData.productType = redesign.newCategory;
+    shopifyFallbackData.product_type = redesign.newCategory;
   }
 
   if (fields.includes("price")) {
-    try {
-      const liveProduct = await shopifyRequest<{ product: { variants: Array<{ id: number }> } }>(
-        projectId, project.shopDomain, `/products/${shopifyProductId}.json`
-      );
-      const variantIds = liveProduct?.product?.variants?.map((v) => v.id) ?? [];
-      if (variantIds.length > 0) {
-        updateData.variants = variantIds.map((id) => ({
-          id,
-          price: redesign.newPrice,
-          compare_at_price: redesign.newCompareAtPrice ?? null,
-        }));
-      } else {
-        updateData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice }];
-      }
-    } catch {
-      updateData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice }];
-    }
+    connectorData.variants = [{ platformId: "", title: "", price: redesign.newPrice, compareAtPrice: redesign.newCompareAtPrice ?? undefined }];
+    shopifyFallbackData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice ?? null }];
   }
 
-  if (Object.keys(updateData).length > 0) {
-    await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
-      method: "PUT",
-      body: JSON.stringify({ product: updateData }),
-    });
+  if (Object.keys(connectorData).length > 0) {
+    const { getProjectConnector } = await import("../lib/platform-helper.js");
+    const connector = await getProjectConnector(projectId);
+    if (connector && connector.supportsFeature("product_update")) {
+      await connector.updateProduct(shopifyProductId, connectorData);
+    } else {
+      await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
+        method: "PUT",
+        body: JSON.stringify({ product: shopifyFallbackData }),
+      });
+    }
   }
 
   let metafieldsApplied = 0;

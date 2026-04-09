@@ -8,6 +8,7 @@ import { askGeminiWithSearch } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { getConnector } from "../lib/connectors/index";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -347,20 +348,13 @@ Devuelve JSON con:
           .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, product.shopifyProductId)));
 
         if (applyToShopify && project) {
-          const isWoo = project.platformType === "woocommerce";
-          if (isWoo) {
-            try {
-              const connector = getConnector(project);
-              await connector.updateSeo(product.shopifyProductId, {
-                metaTitle: result.metaTitle,
-                metaDescription: result.metaDescription,
-              });
-            } catch { /* WooCommerce SEO write may not be available */ }
-          } else {
-            await shopifyRequest(projectId, project.shopDomain, `/products/${product.shopifyProductId}.json`, {
-              method: "PUT",
-              body: JSON.stringify({ product: { id: product.shopifyProductId, metafields_global_title_tag: result.metaTitle, metafields_global_description_tag: result.metaDescription } }),
-            }).catch(() => {});
+          const { updateStoreSeo } = await import("../lib/platform-helper.js");
+          const seoResult = await updateStoreSeo(projectId, product.shopifyProductId, {
+            metaTitle: result.metaTitle,
+            metaDescription: result.metaDescription,
+          });
+          if (!seoResult.ok) {
+            logger.warn({ error: seoResult.error }, "SEO update failed — platform may not support SEO write");
           }
         }
 

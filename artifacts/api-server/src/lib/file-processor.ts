@@ -78,6 +78,34 @@ export async function processUploadedFile(
     }
   }
 
+  if (ext === "zip" || mimeType === "application/zip") {
+    try {
+      const AdmZip = (await import("adm-zip")).default;
+      const zip = new AdmZip(buffer);
+      const entries = zip.getEntries();
+      const fileList = entries.map(e => e.entryName).join("\n");
+      const textFiles: string[] = [];
+
+      for (const entry of entries) {
+        const entExt = entry.entryName.split(".").pop()?.toLowerCase() ?? "";
+        if (TEXT_EXTENSIONS.has(entExt) && entry.getData().length < 50000) {
+          textFiles.push(`\n=== ${entry.entryName} ===\n${entry.getData().toString("utf-8")}`);
+        }
+      }
+
+      return {
+        type: "zip",
+        filename,
+        mimeType: "application/zip",
+        textContent: `Archivos en el ZIP:\n${fileList}\n\nContenido de archivos de texto:\n${textFiles.join("\n")}`,
+        base64Content: null,
+        metadata: { fileCount: entries.length, files: entries.map(e => e.entryName) },
+      };
+    } catch {
+      return { type: "zip", filename, mimeType, textContent: null, base64Content: null, metadata: {} };
+    }
+  }
+
   if (ext === "xlsx" || ext === "xls" || mimeType.includes("spreadsheet")) {
     try {
       const ExcelJS = (await import("exceljs")).default;
@@ -130,4 +158,33 @@ export async function processUploadedFile(
     base64Content: buffer.toString("base64"),
     metadata: { sizeKB: Math.round(buffer.length / 1024) },
   };
+}
+
+export function filesToClaudeContent(files: ProcessedFile[]): Array<Record<string, unknown>> {
+  const blocks: Array<Record<string, unknown>> = [];
+
+  for (const file of files) {
+    if (file.type === "image" && file.base64Content) {
+      blocks.push({
+        type: "image",
+        source: { type: "base64", media_type: file.mimeType, data: file.base64Content },
+      });
+      blocks.push({ type: "text", text: `[Imagen subida: ${file.filename}]` });
+    } else if (file.type === "pdf" && file.base64Content) {
+      blocks.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: file.base64Content },
+      });
+      if (file.textContent) {
+        blocks.push({ type: "text", text: `[PDF: ${file.filename}]\nTexto extraído:\n${file.textContent.slice(0, 15000)}` });
+      }
+    } else if (file.textContent) {
+      blocks.push({
+        type: "text",
+        text: `[Archivo: ${file.filename} (${file.type})]\n${file.textContent.slice(0, 20000)}`,
+      });
+    }
+  }
+
+  return blocks;
 }

@@ -15,7 +15,7 @@ import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
-import { processUploadedFile } from "../lib/file-processor.js";
+import { processUploadedFile, filesToClaudeContent } from "../lib/file-processor.js";
 import { generateLeveledReport } from "../lib/report-levels.js";
 import multer from "multer";
 import * as fs from "fs";
@@ -46,8 +46,8 @@ const FRONTEND_SRC = path.resolve(FRONTEND_ROOT, "src");
 const UPLOADS_DIR = path.resolve(BACKEND_ROOT, "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const upload = multer({
-  dest: UPLOADS_DIR,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpg|jpeg|png|gif|webp|svg|pdf|csv|xlsx|xls|json|txt|md|html|css|xml|zip)$/i;
     if (allowed.test(file.originalname)) cb(null, true);
@@ -9562,9 +9562,8 @@ router.post("/shopybrain/upload", requireAdmin, upload.single("file"), async (re
       res.status(400).json({ success: false, error: "No se recibió ningún archivo" });
       return;
     }
-    const buffer = fs.readFileSync(file.path);
+    const buffer = file.buffer;
     const processed = await processUploadedFile(buffer, file.originalname, file.mimetype);
-    try { fs.unlinkSync(file.path); } catch {}
     res.json({
       success: true,
       fileName: file.originalname,

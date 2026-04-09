@@ -481,24 +481,15 @@ router.post("/projects/:projectId/products/:productId/apply-price", async (req, 
     return;
   }
 
-  try {
-    const connector = getConnector(project as any);
-    await connector.updateProduct(shopifyProductId, {
-      variants: [{ platformId: "", title: "", price, compareAtPrice: compareAtPrice ?? undefined }],
-    } as any);
-  } catch (connectorErr: any) {
-    if (connectorErr?.name === "PlatformNotSupportedError" || connectorErr?.name === "FeatureNotSupportedError") {
-      await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
-        method: "PUT",
-        body: JSON.stringify({
-          product: {
-            variants: [{ price, compare_at_price: compareAtPrice ?? null }],
-          },
-        }),
-      });
-    } else {
-      throw connectorErr;
-    }
+  const { updateStoreProduct } = await import("../lib/platform-helper.js");
+  const updateResult = await updateStoreProduct(projectId, shopifyProductId, {
+    price,
+    compareAtPrice: compareAtPrice ?? null,
+    variants: [{ platformId: "", title: "", price, compareAtPrice: compareAtPrice || undefined }],
+  });
+  if (!updateResult.ok) {
+    res.status(400).json({ error: updateResult.error });
+    return;
   }
 
   await db.update(productsTable)
@@ -611,20 +602,18 @@ router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (
 
   let shopifyDetails = "";
   try {
-    const live = await shopifyRequest<{ product: Record<string, unknown> }>(
-      projectId, project.shopDomain, `/products/${shopifyProductId}.json`
-    );
-    const p = live.product;
-    const variants = (p.variants as Array<Record<string, unknown>>) || [];
-    const weight = variants[0]?.weight ? `${variants[0].weight} ${variants[0].weight_unit || "g"}` : "desconocido";
-    shopifyDetails = `
-Peso del producto: ${weight}
-SKU: ${variants[0]?.sku || "sin SKU"}
-Barcode: ${variants[0]?.barcode || "sin barcode"}
-Vendor: ${p.vendor || "desconocido"}
-Tipo de producto: ${p.product_type || "sin tipo"}
-Variantes: ${variants.length} (precios: ${variants.map((v: Record<string, unknown>) => `€${v.price}`).join(", ")})
+    const { getProjectConnector } = await import("../lib/platform-helper.js");
+    const connector = await getProjectConnector(projectId);
+    if (connector && connector.supportsFeature("products")) {
+      const liveProduct = await connector.getProduct(shopifyProductId);
+      const weight = liveProduct.variants?.[0] ? "estimado" : "desconocido";
+      shopifyDetails = `
+Vendor: ${liveProduct.vendor || "desconocido"}
+Tipo de producto: ${liveProduct.productType || "sin tipo"}
+Variantes: ${liveProduct.variants?.length ?? 1} (precios: ${liveProduct.variants?.map(v => `€${v.price}`).join(", ") ?? "N/A"})
+Peso estimado: ${weight}
 `;
+    }
   } catch {}
 
   const productType = product.productType || "producto general";

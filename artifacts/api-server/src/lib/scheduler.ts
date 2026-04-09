@@ -107,10 +107,16 @@ export async function runRevenueSnapshots() {
       try {
         const now = new Date();
         const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-        const data = await shopifyRequest<{ orders: Array<{ total_price: string }> }>(
-          project.id, project.shopDomain, `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`
-        );
-        const revenue = data.orders.reduce((sum, o) => sum + parseFloat(o.total_price || "0"), 0);
+        const { getProjectConnector } = await import("./platform-helper.js");
+        const connector = await getProjectConnector(project.id);
+        if (!connector || !connector.supportsFeature("orders")) continue;
+
+        const ordersList = await connector.getOrders({
+          limit: 250,
+          after: since,
+        });
+        const revenue = ordersList.reduce((sum, o) => sum + parseFloat(o.total ?? "0"), 0);
+        const data = { orders: ordersList };
         const today = new Date().toISOString().split("T")[0];
         const existing = await db.select({ id: revenueSnapshotsTable.id })
           .from(revenueSnapshotsTable)
@@ -152,11 +158,19 @@ export async function runInventorySync() {
       try {
         type InventoryProduct = { id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> };
         let allProducts: InventoryProduct[] = [];
-        for (const st of ["active", "draft", "archived"]) {
-          const d = await shopifyRequest<{ products: InventoryProduct[] }>(
-            project.id, project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,product_type,vendor,options,variants,status`
-          );
-          allProducts = allProducts.concat(d.products || []);
+        const { getProjectConnector } = await import("./platform-helper.js");
+        const invConnector = await getProjectConnector(project.id);
+        if (!invConnector || !invConnector.supportsFeature("products")) continue;
+        try {
+          const platformProducts = await invConnector.getProducts({ status: "active", limit: 250 });
+          allProducts = (platformProducts as unknown as InventoryProduct[]) || [];
+        } catch {
+          for (const st of ["active", "draft", "archived"]) {
+            const d = await shopifyRequest<{ products: InventoryProduct[] }>(
+              project.id, project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,product_type,vendor,options,variants,status`
+            );
+            allProducts = allProducts.concat(d.products || []);
+          }
         }
         for (const product of allProducts) {
           const optionNames = product.options || [];
