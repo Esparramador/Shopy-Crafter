@@ -87,7 +87,10 @@ Return JSON: { "subject": "...", "body": "...", "urgency": "critical|high|medium
       niche
     );
     const match = text.match(/\{[\s\S]*\}/);
-    const email = match ? JSON.parse(match[0]) : { subject: "Restock Request", body: text, urgency: "high", suggestedQuantity: 90 };
+    const defaultEmail = { subject: "Restock Request", body: text, urgency: "high", suggestedQuantity: 90 };
+    let email: any;
+    if (match) { try { email = JSON.parse(match[0]); } catch { email = defaultEmail; } }
+    else { email = defaultEmail; }
 
     const [order] = await db.insert(restockOrdersTable).values({
       id: randomUUID(), projectId, productId, productTitle,

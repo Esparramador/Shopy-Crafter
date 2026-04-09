@@ -883,7 +883,8 @@ function buildBrandedHtmlFromMetadata(file: {
   const date = new Date(file.createdAt ?? Date.now()).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date(file.createdAt ?? Date.now()).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
-  const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {});
+  let meta: Record<string, unknown> = {};
+  try { meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {}) as Record<string, unknown>; } catch { meta = {}; }
 
   function renderValue(val: unknown, depth = 0): string {
     if (val === null || val === undefined) return `<span style="color:${B.muted};">—</span>`;

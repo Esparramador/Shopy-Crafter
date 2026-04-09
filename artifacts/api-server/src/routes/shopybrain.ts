@@ -156,7 +156,8 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
     const jsonMatch = geminiResult.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return defaultResult;
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed: any;
+    try { parsed = JSON.parse(jsonMatch[0]); } catch { return defaultResult; }
     const result = {
       marketPriceRange: parsed.marketPriceRange ?? defaultResult.marketPriceRange,
       competitorPrices: parsed.competitorPrices ?? [],
@@ -6571,7 +6572,8 @@ Responde SOLO JSON:
             undefined,
             3000
           );
-          const uiJson = JSON.parse(uiText.match(/\{[\s\S]*\}/)?.[0] || "{}");
+          let uiJson: any = {};
+          try { uiJson = JSON.parse(uiText.match(/\{[\s\S]*\}/)?.[0] || "{}"); } catch { uiJson = {}; }
 
           let changesApplied = 0;
           const appliedFiles: string[] = [];

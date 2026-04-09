@@ -353,15 +353,13 @@ RESPONDE con este formato JSON exacto:
     if (compResult.status === "fulfilled") {
       const jsonMatch = compResult.value.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        competitorResearch = { ...competitorResearch, ...parsed };
+        try { competitorResearch = { ...competitorResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
       }
     }
     if (suppResult.status === "fulfilled") {
       const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        supplierResearch = { ...supplierResearch, ...parsed };
+        try { supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
       }
     }
   } catch {}

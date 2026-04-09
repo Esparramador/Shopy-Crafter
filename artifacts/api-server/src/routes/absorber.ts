@@ -698,7 +698,8 @@ Return ONLY valid JSON with these exact fields:
 
       const visionText = (visionRes.content[0] as { type: string; text: string }).text;
       const visionMatch = visionText.match(/\{[\s\S]*\}/);
-      const productAnalysis = visionMatch ? JSON.parse(visionMatch[0]) : {};
+      let productAnalysis: any = {};
+      if (visionMatch) { try { productAnalysis = JSON.parse(visionMatch[0]); } catch { productAnalysis = {}; } }
 
       logger.info({ product: productAnalysis.productName, category: productAnalysis.productCategory }, "Vision analysis complete");
 
@@ -793,7 +794,8 @@ Genera JSON con:
 
       const copyText = (copyRes.content[0] as { type: string; text: string }).text;
       const copyMatch = copyText.match(/\{[\s\S]*\}/);
-      const productCopy = copyMatch ? JSON.parse(copyMatch[0]) : {};
+      let productCopy: any = {};
+      if (copyMatch) { try { productCopy = JSON.parse(copyMatch[0]); } catch { productCopy = {}; } }
 
       const finalPrice = recommendedPrice > 0 ? recommendedPrice.toFixed(2) : "0.00";
       const finalCompareAt = compareAtPrice > recommendedPrice ? compareAtPrice.toFixed(2) : null;

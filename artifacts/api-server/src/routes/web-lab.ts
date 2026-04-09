@@ -537,7 +537,8 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
 
     const requestedTpl = req.query.template;
     if (requestedTpl && VALID_TEMPLATES.has(requestedTpl as ReportTemplate)) {
-      const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+      let meta: any = {};
+      try { meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {}); } catch { meta = {}; }
       const storedTpl = meta?.template ?? "prestige";
       if (requestedTpl !== storedTpl && meta?.url) {
         const projectId = file.projectId;
@@ -549,9 +550,9 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
         const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
         const tpl = requestedTpl as ReportTemplate;
 
-        const analysis: WebLabAnalysis = meta.analysis
-          ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis)
-          : { overallScore: meta.score ?? 50, categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } };
+        let analysis: WebLabAnalysis;
+        try { analysis = meta.analysis ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis) : null; } catch { analysis = null as any; }
+        if (!analysis) analysis = { overallScore: meta.score ?? 50, categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } } as WebLabAnalysis;
 
         const reportBody = buildReportBody(analysis, meta.url, null, null, null);
         const reportHtml = getReportShell(tpl)(
@@ -589,7 +590,8 @@ router.post("/web-lab/download-report", async (req: Request, res: Response): Pro
     );
     if (!file?.content) { res.status(404).json({ error: "Informe no encontrado" }); return; }
 
-    const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
+    let meta: any = {};
+    try { meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {}); } catch { meta = {}; }
     const storedTpl = meta?.template ?? "prestige";
 
     if (tpl === storedTpl) {
@@ -609,9 +611,9 @@ router.post("/web-lab/download-report", async (req: Request, res: Response): Pro
     const url = meta?.url ?? "URL desconocida";
     const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
-    const analysis: WebLabAnalysis = meta?.analysis
-      ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis)
-      : { overallScore: meta?.score ?? 50, categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } };
+    let analysis: WebLabAnalysis;
+    try { analysis = meta?.analysis ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis) : null; } catch { analysis = null as any; }
+    if (!analysis) analysis = { overallScore: meta?.score ?? 50, categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } } as WebLabAnalysis;
 
     const reportBody = buildReportBody(analysis, url, null, null, null);
     const reportHtml = getReportShell(tpl)(
@@ -639,7 +641,8 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
     if (!reportFile) { res.status(404).json({ error: "Análisis no encontrado" }); return; }
 
     const projectId = reportFile.projectId;
-    const meta = typeof reportFile.metadata === "string" ? JSON.parse(reportFile.metadata) : (reportFile.metadata as any);
+    let meta: any = {};
+    try { meta = typeof reportFile.metadata === "string" ? JSON.parse(reportFile.metadata) : (reportFile.metadata ?? {}); } catch { meta = {}; }
     const targetUrl = meta?.url || "unknown";
 
     const relatedFiles = await db.select().from(projectFilesTable).where(

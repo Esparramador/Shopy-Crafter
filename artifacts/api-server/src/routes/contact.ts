@@ -958,11 +958,11 @@ router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
   const result = await pool.query(
     `SELECT id, details, created_at FROM audit_log WHERE action = 'lead_form_submitted' ORDER BY created_at DESC LIMIT 100`
   );
-  const leads = result.rows.map((r: { id: string; details: string; created_at: string }) => ({
-    id: r.id,
-    ...JSON.parse(r.details),
-    createdAt: r.created_at,
-  }));
+  const leads = result.rows.map((r: { id: string; details: string; created_at: string }) => {
+    let details: Record<string, unknown> = {};
+    try { details = JSON.parse(r.details); } catch {}
+    return { id: r.id, ...details, createdAt: r.created_at };
+  });
   res.json(leads);
 });
 
@@ -987,7 +987,7 @@ router.get("/lead-reports", requireAdmin, async (req, res): Promise<void> => {
 
   const parsed = reports.map(r => ({
     ...r,
-    metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    metadata: r.metadata ? (() => { try { return JSON.parse(r.metadata); } catch { return null; } })() : null,
     downloadUrl: `/api/lead-reports/${r.id}/download`,
     downloadPdfUrl: `/api/lead-reports/${r.id}/download?format=pdf`,
   }));

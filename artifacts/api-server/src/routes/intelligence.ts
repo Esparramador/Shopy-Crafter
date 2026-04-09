@@ -276,7 +276,9 @@ Devuelve JSON estructurado con todos estos campos. Sé extremadamente específic
     });
     const text = dualResult.final;
     const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-    const profile = match ? JSON.parse(match[1] ?? match[0]) : { executiveSummary: text };
+    let profile: any;
+    if (match) { try { profile = JSON.parse(match[1] ?? match[0]); } catch { profile = { executiveSummary: text }; } }
+    else { profile = { executiveSummary: text }; }
 
     if (project.storeNiche) {
       learnFromOperation({
@@ -509,7 +511,9 @@ Return JSON:
     });
     const text = dualResult.final;
     const match = text.match(/\{[\s\S]*\}/);
-    const analysis = match ? JSON.parse(match[0]) : { summary: text, topInsights: [], recommendations: [] };
+    let analysis: any;
+    if (match) { try { analysis = JSON.parse(match[0]); } catch { analysis = { summary: text, topInsights: [], recommendations: [] }; } }
+    else { analysis = { summary: text, topInsights: [], recommendations: [] }; }
     res.json({ analysis, projectId, analyzedAt: new Date().toISOString(), dualAI: { mode: dualResult.mode, timings: dualResult.timings } });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

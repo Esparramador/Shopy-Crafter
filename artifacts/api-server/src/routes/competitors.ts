@@ -118,7 +118,8 @@ Analyze the competitor and return competitive intelligence. Extract real prices,
       niche
     );
     const match = text.match(/\{[\s\S]*\}/);
-    const data = match ? JSON.parse(match[0]) : {};
+    let data: any = {};
+    if (match) { try { data = JSON.parse(match[0]); } catch { data = {}; } }
 
     const [snap] = await db.insert(competitorSnapshotsTable).values({
       id: randomUUID(),
@@ -250,7 +251,8 @@ RESPONDE con JSON exacto:
 
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+      let parsed: any = {};
+      try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = { competitors: [] }; }
       discovered = (parsed.competitors || []).filter((c: { url?: string }) => {
         if (!c.url || !isSafePublicUrl(c.url)) return false;
         try {

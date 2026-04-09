@@ -4,6 +4,76 @@ import { db } from "@workspace/db";
 import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable, omnicoreAbsorbedContentTable, omnicoreCrossConnectionsTable } from "@workspace/db";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
+import { logger } from "./logger.js";
+
+function repairJson(raw: string): string {
+  let s = raw.trim();
+
+  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ");
+
+  s = s.replace(/,\s*([}\]])/g, "$1");
+
+  let braces = 0;
+  let brackets = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === "\\") { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === "{") braces++;
+    else if (c === "}") braces--;
+    else if (c === "[") brackets++;
+    else if (c === "]") brackets--;
+  }
+
+  if (braces > 0 || brackets > 0) {
+    const lastValidIdx = findLastValidJsonPosition(s);
+    if (lastValidIdx > 0 && lastValidIdx < s.length - 1) {
+      s = s.substring(0, lastValidIdx + 1);
+    }
+    s = s.replace(/,\s*$/, "");
+    for (let i = 0; i < brackets; i++) s += "]";
+    for (let i = 0; i < braces; i++) s += "}";
+  }
+
+  return s;
+}
+
+function findLastValidJsonPosition(s: string): number {
+  let inStr = false;
+  let esc = false;
+  let lastGoodPos = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; lastGoodPos = i; continue; }
+    if (inStr) continue;
+    if (c === "}" || c === "]" || c === "," || c === ":") lastGoodPos = i;
+    if (/[\w\d]/.test(c)) lastGoodPos = i;
+  }
+  return lastGoodPos;
+}
+
+export function safeJsonParse<T>(text: string, label?: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch (firstErr) {
+    try {
+      const repaired = repairJson(text);
+      const result = JSON.parse(repaired) as T;
+      logger.warn({ label }, "JSON repaired successfully after initial parse failure");
+      return result;
+    } catch (secondErr) {
+      const truncated = text.length > 200 ? text.substring(0, 200) + "..." : text;
+      logger.error({ label, firstErr, truncated }, "JSON parse failed even after repair");
+      throw firstErr;
+    }
+  }
+}
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
 
@@ -124,11 +194,22 @@ export async function askClaudeJson<T>(
     timeoutMs
   );
 
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-  if (!jsonMatch) {
-    return JSON.parse(text) as T;
+  const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    return safeJsonParse<T>(codeBlockMatch[1], "askClaudeJson:codeblock");
   }
-  return JSON.parse(jsonMatch[1]) as T;
+
+  const objectMatch = text.match(/(\{[\s\S]*\})/);
+  const arrayMatch = text.match(/(\[[\s\S]*\])/);
+
+  if (objectMatch) {
+    return safeJsonParse<T>(objectMatch[1], "askClaudeJson:object");
+  }
+  if (arrayMatch) {
+    return safeJsonParse<T>(arrayMatch[1], "askClaudeJson:array");
+  }
+
+  return safeJsonParse<T>(text, "askClaudeJson:raw");
 }
 
 /**

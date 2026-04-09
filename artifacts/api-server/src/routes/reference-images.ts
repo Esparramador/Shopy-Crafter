@@ -144,7 +144,8 @@ Output ONLY the JSON array — no markdown, no explanations.` }],
     );
 
     const cleaned = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleaned) as Array<{ key: string; label: string; prompt: string }>;
+    let parsed: Array<{ key: string; label: string; prompt: string }>;
+    try { parsed = JSON.parse(cleaned); } catch { return []; }
     if (!Array.isArray(parsed)) return [];
 
     return parsed.filter(s => s.key && s.label && s.prompt).map(s => ({
