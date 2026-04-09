@@ -352,6 +352,12 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   }
 
   if (returnRaw) {
+   res.setHeader("Content-Type", "application/json; charset=utf-8");
+   res.setHeader("Cache-Control", "no-cache");
+   res.setHeader("X-Accel-Buffering", "no");
+   res.setHeader("Connection", "keep-alive");
+   res.flushHeaders();
+
    try {
     let entityKnowledgeContext = "";
     const entityMatches = query.match(/[@]([a-zA-Z0-9_.]+)|(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]{3,})\.[a-zA-Z]{2,}|(?:sobre|investigar?|analiza|dame información de|qué sabes de|qué tienes sobre)\s+([^\?\.]+)/i);
@@ -1260,6 +1266,12 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   const domainsToStudy = requestedDomains ?? Object.keys(DOMAIN_LABELS).slice(0, 4);
   const startTime = Date.now();
 
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
   const systemPrompt = `Eres Shopy Crafter — el MEGACEREBRO OMNISCIENTE que aprende de TODAS las disciplinas del conocimiento humano.
 Vas a realizar una sesión de estudio profundo en estos dominios: ${domainsToStudy.join(", ")}.
 
@@ -1650,6 +1662,12 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
   const { action, params } = req.body;
   if (!action) { res.status(400).json({ error: "action requerida" }); return; }
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
 
   const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
 

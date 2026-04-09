@@ -316,6 +316,12 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
     return;
   }
 
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
   const startTime = Date.now();
   const researchId = randomUUID();
 
@@ -860,6 +866,12 @@ router.post("/shopybrain/audit-entity", requireAdmin, async (req: Request, res: 
     res.status(400).json({ error: "entityInput o url requerido" });
     return;
   }
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
 
   const startTime = Date.now();
   const input = entityInput ?? url;

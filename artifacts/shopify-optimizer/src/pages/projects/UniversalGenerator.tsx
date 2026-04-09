@@ -250,16 +250,16 @@ export default function UniversalGenerator() {
         </Button>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", background: "#f0f4ff", padding: "12px 16px", borderRadius: 10, border: "1px solid #c7d2fe" }}>
-        <ExternalLink size={16} style={{ color: "#4f46e5", flexShrink: 0 }} />
-        <span style={{ fontSize: 13, color: "#4338ca", fontWeight: 500, whiteSpace: "nowrap" }}>URL externa:</span>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", background: "rgba(79,70,229,.08)", padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(99,102,241,.25)" }}>
+        <ExternalLink size={16} style={{ color: "#818cf8", flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: "#a5b4fc", fontWeight: 500, whiteSpace: "nowrap" }}>URL externa:</span>
         <Input
           placeholder="https://tienda-competidor.myshopify.com"
           value={externalUrl}
           onChange={e => setExternalUrl(e.target.value)}
-          style={{ flex: 1, fontSize: 13 }}
+          style={{ flex: 1, fontSize: 13, background: "#0c0c14", color: "#f5f5f7", border: "1px solid #2a2a3a" }}
         />
-        <span style={{ fontSize: 11, color: "#6366f1", whiteSpace: "nowrap" }}>Para analizar cualquier tienda</span>
+        <span style={{ fontSize: 11, color: "#818cf8", whiteSpace: "nowrap" }}>Para analizar cualquier tienda</span>
       </div>
 
       {showHistory && history.length > 0 && (

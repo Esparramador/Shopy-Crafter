@@ -117,6 +117,12 @@ router.post("/generator/run", async (req: Request, res: Response): Promise<any> 
     return res.status(400).json({ error: "Se requiere una URL o projectId" });
   }
 
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
   const outputFormat = format || genType.outputFormats[0];
   const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
 

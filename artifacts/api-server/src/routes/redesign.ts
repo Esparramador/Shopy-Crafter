@@ -6,6 +6,7 @@ import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -143,7 +144,7 @@ Devuelve SOLO JSON:
   "metafields": [{"namespace":"custom","key":"material","value":"valor real","type":"single_line_text_field"},{"namespace":"custom","key":"color","value":"valor","type":"single_line_text_field"},{"namespace":"custom","key":"care_instructions","value":"instrucciones detalladas","type":"multi_line_text_field"},{"namespace":"custom","key":"origin","value":"país/región","type":"single_line_text_field"},{"namespace":"custom","key":"warranty","value":"info garantía","type":"single_line_text_field"},{"namespace":"custom","key":"weight_detail","value":"peso con unidad","type":"single_line_text_field"}]
 }`;
 
-  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 8000);
+  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 12000);
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {
@@ -161,7 +162,14 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
     return;
   }
 
-  const result = await doRedesign(projectId, shopifyProductId);
+  let result: RedesignOutput;
+  try {
+    result = await doRedesign(projectId, shopifyProductId);
+  } catch (err: any) {
+    logger.error({ err, projectId, shopifyProductId }, "Redesign AI call failed");
+    res.status(500).json({ error: err.message || "Error en el rediseño IA" });
+    return;
+  }
 
   if (parts && parts.length > 0) {
     const allParts = ["title", "bodyHtml", "price", "tags", "seoMeta", "photoBriefs", "category", "metafields"];
