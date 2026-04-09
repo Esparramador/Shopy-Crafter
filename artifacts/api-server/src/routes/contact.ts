@@ -3,6 +3,7 @@ import { db, auditLogTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
@@ -16,6 +17,7 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import juice from "juice";
 
 const router = Router();
+const contactUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 
 const ADMIN_EMAIL = "craftershopy@gmail.com";
 
@@ -437,6 +439,7 @@ function buildReportHtml(
   const esc = sanitizeHtml;
 
   function safeUrl(url: string): string {
+    if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(url.slice(0, 200))) return url;
     try {
       const u = new URL(url.startsWith("http") ? url : `https://${url}`);
       if (u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:") return u.href;
@@ -743,16 +746,30 @@ function buildReportHtml(
   );
 }
 
-router.post("/contact", async (req, res): Promise<void> => {
+router.post("/contact", contactUpload.single("referenceImage"), async (req, res): Promise<void> => {
+  const body = req.body ?? {};
   const {
     name, email, phone, storeUrl, niche, customNiche, revenue,
-    services, socialMedia, message, extraInfo, productImageUrl,
-  } = req.body as {
+    socialMedia, message, extraInfo, productImageUrl,
+  } = body as {
     name: string; email: string; phone?: string; storeUrl?: string;
-    niche?: string; customNiche?: string; revenue?: string; services?: string[];
+    niche?: string; customNiche?: string; revenue?: string;
     socialMedia?: string; message?: string; extraInfo?: string;
     productImageUrl?: string;
   };
+  let services: string[] = [];
+  try {
+    const raw = body.services;
+    if (Array.isArray(raw)) services = raw;
+    else if (typeof raw === "string") services = JSON.parse(raw);
+  } catch {}
+
+  const uploadedFile = (req as any).file as Express.Multer.File | undefined;
+  let resolvedImageUrl = productImageUrl ?? null;
+  if (uploadedFile) {
+    const b64 = uploadedFile.buffer.toString("base64");
+    resolvedImageUrl = `data:${uploadedFile.mimetype};base64,${b64}`;
+  }
 
   const ip = req.ip ?? "unknown";
   if (!checkContactRateLimit(ip)) {
@@ -783,7 +800,7 @@ router.post("/contact", async (req, res): Promise<void> => {
     socialMedia: socialMedia?.trim() ?? null,
     message: message?.trim() ?? null,
     extraInfo: extraInfo?.trim() ?? null,
-    productImageUrl: productImageUrl?.trim() ?? null,
+    productImageUrl: resolvedImageUrl?.trim() ?? null,
     submittedAt: new Date().toISOString(),
   };
 

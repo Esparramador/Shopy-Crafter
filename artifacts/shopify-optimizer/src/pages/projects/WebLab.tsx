@@ -369,10 +369,10 @@ function WebLabInner({ projectId }: { projectId: number }) {
                   <div>
                     <div style={{ fontSize: 13, color: "var(--t1, #eee)" }}>{h.originalUrl || h.title}</div>
                     <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-                      {new Date(h.createdAt).toLocaleDateString("es-ES")} — Score: {meta?.score ?? "?"}
+                      {new Date(h.createdAt).toLocaleDateString("es-ES")} — Score: {String(meta?.score ?? "?")}
                     </div>
                   </div>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: scoreColor(meta?.score ?? 0) }}>{meta?.score ?? "?"}</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: scoreColor(Number(meta?.score) || 0) }}>{String(meta?.score ?? "?")}</span>
                 </div>
               );
             })}
