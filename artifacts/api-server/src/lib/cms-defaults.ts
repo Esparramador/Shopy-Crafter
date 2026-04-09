@@ -433,6 +433,8 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "seo", label: "SEO Engine", icon: "🔍" },
       { id: "vault", label: "Repositorio", icon: "🗄️" },
       { id: "exports", label: "Exportar", icon: "📥" },
+      { id: "generator", label: "Generador IA", icon: "✨" },
+      { id: "web-lab", label: "Lab Web", icon: "🔬" },
     ],
     shopybrain: [
       { label: "IA Brain", icon: "🧠", href: "/admin/shopybrain" },
@@ -445,6 +447,11 @@ export const DEFAULT_CMS_CONTENT = {
       { label: "Flujos de Email", icon: "🔄", href: "/admin/email-flows" },
       { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
       { label: "Ver Landing", icon: "🌐", href: "/landing" },
+      { label: "Generador Universal IA", icon: "✨", href: "/projects/2/generator" },
+      { label: "Lab Web", icon: "🔬", href: "/web-lab" },
+      { label: "Informes y Auditorías", icon: "📋", href: "/projects/2/exports" },
+      { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
+      { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
     ],
     admin: [
       { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
