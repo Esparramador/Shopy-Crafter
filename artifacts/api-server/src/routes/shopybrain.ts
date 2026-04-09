@@ -7544,6 +7544,7 @@ Responde SOLO con JSON válido (sin markdown):
       }
 
       case "auto_estimate_all_cogs": {
+        interface ProductItem { id?: string | number; shopifyId?: string | number; title?: string; cogs?: { totalCost?: number } }
         const projectId = params?.projectId;
         if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
         try {
@@ -7551,29 +7552,34 @@ Responde SOLO con JSON válido (sin markdown):
           const productsResp = await fetch(`${baseUrl}/api/projects/${projectId}/products`, {
             headers: { cookie: req.headers.cookie ?? "" },
           });
-          const productsData = await productsResp.json() as Record<string, unknown>;
-          const products = (Array.isArray(productsData) ? productsData : Array.isArray((productsData as any)?.products) ? (productsData as any).products : []) as Array<Record<string, unknown>>;
+          const productsData: unknown = await productsResp.json();
+          const products: ProductItem[] = Array.isArray(productsData)
+            ? productsData
+            : (productsData !== null && typeof productsData === "object" && Array.isArray((productsData as Record<string, unknown>).products))
+              ? (productsData as Record<string, ProductItem[]>).products
+              : [];
           if (products.length === 0) {
             result = { error: true, message: "❌ No se encontraron productos en este proyecto." };
             break;
           }
 
-          const productsWithoutCogs = products.filter((p: Record<string, unknown>) => !(p as any).cogs || (p as any).cogs?.totalCost === 0);
+          const productsWithoutCogs = products.filter(p => !p.cogs || (p.cogs.totalCost ?? 0) === 0);
           const toEstimate = productsWithoutCogs.length > 0 ? productsWithoutCogs : products;
           const maxProducts = Math.min(toEstimate.length, 10);
 
           const results: Array<{ productId: string; title: string; success: boolean; error?: string }> = [];
           for (let i = 0; i < maxProducts; i++) {
             const product = toEstimate[i];
+            const pid = String(product.shopifyId ?? product.id ?? "");
+            const ptitle = product.title ?? "";
             try {
-              const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${(product as any).shopifyId || (product as any).id}/ai-estimate-cogs`, {
+              const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${pid}/ai-estimate-cogs`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
               });
-              const ok = resp.ok;
-              results.push({ productId: String((product as any).shopifyId || (product as any).id), title: String((product as any).title ?? ""), success: ok, error: ok ? undefined : `HTTP ${resp.status}` });
+              results.push({ productId: pid, title: ptitle, success: resp.ok, error: resp.ok ? undefined : `HTTP ${resp.status}` });
             } catch (e) {
-              results.push({ productId: String((product as any).shopifyId || (product as any).id), title: String((product as any).title ?? ""), success: false, error: String(e) });
+              results.push({ productId: pid, title: ptitle, success: false, error: String(e) });
             }
           }
 

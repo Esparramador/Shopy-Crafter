@@ -219,11 +219,16 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       ? `${extraction.css.slice(0, 20_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-10_000)}`
       : extraction.css;
 
-    let brandResearch = {
-      brandInfo: null as any,
-      instagramInfo: null as any,
-      competitorDesign: null as any,
-      sectorDesign: null as any,
+    let brandResearch: {
+      brandInfo: Record<string, unknown> | null;
+      instagramInfo: Record<string, unknown> | null;
+      competitorDesign: Record<string, unknown> | null;
+      sectorDesign: Record<string, unknown> | null;
+    } = {
+      brandInfo: null,
+      instagramInfo: null,
+      competitorDesign: null,
+      sectorDesign: null,
     };
 
     const parsedUrl = new URL(url);
@@ -257,12 +262,12 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
         ),
       ]);
 
-      const parseSafe = (r: PromiseSettledResult<any>) => {
+      const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
         if (r.status !== "fulfilled") return null;
         try {
           const text = r.value?.text ?? "";
           const jsonMatch = text.match(/\{[\s\S]*\}/);
-          return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+          return jsonMatch ? JSON.parse(jsonMatch[0]) as Record<string, unknown> : null;
         } catch { return null; }
       };
 
