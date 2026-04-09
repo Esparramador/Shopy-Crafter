@@ -215,3 +215,45 @@ id = "ojcZIyZeu-niKwXkDxn31"
 uri = "file://exports/portada-prestige.pdf"
 type = "pdf"
 title = "PRESTIGE (Cobre) - Sin márgenes"
+
+[[outputs]]
+id = "j4cFTQ0OpQjTgYcT9McKz"
+uri = "file://FULL_CODE_EXPORT.txt"
+type = "text"
+title = "Código Completo (todo junto) — 4.2 MB, 86,359 líneas"
+
+[[outputs]]
+id = "5qyC7YzSK_KJmh7HLVfCC"
+uri = "file://CODE_PARTE_1_de_6.txt"
+type = "text"
+title = "Parte 1: Backend Core + AI Engine + Shopify/Platform libs + inicio Routes"
+
+[[outputs]]
+id = "ve6h1vFHrOBuoVwfNFs4v"
+uri = "file://CODE_PARTE_2_de_6.txt"
+type = "text"
+title = "Parte 2: Backend Routes (action-buttons → intelligence)"
+
+[[outputs]]
+id = "1eRvWlymP_rQNtvIuJYAh"
+uri = "file://CODE_PARTE_3_de_6.txt"
+type = "text"
+title = "Parte 3: Backend Routes (inventory → shopybrain)"
+
+[[outputs]]
+id = "7sxSTVGpHAJ4KELjgGoVz"
+uri = "file://CODE_PARTE_4_de_6.txt"
+type = "text"
+title = "Parte 4: Backend Routes fin + Frontend Core + Páginas inicio"
+
+[[outputs]]
+id = "QaYvpx6ixnLxSch7baNBb"
+uri = "file://CODE_PARTE_5_de_6.txt"
+type = "text"
+title = "Parte 5: Frontend Páginas admin + client + projects inicio"
+
+[[outputs]]
+id = "1qCHshDNaL9wJQ6hGgTAu"
+uri = "file://CODE_PARTE_6_de_6.txt"
+type = "text"
+title = "Parte 6: Frontend Projects fin + Components + CSS Design System"
