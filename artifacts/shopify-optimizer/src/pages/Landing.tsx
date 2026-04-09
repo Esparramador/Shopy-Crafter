@@ -235,7 +235,8 @@ export default function Landing() {
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
     if (!container) return;
-    if (window.innerWidth <= 900) {
+    const fpActive = window.innerWidth > 900 && window.innerHeight > 500;
+    if (!fpActive) {
       currentRef.current = index;
       setCurrentSection(index);
       const sections = container.querySelectorAll<HTMLElement>(".fp-section");
@@ -280,6 +281,7 @@ export default function Landing() {
     }
 
     const sections = [...container.querySelectorAll<HTMLElement>(".fp-section")];
+    setAnimatedSections(new Set(FP_SECTION_IDS));
     const obs = new IntersectionObserver(entries => {
       let bestIdx = -1;
       let bestRatio = 0;
@@ -295,9 +297,8 @@ export default function Landing() {
       if (bestIdx >= 0) {
         currentRef.current = bestIdx;
         setCurrentSection(bestIdx);
-        setAnimatedSections(prev => new Set([...prev, sections[bestIdx].id]));
       }
-    }, { threshold: [0.3, 0.5, 0.7] });
+    }, { threshold: [0.05, 0.1, 0.3] });
 
     sections.forEach(s => obs.observe(s));
     return () => obs.disconnect();
@@ -324,19 +325,13 @@ export default function Landing() {
     return () => window.removeEventListener("message", handler);
   }, [isPreview, goToSection]);
 
-  // Lock body scroll ONLY on desktop — mobile/landscape uses native scroll
+  const isFpActive = useCallback(() => {
+    return window.innerWidth > 900 && window.innerHeight > 500;
+  }, []);
+
   useEffect(() => {
-    const isMobile = () => window.innerWidth <= 900 || (window.innerHeight <= 500 && window.matchMedia("(orientation: landscape)").matches);
-    if (isMobile()) return;
-    const prev = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    const onResize = () => {
-      if (isMobile()) {
-        document.body.style.overflow = prev;
-        document.documentElement.style.overflow = prevHtml;
-      } else {
+    const applyScrollLock = () => {
+      if (isFpActive()) {
         document.body.style.overflow = "hidden";
         document.documentElement.style.overflow = "hidden";
         const container = fpRef.current;
@@ -345,76 +340,122 @@ export default function Landing() {
           if (wrapper) {
             wrapper.style.transition = "none";
             wrapper.style.transform = `translateY(-${currentRef.current * container.clientHeight}px)`;
+            requestAnimationFrame(() => { wrapper.style.transition = ""; });
           }
         }
+      } else {
+        document.body.style.overflow = "";
+        document.documentElement.style.overflow = "";
       }
     };
-    window.addEventListener("resize", onResize);
+    applyScrollLock();
+    window.addEventListener("resize", applyScrollLock);
     return () => {
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", applyScrollLock);
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, []);
+  }, [isFpActive]);
 
   useEffect(() => {
-    const isScrollJackDisabled = () => window.innerWidth <= 900 || window.innerHeight <= 500;
-    if (isScrollJackDisabled()) return;
+    if (!content) return;
     const container = fpRef.current;
     if (!container) return;
 
     let accumulated = 0;
     const THRESHOLD = 60;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let touchActive = false;
+    let touchBypassed = false;
 
-    const onWheel = (e: WheelEvent) => {
-      if (isAnimatingRef.current) { e.preventDefault(); return; }
-
-      const target = e.target as HTMLElement;
-      const hScrollParent = target.closest<HTMLElement>("[style*='overflow-x'], .fp-pricing-row, .fp-calc-tabs, .fp-calc-items");
+    const canBypassSectionScroll = (e: WheelEvent | TouchEvent, deltaY: number) => {
+      const target = (e instanceof TouchEvent ? e.target : e.target) as HTMLElement;
+      const hScrollParent = target.closest<HTMLElement>(".fp-pricing-row, .fp-calc-tabs, .fp-calc-items");
       if (hScrollParent) {
         const canScrollH = hScrollParent.scrollWidth > hScrollParent.clientWidth + 2;
-        if (canScrollH && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-          return;
+        if (e instanceof WheelEvent && canScrollH && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+          return true;
         }
         const canScrollV = hScrollParent.scrollHeight > hScrollParent.clientHeight + 2;
         if (canScrollV) {
           const atTop = hScrollParent.scrollTop <= 0;
           const atBottom = hScrollParent.scrollTop + hScrollParent.clientHeight >= hScrollParent.scrollHeight - 2;
-          if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-            return;
-          }
+          if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) return true;
         }
       }
-
       const sections = container.querySelectorAll<HTMLElement>(".fp-section");
       const currentEl = sections[currentRef.current];
       if (currentEl && currentEl.scrollHeight > currentEl.clientHeight + 2) {
         const atTop = currentEl.scrollTop <= 0;
         const atBottom = currentEl.scrollTop + currentEl.clientHeight >= currentEl.scrollHeight - 2;
-        if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-          return;
-        }
+        if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) return true;
       }
+      return false;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (!isFpActive()) return;
+      if (isAnimatingRef.current) { e.preventDefault(); return; }
+      if (canBypassSectionScroll(e, e.deltaY)) return;
 
       e.preventDefault();
       accumulated += e.deltaY;
-
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => { accumulated = 0; }, 200);
 
       if (Math.abs(accumulated) >= THRESHOLD) {
-        if (accumulated > 0) {
-          goToSection(currentRef.current + 1);
-        } else {
-          goToSection(currentRef.current - 1);
-        }
+        if (accumulated > 0) goToSection(currentRef.current + 1);
+        else goToSection(currentRef.current - 1);
         accumulated = 0;
       }
     };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (!isFpActive()) return;
+      if (e.touches.length !== 1) return;
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      touchActive = true;
+      touchBypassed = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isFpActive() || !touchActive) return;
+      if (e.touches.length !== 1) return;
+      const dy = touchStartY - e.touches[0].clientY;
+      const dx = touchStartX - e.touches[0].clientX;
+      if (Math.abs(dx) > Math.abs(dy)) { touchBypassed = true; return; }
+      if (canBypassSectionScroll(e, dy)) { touchBypassed = true; return; }
+      e.preventDefault();
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isFpActive() || !touchActive) return;
+      touchActive = false;
+      if (touchBypassed) return;
+      if (e.changedTouches.length !== 1) return;
+      const dy = touchStartY - e.changedTouches[0].clientY;
+      const SWIPE_THRESHOLD = 50;
+      if (isAnimatingRef.current) return;
+      if (Math.abs(dy) >= SWIPE_THRESHOLD) {
+        if (dy > 0) goToSection(currentRef.current + 1);
+        else goToSection(currentRef.current - 1);
+      }
+    };
+
     container.addEventListener("wheel", onWheel, { passive: false });
-    return () => container.removeEventListener("wheel", onWheel);
-  }, [goToSection, content]);
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [goToSection, content, isFpActive]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

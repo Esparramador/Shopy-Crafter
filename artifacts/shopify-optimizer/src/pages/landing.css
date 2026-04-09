@@ -992,28 +992,48 @@
   .l-root {
     overflow: visible !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     height: auto !important;
     min-height: 100vh;
+    cursor: auto !important;
   }
+  .l-root *, .l-root a, .l-root button { cursor: auto !important; }
   .l-nav { padding: 0 24px; }
   .l-nav-links { display: none; }
-  .fp-sidenav { display: none; }
-  .fp-progress { display: none; }
-  .fp-counter { display: none; }
+  .fp-sidenav { display: none !important; }
+  .fp-progress { display: none !important; }
+  .fp-counter { display: none !important; }
+  .fp-scroll-hint { display: none !important; }
   .fp-section {
     padding: 0 24px;
     height: auto !important;
     min-height: auto !important;
     padding-top: 60px !important;
     padding-bottom: 60px !important;
+    overflow: visible !important;
+    justify-content: flex-start !important;
+  }
+  .fp-section:first-child {
+    padding-top: 80px !important;
   }
   .fp-container {
     height: auto !important;
+    overflow: visible !important;
     overflow-y: visible !important;
+    overflow-x: hidden !important;
   }
   .fp-wrapper {
     transform: none !important;
     transition: none !important;
+  }
+  .fp-animate {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .fp-animated {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
   .fp-hero-layout { grid-template-columns: 1fr; gap: 24px; }
   .fp-hero-right { display: none; }
@@ -1049,9 +1069,13 @@
   .fp-etab-name { display: none; }
   .l-testi-card { padding: 24px; }
   .fp-testi-carousel { perspective: none; }
-  .fp-scroll-hint { display: none; }
   .fp-contact-form { padding: 32px 28px !important; }
   .fp-testi-carousel { height: auto; min-height: 300px; }
+  .fp-testi-card:not(.active) { display: none !important; }
+  .fp-testi-card.active { position: relative !important; transform: none !important; }
+  .fp-calc-grid { grid-template-columns: 1fr !important; }
+  .fp-calc-summary { position: static; }
+  .fp-contact-form .fp-contact-row { grid-template-columns: 1fr !important; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -1069,34 +1093,19 @@
   .l-nav-gem { width: 26px; height: 26px; font-size: 13px; border-radius: 7px; }
   .l-nav-logo-text { font-size: 16px; }
 
-  .l-root { cursor: auto !important; }
-  .l-root *, .l-root a, .l-root button { cursor: auto !important; }
-
   .fp-container {
     position: relative !important;
-    height: auto !important;
-    overflow-y: visible !important;
     margin-top: 56px !important;
   }
-  .fp-wrapper {
-    transform: none !important;
-    transition: none !important;
-  }
 
-  /* Secciones: auto-height, flex-start en vez de center */
   .fp-section {
-    height: auto !important;
-    min-height: 100svh !important;
     padding: 60px 20px 50px !important;
-    overflow: visible !important;
-    justify-content: flex-start !important;
     align-items: flex-start !important;
   }
   .fp-section:first-child {
     padding-top: 90px !important;
   }
 
-  /* Centrar contenido en secciones que no sean hero */
   #fp-engines,
   #fp-demo,
   #fp-results,
@@ -1104,27 +1113,8 @@
   #fp-calculator,
   #fp-contact {
     align-items: center !important;
-    justify-content: center !important;
     text-align: center;
   }
-
-  /* Animaciones: forzar visibilidad en mobile
-     (IntersectionObserver con root auto-height falla — ratio 14% < threshold 0.3) */
-  .fp-animate {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-  .fp-animated {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  /* Ocultar elementos de navegación de scroll */
-  .fp-progress,
-  .fp-sidenav,
-  .fp-counter { display: none !important; }
-  .fp-scroll-hint { display: none !important; }
 
   /* Hero */
   .fp-hero-layout {
