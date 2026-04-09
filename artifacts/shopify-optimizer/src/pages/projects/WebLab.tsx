@@ -352,7 +352,8 @@ function WebLabInner({ projectId }: { projectId: number }) {
           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--t1, #eee)" }}>📜 Análisis anteriores</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {history.map((h) => {
-              const meta = typeof h.metadata === "string" ? JSON.parse(h.metadata) : h.metadata;
+              let meta: Record<string, unknown> = {};
+              try { meta = typeof h.metadata === "string" ? JSON.parse(h.metadata) : (h.metadata ?? {}); } catch { meta = {}; }
               return (
                 <div
                   key={h.id}
