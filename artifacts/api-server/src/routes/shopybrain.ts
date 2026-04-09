@@ -381,7 +381,7 @@ Acciones disponibles:
 - list_all_products: Listar TODOS los productos (active+draft+archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
 - create_product: Crear producto CALIDAD 100/100 con IA (título SEO 45-65 chars, descripción 800-1200 palabras con 8 secciones: storytelling, beneficios, specs, FAQ, trust badges; 22-28 tags; precio investigado del mercado; meta tags SEO optimizados; imágenes generadas con IA). Si el usuario proporciona referenceImageUrl, las imágenes se generan desde esa referencia (modelo con producto, lifestyle, detalles, etc). Params: {projectId, title, bodyHtml?, price?, tags?, productType?, vendor?, status?, aiGenerate?, skipImages?, referenceImageUrl?}
 - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?, vendor?}
-- change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
+- change_price: Cambiar precio. Params: {projectId, productId? o title (nombre del producto), price, compareAtPrice?}. Puedes usar el NOMBRE del producto en "title" y se buscará automáticamente.
 - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
 - scan_store: Escanear/auditar TODOS los productos de la tienda (incluye draft, archived). Params: {projectId, statusFilter? ("any","active","draft","archived")}
 - audit_store: Auditoría PROFUNDA de toda la tienda — scores, grades (A/B/C/D), problemas críticos, warnings, productos sin publicar, sin compare_at_price, pocas imágenes, descripción corta, pocos tags. Params: {projectId}
@@ -504,7 +504,7 @@ Acciones disponibles:
 - update_stock: Actualizar stock de un producto/variante. Si se pasa productId sin variantId, actualiza TODAS las variantes. Params: {projectId, productId?, variantId?, quantity}
 - bulk_update_stock: Actualizar stock de múltiples productos/variantes a la vez. Params: {projectId, items: [{variantId? o productId?, quantity}]}
 - update_product_price: Actualizar el precio de un producto/variante en Shopify. Params: {projectId, productId?, variantId?, price, compareAtPrice?}. Si solo se da productId, actualiza TODAS las variantes.
-- bulk_update_prices: Actualizar precios de múltiples productos/variantes a la vez. Params: {projectId, items: [{productId? o variantId?, price, compareAtPrice?}]}
+- bulk_update_prices: Actualizar precios de múltiples productos/variantes a la vez. Params: {projectId, items: [{productId? o variantId? o title (nombre del producto), price, compareAtPrice?}]}. IMPORTANTE: puedes pasar el NOMBRE del producto en "title" y se buscará automáticamente en Shopify.
 - sync_catalog_prices: Sincronizar TODOS los precios de los productos de Shopify con el catálogo oficial de Shopy Crafter. Analiza todos los productos, detecta discrepancias y actualiza los precios incorrectos automáticamente. Params: {projectId, dryRun? (si true, solo muestra cambios sin aplicar)}
 - price_audit: Auditar los precios de todos los productos de la tienda Shopify, comparándolos con el catálogo oficial. Genera un informe de discrepancias con recomendaciones. Params: {projectId}
 - list_products_with_prices: Listar TODOS los productos de la tienda con sus precios actuales, variantes, SKUs y compare_at_price. Params: {projectId, filter? ("all"|"subscriptions"|"services"|"creative"|"credits")}
@@ -2681,13 +2681,35 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
 
       case "change_price": {
         const projectId = params?.projectId;
-        const productId = params?.productId;
+        let productId = params?.productId;
+        const productTitle = params?.title || params?.name;
         const newPrice = params?.price;
-        if (!projectId || !productId || !newPrice) { res.status(400).json({ error: "projectId, productId y price requeridos" }); return; }
+        if (!projectId || (!productId && !productTitle) || !newPrice) { res.status(400).json({ error: "projectId, (productId o title) y price requeridos" }); return; }
         const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
         if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-        const current = await shopifyRequest<{ product: { variants: Array<{ id: number; price: string }> } }>(
+        if (!productId && productTitle) {
+          const cleanTitle = String(productTitle).trim();
+          if (cleanTitle.length < 3) { res.status(400).json({ error: "El nombre del producto debe tener al menos 3 caracteres" }); return; }
+          const catalog = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+            parseInt(projectId), project.shopDomain, "/products.json?limit=250&fields=id,title"
+          );
+          const searchName = cleanTitle.toLowerCase();
+          const exactMatch = (catalog.products || []).find(p => String(p.title || "").toLowerCase() === searchName);
+          const partialMatches = exactMatch ? [] : (catalog.products || []).filter(p => {
+            const pTitle = String(p.title || "").toLowerCase();
+            return pTitle.includes(searchName) || searchName.includes(pTitle);
+          });
+          const matched = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
+          if (!matched && partialMatches.length > 1) {
+            const candidates = partialMatches.slice(0, 5).map(p => `• ${p.title} (ID: ${p.id})`).join("\n");
+            res.status(400).json({ error: `Varios productos coinciden con "${cleanTitle}":\n${candidates}\n\nEspecifica el nombre exacto o el productId.` }); return;
+          }
+          if (!matched) { res.status(404).json({ error: `Producto "${cleanTitle}" no encontrado en Shopify` }); return; }
+          productId = String(matched.id);
+        }
+
+        const current = await shopifyRequest<{ product: { title: string; variants: Array<{ id: number; price: string }> } }>(
           parseInt(projectId), project.shopDomain, `/products/${productId}.json?fields=id,title,variants`
         );
         const variantId = current.product.variants?.[0]?.id;
@@ -2702,7 +2724,7 @@ Plan activo: ${plan} → ${(IMAGE_TYPES_BY_PLAN[plan] || []).length} tipos de im
           productId,
           oldPrice: current.product.variants[0].price,
           newPrice: String(newPrice),
-          message: `Precio actualizado: ${current.product.variants[0].price}€ → ${newPrice}€`,
+          message: `Precio actualizado para "${current.product.title}": ${current.product.variants[0].price}€ → ${newPrice}€`,
         };
         break;
       }
@@ -5082,21 +5104,57 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
       case "bulk_update_prices": {
         const projectId = params?.projectId;
         if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
-        const items = params?.items as Array<{ productId?: string; variantId?: string; price: string; compareAtPrice?: string }> | undefined;
+        const items = params?.items as Array<{ productId?: string; variantId?: string; title?: string; name?: string; price: string; compareAtPrice?: string }> | undefined;
         if (!items || !Array.isArray(items) || items.length === 0) {
-          result = { error: true, message: "❌ Falta items — array de {productId o variantId, price, compareAtPrice?}" }; break;
+          result = { error: true, message: "❌ Falta items — array de {productId o variantId o title, price, compareAtPrice?}" }; break;
         }
         try {
           const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
           if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+
+          let allProducts: Array<Record<string, unknown>> | null = null;
+          const needsNameLookup = items.some(i => !i.productId && !i.variantId && (i.title || i.name));
+          if (needsNameLookup) {
+            const catalog = await shopifyRequest<{ products: Array<Record<string, unknown>> }>(
+              parseInt(String(projectId)), project.shopDomain, "/products.json?limit=250&fields=id,title,variants"
+            );
+            allProducts = catalog.products || [];
+          }
+
           let successCount = 0;
           let failCount = 0;
           const details: string[] = [];
           for (const item of items) {
             try {
               let vid = item.variantId;
-              let label = vid || "";
-              if (!vid && item.productId) {
+              let label = vid || item.title || item.name || "";
+
+              if (!vid && !item.productId && (item.title || item.name)) {
+                const cleanTitle = (item.title || item.name || "").trim();
+                if (cleanTitle.length < 3) { failCount++; details.push(`❌ "${cleanTitle}": nombre demasiado corto (mín 3 chars)`); continue; }
+                const searchName = cleanTitle.toLowerCase();
+                const exactMatch = allProducts?.find(p => String(p.title || "").toLowerCase() === searchName);
+                const partialMatches = exactMatch ? [] : (allProducts || []).filter(p => {
+                  const pTitle = String(p.title || "").toLowerCase();
+                  return pTitle.includes(searchName) || searchName.includes(pTitle);
+                });
+                const matched = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
+                if (!matched && partialMatches.length > 1) {
+                  failCount++;
+                  const candidates = partialMatches.slice(0, 3).map(p => String(p.title)).join(", ");
+                  details.push(`❌ "${cleanTitle}": ambiguo (${partialMatches.length} coincidencias: ${candidates})`);
+                  continue;
+                }
+                if (matched) {
+                  const firstV = (matched.variants as Array<Record<string, unknown>>)?.[0];
+                  vid = String(firstV?.id || "");
+                  label = String(matched.title);
+                } else {
+                  failCount++;
+                  details.push(`❌ "${cleanTitle}": producto no encontrado en Shopify`);
+                  continue;
+                }
+              } else if (!vid && item.productId) {
                 const pData = await shopifyRequest<{ product: Record<string, unknown> }>(
                   parseInt(String(projectId)), project.shopDomain,
                   `/products/${item.productId}.json?fields=title,variants`
@@ -5115,7 +5173,7 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
               );
               successCount++;
               details.push(`✅ ${data.variant.title || label}: €${item.price}`);
-            } catch { failCount++; details.push(`❌ ${item.variantId || item.productId}: error`); }
+            } catch { failCount++; details.push(`❌ ${item.variantId || item.productId || item.title || item.name}: error`); }
           }
           result = {
             success: successCount, failed: failCount,

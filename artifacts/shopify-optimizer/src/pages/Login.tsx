@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { role } = await login(email, password);
-      navigate(role === "admin" ? "/admin/clients" : "/client");
+      navigate(role === "admin" ? "/home" : "/client");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("loginError", "Error al iniciar sesión"));
     } finally {

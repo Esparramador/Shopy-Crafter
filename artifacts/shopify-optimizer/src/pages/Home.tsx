@@ -23,7 +23,7 @@ export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { data: projects, isLoading } = useListProjects();
-  const [brainStatus, setBrainStatus] = useState<{ status: string; memoriesCount: number } | null>(null);
+  const [brainStatus, setBrainStatus] = useState<{ totalMemories: number; totalInsights: number; brainHealth: number } | null>(null);
   const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
   const { t } = useCmsSection("labels.home");
 
@@ -62,7 +62,7 @@ export default function Home() {
 
       <div className="grid-r4" style={{ marginBottom: 28 }}>
         <StatBubble icon={<Users size={18} />} label={t("storesActive", "Tiendas activas")} value={isLoading ? "—" : projectCount} />
-        <StatBubble icon={<Brain size={18} />} label={t("aiMemories", "Memorias IA")} value={brainStatus?.memoriesCount ?? "—"} color="var(--gold)" />
+        <StatBubble icon={<Brain size={18} />} label={t("aiMemories", "Memorias IA")} value={brainStatus?.totalMemories ?? "—"} color="var(--gold)" />
         <StatBubble icon={<ShieldCheck size={18} />} label={t("systemStatus", "Estado del sistema")} value={t("systemOk", "Operativo")} color="var(--jade)" />
         <StatBubble icon={<Zap size={18} />} label={t("aiEnginesActive", "Motores IA activos")} value="7" color="#8b5cf6" />
       </div>
