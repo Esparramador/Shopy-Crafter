@@ -616,6 +616,117 @@ Variantes: ${variants.length} (precios: ${variants.map((v: Record<string, unknow
 `;
   } catch {}
 
+  const productType = product.productType || "producto general";
+  const niche = project.storeNiche || "e-commerce";
+
+  let materialResearch = { materials: [] as Array<{ material: string; priceRange: string; source: string; url?: string }>, avgMaterialCost: 0, insight: "" };
+  let shippingResearch = { carriers: [] as Array<{ carrier: string; domestic: string; international: string; source: string }>, insight: "" };
+  let supplierResearch = { suppliers: [] as Array<{ supplier: string; priceRange: string; moq?: string; origin?: string; url?: string }>, avgCost: 0, insight: "" };
+  const researchWarnings: string[] = [];
+
+  try {
+    const [matResult, shipResult, suppResult] = await Promise.allSettled([
+      askGeminiWithSearch(
+        `BUSCA PRECIOS REALES DE MATERIALES Y COMPONENTES para fabricar este tipo de producto:
+
+Producto: "${product.title}"
+Tipo: ${productType}
+Nicho: ${niche}
+
+INSTRUCCIONES:
+1. Busca en proveedores reales (Amazon, AliExpress, proveedores industriales España, ferreterías online, tiendas de materiales)
+2. Encuentra precios ACTUALES de los materiales/componentes necesarios para fabricar este tipo de producto
+3. Incluye: materia prima, componentes, acabados, herramientas consumibles
+4. Para productos de impresión 3D: busca precios de filamento (PLA, ABS, PETG, resina) por kg
+5. Para textiles: busca precios de tela por metro
+6. Para artesanía/manualidades: busca precios de los materiales específicos
+
+RESPONDE con JSON exacto:
+{
+  "materials": [{"material": "nombre", "priceRange": "X.XX - X.XX €", "source": "tienda/proveedor", "url": "URL"}],
+  "avgMaterialCost": XX.XX,
+  "insight": "Análisis de costes de material con fuentes reales"
+}`,
+        `You are a supply chain cost analyst. Search Google for REAL current material and component prices in Spain/Europe. Return ONLY valid JSON with actual prices from real suppliers.`
+      ),
+      askGeminiWithSearch(
+        `BUSCA TARIFAS REALES DE ENVÍO para e-commerce en España en 2025-2026:
+
+Tipo de producto: "${product.title}" (${productType})
+Peso estimado: basado en el tipo de producto
+
+INSTRUCCIONES:
+1. Busca tarifas actualizadas de: Correos Express, SEUR, MRW, Nacex, GLS, DHL Express, FedEx, UPS España
+2. Para envío NACIONAL (península) de paquetes pequeños/medianos
+3. Para envío INTERNACIONAL a Europa
+4. Incluye tarifas de punto de recogida vs domicilio
+5. Busca también coste medio de embalaje e-commerce (cajas, relleno, cinta)
+
+RESPONDE con JSON exacto:
+{
+  "carriers": [{"carrier": "nombre", "domestic": "X.XX - X.XX €", "international": "X.XX - X.XX €", "source": "fuente"}],
+  "insight": "Análisis de las mejores opciones de envío según precio/servicio"
+}`,
+        `You are a logistics cost analyst. Search Google for REAL current shipping rates from Spanish carriers for e-commerce. Return ONLY valid JSON.`
+      ),
+      askGeminiWithSearch(
+        `BUSCA PRECIOS REALES DE PROVEEDORES Y FABRICANTES para este tipo de producto:
+
+Producto: "${product.title}"
+Tipo: ${productType}
+Nicho: ${niche}
+
+INSTRUCCIONES:
+1. Busca en Alibaba, AliExpress mayorista, fabricantes españoles y europeos del sector "${niche}"
+2. Busca servicios de fabricación bajo demanda, talleres, imprentas 3D profesionales si aplica
+3. Encuentra precios de producción/fabricación por unidad REALES
+4. Incluye MOQ (cantidad mínima) y país de origen
+5. Busca también servicios de fulfillment en España (precios por pedido preparado)
+
+RESPONDE con JSON exacto:
+{
+  "suppliers": [{"supplier": "nombre", "priceRange": "X.XX - X.XX €/ud", "moq": "cantidad", "origin": "país", "url": "URL"}],
+  "avgCost": XX.XX,
+  "insight": "Análisis del mercado de proveedores con recomendación"
+}`,
+        `You are a manufacturing sourcing analyst. Search Google for REAL supplier, manufacturer, and production service prices. Focus on Spanish/European suppliers. Return ONLY valid JSON.`
+      ),
+    ]);
+
+    if (matResult.status === "fulfilled") {
+      try {
+        const jsonMatch = matResult.value.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) materialResearch = { ...materialResearch, ...JSON.parse(jsonMatch[0]) };
+      } catch { researchWarnings.push("Error parseando datos de materiales de Google Search"); }
+    } else { researchWarnings.push("Búsqueda de materiales falló: " + (matResult.status === "rejected" ? String(matResult.reason) : "desconocido")); }
+
+    if (shipResult.status === "fulfilled") {
+      try {
+        const jsonMatch = shipResult.value.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) shippingResearch = { ...shippingResearch, ...JSON.parse(jsonMatch[0]) };
+      } catch { researchWarnings.push("Error parseando datos de envío de Google Search"); }
+    } else { researchWarnings.push("Búsqueda de tarifas de envío falló"); }
+
+    if (suppResult.status === "fulfilled") {
+      try {
+        const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) };
+      } catch { researchWarnings.push("Error parseando datos de proveedores de Google Search"); }
+    } else { researchWarnings.push("Búsqueda de proveedores falló"); }
+  } catch (e) { researchWarnings.push("Error general en investigación de mercado: " + (e instanceof Error ? e.message : "desconocido")); }
+
+  const materialDataStr = materialResearch.materials.length > 0
+    ? `PRECIOS REALES DE MATERIALES (investigados via Google Search):\n${materialResearch.materials.map(m => `  - ${m.material}: ${m.priceRange} [${m.source}] ${m.url ? `(${m.url})` : ""}`).join("\n")}\n  Coste medio material: €${materialResearch.avgMaterialCost}\n  Insight: ${materialResearch.insight}`
+    : "Sin datos de materiales encontrados en búsqueda — estima basándote en conocimiento del sector";
+
+  const shippingDataStr = shippingResearch.carriers.length > 0
+    ? `TARIFAS REALES DE ENVÍO (investigadas via Google Search):\n${shippingResearch.carriers.map(c => `  - ${c.carrier}: Nacional ${c.domestic}, Internacional ${c.international} [${c.source}]`).join("\n")}\n  Insight: ${shippingResearch.insight}`
+    : "Sin datos de envío encontrados — usa tarifas estándar españolas";
+
+  const supplierDataStr = supplierResearch.suppliers.length > 0
+    ? `PRECIOS REALES DE PROVEEDORES/FABRICANTES (investigados via Google Search):\n${supplierResearch.suppliers.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""} ${s.origin ? `[${s.origin}]` : ""} ${s.url ? `(${s.url})` : ""}`).join("\n")}\n  Coste medio proveedor: €${supplierResearch.avgCost}\n  Insight: ${supplierResearch.insight}`
+    : "Sin datos de proveedores encontrados";
+
   const prompt = `Eres un experto en costes de producción, logística, fabricación, materiales, envíos e impuestos con 20 años de experiencia.
 
 PRODUCTO A ANALIZAR:
@@ -625,81 +736,47 @@ PRODUCTO A ANALIZAR:
 - Vendor: ${product.vendor || "sin definir"}
 - Imágenes: ${product.imageCount || 0}
 - Tags: ${product.tags || "ninguno"}
-- Tienda: "${project.name}" (Nicho: ${project.storeNiche || "e-commerce"})
+- Tienda: "${project.name}" (Nicho: ${niche})
 - Mercados: ${project.storeMarkets || "España"}
 ${shopifyDetails}
 
-Tu tarea es ESTIMAR todos los costes de producción y operación basándote en DATOS REALES del mercado.
-Usa tu conocimiento de:
-- Costes reales de materiales (madera, textiles, resina, PLA, ABS, PVA, PETG, nylon, metacrilato, metal, cristal, cerámica, papel, cartón, etc.)
-- Costes de impresión 3D (FDM, SLA, SLS) — tiempo de máquina, electricidad, material, post-procesado
-- Costes de APIs de IA (Tripo3D ~$0.50-2/modelo, Meshy ~$0.30-1/modelo, Midjourney, DALL-E, etc.)
-- Tarifas reales de envío: Correos (2-5€ nacional), SEUR (4-8€), Nacex (5-9€), FedEx (8-15€ nacional, 15-40€ internacional), DHL, UPS, MRW, GLS
-- Peso medio de paquetes según tipo de producto
-- Costes de embalaje (cajas, burbujas, relleno, cinta, etiquetas) — 0.30-2€ según tamaño
-- Costes de plataforma Shopify (2.9% + 0.30€ por transacción en plan Basic)
-- IVA España 21%, impuesto sociedades 25%
-- Aranceles y aduanas para importación (si aplica por el tipo de producto)
-- Costes de almacén (0.50-3€/m³/día según ubicación)
-- Tasas de devolución e-commerce (~5-15% según nicho)
-- Marketing digital medio (CAC €5-30 según nicho)
+=== DATOS REALES DE MERCADO (investigados con Google Search en tiempo real) ===
+
+${materialDataStr}
+
+${shippingDataStr}
+
+${supplierDataStr}
+
+=== FIN DATOS REALES ===
+
+Tu tarea es CALCULAR todos los costes de producción y operación basándote en los DATOS REALES anteriores.
+REGLAS CRÍTICAS:
+1. USA los precios REALES de materiales/proveedores/envío encontrados arriba como BASE de tu estimación
+2. Si hay datos reales, NO los ignores ni los sustituyas por estimaciones genéricas
+3. Complementa con tu conocimiento SOLO los campos donde no hay datos reales
+4. Los costes de plataforma Shopify son fijos: 2.9% + 0.30€ por transacción en plan Basic
+5. IVA España 21%, impuesto sociedades 25%
 
 IMPORTANTE: Proporciona DOS escenarios:
-1. "ownEquipment" — Producción propia (impresora 3D propia, taller propio, etc.)
-   - Amortización de equipos (ej: impresora 3D €300-1500, amortizada en 500-2000 unidades)
-   - Solo coste de material + electricidad + tiempo
-2. "externalService" — Servicio externo (encargado a empresa de fabricación/impresión)
-   - Precios de servicios profesionales de impresión 3D (3-15€/pieza según tamaño)
-   - Precios de fabricación por encargo
+1. "ownEquipment" — Producción propia (taller/equipos propios, amortización incluida)
+2. "externalService" — Servicio externo (fabricación/producción externalizada)
 
 Para CADA escenario, estima estos campos (en euros, por unidad):
-- unitCost: coste unitario de producción del producto
-- materialCost: coste de materiales (marcos, componentes, materia prima)
-- fabricCost: tejidos/telas (si aplica, sino 0)
-- printingCost: impresión digital/3D (si aplica)
-- screenPrintingCost: serigrafía (si aplica, sino 0)
-- moldAmortization: amortización de moldes/utillajes
-- assemblyCost: montaje/ensamblaje
-- laborCostPerUnit: mano de obra por unidad
-- qualityControlCost: control de calidad
-- packagingCost: embalaje completo (caja + protección + presentación)
-- labelCost: etiquetas/pegatinas
-- shippingCostDomestic: envío nacional medio (promedio transportistas)
-- shippingCostInternational: envío internacional medio
-- fulfillmentFee: preparación de pedido
-- warehouseCostPerUnit: almacén por unidad
-- customsDuty: aranceles (si importación)
-- insuranceCost: seguro de envío
-- returnRate: tasa de devolución (como decimal, ej: 0.08)
-- returnProcessingCost: coste de procesar una devolución
-- shopifyPaymentFee: comisión Shopify (como decimal, ej: 0.029)
-- shopifyPlanCostPerOrder: coste del plan por pedido
-- paymentProcessingFee: comisión pasarela de pago
-- platformCommission: comisión marketplace
-- cac: coste de adquisición de cliente
-- affiliateFee: comisión afiliados
-- digitalMarketingCost: marketing digital por unidad
-- influencerCostPerUnit: influencers por unidad
-- seoCostPerUnit: SEO por unidad
-- vatRate: tipo de IVA (como decimal, ej: 0.21)
-- corporateTaxRate: impuesto sociedades (decimal)
-- consultingFee: asesoría
-- legalCostPerUnit: legal por unidad
-- aiApiCostPerUnit: APIs de IA por unidad
-- designCostPerUnit: diseño gráfico por unidad
-- overheadPerUnit: gastos generales por unidad
+unitCost, materialCost, fabricCost, printingCost, screenPrintingCost, moldAmortization, assemblyCost, laborCostPerUnit, qualityControlCost, packagingCost, labelCost, shippingCostDomestic, shippingCostInternational, fulfillmentFee, warehouseCostPerUnit, customsDuty, insuranceCost, returnRate (decimal), returnProcessingCost, shopifyPaymentFee (decimal), shopifyPlanCostPerOrder, paymentProcessingFee, platformCommission, cac, affiliateFee, digitalMarketingCost, influencerCostPerUnit, seoCostPerUnit, vatRate (decimal), corporateTaxRate (decimal), consultingFee, legalCostPerUnit, aiApiCostPerUnit, designCostPerUnit, overheadPerUnit
 
 También incluye:
-- reasoning: explicación detallada de por qué estimas cada coste
-- shippingBreakdown: desglose por transportista { carrier: string, domestic: number, international: number, estimatedWeight: string }[]
-- materialBreakdown: desglose de materiales { material: string, costPerUnit: number, notes: string }[]
-- productionMethod: método de producción identificado (ej: "Impresión 3D FDM", "Fabricación textil", "Artesanía manual", etc.)
-- colorComplexity: complejidad de color ("monocolor", "bicolor", "multicolor_completo") y cómo afecta al coste
+- reasoning: explicación detallada citando las FUENTES REALES de cada dato
+- shippingBreakdown: desglose por transportista { carrier, domestic, international, estimatedWeight }[]
+- materialBreakdown: desglose de materiales { material, costPerUnit, notes, source }[]
+- supplierOptions: opciones de proveedor encontradas { name, unitCost, moq, origin }[]
+- productionMethod: método de producción identificado
+- colorComplexity: complejidad de color
+- dataQuality: "real" si usaste datos de Google Search, "partial" si mezclaste, "estimated" si no había datos
 
-Devuelve JSON con: { ownEquipment: { ...todos los campos }, externalService: { ...todos los campos }, reasoning: string, shippingBreakdown: [...], materialBreakdown: [...], productionMethod: string, colorComplexity: string, confidenceLevel: "high"|"medium"|"low" }
+Devuelve JSON: { ownEquipment: {...}, externalService: {...}, reasoning, shippingBreakdown, materialBreakdown, supplierOptions, productionMethod, colorComplexity, confidenceLevel: "high"|"medium"|"low", dataQuality, realSourcesCount }
 
-SÉ PRECISO. Usa datos REALES del mercado español/europeo. No inventes — estima basándote en tu conocimiento real de costes industriales y logísticos.
-Responde SOLO el JSON.`;
+IMPORTANTE: Cita las fuentes reales en el reasoning. Responde SOLO el JSON.`;
 
   let estimated;
   try {
@@ -708,10 +785,13 @@ Responde SOLO el JSON.`;
       externalService: Record<string, number>;
       reasoning: string;
       shippingBreakdown: Array<{ carrier: string; domestic: number; international: number; estimatedWeight: string }>;
-      materialBreakdown: Array<{ material: string; costPerUnit: number; notes: string }>;
+      materialBreakdown: Array<{ material: string; costPerUnit: number; notes: string; source?: string }>;
+      supplierOptions: Array<{ name: string; unitCost: number; moq?: string; origin?: string }>;
       productionMethod: string;
       colorComplexity: string;
       confidenceLevel: string;
+      dataQuality: string;
+      realSourcesCount: number;
     }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "cogs_estimation", project.storeNiche ?? undefined, 8192);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -723,16 +803,22 @@ Responde SOLO el JSON.`;
     operationType: "cogs_estimation",
     niche: project.storeNiche ?? null,
     productType: product.productType ?? null,
-    title: `COGS estimado IA: ${product.title}`,
-    content: `Estimación COGS para "${product.title}" (${estimated.productionMethod ?? "desconocido"}): Propio €${estimated.ownEquipment?.unitCost ?? "?"}, Externo €${estimated.externalService?.unitCost ?? "?"}. Materiales: ${estimated.materialBreakdown?.map(m => `${m.material}: €${m.costPerUnit}`).join(", ") ?? "N/A"}. Color: ${estimated.colorComplexity ?? "N/A"}. Confianza: ${estimated.confidenceLevel ?? "N/A"}.`,
-    confidence: estimated.confidenceLevel === "high" ? 0.85 : estimated.confidenceLevel === "medium" ? 0.65 : 0.45,
-    tags: ["cogs", "estimation", "ai", product.productType ?? "general"],
+    title: `COGS estimado IA (datos reales): ${product.title}`,
+    content: `Estimación COGS para "${product.title}" (${estimated.productionMethod ?? "desconocido"}): Propio €${estimated.ownEquipment?.unitCost ?? "?"}, Externo €${estimated.externalService?.unitCost ?? "?"}. Materiales reales: ${estimated.materialBreakdown?.map(m => `${m.material}: €${m.costPerUnit}${m.source ? ` [${m.source}]` : ""}`).join(", ") ?? "N/A"}. Proveedores: ${estimated.supplierOptions?.length ?? 0} encontrados. Calidad datos: ${estimated.dataQuality ?? "unknown"}. Confianza: ${estimated.confidenceLevel ?? "N/A"}.`,
+    confidence: estimated.confidenceLevel === "high" ? 0.9 : estimated.confidenceLevel === "medium" ? 0.7 : 0.5,
+    tags: ["cogs", "estimation", "ai", "real_data", product.productType ?? "general"],
   });
 
   res.json({
     productId: shopifyProductId,
     productTitle: product.title,
     ...estimated,
+    marketResearch: {
+      materials: materialResearch.materials,
+      carriers: shippingResearch.carriers,
+      suppliers: supplierResearch.suppliers,
+    },
+    researchWarnings: researchWarnings.length > 0 ? researchWarnings : undefined,
   });
 });
 

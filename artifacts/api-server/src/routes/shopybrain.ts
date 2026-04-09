@@ -448,6 +448,7 @@ Acciones disponibles:
 - audit_page_speed: Auditoría PageSpeed Insights (Core Web Vitals, LCP, CLS, FID). Params: {projectId}
 - generate_sitemap: Generar sitemap XML optimizado. Params: {projectId}
 - scan_competitor: Escanear competidor (precios, productos, promociones, nivel de amenaza). Params: {projectId, competitorId}
+- discover_competitors: Descubrir competidores automáticamente usando Google Search (no necesita que el usuario diga quiénes son). Busca tiendas y marcas competidoras en el mismo nicho. Params: {projectId}
 - analyze_competitor_product: Analizar posicionamiento de precio vs competidores. Params: {projectId, productId}
 - calculate_optimal_price: Calcular precio óptimo con IA (elasticidad, márgenes, competencia). Params: {projectId, productId}
 - estimate_cogs: Estimar COGS con IA (materiales, producción, envío). Params: {projectId, productId}
@@ -565,7 +566,7 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Schema / JSON-LD / datos estructurados → generate_schemas; Meta tags / generar metas → generate_all_metas
 - Alt texts / corregir alt / SEO imágenes → fix_all_alt_texts; PageSpeed / velocidad / Core Web Vitals → audit_page_speed
 - Sitemap / mapa del sitio → generate_sitemap
-- Escanear competidor / competencia → scan_competitor; Precio vs competencia → analyze_competitor_product
+- Escanear competidor / competencia → scan_competitor; Descubrir/buscar competidores automáticamente → discover_competitors; Precio vs competencia → analyze_competitor_product
 - Precio óptimo / mejor precio → calculate_optimal_price; Estimar costos / COGS → estimate_cogs
 - Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
 - Dashboard financiero / márgenes → financial_dashboard
@@ -1537,7 +1538,7 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
   const pricingActions = ["change_price", "calculate_optimal_price", "estimate_cogs", "price_simulator", "financial_forecast", "financial_dashboard", "generate_competitive_pricing"];
   const productActions = ["create_product", "edit_product", "optimize_product", "redesign_product", "apply_redesign", "bulk_redesign", "optimize_all_products", "set_product_status", "publish_product", "delete_product"];
   const imageActions = ["generate_product_images", "generate_images_from_reference", "virtual_tryon", "bulk_generate_images", "optimize_images", "fix_all_alt_texts"];
-  const competitorActions = ["scan_competitor", "analyze_competitor_product", "search_suppliers"];
+  const competitorActions = ["scan_competitor", "discover_competitors", "analyze_competitor_product", "search_suppliers"];
   const themeActions = ["list_themes", "list_theme_files", "read_theme_file", "edit_theme_file", "create_theme_section", "audit_theme", "edit_theme_css", "edit_theme_settings", "sync_store_theme"];
   const marketingActions = ["generate_email", "generate_email_flow", "agency_quote", "agency_proposal"];
   const catalogActions = ["scan_store", "store_status", "list_products", "list_all_products", "search_product", "get_orders", "list_collections", "list_pages", "update_page", "add_to_collection"];
@@ -7474,6 +7475,24 @@ Responde SOLO con JSON válido (sin markdown):
           const data = await resp.json() as Record<string, unknown>;
           if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error escaneando competidor"}` }; break; }
           result = { ...data, message: `🔍 **Competidor escaneado**\n\nPrecios, productos, promociones y nivel de amenaza analizados con IA.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "discover_competitors": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const resp = await fetch(`${baseUrl}/api/competitors/auto-discover`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+            body: JSON.stringify({ projectId }),
+          });
+          const data = await resp.json() as Record<string, unknown>;
+          if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error descubriendo competidores"}` }; break; }
+          const discovered = (data.discovered as Array<{ name: string; url: string; type: string; reason: string }>) || [];
+          const summary = discovered.map((c, i) => `${i + 1}. **${c.name}** (${c.type})\n   ${c.url}\n   _${c.reason}_`).join("\n\n");
+          result = { ...data, message: `🔍 **Competidores descubiertos automáticamente**\n\n${discovered.length} competidores encontrados via Google Search:\n\n${summary || "No se encontraron nuevos competidores."}` };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }

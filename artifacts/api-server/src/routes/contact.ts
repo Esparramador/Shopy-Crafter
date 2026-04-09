@@ -546,139 +546,123 @@ function buildReportHtml(
     : "<li class=\"muted\">Sin fuentes verificadas</li>";
 
   const ps = research.productSample;
+  const productImageUrl = lead.productImageUrl || "";
   const productSampleHtml = ps ? `
     <div class="section" style="page-break-before:always;">
       <div class="section-title">Producto Optimizado por Shopy Crafter — Score SEO 100/100</div>
-      <div class="card" style="padding:28px;">
-        <div class="ai-deliverable">
-          <div class="ai-deliverable-header">Producto/Servicio de muestra optimizado al 100% para tu nicho</div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="ai-deliverable" style="padding:0;">
 
-          <div class="ai-field">
-            <div class="ai-field-label">Titulo Optimizado (Shopify Title)</div>
-            <div class="ai-field-value" style="font-size:17px;font-weight:700;">${esc(ps.title)}</div>
-          </div>
+          ${productImageUrl ? `
+          <div style="position:relative;background:#0a0a0a;text-align:center;padding:32px 20px;">
+            <img src="${safeUrl(productImageUrl)}" alt="${esc(ps.altText || ps.title)}" style="max-width:100%;max-height:420px;border-radius:12px;object-fit:contain;display:inline-block;box-shadow:0 8px 32px rgba(0,0,0,.5);" onerror="this.parentElement.style.display='none'" />
+            <div style="position:absolute;top:16px;right:16px;background:rgba(52,211,153,.15);color:#34d399;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;border:1px solid rgba(52,211,153,.3);">SEO 100/100</div>
+          </div>` : `
+          <div style="background:linear-gradient(135deg,rgba(196,149,106,.08),rgba(52,211,153,.05));padding:40px 20px;text-align:center;">
+            <div style="font-size:48px;margin-bottom:8px;">🛍️</div>
+            <div style="font-size:11px;color:rgba(196,149,106,.6);letter-spacing:2px;text-transform:uppercase;">Producto Optimizado</div>
+          </div>`}
 
-          <div class="ai-field">
-            <div class="ai-field-label">URL Handle (Slug SEO)</div>
-            <div class="ai-field-value"><code style="background:rgba(196,149,106,.1);color:#c4956a;padding:4px 10px;border-radius:4px;font-size:13px;">/${esc(ps.handle || "producto-optimizado")}</code></div>
-          </div>
-
-          <div class="ai-field">
-            <div class="ai-field-label">Descripcion de Venta (Shopify Body HTML)</div>
-            <div class="ai-field-value" style="line-height:1.8;">${esc(ps.description)}</div>
-          </div>
-
-          <div class="highlight-box highlight-success" style="margin:16px 0;">
-            <div style="font-size:11px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Metadatos SEO — Google Search</div>
-            <div class="ai-field" style="margin-bottom:12px;">
-              <div class="ai-field-label">Meta Title (max 60 chars)</div>
-              <div class="ai-field-value" style="font-weight:600;color:#34d399;">${esc(ps.seoTitle)}</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;">${(ps.seoTitle || "").length} caracteres</div>
+          <div style="padding:28px;">
+            <div style="margin-bottom:24px;">
+              <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Titulo Shopify</div>
+              <div style="font-size:20px;font-weight:700;color:rgba(255,255,255,.95);line-height:1.3;">${esc(ps.title)}</div>
+              <div style="margin-top:8px;">
+                <span style="display:inline-block;background:rgba(196,149,106,.1);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;">/${esc(ps.handle || "producto-optimizado")}</span>
+                <span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${esc(ps.productType)}</span>
+                <span style="display:inline-block;background:rgba(196,149,106,.08);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${esc(ps.vendor || lead.name)}</span>
+              </div>
             </div>
-            <div class="ai-field" style="margin-bottom:12px;">
-              <div class="ai-field-label">Meta Description (max 155 chars)</div>
-              <div class="ai-field-value" style="color:#34d399;">${esc(ps.seoDescription)}</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;">${(ps.seoDescription || "").length} caracteres</div>
+
+            <div class="ai-field" style="margin-bottom:20px;">
+              <div class="ai-field-label">Descripcion de Venta</div>
+              <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${esc(ps.description)}</div>
             </div>
-            <div class="ai-field" style="margin-bottom:0;">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+              <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
+                <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Title</div>
+                <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:600;">${esc(ps.seoTitle)}</div>
+                <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoTitle || "").length}/60 chars</div>
+              </div>
+              <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
+                <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Description</div>
+                <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.seoDescription)}</div>
+                <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoDescription || "").length}/155 chars</div>
+              </div>
+            </div>
+
+            <div style="background:rgba(107,168,240,.04);border:1px solid rgba(107,168,240,.12);border-radius:10px;padding:16px;margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:#6ba8f0;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Open Graph — Redes Sociales</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Title</div>
+                  <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Description</div>
+                  <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
+                </div>
+              </div>
+            </div>
+
+            ${ps.altText ? `
+            <div class="ai-field" style="margin-bottom:16px;">
               <div class="ai-field-label">Alt Text Imagen Principal</div>
-              <div class="ai-field-value" style="color:#34d399;">${esc(ps.altText || "")}</div>
-            </div>
-          </div>
+              <div class="ai-field-value" style="color:#34d399;font-size:13px;">${esc(ps.altText)}</div>
+            </div>` : ""}
 
-          <div class="highlight-box" style="background:rgba(107,168,240,.06);border:1px solid rgba(107,168,240,.2);margin:16px 0;">
-            <div style="font-size:11px;font-weight:700;color:#6ba8f0;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Open Graph — Redes Sociales</div>
-            <div class="ai-field" style="margin-bottom:8px;">
-              <div class="ai-field-label">OG Title</div>
-              <div class="ai-field-value" style="color:#6ba8f0;">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
-            </div>
-            <div class="ai-field" style="margin-bottom:0;">
-              <div class="ai-field-label">OG Description</div>
-              <div class="ai-field-value" style="color:#6ba8f0;">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
-            </div>
-          </div>
-
-          ${ps.variants && ps.variants.length > 0 ? `
-          <div class="ai-field">
-            <div class="ai-field-label">Variantes Configuradas (Shopify Variants)</div>
-            <div class="ai-field-value">
+            ${ps.variants && ps.variants.length > 0 ? `
+            <div style="background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:10px;padding:16px;margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:#c4956a;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Variantes Shopify</div>
               ${ps.variants.map(v =>
-                `<span class="tag">${esc(v.option)}</span> <span class="muted">${v.values.map(val => esc(val)).join(" | ")}</span>`
-              ).join("<br/>")}
+                `<div style="margin-bottom:8px;"><span style="font-weight:600;color:rgba(255,255,255,.8);font-size:13px;">${esc(v.option)}:</span> <span style="color:rgba(255,255,255,.6);font-size:13px;">${v.values.map(val => esc(val)).join(" · ")}</span></div>`
+              ).join("")}
+            </div>` : ""}
+
+            <div style="margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Tags SEO</div>
+              <div>${(ps.tags || []).map(t => `<span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(107,168,240,.15);">${esc(t)}</span>`).join("")}</div>
             </div>
-          </div>` : ""}
 
-          <div class="ai-field">
-            <div class="ai-field-label">Vendor / Marca</div>
-            <div class="ai-field-value">${esc(ps.vendor || lead.name)}</div>
-          </div>
+            ${ps.seoKeywords && ps.seoKeywords.length > 0 ? `
+            <div style="margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:rgba(52,211,153,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Keywords Target</div>
+              <div>${ps.seoKeywords.map(k => `<span style="display:inline-block;background:rgba(52,211,153,.06);color:#34d399;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(52,211,153,.12);">${esc(k)}</span>`).join("")}</div>
+            </div>` : ""}
 
-          <div class="ai-field">
-            <div class="ai-field-label">Product Type</div>
-            <div class="ai-field-value">${esc(ps.productType)}</div>
-          </div>
-
-          <div class="ai-field">
-            <div class="ai-field-label">Tags SEO (Shopify Tags)</div>
-            <div class="ai-field-value">${(ps.tags || []).map(t => `<span class="tag tag-blue">${esc(t)}</span>`).join(" ")}</div>
-          </div>
-
-          ${ps.seoKeywords && ps.seoKeywords.length > 0 ? `
-          <div class="ai-field">
-            <div class="ai-field-label">Keywords de Cola Larga (Target SEO)</div>
-            <div class="ai-field-value">${ps.seoKeywords.map(k => `<span class="tag" style="background:rgba(52,211,153,.08);color:#34d399;border-color:rgba(52,211,153,.15);">${esc(k)}</span>`).join(" ")}</div>
-          </div>` : ""}
-
-          <div class="ai-field">
-            <div class="ai-field-label">Estrategia de Precio</div>
-            <div class="ai-field-value">${esc(ps.priceStrategy)}</div>
-          </div>
-
-          <div class="ai-field">
-            <div class="ai-field-label">Mejoras que Aplicariamos (Impacto Estimado)</div>
-            <div class="ai-field-value">${esc(ps.improvementNotes)}</div>
-          </div>
-
-          ${ps.schemaJsonLd ? `
-          <div class="ai-field">
-            <div class="ai-field-label">Schema JSON-LD (Structured Data para Google)</div>
-            <div class="ai-field-value">
-              <div class="schema-code-block"><pre><code>${esc(typeof ps.schemaJsonLd === "string" ? ((() => { try { return JSON.stringify(JSON.parse(ps.schemaJsonLd), null, 2); } catch { return ps.schemaJsonLd; } })()) : JSON.stringify(ps.schemaJsonLd, null, 2))}</code></pre></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+              <div class="ai-field">
+                <div class="ai-field-label">Estrategia de Precio</div>
+                <div class="ai-field-value" style="font-size:13px;">${esc(ps.priceStrategy)}</div>
+              </div>
+              <div class="ai-field">
+                <div class="ai-field-label">Mejoras con Impacto</div>
+                <div class="ai-field-value" style="font-size:13px;">${esc(ps.improvementNotes)}</div>
+              </div>
             </div>
-          </div>` : ""}
 
-          ${ps.faqItems && ps.faqItems.length > 0 ? `
-          <div class="ai-field">
-            <div class="ai-field-label">FAQ Schema (Preguntas Frecuentes)</div>
-            <div class="ai-field-value">
+            ${ps.faqItems && ps.faqItems.length > 0 ? `
+            <div style="margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">FAQ — Preguntas Frecuentes</div>
               ${ps.faqItems.map(faq => `
-                <div style="margin-bottom:12px;padding:12px 16px;background:rgba(196,149,106,.04);border-radius:8px;border-left:3px solid rgba(196,149,106,.3);">
-                  <div style="font-weight:600;color:rgba(255,255,255,.9);margin-bottom:4px;">Q: ${esc(faq.question)}</div>
-                  <div style="color:rgba(255,255,255,.7);font-size:13px;">A: ${esc(faq.answer)}</div>
+                <div style="margin-bottom:10px;padding:12px 16px;background:rgba(196,149,106,.03);border-radius:8px;border-left:3px solid rgba(196,149,106,.25);">
+                  <div style="font-weight:600;color:rgba(255,255,255,.9);font-size:13px;margin-bottom:4px;">${esc(faq.question)}</div>
+                  <div style="color:rgba(255,255,255,.65);font-size:12px;">${esc(faq.answer)}</div>
                 </div>
               `).join("")}
-            </div>
-          </div>` : ""}
+            </div>` : ""}
 
-          ${ps.generatedImagePrompt ? `
-          <div class="highlight-box ai-image-prompt-box" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);margin-top:16px;">
-            <div style="font-size:11px;font-weight:700;color:#f59e0b;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Imagen AI — Brief de Produccion Visual</div>
-            <div class="ai-image-placeholder">
-              <div class="ai-image-placeholder-icon">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              </div>
-              <div class="ai-image-placeholder-label">Imagen Generada por IA</div>
-            </div>
-            <div class="ai-image-brief">
-              <div style="font-size:10px;font-weight:600;color:rgba(245,158,11,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Brief creativo</div>
-              <div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.7;font-style:italic;">"${esc(ps.generatedImagePrompt)}"</div>
-            </div>
-            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:12px;padding-top:10px;border-top:1px solid rgba(245,158,11,.1);">Con Shopy Crafter generamos imagenes profesionales AI para cada producto de tu catalogo.</div>
-          </div>` : ""}
+            ${ps.schemaJsonLd ? `
+            <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.1);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+              <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Schema JSON-LD</div>
+              <div style="font-size:11px;color:rgba(52,211,153,.6);">Datos estructurados configurados correctamente para Google Rich Results</div>
+            </div>` : ""}
 
-          <div class="highlight-box highlight-gold" style="text-align:center;margin-top:20px;">
-            <strong>Este es solo 1 producto de muestra optimizado al 100/100.</strong><br/>
-            <span style="font-size:12px;">Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente con IA: meta titles, descriptions, Schema JSON-LD, Open Graph, alt texts, variantes y keywords.</span>
+            <div style="background:linear-gradient(135deg,rgba(196,149,106,.08),rgba(196,149,106,.03));border:1px solid rgba(196,149,106,.2);border-radius:12px;padding:20px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:#c4956a;margin-bottom:6px;">Este es solo 1 producto de muestra optimizado al 100/100.</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.6;">Con Shopy Crafter, optimizamos TODO tu catalogo automaticamente con IA: meta titles, descriptions, Schema JSON-LD, Open Graph, alt texts, variantes y keywords.</div>
+            </div>
           </div>
         </div>
       </div>

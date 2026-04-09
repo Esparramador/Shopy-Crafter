@@ -1,12 +1,33 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable } from "@workspace/db";
+import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable, productsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askGeminiWithSearch } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
+import net from "net";
 
 const router = Router();
+
+function isSafePublicUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return false;
+    if (host.endsWith(".local") || host.endsWith(".internal")) return false;
+    if (net.isIP(host)) {
+      const parts = host.split(".").map(Number);
+      if (parts[0] === 10) return false;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+      if (parts[0] === 192 && parts[1] === 168) return false;
+      if (parts[0] === 169 && parts[1] === 254) return false;
+      if (parts[0] === 0) return false;
+    }
+    return true;
+  } catch { return false; }
+}
 
 router.get("/competitors", async (req, res): Promise<void> => {
   const { projectId } = req.query as Record<string, string>;
@@ -46,6 +67,11 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
   const [competitor] = await db.select().from(competitorsTable)
     .where(eq(competitorsTable.id, competitorId));
   if (!competitor) { res.status(404).json({ error: "Competitor not found" }); return; }
+
+  if (!isSafePublicUrl(competitor.url)) {
+    res.status(400).json({ error: "URL del competidor no es válida o es una dirección interna" });
+    return;
+  }
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
 
@@ -165,6 +191,122 @@ router.post("/competitors/alerts/:id/dismiss", async (req, res): Promise<void> =
     .set({ dismissed: 1 })
     .where(eq(competitorAlertsTable.id, req.params.id));
   res.json({ ok: true });
+});
+
+router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
+  const { projectId } = req.body;
+  if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+
+  const pid = parseInt(projectId, 10);
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid));
+  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+  const products = await db.select().from(productsTable).where(eq(productsTable.projectId, pid));
+  const topProducts = products.slice(0, 5).map(p => p.title).join(", ");
+  const niche = project.storeNiche || "e-commerce";
+  const storeName = project.name || "tienda";
+  const shopDomain = project.shopDomain || "";
+
+  const existingCompetitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, projectId.toString()));
+  const existingUrls = existingCompetitors.map(c => c.url?.toLowerCase()).filter(Boolean);
+
+  let discovered: Array<{ name: string; url: string; type: string; reason: string }> = [];
+
+  try {
+    const result = await askGeminiWithSearch(
+      `BUSCA COMPETIDORES REALES para esta tienda online Shopify:
+
+Tienda: "${storeName}"
+Dominio: ${shopDomain}
+Nicho: ${niche}
+Productos principales: ${topProducts || "no especificados"}
+
+INSTRUCCIONES:
+1. Busca en Google tiendas online que vendan productos similares en España y Europa
+2. Busca competidores DIRECTOS (mismo tipo de producto, mismo mercado)
+3. Busca competidores INDIRECTOS (productos sustitutivos o plataformas con funciones similares)
+4. Incluye tiendas Shopify, WooCommerce, PrestaShop, Amazon sellers, Etsy sellers, y tiendas propias
+5. Para cada competidor, proporciona la URL REAL de su tienda (no la página de Amazon/Etsy genérica)
+6. Busca al menos 8-12 competidores reales
+7. NO incluyas la propia tienda "${shopDomain}" como competidor
+
+${existingUrls.length > 0 ? `EXCLUIR estos competidores ya registrados:\n${existingUrls.join("\n")}` : ""}
+
+RESPONDE con JSON exacto:
+{
+  "competitors": [
+    {
+      "name": "Nombre de la tienda/marca",
+      "url": "https://...",
+      "type": "direct|indirect|substitute",
+      "reason": "Por qué es competidor (qué venden similar, rango de precios, mercado objetivo)"
+    }
+  ],
+  "marketOverview": "Resumen del panorama competitivo del nicho",
+  "threatAssessment": "Nivel de competencia general: bajo/medio/alto/muy_alto"
+}`,
+      `You are a competitive intelligence analyst specializing in e-commerce. Search Google thoroughly to find REAL competitor stores and marketplaces selling similar products. Focus on Spanish and European markets. Return ONLY valid JSON with real, verified URLs.`
+    );
+
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      discovered = (parsed.competitors || []).filter((c: { url?: string }) => {
+        if (!c.url || !isSafePublicUrl(c.url)) return false;
+        try {
+          const u = new URL(c.url);
+          const origin = u.origin.toLowerCase();
+          if (shopDomain && origin.includes(shopDomain.toLowerCase().replace(/^https?:\/\//, ""))) return false;
+          return !existingUrls.includes(origin) && !existingUrls.includes(c.url.toLowerCase());
+        } catch { return false; }
+      });
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ error: `Error descubriendo competidores: ${msg}` });
+    return;
+  }
+
+  const added: Array<{ id: string; name: string; url: string; type: string; reason: string }> = [];
+  for (const comp of discovered) {
+    try {
+      const [inserted] = await db.insert(competitorsTable).values({
+        id: randomUUID(),
+        projectId: projectId.toString(),
+        name: comp.name,
+        url: comp.url,
+        type: comp.type || "direct",
+      }).returning();
+      added.push({ ...inserted, reason: comp.reason });
+    } catch {}
+  }
+
+  learnFromOperation({
+    projectId: pid,
+    operation: "competitor_auto_discovery",
+    result: `Auto-descubrimiento de competidores para "${storeName}" (${niche}): ${added.length} competidores encontrados y registrados. ${added.map(c => `${c.name} (${c.type})`).join(", ")}`,
+    niche,
+    category: "competitor_intel",
+  });
+
+  saveToVault({
+    projectId: pid,
+    fileType: "analysis",
+    category: "competitor_scan",
+    title: `Auto-descubrimiento de Competidores: ${storeName}`,
+    description: `${added.length} competidores descubiertos automáticamente via Google Search`,
+    mimeType: "application/json",
+    fileSizeBytes: Buffer.from(JSON.stringify(added)).length,
+    generatedBy: "competitor_auto_discovery",
+    content: JSON.stringify({ discovered: added, totalFound: discovered.length, storeName, niche }, null, 2),
+    metadata: { totalDiscovered: discovered.length, registered: added.length },
+  }).catch(() => {});
+
+  res.json({
+    discovered: added,
+    totalFound: discovered.length,
+    alreadyRegistered: existingCompetitors.length,
+  });
 });
 
 export default router;
