@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { encrypt, safeDecrypt } from "./crypto.js";
 
-const SHOPIFY_FETCH_TIMEOUT = 30_000;
-const TOKEN_OP_TIMEOUT = 15_000;
+const SHOPIFY_FETCH_TIMEOUT = 45_000;
+const TOKEN_OP_TIMEOUT = 20_000;
 
 export function normalizeShopDomain(domain: string): string {
   return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");

@@ -187,7 +187,7 @@ export async function scrapeWebsite(rawUrl: string): Promise<WebScrapingResult> 
   const resp = await fetch(url, {
     headers: { "User-Agent": BROWSER_UA, Accept: "text/html,application/xhtml+xml" },
     redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(45_000),
   });
 
   const html = await resp.text();

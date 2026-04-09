@@ -337,6 +337,23 @@ export default function Landing() {
     const onWheel = (e: WheelEvent) => {
       if (isAnimatingRef.current) { e.preventDefault(); return; }
 
+      const target = e.target as HTMLElement;
+      const hScrollParent = target.closest<HTMLElement>("[style*='overflow-x'], .fp-pricing-row, .fp-calc-tabs, .fp-calc-items");
+      if (hScrollParent) {
+        const canScrollH = hScrollParent.scrollWidth > hScrollParent.clientWidth + 2;
+        if (canScrollH && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+          return;
+        }
+        const canScrollV = hScrollParent.scrollHeight > hScrollParent.clientHeight + 2;
+        if (canScrollV) {
+          const atTop = hScrollParent.scrollTop <= 0;
+          const atBottom = hScrollParent.scrollTop + hScrollParent.clientHeight >= hScrollParent.scrollHeight - 2;
+          if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
+            return;
+          }
+        }
+      }
+
       const sections = container.querySelectorAll<HTMLElement>(".fp-section");
       const currentEl = sections[currentRef.current];
       if (currentEl && currentEl.scrollHeight > currentEl.clientHeight + 2) {

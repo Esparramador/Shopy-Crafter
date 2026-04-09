@@ -83,7 +83,7 @@ export async function askClaude(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
   maxTokens = 4096,
-  timeoutMs = 120_000
+  timeoutMs = 180_000
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
@@ -110,7 +110,7 @@ export async function askClaudeJson<T>(
   prompt: string,
   systemPrompt?: string,
   maxTokens = 4096,
-  timeoutMs = 120_000
+  timeoutMs = 180_000
 ): Promise<T> {
   const text = await askClaude(
     projectId,
@@ -449,7 +449,7 @@ export async function askClaudeWithBrain(
   useCase: "redesign" | "seo" | "pricing" | "images" | "general" = "general",
   niche?: string,
   maxTokens = 16000,
-  timeoutMs = 120_000
+  timeoutMs = 180_000
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const platform = await resolvePlatformType(projectId);
@@ -471,7 +471,7 @@ export async function askClaudeJsonWithBrain<T>(
   useCase: "redesign" | "seo" | "pricing" | "images" | "general",
   niche?: string,
   maxTokens = 16000,
-  timeoutMs = 120_000
+  timeoutMs = 180_000
 ): Promise<T> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([

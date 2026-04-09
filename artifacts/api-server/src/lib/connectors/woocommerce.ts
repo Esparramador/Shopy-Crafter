@@ -14,7 +14,7 @@ import type {
   PlatformFeature,
 } from "./types";
 
-const WC_FETCH_TIMEOUT = 30_000;
+const WC_FETCH_TIMEOUT = 45_000;
 const RETRY_DELAYS = [1000, 2000, 4000];
 
 function normalizeWooUrl(domain: string): string {

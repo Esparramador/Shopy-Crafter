@@ -46,11 +46,10 @@ const GEMINI_PRO_MODEL = "gemini-2.5-pro";
 // Replit proxy cuts at 300s. Server socket at 600s. We use 270s for user-facing
 // requests (safe margin) and generous per-call limits so each search dimension
 // has room to finish. Background/cron jobs have no proxy limit.
-const GEMINI_CALL_TIMEOUT_MS   = 150_000;  // 150s per individual Gemini call (generous for complex prompts)
-const GEMINI_SEARCH_TIMEOUT    = 150_000;  // 150s per search-grounding call (same — searches can be slow)
+const GEMINI_CALL_TIMEOUT_MS   = 180_000;  // 180s per individual Gemini call
+const GEMINI_SEARCH_TIMEOUT    = 180_000;  // 180s per search-grounding call
 const OVERALL_RESEARCH_TIMEOUT = 270_000;  // 270s total for full entity research (safe under 5-min proxy)
-const URL_FETCH_TIMEOUT_MS     = 30_000;   // 30s per URL fetch
-const GEMINI_URL_CTX_TIMEOUT   = 150_000;  // 150s for URL context deep-dive (reads many pages)
+const GEMINI_URL_CTX_TIMEOUT   = 180_000;  // 180s for URL context deep-dive (SDK handles URL fetching internally)
 
 // ─── Utility: race a promise against a timeout ────────────────────────────────
 function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {

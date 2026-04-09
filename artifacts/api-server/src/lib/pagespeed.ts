@@ -39,12 +39,31 @@ export async function runPageSpeedAudit(
 
   const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}&key=${apiKey}&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY&category=BEST_PRACTICES`;
 
-  const resp = await fetch(psiUrl, { signal: AbortSignal.timeout(60_000) });
+  let resp: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      resp = await fetch(psiUrl, { signal: AbortSignal.timeout(90_000) });
+      if (resp.ok) break;
+      if (resp.status >= 500 && attempt === 0) {
+        logger.warn({ status: resp.status, url, attempt }, "PageSpeed API 5xx — retrying in 3s");
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
+      break;
+    } catch (err) {
+      if (attempt === 0) {
+        logger.warn({ url, err: String(err) }, "PageSpeed fetch error — retrying in 3s");
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
+      throw err;
+    }
+  }
 
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => "");
-    logger.warn({ status: resp.status, url, errText: errText.slice(0, 200) }, "PageSpeed API error");
-    throw new Error(`PageSpeed API respondió ${resp.status}`);
+  if (!resp || !resp.ok) {
+    const errText = resp ? await resp.text().catch(() => "") : "No response";
+    logger.warn({ status: resp?.status, url, errText: String(errText).slice(0, 200) }, "PageSpeed API error");
+    throw new Error(`PageSpeed API respondió ${resp?.status ?? "timeout"}`);
   }
 
   const data = await resp.json() as {

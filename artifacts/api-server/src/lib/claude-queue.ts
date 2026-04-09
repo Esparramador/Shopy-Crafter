@@ -1,8 +1,8 @@
 import { logger } from "./logger.js";
 
-const MAX_CONCURRENT = 4;
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 1000;
+const MAX_CONCURRENT = 8;
+const MAX_RETRIES = 4;
+const INITIAL_BACKOFF_MS = 1500;
 
 let active = 0;
 const waiting: Array<() => void> = [];
@@ -55,8 +55,9 @@ export async function withClaudeQueue<T>(fn: () => Promise<T>): Promise<T> {
       } catch (err) {
         lastErr = err;
         if (attempt < MAX_RETRIES && isRetryable(err)) {
-          const delay = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-          logger.warn({ attempt: attempt + 1, delay }, "Claude API transient error — retrying with backoff");
+          const jitter = Math.random() * 500;
+          const delay = INITIAL_BACKOFF_MS * Math.pow(2, attempt) + jitter;
+          logger.warn({ attempt: attempt + 1, delay: Math.round(delay) }, "Claude API transient error — retrying with backoff");
           releaseSlot();
           await sleep(delay);
           await acquireSlot();

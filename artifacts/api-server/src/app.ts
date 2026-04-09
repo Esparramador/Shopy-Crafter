@@ -84,7 +84,7 @@ const apiLimiter = rateLimit({
 
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   store: new PgRateLimitStore("ai"),
