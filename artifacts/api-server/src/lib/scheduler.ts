@@ -9,34 +9,29 @@ import {
 import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
-import { buildShopyBrainContext } from "./claude.js";
+import { askClaudeWithBrain, buildShopyBrainContext, learnFromOperation, type BrainUseCase } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
-import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-let anthropicCreditsExhausted = false;
+let geminiOnly = false;
 
-async function aiGenerate(opts: { system: string; prompt: string; maxTokens: number; timeoutMs?: number }): Promise<string> {
-  const timeout = opts.timeoutMs ?? 120_000;
-
-  if (!anthropicCreditsExhausted) {
+async function aiGenerate(opts: { system: string; prompt: string; maxTokens: number; timeoutMs?: number; useCase?: BrainUseCase; niche?: string }): Promise<string> {
+  if (!geminiOnly) {
     try {
-      const response = await anthropic.messages.create(
-        {
-          model: "claude-sonnet-4-5",
-          max_tokens: opts.maxTokens,
-          system: opts.system,
-          messages: [{ role: "user", content: opts.prompt }],
-        },
-        { signal: AbortSignal.timeout(timeout) }
+      return await askClaudeWithBrain(
+        0,
+        [{ role: "user", content: opts.prompt }],
+        opts.system,
+        opts.useCase ?? "general",
+        opts.niche,
+        opts.maxTokens,
+        opts.timeoutMs ?? 120_000,
       );
-      return (response.content[0] as { type: string; text: string }).text;
-    } catch (err: any) {
-      const msg = String(err?.message ?? err ?? "");
-      if (msg.includes("credit balance") || msg.includes("billing") || msg.includes("overloaded") || err?.status === 429) {
-        anthropicCreditsExhausted = true;
+    } catch (err: unknown) {
+      const msg = String((err as { message?: string })?.message ?? err ?? "");
+      if (msg.includes("credit balance") || msg.includes("billing") || msg.includes("overloaded") || (err as { status?: number })?.status === 429) {
+        geminiOnly = true;
         log("ai-fallback", "⚠️ Anthropic credits exhausted — switching to Gemini for all scheduler AI jobs");
       } else {
         throw err;

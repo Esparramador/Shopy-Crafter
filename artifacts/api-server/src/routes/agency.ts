@@ -4,11 +4,9 @@ import { db, agencyCostStructureTable, serviceCatalogTable, pricingDecisionsTabl
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation } from "../lib/claude.js";
-import Anthropic from "@anthropic-ai/sdk";
+import { askClaudeJsonWithBrain, askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const DEFAULT_SERVICES = [
   { serviceName: "Setup Starter", serviceType: "setup", costTimeHours: 1.5, costPlatform: 1.5, priceCurrent: 297, priceMin: 197, priceMax: 497, marketAvgPrice: 350, ourPositioning: "mid" },
@@ -111,22 +109,13 @@ Servicios: ${JSON.stringify(services.map(s => ({ id: s.id, name: s.serviceName, 
 
 Análisis el posicionamiento de precios, márgenes y oportunidades de mejora.`;
 
-  const aiRes = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMsg }],
-  });
+  const analysis = await askClaudeJsonWithBrain<Record<string, unknown>>(
+    0, userMsg, systemPrompt, "pricing", undefined, 16000,
+  );
 
-  const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
-  let analysis: any = {};
-  try {
-    const m = raw.match(/\{[\s\S]*\}/);
-    analysis = m ? JSON.parse(m[0]) : {};
-  } catch {}
-
-  if (analysis.recommendations?.length) {
-    for (const rec of analysis.recommendations) {
+  const recs = (analysis as { recommendations?: Array<{ serviceId?: string; suggestedPrice?: number; reasoning?: string; confidence?: number; currentPrice?: number }> }).recommendations;
+  if (recs?.length) {
+    for (const rec of recs) {
       if (rec.serviceId) {
         await db.update(serviceCatalogTable).set({
           priceSuggested: rec.suggestedPrice,
@@ -141,8 +130,8 @@ Análisis el posicionamiento de precios, márgenes y oportunidades de mejora.`;
 
   learnFromOperation({
     operationType: "agency_pricing_analysis",
-    title: `Análisis pricing agencia: ${analysis.recommendations?.length ?? 0} recomendaciones`,
-    content: `Análisis de precios de servicios de agencia. Recomendaciones: ${JSON.stringify(analysis.recommendations ?? []).slice(0, 1800)}`,
+    title: `Análisis pricing agencia: ${recs?.length ?? 0} recomendaciones`,
+    content: `Análisis de precios de servicios de agencia. Recomendaciones: ${JSON.stringify(recs ?? []).slice(0, 1800)}`,
     confidence: 0.9,
     tags: ["agency", "pricing", "analysis"],
   });
@@ -183,19 +172,9 @@ Timeline: ${timeline}, Contrato: ${contractLength}
 Costes plataforma: ${JSON.stringify(costs)}
 Catálogo servicios: ${JSON.stringify(servicesList.map(s => ({ name: s.serviceName, price: s.priceCurrent, cost: s.totalCost })))}`;
 
-  const aiRes = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMsg }],
-  });
-
-  const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
-  let quote: any = {};
-  try {
-    const m = raw.match(/\{[\s\S]*\}/);
-    quote = m ? JSON.parse(m[0]) : {};
-  } catch {}
+  const quote = await askClaudeJsonWithBrain<Record<string, unknown>>(
+    0, userMsg, systemPrompt, "pricing", niche ?? undefined, 16000,
+  );
 
   learnFromOperation({
     operationType: "agency_quote",
@@ -292,19 +271,9 @@ SERVICIOS SOLICITADOS:
 ${(budgetItems ?? []).map((s: any) => `- ${s.name}: ${s.description || ""} (qty: ${s.qty || 1})`).join("\n") || "Paquete completo: diseño web + productos + SEO + auditoría + imágenes IA"}`;
 
   try {
-    const aiRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 16000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMsg }],
-    });
-
-    const raw = aiRes.content[0].type === "text" ? aiRes.content[0].text : "{}";
-    let budget: any = {};
-    try {
-      const m = raw.match(/\{[\s\S]*\}/);
-      budget = m ? JSON.parse(m[0]) : {};
-    } catch { budget = { error: "Error parsing AI response", raw }; }
+    const budget = await askClaudeJsonWithBrain<Record<string, unknown>>(
+      0, userMsg, systemPrompt, "pricing", storeNiche ?? undefined, 16000,
+    );
 
     learnFromOperation({
       operationType: "agency_budget",
@@ -334,14 +303,14 @@ Servicios: ${JSON.stringify(selectedServices)}
 Propuesta económica: ${JSON.stringify(quote)}
 ${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`;
 
-  const aiRes = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMsg }],
-  });
-
-  const proposal = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+  const proposal = await askClaudeWithBrain(
+    0,
+    [{ role: "user", content: userMsg }],
+    systemPrompt,
+    "general",
+    undefined,
+    16000,
+  );
 
   learnFromOperation({
     operationType: "agency_proposal",
@@ -351,7 +320,7 @@ ${auditResults ? `Resultados auditoría: ${JSON.stringify(auditResults)}` : ""}`
     tags: ["agency", "proposal", "commercial"],
   });
 
-  res.json({ proposal, tokensUsed: aiRes.usage?.input_tokens + aiRes.usage?.output_tokens });
+  res.json({ proposal });
 });
 
 // ─── Shopify Billing Integration ───────────────────────────────────────────

@@ -1,9 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "./logger.js";
-import { learnFromOperation } from "./claude.js";
-import { AI_MODELS } from "./config.js";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { askClaudeVisionWithBrain, learnFromOperation } from "./claude.js";
 
 export interface ImageAnalysis {
   layers: Array<{
@@ -64,19 +60,14 @@ export async function analyzeImageForFusion(
 ): Promise<ImageAnalysis> {
   logger.info({ mimeType, hasAdditional: !!additionalImages?.length }, "Fusion Studio: Analyzing image");
 
-  const imageBlocks: Anthropic.ImageBlockParam[] = [
-    {
-      type: "image",
-      source: { type: "base64", media_type: mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: imageBase64 },
-    },
+  type VisionMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  const allImages: Array<{ base64: string; mediaType: VisionMediaType }> = [
+    { base64: imageBase64, mediaType: mimeType as VisionMediaType },
   ];
 
   if (additionalImages) {
     for (const img of additionalImages.slice(0, 4)) {
-      imageBlocks.push({
-        type: "image",
-        source: { type: "base64", media_type: img.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: img.base64 },
-      });
+      allImages.push({ base64: img.base64, mediaType: img.mimeType as VisionMediaType });
     }
   }
 
@@ -135,19 +126,15 @@ RESPONDE EXCLUSIVAMENTE con JSON válido con esta estructura:
   "productGeneration": { "suggestedTitle": "...", "suggestedDescription": "...(HTML)...", "suggestedTags": [...], "suggestedCategory": "...", "suggestedPrice": "...", "seoKeywords": [...], "photoBriefs": [...] }
 }`;
 
-  const response = await anthropic.messages.create({
-    model: AI_MODELS.claude,
-    max_tokens: 16000,
-    messages: [{
-      role: "user",
-      content: [
-        ...imageBlocks,
-        { type: "text", text: prompt },
-      ],
-    }],
-  }, { signal: AbortSignal.timeout(120_000) });
-
-  const text = response.content[0].type === "text" ? response.content[0].text : "{}";
+  const text = await askClaudeVisionWithBrain(
+    0,
+    prompt,
+    allImages,
+    `Eres el Fusion Studio de ShopyBrain — sistema experto de descomposición visual de productos para eCommerce.`,
+    "images",
+    context?.niche,
+    16000,
+  );
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON in Fusion Studio response");
 

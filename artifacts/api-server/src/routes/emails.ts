@@ -2,9 +2,8 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
-import Anthropic from "@anthropic-ai/sdk";
 import { safeDecrypt } from "../lib/crypto.js";
-import { buildShopyBrainContext, learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 
 const router = Router();
@@ -153,11 +152,6 @@ router.post("/emails/generate", async (req, res): Promise<void> => {
     const brandTone = project.brand_tone || "";
     const shopDomain = project.shop_domain || "";
 
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    const client = new Anthropic({ apiKey: anthropicKey });
-
-    const brainContext = await buildShopyBrainContext(niche, "general", `email marketing para ${niche || "ecommerce"} tienda Shopify`);
-
     const systemPrompt = `Eres un experto en email marketing de eCommerce con años de experiencia creando emails de alta conversión.
 Generas emails HTML completos, profesionales y que realmente convierten para tiendas Shopify.
 SIEMPRE devuelves JSON válido y nada más.
@@ -174,8 +168,7 @@ Aunque el emisor es Shopy Crafter, el CONTENIDO se adapta 100% a la marca del cl
 - NUNCA uses nombres genéricos como "Tu Tienda", "Mi Marca", "Acme", "Store Name".
 - El nicho es "${niche}" — todo el copy debe ser relevante a este nicho.
 ${brandTone ? `- El tono de voz de la marca es: "${brandTone}".` : ""}
-${shopDomain ? `- El dominio real es "${shopDomain}".` : ""}
-${brainContext}`;
+${shopDomain ? `- El dominio real es "${shopDomain}".` : ""}`;
 
     const userPrompt = `Genera un email HTML completo y profesional para "${storeName}" (nicho: ${niche}).
 
@@ -217,28 +210,22 @@ Devuelve SOLO este JSON (nada más):
   "variables_used": ["lista de variables Klaviyo usadas"]
 }`;
 
-    const message = await client.messages.create(
-      {
-        model: "claude-sonnet-4-5",
-        max_tokens: 16000,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      },
-      { signal: AbortSignal.timeout(180_000) }
+    const result = await askClaudeJsonWithBrain<Record<string, unknown>>(
+      parseInt(projectId),
+      userPrompt,
+      systemPrompt,
+      "general",
+      niche,
+      16000,
+      180_000,
     );
-
-    const content = message.content[0].type === "text" ? message.content[0].text : "";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in Claude response");
-
-    const result = JSON.parse(jsonMatch[0]);
 
     // ShopyBrain learns from every email generated
     learnFromOperation({
-      operationType: "redesign",
+      operationType: "email_content",
       niche,
       title: `Email ${flowType} generado para ${storeName}`,
-      content: `Flow: ${flowType} | Tone: ${tone} | Tienda: ${storeName} | Subjects: ${result.subject_a ?? ""} / ${result.subject_b ?? ""}`,
+      content: `Flow: ${flowType} | Tone: ${tone} | Tienda: ${storeName} | Subjects: ${(result as Record<string, string>).subject_a ?? ""} / ${(result as Record<string, string>).subject_b ?? ""}`,
       confidence: 0.68,
       tags: ["email", flowType, tone, niche],
     });

@@ -1,12 +1,9 @@
 import { Router } from "express";
 import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import Anthropic from "@anthropic-ai/sdk";
-import { learnFromOperation } from "../lib/claude";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 router.post("/voice/command", async (req, res): Promise<void> => {
   const { transcript, projectId, currentPage } = req.body;
@@ -65,16 +62,14 @@ Devuelve SOLO JSON válido:
 Si confidence < 0.6, pide aclaración. Nunca inventes datos.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 16000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: transcript }],
-    });
-
-    const text = (message.content[0] as any).text;
-    const match = text.match(/\{[\s\S]*\}/);
-    const parsed = match ? JSON.parse(match[0]) : { response: text, action: null, confidence: 0.8 };
+    const parsed = await askClaudeJsonWithBrain<{ response: string; action: { type: string; params: Record<string, unknown> } | null; confidence: number }>(
+      activeProjectId ?? 0,
+      transcript,
+      systemPrompt,
+      "general",
+      undefined,
+      16000,
+    );
 
     if (parsed.confidence >= 0.6 && parsed.action) {
       learnFromOperation({
@@ -87,12 +82,12 @@ Si confidence < 0.6, pide aclaración. Nunca inventes datos.`;
     }
 
     res.json({
-      response: parsed.response || "Entendido. ¿Puedes repetirlo?",
-      action: parsed.action || null,
+      response: parsed?.response || "Entendido. ¿Puedes repetirlo?",
+      action: parsed?.action || null,
       executed: false,
-      confidence: parsed.confidence || 0.8,
+      confidence: parsed?.confidence || 0.8,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     res.status(500).json({
       response: "Lo siento, hubo un error procesando tu comando.",
       action: null,

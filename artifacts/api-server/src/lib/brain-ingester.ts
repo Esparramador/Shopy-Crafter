@@ -14,10 +14,7 @@
 import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreInsightsTable, omnicoreKnowledgeDomainsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MODEL } from "./claude.js";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { getClaudeClient, CLAUDE_MODEL } from "./claude.js";
 
 // ── Domain weights for auto-categorisation ─────────────────────────────────
 const DOMAIN_MAP: Record<string, string[]> = {
@@ -102,7 +99,8 @@ Responde exactamente con este JSON:
 }`;
 
   try {
-    const resp = await anthropic.messages.create(
+    const client = await getClaudeClient(0);
+    const resp = await client.messages.create(
       {
         model: CLAUDE_MODEL,
         max_tokens: 16000,

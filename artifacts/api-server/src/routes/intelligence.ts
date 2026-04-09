@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, eventsTable, revenueSnapshotsTable, projectsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, buildShopyBrainContext, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 
 // ─── INTELLIGENCE EXTRACTION ENGINE ─────────────────────────────────────────
@@ -154,27 +154,21 @@ Si no hay datos web disponibles, usa tu conocimiento sobre la empresa/marca. Si 
 Sé específico y concreto — nada de respuestas genéricas. Este análisis debe ser tan preciso como si hubieras investigado la empresa durante 10 horas.`;
 
   try {
-    const brainCtx = await buildShopyBrainContext(undefined, "intelligence", req.body?.input || req.body?.query || req.body?.url || "brand intelligence analysis");
-    const intelligenceSystem = `${SHOPIFY_EXPERT_SYSTEM} You are a master brand intelligence analyst with deep expertise in e-commerce, digital marketing, and competitive positioning. You extract maximum strategic value from any input — URLs, brand names, company names, or text.${brainCtx}`;
-    const { getClaudeClient } = await import("../lib/claude.js");
-    const client = await getClaudeClient(0);
-    const response = await client.messages.create(
-      {
-        model: "claude-sonnet-4-5",
-        max_tokens: 16000,
-        system: intelligenceSystem,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: AbortSignal.timeout(180_000) }
+    const intelligenceSystem = `${SHOPIFY_EXPERT_SYSTEM} You are a master brand intelligence analyst with deep expertise in e-commerce, digital marketing, and competitive positioning. You extract maximum strategic value from any input — URLs, brand names, company names, or text.`;
+    interface IntelResult {
+      brandName?: string; entityType?: string;
+      market?: { niche?: string; targetAudience?: string };
+      brandDNA?: { essence?: string; positioning?: string };
+      intelligence?: { uniqueInsight?: string; confidenceScore?: number; summary?: string };
+      autofill?: { storeNiche?: string; brandTone?: string; targetAudience?: string; storeMarkets?: string };
+    }
+    const intelligence = await askClaudeJsonWithBrain<IntelResult>(
+      0, prompt, intelligenceSystem, "intelligence", undefined, 16000, 180_000,
     );
-    const text = (response.content[0] as { type: string; text: string }).text;
-    const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-    const intelligence = match ? JSON.parse(match[1] ?? match[0]) : { intelligence: { summary: text } };
 
-    // Save to OmniCore memories (fire-and-forget)
     if (intelligence.brandName && intelligence.market?.niche) {
       learnFromOperation({
-        operationType: "redesign",
+        operationType: "brand_analysis",
         niche: intelligence.market.niche,
         title: `Perfil extraído: ${intelligence.brandName}`,
         content: `Entidad: ${intelligence.entityType}\nEsencia: ${intelligence.brandDNA?.essence ?? ""}\nPosicionamiento: ${intelligence.brandDNA?.positioning ?? ""}\nAudiencia: ${intelligence.market?.targetAudience ?? ""}\nInsight: ${intelligence.intelligence?.uniqueInsight ?? ""}`,
@@ -183,7 +177,6 @@ Sé específico y concreto — nada de respuestas genéricas. Este análisis deb
       });
     }
 
-    // If projectId provided, update project with extracted context
     if (projectId && intelligence.autofill) {
       const updates: Record<string, string> = {};
       if (intelligence.autofill.storeNiche) updates.storeNiche = intelligence.autofill.storeNiche;
@@ -191,7 +184,7 @@ Sé específico y concreto — nada de respuestas genéricas. Este análisis deb
       if (intelligence.autofill.targetAudience) updates.targetAudience = intelligence.autofill.targetAudience;
       if (intelligence.autofill.storeMarkets) updates.storeMarkets = intelligence.autofill.storeMarkets;
       if (Object.keys(updates).length > 0) {
-        await db.update(projectsTable).set(updates as any).where(eq(projectsTable.id, projectId)).catch(() => {});
+        await db.update(projectsTable).set(updates as Record<string, string>).where(eq(projectsTable.id, projectId)).catch(() => {});
       }
     }
 

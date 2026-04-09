@@ -179,6 +179,51 @@ export async function askClaudeWithVision(
   });
 }
 
+export async function askClaudeVisionWithBrain(
+  projectId: number,
+  prompt: string,
+  images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" }>,
+  systemPrompt?: string,
+  useCase: BrainUseCase = "general",
+  niche?: string,
+  maxTokens = 8192
+): Promise<string> {
+  const platform = await resolvePlatformType(projectId);
+  const [brainContext, brandDna] = await Promise.all([
+    buildSmartBrainContext(prompt, useCase, niche, platform),
+    buildBrandDnaContext(projectId),
+  ]);
+  const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
+  const enrichedSystem = base + (brainContext || "") + (brandDna || "");
+  const budget = enforcePromptBudget(enrichedSystem, prompt, maxTokens);
+
+  const { withClaudeQueue } = await import("./claude-queue.js");
+  return withClaudeQueue(async () => {
+    const client = await getClaudeClient(projectId);
+    const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
+      type: "image",
+      source: { type: "base64", media_type: img.mediaType, data: img.base64 },
+    }));
+
+    const response = await client.messages.create(
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens,
+        system: budget.system,
+        messages: [{
+          role: "user",
+          content: [...imageBlocks, { type: "text", text: budget.user }],
+        }],
+      },
+      { signal: AbortSignal.timeout(120_000) }
+    );
+
+    const content = response.content[0];
+    if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
+    return content.text;
+  });
+}
+
 export async function claude(prompt: string, maxTokens = 2048): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {

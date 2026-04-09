@@ -15,7 +15,7 @@ import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
-import { getClaudeClient, learnFromOperation } from "../lib/claude.js";
+import { getClaudeClient, askClaudeWithBrain, askClaudeJsonWithBrain, buildShopyBrainContext, buildBrandDnaContext, learnFromOperation, CLAUDE_MODEL } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";
@@ -223,7 +223,10 @@ async function analyzeImageWithClaude(
   mediaType: string = "image/jpeg",
   isUrl = false
 ): Promise<Record<string, unknown>> {
-  const anthropic = await getClaudeClient(0);
+  const [brainCtx, client] = await Promise.all([
+    buildShopyBrainContext(undefined, "images", "visual product analysis"),
+    getClaudeClient(0),
+  ]);
   
   const imageBlock = isUrl
     ? { type: "image" as const, source: { type: "url" as const, url: imageData as string } }
@@ -236,9 +239,10 @@ async function analyzeImageWithClaude(
         },
       };
   
-  const res = await anthropic.messages.create({
-    model: "claude-opus-4-5",
+  const res = await client.messages.create({
+    model: CLAUDE_MODEL,
     max_tokens: 16000,
+    system: `ShopyBrain Vision Analysis Engine.${brainCtx}`,
     messages: [{
       role: "user",
       content: [
@@ -561,10 +565,9 @@ router.post("/shopybrain/absorb-document", requireAdmin, async (req: Request, re
     const docLabel = label ?? fileName ?? "Documento";
     logger.info({ fileName, fileType, ext, length: text.length }, "ShopyBrain absorbing document");
 
-    const { askClaudeWithBrain } = await import("../lib/claude.js");
     const analysis = await askClaudeWithBrain(
       0,
-      `Analiza este documento "${docLabel}" (${ext.toUpperCase()}, ${text.length} caracteres) y extrae TODA la información relevante.
+      [{ role: "user", content: `Analiza este documento "${docLabel}" (${ext.toUpperCase()}, ${text.length} caracteres) y extrae TODA la información relevante.
 
 DOCUMENTO:
 ---
@@ -577,10 +580,10 @@ Debes:
 3. INTERPRETAR la intención del usuario (¿quiere crear productos? ¿actualizar precios? ¿aprender algo?)
 4. RESUMIR las acciones sugeridas que ShopyBrain podría ejecutar con esta información
 
-Responde en español con un análisis completo y detallado. Si detectas una lista de productos con precios, extrae CADA producto con su nombre y precio exacto.`,
+Responde en español con un análisis completo y detallado. Si detectas una lista de productos con precios, extrae CADA producto con su nombre y precio exacto.` }],
       "ShopyBrain Document Intelligence Engine. You extract maximum value from any document format. You identify products, prices, instructions, and data structures. Be thorough and complete.",
-      "documents",
-      niche
+      "general",
+      niche ?? undefined,
     );
 
     const memoryId = await saveToShopyBrain({
@@ -629,7 +632,11 @@ router.post("/shopybrain/create-product-from-image",
     try {
       logger.info({ projectId, file: file?.originalname, imageUrl }, "Creating product from image");
 
-      const anthropic = await getClaudeClient(0);
+      const [brainCtx2, brandDna2, productClient] = await Promise.all([
+        buildShopyBrainContext(project.storeNiche ?? undefined, "images", "product image analysis for product creation"),
+        buildBrandDnaContext(parseInt(projectId)),
+        getClaudeClient(parseInt(projectId)),
+      ]);
 
       const imageBlock = (imageUrl && !file)
         ? { type: "image" as const, source: { type: "url" as const, url: imageUrl } }
@@ -642,9 +649,10 @@ router.post("/shopybrain/create-product-from-image",
             },
           };
 
-      const visionRes = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const visionRes = await productClient.messages.create({
+        model: CLAUDE_MODEL,
         max_tokens: 16000,
+        system: `ShopyBrain Product Intelligence Engine.${brainCtx2}${brandDna2}`,
         messages: [{
           role: "user",
           content: [
@@ -753,14 +761,14 @@ Responde en este formato JSON exacto:
         geminiSources: pricingResult.sources?.length
       }, "Pricing research complete");
 
-      const copyRes = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const copyRes = await productClient.messages.create({
+        model: CLAUDE_MODEL,
         max_tokens: 16000,
         system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
-Tienda: ${project.storeName || "Shopify Store"}
+Tienda: ${project.name || "Shopify Store"}
 Nicho: ${project.storeNiche || "general"}
 Tono: ${project.brandTone || "profesional"}
-El producto ha sido analizado visualmente y los precios han sido investigados con datos REALES del mercado.`,
+El producto ha sido analizado visualmente y los precios han sido investigados con datos REALES del mercado.${brainCtx2}${brandDna2}`,
         messages: [{
           role: "user",
           content: `Genera contenido Shopify OPTIMIZADO para este producto:
@@ -1056,11 +1064,12 @@ Responde en JSON:
       ...supplierSearches[2].sources,
     ];
 
-    const anthropic = await getClaudeClient(0);
-    const synthesisRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+    const supplierBrainCtx = await buildShopyBrainContext(undefined, "ecommerce", `sourcing suppliers for ${productName}`);
+    const supplierClient = await getClaudeClient(0);
+    const synthesisRes = await supplierClient.messages.create({
+      model: CLAUDE_MODEL,
       max_tokens: 16000,
-      system: "Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.",
+      system: `Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.${supplierBrainCtx}`,
       messages: [{
         role: "user",
         content: `Analiza estos datos de proveedores para "${productName}" y genera una recomendación estratégica.

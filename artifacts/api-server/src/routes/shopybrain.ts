@@ -3,12 +3,11 @@ import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
-import Anthropic from "@anthropic-ai/sdk";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, askClaude, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
@@ -106,7 +105,6 @@ function resolveFilePath(filePath: string): string | null {
 }
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 async function researchRealPricing(productTitle: string, productType: string, niche: string, currentPrice?: string): Promise<{
   marketPriceRange: { min: number; max: number; median: number };
@@ -1099,14 +1097,12 @@ Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de 
     }
     const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContextInfo;
 
-    const aiRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 16000,
-      system: sysPrompt,
-      messages: [{ role: "user", content: userContent }],
-    });
-
-    const answer = aiRes.content[0].type === "text" ? aiRes.content[0].text : "";
+    const answer = await askClaude(
+      resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
+      [{ role: "user", content: userContent }],
+      sysPrompt,
+      16000,
+    );
 
     let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
     const detectedActions: { action: string; params: Record<string, unknown> }[] = [];
