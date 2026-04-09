@@ -82,7 +82,8 @@ export async function askClaude(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
-  maxTokens = 4096
+  maxTokens = 4096,
+  timeoutMs = 120_000
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
@@ -95,7 +96,7 @@ export async function askClaude(
         system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
         messages,
       },
-      { signal: AbortSignal.timeout(120_000) }
+      { signal: AbortSignal.timeout(timeoutMs) }
     );
 
     const content = response.content[0];
@@ -108,13 +109,15 @@ export async function askClaudeJson<T>(
   projectId: number,
   prompt: string,
   systemPrompt?: string,
-  maxTokens = 4096
+  maxTokens = 4096,
+  timeoutMs = 120_000
 ): Promise<T> {
   const text = await askClaude(
     projectId,
     [{ role: "user", content: prompt }],
     systemPrompt,
-    maxTokens
+    maxTokens,
+    timeoutMs
   );
 
   const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
@@ -445,7 +448,8 @@ export async function askClaudeWithBrain(
   systemPrompt?: string,
   useCase: "redesign" | "seo" | "pricing" | "images" | "general" = "general",
   niche?: string,
-  maxTokens = 16000
+  maxTokens = 16000,
+  timeoutMs = 120_000
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const platform = await resolvePlatformType(projectId);
@@ -457,7 +461,7 @@ export async function askClaudeWithBrain(
   const enrichedSystem = base + (brainContext || "") + (brandDna || "");
   const totalUserContent = messages.map(m => m.content).join("\n");
   const budget = enforcePromptBudget(enrichedSystem, totalUserContent, maxTokens);
-  return askClaude(projectId, messages, budget.system, maxTokens);
+  return askClaude(projectId, messages, budget.system, maxTokens, timeoutMs);
 }
 
 export async function askClaudeJsonWithBrain<T>(
@@ -466,7 +470,8 @@ export async function askClaudeJsonWithBrain<T>(
   systemPrompt: string,
   useCase: "redesign" | "seo" | "pricing" | "images" | "general",
   niche?: string,
-  maxTokens = 16000
+  maxTokens = 16000,
+  timeoutMs = 120_000
 ): Promise<T> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
@@ -475,7 +480,7 @@ export async function askClaudeJsonWithBrain<T>(
   ]);
   const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");
   const budget = enforcePromptBudget(enrichedSystem, prompt, maxTokens);
-  return askClaudeJson<T>(projectId, budget.user, budget.system, maxTokens);
+  return askClaudeJson<T>(projectId, budget.user, budget.system, maxTokens, timeoutMs);
 }
 
 /**

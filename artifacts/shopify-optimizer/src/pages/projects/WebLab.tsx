@@ -143,12 +143,18 @@ function WebLabInner({ projectId }: { projectId: number }) {
 
       clearInterval(phaseInterval);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Error desconocido" }));
+      const rawText = await res.text();
+      let data;
+      try { data = JSON.parse(rawText.trim()); } catch { throw new Error(`Error ${res.status}: respuesta inválida`); }
+
+      if (!res.ok || data.error) {
         throw new Error(data.error || `Error ${res.status}`);
       }
 
-      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "El análisis no devolvió resultados válidos");
+      }
+
       setResult(data);
       setTab("summary");
       setPhase(4);

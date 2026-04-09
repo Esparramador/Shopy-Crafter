@@ -177,6 +177,14 @@ Responde SIEMPRE en JSON válido con esta estructura exacta:
 }`;
 
 router.post("/web-lab/analyze", async (req: Request, res: Response) => {
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded && !res.headersSent) return;
+    if (!res.writableEnded) {
+      try { res.write(" "); } catch {}
+    }
+  }, 15_000);
+  const stopKeepAlive = () => { clearInterval(keepAlive); };
+
   try {
     const { url, projectId, template } = req.body as {
       url: string;
@@ -184,7 +192,12 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       template?: ReportTemplate;
     };
 
-    if (!url) return res.status(400).json({ error: "URL requerida" });
+    if (!url) { stopKeepAlive(); return res.status(400).json({ error: "URL requerida" }); }
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
 
     const [extraction, pageSpeed, scraperData] = await Promise.all([
       extractFullWebContent(url),
@@ -204,11 +217,11 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       if (proj) projectName = proj.name ?? projectName;
     }
 
-    const htmlForClaude = extraction.html.length > 80_000
-      ? `${extraction.html.slice(0, 50_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-30_000)}`
+    const htmlForClaude = extraction.html.length > 40_000
+      ? `${extraction.html.slice(0, 25_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-15_000)}`
       : extraction.html;
-    const cssForClaude = extraction.css.length > 60_000
-      ? `${extraction.css.slice(0, 40_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-20_000)}`
+    const cssForClaude = extraction.css.length > 30_000
+      ? `${extraction.css.slice(0, 20_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-10_000)}`
       : extraction.css;
 
     let contextParts: string[] = [];
@@ -234,7 +247,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
     const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES extraídos directamente del sitio.\n\n${contextParts.join("\n")}`;
 
     const analysis = await askClaudeJsonWithBrain<WebLabAnalysis>(
-      pid, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000
+      pid, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000, 300_000
     );
 
     if (!analysis.improvedCss) analysis.improvedCss = "/* No se generaron mejoras CSS */";
@@ -330,7 +343,8 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       });
     }
 
-    res.json({
+    stopKeepAlive();
+    const result = JSON.stringify({
       success: true,
       analysis,
       reportHtml: pid === 0 ? reportHtml : undefined,
@@ -350,9 +364,15 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       url,
       template: tpl,
     });
+    res.end(result);
   } catch (err: any) {
+    stopKeepAlive();
     logger.error({ err }, "Web Lab analysis failed");
-    res.status(500).json({ error: err.message || "Error en el análisis" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Error en el análisis" });
+    } else {
+      try { res.end(JSON.stringify({ error: err.message || "Error en el análisis" })); } catch {}
+    }
   }
 });
 
@@ -590,11 +610,11 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
     if (proj) projectName = proj.name ?? projectName;
   }
 
-  const htmlForClaude = extraction.html.length > 80_000
-    ? `${extraction.html.slice(0, 50_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-30_000)}`
+  const htmlForClaude = extraction.html.length > 40_000
+    ? `${extraction.html.slice(0, 25_000)}\n<!-- ...CONTENT TRIMMED FOR ANALYSIS... -->\n${extraction.html.slice(-15_000)}`
     : extraction.html;
-  const cssForClaude = extraction.css.length > 60_000
-    ? `${extraction.css.slice(0, 40_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-20_000)}`
+  const cssForClaude = extraction.css.length > 30_000
+    ? `${extraction.css.slice(0, 20_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-10_000)}`
     : extraction.css;
 
   let contextParts: string[] = [];
@@ -615,7 +635,7 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES.\n\n${contextParts.join("\n")}`;
 
   const analysis = await askClaudeJsonWithBrain<WebLabAnalysis>(
-    projectId, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000
+    projectId, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000, 300_000
   );
 
   if (!analysis.improvedCss) analysis.improvedCss = "/* No se generaron mejoras CSS */";
