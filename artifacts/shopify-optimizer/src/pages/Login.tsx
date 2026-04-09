@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, getLastRoute, clearLastRoute } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
@@ -20,7 +20,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { role } = await login(email, password);
-      navigate(role === "admin" ? "/home" : "/client");
+      const savedRoute = getLastRoute();
+      if (savedRoute && role === "admin") {
+        clearLastRoute();
+        navigate(savedRoute);
+      } else {
+        navigate(role === "admin" ? "/home" : "/client");
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("loginError", "Error al iniciar sesión"));
     } finally {

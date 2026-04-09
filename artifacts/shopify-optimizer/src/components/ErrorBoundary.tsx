@@ -2,6 +2,7 @@ import { Component, type ReactNode, type ErrorInfo } from "react";
 
 interface Props {
   children: ReactNode;
+  fallbackRoute?: string;
 }
 
 interface State {
@@ -23,6 +24,12 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("[ErrorBoundary]", error, errorInfo);
   }
 
+  componentDidUpdate(prevProps: Props) {
+    if (prevProps.children !== this.props.children && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
   handleReload = () => {
     this.setState({ hasError: false, error: null });
     window.location.reload();
@@ -30,7 +37,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleGoHome = () => {
     this.setState({ hasError: false, error: null });
-    window.location.href = "/";
+    window.location.href = this.props.fallbackRoute || "/home";
+  };
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
   };
 
   render() {
@@ -73,17 +84,24 @@ export class ErrorBoundary extends Component<Props, State> {
               </pre>
             )}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={this.handleReload} style={{
+              <button onClick={this.handleRetry} style={{
                 padding: "12px 28px", borderRadius: 8, border: "none", cursor: "pointer",
                 background: "linear-gradient(135deg, #c8a84b, #a08838)", color: "#080810",
                 fontSize: 14, fontWeight: 600, letterSpacing: 0.3,
+              }}>
+                Reintentar
+              </button>
+              <button onClick={this.handleReload} style={{
+                padding: "12px 28px", borderRadius: 8, cursor: "pointer",
+                background: "transparent", border: "1px solid rgba(200,168,75,0.3)",
+                color: "#c8a84b", fontSize: 14, fontWeight: 500,
               }}>
                 Recargar Página
               </button>
               <button onClick={this.handleGoHome} style={{
                 padding: "12px 28px", borderRadius: 8, cursor: "pointer",
-                background: "transparent", border: "1px solid rgba(200,168,75,0.3)",
-                color: "#c8a84b", fontSize: 14, fontWeight: 500,
+                background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                color: "rgba(240,240,245,0.55)", fontSize: 14, fontWeight: 500,
               }}>
                 Ir al Inicio
               </button>

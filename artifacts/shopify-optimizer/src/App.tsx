@@ -1,9 +1,10 @@
+import { useRef, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth, getLastRoute, saveLastRoute, clearLastRoute } from "@/contexts/AuthContext";
 import { CmsProvider } from "@/contexts/CmsContext";
 import { Loader2 } from "lucide-react";
 import SCCursor from "@/components/ui/SCCursor";
@@ -74,7 +75,21 @@ import { initGlobalErrorHandlers } from "@/lib/global-error-handler";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: false },
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof Error && error.message.includes("401")) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+      retryDelay: 2000,
+    },
   },
 });
 
@@ -107,6 +122,11 @@ function HomeRedirect() {
   if (loading) return <LoadingScreen />;
   if (!user) return <Landing />;
   if (user.role === "client") return <Redirect to="/client" />;
+  const saved = getLastRoute();
+  if (saved && saved !== "/" && saved !== "/login") {
+    clearLastRoute();
+    return <Redirect to={saved} />;
+  }
   return <Redirect to="/home" />;
 }
 
@@ -140,11 +160,15 @@ function ImpersonationBanner() {
   );
 }
 
+function PageErrorBoundary({ children }: { children: React.ReactNode }) {
+  return <ErrorBoundary fallbackRoute="/home">{children}</ErrorBoundary>;
+}
+
 function AdminWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return (
     <>
-      {children}
+      <PageErrorBoundary>{children}</PageErrorBoundary>
       {user?.role === "admin" && (
         <>
           <VoiceButton />
@@ -162,9 +186,23 @@ function AdminOnlyExtras() {
   return <CommandPalette />;
 }
 
+function RoutePersistence() {
+  const [location] = useLocation();
+  const { user } = useAuth();
+  const lastSaved = useRef("");
+  useEffect(() => {
+    if (user && location !== lastSaved.current) {
+      lastSaved.current = location;
+      saveLastRoute(location);
+    }
+  }, [location, user]);
+  return null;
+}
+
 function Router() {
   return (
     <>
+      <RoutePersistence />
       <ImpersonationBanner />
       <AdminOnlyExtras />
       <Switch>

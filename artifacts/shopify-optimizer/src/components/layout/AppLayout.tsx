@@ -1,10 +1,9 @@
-import { ReactNode, useState, useEffect, useCallback } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { LogOut, Settings, Bell, Sun, Moon, Menu, X, WifiOff } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
-import { useOnlineStatus } from "@/hooks/use-draft-persistence";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -67,7 +66,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [match, params] = useRoute("/projects/:id/*");
   const activeProjectId = match ? parseInt(params.id) : null;
   const activeProject = projects?.find((p: { id: number }) => p.id === activeProjectId);
-  const { user, logout } = useAuth();
+  const { user, logout, isOnline } = useAuth();
   const [location, navigate] = useLocation();
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -108,8 +107,6 @@ export function AppLayout({ children }: AppLayoutProps) {
     const t = setInterval(poll, 30000);
     return () => clearInterval(t);
   }, [user?.role]);
-
-  const { isOnline } = useOnlineStatus(useCallback(() => {}, []));
 
   const toggleDarkMode = () => {
     setDarkMode(d => !d);
