@@ -10,6 +10,8 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { getReportShell, type ReportTemplate } from "./exports.js";
+import { generateLeveledReport, type LeveledReportResult } from "../lib/report-levels.js";
+import { REPORT_LEVELS } from "../lib/config.js";
 
 const router = Router();
 
@@ -88,6 +90,10 @@ const CATEGORIES: Record<string, { label: string; icon: string }> = {
   agencia: { label: "Agencia & Comercial", icon: "💼" },
 };
 
+router.get("/generator/levels", (_req: Request, res: Response) => {
+  res.json({ success: true, levels: REPORT_LEVELS });
+});
+
 router.get("/generator/types", (_req: Request, res: Response) => {
   const grouped: Record<string, { label: string; icon: string; types: GeneratorType[] }> = {};
   for (const cat of Object.keys(CATEGORIES)) {
@@ -97,7 +103,8 @@ router.get("/generator/types", (_req: Request, res: Response) => {
 });
 
 router.post("/generator/run", async (req: Request, res: Response) => {
-  const { type, projectId, url, format, template, params: extraParams } = req.body;
+  const { type, projectId, url, format, template, level, params: extraParams } = req.body;
+  const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));
   if (!type) return res.status(400).json({ error: "Falta el tipo de generación" });
 
   const genType = GENERATOR_TYPES.find(t => t.id === type);
@@ -114,8 +121,46 @@ router.post("/generator/run", async (req: Request, res: Response) => {
   const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
 
   try {
+    const pid = projectId ? parseInt(String(projectId)) : undefined;
+
+    const LEVEL_CAPABLE_CATEGORIES = new Set(["seo", "informes", "competencia", "finanzas", "contenido", "agencia", "externo"]);
+    const isLevelCapable = LEVEL_CAPABLE_CATEGORIES.has(genType.category) && genType.outputFormats.includes("html");
+    if (reportLevel > 1 && pid && isLevelCapable) {
+      const project = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).then(r => r[0]);
+      const products = await db.select().from(productsTable).where(eq(productsTable.projectId, pid)).limit(30);
+      const productList = products.map(p => `- ${p.title} (${p.price ?? "sin precio"}, ${p.productType ?? "sin tipo"})`).join("\n");
+      const dataBlock = `Proyecto: ${project?.shopName ?? `#${pid}`}\nDominio: ${project?.shopDomain ?? "N/A"}\nNicho: ${project?.storeNiche ?? "N/A"}\nProductos (${products.length}):\n${productList}`;
+
+      const levelResult = await generateLeveledReport({
+        projectId: pid,
+        level: reportLevel as 1 | 2 | 3 | 4 | 5,
+        reportType: type,
+        reportTitle: genType.label,
+        dataBlock,
+        niche: project?.storeNiche ?? undefined,
+        template: tpl,
+      });
+
+      res.json({
+        success: true,
+        type,
+        level: reportLevel,
+        levelName: levelResult.levelName,
+        files: levelResult.files.map(f => ({
+          type: f.type,
+          title: f.title,
+          vaultId: f.vaultId,
+        })),
+        totalFiles: levelResult.files.length,
+        message: `Informe ${levelResult.levelName} generado con ${levelResult.files.length} archivos`,
+        vaultSaved: true,
+        brainLearned: true,
+      });
+      return;
+    }
+
     const result = await runGenerator(type, {
-      projectId: projectId ? parseInt(String(projectId)) : undefined,
+      projectId: pid,
       url,
       format: outputFormat,
       template: tpl,

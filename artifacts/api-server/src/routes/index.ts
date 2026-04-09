@@ -44,6 +44,7 @@ import auditRouter from "./audit.js";
 import enrichmentRouter from "./enrichment.js";
 import generatorRouter from "./generator.js";
 import webLabRouter from "./web-lab.js";
+import fusionStudioRouter from "./fusion-studio.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -98,5 +99,6 @@ router.use(auditRouter);
 router.use("/enrichment", enrichmentRouter);
 router.use(generatorRouter);
 router.use(webLabRouter);
+router.use(fusionStudioRouter);
 
 export default router;

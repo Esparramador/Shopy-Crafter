@@ -62,6 +62,7 @@ export default function UniversalGenerator() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [template, setTemplate] = useState<"classic" | "elegance" | "prestige">("prestige");
+  const [reportLevel, setReportLevel] = useState(1);
 
   useEffect(() => {
     fetch(api("/generator/types"), { credentials: "include" })
@@ -89,7 +90,7 @@ export default function UniversalGenerator() {
   const runGeneration = async (typeId: string, genType: GeneratorType) => {
     setGenerating(typeId);
     try {
-      const body: any = { type: typeId, projectId: parseInt(projectId), template };
+      const body: Record<string, unknown> = { type: typeId, projectId: parseInt(projectId), template, level: reportLevel };
       if (genType.acceptsUrl && externalUrl) body.url = externalUrl;
       if (!genType.requiresProject && genType.acceptsUrl && externalUrl) body.url = externalUrl;
 
@@ -178,6 +179,41 @@ export default function UniversalGenerator() {
         <span style={{ fontSize: 11, color: "#64748b", marginLeft: "auto" }}>
           Aplica a todos los informes y contenidos generados
         </span>
+      </div>
+
+      <div style={{
+        display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap",
+        background: "linear-gradient(90deg, #0f172a, #1e293b)", padding: "10px 16px", borderRadius: 10, border: "1px solid #334155"
+      }}>
+        <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>Nivel:</span>
+        {([
+          { lvl: 1, name: "Diagnóstico", color: "#c8a84b", price: "Base" },
+          { lvl: 2, name: "Guía Implementación", color: "#60a5fa", price: "+Guía paso a paso" },
+          { lvl: 3, name: "Contenido Producido", color: "#c084fc", price: "+Contenido listo" },
+          { lvl: 4, name: "Premium Full", color: "#f472b6", price: "+CSS, código, emails" },
+          { lvl: 5, name: "Enterprise", color: "#fbbf24", price: "+Roadmap 12 meses" },
+        ] as const).map(({ lvl, name, color, price }) => (
+          <button
+            key={lvl}
+            onClick={() => setReportLevel(lvl)}
+            style={{
+              padding: "6px 14px", borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: reportLevel === lvl ? 700 : 500,
+              border: reportLevel === lvl ? `2px solid ${color}` : "1px solid #475569",
+              background: reportLevel === lvl ? `${color}15` : "transparent",
+              color: reportLevel === lvl ? color : "#94a3b8",
+              transition: "all 0.2s", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 1,
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>Nivel {lvl}</span>
+            <span style={{ fontSize: 9, opacity: 0.8 }}>{name}</span>
+            <span style={{ fontSize: 8, marginTop: 1 }}>{price}</span>
+          </button>
+        ))}
+        {reportLevel > 1 && (
+          <span style={{ fontSize: 10, color: "#64748b", marginLeft: 8 }}>
+            Se generarán {reportLevel >= 5 ? "5" : reportLevel >= 4 ? "4" : reportLevel >= 3 ? "3" : "2"} archivos separados
+          </span>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>

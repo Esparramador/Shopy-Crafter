@@ -14,6 +14,10 @@ import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { analyzeImageForFusion } from "../lib/fusion-studio.js";
+import { processUploadedFile } from "../lib/file-processor.js";
+import { generateLeveledReport } from "../lib/report-levels.js";
+import multer from "multer";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -38,6 +42,34 @@ const WORKSPACE_ROOT = findWorkspaceRoot();
 const FRONTEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/shopify-optimizer");
 const BACKEND_ROOT = path.resolve(WORKSPACE_ROOT, "artifacts/api-server");
 const FRONTEND_SRC = path.resolve(FRONTEND_ROOT, "src");
+
+const UPLOADS_DIR = path.resolve(BACKEND_ROOT, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const upload = multer({
+  dest: UPLOADS_DIR,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp|svg|pdf|csv|xlsx|xls|json|txt|md|html|css|xml|zip)$/i;
+    if (allowed.test(file.originalname)) cb(null, true);
+    else cb(new Error("Tipo de archivo no permitido"));
+  },
+});
+
+function isPublicUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "0.0.0.0") return false;
+    if (host.startsWith("10.") || host.startsWith("192.168.") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+    if (host.startsWith("172.")) {
+      const second = parseInt(host.split(".")[1]);
+      if (second >= 16 && second <= 31) return false;
+    }
+    if (host.startsWith("169.254.") || host.startsWith("fc") || host.startsWith("fd")) return false;
+    return true;
+  } catch { return false; }
+}
 
 function isInsideWorkspace(candidate: string): boolean {
   try {
@@ -462,6 +494,10 @@ Acciones disponibles:
 - bulk_generate_images: Generar imágenes para múltiples productos. Params: {projectId, productIds (array de IDs), imageTypes? (array: "hero","lifestyle","detail","packaging","ugc","scale" — default: ["hero","lifestyle","detail"])}
 - generate_email_flow: Crear flujo de email marketing completo con IA (welcome, abandoned cart, post-purchase). Params: {projectId, flowType ("welcome"|"abandoned_cart"|"post_purchase"|"win_back"|"custom"), customTopic?}
 - generate_email: Generar un email de marketing individual con IA. Params: {projectId, emailType ("promotional"|"newsletter"|"product_launch"|"sale"), subject?, products?}
+- fusion_analyze: Analizar imagen con Fusion Studio (descomponer en componentes: colores, formas, texturas, marca, tipografía). Params: {imageUrl, projectId?}
+- fusion_create_product: Analizar imagen y crear producto completo en Shopify desde ella. Params: {projectId, imageUrl, title?, price?}
+- run_leveled_report: Generar informe con sistema de 5 niveles (1=Diagnóstico, 2=Guía, 3=Contenido Producido, 4=Premium Full, 5=Enterprise). Params: {projectId, type (tipo de informe del generador), level (1-5), template?}
+- upload_file: Procesar archivo subido por el usuario (CSV, PDF, Excel, JSON, imágenes). Params: {fileContext? (descripción)}
 - inventory_sync: Sincronizar inventario con Shopify (stock, variantes, opciones, precios). Params: {projectId}
 - inventory_alerts: Ver alertas de stock bajo. Params: {projectId}
 - inventory_deep_report: Informe profundo de inventario (por producto, por opcion/talla/color, por tipo, stock total, valor, margen, agotados). Params: {projectId}
@@ -602,6 +638,10 @@ REGLAS DE DETECCIÓN DE ACCIONES (detecta la intención y ejecuta la acción cor
 - Guía de marca / manual de marca / identidad visual / brand guide / guía estilo / manual identidad / quiero mi guía de marca → generate_brand_guide
 - Generador universal / herramienta de generación / generar contenido / crear informe / quiero un análisis / generar todo / usar generador → run_universal_generator (pide al usuario qué tipo de contenido quiere: SEO, CSS, informe, presupuesto, etc.)
 - Lab web / analizar diseño web / analizar esta web / extraer css de / auditar diseño de / mejorar diseño de / analiza el diseño / extrae el código de / lab de diseño / análisis de diseño web → analyze_web_design (pide la URL si no la proporcionó)
+- Fusion Studio / analizar imagen / descomponer imagen / crear producto desde imagen / imagen de producto → fusion_analyze (analiza imagen y extrae componentes). Params: {imageUrl, projectId?}
+- Crear producto desde imagen / Fusion crear / producto desde foto / producto desde imagen → fusion_create_product (analiza imagen y crea producto en Shopify). Params: {projectId, imageUrl, title?, price?}
+- Informe por niveles / informe nivel 2 / generar nivel 3 / report nivel / informe profesional / informe enterprise → run_leveled_report (genera informe con sistema de 5 niveles). Params: {projectId, type (tipo de informe), level (1-5), template?}
+- Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
 
 SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
 Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -5581,6 +5621,122 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
         break;
       }
 
+      case "fusion_analyze": {
+        const imageUrl = params?.imageUrl;
+        if (!imageUrl) { result = { error: true, message: "❌ Falta imageUrl — proporciona la URL de la imagen a analizar" }; break; }
+        if (!isPublicUrl(String(imageUrl))) { result = { error: true, message: "❌ La URL debe ser pública (https). No se permiten URLs internas." }; break; }
+        try {
+          const imgResp = await fetch(String(imageUrl));
+          if (!imgResp.ok) throw new Error(`No se pudo descargar la imagen: ${imgResp.status}`);
+          const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+          const mimeType = imgResp.headers.get("content-type") || "image/jpeg";
+          const analysis = await analyzeImageForFusion(imgBuf.toString("base64"), mimeType);
+          const colorList = analysis.colors.palette.map(c => `${c.name} (${c.hex}) ${c.percentage}`).join(", ");
+          const textureList = analysis.textures.map(t => `${t.material} (${t.finish})`).join(", ");
+          result = {
+            message: `🎨 **Fusion Studio — Análisis Completado**\n\n` +
+              `📷 **Imagen analizada:** ${imageUrl}\n\n` +
+              `🎨 **Colores:** ${colorList}\n` +
+              `🧵 **Texturas:** ${textureList}\n` +
+              `🏷️ **Categoría:** ${analysis.product.category} / ${analysis.product.subcategory}\n` +
+              `📝 **Estilo:** ${analysis.product.brandStyle}\n` +
+              `👥 **Audiencia:** ${analysis.product.targetAudience}\n` +
+              `💰 **Rango precio:** ${analysis.product.priceRange}\n` +
+              `📐 **Composición:** ${analysis.composition.layout} · ${analysis.composition.lighting}\n\n` +
+              `📦 **Sugerencia producto:**\n` +
+              `• Título: ${analysis.productGeneration.suggestedTitle}\n` +
+              `• Precio: ${analysis.productGeneration.suggestedPrice}\n` +
+              `• Tags: ${analysis.productGeneration.suggestedTags.join(", ")}`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error en Fusion Studio: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "fusion_create_product": {
+        const projectId = params?.projectId;
+        const imageUrl = params?.imageUrl;
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido" }; break; }
+        if (!imageUrl) { result = { error: true, message: "❌ Falta imageUrl — proporciona la URL de la imagen" }; break; }
+        if (!isPublicUrl(String(imageUrl))) { result = { error: true, message: "❌ La URL debe ser pública (https). No se permiten URLs internas." }; break; }
+        try {
+          const imgResp = await fetch(String(imageUrl));
+          if (!imgResp.ok) throw new Error(`No se pudo descargar la imagen: ${imgResp.status}`);
+          const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+          const imgMime = imgResp.headers.get("content-type") || "image/jpeg";
+          const analysis = await analyzeImageForFusion(imgBuf.toString("base64"), imgMime);
+          const title = params?.title || analysis.productGeneration.suggestedTitle || "Producto Fusion";
+          const price = params?.price || analysis.productGeneration.suggestedPrice || "29.99";
+          const productData = {
+            product: {
+              title: String(title),
+              body_html: analysis.productGeneration.suggestedDescription || "Producto creado con Fusion Studio",
+              vendor: "Shopy Crafter",
+              product_type: analysis.product.category || "General",
+              tags: (analysis.productGeneration.suggestedTags || []).join(", "),
+              status: "draft",
+              variants: [{ price: String(price), inventory_management: "shopify" }],
+              images: [{ src: String(imageUrl) }],
+            }
+          };
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const created = await shopifyRequest<{ product: { id: number; title: string; handle: string } }>(
+            parseInt(String(projectId)), project.shopDomain, "/products.json",
+            { method: "POST", body: JSON.stringify(productData) }
+          );
+          result = {
+            message: `🎨✅ **Producto creado con Fusion Studio**\n\n` +
+              `📦 **${created.product.title}** (ID: ${created.product.id})\n` +
+              `💰 Precio: ${price}€\n` +
+              `🏷️ Tags: ${(analysis.productGeneration.suggestedTags || []).join(", ")}\n` +
+              `📊 Estado: Borrador\n\n` +
+              `🔗 Handle: ${created.product.handle}\n` +
+              `💡 El producto está en borrador. Publícalo cuando esté listo.`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error creando producto con Fusion: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
+      case "run_leveled_report": {
+        const projectId = params?.projectId;
+        const reportType = params?.type;
+        const level = Math.max(1, Math.min(5, parseInt(String(params?.level || 1))));
+        if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido" }; break; }
+        if (!reportType) { result = { error: true, message: "❌ Falta type — indica qué tipo de informe (ej: seo_audit, brand_analysis, competitor_report)" }; break; }
+        try {
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+          if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+          const template = parseTemplate(params?.template);
+          const levelResult = await generateLeveledReport({
+            projectId: parseInt(String(projectId)),
+            reportType: String(reportType),
+            reportTitle: `${String(reportType).replace(/_/g, " ")} — ${project.name}`,
+            dataBlock: `Tienda: ${project.name}\nDominio: ${project.shopDomain}\nNicho: ${project.storeNiche || "eCommerce"}`,
+            level: level as 1 | 2 | 3 | 4 | 5,
+            template,
+            niche: project.storeNiche || undefined,
+          });
+          const levelNames = ["", "Diagnóstico", "Guía Implementación", "Contenido Producido", "Premium Full", "Enterprise"];
+          result = {
+            message: `📊 **Informe Nivel ${level} — ${levelNames[level]}**\n\n` +
+              `📋 **Tipo:** ${reportType}\n` +
+              `🏪 **Tienda:** ${project.name}\n` +
+              `📁 **Archivos generados:** ${levelResult.files.length}\n\n` +
+              levelResult.files.map((f: { title: string; vaultId: number | null }, i: number) =>
+                `${i + 1}. 📄 ${f.title}${f.vaultId ? ` — /api/vault/download/${f.vaultId}` : ""}`
+              ).join("\n") +
+              `\n\n🗄️ Todo guardado en el Vault para descarga`,
+          };
+        } catch (err) {
+          result = { error: true, message: `❌ Error generando informe nivel: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        break;
+      }
+
       case "add_variant": {
         const projectId = params?.projectId;
         const productId = params?.productId;
@@ -9397,6 +9553,28 @@ router.post("/shopybrain/run/self-evaluation", requireAdmin, async (_req, res): 
   const { runMonthlySelfEvaluation } = await import("../lib/scheduler.js");
   runMonthlySelfEvaluation().catch(e => logger.error(e));
   res.json({ message: "Monthly self-evaluation started in background" });
+});
+
+router.post("/shopybrain/upload", requireAdmin, upload.single("file"), async (req, res): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, error: "No se recibió ningún archivo" });
+      return;
+    }
+    const buffer = fs.readFileSync(file.path);
+    const processed = await processUploadedFile(buffer, file.originalname, file.mimetype);
+    try { fs.unlinkSync(file.path); } catch {}
+    res.json({
+      success: true,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      processed,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 export default router;
