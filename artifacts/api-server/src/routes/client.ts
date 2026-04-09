@@ -140,7 +140,7 @@ router.get("/reports", async (req, res): Promise<void> => {
   let imagesGenerated = 0;
   for (const p of products) {
     try {
-      const imgs = p.imagesJson ? JSON.parse(p.imagesJson) : [];
+      const imgs = p.imagesJson ? (typeof p.imagesJson === "string" ? JSON.parse(p.imagesJson) : p.imagesJson) : [];
       imagesGenerated += Array.isArray(imgs) ? imgs.length : 0;
     } catch {}
   }
@@ -262,7 +262,7 @@ router.get("/products", async (req, res): Promise<void> => {
     .limit(50);
   const products = rows.map((r) => {
     let images: string[] | null = null;
-    try { images = r.imagesJson ? JSON.parse(r.imagesJson) : null; } catch {}
+    try { images = r.imagesJson ? (typeof r.imagesJson === "string" ? JSON.parse(r.imagesJson) : r.imagesJson as string[]) : null; } catch {}
     return { id: r.id, title: r.title, price: r.price, auditScore: r.auditScore, auditGrade: r.auditGrade, images };
   });
   res.json(products);

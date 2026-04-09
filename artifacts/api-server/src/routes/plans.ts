@@ -31,7 +31,7 @@ router.get("/plans/definitions", async (_req, res): Promise<void> => {
 
 // ─── GET plan status for a project ───────────────────────────────────────────
 router.get("/projects/:projectId/plan", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   try {
     const status = await getPlanStatus(projectId);
     if (!status) {
@@ -47,7 +47,7 @@ router.get("/projects/:projectId/plan", requireAdmin, async (req, res): Promise<
 
 // ─── PUT update plan for a project (admin only) ───────────────────────────────
 router.put("/projects/:projectId/plan", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   const { plan, planRenewsAt } = req.body as { plan: string; planRenewsAt?: string };
 
   const validPlans = ["admin", "starter", "agency_pro", "enterprise", "trial"];
@@ -88,7 +88,7 @@ router.put("/projects/:projectId/plan", requireAdmin, async (req, res): Promise<
 
 // ─── POST reset monthly usage counters ───────────────────────────────────────
 router.post("/projects/:projectId/plan/reset-usage", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   try {
     await db.update(projectsTable)
       .set({ productsUsedThisMonth: 0, imagesUsedThisMonth: 0 })
@@ -102,7 +102,7 @@ router.post("/projects/:projectId/plan/reset-usage", requireAdmin, async (req, r
 
 // ─── POST add extra pack credits to a project ─────────────────────────────────
 router.post("/projects/:projectId/plan/credits", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   const { packType, shopifyOrderId } = req.body as { packType: string; shopifyOrderId?: string };
 
   if (!packType || !PACK_DEFINITIONS[packType]) {
@@ -134,7 +134,7 @@ router.post("/projects/:projectId/plan/credits", requireAdmin, async (req, res):
 
 // ─── GET purchased packs history for a project ───────────────────────────────
 router.get("/projects/:projectId/plan/packs", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   try {
     const packs = await db.select()
       .from(planCreditPacksTable)
@@ -149,7 +149,7 @@ router.get("/projects/:projectId/plan/packs", requireAdmin, async (req, res): Pr
 
 // ─── POST check if an operation is allowed (pre-flight check for UI) ─────────
 router.post("/projects/:projectId/plan/check", requireAdmin, async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
   const { type, count } = req.body as { type: "product" | "image"; count?: number };
 
   if (!type) {

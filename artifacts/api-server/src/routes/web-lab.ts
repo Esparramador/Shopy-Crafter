@@ -177,7 +177,7 @@ Responde SIEMPRE en JSON válido con esta estructura exacta:
   "summary": "Resumen ejecutivo del análisis en español"
 }`;
 
-router.post("/web-lab/analyze", async (req: Request, res: Response) => {
+router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<void> => {
   try {
     const { url, projectId, template, brandName, instagram } = req.body as {
       url: string;
@@ -187,7 +187,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       instagram?: string;
     };
 
-    if (!url) { return res.status(400).json({ error: "URL requerida" }); }
+    if (!url) { res.status(400).json({ error: "URL requerida" }); return; }
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache");
@@ -458,10 +458,10 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
   }
 });
 
-router.get("/web-lab/history/:projectId", async (req: Request, res: Response) => {
+router.get("/web-lab/history/:projectId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
-    if (!projectId) return res.status(400).json({ error: "projectId requerido" });
+    const projectId = parseInt(String(req.params.projectId));
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
 
     const items = await db
       .select()
@@ -481,13 +481,13 @@ router.get("/web-lab/history/:projectId", async (req: Request, res: Response) =>
   }
 });
 
-router.get("/web-lab/result/:vaultId", async (req: Request, res: Response) => {
+router.get("/web-lab/result/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const vaultId = parseInt(req.params.vaultId);
-    if (!vaultId) return res.status(400).json({ error: "vaultId requerido" });
+    const vaultId = parseInt(String(req.params.vaultId));
+    if (!vaultId) { res.status(400).json({ error: "vaultId requerido" }); return; }
 
     const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, vaultId));
-    if (!file) return res.status(404).json({ error: "No encontrado" });
+    if (!file) { res.status(404).json({ error: "No encontrado" }); return; }
 
     res.json({ file });
   } catch (err: any) {
@@ -495,13 +495,13 @@ router.get("/web-lab/result/:vaultId", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/web-lab/download-css/:vaultId", async (req: Request, res: Response) => {
+router.get("/web-lab/download-css/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const vaultId = parseInt(req.params.vaultId);
+    const vaultId = parseInt(String(req.params.vaultId));
     const [file] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vaultId), eq(projectFilesTable.fileType, "web-lab-css"))
     );
-    if (!file?.content) return res.status(404).json({ error: "CSS no encontrado" });
+    if (!file?.content) { res.status(404).json({ error: "CSS no encontrado" }); return; }
 
     res.setHeader("Content-Type", "text/css; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="improved-styles.css"`);
@@ -511,13 +511,13 @@ router.get("/web-lab/download-css/:vaultId", async (req: Request, res: Response)
   }
 });
 
-router.get("/web-lab/download-html/:vaultId", async (req: Request, res: Response) => {
+router.get("/web-lab/download-html/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const vaultId = parseInt(req.params.vaultId);
+    const vaultId = parseInt(String(req.params.vaultId));
     const [file] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vaultId), eq(projectFilesTable.fileType, "web-lab-html"))
     );
-    if (!file?.content) return res.status(404).json({ error: "HTML no encontrado" });
+    if (!file?.content) { res.status(404).json({ error: "HTML no encontrado" }); return; }
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="improved-fragments.html"`);
@@ -527,13 +527,13 @@ router.get("/web-lab/download-html/:vaultId", async (req: Request, res: Response
   }
 });
 
-router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Response) => {
+router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const vaultId = parseInt(req.params.vaultId);
+    const vaultId = parseInt(String(req.params.vaultId));
     const [file] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vaultId), eq(projectFilesTable.fileType, "web-lab-report"))
     );
-    if (!file?.content) return res.status(404).json({ error: "Informe no encontrado" });
+    if (!file?.content) { res.status(404).json({ error: "Informe no encontrado" }); return; }
 
     const requestedTpl = req.query.template;
     if (requestedTpl && VALID_TEMPLATES.has(requestedTpl as ReportTemplate)) {
@@ -564,7 +564,8 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
 
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="web-lab-report-${tpl}.html"`);
-        return res.send(reportHtml);
+        res.send(reportHtml);
+        return;
       }
     }
 
@@ -576,17 +577,17 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
   }
 });
 
-router.post("/web-lab/download-report", async (req: Request, res: Response) => {
+router.post("/web-lab/download-report", async (req: Request, res: Response): Promise<void> => {
   try {
     const { vaultId, template: rawTemplate } = req.body;
-    if (!vaultId) return res.status(400).json({ error: "vaultId requerido" });
+    if (!vaultId) { res.status(400).json({ error: "vaultId requerido" }); return; }
 
     const tpl: ReportTemplate = VALID_TEMPLATES.has(rawTemplate) ? rawTemplate : "prestige";
     const vid = parseInt(String(vaultId));
     const [file] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vid), eq(projectFilesTable.fileType, "web-lab-report"))
     );
-    if (!file?.content) return res.status(404).json({ error: "Informe no encontrado" });
+    if (!file?.content) { res.status(404).json({ error: "Informe no encontrado" }); return; }
 
     const meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : file.metadata;
     const storedTpl = meta?.template ?? "prestige";
@@ -594,7 +595,8 @@ router.post("/web-lab/download-report", async (req: Request, res: Response) => {
     if (tpl === storedTpl) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="web-lab-report-${tpl}.html"`);
-      return res.send(file.content);
+      res.send(file.content);
+      return;
     }
 
     const projectId = file.projectId;
@@ -628,21 +630,21 @@ router.post("/web-lab/download-report", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response) => {
+router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
-    const vaultId = parseInt(req.params.vaultId);
+    const vaultId = parseInt(String(req.params.vaultId));
     const [reportFile] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vaultId), eq(projectFilesTable.fileType, "web-lab-report"))
     );
-    if (!reportFile) return res.status(404).json({ error: "Análisis no encontrado" });
+    if (!reportFile) { res.status(404).json({ error: "Análisis no encontrado" }); return; }
 
     const projectId = reportFile.projectId;
-    const meta = typeof reportFile.metadata === "string" ? JSON.parse(reportFile.metadata) : reportFile.metadata;
+    const meta = typeof reportFile.metadata === "string" ? JSON.parse(reportFile.metadata) : (reportFile.metadata as any);
     const targetUrl = meta?.url || "unknown";
 
     const relatedFiles = await db.select().from(projectFilesTable).where(
       and(
-        eq(projectFilesTable.projectId, projectId),
+        eq(projectFilesTable.projectId, projectId as number),
         eq(projectFilesTable.category, "web-lab"),
         eq(projectFilesTable.originalUrl, targetUrl),
       )

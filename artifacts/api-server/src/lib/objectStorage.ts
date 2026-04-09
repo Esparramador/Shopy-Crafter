@@ -154,6 +154,17 @@ export class ObjectStorageService {
     return objectFile;
   }
 
+  async uploadObject(file: File, data: Buffer, contentType: string = "application/octet-stream"): Promise<void> {
+    await file.save(data, { contentType, resumable: false });
+  }
+
+  async deleteObject(file: File): Promise<void> {
+    const [exists] = await file.exists();
+    if (exists) {
+      await file.delete();
+    }
+  }
+
   normalizeObjectEntityPath(rawPath: string): string {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;

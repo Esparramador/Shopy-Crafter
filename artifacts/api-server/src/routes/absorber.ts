@@ -849,13 +849,13 @@ Genera JSON con:
       });
 
       saveToVault({
-        projectId,
+        projectId: parseInt(projectId),
         fileType: "product_card",
         category: "product_creation",
         title: `Producto: ${created.product.title}`,
-        description: productAnalysis.productName || created.product.title,
+        description: productAnalysis.productName || (created.product.title as string),
         productId: String(created.product.id),
-        productTitle: created.product.title,
+        productTitle: created.product.title as string,
         generatedBy: "image_to_product",
         metadata: {
           price: finalPrice,

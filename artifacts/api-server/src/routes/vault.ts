@@ -13,6 +13,13 @@ import sharp from "sharp";
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
 
+function metadataToReportHtml(file: { title: string; metadata: string | null; fileType: string; description?: string | null }): string {
+  let meta: Record<string, unknown> = {};
+  try { meta = file.metadata ? JSON.parse(file.metadata) : {}; } catch {}
+  const content = typeof meta === "object" ? JSON.stringify(meta, null, 2) : String(meta);
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${file.title}</title></head><body><h1>${file.title}</h1>${file.description ? `<p>${file.description}</p>` : ""}<pre>${content}</pre></body></html>`;
+}
+
 const router = Router();
 let storage: ObjectStorageService | null = null;
 function getStorage() {
@@ -539,7 +546,7 @@ router.delete("/projects/:projectId/vault/:fileId", requireAuth, async (req, res
 router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId));
   const fileId = parseInt(String(req.params.fileId));
-  const format = (req.params.format || "png").toLowerCase();
+  const format = String(req.params.format || "png").toLowerCase();
 
   const allFormats = ["png", "jpg", "jpeg", "webp", "tiff", "avif", "pdf", "docx"];
   if (!allFormats.includes(format)) {
@@ -739,7 +746,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
 // ─── DESCARGAR TODAS LAS IMÁGENES EN FORMATO ESPECÍFICO (ZIP) ───────────────
 router.get("/projects/:projectId/vault/download-images/:format", requireAuth, async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId));
-  const format = (req.params.format || "png").toLowerCase();
+  const format = String(req.params.format || "png").toLowerCase();
 
   if (!["png", "jpg", "jpeg", "webp", "tiff", "avif", "original"].includes(format)) {
     res.status(400).json({ error: "Formato no soportado" }); return;

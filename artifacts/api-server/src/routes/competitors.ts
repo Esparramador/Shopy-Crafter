@@ -151,11 +151,11 @@ Analyze the competitor and return competitive intelligence. Extract real prices,
     }
 
     learnFromOperation({
-      projectId: parseInt(projectId),
-      operation: "competitor_scan",
-      result: `Competitor scan: ${data.productsFound ?? 0} products found, price range €${data.priceMin ?? "?"}-€${data.priceMax ?? "?"}, threat level: ${data.overallThreatLevel ?? "unknown"}. ${(data.insights ?? []).length} insights detected.`,
+      operationType: "competitor_scan",
+      title: `Competitor Scan: ${competitor.name}`,
+      content: `Competitor scan: ${data.productsFound ?? 0} products found, price range €${data.priceMin ?? "?"}-€${data.priceMax ?? "?"}, threat level: ${data.overallThreatLevel ?? "unknown"}. ${(data.insights ?? []).length} insights detected.`,
       niche: niche,
-      category: "competitor_intel",
+      sourceProjectId: parseInt(projectId),
     });
 
     saveToVault({
@@ -277,16 +277,16 @@ RESPONDE con JSON exacto:
         url: comp.url,
         type: comp.type || "direct",
       }).returning();
-      added.push({ ...inserted, reason: comp.reason });
+      added.push({ id: inserted.id, name: inserted.name, url: inserted.url, type: inserted.type || "direct", reason: comp.reason });
     } catch {}
   }
 
   learnFromOperation({
-    projectId: pid,
-    operation: "competitor_auto_discovery",
-    result: `Auto-descubrimiento de competidores para "${storeName}" (${niche}): ${added.length} competidores encontrados y registrados. ${added.map(c => `${c.name} (${c.type})`).join(", ")}`,
+    operationType: "competitor_auto_discovery",
+    title: `Auto-Discovery: ${storeName} (${niche})`,
+    content: `Auto-descubrimiento de competidores para "${storeName}" (${niche}): ${added.length} competidores encontrados y registrados. ${added.map((c: any) => `${c.name} (${c.type})`).join(", ")}`,
     niche,
-    category: "competitor_intel",
+    sourceProjectId: pid,
   });
 
   saveToVault({

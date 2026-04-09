@@ -320,17 +320,17 @@ Devuelve SOLO este JSON (nada más):
       userPrompt,
       systemPrompt,
       "general",
-      projectInfo.niche,
+      realNiche,
       8000
     );
 
     learnFromOperation({
       operationType: "email_template",
-      niche: projectInfo.niche,
-      title: `Email Template: ${typeName} para ${projectInfo.name}`,
-      content: `Plantilla: ${typeName} | Tono: ${tone} | Marca: ${projectInfo.name} | Subject A: ${result.subject_a ?? ""}`,
+      niche: realNiche,
+      title: `Email Template: ${typeName} para ${realStoreName}`,
+      content: `Plantilla: ${typeName} | Tono: ${tone} | Marca: ${realStoreName} | Subject A: ${result.subject_a ?? ""}`,
       confidence: 0.75,
-      tags: ["email", "template", templateType, tone, projectInfo.niche],
+      tags: ["email", "template", templateType, tone, realNiche],
     });
 
     res.json(result);

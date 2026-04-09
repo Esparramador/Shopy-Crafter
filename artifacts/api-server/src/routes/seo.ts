@@ -276,7 +276,7 @@ router.post("/projects/:projectId/seo/audit", async (req, res): Promise<void> =>
   learnFromOperation({
     operationType: "seo_audit",
     niche: project?.storeNiche ?? null,
-    title: `SEO Audit — ${project?.storeName ?? project?.shopDomain ?? "store"}: ${storeGrade} (${Math.round(avgScore)}/100)`,
+    title: `SEO Audit — ${project?.name ?? project?.shopDomain ?? "store"}: ${storeGrade} (${Math.round(avgScore)}/100)`,
     content: `Auditoría SEO: ${products.length} productos. Score medio: ${Math.round(avgScore)}. Grade: ${storeGrade}. Críticos: ${criticalIssues.length} (${noMetaDesc} sin meta desc). Altos: ${highIssues.length} (${noSchema} sin schema). Medios: ${mediumIssues.length} (${noAltTexts} sin alt texts).`,
     confidence: 0.8,
     tags: ["seo", "audit", "store_health"],
@@ -531,7 +531,7 @@ Devuelve JSON con:
   "dataSource": "google_search_grounding"
 }`;
 
-  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", niche);
+  const result = await askClaudeJsonWithBrain<Record<string, any>>(projectId, prompt, SEO_SYSTEM, "seo", niche);
 
   if (result) {
     result.sources = allSources.slice(0, 15);
@@ -581,7 +581,7 @@ Devuelve JSON con:
   "dataSource": "google_search_grounding"
 }`;
 
-  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", niche, 6000);
+  const result = await askClaudeJsonWithBrain<Record<string, any>>(projectId, prompt, SEO_SYSTEM, "seo", niche, 6000);
 
   if (result && trendData) {
     result.dataSource = "google_search_grounding";
@@ -619,7 +619,7 @@ El artículo debe tener:
 
 Devuelve JSON con: title, metaTitle (60 chars), metaDescription (155 chars), bodyHtml (HTML completo), wordCount (number), readyForShopify (true).`;
 
-  const result = await askClaudeJsonWithBrain(projectId, prompt, SEO_SYSTEM, "seo", undefined, 8000);
+  const result = await askClaudeJsonWithBrain<Record<string, any>>(projectId, prompt, SEO_SYSTEM, "seo", undefined, 8000);
 
   learnFromOperation({
     operationType: "seo_blog",
@@ -709,9 +709,9 @@ router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promi
 
     for (const product of products) {
       try {
-        const shopifyData = await shopifyRequest(
+        const shopifyData = await shopifyRequest<any>(
           projectId, project.shopDomain,
-          `/products/${product.shopifyProductId}.json`, "GET"
+          `/products/${product.shopifyProductId}.json`, { method: "GET" }
         );
         const sp = shopifyData?.product;
         if (!sp) { failed++; continue; }
@@ -741,14 +741,14 @@ Las preguntas deben ser específicas del producto, no genéricas. Respuestas con
           name: sp.title,
           description: bodyText.slice(0, 500),
           url: `https://${project.shopDomain}/products/${sp.handle}`,
-          brand: { "@type": "Brand", name: project.shopName || project.shopDomain.split(".")[0] },
+          brand: { "@type": "Brand", name: project.name || project.shopDomain.split(".")[0] },
           offers: {
             "@type": "Offer",
             price: priceAmount,
             priceCurrency: currency,
             availability: available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
             url: `https://${project.shopDomain}/products/${sp.handle}`,
-            seller: { "@type": "Organization", name: project.shopName || project.shopDomain.split(".")[0] },
+            seller: { "@type": "Organization", name: project.name || project.shopDomain.split(".")[0] },
           },
         };
 
@@ -828,7 +828,7 @@ Las preguntas deben ser específicas del producto, no genéricas. Respuestas con
           const orgSchema = JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: project.shopName || project.shopDomain.split(".")[0],
+            name: project.name || project.shopDomain.split(".")[0],
             url: `https://${project.shopDomain}`,
             logo: `https://${project.shopDomain}/cdn/shop/files/logo.png`,
             sameAs: [],
@@ -836,7 +836,7 @@ Las preguntas deben ser específicas del producto, no genéricas. Respuestas con
           const webSiteSchema = JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: project.shopName || project.shopDomain.split(".")[0],
+            name: project.name || project.shopDomain.split(".")[0],
             url: `https://${project.shopDomain}`,
             potentialAction: {
               "@type": "SearchAction",

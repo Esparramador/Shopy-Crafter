@@ -175,11 +175,11 @@ async function warmupProdKnowledge() {
             let nextPageInfo: string | null = null;
             let isFirst = true;
             while (true) {
-              const path = isFirst
+              const path: string = isFirst
                 ? `/products.json?limit=250&status=${st}&published_status=any`
                 : `/products.json?limit=250&page_info=${nextPageInfo}`;
 
-              const pageResult = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
+              const pageResult: { data: { products: ShopifyProductRaw[] }; nextPageInfo: string | null } = await shopifyRequestPaged<{ products: ShopifyProductRaw[] }>(
                 project.id, project.shopDomain, path
               );
               isFirst = false;
@@ -196,9 +196,9 @@ async function warmupProdKnowledge() {
             let seoHasNext = true;
             let seoCursor: string | null = null;
             while (seoHasNext) {
-              const afterClause = seoCursor ? `, after: "${seoCursor}"` : "";
-              const warmupSeoGql = `{ products(first: 250${afterClause}) { edges { node { id seo { title description } } } pageInfo { hasNextPage endCursor } } }`;
-              const warmupSeoRes = await shopifyGraphQL<{ products: { edges: Array<{ node: { id: string; seo: { title: string | null; description: string | null } } }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
+              const afterClause: string = seoCursor ? `, after: "${seoCursor}"` : "";
+              const warmupSeoGql: string = `{ products(first: 250${afterClause}) { edges { node { id seo { title description } } } pageInfo { hasNextPage endCursor } } }`;
+              const warmupSeoRes: { products: { edges: Array<{ node: { id: string; seo: { title: string | null; description: string | null } } }>; pageInfo: { hasNextPage: boolean; endCursor: string } } } = await shopifyGraphQL<{ products: { edges: Array<{ node: { id: string; seo: { title: string | null; description: string | null } } }>; pageInfo: { hasNextPage: boolean; endCursor: string } } }>(
                 project.id, project.shopDomain, warmupSeoGql
               );
               for (const edge of warmupSeoRes.products?.edges ?? []) {

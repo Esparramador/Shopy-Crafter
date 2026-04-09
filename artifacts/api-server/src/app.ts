@@ -133,9 +133,10 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
 const __filename2 = fileURLToPath(import.meta.url);
 const __dirname2 = path.dirname(__filename2);
 const reportsDir = path.join(__dirname2, "..", "public", "reports");
-const reportAuth = (req: Request, res: Response, next: NextFunction) => {
+const reportAuth = (req: Request, res: Response, next: NextFunction): void => {
   if (!(req.session as any)?.userId) {
-    return res.status(403).json({ error: "Forbidden" });
+    res.status(403).json({ error: "Forbidden" });
+    return;
   }
   next();
 };

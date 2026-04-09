@@ -2080,19 +2080,19 @@ Responde SOLO JSON válido:
           published_scope: "global",
         };
 
-        const aiVariants = (params?.aiGenerate !== false && aiContent?.variants?.length) ? aiContent.variants : null;
-        const aiOptions = (params?.aiGenerate !== false && aiContent?.options?.length) ? aiContent.options : null;
+        const aiVariantsRaw = (params?.aiGenerate !== false && (aiContent as any)?.variants?.length) ? (aiContent as any).variants as any[] : null;
+        const aiOptionsRaw = (params?.aiGenerate !== false && (aiContent as any)?.options?.length) ? (aiContent as any).options as any[] : null;
 
-        if (aiOptions && aiOptions.length > 0) {
-          shopifyProduct.options = aiOptions.map((o: { name: string; values: string[] }, i: number) => ({
+        if (aiOptionsRaw && aiOptionsRaw.length > 0) {
+          shopifyProduct.options = aiOptionsRaw.map((o: { name: string; values: string[] }, i: number) => ({
             name: o.name,
             position: i + 1,
             values: o.values,
           }));
         }
 
-        if (aiVariants && aiVariants.length > 0 && aiOptions && aiOptions.length > 0) {
-          shopifyProduct.variants = aiVariants.map((v: Record<string, unknown>) => {
+        if (aiVariantsRaw && aiVariantsRaw.length > 0 && aiOptionsRaw && aiOptionsRaw.length > 0) {
+          shopifyProduct.variants = aiVariantsRaw.map((v: Record<string, unknown>) => {
             const optVals = (v.optionValues || {}) as Record<string, string>;
             const variant: Record<string, unknown> = {
               price: String(v.price || finalPrice),
@@ -2100,16 +2100,16 @@ Responde SOLO JSON válido:
               sku: v.sku || null,
               inventory_management: "shopify",
               inventory_quantity: v.inventoryQuantity ?? 25,
-              inventory_policy: aiContent?.inventoryPolicy || "deny",
+              inventory_policy: (aiContent as any)?.inventoryPolicy || "deny",
               weight: v.weight || null,
               weight_unit: v.weightUnit || "kg",
               barcode: v.barcode || null,
               requires_shipping: true,
               taxable: true,
             };
-            if (aiOptions[0]) variant.option1 = optVals[aiOptions[0].name] || null;
-            if (aiOptions[1]) variant.option2 = optVals[aiOptions[1].name] || null;
-            if (aiOptions[2]) variant.option3 = optVals[aiOptions[2].name] || null;
+            if (aiOptionsRaw[0]) variant.option1 = optVals[aiOptionsRaw[0].name] || null;
+            if (aiOptionsRaw[1]) variant.option2 = optVals[aiOptionsRaw[1].name] || null;
+            if (aiOptionsRaw[2]) variant.option3 = optVals[aiOptionsRaw[2].name] || null;
             return variant;
           });
         } else {
@@ -4557,7 +4557,7 @@ REGLAS CRÍTICAS:
               const pPriceContext = pPriceResearch.competitorPrices.length > 0
                 ? `\n\nDATOS REALES DE MERCADO:
 Rango: ${pPriceResearch.marketPriceRange.min}€ - ${pPriceResearch.marketPriceRange.max}€ (mediana: ${pPriceResearch.marketPriceRange.median}€)
-Competidores: ${pPriceResearch.competitorPrices.map((c: { source: string; price: number }) => `${c.source}: ${c.price}€`).join(", ")}
+Competidores: ${pPriceResearch.competitorPrices.map((c: { source: string; price: string; url?: string }) => `${c.source}: ${c.price}€`).join(", ")}
 Recomendación: ${pPriceResearch.suggestedPrice}€`
                 : "";
 
@@ -4784,20 +4784,20 @@ SOLO JSON, contenido REAL.`, CLAUDE_EXPERT_SYSTEM, "seo", project.storeNiche || 
           ),
         ]);
 
-        const allCollections = [
-          ...(customData.custom_collections || []).map(c => ({ ...c, type: "custom" })),
-          ...(smartData.smart_collections || []).map(c => ({ ...c, type: "smart" })),
+        const allCollections: any[] = [
+          ...((customData as any).custom_collections || []).map((c: any) => ({ ...c, type: "custom" })),
+          ...((smartData as any).smart_collections || []).map((c: any) => ({ ...c, type: "smart" })),
         ];
 
         result = {
-          collections: allCollections.map(c => ({
+          collections: allCollections.map((c: any) => ({
             id: c.id, title: c.title, type: c.type,
             handle: c.handle, published: c.published_at != null,
             productsCount: c.products_count || 0,
             bodyLength: String(c.body_html || "").length,
           })),
           total: allCollections.length,
-          message: `${allCollections.length} colecciones encontradas (${customData.custom_collections?.length || 0} manuales + ${smartData.smart_collections?.length || 0} inteligentes)`,
+          message: `${allCollections.length} colecciones encontradas (${(customData as any).custom_collections?.length || 0} manuales + ${(smartData as any).smart_collections?.length || 0} inteligentes)`,
         };
         break;
       }
@@ -6230,7 +6230,7 @@ Genera exactamente ${images.length} alt texts.`,
           for (const p of parts) { val = (val as Record<string, unknown>)?.[p]; if (val === undefined) break; }
           result = { section: sectionToRead, value: val ?? null, message: `CMS sección "${sectionToRead}": ${JSON.stringify(val).slice(0, 500)}` };
         } else {
-          const sections = Object.keys(cmsData).filter(k => k !== "meta");
+          const sections = Object.keys(cmsData as Record<string, unknown>).filter(k => k !== "meta");
           result = { sections, totalSections: sections.length, message: `CMS tiene ${sections.length} secciones: ${sections.join(", ")}` };
         }
         break;
@@ -6432,8 +6432,8 @@ RESPONDE SOLO JSON válido con un array "plans":
           const cmsReadRes = await fetch(`http://localhost:${process.env.PORT ?? 3001}/api/cms/content`, { headers: { "Cookie": cookieAudit } });
           const cmsData = cmsReadRes.ok ? await cmsReadRes.json() : {};
 
-          const features = (cmsData.features?.items as Array<{ title: string; description: string }>) ?? [];
-          const plans = (cmsData.pricing?.plans as Array<{ name: string; price: string; features: Array<{ text: string; included: boolean }> }>) ?? [];
+          const features = ((cmsData as any).features?.items as Array<{ title: string; description: string }>) ?? [];
+          const plans = ((cmsData as any).pricing?.plans as Array<{ name: string; price: string; features: Array<{ text: string; included: boolean }> }>) ?? [];
 
           const auditPrompt = `Audita la oferta de Shopy Crafter basándote en lo que realmente ofrece la plataforma:
 
@@ -6669,7 +6669,7 @@ Responde SOLO JSON:
         let filteredFiles: string[] = [];
         if (directory) {
           const tree = structureSummary.fileTree;
-          filteredFiles = (tree as Record<string, string[]>)[directory] ?? [];
+          filteredFiles = (tree as unknown as Record<string, string[]>)[directory] ?? [];
         }
         result = {
           themeId,
@@ -7305,7 +7305,7 @@ ${mobileNav}
 
           const products = productsRes.products?.edges?.map(e => e.node) ?? [];
 
-          const brainCtx = await buildShopyBrainContext(Number(projectId), "general", "copyright trademark intellectual property brand names");
+          const brainCtx = await buildShopyBrainContext(undefined, "general", "copyright trademark intellectual property brand names");
           const auditResult = await askClaudeJsonWithBrain<{
             totalProducts: number;
             riskProducts: { title: string; risks: string[]; severity: "alta" | "media" | "baja"; suggestion: string }[];
@@ -7313,6 +7313,7 @@ ${mobileNav}
             recommendations: string[];
             safeProducts: number;
           }>(
+            parseInt(projectId),
             `Realiza una auditoría de copyright y propiedad intelectual de los siguientes productos de una tienda Shopify.
 
 PRODUCTOS (${products.length}):
@@ -7332,7 +7333,7 @@ Responde SOLO con JSON válido (sin markdown):
   "recommendations": ["recomendación 1"],
   "safeProducts": number
 }`,
-            brainCtx, "copyright_audit"
+            brainCtx, "general"
           );
 
           let msg = `⚖️ **Auditoría de Copyright completada**\n\n`;
@@ -7954,7 +7955,7 @@ Responde SOLO con JSON válido (sin markdown):
           const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
           const resp = await fetch(`${baseUrl}/api/klaviyo-ai/generate-workflow`, {
             method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
-            body: JSON.stringify({ shopDomain: project.shopDomain, storeName: project.name, niche: project.niche || "ecommerce", market: "es", storeContext: params?.customTopic || "" }),
+            body: JSON.stringify({ shopDomain: project.shopDomain, storeName: project.name, niche: project.storeNiche || "ecommerce", market: "es", storeContext: params?.customTopic || "" }),
           });
           const data = await resp.json() as Record<string, unknown>;
           if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando flujo email"}` }; break; }
@@ -7973,7 +7974,7 @@ Responde SOLO con JSON válido (sin markdown):
           const flowType = params?.emailType || "promotional";
           const resp = await fetch(`${baseUrl}/api/klaviyo-ai/generate-email`, {
             method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
-            body: JSON.stringify({ flowType, emailPosition: 1, storeName: project.name, shopDomain: project.shopDomain, niche: project.niche || "ecommerce", market: "es", projectId }),
+            body: JSON.stringify({ flowType, emailPosition: 1, storeName: project.name, shopDomain: project.shopDomain, niche: project.storeNiche || "ecommerce", market: "es", projectId }),
           });
           const data = await resp.json() as Record<string, unknown>;
           if (!resp.ok) { result = { error: true, message: `❌ ${data.error ?? "Error generando email"}` }; break; }
@@ -8883,9 +8884,9 @@ ${buildCoverPage({ reportTitle: "Informe de Capacidades", reportSubtitle: "Catá
             try {
               const { runDualPageSpeed } = await import("../lib/pagespeed.js");
               const ps = await runDualPageSpeed(validatedUrl);
-              sections.pagespeed = `📊 PageSpeed: Mobile ${ps.mobile?.score ?? "N/A"}/100, Desktop ${ps.desktop?.score ?? "N/A"}/100\n` +
-                `FCP: ${ps.mobile?.metrics?.firstContentfulPaint ?? "?"}, LCP: ${ps.mobile?.metrics?.largestContentfulPaint ?? "?"}, CLS: ${ps.mobile?.metrics?.cumulativeLayoutShift ?? "?"}\n` +
-                `Speed Index: ${ps.mobile?.metrics?.speedIndex ?? "?"}`;
+              sections.pagespeed = `📊 PageSpeed: Mobile ${ps.mobile?.performanceScore ?? "N/A"}/100, Desktop ${ps.desktop?.performanceScore ?? "N/A"}/100\n` +
+                `FCP: ${ps.mobile?.coreWebVitals?.fcp?.value ?? "?"}, LCP: ${ps.mobile?.coreWebVitals?.lcp?.value ?? "?"}, CLS: ${ps.mobile?.coreWebVitals?.cls?.value ?? "?"}\n` +
+                `Speed Index: ${ps.mobile?.coreWebVitals?.si?.value ?? "?"}`;
             } catch (e) { errors.push(`PageSpeed: ${e instanceof Error ? e.message : String(e)}`); }
           }
 

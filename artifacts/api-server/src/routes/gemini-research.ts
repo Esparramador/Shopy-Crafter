@@ -77,7 +77,7 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
     const gaps = await askClaudeJsonWithBrain<{ quickWins: string[]; contentGaps: string[]; pricingOpportunity: string; seoGap: string }>(
       0,
       `Based on this competitor intelligence for ${domain}:\n${JSON.stringify(intel, null, 2)}\n\nIdentify specific opportunities for a competing Shopify store to win:\nReturn JSON: { "quickWins": ["3 immediate actions"], "contentGaps": ["content they lack"], "pricingOpportunity": "string", "seoGap": "string" }`,
-      undefined,
+      "You are a competitive analysis expert for e-commerce stores.",
       "general",
       niche
     );

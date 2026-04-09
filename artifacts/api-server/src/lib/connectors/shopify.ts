@@ -214,7 +214,13 @@ export class ShopifyConnector implements IPlatformConnector {
 
   async getSeoData(platformProductId: string): Promise<SeoData | null> {
     const product = await this.getProduct(platformProductId);
-    return product.seo ?? null;
+    if (!product.seo) return null;
+    return {
+      metaTitle: product.seo.metaTitle ?? "",
+      metaDescription: product.seo.metaDescription ?? "",
+      focusKeyword: product.seo.focusKeyword,
+      handle: (product.seo as any).handle,
+    };
   }
 
   async updateSeo(platformProductId: string, data: Partial<SeoData>): Promise<SeoData> {

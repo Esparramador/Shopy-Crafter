@@ -102,7 +102,7 @@ router.get("/generator/types", (_req: Request, res: Response) => {
   res.json({ success: true, categories: grouped, total: GENERATOR_TYPES.length });
 });
 
-router.post("/generator/run", async (req: Request, res: Response) => {
+router.post("/generator/run", async (req: Request, res: Response): Promise<any> => {
   const { type, projectId, url, format, template, level, params: extraParams } = req.body;
   const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));
   if (!type) return res.status(400).json({ error: "Falta el tipo de generación" });
@@ -129,7 +129,7 @@ router.post("/generator/run", async (req: Request, res: Response) => {
       const project = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).then(r => r[0]);
       const products = await db.select().from(productsTable).where(eq(productsTable.projectId, pid)).limit(30);
       const productList = products.map(p => `- ${p.title} (${p.price ?? "sin precio"}, ${p.productType ?? "sin tipo"})`).join("\n");
-      const dataBlock = `Proyecto: ${project?.shopName ?? `#${pid}`}\nDominio: ${project?.shopDomain ?? "N/A"}\nNicho: ${project?.storeNiche ?? "N/A"}\nProductos (${products.length}):\n${productList}`;
+      const dataBlock = `Proyecto: ${project?.name ?? `#${pid}`}\nDominio: ${project?.shopDomain ?? "N/A"}\nNicho: ${project?.storeNiche ?? "N/A"}\nProductos (${products.length}):\n${productList}`;
 
       const levelResult = await generateLeveledReport({
         projectId: pid,
@@ -272,7 +272,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         try {
           const shell = getReportShell(template);
           const project = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)).then(r => r[0]);
-          const storeName = project?.shopName || `Proyecto ${projectId}`;
+          const storeName = project?.name || `Proyecto ${projectId}`;
           const vaultHtml = shell(
             genLabel,
             `${storeName} — ${project?.shopDomain || ""}`,
@@ -322,17 +322,18 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       const project = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)).then(r => r[0]);
       if (!project) return { message: "❌ Proyecto no encontrado" };
       const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId)).limit(30);
-      const brandCtx = await buildBrandDnaContext(projectId);
+      const brandProfile = await fetchBrandProfile(projectId);
+      const brandCtx = brandProfile ? buildBrandDnaContext(brandProfile) : "";
       const brainCtx = await buildShopyBrainContext(project.storeNiche || undefined, "general", `Genera ${type} profesional`);
 
       const prompts: Record<string, string> = {
         "seo-metas": `Genera meta titles (máx 60 chars) y meta descriptions (máx 155 chars) SEO optimizados para CADA uno de estos ${products.length} productos de la tienda "${project.shopDomain}". Incluye keywords investigados. Formato: tabla HTML profesional con columnas: Producto | Meta Title | Meta Description | Keywords Target.\n\nProductos:\n${products.map(p => `- ${p.title} (${p.productType || "General"}) — ${p.price}€`).join("\n")}`,
         "seo-schemas": `Genera Schema JSON-LD completo para la tienda "${project.shopDomain}". Incluye:\n1. Organization schema\n2. WebSite schema con SearchAction\n3. BreadcrumbList\n4. Product schema para cada producto\n5. FAQ schema\n\nProductos: ${products.map(p => `${p.title} (${p.price}€)`).join(", ")}`,
-        "seo-alt-texts": `Genera alt texts SEO descriptivos (máx 125 chars cada uno) para todas las imágenes de estos productos. Formato tabla HTML: Producto | Imagen | Alt Text sugerido.\n\nProductos: ${products.map(p => `${p.title} (imágenes: ${(p.images as any)?.length || 0})`).join(", ")}`,
-        "seo-keywords": `Realiza una investigación de keywords completa para la tienda "${project.shopDomain}" en el nicho "${project.shopName}". Incluye:\n- 20 keywords principales con volumen estimado y dificultad\n- 15 long-tail keywords\n- 10 keywords de competidores\n- Oportunidades de contenido\n- Mapa de keywords por página`,
+        "seo-alt-texts": `Genera alt texts SEO descriptivos (máx 125 chars cada uno) para todas las imágenes de estos productos. Formato tabla HTML: Producto | Imagen | Alt Text sugerido.\n\nProductos: ${products.map(p => `${p.title} (imágenes: ${(p as any).images?.length || p.imageCount || 0})`).join(", ")}`,
+        "seo-keywords": `Realiza una investigación de keywords completa para la tienda "${project.shopDomain}" en el nicho "${project.name}". Incluye:\n- 20 keywords principales con volumen estimado y dificultad\n- 15 long-tail keywords\n- 10 keywords de competidores\n- Oportunidades de contenido\n- Mapa de keywords por página`,
         "seo-sitemap": `Genera un sitemap.xml completo para "${project.shopDomain}" con estas URLs:\n${products.map(p => `- /products/${p.handle || p.title.toLowerCase().replace(/\s+/g, "-")}`).join("\n")}\n\nIncluye: homepage, colecciones, páginas estáticas, blog. Prioridades y changefreq optimizados.`,
-        "blog-strategy": `Crea una estrategia de blog completa para "${project.shopName}" (${project.shopDomain}):\n- Plan editorial de 12 semanas\n- 24 títulos de artículos con keywords target\n- Estructura de cada artículo (H2s)\n- Calendario de publicación\n- Estrategia de interlinking\n- Métricas objetivo`,
-        "blog-post": `Escribe un artículo de blog SEO completo de 1500+ palabras para "${project.shopName}". Tema: "Guía completa de ${products[0]?.productType || "productos"}". Incluye: H1, H2s, H3s, párrafos informativos, CTAs, FAQ schema, imágenes sugeridas, meta description.`,
+        "blog-strategy": `Crea una estrategia de blog completa para "${project.name}" (${project.shopDomain}):\n- Plan editorial de 12 semanas\n- 24 títulos de artículos con keywords target\n- Estructura de cada artículo (H2s)\n- Calendario de publicación\n- Estrategia de interlinking\n- Métricas objetivo`,
+        "blog-post": `Escribe un artículo de blog SEO completo de 1500+ palabras para "${project.name}". Tema: "Guía completa de ${products[0]?.productType || "productos"}". Incluye: H1, H2s, H3s, párrafos informativos, CTAs, FAQ schema, imágenes sugeridas, meta description.`,
       };
 
       const prompt = prompts[type] || `Genera contenido ${type} profesional para ${project.shopDomain}`;
@@ -348,7 +349,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       const genLabel = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
       const date = new Date().toLocaleDateString("es-ES");
       const shell = getReportShell(template);
-      const html = shell(genLabel, `${project.shopName} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date, project.shopName || undefined);
+      const html = shell(genLabel, `${project.name} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date, project.name || undefined);
 
       let vaultId: number | null = null;
       if (projectId) {
@@ -364,7 +365,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
         });
         learnFromOperation({
           operationType: `generator_${type}`,
-          title: `Generado ${type} para "${project.shopName}" [${template}]`,
+          title: `Generado ${type} para "${project.name}" [${template}]`,
           content: aiContent.substring(0, 8000),
         });
       }
@@ -408,7 +409,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       if (!projectId) return { message: "❌ Requiere proyecto" };
       const profile2 = await fetchBrandProfile(projectId);
       if (!profile2) return { message: "❌ Proyecto no encontrado" };
-      const aiCss = await generateAiBrandCss(profile2);
+      const aiCss = await generateAiBrandCss(projectId, profile2);
       const vaultId2 = await saveToVault({
         projectId,
         fileType: "brand-css-ai",
@@ -483,22 +484,23 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       const project = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)).then(r => r[0]);
       if (!project) return { message: "❌ Proyecto no encontrado" };
       const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId)).limit(20);
-      const brandCtx = await buildBrandDnaContext(projectId);
+      const brandProfile2 = await fetchBrandProfile(projectId);
+      const brandCtx = brandProfile2 ? buildBrandDnaContext(brandProfile2) : "";
       const brainCtx = await buildShopyBrainContext(project.storeNiche || undefined, "general", `Genera ${type}`);
 
       const contentPrompts: Record<string, string> = {
-        "photo-brief": `Genera un BRIEF FOTOGRÁFICO PROFESIONAL para la marca "${project.shopName}". Incluye:\n- Estilo visual (minimalista/lifestyle/editorial)\n- Paleta de colores de fondo\n- Tipo de iluminación (natural/estudio/dramática)\n- Ángulos de cámara recomendados\n- Props y escenografía\n- Mood board descriptivo\n- Especificaciones técnicas (resolución, ratio, formato)\n- 8 tipos de foto por producto (Hero, Lifestyle, Detalle, Escala, Proceso, UGC, Packaging, Variante)\n\nProductos a fotografiar:\n${products.map(p => `- ${p.title}`).join("\n")}`,
-        "social-kit": `Genera un KIT COMPLETO PARA REDES SOCIALES para "${project.shopName}":\n- Paleta de colores para posts (con hex codes)\n- Tipografías recomendadas\n- 6 templates de post (formato descripción detallada)\n- Grid estético para Instagram (9 posts planificados)\n- Hashtags por categoría\n- Tono de voz y guidelines\n- Calendario semanal tipo`,
-        "email-templates": `Genera 5 TEMPLATES HTML COMPLETOS de email marketing para "${project.shopName}":\n1. Email de Bienvenida\n2. Carrito Abandonado\n3. Post-Compra + Upsell\n4. Newsletter Mensual\n5. Oferta Especial / Flash Sale\n\nCada template debe incluir: HTML completo con CSS inline, subject line, preheader, CTAs, y estructura responsive. Usa los colores de la marca.`,
-        "email-flow": `Diseña un FLUJO DE EMAIL AUTOMATIZADO completo para "${project.shopName}" (Klaviyo-ready):\n- Flow de Bienvenida (4 emails, timing)\n- Flow Carrito Abandonado (3 emails)\n- Flow Post-Compra (3 emails)\n- Flow Win-Back (2 emails)\n- Flow Review Request\n\nPara cada email: trigger, delay, subject, contenido resumido, segmentación y A/B test sugerido.`,
-        "social-posts": `Genera 30 POSTS PROFESIONALES para redes sociales de "${project.shopName}":\n- 10 posts Instagram (caption + hashtags)\n- 10 posts para Stories/Reels (script + hook)\n- 10 posts TikTok/Shorts (script + trending audio sugerido)\n\nIncluye calendario de 30 días y métricas objetivo.`,
-        "landing-design": `Diseña una LANDING PAGE COMPLETA para "${project.shopName}":\n- Wireframe detallado (secciones con medidas)\n- Hero section con headline + subheadline + CTA\n- Sección de beneficios (3-4 puntos)\n- Social proof / testimonios\n- Showcase de productos\n- FAQ section\n- Final CTA\n- CSS completo para toda la landing\n- Textos finales listos para copiar`,
-        "product-redesign": `Rediseña los ${Math.min(products.length, 5)} primeros productos de "${project.shopName}" con calidad 100/100. Para CADA producto genera:\n1. Título SEO optimizado (máx 70 chars)\n2. Descripción HTML 800-1200 palabras con 8 secciones\n3. Meta description (máx 155 chars)\n4. 5 keywords target\n5. FAQ (3-4 preguntas)\n6. Trust badges sugeridos\n\nProductos:\n${products.slice(0, 5).map(p => `- ${p.title}: ${p.price}€`).join("\n")}`,
-        "pricing-optimal": `Calcula el PRECIO ÓPTIMO para cada producto de "${project.shopName}". Análisis:\n- Precio actual vs precio óptimo\n- Precio psicológico recomendado\n- Margen estimado\n- Elasticidad de demanda\n- Benchmark vs competencia\n\nProductos:\n${products.map(p => `- ${p.title}: ${p.price}€ (compare: ${p.compareAtPrice || "N/A"}€)`).join("\n")}`,
-        "margin-waterfall": `Genera un WATERFALL DE MÁRGENES detallado para "${project.shopName}". Para cada €1 de revenue, desglosa:\n- Coste de producto (COGS)\n- Comisión Shopify (2.9% + 0.30€)\n- Comisión pasarela de pago\n- Coste de envío estimado\n- Marketing (CAC estimado)\n- Costes operativos\n- Margen neto\n\nProductos:\n${products.map(p => `- ${p.title}: ${p.price}€`).join("\n")}`,
-        "financial-forecast": `Genera una PROYECCIÓN FINANCIERA A 12 MESES para "${project.shopName}" con 3 escenarios:\n\n🟢 OPTIMISTA: +30% crecimiento mensual\n🟡 BASE: +15% crecimiento mensual\n🔴 CONSERVADOR: +5% crecimiento mensual\n\nIncluye: Revenue mensual, Costes, EBITDA, Break-even point, ROI marketing, LTV/CAC ratio.\n\nDatos actuales: ${products.length} productos, precio medio ${products.length > 0 ? (products.reduce((s, p) => s + parseFloat(String(p.price || 0)), 0) / products.length).toFixed(2) : 0}€`,
-        "agency-proposal": `Genera una PROPUESTA COMERCIAL PROFESIONAL de Shopy Crafter para el cliente "${project.shopName}" (${project.shopDomain}). Incluye:\n- Portada corporativa\n- Resumen ejecutivo\n- Diagnóstico actual (basado en los ${products.length} productos)\n- Servicios recomendados con precios\n- Plan de trabajo (timeline 3 meses)\n- ROI estimado\n- Equipo asignado\n- Condiciones y siguiente paso\n\nUsa diseño profesional con colores corporativos de Shopy Crafter.`,
-        "agency-budget": `Genera un PRESUPUESTO PROFESIONAL DETALLADO de Shopy Crafter para "${project.shopName}". Formato:\n- Datos del cliente y de la agencia\n- Desglose de servicios con precio unitario\n- Subtotal\n- IVA 21%\n- TOTAL\n- Condiciones de pago\n- Validez del presupuesto\n- Firma\n\nServicios recomendados basados en ${products.length} productos y el análisis de la tienda.`,
+        "photo-brief": `Genera un BRIEF FOTOGRÁFICO PROFESIONAL para la marca "${project.name}". Incluye:\n- Estilo visual (minimalista/lifestyle/editorial)\n- Paleta de colores de fondo\n- Tipo de iluminación (natural/estudio/dramática)\n- Ángulos de cámara recomendados\n- Props y escenografía\n- Mood board descriptivo\n- Especificaciones técnicas (resolución, ratio, formato)\n- 8 tipos de foto por producto (Hero, Lifestyle, Detalle, Escala, Proceso, UGC, Packaging, Variante)\n\nProductos a fotografiar:\n${products.map(p => `- ${p.title}`).join("\n")}`,
+        "social-kit": `Genera un KIT COMPLETO PARA REDES SOCIALES para "${project.name}":\n- Paleta de colores para posts (con hex codes)\n- Tipografías recomendadas\n- 6 templates de post (formato descripción detallada)\n- Grid estético para Instagram (9 posts planificados)\n- Hashtags por categoría\n- Tono de voz y guidelines\n- Calendario semanal tipo`,
+        "email-templates": `Genera 5 TEMPLATES HTML COMPLETOS de email marketing para "${project.name}":\n1. Email de Bienvenida\n2. Carrito Abandonado\n3. Post-Compra + Upsell\n4. Newsletter Mensual\n5. Oferta Especial / Flash Sale\n\nCada template debe incluir: HTML completo con CSS inline, subject line, preheader, CTAs, y estructura responsive. Usa los colores de la marca.`,
+        "email-flow": `Diseña un FLUJO DE EMAIL AUTOMATIZADO completo para "${project.name}" (Klaviyo-ready):\n- Flow de Bienvenida (4 emails, timing)\n- Flow Carrito Abandonado (3 emails)\n- Flow Post-Compra (3 emails)\n- Flow Win-Back (2 emails)\n- Flow Review Request\n\nPara cada email: trigger, delay, subject, contenido resumido, segmentación y A/B test sugerido.`,
+        "social-posts": `Genera 30 POSTS PROFESIONALES para redes sociales de "${project.name}":\n- 10 posts Instagram (caption + hashtags)\n- 10 posts para Stories/Reels (script + hook)\n- 10 posts TikTok/Shorts (script + trending audio sugerido)\n\nIncluye calendario de 30 días y métricas objetivo.`,
+        "landing-design": `Diseña una LANDING PAGE COMPLETA para "${project.name}":\n- Wireframe detallado (secciones con medidas)\n- Hero section con headline + subheadline + CTA\n- Sección de beneficios (3-4 puntos)\n- Social proof / testimonios\n- Showcase de productos\n- FAQ section\n- Final CTA\n- CSS completo para toda la landing\n- Textos finales listos para copiar`,
+        "product-redesign": `Rediseña los ${Math.min(products.length, 5)} primeros productos de "${project.name}" con calidad 100/100. Para CADA producto genera:\n1. Título SEO optimizado (máx 70 chars)\n2. Descripción HTML 800-1200 palabras con 8 secciones\n3. Meta description (máx 155 chars)\n4. 5 keywords target\n5. FAQ (3-4 preguntas)\n6. Trust badges sugeridos\n\nProductos:\n${products.slice(0, 5).map(p => `- ${p.title}: ${p.price}€`).join("\n")}`,
+        "pricing-optimal": `Calcula el PRECIO ÓPTIMO para cada producto de "${project.name}". Análisis:\n- Precio actual vs precio óptimo\n- Precio psicológico recomendado\n- Margen estimado\n- Elasticidad de demanda\n- Benchmark vs competencia\n\nProductos:\n${products.map(p => `- ${p.title}: ${p.price}€ (compare: ${p.compareAtPrice || "N/A"}€)`).join("\n")}`,
+        "margin-waterfall": `Genera un WATERFALL DE MÁRGENES detallado para "${project.name}". Para cada €1 de revenue, desglosa:\n- Coste de producto (COGS)\n- Comisión Shopify (2.9% + 0.30€)\n- Comisión pasarela de pago\n- Coste de envío estimado\n- Marketing (CAC estimado)\n- Costes operativos\n- Margen neto\n\nProductos:\n${products.map(p => `- ${p.title}: ${p.price}€`).join("\n")}`,
+        "financial-forecast": `Genera una PROYECCIÓN FINANCIERA A 12 MESES para "${project.name}" con 3 escenarios:\n\n🟢 OPTIMISTA: +30% crecimiento mensual\n🟡 BASE: +15% crecimiento mensual\n🔴 CONSERVADOR: +5% crecimiento mensual\n\nIncluye: Revenue mensual, Costes, EBITDA, Break-even point, ROI marketing, LTV/CAC ratio.\n\nDatos actuales: ${products.length} productos, precio medio ${products.length > 0 ? (products.reduce((s, p) => s + parseFloat(String(p.price || 0)), 0) / products.length).toFixed(2) : 0}€`,
+        "agency-proposal": `Genera una PROPUESTA COMERCIAL PROFESIONAL de Shopy Crafter para el cliente "${project.name}" (${project.shopDomain}). Incluye:\n- Portada corporativa\n- Resumen ejecutivo\n- Diagnóstico actual (basado en los ${products.length} productos)\n- Servicios recomendados con precios\n- Plan de trabajo (timeline 3 meses)\n- ROI estimado\n- Equipo asignado\n- Condiciones y siguiente paso\n\nUsa diseño profesional con colores corporativos de Shopy Crafter.`,
+        "agency-budget": `Genera un PRESUPUESTO PROFESIONAL DETALLADO de Shopy Crafter para "${project.name}". Formato:\n- Datos del cliente y de la agencia\n- Desglose de servicios con precio unitario\n- Subtotal\n- IVA 21%\n- TOTAL\n- Condiciones de pago\n- Validez del presupuesto\n- Firma\n\nServicios recomendados basados en ${products.length} productos y el análisis de la tienda.`,
       };
 
       const prompt = contentPrompts[type] || `Genera contenido profesional tipo ${type}`;
@@ -514,7 +516,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       const genLabel2 = GENERATOR_TYPES.find(t => t.id === type)?.label || type;
       const date2 = new Date().toLocaleDateString("es-ES");
       const shell2 = getReportShell(template);
-      const html = shell2(genLabel2, `${project.shopName} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date2, project.shopName || undefined);
+      const html = shell2(genLabel2, `${project.name} — ${project.shopDomain || ""}`, aiContent.includes("ai-deliverable") ? aiContent : `<div class="ai-deliverable">${aiContent}</div>`, date2, project.name || undefined);
 
       const vaultId = await saveToVault({
         projectId,
@@ -528,7 +530,7 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
       });
       learnFromOperation({
         operationType: `generator_${type}`,
-        title: `Generado ${type} para "${project.shopName}" [${template}]`,
+        title: `Generado ${type} para "${project.name}" [${template}]`,
         content: aiContent.substring(0, 2000),
       });
 
@@ -625,8 +627,8 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
   }
 }
 
-router.get("/generator/download/:vaultId", async (req: Request, res: Response) => {
-  const vaultId = parseInt(req.params.vaultId);
+router.get("/generator/download/:vaultId", async (req: Request, res: Response): Promise<any> => {
+  const vaultId = parseInt(String(req.params.vaultId));
   if (isNaN(vaultId)) return res.status(400).json({ error: "ID inválido" });
 
   const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, vaultId));
@@ -657,8 +659,8 @@ router.get("/generator/download/:vaultId", async (req: Request, res: Response) =
   res.send(content);
 });
 
-router.get("/generator/history/:projectId", async (req: Request, res: Response) => {
-  const projectId = parseInt(req.params.projectId);
+router.get("/generator/history/:projectId", async (req: Request, res: Response): Promise<any> => {
+  const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) return res.status(400).json({ error: "ID inválido" });
 
   const files = await db.select({

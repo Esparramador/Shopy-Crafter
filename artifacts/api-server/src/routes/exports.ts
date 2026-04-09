@@ -2080,8 +2080,8 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   const worstProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore < 50).sort((a, b) => (a.seoScore ?? 0) - (b.seoScore ?? 0)).slice(0, 10);
   const bestProducts = seoProductCards.filter(p => p.seoScore !== undefined && p.seoScore >= 80).slice(0, 5);
   const noMetaDesc = seoData.filter(s => !s.metaDescription || s.metaDescription.length < 50).length;
-  const shortDescriptions = seoData.filter(s => !s.bodyHtml || s.bodyHtml.length < 200).length;
-  const missingImages = seoData.filter(s => !s.imageCount || s.imageCount < 2).length;
+  const shortDescriptions = seoData.filter(s => !(s as any).bodyHtml || (s as any).bodyHtml.length < 200).length;
+  const missingImages = seoData.filter(s => !(s as any).imageCount || (s as any).imageCount < 2).length;
   const platformLabel = project.platformType || "shopify";
 
   const seoContext = `TIENDA: ${project.name} (${project.shopDomain || "sin dominio"})
@@ -2427,12 +2427,12 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
   let rows = "";
   for (const t of tests) {
     rows += `<tr><!-- nosemgrep -->
-      <td style="font-weight:500;">${t.testName}</td><!-- nosemgrep -->
+      <td style="font-weight:500;">${(t as any).testName ?? t.productTitle}</td><!-- nosemgrep -->
       <td>${t.testType}</td><!-- nosemgrep -->
       <td><span class="tag">${t.status}</span></td><!-- nosemgrep -->
       <td>${t.startDate ? new Date(t.startDate).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
       <td>${t.winner ?? "—"}</td><!-- nosemgrep -->
-      <td class="text-muted">${t.improvementPct != null ? `+${t.improvementPct.toFixed(1)}%` : "—"}</td><!-- nosemgrep -->
+      <td class="text-muted">${(t as any).improvementPct != null ? `+${(t as any).improvementPct.toFixed(1)}%` : "—"}</td><!-- nosemgrep -->
     </tr>`;
   }
 
@@ -2814,7 +2814,7 @@ IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nom
 
     learnFromOperation({
       operationType: "ai_strategic_report",
-      title: `Informe IA estratégico: ${project.storeName ?? "tienda"} — ${Object.keys(aiReport).length} secciones`,
+      title: `Informe IA estratégico: ${project.name ?? "tienda"} — ${Object.keys(aiReport).length} secciones`,
       content: `Informe IA generado. Secciones: ${Object.keys(aiReport).join(", ")}. Resumen: ${aiReport.executiveSummary ?? ""}. Plan 30d: ${aiReport.actionPlan30Days ?? ""}. Revenue: ${aiReport.revenueProjection ?? ""}`,
       confidence: 0.92,
       tags: ["report", "strategic", "ai_analysis", project.storeNiche ?? "general"],
@@ -3147,8 +3147,8 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
       <td style="font-weight:600;">${esc(p.title).slice(0, 40)}</td>
       <td>${price.toFixed(2)}€</td>
       <td>${cogs ? `${cogs.unitCost?.toFixed(2) ?? "0.00"}€` : "—"}</td>
-      <td>${cogs ? `${(cogs.packaging ?? 0).toFixed(2)}€` : "—"}</td>
-      <td>${cogs ? `${(cogs.shippingDomestic ?? 0).toFixed(2)}€` : "—"}</td>
+      <td>${cogs ? `${(cogs.packagingCost ?? 0).toFixed(2)}€` : "—"}</td>
+      <td>${cogs ? `${(cogs.shippingCostDomestic ?? 0).toFixed(2)}€` : "—"}</td>
       <td style="font-weight:700;">${cogs ? `${cogs.totalCogs.toFixed(2)}€` : "—"}</td>
       <td>${breakEven != null ? `${breakEven.toFixed(2)}€` : "—"}</td>
       <td>${margin != null ? `<span class="${margin > 30 ? "text-jade fw-700" : margin > 15 ? "text-gold fw-700" : "text-red fw-700"}">${margin.toFixed(1)}%</span>` : "—"}</td>
@@ -3330,12 +3330,12 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   if (allCogs.length === 0 && products.length > 0) {
     try {
       const cogsEst = await estimateCogsWithAI(projectId, {
-        name: project.shopifyDomain?.replace(".myshopify.com", "") || project.storeName || "Tienda",
+        name: project.shopDomain?.replace(".myshopify.com", "") || project.name || "Tienda",
         sector: project.storeNiche || "eCommerce",
-        location: project.storeMarkets || "España",
-        services: productTypes,
+        location: (project as any).storeMarkets || "España",
+        services: productTypes as string[],
         products: products.slice(0, 15).map(p => ({ title: p.title ?? "", price: p.price ?? "0" })),
-        domain: project.shopifyDomain ?? undefined,
+        domain: project.shopDomain ?? undefined,
       });
       if (cogsEst) {
         cogsEstimationHtml = buildCogsEstimationHtml(cogsEst, {
@@ -3921,7 +3921,7 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
     ${await generateAiRecommendations(projectId, "inventory", (() => {
   const healthy = inventory.filter(i => i.status !== "critical" && i.status !== "low");
   const avgDailySalesAll = inventory.filter(i => i.avgDailySales != null).reduce((s, i) => s + (i.avgDailySales ?? 0), 0);
-  const totalValue = inventory.reduce((s, i) => (s + (i.currentStock ?? 0) * (i.unitCost ?? 0)), 0);
+  const totalValue = inventory.reduce((s, i) => (s + (i.currentStock ?? 0) * ((i as any).unitCost ?? 0)), 0);
   const pendingRestocks = restocks.filter(r => !r.adminApproved);
   return `TIENDA: ${project.name}
 PLATAFORMA: ${project.platformType || "shopify"}
@@ -3942,7 +3942,7 @@ VENTAS DIARIAS TOTALES ESTIMADAS: ${avgDailySalesAll.toFixed(1)} unidades/día
 ${critical.slice(0, 10).map((i, idx) => `${idx + 1}. "${i.productTitle || i.productId}"
    Stock actual: ${i.currentStock ?? 0} uds | Ventas/día: ${i.avgDailySales?.toFixed(1) ?? "?"} | Días hasta rotura: ${i.daysRemaining ?? "?"}
    Proveedor: ${i.supplierEmail || "❌ SIN PROVEEDOR ASIGNADO"} | Lead time: ${i.supplierLeadDays ?? "?"} días
-   Coste oportunidad/día sin stock: ~${i.avgDailySales ? (i.avgDailySales * (i.unitCost ?? 10) * 2.5).toFixed(2) : "?"} €`).join("\n") || "Ninguno en estado crítico"}
+   Coste oportunidad/día sin stock: ~${i.avgDailySales ? (i.avgDailySales * ((i as any).unitCost ?? 10) * 2.5).toFixed(2) : "?"} €`).join("\n") || "Ninguno en estado crítico"}
 
 ⚠️ PRODUCTOS CON STOCK BAJO — PLANIFICAR REPOSICIÓN:
 ${lowStock.slice(0, 10).map(i => `- "${i.productTitle || i.productId}" Stock: ${i.currentStock ?? 0} uds, Días restantes: ${i.daysRemaining ?? "?"}, Proveedor: ${i.supplierEmail || "sin proveedor"}`).join("\n") || "Ninguno"}
@@ -3974,7 +3974,7 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
     rows += `<tr><!-- nosemgrep -->
       <td style="font-weight:500;">${product?.title || r.shopifyProductId || "Desconocido"}</td><!-- nosemgrep -->
       <td>${r.newTitle?.slice(0, 50) ?? "—"}${(r.newTitle?.length ?? 0) > 50 ? "…" : ""}</td><!-- nosemgrep -->
-      <td>${r.recommendedPrice != null ? `${r.recommendedPrice}€` : "—"}</td><!-- nosemgrep -->
+      <td>${(r as any).recommendedPrice != null ? `${(r as any).recommendedPrice}€` : "—"}</td><!-- nosemgrep -->
       <td>${r.appliedAt ? `<span class="text-jade">Aplicado</span>` : '<span class="text-muted">Pendiente</span>'}</td>
       <td class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-ES") : "—"}</td><!-- nosemgrep -->
     </tr>`;
@@ -3995,19 +3995,19 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
         </table>
       </div>
     </div>
-    ${redesigns.length > 0 && redesigns[0].newDescription ? `<div class="section"><!-- nosemgrep -->
+    ${redesigns.length > 0 && (redesigns[0] as any).newDescription ? `<div class="section"><!-- nosemgrep -->
       <div class="section-title">Ejemplo de Rediseño Más Reciente</div>
       <div class="card">
         <p class="text-muted" style="font-size:11px;text-transform:uppercase;margin-bottom:8px;">Producto: ${productMap.get(redesigns[0].shopifyProductId ?? "")?.title || "—"}</p><!-- nosemgrep -->
         <p style="font-size:16px;font-weight:600;color:${BRAND.gold};margin-bottom:12px;">${redesigns[0].newTitle || "—"}</p><!-- nosemgrep -->
-        <div class="blog-content" style="font-size:13px;">${redesigns[0].newDescription?.slice(0, 500) ?? ""}${(redesigns[0].newDescription?.length ?? 0) > 500 ? "..." : ""}</div><!-- nosemgrep -->
-        ${redesigns[0].tags ? `<div style="margin-top:12px;">${(redesigns[0].tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}<!-- nosemgrep -->
+        <div class="blog-content" style="font-size:13px;">${(redesigns[0] as any).newDescription?.slice(0, 500) ?? ""}${((redesigns[0] as any).newDescription?.length ?? 0) > 500 ? "..." : ""}</div><!-- nosemgrep -->
+        ${(redesigns[0] as any).tags ? `<div style="margin-top:12px;">${((redesigns[0] as any).tags as any)?.slice?.(0, 10)?.map?.((t: string) => `<span class="tag">${t}</span>`)?.join(" ") ?? ""}</div>` : ""}<!-- nosemgrep -->
       </div>
     </div>` : ""}
 
     ${await generateAiRecommendations(projectId, "redesigns", (() => {
   const pending = redesigns.filter(r => !r.appliedAt);
-  const withPriceChange = redesigns.filter(r => r.recommendedPrice != null);
+  const withPriceChange = redesigns.filter(r => (r as any).recommendedPrice != null);
   const productsWithoutRedesign = products.filter(p => !redesigns.some(r => r.shopifyProductId === p.shopifyProductId));
   return `TIENDA: ${project.name}
 PLATAFORMA: ${project.platformType || "shopify"}
@@ -4024,12 +4024,13 @@ REDISEÑOS CON CAMBIO DE PRECIO: ${withPriceChange.length}
 ${redesigns.slice(0, 12).map((r, i) => {
   const prod = productMap.get(r.shopifyProductId ?? "");
   const origPrice = prod ? parseFloat(prod.price ?? "0") : 0;
-  const priceChange = r.recommendedPrice && origPrice > 0 ? ((r.recommendedPrice - origPrice) / origPrice * 100).toFixed(1) : null;
+  const recPrice = (r as any).recommendedPrice;
+  const priceChange = recPrice && origPrice > 0 ? ((recPrice - origPrice) / origPrice * 100).toFixed(1) : null;
   return `${i + 1}. "${prod?.title || "Desconocido"}"
    Título propuesto: "${r.newTitle?.slice(0, 100) || "N/A"}"
-   Precio original: ${origPrice.toFixed(2)}€ → Recomendado: ${r.recommendedPrice != null ? r.recommendedPrice + "€" : "sin cambio"} ${priceChange ? `(${Number(priceChange) >= 0 ? "+" : ""}${priceChange}%)` : ""}
+   Precio original: ${origPrice.toFixed(2)}€ → Recomendado: ${recPrice != null ? recPrice + "€" : "sin cambio"} ${priceChange ? `(${Number(priceChange) >= 0 ? "+" : ""}${priceChange}%)` : ""}
    Estado: ${r.appliedAt ? "✅ APLICADO" : "⏳ PENDIENTE"}
-   Tags propuestos: ${Array.isArray(r.tags) ? (r.tags as string[]).slice(0, 5).join(", ") : "N/A"}`;
+   Tags propuestos: ${Array.isArray((r as any).tags) ? ((r as any).tags as string[]).slice(0, 5).join(", ") : "N/A"}`;
 }).join("\n")}
 
 🚫 PRODUCTOS AÚN SIN REDISEÑAR (oportunidad):
@@ -4289,8 +4290,8 @@ router.get("/projects/:projectId/exports/json/full", async (req, res): Promise<v
     products: products.map(p => ({ title: p.title, handle: p.handle, price: p.price, status: p.status, vendor: p.vendor, type: p.productType, tags: p.tags, images: p.imageCount, variants: p.variantCount, audit: p.auditScore })),
     seo: seoData.map(s => ({ productId: s.shopifyProductId, score: s.seoScore, grade: s.seoGrade, metaTitle: s.metaTitle, metaDescription: s.metaDescription })),
     cogs: allCogs.map(c => ({ productId: c.shopifyProductId, total: c.totalCogs })),
-    abTests: tests.map(t => ({ name: t.testName, type: t.testType, status: t.status, winner: t.winner, improvement: t.improvementPct })),
-    redesigns: redesignsData.map(r => ({ productId: r.shopifyProductId, newTitle: r.newTitle, price: r.recommendedPrice, applied: !!r.appliedAt })),
+    abTests: tests.map(t => ({ name: (t as any).testName ?? t.productTitle, type: t.testType, status: t.status, winner: t.winner, improvement: (t as any).improvementPct })),
+    redesigns: redesignsData.map(r => ({ productId: r.shopifyProductId, newTitle: r.newTitle, price: (r as any).recommendedPrice, applied: !!r.appliedAt })),
     aiImages: jobs.filter(j => j.status === "succeeded").map(j => ({ type: j.imageType, url: j.imageUrl, alt: j.altText, model: j.model })),
     competitors: competitors.map(c => ({ name: c.name, url: c.url, type: c.type })),
     inventory: inventory.map(i => ({ product: i.productTitle, stock: i.currentStock, daysLeft: i.daysRemaining, status: i.status })),
@@ -4588,7 +4589,7 @@ router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<v
       { header: "Mejora %", key: "improvement", width: 10 },
     ];
     ws2.getRow(1).eachCell(headerStyle);
-    for (const t of tests) ws2.addRow({ name: t.testName, type: t.testType, status: t.status, winner: t.winner ?? "", improvement: t.improvementPct ?? null });
+    for (const t of tests) ws2.addRow({ name: (t as any).testName ?? t.productTitle, type: t.testType, status: t.status, winner: t.winner ?? "", improvement: (t as any).improvementPct ?? null });
   }
 
   if (competitors.length > 0) {
