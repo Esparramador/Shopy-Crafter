@@ -69,7 +69,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   store: new PgRateLimitStore("auth"),
   message: { error: "Demasiados intentos. Espera 15 minutos antes de reintentar.", code: "RATE_LIMITED" },
-  skip: (req) => process.env.NODE_ENV !== "production",
+  skip: (req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
 const apiLimiter = rateLimit({
@@ -79,7 +79,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   store: new PgRateLimitStore("api"),
   message: { error: "Límite de peticiones alcanzado. Inténtalo en un momento.", code: "RATE_LIMITED" },
-  skip: (req) => process.env.NODE_ENV !== "production",
+  skip: (req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
 const aiLimiter = rateLimit({
@@ -89,7 +89,7 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
   store: new PgRateLimitStore("ai"),
   message: { error: "Demasiadas solicitudes de IA simultáneas. Espera un momento.", code: "AI_RATE_LIMITED" },
-  skip: (req) => process.env.NODE_ENV !== "production",
+  skip: (req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
 startRateLimitCleanup();

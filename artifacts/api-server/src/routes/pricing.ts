@@ -6,6 +6,7 @@ import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { getConnector } from "../lib/connectors/index.js";
+import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
 
 const router = Router();
 
@@ -629,77 +630,133 @@ Variantes: ${variants.length} (precios: ${variants.map((v: Record<string, unknow
   const productType = product.productType || "producto general";
   const niche = project.storeNiche || "e-commerce";
 
+  let productClassification = {
+    category: "physical" as string,
+    manufacturingMethod: "unknown" as string,
+    estimatedWeight: "500g" as string,
+    materialComposition: [] as string[],
+    shippingCategory: "standard" as string,
+    searchTerms: {
+      material: product.title,
+      shipping: "paquete pequeño",
+      supplier: product.title,
+      packaging: `Packaging ecommerce para ${productType} España precios`,
+    },
+  };
+
+  try {
+    const classResult = await askClaudeJsonWithBrain<{
+      category: string;
+      manufacturingMethod: string;
+      estimatedWeight: string;
+      estimatedDimensions: string;
+      materialComposition: string[];
+      complexityLevel: string;
+      isFragile: boolean;
+      shippingCategory: string;
+      specificSearchQueries: {
+        materialSearch: string;
+        shippingSearch: string;
+        supplierSearch: string;
+        packagingSearch: string;
+      };
+    }>(projectId,
+      `Clasifica este producto para estimar costes de producción:
+       Título: "${product.title}"
+       Descripción: "${(product.bodyHtml ?? "").replace(/<[^>]+>/g, " ").slice(0, 1500)}"
+       Tipo: "${productType}"
+       Vendor: "${product.vendor}"
+       Precio: €${product.price}
+       ${shopifyDetails}
+       
+       RESPONDE con JSON:
+       {
+         "category": "physical|digital|service|subscription",
+         "manufacturingMethod": "handmade|3d_printed|injection_molded|textile|assembled|wholesale_resale|dropship|print_on_demand|food|cosmetic|electronic|artisan|jewellery|paper_print",
+         "estimatedWeight": "Xg o Xkg",
+         "estimatedDimensions": "largo x ancho x alto cm",
+         "materialComposition": ["material1", "material2"],
+         "complexityLevel": "simple|medium|complex|very_complex",
+         "isFragile": false,
+         "shippingCategory": "standard|oversized|fragile|hazmat|cold_chain",
+         "specificSearchQueries": {
+           "materialSearch": "la query EXACTA para buscar en Google los materiales de este producto con precios",
+           "shippingSearch": "la query EXACTA para buscar tarifas de envío para este tipo/peso de producto",
+           "supplierSearch": "la query EXACTA para buscar proveedores/fabricantes de este tipo de producto",
+           "packagingSearch": "la query EXACTA para buscar packaging específico para este producto"
+         }
+       }`,
+      "You are a manufacturing and supply chain expert. Classify this product for cost estimation. Return ONLY valid JSON.",
+      "cogs_estimation",
+      niche,
+      2048, 30_000
+    );
+
+    productClassification = {
+      ...productClassification,
+      ...classResult,
+      searchTerms: {
+        material: classResult.specificSearchQueries?.materialSearch ?? product.title,
+        shipping: classResult.specificSearchQueries?.shippingSearch ?? "envío paquete ecommerce",
+        supplier: classResult.specificSearchQueries?.supplierSearch ?? product.title,
+        packaging: classResult.specificSearchQueries?.packagingSearch ?? `Packaging ecommerce para ${productType} España precios`,
+      },
+    };
+  } catch (err) {
+    // Classification failed — use defaults
+  }
+
   let materialResearch = { materials: [] as Array<{ material: string; priceRange: string; source: string; url?: string }>, avgMaterialCost: 0, insight: "" };
   let shippingResearch = { carriers: [] as Array<{ carrier: string; domestic: string; international: string; source: string }>, insight: "" };
   let supplierResearch = { suppliers: [] as Array<{ supplier: string; priceRange: string; moq?: string; origin?: string; url?: string }>, avgCost: 0, insight: "" };
+  let packagingResearch = { items: [] as Array<{ item: string; pricePerUnit: number; source: string }>, totalPackagingCost: 0, insight: "" };
   const researchWarnings: string[] = [];
 
   try {
-    const [matResult, shipResult, suppResult] = await Promise.allSettled([
+    const [matResult, shipResult, suppResult, packResult] = await Promise.allSettled([
       askGeminiWithSearch(
-        `BUSCA PRECIOS REALES DE MATERIALES Y COMPONENTES para fabricar este tipo de producto:
+        `${productClassification.searchTerms.material}
 
-Producto: "${product.title}"
-Tipo: ${productType}
-Nicho: ${niche}
+Busca PRECIOS REALES en: AliExpress, Amazon, proveedores industriales España.
+Materiales necesarios: ${productClassification.materialComposition.join(", ") || "detectar del tipo de producto"}.
+Método fabricación: ${productClassification.manufacturingMethod}.
 
-INSTRUCCIONES:
-1. Busca en proveedores reales (Amazon, AliExpress, proveedores industriales España, ferreterías online, tiendas de materiales)
-2. Encuentra precios ACTUALES de los materiales/componentes necesarios para fabricar este tipo de producto
-3. Incluye: materia prima, componentes, acabados, herramientas consumibles
-4. Para productos de impresión 3D: busca precios de filamento (PLA, ABS, PETG, resina) por kg
-5. Para textiles: busca precios de tela por metro
-6. Para artesanía/manualidades: busca precios de los materiales específicos
-
-RESPONDE con JSON exacto:
-{
-  "materials": [{"material": "nombre", "priceRange": "X.XX - X.XX €", "source": "tienda/proveedor", "url": "URL"}],
-  "avgMaterialCost": XX.XX,
-  "insight": "Análisis de costes de material con fuentes reales"
-}`,
-        `You are a supply chain cost analyst. Search Google for REAL current material and component prices in Spain/Europe. Return ONLY valid JSON with actual prices from real suppliers.`
+JSON: { "materials": [{"material": "", "priceRange": "€", "source": "", "url": ""}], 
+"avgMaterialCost": 0, "insight": "" }`,
+        "Supply chain cost analyst. Search for REAL prices. ONLY JSON."
       ),
       askGeminiWithSearch(
-        `BUSCA TARIFAS REALES DE ENVÍO para e-commerce en España en 2025-2026:
+        `${productClassification.searchTerms.shipping}
 
-Tipo de producto: "${product.title}" (${productType})
-Peso estimado: basado en el tipo de producto
+Peso estimado: ${productClassification.estimatedWeight}.
+Categoría envío: ${productClassification.shippingCategory}.
+Busca tarifas 2025-2026 de: Correos Express, SEUR, MRW, Nacex, GLS, DHL.
+Para envío NACIONAL España y a EUROPA.
 
-INSTRUCCIONES:
-1. Busca tarifas actualizadas de: Correos Express, SEUR, MRW, Nacex, GLS, DHL Express, FedEx, UPS España
-2. Para envío NACIONAL (península) de paquetes pequeños/medianos
-3. Para envío INTERNACIONAL a Europa
-4. Incluye tarifas de punto de recogida vs domicilio
-5. Busca también coste medio de embalaje e-commerce (cajas, relleno, cinta)
-
-RESPONDE con JSON exacto:
-{
-  "carriers": [{"carrier": "nombre", "domestic": "X.XX - X.XX €", "international": "X.XX - X.XX €", "source": "fuente"}],
-  "insight": "Análisis de las mejores opciones de envío según precio/servicio"
-}`,
-        `You are a logistics cost analyst. Search Google for REAL current shipping rates from Spanish carriers for e-commerce. Return ONLY valid JSON.`
+JSON: { "carriers": [{"carrier": "", "domestic": "€", "international": "€", "source": ""}], 
+"insight": "", "recommendedCarrier": "" }`,
+        "Logistics analyst. Current Spanish carrier rates. ONLY JSON."
       ),
       askGeminiWithSearch(
-        `BUSCA PRECIOS REALES DE PROVEEDORES Y FABRICANTES para este tipo de producto:
+        `${productClassification.searchTerms.supplier}
 
-Producto: "${product.title}"
-Tipo: ${productType}
-Nicho: ${niche}
+Busca en Alibaba, AliExpress mayorista, fabricantes españoles de ${niche}.
+Método: ${productClassification.manufacturingMethod}.
 
-INSTRUCCIONES:
-1. Busca en Alibaba, AliExpress mayorista, fabricantes españoles y europeos del sector "${niche}"
-2. Busca servicios de fabricación bajo demanda, talleres, imprentas 3D profesionales si aplica
-3. Encuentra precios de producción/fabricación por unidad REALES
-4. Incluye MOQ (cantidad mínima) y país de origen
-5. Busca también servicios de fulfillment en España (precios por pedido preparado)
+JSON: { "suppliers": [{"supplier": "", "priceRange": "€/ud", "moq": "", "origin": "", "url": ""}], 
+"avgCost": 0, "insight": "" }`,
+        "Manufacturing sourcing analyst. REAL supplier prices. ONLY JSON."
+      ),
+      askGeminiWithSearch(
+        `${productClassification.searchTerms.packaging}
 
-RESPONDE con JSON exacto:
-{
-  "suppliers": [{"supplier": "nombre", "priceRange": "X.XX - X.XX €/ud", "moq": "cantidad", "origin": "país", "url": "URL"}],
-  "avgCost": XX.XX,
-  "insight": "Análisis del mercado de proveedores con recomendación"
-}`,
-        `You are a manufacturing sourcing analyst. Search Google for REAL supplier, manufacturer, and production service prices. Focus on Spanish/European suppliers. Return ONLY valid JSON.`
+Busca en: rajapack.es, uline, amazon.es cajas envío, kartox.com.
+Incluir: caja, relleno protector, cinta, etiqueta, bolsa.
+Producto: ${productClassification.shippingCategory === "fragile" ? "FRÁGIL — necesita protección extra" : "estándar"}.
+
+JSON: { "items": [{"item": "", "pricePerUnit": 0, "source": ""}], 
+"totalPackagingCost": 0, "insight": "" }`,
+        "Packaging procurement analyst. ONLY JSON."
       ),
     ]);
 
@@ -723,6 +780,13 @@ RESPONDE con JSON exacto:
         if (jsonMatch) supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) };
       } catch { researchWarnings.push("Error parseando datos de proveedores de Google Search"); }
     } else { researchWarnings.push("Búsqueda de proveedores falló"); }
+
+    if (packResult.status === "fulfilled") {
+      try {
+        const jsonMatch = packResult.value.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) packagingResearch = { ...packagingResearch, ...JSON.parse(jsonMatch[0]) };
+      } catch { researchWarnings.push("Error parseando datos de packaging de Google Search"); }
+    } else { researchWarnings.push("Búsqueda de packaging falló"); }
   } catch (e) { researchWarnings.push("Error general en investigación de mercado: " + (e instanceof Error ? e.message : "desconocido")); }
 
   const materialDataStr = materialResearch.materials.length > 0
@@ -736,6 +800,19 @@ RESPONDE con JSON exacto:
   const supplierDataStr = supplierResearch.suppliers.length > 0
     ? `PRECIOS REALES DE PROVEEDORES/FABRICANTES (investigados via Google Search):\n${supplierResearch.suppliers.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""} ${s.origin ? `[${s.origin}]` : ""} ${s.url ? `(${s.url})` : ""}`).join("\n")}\n  Coste medio proveedor: €${supplierResearch.avgCost}\n  Insight: ${supplierResearch.insight}`
     : "Sin datos de proveedores encontrados";
+
+  const packagingDataStr = packagingResearch.items.length > 0
+    ? `PRECIOS REALES DE PACKAGING (investigados via Google Search):\n${packagingResearch.items.map(p => `  - ${p.item}: €${p.pricePerUnit}/ud [${p.source}]`).join("\n")}\n  Coste packaging total: €${packagingResearch.totalPackagingCost}\n  Insight: ${packagingResearch.insight}`
+    : "Sin datos de packaging encontrados";
+
+  const classificationStr = productClassification.manufacturingMethod !== "unknown"
+    ? `\nCLASIFICACIÓN DEL PRODUCTO (pre-análisis IA):
+  - Categoría: ${productClassification.category}
+  - Método fabricación: ${productClassification.manufacturingMethod}
+  - Peso estimado: ${productClassification.estimatedWeight}
+  - Materiales: ${productClassification.materialComposition.join(", ") || "no clasificados"}
+  - Categoría envío: ${productClassification.shippingCategory}`
+    : "";
 
   const prompt = `Eres un experto en costes de producción, logística, fabricación, materiales, envíos e impuestos con 20 años de experiencia.
 
@@ -751,12 +828,15 @@ PRODUCTO A ANALIZAR:
 ${shopifyDetails}
 
 === DATOS REALES DE MERCADO (investigados con Google Search en tiempo real) ===
+${classificationStr}
 
 ${materialDataStr}
 
 ${shippingDataStr}
 
 ${supplierDataStr}
+
+${packagingDataStr}
 
 === FIN DATOS REALES ===
 
@@ -819,14 +899,37 @@ IMPORTANTE: Cita las fuentes reales en el reasoning. Responde SOLO el JSON.`;
     tags: ["cogs", "estimation", "ai", "real_data", product.productType ?? "general"],
   });
 
+  const ownEq = estimated.ownEquipment ?? {};
+  updateCogsBenchmark({
+    productCategory: productClassification.category,
+    manufacturingMethod: productClassification.manufacturingMethod,
+    niche: niche,
+    materialCost: ownEq.materialCost ?? 0,
+    shippingDomestic: ownEq.shippingCostDomestic ?? 0,
+    shippingInternational: ownEq.shippingCostInternational ?? 0,
+    packagingCost: ownEq.packagingCost ?? 0,
+    fulfillmentCost: ownEq.fulfillmentFee ?? 0,
+    platformFeePct: ownEq.shopifyPaymentFee ?? 0.015,
+    returnRate: ownEq.returnRate ?? 0.08,
+    cac: ownEq.cac ?? 0,
+  }).catch(() => {});
+
   res.json({
     productId: shopifyProductId,
     productTitle: product.title,
+    productClassification: {
+      category: productClassification.category,
+      manufacturingMethod: productClassification.manufacturingMethod,
+      estimatedWeight: productClassification.estimatedWeight,
+      materialComposition: productClassification.materialComposition,
+      shippingCategory: productClassification.shippingCategory,
+    },
     ...estimated,
     marketResearch: {
       materials: materialResearch.materials,
       carriers: shippingResearch.carriers,
       suppliers: supplierResearch.suppliers,
+      packaging: packagingResearch.items,
     },
     researchWarnings: researchWarnings.length > 0 ? researchWarnings : undefined,
   });

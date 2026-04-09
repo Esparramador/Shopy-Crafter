@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
-import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable, omnicoreAbsorbedContentTable } from "@workspace/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable, omnicoreAbsorbedContentTable, omnicoreCrossConnectionsTable } from "@workspace/db";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
@@ -443,8 +443,114 @@ export async function buildBrandDnaContext(projectId: number): Promise<string> {
   }
 }
 
+export async function buildSmartBrainContext(
+  query: string,
+  useCase: string,
+  niche?: string | null,
+  platformType?: string,
+  maxChars = 12000,
+): Promise<string> {
+  try {
+    const keywords = query
+      .toLowerCase()
+      .replace(/[^\wáéíóúñü\s]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length > 3)
+      .slice(0, 8);
+
+    if (keywords.length === 0) {
+      return buildShopyBrainContext(niche ?? undefined, useCase as BrainUseCase, query, platformType);
+    }
+
+    const searchTerms = keywords.join(" | ");
+
+    const [relevantMemories, relevantInsights, nicheMemories] = await Promise.all([
+      db.execute(sql`
+        SELECT title, content, memory_type, niche, confidence, 
+               ts_rank(to_tsvector('spanish', coalesce(title,'') || ' ' || coalesce(content,'')), 
+                       to_tsquery('spanish', ${searchTerms})) as rank
+        FROM omnicore_memories 
+        WHERE to_tsvector('spanish', coalesce(title,'') || ' ' || coalesce(content,'')) 
+              @@ to_tsquery('spanish', ${searchTerms})
+        ORDER BY rank DESC, confidence DESC
+        LIMIT 15
+      `).catch(() => ({ rows: [] })),
+
+      db.execute(sql`
+        SELECT title, insight, domain, confidence, impact_score
+        FROM omnicore_insights
+        WHERE to_tsvector('spanish', coalesce(title,'') || ' ' || coalesce(insight,''))
+              @@ to_tsquery('spanish', ${searchTerms})
+        ORDER BY impact_score DESC, confidence DESC
+        LIMIT 8
+      `).catch(() => ({ rows: [] })),
+
+      niche ? db.select()
+        .from(omnicoreMemoriesTable)
+        .where(sql`lower(${omnicoreMemoriesTable.niche}) LIKE ${'%' + niche.toLowerCase() + '%'}`)
+        .orderBy(desc(omnicoreMemoriesTable.confidence))
+        .limit(5) : Promise.resolve([]),
+    ]);
+
+    const lines: string[] = ["━━━ SHOPY BRAIN — CONTEXTO RELEVANTE ━━━"];
+
+    if (platformType && platformType !== "shopify") {
+      const platformNotes: Record<string, string> = {
+        woocommerce: "Plataforma: WooCommerce. API: WC REST v3, Basic Auth. SEO: Yoast/RankMath. Status: publish/draft/private.",
+        prestashop: "Plataforma: PrestaShop. API: Webservice XML/JSON. SEO: URL amigables + meta tags nativos. Stock: stock_availables.",
+        universal: "Plataforma: Auditoría Universal (web genérica). Sin gestión de productos — solo análisis SEO, diseño, PageSpeed.",
+      };
+      if (platformNotes[platformType]) lines.push(`🔧 ${platformNotes[platformType]}`);
+    }
+
+    let charCount = 0;
+    const memRows = (relevantMemories as any).rows ?? [];
+    if (memRows.length > 0) {
+      lines.push("\n🧠 Conocimiento relevante:");
+      for (const m of memRows) {
+        const chunk = `  [${m.memory_type}] ${m.title}: ${(m.content ?? "").slice(0, 800)}`;
+        if (charCount + chunk.length > maxChars * 0.6) break;
+        lines.push(chunk);
+        charCount += chunk.length;
+      }
+    }
+
+    const insRows = (relevantInsights as any).rows ?? [];
+    if (insRows.length > 0) {
+      lines.push("\n💡 Insights aplicables:");
+      for (const ins of insRows) {
+        const chunk = `  [${ins.domain}] ${ins.title}: ${ins.insight} (confianza: ${ins.confidence})`;
+        if (charCount + chunk.length > maxChars * 0.8) break;
+        lines.push(chunk);
+        charCount += chunk.length;
+      }
+    }
+
+    if (nicheMemories.length > 0) {
+      lines.push(`\n📌 Conocimiento del nicho "${niche}":`);
+      for (const m of nicheMemories.slice(0, 3)) {
+        const chunk = `  ${m.title}: ${(m.content ?? "").slice(0, 500)}`;
+        if (charCount + chunk.length > maxChars) break;
+        lines.push(chunk);
+        charCount += chunk.length;
+      }
+    }
+
+    lines.push("━━━ FIN CONTEXTO RELEVANTE ━━━");
+
+    if (memRows.length === 0 && insRows.length === 0 && nicheMemories.length === 0) {
+      return buildShopyBrainContext(niche ?? undefined, useCase as BrainUseCase, query, platformType);
+    }
+
+    return lines.join("\n");
+  } catch {
+    return buildShopyBrainContext(niche ?? undefined, useCase as BrainUseCase, query, platformType);
+  }
+}
+
 /**
  * askClaude enhanced with ShopyBrain + BrandDNA context injection (returns raw string).
+ * Uses buildSmartBrainContext for relevance-based context (full-text search).
  */
 export async function askClaudeWithBrain(
   projectId: number,
@@ -458,7 +564,7 @@ export async function askClaudeWithBrain(
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase, lastUserMsg, platform),
+    buildSmartBrainContext(lastUserMsg ?? "", useCase, niche, platform),
     buildBrandDnaContext(projectId),
   ]);
   const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
@@ -479,7 +585,7 @@ export async function askClaudeJsonWithBrain<T>(
 ): Promise<T> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
-    buildShopyBrainContext(niche, useCase, prompt, platform),
+    buildSmartBrainContext(prompt, useCase, niche, platform),
     buildBrandDnaContext(projectId),
   ]);
   const enrichedSystem = systemPrompt + (brainContext || "") + (brandDna || "");
@@ -487,10 +593,40 @@ export async function askClaudeJsonWithBrain<T>(
   return askClaudeJson<T>(projectId, budget.user, budget.system, maxTokens, timeoutMs);
 }
 
+async function detectAndSaveCrossConnections(
+  operationType: string, content: string, niche: string | null, tags: string[]
+): Promise<void> {
+  const domainKeywords: Record<string, RegExp> = {
+    pricing: /precio|margen|cogs|revenue|profit|coste|€|\$|margin|break.?even/i,
+    seo: /seo|keyword|meta|title|description|schema|google|ranking|tráfico/i,
+    design: /css|diseño|color|tipograf|layout|responsive|ux|ui|accesib/i,
+    marketing: /email|campaña|engagement|conversión|funnel|cta|newsletter/i,
+    competitor: /competidor|competencia|rival|mercado|benchmark|amenaza/i,
+    inventory: /stock|inventario|unidades|agotad|restock|almacén/i,
+  };
+
+  const detectedDomains: string[] = [];
+  for (const [domain, regex] of Object.entries(domainKeywords)) {
+    if (regex.test(content)) detectedDomains.push(domain);
+  }
+
+  if (detectedDomains.length >= 2) {
+    const connectionContent = `Operación "${operationType}" en nicho "${niche}" conecta conocimiento de: ${detectedDomains.join(", ")}. Contexto: ${content.slice(0, 500)}`;
+
+    await db.insert(omnicoreCrossConnectionsTable).values({
+      id: randomBytes(12).toString("hex"),
+      insightA: `${detectedDomains[0]}:${operationType}`,
+      insightB: `${detectedDomains[1]}:${operationType}`,
+      connectionType: "auto_detected",
+      connectionStrength: Math.min(0.9, 0.5 + (detectedDomains.length * 0.1)),
+    }).catch(() => {});
+  }
+}
+
 /**
- * learnFromOperation — fire-and-forget learning after every successful AI operation.
- * Saves the result as a ShopyBrain memory so future prompts benefit from past successes.
- * Never throws — completely non-blocking.
+ * learnFromOperation v2 — Enhanced: structured data, monetary values, cross-connections.
+ * Backward-compatible with v1 — same required params, new optional fields.
+ * Fire-and-forget, never throws.
  */
 export function learnFromOperation(params: {
   operationType: string;
@@ -500,6 +636,11 @@ export function learnFromOperation(params: {
   content: string;
   confidence?: number;
   tags?: string[];
+  structuredData?: Record<string, unknown>;
+  sourceProjectId?: number;
+  relatedProductId?: string;
+  monetaryValues?: { revenue?: number; cost?: number; margin?: number; price?: number };
+  metrics?: Record<string, number>;
 }): void {
   const memTypeMap: Record<string, string> = {
     redesign: "prompt_template",
@@ -628,6 +769,7 @@ export function learnFromOperation(params: {
   };
 
   const memoryType = memTypeMap[params.operationType] ?? "general";
+  const allTags = [...new Set([...(params.tags ?? []), params.operationType, params.niche ?? "", params.productType ?? ""].filter(Boolean))];
 
   db.insert(omnicoreMemoriesTable).values({
     id: randomBytes(16).toString("hex"),
@@ -636,13 +778,26 @@ export function learnFromOperation(params: {
     productType: params.productType ?? null,
     market: "es",
     title: params.title.slice(0, 200),
-    content: params.content,
+    content: params.content.slice(0, 15000),
     confidence: params.confidence ?? 0.65,
     sourceType: `auto_${params.operationType}`,
-    tags: params.tags ? JSON.stringify(params.tags) : null,
+    tags: JSON.stringify(allTags),
     isVerified: 0,
     useCount: 1,
     successCount: 1,
     successRate: 1.0,
   }).catch(() => {});
+
+  if (params.monetaryValues && Object.keys(params.monetaryValues).length > 0) {
+    db.execute(sql`
+      INSERT INTO pricing_intelligence (id, niche, product_type, operation_type, 
+        revenue, cost, margin, price, created_at)
+      VALUES (${randomBytes(8).toString("hex")}, ${params.niche ?? null}, ${params.productType ?? null}, 
+        ${params.operationType}, ${params.monetaryValues.revenue ?? null}, ${params.monetaryValues.cost ?? null},
+        ${params.monetaryValues.margin ?? null}, ${params.monetaryValues.price ?? null}, NOW())
+      ON CONFLICT DO NOTHING
+    `).catch(() => {});
+  }
+
+  detectAndSaveCrossConnections(params.operationType, params.content, params.niche ?? null, allTags).catch(() => {});
 }

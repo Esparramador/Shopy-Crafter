@@ -102,6 +102,8 @@ export default function WebLab() {
 
 function WebLabInner({ projectId }: { projectId: number }) {
   const [url, setUrl] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [brandName, setBrandName] = useState("");
   const [template, setTemplate] = useState<ReportTemplate>("prestige");
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState(0);
@@ -138,7 +140,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: url.trim(), projectId, template }),
+        body: JSON.stringify({ url: url.trim(), projectId, template, instagram: instagram.replace("@", "").trim() || undefined, brandName: brandName.trim() || undefined }),
       });
 
       clearInterval(phaseInterval);
@@ -224,6 +226,43 @@ function WebLabInner({ projectId }: { projectId: number }) {
                 outline: "none",
               }}
             />
+            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+              <input
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="Instagram de la marca (ej: @zara) — opcional"
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "var(--ink, #0a0a0a)",
+                  border: "1px solid var(--border, #333)",
+                  borderRadius: 8,
+                  color: "var(--t1, #eee)",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+              <input
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="Nombre de la marca (ej: Zara) — opcional"
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "var(--ink, #0a0a0a)",
+                  border: "1px solid var(--border, #333)",
+                  borderRadius: 8,
+                  color: "var(--t1, #eee)",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 12, color: "var(--t3, #666)", marginTop: 4 }}>
+              Si proporcionas el Instagram o nombre, ShopyBrain investigará la identidad visual de la marca para generar un CSS 100% alineado con su estética.
+            </p>
           </div>
           <div>
             <label style={{ fontSize: 12, color: "var(--t2, #888)", display: "block", marginBottom: 6 }}>Plantilla informe</label>

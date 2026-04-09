@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
+import { askGeminiWithSearch } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
 import { getReportShell, type ReportTemplate } from "./exports.js";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
@@ -178,10 +179,12 @@ Responde SIEMPRE en JSON válido con esta estructura exacta:
 
 router.post("/web-lab/analyze", async (req: Request, res: Response) => {
   try {
-    const { url, projectId, template } = req.body as {
+    const { url, projectId, template, brandName, instagram } = req.body as {
       url: string;
       projectId?: number;
       template?: ReportTemplate;
+      brandName?: string;
+      instagram?: string;
     };
 
     if (!url) { return res.status(400).json({ error: "URL requerida" }); }
@@ -216,7 +219,80 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       ? `${extraction.css.slice(0, 20_000)}\n/* ...CSS TRIMMED FOR ANALYSIS... */\n${extraction.css.slice(-10_000)}`
       : extraction.css;
 
+    let brandResearch = {
+      brandInfo: null as any,
+      instagramInfo: null as any,
+      competitorDesign: null as any,
+      sectorDesign: null as any,
+    };
+
+    const parsedUrl = new URL(url);
+    const domain = parsedUrl.hostname.replace("www.", "");
+    const searchName = brandName || domain.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+
+    logger.info({ searchName, instagram, domain }, "🔍 Web Lab: Starting brand research");
+
+    try {
+      const [brandResult, igResult, competitorResult, sectorResult] = await Promise.allSettled([
+        askGeminiWithSearch(
+          `Investiga "${searchName}" (${url}). Qué es, qué vende, sector/nicho, público objetivo (edad, género, poder adquisitivo), estilo de marca (luxury, streetwear, corporate, artesanal, tech, minimal, bold...), colores que usa, valores de marca, rango de precios. SOLO JSON: { "name": "", "sector": "", "audience": "", "style": "", "colors": [], "values": [], "priceRange": "", "luxuryLevel": 0, "designAdjectives": [] }`,
+          "Brand analyst. Return ONLY valid JSON. Search Google for real info."
+        ),
+        instagram
+          ? askGeminiWithSearch(
+              `Analiza @${instagram} en Instagram: estilo visual, colores dominantes, tipo de fotos, engagement, estética general, filtros, tipo de producto mostrado. JSON: { "handle": "", "followers": "", "aesthetic": "", "colors": [], "photoStyle": "", "contentTypes": [], "mood": "" }`,
+              "Instagram visual analyst. Return ONLY JSON."
+            )
+          : askGeminiWithSearch(
+              `Busca la cuenta oficial de Instagram de "${searchName}" (${url}). Si la encuentras, analiza su estilo visual. JSON: { "handle": "", "found": false, "aesthetic": "", "colors": [] }`,
+              "Social media researcher. Return ONLY JSON."
+            ),
+        askGeminiWithSearch(
+          `Busca 3 webs de competidores de "${searchName}" y analiza su DISEÑO WEB. Patrones de diseño, colores, tipografías, estilo de layout, estilo de fotos. JSON: { "competitors": [{ "name": "", "url": "", "designStyle": "", "colors": [], "fonts": [], "highlights": "" }] }`,
+          "Competitive design analyst. Return ONLY JSON."
+        ),
+        askGeminiWithSearch(
+          `What are the best web design trends for ${searchName}'s sector in 2026? Find 3 award-winning websites in the same industry. JSON: { "trends": [], "awardWinningExamples": [{ "url": "", "why": "" }], "recommendedFonts": [], "colorTrends": [] }`,
+          "Web design trend analyst. Return ONLY JSON."
+        ),
+      ]);
+
+      const parseSafe = (r: PromiseSettledResult<any>) => {
+        if (r.status !== "fulfilled") return null;
+        try {
+          const text = r.value?.text ?? "";
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        } catch { return null; }
+      };
+
+      brandResearch.brandInfo = parseSafe(brandResult);
+      brandResearch.instagramInfo = parseSafe(igResult);
+      brandResearch.competitorDesign = parseSafe(competitorResult);
+      brandResearch.sectorDesign = parseSafe(sectorResult);
+
+      logger.info({
+        hasBrand: !!brandResearch.brandInfo,
+        hasIg: !!brandResearch.instagramInfo,
+        hasCompetitors: !!brandResearch.competitorDesign,
+        hasTrends: !!brandResearch.sectorDesign,
+      }, "✅ Brand research complete");
+    } catch (err) {
+      logger.warn({ err }, "Brand research partially failed — continuing with available data");
+    }
+
+    const brandContextBlock = `
+═══ INTELIGENCIA DE MARCA (investigación en tiempo real) ═══
+${brandResearch.brandInfo ? `MARCA: ${JSON.stringify(brandResearch.brandInfo)}` : "Marca: No se encontró información — genera CSS basado en análisis del HTML/CSS actual."}
+${brandResearch.instagramInfo ? `INSTAGRAM: ${JSON.stringify(brandResearch.instagramInfo)}\nINSTRUCCIÓN: El CSS DEBE reflejar la estética de su Instagram.` : ""}
+${brandResearch.competitorDesign ? `COMPETIDORES (diseño web): ${JSON.stringify(brandResearch.competitorDesign)}\nINSTRUCCIÓN: El CSS mejorado debe ser MEJOR que el de los competidores.` : ""}
+${brandResearch.sectorDesign ? `TENDENCIAS DEL SECTOR: ${JSON.stringify(brandResearch.sectorDesign)}` : ""}
+REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como la marca "${searchName}".
+═══ FIN INTELIGENCIA DE MARCA ═══
+`;
+
     let contextParts: string[] = [];
+    contextParts.push(brandContextBlock);
     contextParts.push(`URL ANALIZADA: ${url}`);
     contextParts.push(`\n--- HTML REAL DE LA PÁGINA (${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
     contextParts.push(`\n--- CSS REAL (inline + ${extraction.stylesheetUrls.length} archivos externos, ${cssForClaude.length} chars) ---\n${cssForClaude}`);
@@ -335,9 +411,20 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       });
     }
 
+    if (brandResearch.brandInfo) {
+      learnFromOperation({
+        operationType: "web_lab_brand_intelligence",
+        title: `Brand intelligence: ${searchName} — ${url}`,
+        content: `Marca: ${JSON.stringify(brandResearch.brandInfo)}. Instagram: ${JSON.stringify(brandResearch.instagramInfo)}. Competidores: ${JSON.stringify(brandResearch.competitorDesign)}. Sector design trends: ${JSON.stringify(brandResearch.sectorDesign)}.`,
+        confidence: 0.85,
+        tags: ["web-lab", "brand-intelligence", searchName, url],
+      });
+    }
+
     const result = JSON.stringify({
       success: true,
       analysis,
+      brandResearch,
       reportHtml: pid === 0 ? reportHtml : undefined,
       vaultIds: { report: vaultReportId, css: vaultCssId, html: vaultHtmlId },
       pageSpeed: pageSpeed ? {

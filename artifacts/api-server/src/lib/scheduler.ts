@@ -1011,6 +1011,125 @@ Return ONLY valid JSON:
 }
 
 // ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
+export async function runAdaptiveStudy() {
+  log("adaptive-study", "🧠 Starting adaptive study session at 5:30am...");
+  try {
+    const recentMemories = await db
+      .select({
+        id: omnicoreMemoriesTable.id,
+        content: omnicoreMemoriesTable.content,
+        memoryType: omnicoreMemoriesTable.memoryType,
+        niche: omnicoreMemoriesTable.niche,
+        confidence: omnicoreMemoriesTable.confidence,
+        tags: omnicoreMemoriesTable.tags,
+        useCount: omnicoreMemoriesTable.useCount,
+        createdAt: omnicoreMemoriesTable.createdAt,
+      })
+      .from(omnicoreMemoriesTable)
+      .where(
+        and(
+          gte(omnicoreMemoriesTable.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
+          gte(omnicoreMemoriesTable.confidence, 0.3),
+        )
+      )
+      .orderBy(desc(omnicoreMemoriesTable.createdAt))
+      .limit(50);
+
+    if (recentMemories.length < 3) {
+      log("adaptive-study", "⏭️ Not enough recent memories for adaptive study, skipping");
+      return;
+    }
+
+    const weakMemories = recentMemories.filter(m => (m.confidence ?? 0) < 0.6 || (m.useCount ?? 0) < 2);
+    const strongMemories = recentMemories.filter(m => (m.confidence ?? 0) >= 0.7 && (m.useCount ?? 0) >= 3);
+
+    const domainCounts: Record<string, number> = {};
+    for (const m of recentMemories) {
+      const d = m.memoryType ?? "general";
+      domainCounts[d] = (domainCounts[d] || 0) + 1;
+    }
+    const sortedDomains = Object.entries(domainCounts).sort((a, b) => b[1] - a[1]);
+    const underrepresented = sortedDomains.filter(([, c]) => c <= 2).map(([d]) => d);
+
+    const studyFocus = weakMemories.length > strongMemories.length ? "reinforcement" : "expansion";
+
+    const studyPrompt = `ShopyBrain Adaptive Study Session.
+Focus: ${studyFocus === "reinforcement" ? "REFORZAR memorias débiles y llenar gaps" : "EXPANDIR conocimiento y buscar conexiones nuevas"}.
+
+MEMORIAS DÉBILES (necesitan refuerzo — baja confianza o poco acceso):
+${weakMemories.slice(0, 10).map(m => `- [${m.memoryType}] (conf: ${m.confidence}) ${String(m.content).slice(0, 200)}`).join("\n")}
+
+MEMORIAS FUERTES (alto valor — buscar extensiones):
+${strongMemories.slice(0, 5).map(m => `- [${m.memoryType}] ${String(m.content).slice(0, 200)}`).join("\n")}
+
+DOMINIOS SUBREPRESENTADOS: ${underrepresented.join(", ") || "ninguno"}
+DISTRIBUCIÓN POR DOMINIO: ${sortedDomains.map(([d, c]) => `${d}:${c}`).join(", ")}
+
+TAREA: Genera exactamente 5 insights nuevos que:
+1. Refuercen las memorias débiles con datos complementarios
+2. Conecten memorias fuertes con dominios subrepresentados
+3. Llenen gaps de conocimiento detectados
+4. Cada insight debe tener valor práctico para optimizar tiendas e-commerce
+
+Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "confidence": 0.7, "tags": ["string"], "connectionTo": "string (dominio conectado)" }] }`;
+
+    const studyResult = await aiGenerate({
+      system: "You are ShopyBrain's adaptive learning engine. Generate high-value cross-domain insights for e-commerce optimization. Always respond in Spanish. Return ONLY valid JSON.",
+      prompt: studyPrompt,
+      maxTokens: 4096,
+      timeoutMs: 90_000,
+    });
+
+    const jsonMatch = studyResult.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      log("adaptive-study", "⚠️ No JSON in study result");
+      return;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
+
+    let savedCount = 0;
+    for (const insight of insights.slice(0, 5)) {
+      try {
+        await db.insert(omnicoreInsightsTable).values({
+          id: randomBytes(12).toString("hex"),
+          domain: insight.domain ?? "general",
+          insightType: "adaptive_study",
+          title: `Adaptive: ${(insight.content ?? "").slice(0, 80)}`,
+          insight: insight.content ?? "",
+          confidence: insight.confidence ?? 0.6,
+          source: "adaptive_study_cron",
+        });
+        savedCount++;
+
+        if (insight.connectionTo && insight.domain !== insight.connectionTo) {
+          await db.insert(omnicoreCrossConnectionsTable).values({
+            id: randomBytes(12).toString("hex"),
+            insightA: `${insight.domain}:adaptive_study`,
+            insightB: `${insight.connectionTo}:adaptive_study`,
+            connectionType: "adaptive_study",
+            connectionStrength: insight.confidence ?? 0.6,
+          }).catch(() => {});
+        }
+      } catch { /* skip duplicate or error */ }
+    }
+
+    const sessionId = randomBytes(12).toString("hex");
+    await db.insert(omnicoreStudySessionsTable).values({
+      id: sessionId,
+      sessionType: "adaptive_study",
+      domainsStudied: [...new Set(insights.map((i: any) => i.domain))].join(", "),
+      insightsCreated: savedCount,
+      summary: `Adaptive study: focus=${studyFocus}, weak=${weakMemories.length}, strong=${strongMemories.length}, saved=${savedCount}`,
+    }).catch(() => {});
+
+    log("adaptive-study", `✅ Adaptive study complete: ${savedCount} insights saved, focus=${studyFocus}, weak=${weakMemories.length}, strong=${strongMemories.length}`);
+  } catch (err) {
+    log("adaptive-study", `❌ Error: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function registerCronJobs() {
   log("scheduler", "🕐 Registering 24/7 continuous learning jobs (timezone: Europe/Madrid)");
 
@@ -1023,6 +1142,9 @@ export function registerCronJobs() {
 
   // Cada 12 horas — Cross-domain synthesis: conexiones entre dominios
   cron.schedule("0 */12 * * *", () => { runOmniCoreCrossConnections().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
+  // 5:30am diario — Adaptive study: refuerza memorias débiles, conecta dominios
+  cron.schedule("30 5 * * *", () => { runAdaptiveStudy().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
   // ── CICLOS DIARIOS ───────────────────────────────────────────────────────
   // 1am diario — Daily deep study: todos los dominios, 5 insights/dominio
@@ -1058,7 +1180,7 @@ export function registerCronJobs() {
   setTimeout(() => { runTokenRefresh().catch(e => logger.error(e)); }, 10_000);
 
   log("scheduler", [
-    "✅ 12 jobs registrados:",
+    "✅ 13 jobs registrados:",
     "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
@@ -1066,6 +1188,7 @@ export function registerCronJobs() {
     "  🎓 Deep study        → 1am     (14 dominios × 5 insights)",
     "  📊 Revenue           → 2am     (snapshots Shopify)",
     "  📦 Real data         → 3am     (integración datos reales)",
+    "  🧪 Adaptive study    → 5:30am  (refuerzo memorias + gaps)",
     "  🔍 Competidores      → 6am     (price scans)",
     "  📦 Inventario        → 7am     (sync + alertas stock)",
     "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",

@@ -381,6 +381,7 @@ export async function deepEntityResearch(
   overview: string; products: string; social: string; news: string; reviews: string;
   competitors: string; ecommerce: string; visual: string; pricing: string;
   paidAds: string; founders: string; international: string;
+  instagramDeep: string; socialExtended: string; financials: string;
   urlDeepDive: string;
   allSources: string[]; allQueries: string[];
 }> {
@@ -388,7 +389,7 @@ export async function deepEntityResearch(
   const entityWithUrl = entityUrl ? `"${entityName}" site:${new URL(entityUrl.startsWith("http") ? entityUrl : `https://${entityUrl}`).hostname} OR "${entityName}"` : `"${entityName}"`;
 
   logger.info({ entityName, entityUrl, hasExistingKnowledge: !!existingKnowledge },
-    "🔍 Deep entity research: 12 parallel searches + URL deep-dive"
+    "🔍 Deep entity research: 15 parallel searches + URL deep-dive"
   );
 
   // Inject existing knowledge so Gemini hunts for GAPS only — with SPECIFIC instructions
@@ -480,13 +481,31 @@ export async function deepEntityResearch(
       `Research international presence and expansion strategy of ${entity}. Find: countries operating in, languages supported, international shipping, local warehouses, country-specific marketing, currency support, localization efforts, markets targeted for expansion, international competitors faced.${knowledgeCtx}`,
       "International expansion and localization analyst. Find global footprint."
     ), 1, 3000, "international"),
+
+    // 13. Instagram deep-dive — content strategy & aesthetics
+    withRetry(() => askGeminiWithSearch(
+      `Deep-dive into the Instagram strategy of ${entity}. Find: exact @handle, bio text, link in bio destination, follower/following count, avg likes/comments per post, posting frequency, Reels vs Carousel vs Static ratio, Story highlights, branded hashtags, UGC hashtags, influencer collaborations, aesthetic (colors, filters, grid layout pattern), recent campaign themes, shopping tags enabled, Instagram Shop products, giveaway frequency.${knowledgeCtx}`,
+      "Instagram marketing analyst specialized in visual commerce brands. Extract every measurable metric."
+    ), 1, 3000, "instagramDeep"),
+
+    // 14. Extended social & community — TikTok, YouTube, Discord, forums
+    withRetry(() => askGeminiWithSearch(
+      `Research the extended social and community presence of ${entity} BEYOND Instagram. Find: TikTok @handle, video count, avg views, viral videos, YouTube subscribers, video count, avg views, Shorts usage, Discord/Slack community size, Reddit mentions (r/ subreddits), Quora answers, niche forums, WhatsApp/Telegram groups, podcast appearances, Clubhouse/Twitter Spaces, community engagement programs, ambassador programs, loyalty programs.${knowledgeCtx}`,
+      "Community and social intelligence analyst. Map presence across ALL platforms beyond Instagram."
+    ), 1, 3000, "socialExtended"),
+
+    // 15. Financial signals & unit economics
+    withRetry(() => askGeminiWithSearch(
+      `Research financial signals and unit economics of ${entity}. Find: estimated annual revenue, revenue growth rate, number of employees (LinkedIn, Glassdoor), estimated AOV (average order value), estimated order volume, funding rounds and amounts, investor names, profitability signals, warehouse/logistics partners, fulfillment model (in-house/3PL), estimated CAC from ad library, estimated LTV signals from subscription/repeat purchase data, Crunchbase/PitchBook data, company registry filings.${knowledgeCtx}`,
+      "Financial intelligence and unit economics analyst. Find revenue signals, funding data, and operational metrics."
+    ), 1, 3000, "financials"),
   ];
 
-  // Run all 12 with overall 270s timeout
+  // Run all 15 with overall 270s timeout
   const settled = await withTimeout(
     Promise.allSettled(searchPromises),
     OVERALL_RESEARCH_TIMEOUT,
-    "12-parallel-searches"
+    "15-parallel-searches"
   ).catch(() => {
     logger.warn("Overall research timeout reached — returning partial results");
     return Promise.allSettled(searchPromises.map(p => Promise.race([p, Promise.resolve({ text: "", sources: [], queries: [] })])));
@@ -506,21 +525,24 @@ export async function deepEntityResearch(
     return "";
   };
 
-  const [overview, products, social, news, reviews, competitors, ecommerce, visual, pricing, paidAds, founders, international] = settled;
+  const [overview, products, social, news, reviews, competitors, ecommerce, visual, pricing, paidAds, founders, international, instagramDeep, socialExtended, financials] = settled;
 
   const dimensionResults = {
-    overview:      get(overview, "overview"),
-    products:      get(products, "products"),
-    social:        get(social, "social"),
-    news:          get(news, "news"),
-    reviews:       get(reviews, "reviews"),
-    competitors:   get(competitors, "competitors"),
-    ecommerce:     get(ecommerce, "ecommerce"),
-    visual:        get(visual, "visual"),
-    pricing:       get(pricing, "pricing"),
-    paidAds:       get(paidAds, "paidAds"),
-    founders:      get(founders, "founders"),
-    international: get(international, "international"),
+    overview:       get(overview, "overview"),
+    products:       get(products, "products"),
+    social:         get(social, "social"),
+    news:           get(news, "news"),
+    reviews:        get(reviews, "reviews"),
+    competitors:    get(competitors, "competitors"),
+    ecommerce:      get(ecommerce, "ecommerce"),
+    visual:         get(visual, "visual"),
+    pricing:        get(pricing, "pricing"),
+    paidAds:        get(paidAds, "paidAds"),
+    founders:       get(founders, "founders"),
+    international:  get(international, "international"),
+    instagramDeep:  get(instagramDeep, "instagramDeep"),
+    socialExtended: get(socialExtended, "socialExtended"),
+    financials:     get(financials, "financials"),
   };
 
   // ── Phase 2: URL Deep-Dive ─────────────────────────────────────────────────
@@ -582,7 +604,7 @@ export async function deepEntityResearch(
     totalSources: [...new Set(allSources)].length,
     totalQueries: [...new Set(allQueries)].length,
     urlDeepDiveChars: urlDeepDive.length,
-    dimensions: 12,
+    dimensions: 15,
   }, "✅ Deep entity research complete");
 
   return {

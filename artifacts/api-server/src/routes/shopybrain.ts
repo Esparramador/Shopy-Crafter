@@ -452,6 +452,7 @@ Acciones disponibles:
 - analyze_competitor_product: Analizar posicionamiento de precio vs competidores. Params: {projectId, productId}
 - calculate_optimal_price: Calcular precio óptimo con IA (elasticidad, márgenes, competencia). Params: {projectId, productId}
 - estimate_cogs: Estimar COGS con IA (materiales, producción, envío). Params: {projectId, productId}
+- auto_estimate_all_cogs: Estimar COGS de TODOS los productos de un proyecto en lote (máx 10). Params: {projectId}. Útil cuando el usuario dice "estima los costes de todos mis productos" o "calcula COGS de todo el catálogo".
 - price_simulator: Simular escenarios de precio (qué pasa si subo/bajo precio). Params: {projectId, productId, newPrice (número), unitsPerMonth? (default 30)}
 - financial_forecast: Forecast financiero a 3-6 meses con escenarios. Params: {projectId, months? (default 6)}
 - financial_dashboard: Ver dashboard financiero completo (márgenes, COGS, revenue). Params: {projectId}
@@ -7538,6 +7539,52 @@ Responde SOLO con JSON válido (sin markdown):
           });
           const data = await resp.json() as Record<string, unknown>;
           result = { ...data, message: `📦 **COGS estimado con IA**\n\nMateriales, producción, envío y márgenes calculados.` };
+        } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+        break;
+      }
+
+      case "auto_estimate_all_cogs": {
+        const projectId = params?.projectId;
+        if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
+        try {
+          const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+          const productsResp = await fetch(`${baseUrl}/api/projects/${projectId}/products`, {
+            headers: { cookie: req.headers.cookie ?? "" },
+          });
+          const productsData = await productsResp.json() as Record<string, unknown>;
+          const products = (Array.isArray(productsData) ? productsData : Array.isArray((productsData as any)?.products) ? (productsData as any).products : []) as Array<Record<string, unknown>>;
+          if (products.length === 0) {
+            result = { error: true, message: "❌ No se encontraron productos en este proyecto." };
+            break;
+          }
+
+          const productsWithoutCogs = products.filter((p: Record<string, unknown>) => !(p as any).cogs || (p as any).cogs?.totalCost === 0);
+          const toEstimate = productsWithoutCogs.length > 0 ? productsWithoutCogs : products;
+          const maxProducts = Math.min(toEstimate.length, 10);
+
+          const results: Array<{ productId: string; title: string; success: boolean; error?: string }> = [];
+          for (let i = 0; i < maxProducts; i++) {
+            const product = toEstimate[i];
+            try {
+              const resp = await fetch(`${baseUrl}/api/projects/${projectId}/products/${(product as any).shopifyId || (product as any).id}/ai-estimate-cogs`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", cookie: req.headers.cookie ?? "" },
+              });
+              const ok = resp.ok;
+              results.push({ productId: String((product as any).shopifyId || (product as any).id), title: String((product as any).title ?? ""), success: ok, error: ok ? undefined : `HTTP ${resp.status}` });
+            } catch (e) {
+              results.push({ productId: String((product as any).shopifyId || (product as any).id), title: String((product as any).title ?? ""), success: false, error: String(e) });
+            }
+          }
+
+          const successCount = results.filter(r => r.success).length;
+          const failCount = results.filter(r => !r.success).length;
+          let msg = `📦 **COGS estimados en lote**\n\n✅ ${successCount} productos estimados correctamente\n`;
+          if (failCount > 0) msg += `❌ ${failCount} productos con error\n`;
+          msg += `\n📊 Productos procesados:\n${results.map(r => `${r.success ? "✅" : "❌"} ${r.title}`).join("\n")}`;
+          if (toEstimate.length > maxProducts) msg += `\n\n⚠️ Limitado a ${maxProducts} productos. Quedan ${toEstimate.length - maxProducts} por estimar.`;
+
+          result = { success: true, results, message: msg, total: products.length, estimated: successCount, errors: failCount };
         } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
         break;
       }
