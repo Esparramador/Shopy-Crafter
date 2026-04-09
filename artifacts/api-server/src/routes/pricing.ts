@@ -5,6 +5,7 @@ import { eq, and, desc, gte } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch } from "../lib/gemini.js";
+import { getConnector } from "../lib/connectors/index.js";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ function calculateCogs(data: Record<string, any>): {
   const logistics = n("shippingCostDomestic") + n("shippingCostInternational")
     + n("fulfillmentFee") + n("warehouseCostPerUnit") + n("customsDuty") + n("insuranceCost");
 
-  const returns = n("returnRate") * n("returnProcessingCost");
+  const returns = n("returnRate") * (n("returnProcessingCost") + n("returnShippingCost") + n("returnRestockingCost"));
 
   const platform = (price * n("shopifyPaymentFee")) + n("shopifyPlanCostPerOrder")
     + n("paymentProcessingFee") + n("platformCommission");
@@ -67,15 +68,12 @@ function calculateCogs(data: Record<string, any>): {
 }
 
 function psychologicalPrice(price: number): number {
-  if (price < 10) return Math.floor(price) + 0.99;
-  if (price < 50) return Math.floor(price) + 0.95;
-  if (price < 100) return Math.floor(price) + 0.90;
-  if (price < 500) {
-    const rounded = Math.round(price / 10) * 10;
-    return rounded % 50 === 0 ? rounded - 1 : rounded + 9;
-  }
-  const rounded = Math.round(price / 100) * 100;
-  return rounded - 1;
+  if (price < 10) return Math.floor(price) - 0.01 + 1;
+  if (price < 20) return Math.floor(price) + 0.95;
+  if (price < 50) return Math.round(price / 5) * 5 - 0.05;
+  if (price < 100) return Math.round(price / 10) * 10 - 0.01;
+  if (price < 500) return Math.round(price / 10) * 10 - 1;
+  return Math.round(price / 50) * 50 - 1;
 }
 
 router.get("/projects/:projectId/products/:productId/cogs", async (req, res): Promise<void> => {
@@ -482,20 +480,32 @@ router.post("/projects/:projectId/products/:productId/apply-price", async (req, 
     return;
   }
 
-  await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
-    method: "PUT",
-    body: JSON.stringify({
-      product: {
-        variants: [{ price, compare_at_price: compareAtPrice ?? null }],
-      },
-    }),
-  });
+  try {
+    const connector = getConnector(project as any);
+    await connector.updateProduct(shopifyProductId, {
+      variants: [{ platformId: "", title: "", price, compareAtPrice: compareAtPrice ?? undefined }],
+    } as any);
+  } catch (connectorErr: any) {
+    if (connectorErr?.name === "PlatformNotSupportedError" || connectorErr?.name === "FeatureNotSupportedError") {
+      await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
+        method: "PUT",
+        body: JSON.stringify({
+          product: {
+            variants: [{ price, compare_at_price: compareAtPrice ?? null }],
+          },
+        }),
+      });
+    } else {
+      throw connectorErr;
+    }
+  }
 
   await db.update(productsTable)
     .set({ price, compareAtPrice: compareAtPrice ?? null })
     .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
 
-  res.json({ success: true, message: `Precio €${price} aplicado correctamente en Shopify` });
+  const platformName = (project as any).platformType || "Shopify";
+  res.json({ success: true, message: `Precio €${price} aplicado correctamente en ${platformName}` });
 });
 
 router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise<void> => {

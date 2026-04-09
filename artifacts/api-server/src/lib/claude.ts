@@ -5,6 +5,10 @@ import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnic
 import { eq, desc, and, gte } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 
+export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+
+export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce" | "cogs_estimation";
+
 const platformTypeCache = new Map<number, { value: string; ts: number }>();
 
 async function resolvePlatformType(projectId: number): Promise<string | undefined> {
@@ -91,7 +95,7 @@ export async function askClaude(
 
     const response = await client.messages.create(
       {
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_MODEL,
         max_tokens: maxTokens,
         system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
         messages,
@@ -153,7 +157,7 @@ export async function askClaudeWithVision(
 
     const response = await client.messages.create(
       {
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_MODEL,
         max_tokens: maxTokens,
         system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
         messages: [
@@ -181,7 +185,7 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
     const client = getDefaultClient();
     const response = await client.messages.create(
       {
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_MODEL,
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       },
@@ -203,7 +207,7 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
  */
 export async function buildShopyBrainContext(
   niche?: string,
-  useCase?: "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ecommerce",
+  useCase?: BrainUseCase,
   userQuery?: string,
   platformType?: string,
 ): Promise<string> {
@@ -446,7 +450,7 @@ export async function askClaudeWithBrain(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
-  useCase: "redesign" | "seo" | "pricing" | "images" | "general" = "general",
+  useCase: BrainUseCase = "general",
   niche?: string,
   maxTokens = 16000,
   timeoutMs = 180_000
@@ -468,7 +472,7 @@ export async function askClaudeJsonWithBrain<T>(
   projectId: number,
   prompt: string,
   systemPrompt: string,
-  useCase: "redesign" | "seo" | "pricing" | "images" | "general",
+  useCase: BrainUseCase = "general",
   niche?: string,
   maxTokens = 16000,
   timeoutMs = 180_000

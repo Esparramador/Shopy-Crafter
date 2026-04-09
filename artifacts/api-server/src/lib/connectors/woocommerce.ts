@@ -16,6 +16,8 @@ import type {
 
 const WC_FETCH_TIMEOUT = 45_000;
 const RETRY_DELAYS = [1000, 2000, 4000];
+const WC_MIN_REQUEST_INTERVAL = 200;
+let wcLastRequestTime = 0;
 
 function normalizeWooUrl(domain: string): string {
   let url = domain.trim().replace(/\/+$/, "");
@@ -481,6 +483,13 @@ export class WooCommerceConnector implements IPlatformConnector {
   }
 
   private async wcRawRequest(method: string, path: string, body?: unknown): Promise<Response> {
+    const now = Date.now();
+    const elapsed = now - wcLastRequestTime;
+    if (elapsed < WC_MIN_REQUEST_INTERVAL) {
+      await new Promise(r => setTimeout(r, WC_MIN_REQUEST_INTERVAL - elapsed));
+    }
+    wcLastRequestTime = Date.now();
+
     const url = `${this.baseUrl}${path}`;
 
     const init: RequestInit = {

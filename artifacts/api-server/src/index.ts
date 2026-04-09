@@ -36,6 +36,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function deduplicateProducts() {
   try {
+    // PostgreSQL-specific USING syntax — migrate if changing DB engine
     const result = await db.execute(sql`
       DELETE FROM products a USING products b
       WHERE a.id < b.id
@@ -61,27 +62,8 @@ async function ensureProjectConfig() {
     const projects = await db.select().from(projectsTable)
       .where(or(isNull(projectsTable.storeNiche), eq(projectsTable.storeNiche, "")));
 
-    for (const project of projects) {
-      const domain = project.shopDomain ?? "";
-      let niche = "";
-      let tone = "";
-
-      if (domain.includes("comic")) {
-        niche = "comics y arte digital";
-        tone = "Creativo, apasionado y cercano";
-      }
-
-      if (niche) {
-        await db.update(projectsTable)
-          .set({
-            storeNiche: niche,
-            brandTone: tone,
-            targetAudience: "Fans de cómics, manga y juegos de cartas coleccionables",
-            storeMarkets: "España",
-          })
-          .where(eq(projectsTable.id, project.id));
-        logger.info({ projectId: project.id, niche, tone }, "✅ Project config synced (niche + tone + audience + markets)");
-      }
+    if (projects.length > 0) {
+      logger.info({ count: projects.length }, "📋 Projects without niche detected — set niche via project settings or onboarding");
     }
   } catch (err) {
     logger.error({ err }, "⚠️  ensureProjectConfig failed — continuing startup");
@@ -90,14 +72,20 @@ async function ensureProjectConfig() {
 
 async function ensureAdminUser() {
   try {
-    const ADMIN_EMAIL = "sadiagiljoan@gmail.com";
-    const ADMIN_NAME  = "Joan Sadia Gil";
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@shopycrafter.com";
+    const ADMIN_NAME  = process.env.ADMIN_NAME || "Admin";
     const envPass = process.env.ADMIN_PASSWORD;
-    if (!envPass && process.env.NODE_ENV === "production") {
+
+    let ADMIN_PASS: string;
+    if (envPass) {
+      ADMIN_PASS = envPass;
+    } else if (process.env.NODE_ENV === "production") {
       logger.error("❌ ADMIN_PASSWORD env var is required in production — skipping admin user creation");
       return;
+    } else {
+      ADMIN_PASS = randomBytes(24).toString("base64url");
+      logger.info({ password: ADMIN_PASS }, "🔑 Generated dev admin password (ADMIN_PASSWORD env not set)");
     }
-    const ADMIN_PASS = envPass || "ShopyAdmin2026!";
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL));
     if (existing.length === 0) {
@@ -171,7 +159,9 @@ async function warmupProdKnowledge() {
     if (projects.length === 0) { logger.info("⏭ Warmup: no projects, skipping"); return; }
 
     for (const project of projects) {
-      if (!project.accessToken || !project.shopDomain) continue;
+      const platformType = (project as any).platformType ?? "shopify";
+      if (!project.accessToken && platformType === "shopify") continue;
+      if (!project.shopDomain && platformType !== "universal") continue;
 
       const [prodCount] = await db.select({ c: sql<number>`count(*)` })
         .from(productsTable).where(eq(productsTable.projectId, project.id));

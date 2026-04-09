@@ -131,7 +131,7 @@ export interface IPlatformConnector {
 export class PlatformNotSupportedError extends Error {
   constructor(platformType: string) {
     super(
-      `Platform "${platformType}" is not yet supported. Supported platforms: shopify. Coming soon: woocommerce, prestashop, wordpress, universal.`
+      `La plataforma "${platformType}" aún no está soportada. Plataformas disponibles: shopify, woocommerce, prestashop, universal`
     );
     this.name = "PlatformNotSupportedError";
   }

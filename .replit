@@ -32,6 +32,8 @@ timeoutMs = 20000
 COLLECTION_HANDLE = "shopify-automatization"
 SHOP_CURRENCY = "EUR"
 APP_URL = "https://shopycrafter.com"
+ADMIN_EMAIL = "sadiagiljoan@gmail.com"
+ADMIN_NAME = "Joan Sadia Gil"
 
 [nix]
 channel = "stable-25_05"

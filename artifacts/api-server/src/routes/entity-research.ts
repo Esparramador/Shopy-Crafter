@@ -213,14 +213,22 @@ async function upsertEntityMemory(params: {
   return { id, action: "created" };
 }
 
+const asyncResearchJobs = new Map<string, { status: "running" | "completed" | "failed"; entity: any; result?: any; error?: string; startedAt: number; completedAt?: number }>();
+
+setInterval(() => {
+  const cutoff = Date.now() - 3600_000;
+  for (const [id, job] of asyncResearchJobs) {
+    if (job.startedAt < cutoff) asyncResearchJobs.delete(id);
+  }
+}, 600_000);
+
 // ─── POST /api/shopybrain/research-entity ─────────────────────────────────────
-// The main exhaustive parallel research endpoint
 router.post("/shopybrain/research-entity", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const {
-    input,         // Any: URL, Instagram handle, brand name, "Comic Crafter", "@brand", etc.
-    niche,         // Optional hint: "comics", "moda", etc.
-    market = "es", // Market language/region
-    depth = "full" // "quick" | "full" | "deep"
+    input,
+    niche,
+    market = "es",
+    depth = "full"
   } = req.body as { input: string; niche?: string; market?: string; depth?: string };
 
   if (!input?.trim()) {
@@ -228,24 +236,68 @@ router.post("/shopybrain/research-entity", requireAdmin, async (req: Request, re
     return;
   }
 
-  const startTime = Date.now();
   const researchId = randomUUID();
 
-  logger.info({ input, niche, depth }, "🔬 ShopyBrain: Exhaustive entity research starting");
+  logger.info({ input, niche, depth }, "🔬 ShopyBrain: Async entity research starting");
 
   try {
-    // Step 1: Identify the entity
     const entity = await extractEntityName(input.trim());
     logger.info(entity, "Entity identified");
 
-    // Step 2: PARALLEL DEEP RESEARCH — 8 dimensions searched simultaneously via Google
-    res.json({ status: "started", researchId, entity, message: "Investigación paralela iniciada..." });
+    asyncResearchJobs.set(researchId, { status: "running", entity, startedAt: Date.now() });
 
-    // Note: We return immediately and do research async? No, let's do it sync and stream.
-    // Actually let's do full sync response with everything. Client should show loading.
+    res.json({ status: "started", researchId, entity, message: "Investigación paralela iniciada en background..." });
+
+    setImmediate(async () => {
+      try {
+        const existingKnowledge = await loadExistingEntityKnowledge(entity.name || input);
+        const research = await deepEntityResearch(entity.name || input, entity.url, existingKnowledge.hasKnowledge ? existingKnowledge.summary : undefined);
+
+        await upsertEntityMemory({
+          entityName: entity.name || input,
+          title: `[DEEP RESEARCH] ${entity.name || input}`,
+          content: `ENTITY: ${entity.name}\nURL: ${entity.url ?? "N/A"}\nHANDLES: ${JSON.stringify(entity.handles)}\nFUENTES: ${research.allSources.length}\n\nOVERVIEW:\n${research.overview?.slice(0, 3000)}\n\nSOCIAL:\n${research.social?.slice(0, 2000)}\n\nPRODUCTS:\n${research.products?.slice(0, 2000)}`,
+          memoryType: "brand_intelligence",
+          niche,
+          sourceType: "deep_entity_research",
+          confidence: 0.90,
+          tags: ["deep_research", "brand_profile", (entity.name || input).toLowerCase(), niche ?? "general"],
+        });
+
+        asyncResearchJobs.set(researchId, {
+          status: "completed",
+          entity,
+          result: { sourcesFound: research.allSources.length, queriesExecuted: research.allQueries.length },
+          startedAt: asyncResearchJobs.get(researchId)!.startedAt,
+          completedAt: Date.now(),
+        });
+        logger.info({ researchId }, "✅ Async entity research completed");
+      } catch (err) {
+        asyncResearchJobs.set(researchId, {
+          status: "failed",
+          entity,
+          error: String(err),
+          startedAt: asyncResearchJobs.get(researchId)!.startedAt,
+          completedAt: Date.now(),
+        });
+        logger.error({ err, researchId }, "❌ Async entity research failed");
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
+});
+
+// ─── GET /api/shopybrain/research-status/:researchId ──────────────────────────
+router.get("/shopybrain/research-status/:researchId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const { researchId } = req.params;
+  const job = asyncResearchJobs.get(researchId as string);
+  if (!job) {
+    res.status(404).json({ error: "Research job not found or expired" });
+    return;
+  }
+  const elapsed = ((job.completedAt ?? Date.now()) - job.startedAt) / 1000;
+  res.json({ researchId, ...job, elapsedSeconds: Math.round(elapsed) });
 });
 
 // ─── POST /api/shopybrain/research-entity-sync ────────────────────────────────

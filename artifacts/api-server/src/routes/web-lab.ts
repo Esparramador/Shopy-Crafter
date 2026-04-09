@@ -177,14 +177,6 @@ Responde SIEMPRE en JSON válido con esta estructura exacta:
 }`;
 
 router.post("/web-lab/analyze", async (req: Request, res: Response) => {
-  const keepAlive = setInterval(() => {
-    if (!res.writableEnded && !res.headersSent) return;
-    if (!res.writableEnded) {
-      try { res.write(" "); } catch {}
-    }
-  }, 15_000);
-  const stopKeepAlive = () => { clearInterval(keepAlive); };
-
   try {
     const { url, projectId, template } = req.body as {
       url: string;
@@ -192,7 +184,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       template?: ReportTemplate;
     };
 
-    if (!url) { stopKeepAlive(); return res.status(400).json({ error: "URL requerida" }); }
+    if (!url) { return res.status(400).json({ error: "URL requerida" }); }
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache");
@@ -343,7 +335,6 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
       });
     }
 
-    stopKeepAlive();
     const result = JSON.stringify({
       success: true,
       analysis,
@@ -366,7 +357,6 @@ router.post("/web-lab/analyze", async (req: Request, res: Response) => {
     });
     res.end(result);
   } catch (err: any) {
-    stopKeepAlive();
     logger.error({ err }, "Web Lab analysis failed");
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Error en el análisis" });

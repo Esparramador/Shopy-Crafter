@@ -15,6 +15,7 @@ import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreInsightsTable, omnicoreKnowledgeDomainsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL } from "./claude.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -103,7 +104,7 @@ Responde exactamente con este JSON:
   try {
     const resp = await anthropic.messages.create(
       {
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_MODEL,
         max_tokens: 16000,
         system,
         messages: [{ role: "user", content: prompt }],
