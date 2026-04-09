@@ -582,31 +582,39 @@ function buildReportHtml(
               <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${esc(ps.description)}</div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-              <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
-                <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Title</div>
-                <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:600;">${esc(ps.seoTitle)}</div>
-                <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoTitle || "").length}/60 chars</div>
-              </div>
-              <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
-                <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Description</div>
-                <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.seoDescription)}</div>
-                <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoDescription || "").length}/155 chars</div>
-              </div>
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+              <tr>
+                <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
+                  <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
+                    <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Title</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:600;">${esc(ps.seoTitle)}</div>
+                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoTitle || "").length}/60 chars</div>
+                  </div>
+                </td>
+                <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
+                  <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
+                    <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Description</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.seoDescription)}</div>
+                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoDescription || "").length}/155 chars</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
             <div style="background:rgba(107,168,240,.04);border:1px solid rgba(107,168,240,.12);border-radius:10px;padding:16px;margin-bottom:20px;">
               <div style="font-size:10px;font-weight:700;color:#6ba8f0;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Open Graph — Redes Sociales</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div>
-                  <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Title</div>
-                  <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Description</div>
-                  <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
-                </div>
-              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
+                    <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Title</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
+                  </td>
+                  <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
+                    <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Description</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
+                  </td>
+                </tr>
+              </table>
             </div>
 
             ${ps.altText ? `
@@ -634,16 +642,22 @@ function buildReportHtml(
               <div>${ps.seoKeywords.map(k => `<span style="display:inline-block;background:rgba(52,211,153,.06);color:#34d399;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(52,211,153,.12);">${esc(k)}</span>`).join("")}</div>
             </div>` : ""}
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-              <div class="ai-field">
-                <div class="ai-field-label">Estrategia de Precio</div>
-                <div class="ai-field-value" style="font-size:13px;">${esc(ps.priceStrategy)}</div>
-              </div>
-              <div class="ai-field">
-                <div class="ai-field-label">Mejoras con Impacto</div>
-                <div class="ai-field-value" style="font-size:13px;">${esc(ps.improvementNotes)}</div>
-              </div>
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+              <tr>
+                <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
+                  <div class="ai-field">
+                    <div class="ai-field-label">Estrategia de Precio</div>
+                    <div class="ai-field-value" style="font-size:13px;">${esc(ps.priceStrategy)}</div>
+                  </div>
+                </td>
+                <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
+                  <div class="ai-field">
+                    <div class="ai-field-label">Mejoras con Impacto</div>
+                    <div class="ai-field-value" style="font-size:13px;">${esc(ps.improvementNotes)}</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
             ${ps.faqItems && ps.faqItems.length > 0 ? `
             <div style="margin-bottom:20px;">

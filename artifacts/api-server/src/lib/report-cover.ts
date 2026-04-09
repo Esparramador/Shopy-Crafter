@@ -21,34 +21,41 @@ export function buildCoverPage(opts: CoverPageOptions): string {
 
 function buildClassicCover(companyName: string): string {
   return `
-<div class="sc-cover-page" style="min-height:100vh;page-break-after:always;background:linear-gradient(170deg,#08080e 0%,#0c0c14 40%,#08080e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:0;margin:0;">
-  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 40%,rgba(200,168,75,.05) 0%,transparent 60%);pointer-events:none;"></div>
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;">
-    <div style="width:160px;height:160px;border-radius:32px;overflow:hidden;border:2px solid rgba(200,168,75,.25);box-shadow:0 30px 80px rgba(0,0,0,.5);margin-bottom:28px;">
-      <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" style="width:100%;height:100%;object-fit:cover;" />
-    </div>
-    <p style="font-size:32px;font-weight:700;color:rgba(200,168,75,.85);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
-  </div>
-  <div style="position:absolute;bottom:40px;right:48px;z-index:1;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#08080e;page-break-after:always;">
+  <tr><td style="padding:80px 40px 20px;text-align:center;">
+    <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" width="120" height="120" style="width:120px;height:120px;border-radius:24px;border:2px solid rgba(200,168,75,.25);display:block;margin:0 auto 24px;" />
+    <p style="font-size:28px;font-weight:700;color:rgba(200,168,75,.85);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
+  </td></tr>
+  <tr><td style="padding:20px 40px 60px;text-align:right;">
     <p style="font-size:14px;color:rgba(200,168,75,.45);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
-  </div>
-</div>`;
+  </td></tr>
+</table>`;
 }
 
 function buildEleganceCover(companyName: string): string {
   return `
-<div class="sc-cover-page" style="min-height:100vh;page-break-after:always;background:linear-gradient(160deg,#0b1628 0%,#0f1d35 35%,#111e36 65%,#0b1628 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:0;margin:0;">
-  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 40%,rgba(192,200,216,.06) 0%,transparent 70%);pointer-events:none;"></div>
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;">
-    <div style="width:160px;height:160px;border-radius:32px;overflow:hidden;border:2px solid rgba(192,200,216,.2);box-shadow:0 30px 80px rgba(0,0,0,.5);margin-bottom:28px;">
-      <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" style="width:100%;height:100%;object-fit:cover;" />
-    </div>
-    <p style="font-size:32px;font-weight:700;color:rgba(192,200,216,.8);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
-  </div>
-  <div style="position:absolute;bottom:40px;right:48px;z-index:1;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0b1628;page-break-after:always;">
+  <tr><td style="padding:80px 40px 20px;text-align:center;">
+    <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" width="120" height="120" style="width:120px;height:120px;border-radius:24px;border:2px solid rgba(192,200,216,.2);display:block;margin:0 auto 24px;" />
+    <p style="font-size:28px;font-weight:700;color:rgba(192,200,216,.8);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
+  </td></tr>
+  <tr><td style="padding:20px 40px 60px;text-align:right;">
     <p style="font-size:14px;color:rgba(192,200,216,.4);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
-  </div>
-</div>`;
+  </td></tr>
+</table>`;
+}
+
+function buildPrestigeCover(companyName: string): string {
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1a1410;page-break-after:always;">
+  <tr><td style="padding:80px 40px 20px;text-align:center;">
+    <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="Shopy Crafter" width="120" height="120" style="width:120px;height:120px;border-radius:50%;border:2px solid rgba(196,149,106,.3);display:block;margin:0 auto 24px;" />
+    <p style="font-size:28px;font-weight:700;color:rgba(196,149,106,.8);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Cormorant Garamond','Georgia',serif;">Shopy Crafter</p>
+  </td></tr>
+  <tr><td style="padding:20px 40px 60px;text-align:right;">
+    <p style="font-size:14px;color:rgba(196,149,106,.45);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
+  </td></tr>
+</table>`;
 }
 
 export function buildTableOfContents(body: string, template: CoverTemplate = "prestige"): string {
@@ -61,68 +68,50 @@ export function buildTableOfContents(body: string, template: CoverTemplate = "pr
   }
   if (titles.length === 0) return "";
 
-  const colors: Record<CoverTemplate, { bg: string; accent: string; accentRgba: string; text: string; subtext: string; dot: string; line: string; font: string; numBg: string; numColor: string }> = {
+  const colors: Record<CoverTemplate, { bg: string; accent: string; text: string; subtext: string; line: string; font: string; numBg: string; numColor: string }> = {
     classic: {
-      bg: "linear-gradient(170deg,#08080e 0%,#0c0c14 40%,#08080e 100%)",
-      accent: "#c8a84b", accentRgba: "rgba(200,168,75,", text: "#f0f0f5", subtext: "rgba(240,240,245,.5)",
-      dot: "rgba(200,168,75,.6)", line: "rgba(200,168,75,.12)", font: "'Helvetica Neue',Arial,sans-serif",
+      bg: "#08080e",
+      accent: "#c8a84b", text: "#f0f0f5", subtext: "rgba(240,240,245,.5)",
+      line: "rgba(200,168,75,.12)", font: "'Helvetica Neue',Arial,sans-serif",
       numBg: "rgba(200,168,75,.1)", numColor: "rgba(200,168,75,.8)",
     },
     elegance: {
-      bg: "linear-gradient(160deg,#0b1628 0%,#0f1d35 35%,#111e36 65%,#0b1628 100%)",
-      accent: "#c0c8d8", accentRgba: "rgba(192,200,216,", text: "#e8ecf2", subtext: "rgba(232,236,242,.5)",
-      dot: "rgba(192,200,216,.6)", line: "rgba(192,200,216,.12)", font: "'Playfair Display','Georgia',serif",
+      bg: "#0b1628",
+      accent: "#c0c8d8", text: "#e8ecf2", subtext: "rgba(232,236,242,.5)",
+      line: "rgba(192,200,216,.12)", font: "'Playfair Display','Georgia',serif",
       numBg: "rgba(192,200,216,.08)", numColor: "rgba(192,200,216,.7)",
     },
     prestige: {
-      bg: "linear-gradient(160deg,#1a1410 0%,#211a14 30%,#1e1812 60%,#1a1410 100%)",
-      accent: "#c4956a", accentRgba: "rgba(196,149,106,", text: "#f0ebe4", subtext: "rgba(240,235,228,.5)",
-      dot: "rgba(196,149,106,.6)", line: "rgba(196,149,106,.12)", font: "'Cormorant Garamond','Georgia',serif",
+      bg: "#1a1410",
+      accent: "#c4956a", text: "#f0ebe4", subtext: "rgba(240,235,228,.5)",
+      line: "rgba(196,149,106,.12)", font: "'Cormorant Garamond','Georgia',serif",
       numBg: "rgba(196,149,106,.08)", numColor: "rgba(196,149,106,.7)",
     },
   };
   const c = colors[template];
 
   const items = titles.map((t, i) => `
-    <div style="display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid ${c.line};">
-      <div style="width:36px;height:36px;border-radius:10px;background:${c.numBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <span style="font-size:14px;font-weight:700;color:${c.numColor};font-family:${c.font};">${String(i + 1).padStart(2, "0")}</span>
-      </div>
-      <div style="flex:1;font-size:15px;font-weight:500;color:${c.text};letter-spacing:.3px;font-family:${c.font};">${t}</div>
-      <div style="width:8px;height:8px;border-radius:50%;background:${c.dot};flex-shrink:0;opacity:.5;"></div>
-    </div>`).join("");
+    <tr>
+      <td width="48" style="padding:14px 8px 14px 0;vertical-align:middle;border-bottom:1px solid ${c.line};">
+        <div style="width:36px;height:36px;border-radius:10px;background:${c.numBg};text-align:center;line-height:36px;">
+          <span style="font-size:14px;font-weight:700;color:${c.numColor};font-family:${c.font};">${String(i + 1).padStart(2, "0")}</span>
+        </div>
+      </td>
+      <td style="padding:14px 0;vertical-align:middle;font-size:15px;font-weight:500;color:${c.text};letter-spacing:.3px;font-family:${c.font};border-bottom:1px solid ${c.line};">${t}</td>
+    </tr>`).join("");
 
   return `
-<div class="sc-toc-page" style="min-height:100vh;page-break-after:always;background:${c.bg};position:relative;overflow:hidden;padding:60px 72px;box-sizing:border-box;">
-  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 30%,${c.accentRgba}.04) 0%,transparent 60%);pointer-events:none;"></div>
-  <div style="position:relative;z-index:1;">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-      <div style="font-size:28px;font-weight:700;color:${c.accent};letter-spacing:2px;text-transform:uppercase;font-family:${c.font};">Índice</div>
-      <div style="flex:1;height:1px;background:${c.line};"></div>
-    </div>
-    <div style="font-size:13px;color:${c.subtext};letter-spacing:1px;text-transform:uppercase;margin-bottom:36px;font-family:'Helvetica Neue',Arial,sans-serif;">Contenidos del informe &middot; ${titles.length} secciones</div>
-    <div style="display:flex;flex-direction:column;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.bg};page-break-after:always;">
+  <tr><td style="padding:60px 48px;">
+    <p style="font-size:28px;font-weight:700;color:${c.accent};letter-spacing:2px;text-transform:uppercase;font-family:${c.font};margin:0 0 8px;">Índice</p>
+    <div style="height:1px;background:${c.line};margin-bottom:8px;"></div>
+    <p style="font-size:13px;color:${c.subtext};letter-spacing:1px;text-transform:uppercase;margin:0 0 32px;font-family:'Helvetica Neue',Arial,sans-serif;">Contenidos del informe &middot; ${titles.length} secciones</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
       ${items}
-    </div>
-  </div>
-  <div style="position:absolute;bottom:40px;right:48px;z-index:1;">
+    </table>
+  </td></tr>
+  <tr><td style="padding:16px 48px 40px;text-align:right;">
     <p style="font-size:12px;color:${c.subtext};letter-spacing:1px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
-  </div>
-</div>`;
-}
-
-function buildPrestigeCover(companyName: string): string {
-  return `
-<div class="sc-cover-page" style="min-height:100vh;page-break-after:always;background:linear-gradient(160deg,#1a1410 0%,#211a14 30%,#1e1812 60%,#1a1410 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:0;margin:0;">
-  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 40%,rgba(196,149,106,.06) 0%,transparent 70%);pointer-events:none;"></div>
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;">
-    <div style="width:160px;height:160px;border-radius:50%;overflow:hidden;border:2px solid rgba(196,149,106,.3);box-shadow:0 30px 80px rgba(0,0,0,.5);margin-bottom:28px;">
-      <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="Shopy Crafter" style="width:100%;height:100%;object-fit:cover;" />
-    </div>
-    <p style="font-size:32px;font-weight:700;color:rgba(196,149,106,.8);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Cormorant Garamond','Georgia',serif;">Shopy Crafter</p>
-  </div>
-  <div style="position:absolute;bottom:40px;right:48px;z-index:1;">
-    <p style="font-size:14px;color:rgba(196,149,106,.45);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
-  </div>
-</div>`;
+  </td></tr>
+</table>`;
 }

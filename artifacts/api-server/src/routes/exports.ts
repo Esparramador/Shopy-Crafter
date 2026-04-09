@@ -947,29 +947,21 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${safeTitle} — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: ${BRAND.dark}; color: ${BRAND.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
-  .cover { background: linear-gradient(160deg, #0e0e18 0%, #12121f 50%, #0a0a14 100%); padding: 56px 56px 48px; border-bottom: 1px solid ${BRAND.border}; position: relative; overflow: hidden; }
-  .cover::before { content: ''; position: absolute; top: -120px; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(200,168,75,.06) 0%, transparent 70%); pointer-events: none; }
-  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, ${BRAND.gold}44, transparent); }
-  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
-  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover { background: #0e0e18; padding: 48px 48px 40px; border-bottom: 1px solid ${BRAND.border}; overflow: hidden; }
   .cover-logo-icon { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }
-  .cover-logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-logo-icon img { width: 100%; height: 100%; }
   .cover-logo-text { font-size: 20px; font-weight: 800; color: ${BRAND.gold}; letter-spacing: 1px; text-transform: uppercase; }
   .cover-badge { background: ${BRAND.surface}; border: 1px solid ${BRAND.borderLight}; border-radius: 8px; padding: 8px 16px; }
   .cover-badge-label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1.5px; }
   .cover-badge-value { font-size: 13px; color: ${BRAND.white}; font-weight: 600; margin-top: 2px; }
-  .cover-title { position: relative; z-index: 1; }
   .cover-title h1 { font-size: 32px; font-weight: 900; color: ${BRAND.white}; letter-spacing: -0.8px; line-height: 1.2; }
   .cover-title h1 span { color: ${BRAND.gold}; }
   .cover-title .subtitle { font-size: 15px; color: ${BRAND.mutedLight}; margin-top: 8px; font-weight: 400; }
-  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
-  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: ${BRAND.muted}; }
-  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${BRAND.gold}; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${BRAND.gold}; display: inline-block; }
 
   .body-content { padding: 40px 56px 48px; }
 
@@ -988,8 +980,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .card:hover { border-color: ${BRAND.borderLight}; }
 
   .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .metric { background: ${BRAND.card}; border: 1px solid ${BRAND.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
-  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${BRAND.gold}33, transparent); }
+  .metric { background: ${BRAND.card}; border: 1px solid ${BRAND.border}; border-radius: 12px; padding: 20px; text-align: center; overflow: hidden; }
   .metric .value { font-size: 30px; font-weight: 900; color: ${BRAND.gold}; letter-spacing: -0.5px; line-height: 1.1; }
   .metric .label { font-size: 10px; color: ${BRAND.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
   .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
@@ -1054,8 +1045,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .ai-quick-wins h3 { color: ${BRAND.jade}; }
   .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
   .ai-quick-wins code { background: rgba(200,168,75,.1); color: ${BRAND.gold}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-  .ai-deliverable { background: rgba(200,168,75,.06); border: 2px solid rgba(200,168,75,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; position: relative; }
-  .ai-deliverable::before { content: "📦 CONTENIDO PRODUCIDO — LISTO PARA USAR"; display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: ${BRAND.gold}; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(200,168,75,.2); }
+  .ai-deliverable { background: rgba(200,168,75,.06); border: 2px solid rgba(200,168,75,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
   .ai-deliverable code { display: block; background: rgba(0,0,0,.3); color: ${BRAND.gold}; padding: 12px 16px; border-radius: 8px; font-size: 12px; line-height: 1.7; margin: 8px 0; white-space: pre-wrap; word-break: break-all; border-left: 3px solid ${BRAND.gold}; font-family: 'Courier New', monospace; }
   .ai-deliverable p, .ai-deliverable li { color: rgba(255,255,255,.8); line-height: 1.7; font-size: 13px; }
   .ai-deliverable table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
@@ -1190,35 +1180,45 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompany, date: safeDate, template: "classic" })}
 <div class="page">
   <div class="cover">
-    <div class="cover-top">
-      <div class="cover-logo">
-        <div class="cover-logo-icon"><img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" /></div>
-        <div class="cover-logo-text">Shopy Crafter</div>
-      </div>
-      <div class="cover-badge">
-        <div class="cover-badge-label">Fecha del informe</div>
-        <div class="cover-badge-value">${safeDate}</div>
-      </div>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+      <tr>
+        <td style="vertical-align:middle;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align:middle;padding-right:12px;"><div class="cover-logo-icon"><img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="44" height="44" style="width:44px;height:44px;border-radius:10px;" /></div></td>
+            <td style="vertical-align:middle;"><span class="cover-logo-text">Shopy Crafter</span></td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;text-align:right;">
+          <div class="cover-badge">
+            <div class="cover-badge-label">Fecha del informe</div>
+            <div class="cover-badge-value">${safeDate}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
     <div class="cover-title">
       <h1>${safeTitle}</h1>
       <p class="subtitle">${safeSub}</p>
     </div>
-    <div class="cover-meta">
-      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Generado por IA</div>
-      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Datos reales</div>
-      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Confidencial</div>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+      <tr>
+        <td style="padding-right:24px;font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Generado por IA</td>
+        <td style="padding-right:24px;font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Datos reales</td>
+        <td style="font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Confidencial</td>
+      </tr>
+    </table>
   </div>
   ${buildTableOfContents(body, "classic")}
   <div class="body-content">
     ${body}
   </div>
-  <div class="footer">
-    <div class="footer-line"></div>
-    <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
-  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" class="footer" style="border-top:1px solid ${BRAND.border};background:${BRAND.card};text-align:center;">
+    <tr><td style="padding:28px 40px;">
+      <div style="width:40px;height:2px;background:${BRAND.gold};margin:0 auto 12px;border-radius:1px;"></div>
+      <p style="font-size:15px;font-weight:700;color:${BRAND.gold};letter-spacing:2px;margin:0;">Shopy Crafter</p>
+      <p style="font-size:11px;color:${BRAND.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
+    </td></tr>
+  </table>
 </div>
 </body>
 </html>`;
@@ -1283,60 +1283,39 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${safeTitle} — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${ELEGANCE.navy}; color: ${ELEGANCE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
   .cover-portfolio {
-    position: relative; width: 100%; min-height: 900px;
-    background: linear-gradient(155deg, #070e1c 0%, ${ELEGANCE.navy} 35%, #0d1a35 70%, #091428 100%);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    text-align: center; padding: 80px 56px 60px; overflow: hidden;
+    width: 100%;
+    background: #070e1c;
+    text-align: center; padding: 60px 40px 40px; overflow: hidden;
     border-bottom: 2px solid ${ELEGANCE.border}; page-break-after: always;
   }
-  .cover-portfolio::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(74,144,217,.06) 0%, transparent 60%); pointer-events: none; }
-  .cover-portfolio::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 85%, rgba(74,144,217,.03) 0%, transparent 50%); pointer-events: none; }
 
-  .cover-frame { position: absolute; inset: 36px; pointer-events: none; }
-  .cover-frame::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${ELEGANCE.accent}; }
-  .cover-frame::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${ELEGANCE.accent}44; }
-  .cover-frame-h1 { position: absolute; top: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}22, transparent); }
-  .cover-frame-h2 { position: absolute; bottom: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}22, transparent); }
+  .cover-inner { max-width: 680px; margin: 0 auto; }
 
-  .cover-inner { position: relative; z-index: 5; max-width: 680px; }
+  .cover-diamond-top { width: 14px; height: 14px; background: ${ELEGANCE.accent}; margin: 0 auto 28px; }
 
-  .cover-diamond-top { width: 14px; height: 14px; background: ${ELEGANCE.accent}; transform: rotate(45deg); margin: 0 auto 36px; box-shadow: 0 0 20px rgba(74,144,217,.3); }
+  .cover-agency-name { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 600; color: ${ELEGANCE.accent}; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 36px; }
 
-  .cover-agency-line { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 44px; }
-  .cover-agency-bar { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}55); }
-  .cover-agency-bar-r { width: 50px; height: 1px; background: linear-gradient(90deg, ${ELEGANCE.accent}55, transparent); }
-  .cover-agency-name { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 600; color: ${ELEGANCE.accent}; letter-spacing: 5px; text-transform: uppercase; }
-
-  .cover-logo-container { margin-bottom: 44px; }
-  .cover-logo-circle { width: 100px; height: 100px; border-radius: 16px; overflow: hidden; margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 0 1px ${ELEGANCE.border}, 0 0 60px rgba(74,144,217,.06); border: 2px solid ${ELEGANCE.accent}44; }
-  .cover-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
-
-  .cover-sep { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto 40px; }
-  .cover-sep-line { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}44); }
-  .cover-sep-line-r { width: 70px; height: 1px; background: linear-gradient(90deg, ${ELEGANCE.accent}44, transparent); }
-  .cover-sep-dot { width: 6px; height: 6px; background: ${ELEGANCE.accent}; transform: rotate(45deg); opacity: .6; }
+  .cover-logo-container { margin-bottom: 36px; }
+  .cover-logo-circle { width: 100px; height: 100px; border-radius: 16px; overflow: hidden; margin: 0 auto; border: 2px solid rgba(74,144,217,.35); }
+  .cover-logo-circle img { width: 100%; height: 100%; }
 
   .cover-doc-type { font-size: 11px; font-weight: 700; color: ${ELEGANCE.muted}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
-  .cover-main-title { font-family: 'Playfair Display', serif; font-size: 50px; font-weight: 800; color: ${ELEGANCE.white}; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 16px; text-shadow: 0 4px 30px rgba(0,0,0,.4); }
-  .cover-main-subtitle { font-size: 16px; color: ${ELEGANCE.silver}; font-weight: 400; line-height: 1.6; margin-bottom: 48px; max-width: 520px; margin-left: auto; margin-right: auto; }
+  .cover-main-title { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; color: ${ELEGANCE.white}; line-height: 1.2; margin-bottom: 16px; }
+  .cover-main-subtitle { font-size: 16px; color: ${ELEGANCE.silver}; font-weight: 400; line-height: 1.6; margin-bottom: 40px; }
 
-  .cover-client-box { background: #0d1628; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+  .cover-client-box { background: #0d1628; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 24px; }
   .cover-client-label { font-size: 10px; color: ${ELEGANCE.muted}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
   .cover-client-name { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: ${ELEGANCE.accentSoft}; font-style: italic; letter-spacing: 0.5px; }
 
-  .cover-meta-row { display: flex; justify-content: center; gap: 40px; margin-top: 16px; }
-  .cover-meta-item { text-align: center; }
   .cover-meta-label { font-size: 9px; color: ${ELEGANCE.muted}; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
   .cover-meta-value { font-size: 13px; color: ${ELEGANCE.silver}; font-weight: 500; }
 
-  .cover-footer-line { position: absolute; bottom: 24px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
-  .cover-footer-text { font-size: 9px; color: ${ELEGANCE.muted}44; letter-spacing: 2px; text-transform: uppercase; }
+  .cover-footer-text { font-size: 9px; color: rgba(104,128,168,.4); letter-spacing: 2px; text-transform: uppercase; }
 
   .body-content { padding: 40px 56px 48px; }
 
@@ -1355,8 +1334,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   .card:hover { border-color: ${ELEGANCE.borderLight}; }
 
   .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .metric { background: ${ELEGANCE.card}; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
-  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${ELEGANCE.accent}33, transparent); }
+  .metric { background: ${ELEGANCE.card}; border: 1px solid ${ELEGANCE.border}; border-radius: 12px; padding: 20px; text-align: center; overflow: hidden; }
   .metric .value { font-size: 30px; font-weight: 900; color: ${ELEGANCE.accent}; letter-spacing: -0.5px; line-height: 1.1; }
   .metric .label { font-size: 10px; color: ${ELEGANCE.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
   .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
@@ -1410,8 +1388,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
   .ai-quick-wins h3 { color: ${ELEGANCE.jade}; }
   .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
   .ai-quick-wins code { background: rgba(74,144,217,.1); color: ${ELEGANCE.accent}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-  .ai-deliverable { background: rgba(74,144,217,.06); border: 2px solid rgba(74,144,217,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; position: relative; }
-  .ai-deliverable::before { content: "📦 CONTENIDO PRODUCIDO — LISTO PARA USAR"; display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: ${ELEGANCE.accent}; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(74,144,217,.2); }
+  .ai-deliverable { background: rgba(74,144,217,.06); border: 2px solid rgba(74,144,217,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
   .ai-deliverable code { display: block; background: rgba(0,0,0,.3); color: ${ELEGANCE.accent}; padding: 12px 16px; border-radius: 8px; font-size: 12px; line-height: 1.7; margin: 8px 0; white-space: pre-wrap; word-break: break-all; border-left: 3px solid ${ELEGANCE.accent}; font-family: 'Courier New', monospace; }
   .ai-deliverable p, .ai-deliverable li { color: rgba(255,255,255,.8); line-height: 1.7; font-size: 13px; }
   .ai-deliverable table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
@@ -1545,27 +1522,15 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyE, date: safeDate, template: "elegance" })}
 <div class="page">
   <div class="cover-portfolio">
-    <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
-
     <div class="cover-inner">
       <div class="cover-diamond-top"></div>
 
-      <div class="cover-agency-line">
-        <div class="cover-agency-bar"></div>
-        <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
-        <div class="cover-agency-bar-r"></div>
-      </div>
+      <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
 
       <div class="cover-logo-container">
         <div class="cover-logo-circle">
-          <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" />
+          <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="96" height="96" style="width:96px;height:96px;border-radius:16px;" />
         </div>
-      </div>
-
-      <div class="cover-sep">
-        <div class="cover-sep-line"></div>
-        <div class="cover-sep-dot"></div>
-        <div class="cover-sep-line-r"></div>
       </div>
 
       <div class="cover-doc-type">Informe de Consultoría Digital</div>
@@ -1577,28 +1542,34 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
         <div class="cover-client-name">${safeCompany}</div>
       </div>` : ""}
 
-      <div class="cover-meta-row">
-        <div class="cover-meta-item"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></div>
-        <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></div>
-        ${coverDomain ? `<div class="cover-meta-item"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></div>` : ""}
-        <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></div>
-      </div>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:16px auto 0;text-align:center;">
+        <tr>
+          <td style="padding:0 20px;"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></td>
+          <td style="padding:0 20px;"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></td>
+          ${coverDomain ? `<td style="padding:0 20px;"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></td>` : ""}
+          <td style="padding:0 20px;"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></td>
+        </tr>
+      </table>
     </div>
 
-    <div class="cover-footer-line">
-      <div class="cover-footer-text">shopycrafter.com</div>
-      <div class="cover-footer-text">Confidencial</div>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
+      <tr>
+        <td style="text-align:left;"><span class="cover-footer-text">shopycrafter.com</span></td>
+        <td style="text-align:right;"><span class="cover-footer-text">Confidencial</span></td>
+      </tr>
+    </table>
   </div>
   ${buildTableOfContents(body, "elegance")}
   <div class="body-content">
     ${body}
   </div>
-  <div class="footer">
-    <div class="footer-line"></div>
-    <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
-  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${ELEGANCE.border};background:${ELEGANCE.surface};text-align:center;">
+    <tr><td style="padding:28px 40px;">
+      <div style="width:40px;height:2px;background:${ELEGANCE.accent};margin:0 auto 12px;border-radius:1px;"></div>
+      <p style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:${ELEGANCE.accent};letter-spacing:2px;margin:0;">Shopy Crafter</p>
+      <p style="font-size:11px;color:${ELEGANCE.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
+    </td></tr>
+  </table>
 </div>
 </body>
 </html>`;
@@ -1621,60 +1592,39 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${safeTitle} — Shopy Crafter</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${PRESTIGE.charcoal}; color: ${PRESTIGE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
   .page { max-width: 960px; margin: 0 auto; padding: 0; }
 
   .cover-portfolio {
-    position: relative; width: 100%; min-height: 900px;
-    background: linear-gradient(170deg, #120e0a 0%, ${PRESTIGE.charcoal} 30%, #1e1810 60%, #150f0a 100%);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    text-align: center; padding: 80px 56px 60px; overflow: hidden;
+    width: 100%;
+    background: #120e0a;
+    text-align: center; padding: 60px 40px 40px; overflow: hidden;
     border-bottom: 2px solid ${PRESTIGE.border}; page-break-after: always;
   }
-  .cover-portfolio::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(196,149,106,.06) 0%, transparent 60%); pointer-events: none; }
-  .cover-portfolio::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 85%, rgba(196,149,106,.03) 0%, transparent 50%); pointer-events: none; }
 
-  .cover-frame { position: absolute; inset: 36px; pointer-events: none; }
-  .cover-frame::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${PRESTIGE.copper}; }
-  .cover-frame::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 28px; background: ${PRESTIGE.copper}44; }
-  .cover-frame-h1 { position: absolute; top: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}22, transparent); }
-  .cover-frame-h2 { position: absolute; bottom: 0; left: 60px; right: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}22, transparent); }
+  .cover-inner { max-width: 680px; margin: 0 auto; }
 
-  .cover-inner { position: relative; z-index: 5; max-width: 680px; }
+  .cover-diamond-top { width: 14px; height: 14px; background: ${PRESTIGE.copper}; margin: 0 auto 28px; }
 
-  .cover-diamond-top { width: 14px; height: 14px; background: ${PRESTIGE.copper}; transform: rotate(45deg); margin: 0 auto 36px; box-shadow: 0 0 20px rgba(196,149,106,.3); }
+  .cover-agency-name { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; color: ${PRESTIGE.copper}; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 36px; }
 
-  .cover-agency-line { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 44px; }
-  .cover-agency-bar { width: 50px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}55); }
-  .cover-agency-bar-r { width: 50px; height: 1px; background: linear-gradient(90deg, ${PRESTIGE.copper}55, transparent); }
-  .cover-agency-name { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; color: ${PRESTIGE.copper}; letter-spacing: 5px; text-transform: uppercase; }
-
-  .cover-logo-container { margin-bottom: 44px; }
-  .cover-logo-circle { width: 100px; height: 100px; border-radius: 50%; overflow: hidden; margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 0 1px #2e2620, 0 0 60px rgba(196,149,106,.06); border: 2px solid ${PRESTIGE.copper}44; }
-  .cover-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
-
-  .cover-sep { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0 auto 40px; }
-  .cover-sep-line { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}44); }
-  .cover-sep-line-r { width: 70px; height: 1px; background: linear-gradient(90deg, ${PRESTIGE.copper}44, transparent); }
-  .cover-sep-dot { width: 6px; height: 6px; background: ${PRESTIGE.copper}; transform: rotate(45deg); opacity: .6; }
+  .cover-logo-container { margin-bottom: 36px; }
+  .cover-logo-circle { width: 100px; height: 100px; border-radius: 50%; overflow: hidden; margin: 0 auto; border: 2px solid rgba(196,149,106,.35); }
+  .cover-logo-circle img { width: 100%; height: 100%; }
 
   .cover-doc-type { font-size: 11px; font-weight: 700; color: ${PRESTIGE.muted}; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 20px; }
-  .cover-main-title { font-family: 'Cormorant Garamond', serif; font-size: 50px; font-weight: 800; color: ${PRESTIGE.white}; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 16px; text-shadow: 0 4px 30px rgba(0,0,0,.4); }
-  .cover-main-subtitle { font-size: 16px; color: ${PRESTIGE.mutedLight}; font-weight: 400; line-height: 1.6; margin-bottom: 48px; max-width: 520px; margin-left: auto; margin-right: auto; }
+  .cover-main-title { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 800; color: ${PRESTIGE.white}; line-height: 1.2; margin-bottom: 16px; }
+  .cover-main-subtitle { font-size: 16px; color: ${PRESTIGE.mutedLight}; font-weight: 400; line-height: 1.6; margin-bottom: 40px; }
 
-  .cover-client-box { background: #211c15; border: 1px solid #3d332a; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+  .cover-client-box { background: #211c15; border: 1px solid #3d332a; border-radius: 12px; padding: 24px 44px; display: inline-block; margin-bottom: 24px; }
   .cover-client-label { font-size: 10px; color: ${PRESTIGE.muted}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
   .cover-client-name { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 700; color: ${PRESTIGE.copperLight}; font-style: italic; letter-spacing: 0.5px; }
 
-  .cover-meta-row { display: flex; justify-content: center; gap: 40px; margin-top: 16px; }
-  .cover-meta-item { text-align: center; }
   .cover-meta-label { font-size: 9px; color: ${PRESTIGE.muted}; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
   .cover-meta-value { font-size: 13px; color: ${PRESTIGE.mutedLight}; font-weight: 500; }
 
-  .cover-footer-line { position: absolute; bottom: 24px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; z-index: 5; }
-  .cover-footer-text { font-size: 9px; color: ${PRESTIGE.muted}44; letter-spacing: 2px; text-transform: uppercase; }
+  .cover-footer-text { font-size: 9px; color: rgba(128,110,90,.4); letter-spacing: 2px; text-transform: uppercase; }
 
   .body-content { padding: 40px 56px 48px; }
 
@@ -1693,8 +1643,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .card:hover { border-color: ${PRESTIGE.borderLight}; }
 
   .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .metric { background: ${PRESTIGE.card}; border: 1px solid ${PRESTIGE.border}; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
-  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, ${PRESTIGE.copper}33, transparent); }
+  .metric { background: ${PRESTIGE.card}; border: 1px solid ${PRESTIGE.border}; border-radius: 12px; padding: 20px; text-align: center; overflow: hidden; }
   .metric .value { font-size: 30px; font-weight: 900; color: ${PRESTIGE.copper}; letter-spacing: -0.5px; line-height: 1.1; }
   .metric .label { font-size: 10px; color: ${PRESTIGE.muted}; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
   .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
@@ -1748,8 +1697,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .ai-quick-wins h3 { color: ${PRESTIGE.jade}; }
   .ai-quick-wins li { margin-bottom: 12px; color: rgba(255,255,255,.7); line-height: 1.7; }
   .ai-quick-wins code { background: rgba(196,149,106,.1); color: ${PRESTIGE.copper}; padding: 2px 8px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-  .ai-deliverable { background: rgba(196,149,106,.06); border: 2px solid rgba(196,149,106,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; position: relative; }
-  .ai-deliverable::before { content: "📦 CONTENIDO PRODUCIDO — LISTO PARA USAR"; display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: ${PRESTIGE.copper}; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(196,149,106,.2); }
+  .ai-deliverable { background: rgba(196,149,106,.06); border: 2px solid rgba(196,149,106,.25); border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
   .ai-deliverable code { display: block; background: rgba(0,0,0,.3); color: ${PRESTIGE.copper}; padding: 12px 16px; border-radius: 8px; font-size: 12px; line-height: 1.7; margin: 8px 0; white-space: pre-wrap; word-break: break-all; border-left: 3px solid ${PRESTIGE.copper}; font-family: 'Courier New', monospace; }
   .ai-deliverable p, .ai-deliverable li { color: rgba(255,255,255,.8); line-height: 1.7; font-size: 13px; }
   .ai-deliverable table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
@@ -1898,8 +1846,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 
   @media print {
     body { background: #faf8f5; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .cover-portfolio { background: #f5f0eb !important; min-height: 100vh; page-break-after: always; }
-    .cover-portfolio::before, .cover-portfolio::after { display: none; }
+    .cover-portfolio { background: #f5f0eb !important; page-break-after: always; }
     .cover-main-title, .cover-title h1 { color: #1a1a1a; }
     .cover-client-name { color: #8b6340; }
     .card, .metric, .recommendation, .toc-item, .stat-item { break-inside: avoid; }
@@ -1917,27 +1864,15 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyP, date: safeDate, template: "prestige" })}
 <div class="page">
   <div class="cover-portfolio">
-    <div class="cover-frame"><div class="cover-frame-h1"></div><div class="cover-frame-h2"></div></div>
-
     <div class="cover-inner">
       <div class="cover-diamond-top"></div>
 
-      <div class="cover-agency-line">
-        <div class="cover-agency-bar"></div>
-        <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
-        <div class="cover-agency-bar-r"></div>
-      </div>
+      <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
 
       <div class="cover-logo-container">
         <div class="cover-logo-circle">
-          <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" />
+          <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" width="96" height="96" style="width:96px;height:96px;border-radius:50%;" />
         </div>
-      </div>
-
-      <div class="cover-sep">
-        <div class="cover-sep-line"></div>
-        <div class="cover-sep-dot"></div>
-        <div class="cover-sep-line-r"></div>
       </div>
 
       <div class="cover-doc-type">Informe de Consultoría Digital</div>
@@ -1949,28 +1884,34 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
         <div class="cover-client-name">${safeCompany}</div>
       </div>` : ""}
 
-      <div class="cover-meta-row">
-        <div class="cover-meta-item"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></div>
-        <div class="cover-meta-item"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></div>
-        ${coverDomain ? `<div class="cover-meta-item"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></div>` : ""}
-        <div class="cover-meta-item"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></div>
-      </div>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:16px auto 0;text-align:center;">
+        <tr>
+          <td style="padding:0 20px;"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></td>
+          <td style="padding:0 20px;"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></td>
+          ${coverDomain ? `<td style="padding:0 20px;"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></td>` : ""}
+          <td style="padding:0 20px;"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></td>
+        </tr>
+      </table>
     </div>
 
-    <div class="cover-footer-line">
-      <div class="cover-footer-text">shopycrafter.com</div>
-      <div class="cover-footer-text">Confidencial</div>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
+      <tr>
+        <td style="text-align:left;"><span class="cover-footer-text">shopycrafter.com</span></td>
+        <td style="text-align:right;"><span class="cover-footer-text">Confidencial</span></td>
+      </tr>
+    </table>
   </div>
   ${buildTableOfContents(body, "prestige")}
   <div class="body-content">
     ${body}
   </div>
-  <div class="footer">
-    <div class="footer-line"></div>
-    <div class="footer-brand">Shopy Crafter</div>
-    <div class="footer-sub">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</div>
-  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${PRESTIGE.border};background:${PRESTIGE.charcoalLight};text-align:center;padding:0;">
+    <tr><td style="padding:28px 40px;">
+      <div style="width:40px;height:2px;background:${PRESTIGE.copper};margin:0 auto 12px;border-radius:1px;"></div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:700;color:${PRESTIGE.copper};letter-spacing:2px;margin:0;">Shopy Crafter</p>
+      <p style="font-size:11px;color:${PRESTIGE.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
+    </td></tr>
+  </table>
 </div>
 </body>
 </html>`;
