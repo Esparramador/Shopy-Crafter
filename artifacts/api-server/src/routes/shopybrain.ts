@@ -6350,6 +6350,8 @@ Responde en español, de forma directa y accionable.`;
           const relevantFiles: { path: string; content: string }[] = [];
           const scanDirs = [
             { root: FRONTEND_SRC, prefix: "" },
+            { root: path.resolve(FRONTEND_ROOT, "public"), prefix: "public/" },
+            { root: path.resolve(BACKEND_ROOT, "src"), prefix: "[backend] " },
           ];
           const targetLower = String(target).toLowerCase();
           for (const { root, prefix } of scanDirs) {
@@ -6361,9 +6363,9 @@ Responde en español, de forma directa y accionable.`;
                   if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
                   const full = path.join(dir, entry.name);
                   if (entry.isDirectory()) { scanRecursive(full, depth + 1); continue; }
-                  if (!/\.(tsx|css)$/.test(entry.name)) continue;
+                  if (!/\.(tsx?|css)$/.test(entry.name)) continue;
                   const relPath = path.relative(root, full);
-                  const nameLower = entry.name.toLowerCase().replace(/\.(tsx|css)$/, "");
+                  const nameLower = entry.name.toLowerCase().replace(/\.(tsx?|css)$/, "");
                   if (targetLower.includes(nameLower) || nameLower.includes("landing") || nameLower.includes("index") || nameLower === "app") {
                     const fc = fs.readFileSync(full, "utf-8");
                     relevantFiles.push({ path: `${prefix}${relPath}`, content: fc.length > 8000 ? fc.slice(0, 8000) + "\n// ... [truncado]" : fc });
@@ -6430,8 +6432,8 @@ Responde SOLO JSON:
                 failedFiles.push(`${file.filePath} (intentado: src/${rawPath}, ${rawPath})`);
                 continue;
               }
-              if (!fullPath.startsWith(FRONTEND_SRC)) {
-                failedFiles.push(`${file.filePath} (solo se permiten cambios en frontend)`);
+              if (!fullPath.startsWith(FRONTEND_ROOT) && !fullPath.startsWith(BACKEND_ROOT)) {
+                failedFiles.push(`${file.filePath} (solo se permiten cambios en frontend/backend)`);
                 continue;
               }
 

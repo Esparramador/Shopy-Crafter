@@ -144,6 +144,8 @@ export default function Landing() {
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [calcCategory, setCalcCategory] = useState("all");
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
+  const pricingRowRef = useRef<HTMLDivElement>(null);
+  const [pricingIdx, setPricingIdx] = useState(0);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -159,6 +161,37 @@ export default function Landing() {
 
   const toggleService = (s: string) =>
     setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
+
+  const scrollPricing = useCallback((dir: 1 | -1) => {
+    const row = pricingRowRef.current;
+    if (!row) return;
+    const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
+    if (!cards.length) return;
+    const next = Math.max(0, Math.min(pricingIdx + dir, cards.length - 1));
+    cards[next].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    setPricingIdx(next);
+  }, [pricingIdx]);
+
+  useEffect(() => {
+    const row = pricingRowRef.current;
+    if (!row) return;
+    const onScroll = () => {
+      const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
+      if (!cards.length) return;
+      const rowRect = row.getBoundingClientRect();
+      const center = rowRect.left + rowRect.width / 2;
+      let closest = 0;
+      let minDist = Infinity;
+      cards.forEach((c, i) => {
+        const cRect = c.getBoundingClientRect();
+        const dist = Math.abs(cRect.left + cRect.width / 2 - center);
+        if (dist < minDist) { minDist = dist; closest = i; }
+      });
+      setPricingIdx(closest);
+    };
+    row.addEventListener("scroll", onScroll, { passive: true });
+    return () => row.removeEventListener("scroll", onScroll);
+  }, [content]);
 
   const submitContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -851,24 +884,39 @@ export default function Landing() {
               <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
-            <div className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {content.pricing.plans.map((plan, planIdx) => (
-                <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
-                  {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
-                  <div className="l-pricing-plan" {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                  <div className="l-pricing-price" {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
-                  <div className="l-pricing-period" {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
-                  <div className="l-pricing-divider"></div>
-                  <ul className="l-pricing-features">
-                    {plan.features.map((f, fi) => (
-                      <li key={fi} className="l-pricing-feature">
-                        <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
-                        <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</Link>
-                </div>
+            <div className="fp-pricing-carousel-wrap">
+              {pricingIdx > 0 && (
+                <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
+              )}
+              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+                {content.pricing.plans.map((plan, planIdx) => (
+                  <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
+                    {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
+                    <div className="l-pricing-plan" {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
+                    <div className="l-pricing-price" {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
+                    <div className="l-pricing-period" {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
+                    <div className="l-pricing-divider"></div>
+                    <ul className="l-pricing-features">
+                      {plan.features.map((f, fi) => (
+                        <li key={fi} className="l-pricing-feature">
+                          <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
+                          <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</Link>
+                  </div>
+                ))}
+              </div>
+              {pricingIdx < (content.pricing.plans.length - 1) && (
+                <button type="button" className="fp-pricing-arrow fp-pricing-arrow-right" onClick={() => scrollPricing(1)} aria-label="Plan siguiente">›</button>
+              )}
+            </div>
+            <div className="fp-pricing-dots">
+              {content.pricing.plans.map((plan, i) => (
+                <button key={plan.id} type="button" className={`fp-pricing-dot${i === pricingIdx ? " active" : ""}`}
+                  onClick={() => { const row = pricingRowRef.current; if (row) { const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card"); if (cards[i]) { cards[i].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); setPricingIdx(i); } } }}
+                  aria-label={plan.name} />
               ))}
             </div>
           </div>
