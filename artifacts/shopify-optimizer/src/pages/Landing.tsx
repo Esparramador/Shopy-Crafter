@@ -329,9 +329,13 @@ export default function Landing() {
     return window.innerWidth > 900 && window.innerHeight > 500;
   }, []);
 
+  const [fpMode, setFpMode] = useState(() => typeof window !== "undefined" && window.innerWidth > 900 && window.innerHeight > 500);
+
   useEffect(() => {
-    const applyScrollLock = () => {
-      if (isFpActive()) {
+    const check = () => {
+      const active = window.innerWidth > 900 && window.innerHeight > 500;
+      setFpMode(active);
+      if (active) {
         document.body.style.overflow = "hidden";
         document.documentElement.style.overflow = "hidden";
         const container = fpRef.current;
@@ -348,17 +352,17 @@ export default function Landing() {
         document.documentElement.style.overflow = "";
       }
     };
-    applyScrollLock();
-    window.addEventListener("resize", applyScrollLock);
+    check();
+    window.addEventListener("resize", check);
     return () => {
-      window.removeEventListener("resize", applyScrollLock);
+      window.removeEventListener("resize", check);
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, [isFpActive]);
+  }, []);
 
   useEffect(() => {
-    if (!content) return;
+    if (!content || !fpMode) return;
     const container = fpRef.current;
     if (!container) return;
 
@@ -396,7 +400,6 @@ export default function Landing() {
     };
 
     const onWheel = (e: WheelEvent) => {
-      if (!isFpActive()) return;
       if (isAnimatingRef.current) { e.preventDefault(); return; }
       if (canBypassSectionScroll(e, e.deltaY)) return;
 
@@ -413,7 +416,6 @@ export default function Landing() {
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (!isFpActive()) return;
       if (e.touches.length !== 1) return;
       touchStartY = e.touches[0].clientY;
       touchStartX = e.touches[0].clientX;
@@ -422,7 +424,7 @@ export default function Landing() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!isFpActive() || !touchActive) return;
+      if (!touchActive) return;
       if (e.touches.length !== 1) return;
       const dy = touchStartY - e.touches[0].clientY;
       const dx = touchStartX - e.touches[0].clientX;
@@ -432,7 +434,7 @@ export default function Landing() {
     };
 
     const onTouchEnd = (e: TouchEvent) => {
-      if (!isFpActive() || !touchActive) return;
+      if (!touchActive) return;
       touchActive = false;
       if (touchBypassed) return;
       if (e.changedTouches.length !== 1) return;
@@ -455,9 +457,10 @@ export default function Landing() {
       container.removeEventListener("touchmove", onTouchMove);
       container.removeEventListener("touchend", onTouchEnd);
     };
-  }, [goToSection, content, isFpActive]);
+  }, [goToSection, content, fpMode]);
 
   useEffect(() => {
+    if (!fpMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === "PageDown") {
         e.preventDefault();
@@ -470,7 +473,7 @@ export default function Landing() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [goToSection]);
+  }, [goToSection, fpMode]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
