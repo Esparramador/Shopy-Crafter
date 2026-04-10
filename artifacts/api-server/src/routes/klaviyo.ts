@@ -91,84 +91,99 @@ router.get("/klaviyo/flows", requireAdmin, async (req, res): Promise<void> => {
 
 // ─── CREATE EVENT (track event for a profile) ─────────────────────────────────
 router.post("/klaviyo/events", requireAdmin, async (req, res): Promise<void> => {
-  const { email, eventName, properties } = req.body as { email: string; eventName: string; properties?: Record<string, unknown> };
-  if (!email || !eventName) {
-    res.status(400).json({ error: "email y eventName son requeridos" });
-    return;
-  }
   try {
-    await klaviyoPost("/events/", {
-      data: {
-        type: "event",
-        attributes: {
-          properties: properties ?? {},
-          metric: { data: { type: "metric", attributes: { name: eventName } } },
-          profile: { data: { type: "profile", attributes: { email } } },
+    const { email, eventName, properties } = req.body as { email: string; eventName: string; properties?: Record<string, unknown> };
+    if (!email || !eventName) {
+      res.status(400).json({ error: "email y eventName son requeridos" });
+      return;
+    }
+    try {
+      await klaviyoPost("/events/", {
+        data: {
+          type: "event",
+          attributes: {
+            properties: properties ?? {},
+            metric: { data: { type: "metric", attributes: { name: eventName } } },
+            profile: { data: { type: "profile", attributes: { email } } },
+          },
         },
-      },
-    });
-    res.json({ success: true });
-  } catch (err) {
-    logger.error({ err }, "Klaviyo event create failed");
-    res.status(500).json({ error: "Error al crear evento en Klaviyo" });
+      });
+      res.json({ success: true });
+    } catch (err) {
+      logger.error({ err }, "Klaviyo event create failed");
+      res.status(500).json({ error: "Error al crear evento en Klaviyo" });
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
 // ─── SUBSCRIBE TO LIST ─────────────────────────────────────────────────────────
 router.post("/klaviyo/subscribe", requireAdmin, async (req, res): Promise<void> => {
-  const { email, firstName, lastName, listId } = req.body as { email: string; firstName?: string; lastName?: string; listId: string };
-  if (!email || !listId) {
-    res.status(400).json({ error: "email y listId son requeridos" });
-    return;
-  }
   try {
-    await klaviyoPost(`/lists/${listId}/relationships/profiles/`, {
-      data: [{
-        type: "profile",
-        attributes: {
-          email,
-          first_name: firstName ?? "",
-          last_name: lastName ?? "",
-        },
-      }],
-    });
-    res.json({ success: true });
-  } catch (err) {
-    logger.error({ err }, "Klaviyo subscribe failed");
-    res.status(500).json({ error: "Error al suscribir perfil" });
+    const { email, firstName, lastName, listId } = req.body as { email: string; firstName?: string; lastName?: string; listId: string };
+    if (!email || !listId) {
+      res.status(400).json({ error: "email y listId son requeridos" });
+      return;
+    }
+    try {
+      await klaviyoPost(`/lists/${listId}/relationships/profiles/`, {
+        data: [{
+          type: "profile",
+          attributes: {
+            email,
+            first_name: firstName ?? "",
+            last_name: lastName ?? "",
+          },
+        }],
+      });
+      res.json({ success: true });
+    } catch (err) {
+      logger.error({ err }, "Klaviyo subscribe failed");
+      res.status(500).json({ error: "Error al suscribir perfil" });
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
 // ─── SEND TRANSACTIONAL EMAIL VIA EVENT ──────────────────────────────────────
 router.post("/klaviyo/send-email", requireAdmin, async (req, res): Promise<void> => {
-  const { email, subject, metricName, properties, name } = req.body as {
-    email: string;
-    subject: string;
-    metricName: string;
-    properties?: Record<string, unknown>;
-    name?: string;
-  };
-
-  if (!email || !metricName) {
-    res.status(400).json({ error: "email y metricName son requeridos" });
-    return;
-  }
-
   try {
-    await klaviyoPost("/events/", {
-      data: {
-        type: "event",
-        attributes: {
-          properties: { subject, ...properties },
-          metric: { data: { type: "metric", attributes: { name: metricName } } },
-          profile: { data: { type: "profile", attributes: { email, first_name: name ?? "" } } },
+    const { email, subject, metricName, properties, name } = req.body as {
+      email: string;
+      subject: string;
+      metricName: string;
+      properties?: Record<string, unknown>;
+      name?: string;
+    };
+  
+    if (!email || !metricName) {
+      res.status(400).json({ error: "email y metricName son requeridos" });
+      return;
+    }
+  
+    try {
+      await klaviyoPost("/events/", {
+        data: {
+          type: "event",
+          attributes: {
+            properties: { subject, ...properties },
+            metric: { data: { type: "metric", attributes: { name: metricName } } },
+            profile: { data: { type: "profile", attributes: { email, first_name: name ?? "" } } },
+          },
         },
-      },
-    });
-    res.json({ success: true, message: `Email event '${metricName}' enviado a ${email}` });
-  } catch (err) {
-    logger.error({ err }, "Klaviyo send-email failed");
-    res.status(500).json({ error: "Error al enviar email via Klaviyo" });
+      });
+      res.json({ success: true, message: `Email event '${metricName}' enviado a ${email}` });
+    } catch (err) {
+      logger.error({ err }, "Klaviyo send-email failed");
+      res.status(500).json({ error: "Error al enviar email via Klaviyo" });
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -189,42 +204,47 @@ router.get("/klaviyo/test", requireAdmin, async (req, res): Promise<void> => {
 
 // ─── SEND CLIENT WELCOME EMAIL ────────────────────────────────────────────────
 router.post("/klaviyo/welcome-client", requireAdmin, async (req, res): Promise<void> => {
-  const { email, name, shopDomain, plan, loginUrl, inviteToken } = req.body as {
-    email: string;
-    name: string;
-    shopDomain?: string;
-    plan?: string;
-    loginUrl?: string;
-    inviteToken?: string;
-  };
-
-  if (!email || !name) {
-    res.status(400).json({ error: "email y name son requeridos" });
-    return;
-  }
-
   try {
-    await klaviyoPost("/events/", {
-      data: {
-        type: "event",
-        attributes: {
-          properties: {
-            clientName: name,
-            shopDomain: shopDomain ?? "",
-            plan: plan ?? "Starter",
-            loginUrl: loginUrl ?? "https://shopifyai.pro/login",
-            inviteUrl: inviteToken ? `https://shopifyai.pro/invite/${inviteToken}` : null,
-            agencyName: "Shopy Crafter",
+    const { email, name, shopDomain, plan, loginUrl, inviteToken } = req.body as {
+      email: string;
+      name: string;
+      shopDomain?: string;
+      plan?: string;
+      loginUrl?: string;
+      inviteToken?: string;
+    };
+  
+    if (!email || !name) {
+      res.status(400).json({ error: "email y name son requeridos" });
+      return;
+    }
+  
+    try {
+      await klaviyoPost("/events/", {
+        data: {
+          type: "event",
+          attributes: {
+            properties: {
+              clientName: name,
+              shopDomain: shopDomain ?? "",
+              plan: plan ?? "Starter",
+              loginUrl: loginUrl ?? "https://shopifyai.pro/login",
+              inviteUrl: inviteToken ? `https://shopifyai.pro/invite/${inviteToken}` : null,
+              agencyName: "Shopy Crafter",
+            },
+            metric: { data: { type: "metric", attributes: { name: "Client Welcome" } } },
+            profile: { data: { type: "profile", attributes: { email, first_name: name } } },
           },
-          metric: { data: { type: "metric", attributes: { name: "Client Welcome" } } },
-          profile: { data: { type: "profile", attributes: { email, first_name: name } } },
         },
-      },
-    });
-    res.json({ success: true, message: `Welcome email enviado a ${email}` });
-  } catch (err) {
-    logger.error({ err }, "Klaviyo welcome-client failed");
-    res.status(500).json({ error: "Error al enviar welcome email" });
+      });
+      res.json({ success: true, message: `Welcome email enviado a ${email}` });
+    } catch (err) {
+      logger.error({ err }, "Klaviyo welcome-client failed");
+      res.status(500).json({ error: "Error al enviar welcome email" });
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 

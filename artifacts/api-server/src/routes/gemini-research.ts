@@ -13,19 +13,27 @@ import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreNicheProfilesTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
+import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
 
 router.get("/status", (_req: Request, res: Response) => {
-  res.json({
-    available: isGeminiAvailable(),
-    model: "gemini-2.5-flash / gemini-3.1-pro-preview",
-    capabilities: ["business-research", "competitor-analysis", "market-intelligence", "product-trends", "person-brand-research"],
-    pipeline: "Gemini (research) → Claude (analysis) → OmniCore (learning)",
-  });
+  try {
+    res.json({
+      available: isGeminiAvailable(),
+      model: "gemini-2.5-flash / gemini-3.1-pro-preview",
+      capabilities: ["business-research", "competitor-analysis", "market-intelligence", "product-trends", "person-brand-research"],
+      pipeline: "Gemini (research) → Claude (analysis) → OmniCore (learning)",
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.post("/research/business", async (req: Request, res: Response): Promise<void> => {
+  enableLongRunning(res);
+  
   try {
     const { businessName, domain, niche, market = "es" } = req.body as {
       businessName: string; domain: string; niche: string; market?: string;
@@ -68,6 +76,8 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
 });
 
 router.post("/research/competitor", async (req: Request, res: Response): Promise<void> => {
+  enableLongRunning(res);
+  
   try {
     const { domain, niche, market = "es" } = req.body as { domain: string; niche: string; market?: string };
     if (!domain || !niche) { res.status(400).json({ error: "domain and niche are required" }); return; }
@@ -175,6 +185,8 @@ router.post("/research/market", async (req: Request, res: Response): Promise<voi
 });
 
 router.post("/research/product-trends", async (req: Request, res: Response): Promise<void> => {
+  enableLongRunning(res);
+  
   try {
     const { productType, market = "es", saveToOmnicore = true } = req.body as { productType: string; market?: string; saveToOmnicore?: boolean };
     if (!productType) { res.status(400).json({ error: "productType is required" }); return; }
@@ -244,6 +256,8 @@ router.post("/research/person-brand", async (req: Request, res: Response): Promi
 });
 
 router.post("/research/full-audit", async (req: Request, res: Response): Promise<void> => {
+  enableLongRunning(res);
+  
   try {
     const { businessName, domain, niche, market = "es" } = req.body as {
       businessName: string; domain: string; niche: string; market?: string;

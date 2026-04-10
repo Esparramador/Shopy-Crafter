@@ -15,6 +15,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { getReportShell } from "./exports.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import juice from "juice";
+import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
 const contactUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
@@ -761,286 +762,307 @@ function buildReportHtml(
 }
 
 router.post("/contact", contactUpload.single("referenceImage"), async (req, res): Promise<void> => {
-  const body = req.body ?? {};
-  const {
-    name, email, phone, storeUrl, niche, customNiche, revenue,
-    socialMedia, message, extraInfo, productImageUrl,
-  } = body as {
-    name: string; email: string; phone?: string; storeUrl?: string;
-    niche?: string; customNiche?: string; revenue?: string;
-    socialMedia?: string; message?: string; extraInfo?: string;
-    productImageUrl?: string;
-  };
-  let services: string[] = [];
+  enableLongRunning(res);
   try {
-    const raw = body.services;
-    if (Array.isArray(raw)) services = raw;
-    else if (typeof raw === "string") services = JSON.parse(raw);
-  } catch {}
-
-  const uploadedFile = (req as any).file as Express.Multer.File | undefined;
-  let resolvedImageUrl = productImageUrl ?? null;
-  if (uploadedFile) {
-    const b64 = uploadedFile.buffer.toString("base64");
-    resolvedImageUrl = `data:${uploadedFile.mimetype};base64,${b64}`;
-  }
-
-  const ip = req.ip ?? "unknown";
-  if (!checkContactRateLimit(ip)) {
-    res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });
-    return;
-  }
-
-  if (!name?.trim() || !email?.trim()) {
-    res.status(400).json({ error: "Nombre y email son obligatorios" });
-    return;
-  }
-
-  const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRx.test(email)) {
-    res.status(400).json({ error: "Email invalido" });
-    return;
-  }
-
-  const resolvedNiche = (niche === "Otro" && customNiche?.trim()) ? customNiche.trim() : (niche?.trim() ?? null);
-
-  const leadData: LeadData = {
-    name: name.trim(), email: email.toLowerCase().trim(),
-    phone: phone?.trim() ?? null,
-    storeUrl: storeUrl?.trim() ?? null,
-    niche: resolvedNiche,
-    revenue: revenue ?? null,
-    services: services ?? [],
-    socialMedia: socialMedia?.trim() ?? null,
-    message: message?.trim() ?? null,
-    extraInfo: extraInfo?.trim() ?? null,
-    productImageUrl: resolvedImageUrl?.trim() ?? null,
-    submittedAt: new Date().toISOString(),
-  };
-
-  await db.insert(auditLogTable).values({
-    id: randomBytes(8).toString("hex"),
-    userId: "public",
-    action: "lead_form_submitted",
-    details: JSON.stringify(leadData),
-    ipAddress: req.ip ?? "unknown",
-  }).catch(() => {});
-
-  res.json({ success: true, message: "¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto." });
-
-  (async () => {
+    const body = req.body ?? {};
+    const {
+      name, email, phone, storeUrl, niche, customNiche, revenue,
+      socialMedia, message, extraInfo, productImageUrl,
+    } = body as {
+      name: string; email: string; phone?: string; storeUrl?: string;
+      niche?: string; customNiche?: string; revenue?: string;
+      socialMedia?: string; message?: string; extraInfo?: string;
+      productImageUrl?: string;
+    };
+    let services: string[] = [];
     try {
-      logger.info({ name: leadData.name, email: leadData.email }, "Starting AI pre-report generation for lead");
-
-      let reportHtml: string;
-      if (isGeminiAvailable()) {
-        reportHtml = await generateAIPreReport(leadData);
-      } else {
-        reportHtml = buildReportHtml(leadData, {
-          business: "Gemini no está configurado — no se pudo realizar investigación automática.",
-          market: "Gemini no está configurado.",
-          seo: "Gemini no está configurado.",
-          sources: [],
-        });
-      }
-
-      let savedFileId: number | null = null;
+      const raw = body.services;
+      if (Array.isArray(raw)) services = raw;
+      else if (typeof raw === "string") services = JSON.parse(raw);
+    } catch {}
+  
+    const uploadedFile = (req as any).file as Express.Multer.File | undefined;
+    let resolvedImageUrl = productImageUrl ?? null;
+    if (uploadedFile) {
+      const b64 = uploadedFile.buffer.toString("base64");
+      resolvedImageUrl = `data:${uploadedFile.mimetype};base64,${b64}`;
+    }
+  
+    const ip = req.ip ?? "unknown";
+    if (!checkContactRateLimit(ip)) {
+      res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });
+      return;
+    }
+  
+    if (!name?.trim() || !email?.trim()) {
+      res.status(400).json({ error: "Nombre y email son obligatorios" });
+      return;
+    }
+  
+    const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRx.test(email)) {
+      res.status(400).json({ error: "Email invalido" });
+      return;
+    }
+  
+    const resolvedNiche = (niche === "Otro" && customNiche?.trim()) ? customNiche.trim() : (niche?.trim() ?? null);
+  
+    const leadData: LeadData = {
+      name: name.trim(), email: email.toLowerCase().trim(),
+      phone: phone?.trim() ?? null,
+      storeUrl: storeUrl?.trim() ?? null,
+      niche: resolvedNiche,
+      revenue: revenue ?? null,
+      services: services ?? [],
+      socialMedia: socialMedia?.trim() ?? null,
+      message: message?.trim() ?? null,
+      extraInfo: extraInfo?.trim() ?? null,
+      productImageUrl: resolvedImageUrl?.trim() ?? null,
+      submittedAt: new Date().toISOString(),
+    };
+  
+    await db.insert(auditLogTable).values({
+      id: randomBytes(8).toString("hex"),
+      userId: "public",
+      action: "lead_form_submitted",
+      details: JSON.stringify(leadData),
+      ipAddress: req.ip ?? "unknown",
+    }).catch(() => {});
+  
+    res.json({ success: true, message: "¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto." });
+  
+    (async () => {
       try {
-        const htmlBuffer = Buffer.from(reportHtml, "utf-8");
-        const dateStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-        const timeStr = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-        const [saved] = await db.insert(projectFilesTable).values({
-          projectId: null,
-          fileType: "report",
-          category: "lead_prereport",
-          title: `Pre-Informe AI — ${leadData.name} — ${leadData.niche || "eCommerce"}`,
-          description: `Pre-informe generado automáticamente el ${dateStr} a las ${timeStr} para el lead ${leadData.name} (${leadData.email})`,
-          objectPath: null,
-          originalUrl: null,
-          mimeType: "text/html",
-          fileSizeBytes: htmlBuffer.length,
-          productId: null,
-          productTitle: null,
-          generatedBy: "lead_contact_form",
-          metadata: JSON.stringify({
-            generatedAt: new Date().toISOString(),
+        logger.info({ name: leadData.name, email: leadData.email }, "Starting AI pre-report generation for lead");
+  
+        let reportHtml: string;
+        if (isGeminiAvailable()) {
+          reportHtml = await generateAIPreReport(leadData);
+        } else {
+          reportHtml = buildReportHtml(leadData, {
+            business: "Gemini no está configurado — no se pudo realizar investigación automática.",
+            market: "Gemini no está configurado.",
+            seo: "Gemini no está configurado.",
+            sources: [],
+          });
+        }
+  
+        let savedFileId: number | null = null;
+        try {
+          const htmlBuffer = Buffer.from(reportHtml, "utf-8");
+          const dateStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+          const timeStr = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+          const [saved] = await db.insert(projectFilesTable).values({
+            projectId: null,
+            fileType: "report",
+            category: "lead_prereport",
+            title: `Pre-Informe AI — ${leadData.name} — ${leadData.niche || "eCommerce"}`,
+            description: `Pre-informe generado automáticamente el ${dateStr} a las ${timeStr} para el lead ${leadData.name} (${leadData.email})`,
+            objectPath: null,
+            originalUrl: null,
+            mimeType: "text/html",
+            fileSizeBytes: htmlBuffer.length,
+            productId: null,
+            productTitle: null,
+            generatedBy: "lead_contact_form",
+            metadata: JSON.stringify({
+              generatedAt: new Date().toISOString(),
+              leadEmail: leadData.email,
+              leadName: leadData.name,
+              leadNiche: leadData.niche,
+              leadRevenue: leadData.revenue,
+              leadStoreUrl: leadData.storeUrl,
+              leadPhone: leadData.phone,
+              leadServices: leadData.services,
+            }),
+            content: reportHtml,
+            isPublic: 0,
+            entityName: leadData.name,
+            entityUrl: leadData.storeUrl || leadData.email,
+          }).returning();
+          savedFileId = saved.id;
+          logger.info({ fileId: saved.id, leadName: leadData.name, sizeKB: Math.round(htmlBuffer.length / 1024) }, "Pre-report saved to vault");
+        } catch (saveErr) {
+          logger.error({ err: saveErr }, "Failed to save pre-report to vault (non-critical)");
+        }
+  
+        if (isGmailAvailable()) {
+          const subject = `Nuevo Lead: ${leadData.name} — ${leadData.niche || "eCommerce"} — Pre-Informe AI`;
+          let emailHtml: string;
+          try {
+            emailHtml = juice(reportHtml, {
+              removeStyleTags: true,
+              preserveMediaQueries: false,
+              preserveFontFaces: false,
+              applyStyleTags: true,
+              insertPreservedExtraCss: false,
+            });
+          } catch (juiceErr) {
+            logger.warn({ err: juiceErr }, "CSS inlining failed, sending raw HTML");
+            emailHtml = reportHtml;
+          }
+          const sent = await sendEmail(ADMIN_EMAIL, subject, emailHtml);
+          if (sent) {
+            logger.info({ to: ADMIN_EMAIL, lead: leadData.email }, "Pre-report email sent to admin (CSS inlined)");
+          } else {
+            logger.error({ to: ADMIN_EMAIL }, "Failed to send pre-report email");
+          }
+        } else {
+          logger.warn("Gmail not available — pre-report NOT sent by email");
+        }
+  
+        await db.insert(auditLogTable).values({
+          id: randomBytes(8).toString("hex"),
+          userId: "system",
+          action: "lead_prereport_generated",
+          details: JSON.stringify({
             leadEmail: leadData.email,
             leadName: leadData.name,
-            leadNiche: leadData.niche,
-            leadRevenue: leadData.revenue,
-            leadStoreUrl: leadData.storeUrl,
-            leadPhone: leadData.phone,
-            leadServices: leadData.services,
+            emailSent: isGmailAvailable(),
+            geminiUsed: isGeminiAvailable(),
+            savedFileId,
+            generatedAt: new Date().toISOString(),
           }),
-          content: reportHtml,
-          isPublic: 0,
-          entityName: leadData.name,
-          entityUrl: leadData.storeUrl || leadData.email,
-        }).returning();
-        savedFileId = saved.id;
-        logger.info({ fileId: saved.id, leadName: leadData.name, sizeKB: Math.round(htmlBuffer.length / 1024) }, "Pre-report saved to vault");
-      } catch (saveErr) {
-        logger.error({ err: saveErr }, "Failed to save pre-report to vault (non-critical)");
+          ipAddress: "system",
+        }).catch(() => {});
+      } catch (err) {
+        logger.error({ err, lead: leadData.email }, "Background AI pre-report generation failed");
       }
-
-      if (isGmailAvailable()) {
-        const subject = `Nuevo Lead: ${leadData.name} — ${leadData.niche || "eCommerce"} — Pre-Informe AI`;
-        let emailHtml: string;
-        try {
-          emailHtml = juice(reportHtml, {
-            removeStyleTags: true,
-            preserveMediaQueries: false,
-            preserveFontFaces: false,
-            applyStyleTags: true,
-            insertPreservedExtraCss: false,
-          });
-        } catch (juiceErr) {
-          logger.warn({ err: juiceErr }, "CSS inlining failed, sending raw HTML");
-          emailHtml = reportHtml;
-        }
-        const sent = await sendEmail(ADMIN_EMAIL, subject, emailHtml);
-        if (sent) {
-          logger.info({ to: ADMIN_EMAIL, lead: leadData.email }, "Pre-report email sent to admin (CSS inlined)");
-        } else {
-          logger.error({ to: ADMIN_EMAIL }, "Failed to send pre-report email");
-        }
-      } else {
-        logger.warn("Gmail not available — pre-report NOT sent by email");
-      }
-
-      await db.insert(auditLogTable).values({
-        id: randomBytes(8).toString("hex"),
-        userId: "system",
-        action: "lead_prereport_generated",
-        details: JSON.stringify({
-          leadEmail: leadData.email,
-          leadName: leadData.name,
-          emailSent: isGmailAvailable(),
-          geminiUsed: isGeminiAvailable(),
-          savedFileId,
-          generatedAt: new Date().toISOString(),
-        }),
-        ipAddress: "system",
-      }).catch(() => {});
-    } catch (err) {
-      logger.error({ err, lead: leadData.email }, "Background AI pre-report generation failed");
-    }
-  })();
-
-  const klaviyoKey = process.env.KLAVIYO_API_KEY;
-  if (klaviyoKey) {
-    try {
-      await fetch("https://a.klaviyo.com/api/events/", {
-        method: "POST",
-        headers: getKlaviyoHeaders(),
-        body: JSON.stringify({
-          data: {
-            type: "event",
-            attributes: {
-              properties: { ...leadData, servicesStr: (services ?? []).join(", ") },
-              metric: { data: { type: "metric", attributes: { name: "Lead Form Submitted" } } },
-              profile: {
-                data: {
-                  type: "profile",
-                  attributes: {
-                    email: leadData.email,
-                    first_name: leadData.name.split(" ")[0],
-                    last_name: leadData.name.split(" ").slice(1).join(" ") || "",
-                    phone_number: leadData.phone ?? undefined,
-                    properties: {
-                      storeUrl: leadData.storeUrl,
-                      niche: leadData.niche,
-                      revenue: leadData.revenue,
-                      services: Array.isArray(leadData.services) ? leadData.services.join(", ") : (leadData.services ?? ""),
-                      source: "Landing Form",
+    })();
+  
+    const klaviyoKey = process.env.KLAVIYO_API_KEY;
+    if (klaviyoKey) {
+      try {
+        await fetch("https://a.klaviyo.com/api/events/", {
+          method: "POST",
+          headers: getKlaviyoHeaders(),
+          body: JSON.stringify({
+            data: {
+              type: "event",
+              attributes: {
+                properties: { ...leadData, servicesStr: (services ?? []).join(", ") },
+                metric: { data: { type: "metric", attributes: { name: "Lead Form Submitted" } } },
+                profile: {
+                  data: {
+                    type: "profile",
+                    attributes: {
+                      email: leadData.email,
+                      first_name: leadData.name.split(" ")[0],
+                      last_name: leadData.name.split(" ").slice(1).join(" ") || "",
+                      phone_number: leadData.phone ?? undefined,
+                      properties: {
+                        storeUrl: leadData.storeUrl,
+                        niche: leadData.niche,
+                        revenue: leadData.revenue,
+                        services: Array.isArray(leadData.services) ? leadData.services.join(", ") : (leadData.services ?? ""),
+                        source: "Landing Form",
+                      },
                     },
                   },
                 },
               },
             },
-          },
-        }),
-      });
-    } catch (err) {
-      logger.warn({ err }, "Klaviyo lead event failed (non-critical)");
+          }),
+        });
+      } catch (err) {
+        logger.warn({ err }, "Klaviyo lead event failed (non-critical)");
+      }
     }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
 router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
-  const { pool } = await import("@workspace/db");
-  const result = await pool.query(
-    `SELECT id, details, created_at FROM audit_log WHERE action = 'lead_form_submitted' ORDER BY created_at DESC LIMIT 100`
-  );
-  const leads = result.rows.map((r: { id: string; details: string; created_at: string }) => {
-    let details: Record<string, unknown> = {};
-    try { details = JSON.parse(r.details); } catch {}
-    return { id: r.id, ...details, createdAt: r.created_at };
-  });
-  res.json(leads);
+  try {
+    const { pool } = await import("@workspace/db");
+    const result = await pool.query(
+      `SELECT id, details, created_at FROM audit_log WHERE action = 'lead_form_submitted' ORDER BY created_at DESC LIMIT 100`
+    );
+    const leads = result.rows.map((r: { id: string; details: string; created_at: string }) => {
+      let details: Record<string, unknown> = {};
+      try { details = JSON.parse(r.details); } catch {}
+      return { id: r.id, ...details, createdAt: r.created_at };
+    });
+    res.json(leads);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.get("/lead-reports", requireAdmin, async (req, res): Promise<void> => {
-  const reports = await db.select({
-    id: projectFilesTable.id,
-    title: projectFilesTable.title,
-    description: projectFilesTable.description,
-    fileSizeBytes: projectFilesTable.fileSizeBytes,
-    entityName: projectFilesTable.entityName,
-    entityUrl: projectFilesTable.entityUrl,
-    metadata: projectFilesTable.metadata,
-    createdAt: projectFilesTable.createdAt,
-  })
-    .from(projectFilesTable)
-    .where(and(
-      eq(projectFilesTable.category, "lead_prereport"),
-      isNull(projectFilesTable.projectId),
-    ))
-    .orderBy(desc(projectFilesTable.createdAt))
-    .limit(200);
-
-  const parsed = reports.map(r => ({
-    ...r,
-    metadata: r.metadata ? (() => { try { return JSON.parse(r.metadata); } catch { return null; } })() : null,
-    downloadUrl: `/api/lead-reports/${r.id}/download`,
-    downloadPdfUrl: `/api/lead-reports/${r.id}/download?format=pdf`,
-  }));
-  res.json(parsed);
+  try {
+    const reports = await db.select({
+      id: projectFilesTable.id,
+      title: projectFilesTable.title,
+      description: projectFilesTable.description,
+      fileSizeBytes: projectFilesTable.fileSizeBytes,
+      entityName: projectFilesTable.entityName,
+      entityUrl: projectFilesTable.entityUrl,
+      metadata: projectFilesTable.metadata,
+      createdAt: projectFilesTable.createdAt,
+    })
+      .from(projectFilesTable)
+      .where(and(
+        eq(projectFilesTable.category, "lead_prereport"),
+        isNull(projectFilesTable.projectId),
+      ))
+      .orderBy(desc(projectFilesTable.createdAt))
+      .limit(200);
+  
+    const parsed = reports.map(r => ({
+      ...r,
+      metadata: r.metadata ? (() => { try { return JSON.parse(r.metadata); } catch { return null; } })() : null,
+      downloadUrl: `/api/lead-reports/${r.id}/download`,
+      downloadPdfUrl: `/api/lead-reports/${r.id}/download?format=pdf`,
+    }));
+    res.json(parsed);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.get("/lead-reports/:fileId/download", requireAdmin, async (req, res): Promise<void> => {
-  const fileId = parseInt(String(req.params.fileId), 10);
-  if (isNaN(fileId)) { res.status(400).json({ error: "ID inválido" }); return; }
-
-  const [file] = await db.select().from(projectFilesTable)
-    .where(and(
-      eq(projectFilesTable.id, fileId),
-      eq(projectFilesTable.category, "lead_prereport"),
-      isNull(projectFilesTable.projectId),
-    ))
-    .limit(1);
-
-  if (!file) { res.status(404).json({ error: "Pre-informe no encontrado" }); return; }
-
-  if (!file.content) { res.status(410).json({ error: "Contenido no disponible" }); return; }
-
-  const safeName = (file.entityName || "Lead").replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "").replace(/\s+/g, "_").slice(0, 80);
-  const dateSlug = new Date(file.createdAt || Date.now()).toISOString().split("T")[0];
-  const filename = `PreInforme_${safeName}_${dateSlug}`;
-
-  const format = (req.query.format as string || "").toLowerCase();
-  if (format === "pdf") {
-    try {
-      await generatePdfFromHtml(file.content, filename, res);
-    } catch (e: any) {
-      res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+  try {
+    const fileId = parseInt(String(req.params.fileId), 10);
+    if (isNaN(fileId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  
+    const [file] = await db.select().from(projectFilesTable)
+      .where(and(
+        eq(projectFilesTable.id, fileId),
+        eq(projectFilesTable.category, "lead_prereport"),
+        isNull(projectFilesTable.projectId),
+      ))
+      .limit(1);
+  
+    if (!file) { res.status(404).json({ error: "Pre-informe no encontrado" }); return; }
+  
+    if (!file.content) { res.status(410).json({ error: "Contenido no disponible" }); return; }
+  
+    const safeName = (file.entityName || "Lead").replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "").replace(/\s+/g, "_").slice(0, 80);
+    const dateSlug = new Date(file.createdAt || Date.now()).toISOString().split("T")[0];
+    const filename = `PreInforme_${safeName}_${dateSlug}`;
+  
+    const format = (req.query.format as string || "").toLowerCase();
+    if (format === "pdf") {
+      try {
+        await generatePdfFromHtml(file.content, filename, res);
+      } catch (e: any) {
+        res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+      }
+      return;
     }
-    return;
+  
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}.html"`);
+    res.send(file.content);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `inline; filename="${filename}.html"`);
-  res.send(file.content);
 });
 
 export default router;

@@ -295,224 +295,239 @@ function actionLabel(action: string): string {
 }
 
 router.post("/projects/:projectId/actions/send", async (req, res): Promise<void> => {
-  const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, recipientEmail, rawData, template: bodyTpl } = req.body as {
-    actionName: string; title: string; content: string; recipientEmail?: string; rawData?: unknown; template?: string;
-  };
-  const tplAction = ((req.query.template || bodyTpl) as CoverTemplate) || "classic";
-
-  if (!actionName || !content) {
-    res.status(400).json({ error: "Se requiere actionName y content" });
-    return;
-  }
-
-  if (!isGmailAvailable()) {
-    res.status(503).json({ error: "Gmail no configurado. Configura la integración de Google Mail." });
-    return;
-  }
-
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  const projectName = project?.name || "Proyecto";
-
-  const label = actionLabel(actionName);
-  const emailTitle = title || `${label} — ${projectName}`;
-  const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName, tplAction);
-
-  const to = recipientEmail || "sadiagiljoan@gmail.com";
-  const subject = `📊 ${emailTitle} | Shopy Crafter`;
-
-  const sent = await sendEmail(to, subject, htmlBody);
-  if (sent) {
-    logger.info({ projectId, actionName, to }, "Action result sent via Gmail");
-    res.json({ success: true, message: `Enviado a ${to}`, to, subject: emailTitle });
-  } else {
-    res.status(500).json({ error: "Error al enviar el email. Intenta de nuevo." });
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const { actionName, title, content, recipientEmail, rawData, template: bodyTpl } = req.body as {
+      actionName: string; title: string; content: string; recipientEmail?: string; rawData?: unknown; template?: string;
+    };
+    const tplAction = ((req.query.template || bodyTpl) as CoverTemplate) || "classic";
+  
+    if (!actionName || !content) {
+      res.status(400).json({ error: "Se requiere actionName y content" });
+      return;
+    }
+  
+    if (!isGmailAvailable()) {
+      res.status(503).json({ error: "Gmail no configurado. Configura la integración de Google Mail." });
+      return;
+    }
+  
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const projectName = project?.name || "Proyecto";
+  
+    const label = actionLabel(actionName);
+    const emailTitle = title || `${label} — ${projectName}`;
+    const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName, tplAction);
+  
+    const to = recipientEmail || "sadiagiljoan@gmail.com";
+    const subject = `📊 ${emailTitle} | Shopy Crafter`;
+  
+    const sent = await sendEmail(to, subject, htmlBody);
+    if (sent) {
+      logger.info({ projectId, actionName, to }, "Action result sent via Gmail");
+      res.json({ success: true, message: `Enviado a ${to}`, to, subject: emailTitle });
+    } else {
+      res.status(500).json({ error: "Error al enviar el email. Intenta de nuevo." });
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
 router.post("/projects/:projectId/actions/save", async (req, res): Promise<void> => {
-  const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, rawData, template: bodyTpl2 } = req.body as {
-    actionName: string; title: string; content: string; rawData?: unknown; template?: string;
-  };
-  const tplSave = ((req.query.template || bodyTpl2) as CoverTemplate) || "classic";
-
-  if (!actionName || !content) {
-    res.status(400).json({ error: "Se requiere actionName y content" });
-    return;
-  }
-
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
-
-  const label = actionLabel(actionName);
-  const reportTitle = title || `${label} — ${project.name}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, project.name, tplSave);
-
-  const fileId = await saveToVault({
-    projectId,
-    fileType: "report",
-    category: `chatbot_${actionName}`,
-    title: reportTitle,
-    description: `Resultado guardado desde chatbot: ${label}`,
-    mimeType: "text/html",
-    fileSizeBytes: Buffer.from(htmlContent).length,
-    generatedBy: "chatbot_action_save",
-    content: htmlContent,
-    metadata: {
-      actionName,
-      savedAt: new Date().toISOString(),
-      hasRawData: !!rawData,
-    },
-  });
-
-  if (rawData) {
-    const jsonContent = JSON.stringify(rawData, null, 2);
-    await saveToVault({
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const { actionName, title, content, rawData, template: bodyTpl2 } = req.body as {
+      actionName: string; title: string; content: string; rawData?: unknown; template?: string;
+    };
+    const tplSave = ((req.query.template || bodyTpl2) as CoverTemplate) || "classic";
+  
+    if (!actionName || !content) {
+      res.status(400).json({ error: "Se requiere actionName y content" });
+      return;
+    }
+  
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+  
+    const label = actionLabel(actionName);
+    const reportTitle = title || `${label} — ${project.name}`;
+    const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, project.name, tplSave);
+  
+    const fileId = await saveToVault({
       projectId,
-      fileType: "data",
-      category: `chatbot_${actionName}_data`,
-      title: `${reportTitle} — Datos`,
-      description: `Datos JSON del resultado: ${label}`,
-      mimeType: "application/json",
-      fileSizeBytes: Buffer.from(jsonContent).length,
+      fileType: "report",
+      category: `chatbot_${actionName}`,
+      title: reportTitle,
+      description: `Resultado guardado desde chatbot: ${label}`,
+      mimeType: "text/html",
+      fileSizeBytes: Buffer.from(htmlContent).length,
       generatedBy: "chatbot_action_save",
-      content: jsonContent,
-      metadata: { actionName, savedAt: new Date().toISOString() },
+      content: htmlContent,
+      metadata: {
+        actionName,
+        savedAt: new Date().toISOString(),
+        hasRawData: !!rawData,
+      },
     });
+  
+    if (rawData) {
+      const jsonContent = JSON.stringify(rawData, null, 2);
+      await saveToVault({
+        projectId,
+        fileType: "data",
+        category: `chatbot_${actionName}_data`,
+        title: `${reportTitle} — Datos`,
+        description: `Datos JSON del resultado: ${label}`,
+        mimeType: "application/json",
+        fileSizeBytes: Buffer.from(jsonContent).length,
+        generatedBy: "chatbot_action_save",
+        content: jsonContent,
+        metadata: { actionName, savedAt: new Date().toISOString() },
+      });
+    }
+  
+    logger.info({ projectId, actionName, fileId }, "Action result saved to vault");
+  
+    learnFromOperation({
+      operationType: `action_save_${actionName}`,
+      title: `Acción guardada: ${reportTitle}`,
+      content: typeof content === "string" ? content.slice(0, 8000) : JSON.stringify(content).slice(0, 8000),
+      tags: ["action_save", actionName],
+    });
+  
+    res.json({ success: true, message: "Guardado en el vault del proyecto", fileId });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  logger.info({ projectId, actionName, fileId }, "Action result saved to vault");
-
-  learnFromOperation({
-    operationType: `action_save_${actionName}`,
-    title: `Acción guardada: ${reportTitle}`,
-    content: typeof content === "string" ? content.slice(0, 8000) : JSON.stringify(content).slice(0, 8000),
-    tags: ["action_save", actionName],
-  });
-
-  res.json({ success: true, message: "Guardado en el vault del proyecto", fileId });
 });
 
 router.post("/projects/:projectId/actions/download", async (req, res): Promise<void> => {
-  const projectId = parseInt(String(req.params.projectId), 10);
-  const { actionName, title, content, rawData, downloadType, template: bodyTpl3 } = req.body as {
-    actionName: string; title: string; content: string; rawData?: unknown; downloadType?: "pdf" | "zip"; template?: string;
-  };
-  const tplDownload = ((req.query.template || bodyTpl3) as CoverTemplate) || "classic";
-
-  if (!actionName || !content) {
-    res.status(400).json({ error: "Se requiere actionName y content" });
-    return;
-  }
-
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  const projectName = project?.name || "Proyecto";
-
-  const label = actionLabel(actionName);
-  const reportTitle = title || `${label} — ${projectName}`;
-  const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, projectName, tplDownload);
-  const safeName = reportTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
-  const dateStr = new Date().toISOString().split("T")[0];
-
-  if (downloadType === "zip") {
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.zip"`);
-
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    archive.on("error", (err: any) => {
-      logger.error({ err, projectId }, "ZIP archive error");
-      if (!res.headersSent) res.status(500).json({ error: err.message });
-    });
-    archive.pipe(res);
-
-    archive.append(htmlContent, { name: `${safeName}.html` });
-
-    if (rawData) {
-      archive.append(JSON.stringify(rawData, null, 2), { name: `${safeName}_datos.json` });
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const { actionName, title, content, rawData, downloadType, template: bodyTpl3 } = req.body as {
+      actionName: string; title: string; content: string; rawData?: unknown; downloadType?: "pdf" | "zip"; template?: string;
+    };
+    const tplDownload = ((req.query.template || bodyTpl3) as CoverTemplate) || "classic";
+  
+    if (!actionName || !content) {
+      res.status(400).json({ error: "Se requiere actionName y content" });
+      return;
     }
-
-    const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
-    const cookieHeader = req.headers.cookie || "";
-    const fetchOpts = { headers: { Cookie: cookieHeader }, signal: AbortSignal.timeout(15000) };
-    const reportEndpoints = [
-      { name: "Informe_Completo", path: "complete-report" },
-      { name: "SEO_Audit", path: "seo-audit" },
-      { name: "Catalogo_Productos", path: "product-catalog" },
-      { name: "Informe_Financiero", path: "financial" },
-      { name: "Brand_Brief", path: "brand-brief" },
-      { name: "Competidores", path: "competitors" },
-      { name: "Consistencia_BrandDNA", path: "consistency" },
-      { name: "Inventario", path: "inventory" },
-      { name: "Revenue_Forecast", path: "revenue" },
-      { name: "ShopyCrafter_Intel", path: "shopybrain" },
-    ];
-
-    for (const rpt of reportEndpoints) {
-      try {
-        const response = await fetch(`${baseUrl}/${rpt.path}`, fetchOpts);
-        if (response.ok) {
-          const html = await response.text();
-          archive.append(html, { name: `informes/${rpt.name}_${dateStr}.html` });
-        }
-      } catch {}
-    }
-
-    try {
-      const csvRes = await fetch(`${baseUrl}/csv/products`, fetchOpts);
-      if (csvRes.ok) {
-        const csv = await csvRes.text();
-        archive.append(csv, { name: `datos/Productos_${dateStr}.csv` });
+  
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const projectName = project?.name || "Proyecto";
+  
+    const label = actionLabel(actionName);
+    const reportTitle = title || `${label} — ${projectName}`;
+    const htmlContent = buildProfessionalHtml(reportTitle, content, label, rawData, projectName, tplDownload);
+    const safeName = reportTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
+    const dateStr = new Date().toISOString().split("T")[0];
+  
+    if (downloadType === "zip") {
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.zip"`);
+  
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.on("error", (err: any) => {
+        logger.error({ err, projectId }, "ZIP archive error");
+        if (!res.headersSent) res.status(500).json({ error: err.message });
+      });
+      archive.pipe(res);
+  
+      archive.append(htmlContent, { name: `${safeName}.html` });
+  
+      if (rawData) {
+        archive.append(JSON.stringify(rawData, null, 2), { name: `${safeName}_datos.json` });
       }
-    } catch {}
-
-    try {
-      const jsonRes = await fetch(`${baseUrl}/json/full`, fetchOpts);
-      if (jsonRes.ok) {
-        const json = await jsonRes.text();
-        archive.append(json, { name: `datos/Exportacion_Completa_${dateStr}.json` });
-      }
-    } catch {}
-
-    const vaultImages = await db.select().from(projectFilesTable)
-      .where(and(
-        eq(projectFilesTable.projectId, projectId),
-        eq(projectFilesTable.fileType, "image"),
-      ));
-
-    for (const img of vaultImages) {
-      if (img.originalUrl) {
+  
+      const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
+      const cookieHeader = req.headers.cookie || "";
+      const fetchOpts = { headers: { Cookie: cookieHeader }, signal: AbortSignal.timeout(15000) };
+      const reportEndpoints = [
+        { name: "Informe_Completo", path: "complete-report" },
+        { name: "SEO_Audit", path: "seo-audit" },
+        { name: "Catalogo_Productos", path: "product-catalog" },
+        { name: "Informe_Financiero", path: "financial" },
+        { name: "Brand_Brief", path: "brand-brief" },
+        { name: "Competidores", path: "competitors" },
+        { name: "Consistencia_BrandDNA", path: "consistency" },
+        { name: "Inventario", path: "inventory" },
+        { name: "Revenue_Forecast", path: "revenue" },
+        { name: "ShopyCrafter_Intel", path: "shopybrain" },
+      ];
+  
+      for (const rpt of reportEndpoints) {
         try {
-          const imgRes = await fetch(img.originalUrl, { signal: AbortSignal.timeout(10000) });
-          if (imgRes.ok) {
-            const buffer = Buffer.from(await imgRes.arrayBuffer());
-            const ext = img.mimeType?.includes("png") ? "png" : img.mimeType?.includes("webp") ? "webp" : "jpg";
-            const imgName = (img.productTitle || img.title || `imagen_${img.id}`).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
-            archive.append(buffer, { name: `imagenes/${imgName}.${ext}` });
+          const response = await fetch(`${baseUrl}/${rpt.path}`, fetchOpts);
+          if (response.ok) {
+            const html = await response.text();
+            archive.append(html, { name: `informes/${rpt.name}_${dateStr}.html` });
           }
         } catch {}
       }
+  
+      try {
+        const csvRes = await fetch(`${baseUrl}/csv/products`, fetchOpts);
+        if (csvRes.ok) {
+          const csv = await csvRes.text();
+          archive.append(csv, { name: `datos/Productos_${dateStr}.csv` });
+        }
+      } catch {}
+  
+      try {
+        const jsonRes = await fetch(`${baseUrl}/json/full`, fetchOpts);
+        if (jsonRes.ok) {
+          const json = await jsonRes.text();
+          archive.append(json, { name: `datos/Exportacion_Completa_${dateStr}.json` });
+        }
+      } catch {}
+  
+      const vaultImages = await db.select().from(projectFilesTable)
+        .where(and(
+          eq(projectFilesTable.projectId, projectId),
+          eq(projectFilesTable.fileType, "image"),
+        ));
+  
+      for (const img of vaultImages) {
+        if (img.originalUrl) {
+          try {
+            const imgRes = await fetch(img.originalUrl, { signal: AbortSignal.timeout(10000) });
+            if (imgRes.ok) {
+              const buffer = Buffer.from(await imgRes.arrayBuffer());
+              const ext = img.mimeType?.includes("png") ? "png" : img.mimeType?.includes("webp") ? "webp" : "jpg";
+              const imgName = (img.productTitle || img.title || `imagen_${img.id}`).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
+              archive.append(buffer, { name: `imagenes/${imgName}.${ext}` });
+            }
+          } catch {}
+        }
+      }
+  
+      archive.append(`# Exportación Completa — ${projectName}
+  Fecha: ${dateStr}
+  Generado por: Shopy Crafter AI
+  
+  ## Contenido
+  - Resultado del chatbot: ${label}
+  - ${reportEndpoints.length} informes HTML profesionales
+  - Datos en CSV y JSON
+  - Imágenes generadas por IA
+  - Abrir archivos .html en navegador → Ctrl+P para convertir a PDF
+  `, { name: "LEEME.txt" });
+  
+      await archive.finalize();
+      logger.info({ projectId, actionName, type: "zip" }, "Full ZIP download generated");
+    } else {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.html"`);
+      res.send(htmlContent);
+      logger.info({ projectId, actionName, type: "html" }, "HTML download generated");
     }
-
-    archive.append(`# Exportación Completa — ${projectName}
-Fecha: ${dateStr}
-Generado por: Shopy Crafter AI
-
-## Contenido
-- Resultado del chatbot: ${label}
-- ${reportEndpoints.length} informes HTML profesionales
-- Datos en CSV y JSON
-- Imágenes generadas por IA
-- Abrir archivos .html en navegador → Ctrl+P para convertir a PDF
-`, { name: "LEEME.txt" });
-
-    await archive.finalize();
-    logger.info({ projectId, actionName, type: "zip" }, "Full ZIP download generated");
-  } else {
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.html"`);
-    res.send(htmlContent);
-    logger.info({ projectId, actionName, type: "html" }, "HTML download generated");
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 

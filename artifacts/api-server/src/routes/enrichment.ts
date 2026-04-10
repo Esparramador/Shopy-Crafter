@@ -127,109 +127,119 @@ function generateMetafields(productType: string, title: string, price: string): 
 }
 
 router.get("/projects/:projectId/product-ids", async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId as string);
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  if (!project) { res.status(404).json({ error: "Project not found" }); return; }
-
-  let allProducts: Array<{ id: number; title: string }> = [];
-  const data = await shopifyRequest<{ products: Array<{ id: number; title: string }> }>(
-    projectId, project.shopDomain,
-    `/products.json?limit=250&fields=id,title&status=active`
-  );
-  if (data?.products) allProducts = data.products;
-
-  res.json({ total: allProducts.length, products: allProducts.map(p => ({ id: String(p.id), title: p.title })) });
+  try {
+    const projectId = parseInt(req.params.projectId as string);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+  
+    let allProducts: Array<{ id: number; title: string }> = [];
+    const data = await shopifyRequest<{ products: Array<{ id: number; title: string }> }>(
+      projectId, project.shopDomain,
+      `/products.json?limit=250&fields=id,title&status=active`
+    );
+    if (data?.products) allProducts = data.products;
+  
+    res.json({ total: allProducts.length, products: allProducts.map(p => ({ id: String(p.id), title: p.title })) });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.post("/projects/:projectId/enrich-batch", async (req, res): Promise<void> => {
-  const projectId = parseInt(req.params.projectId as string);
-  const { productIds } = req.body as { productIds: string[] };
-
-  if (!productIds || !productIds.length) { res.status(400).json({ error: "productIds required" }); return; }
-
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  if (!project) { res.status(404).json({ error: "Project not found" }); return; }
-
-  const results: Array<{ id: string; title: string; status: string; category?: string; meta_title?: string; metafields?: number }> = [];
-
-  for (const pid of productIds) {
-    try {
-      const data = await shopifyRequest<{ product: Record<string, unknown> }>(
-        projectId, project.shopDomain,
-        `/products/${pid}.json?fields=id,title,product_type,body_html,tags,variants,images`
-      );
-      const p = data.product;
-      const title = p.title as string;
-      const productType = (p.product_type as string) || "";
-      const bodyHtml = (p.body_html as string) || "";
-      const variants = (p.variants as Array<Record<string, unknown>>) || [];
-      const price = (variants[0]?.price as string) || "0";
-
-      const metaTitle = generateMetaTitle(title);
-      const metaDescription = generateMetaDescription(title, price, bodyHtml);
-      const category = mapToShopifyTaxonomy(productType, title);
-      const metafields = generateMetafields(productType, title, price);
-
-      const updatePayload: Record<string, unknown> = {
-        id: parseInt(pid),
-        metafields_global_title_tag: metaTitle,
-        metafields_global_description_tag: metaDescription,
-        product_type: category,
-      };
-
-      if (variants.length > 0) {
-        updatePayload.variants = variants.map((v) => ({
-          id: v.id,
-          inventory_management: null,
-        }));
-      }
-
-      await shopifyRequest(projectId, project.shopDomain, `/products/${pid}.json`, {
-        method: "PUT",
-        body: JSON.stringify({ product: updatePayload }),
-      });
-
-      let mfCount = 0;
-      for (const mf of metafields) {
-        try {
-          await shopifyRequest(projectId, project.shopDomain, `/products/${pid}/metafields.json`, {
-            method: "POST",
-            body: JSON.stringify({
-              metafield: { namespace: mf.namespace, key: mf.key, value: mf.value, type: mf.type },
-            }),
-          });
-          mfCount++;
-        } catch {
-          try {
-            const existing = await shopifyRequest<{ metafields: Array<{ id: number; namespace: string; key: string }> }>(
-              projectId, project.shopDomain, `/products/${pid}/metafields.json`
-            );
-            const match = existing?.metafields?.find(m => m.namespace === mf.namespace && m.key === mf.key);
-            if (match) {
-              await shopifyRequest(projectId, project.shopDomain, `/products/${pid}/metafields/${match.id}.json`, {
-                method: "PUT",
-                body: JSON.stringify({ metafield: { id: match.id, value: mf.value, type: mf.type } }),
-              });
-              mfCount++;
-            }
-          } catch {}
+  try {
+    const projectId = parseInt(req.params.projectId as string);
+    const { productIds } = req.body as { productIds: string[] };
+  
+    if (!productIds || !productIds.length) { res.status(400).json({ error: "productIds required" }); return; }
+  
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+  
+    const results: Array<{ id: string; title: string; status: string; category?: string; meta_title?: string; metafields?: number }> = [];
+  
+    for (const pid of productIds) {
+      try {
+        const data = await shopifyRequest<{ product: Record<string, unknown> }>(
+          projectId, project.shopDomain,
+          `/products/${pid}.json?fields=id,title,product_type,body_html,tags,variants,images`
+        );
+        const p = data.product;
+        const title = p.title as string;
+        const productType = (p.product_type as string) || "";
+        const bodyHtml = (p.body_html as string) || "";
+        const variants = (p.variants as Array<Record<string, unknown>>) || [];
+        const price = (variants[0]?.price as string) || "0";
+  
+        const metaTitle = generateMetaTitle(title);
+        const metaDescription = generateMetaDescription(title, price, bodyHtml);
+        const category = mapToShopifyTaxonomy(productType, title);
+        const metafields = generateMetafields(productType, title, price);
+  
+        const updatePayload: Record<string, unknown> = {
+          id: parseInt(pid),
+          metafields_global_title_tag: metaTitle,
+          metafields_global_description_tag: metaDescription,
+          product_type: category,
+        };
+  
+        if (variants.length > 0) {
+          updatePayload.variants = variants.map((v) => ({
+            id: v.id,
+            inventory_management: null,
+          }));
         }
+  
+        await shopifyRequest(projectId, project.shopDomain, `/products/${pid}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ product: updatePayload }),
+        });
+  
+        let mfCount = 0;
+        for (const mf of metafields) {
+          try {
+            await shopifyRequest(projectId, project.shopDomain, `/products/${pid}/metafields.json`, {
+              method: "POST",
+              body: JSON.stringify({
+                metafield: { namespace: mf.namespace, key: mf.key, value: mf.value, type: mf.type },
+              }),
+            });
+            mfCount++;
+          } catch {
+            try {
+              const existing = await shopifyRequest<{ metafields: Array<{ id: number; namespace: string; key: string }> }>(
+                projectId, project.shopDomain, `/products/${pid}/metafields.json`
+              );
+              const match = existing?.metafields?.find(m => m.namespace === mf.namespace && m.key === mf.key);
+              if (match) {
+                await shopifyRequest(projectId, project.shopDomain, `/products/${pid}/metafields/${match.id}.json`, {
+                  method: "PUT",
+                  body: JSON.stringify({ metafield: { id: match.id, value: mf.value, type: mf.type } }),
+                });
+                mfCount++;
+              }
+            } catch {}
+          }
+        }
+  
+        results.push({ id: pid, title: title.slice(0, 60), status: "OK", category, meta_title: metaTitle, metafields: mfCount });
+      } catch (err: unknown) {
+        results.push({ id: pid, title: "?", status: `ERROR: ${(err instanceof Error ? err.message : "unknown").slice(0, 100)}` });
       }
-
-      results.push({ id: pid, title: title.slice(0, 60), status: "OK", category, meta_title: metaTitle, metafields: mfCount });
-    } catch (err: unknown) {
-      results.push({ id: pid, title: "?", status: `ERROR: ${(err instanceof Error ? err.message : "unknown").slice(0, 100)}` });
     }
+  
+    const ok = results.filter(r => r.status === "OK").length;
+    const totalMf = results.reduce((s, r) => s + (r.metafields || 0), 0);
+  
+    res.json({
+      success: true,
+      message: `${ok}/${productIds.length} products enriched. ${totalMf} metafields set.`,
+      results,
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  const ok = results.filter(r => r.status === "OK").length;
-  const totalMf = results.reduce((s, r) => s + (r.metafields || 0), 0);
-
-  res.json({
-    success: true,
-    message: `${ok}/${productIds.length} products enriched. ${totalMf} metafields set.`,
-    results,
-  });
 });
 
 export default router;

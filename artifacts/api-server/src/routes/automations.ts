@@ -157,50 +157,60 @@ const JOB_RUNNERS: Record<string, () => Promise<void>> = {
 };
 
 router.get("/automations/jobs", async (req, res): Promise<void> => {
-  const jobs = JOBS.map(job => {
-    const lastRun = jobLastRun.get(job.id);
-    const isRunning = jobRunning.get(job.id) ?? false;
-    return {
-      ...job,
-      lastRunTime: lastRun?.time ?? null,
-      lastRunResult: lastRun?.result ?? null,
-      nextRunTime: parseNextRun(job.schedule),
-      status: isRunning ? "running" as const : "idle" as const,
-    };
-  });
-  res.json(jobs);
+  try {
+    const jobs = JOBS.map(job => {
+      const lastRun = jobLastRun.get(job.id);
+      const isRunning = jobRunning.get(job.id) ?? false;
+      return {
+        ...job,
+        lastRunTime: lastRun?.time ?? null,
+        lastRunResult: lastRun?.result ?? null,
+        nextRunTime: parseNextRun(job.schedule),
+        status: isRunning ? "running" as const : "idle" as const,
+      };
+    });
+    res.json(jobs);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.post("/automations/jobs/:jobId/run", async (req, res): Promise<void> => {
-  const jobId = req.params.jobId;
-  if (!Object.prototype.hasOwnProperty.call(JOB_RUNNERS, jobId)) {
-    res.status(404).json({ error: "Job no encontrado" });
-    return;
-  }
-  const runner = JOB_RUNNERS[jobId]; // nosemgrep: unsafe-dynamic-method
-  if (!runner) {
-    res.status(404).json({ error: "Job no encontrado" });
-    return;
-  }
-
-  if (jobRunning.get(jobId)) {
-    res.status(409).json({ error: "El job ya está en ejecución" });
-    return;
-  }
-
-  jobRunning.set(jobId, true);
-  res.json({ success: true, message: `Job ${jobId} iniciado` });
-
-  const startTime = new Date().toISOString();
   try {
-    await runner();
-    jobLastRun.set(jobId, { time: startTime, result: "success" });
-    logger.info({ jobId }, "Manual job execution completed successfully");
-  } catch (err) {
-    jobLastRun.set(jobId, { time: startTime, result: "error" });
-    logger.error({ jobId, err }, "Manual job execution failed");
-  } finally {
-    jobRunning.set(jobId, false);
+    const jobId = req.params.jobId;
+    if (!Object.prototype.hasOwnProperty.call(JOB_RUNNERS, jobId)) {
+      res.status(404).json({ error: "Job no encontrado" });
+      return;
+    }
+    const runner = JOB_RUNNERS[jobId]; // nosemgrep: unsafe-dynamic-method
+    if (!runner) {
+      res.status(404).json({ error: "Job no encontrado" });
+      return;
+    }
+  
+    if (jobRunning.get(jobId)) {
+      res.status(409).json({ error: "El job ya está en ejecución" });
+      return;
+    }
+  
+    jobRunning.set(jobId, true);
+    res.json({ success: true, message: `Job ${jobId} iniciado` });
+  
+    const startTime = new Date().toISOString();
+    try {
+      await runner();
+      jobLastRun.set(jobId, { time: startTime, result: "success" });
+      logger.info({ jobId }, "Manual job execution completed successfully");
+    } catch (err) {
+      jobLastRun.set(jobId, { time: startTime, result: "error" });
+      logger.error({ jobId, err }, "Manual job execution failed");
+    } finally {
+      jobRunning.set(jobId, false);
+    }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 

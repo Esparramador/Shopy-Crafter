@@ -6,11 +6,14 @@ import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import multer from "multer";
+import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 5 } });
 
 router.post("/fusion-studio/analyze", upload.array("images", 5), async (req: Request, res: Response) => {
+  enableLongRunning(res);
+  
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {
@@ -61,6 +64,8 @@ router.post("/fusion-studio/analyze", upload.array("images", 5), async (req: Req
 });
 
 router.post("/fusion-studio/create-product", upload.array("images", 5), async (req: Request, res: Response) => {
+  enableLongRunning(res);
+  
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {

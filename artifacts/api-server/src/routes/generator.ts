@@ -91,130 +91,145 @@ const CATEGORIES: Record<string, { label: string; icon: string }> = {
 };
 
 router.get("/generator/levels", (_req: Request, res: Response) => {
-  res.json({ success: true, levels: REPORT_LEVELS });
+  try {
+    res.json({ success: true, levels: REPORT_LEVELS });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.get("/generator/types", (_req: Request, res: Response) => {
-  const grouped: Record<string, { label: string; icon: string; types: GeneratorType[] }> = {};
-  for (const cat of Object.keys(CATEGORIES)) {
-    grouped[cat] = { ...CATEGORIES[cat], types: GENERATOR_TYPES.filter(t => t.category === cat) };
+  try {
+    const grouped: Record<string, { label: string; icon: string; types: GeneratorType[] }> = {};
+    for (const cat of Object.keys(CATEGORIES)) {
+      grouped[cat] = { ...CATEGORIES[cat], types: GENERATOR_TYPES.filter(t => t.category === cat) };
+    }
+    res.json({ success: true, categories: grouped, total: GENERATOR_TYPES.length });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-  res.json({ success: true, categories: grouped, total: GENERATOR_TYPES.length });
 });
 
 router.post("/generator/run", async (req: Request, res: Response): Promise<any> => {
-  const { type, projectId, url, format, template, level, params: extraParams } = req.body;
-  const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));
-  if (!type) return res.status(400).json({ error: "Falta el tipo de generación" });
-
-  const genType = GENERATOR_TYPES.find(t => t.id === type);
-  if (!genType) return res.status(400).json({ error: `Tipo de generación desconocido: ${type}` });
-
-  if (genType.requiresProject && !projectId) {
-    return res.status(400).json({ error: "Se requiere un proyecto asociado para este tipo de generación" });
-  }
-  if (!genType.requiresProject && genType.acceptsUrl && !url && !projectId) {
-    return res.status(400).json({ error: "Se requiere una URL o projectId" });
-  }
-
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
-
-  const outputFormat = format || genType.outputFormats[0];
-  const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
-
   try {
-    const pid = projectId ? parseInt(String(projectId)) : undefined;
-
-    const LEVEL_CAPABLE_CATEGORIES = new Set(["seo", "informes", "competencia", "finanzas", "contenido", "agencia", "externo"]);
-    const isLevelCapable = LEVEL_CAPABLE_CATEGORIES.has(genType.category) && genType.outputFormats.includes("html");
-    if (reportLevel > 1 && pid && isLevelCapable) {
-      const project = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).then(r => r[0]);
-      const products = await db.select().from(productsTable).where(eq(productsTable.projectId, pid)).limit(30);
-      const productList = products.map(p => `- ${p.title} (${p.price ?? "sin precio"}, ${p.productType ?? "sin tipo"})`).join("\n");
-      const dataBlock = `Proyecto: ${project?.name ?? `#${pid}`}\nDominio: ${project?.shopDomain ?? "N/A"}\nNicho: ${project?.storeNiche ?? "N/A"}\nProductos (${products.length}):\n${productList}`;
-
-      const levelResult = await generateLeveledReport({
+    const { type, projectId, url, format, template, level, params: extraParams } = req.body;
+    const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));
+    if (!type) return res.status(400).json({ error: "Falta el tipo de generación" });
+  
+    const genType = GENERATOR_TYPES.find(t => t.id === type);
+    if (!genType) return res.status(400).json({ error: `Tipo de generación desconocido: ${type}` });
+  
+    if (genType.requiresProject && !projectId) {
+      return res.status(400).json({ error: "Se requiere un proyecto asociado para este tipo de generación" });
+    }
+    if (!genType.requiresProject && genType.acceptsUrl && !url && !projectId) {
+      return res.status(400).json({ error: "Se requiere una URL o projectId" });
+    }
+  
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+  
+    const outputFormat = format || genType.outputFormats[0];
+    const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
+  
+    try {
+      const pid = projectId ? parseInt(String(projectId)) : undefined;
+  
+      const LEVEL_CAPABLE_CATEGORIES = new Set(["seo", "informes", "competencia", "finanzas", "contenido", "agencia", "externo"]);
+      const isLevelCapable = LEVEL_CAPABLE_CATEGORIES.has(genType.category) && genType.outputFormats.includes("html");
+      if (reportLevel > 1 && pid && isLevelCapable) {
+        const project = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).then(r => r[0]);
+        const products = await db.select().from(productsTable).where(eq(productsTable.projectId, pid)).limit(30);
+        const productList = products.map(p => `- ${p.title} (${p.price ?? "sin precio"}, ${p.productType ?? "sin tipo"})`).join("\n");
+        const dataBlock = `Proyecto: ${project?.name ?? `#${pid}`}\nDominio: ${project?.shopDomain ?? "N/A"}\nNicho: ${project?.storeNiche ?? "N/A"}\nProductos (${products.length}):\n${productList}`;
+  
+        const levelResult = await generateLeveledReport({
+          projectId: pid,
+          level: reportLevel as 1 | 2 | 3 | 4 | 5,
+          reportType: type,
+          reportTitle: genType.label,
+          dataBlock,
+          niche: project?.storeNiche ?? undefined,
+          template: tpl,
+        });
+  
+        res.json({
+          success: true,
+          type,
+          level: reportLevel,
+          levelName: levelResult.levelName,
+          files: levelResult.files.map(f => ({
+            type: f.type,
+            title: f.title,
+            vaultId: f.vaultId,
+          })),
+          totalFiles: levelResult.files.length,
+          message: `Informe ${levelResult.levelName} generado con ${levelResult.files.length} archivos`,
+          vaultSaved: true,
+          brainLearned: true,
+        });
+        return;
+      }
+  
+      const result = await runGenerator(type, {
         projectId: pid,
-        level: reportLevel as 1 | 2 | 3 | 4 | 5,
-        reportType: type,
-        reportTitle: genType.label,
-        dataBlock,
-        niche: project?.storeNiche ?? undefined,
+        url,
+        format: outputFormat,
         template: tpl,
+        extraParams: extraParams || {},
       });
-
-      res.json({
-        success: true,
-        type,
-        level: reportLevel,
-        levelName: levelResult.levelName,
-        files: levelResult.files.map(f => ({
-          type: f.type,
-          title: f.title,
-          vaultId: f.vaultId,
-        })),
-        totalFiles: levelResult.files.length,
-        message: `Informe ${levelResult.levelName} generado con ${levelResult.files.length} archivos`,
-        vaultSaved: true,
-        brainLearned: true,
-      });
-      return;
-    }
-
-    const result = await runGenerator(type, {
-      projectId: pid,
-      url,
-      format: outputFormat,
-      template: tpl,
-      extraParams: extraParams || {},
-    });
-
-    if (result.redirect) {
-      return res.json({
-        success: true,
-        type,
-        format: outputFormat,
-        redirect: result.redirect,
-        message: result.message,
-        vaultId: result.vaultId ?? null,
-        brainLearned: result.brainLearned ?? false,
-        vaultSaved: result.vaultSaved ?? false,
-      });
-    }
-
-    if (result.vaultId && projectId) {
-      res.json({
-        success: true,
-        type,
-        format: outputFormat,
-        content: result.content ?? "",
-        contentLength: result.content?.length ?? 0,
-        downloadUrl: result.downloadUrl,
-        vaultId: result.vaultId,
-        brainLearned: result.brainLearned ?? false,
-        vaultSaved: true,
-        message: result.message,
-      });
-    } else {
-      res.json({
-        success: true,
-        type,
-        format: outputFormat,
-        content: result.content ?? "",
-        contentLength: result.content?.length ?? 0,
-        downloadUrl: result.downloadUrl,
-        brainLearned: result.brainLearned ?? false,
-        vaultSaved: result.vaultSaved ?? false,
-        message: result.message,
-      });
+  
+      if (result.redirect) {
+        return res.json({
+          success: true,
+          type,
+          format: outputFormat,
+          redirect: result.redirect,
+          message: result.message,
+          vaultId: result.vaultId ?? null,
+          brainLearned: result.brainLearned ?? false,
+          vaultSaved: result.vaultSaved ?? false,
+        });
+      }
+  
+      if (result.vaultId && projectId) {
+        res.json({
+          success: true,
+          type,
+          format: outputFormat,
+          content: result.content ?? "",
+          contentLength: result.content?.length ?? 0,
+          downloadUrl: result.downloadUrl,
+          vaultId: result.vaultId,
+          brainLearned: result.brainLearned ?? false,
+          vaultSaved: true,
+          message: result.message,
+        });
+      } else {
+        res.json({
+          success: true,
+          type,
+          format: outputFormat,
+          content: result.content ?? "",
+          contentLength: result.content?.length ?? 0,
+          downloadUrl: result.downloadUrl,
+          brainLearned: result.brainLearned ?? false,
+          vaultSaved: result.vaultSaved ?? false,
+          message: result.message,
+        });
+      }
+    } catch (err: any) {
+      logger.error({ err, type, projectId }, "Generator error");
+      res.status(500).json({ error: err.message || "Error en la generación" });
     }
   } catch (err: any) {
-    logger.error({ err, type, projectId }, "Generator error");
-    res.status(500).json({ error: err.message || "Error en la generación" });
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -634,66 +649,76 @@ async function runGenerator(type: string, params: GenParams): Promise<GenResult>
 }
 
 router.get("/generator/download/:vaultId", async (req: Request, res: Response): Promise<any> => {
-  const vaultId = parseInt(String(req.params.vaultId));
-  if (isNaN(vaultId)) return res.status(400).json({ error: "ID inválido" });
-
-  const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, vaultId));
-  if (!file) return res.status(404).json({ error: "Archivo no encontrado" });
-
-  const content = (file as any).content || "";
-  const title = (file as any).title || "documento";
-  const mimeType = (file as any).mimeType || "text/html";
-
-  if (mimeType === "text/css") {
-    res.setHeader("Content-Type", "text/css; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-zA-Z0-9-_]/g, "_")}.css"`);
-    return res.send(content);
-  }
-
-  const format = (req.query.format as string || "html").toLowerCase();
-  if (format === "pdf") {
-    try {
-      await generatePdfFromHtml(content, title.replace(/[^a-zA-Z0-9-_]/g, "_"), res);
-    } catch (e: any) {
-      res.status(500).json({ error: `Error PDF: ${e.message}` });
+  try {
+    const vaultId = parseInt(String(req.params.vaultId));
+    if (isNaN(vaultId)) return res.status(400).json({ error: "ID inválido" });
+  
+    const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, vaultId));
+    if (!file) return res.status(404).json({ error: "Archivo no encontrado" });
+  
+    const content = (file as any).content || "";
+    const title = (file as any).title || "documento";
+    const mimeType = (file as any).mimeType || "text/html";
+  
+    if (mimeType === "text/css") {
+      res.setHeader("Content-Type", "text/css; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-zA-Z0-9-_]/g, "_")}.css"`);
+      return res.send(content);
     }
-    return;
+  
+    const format = (req.query.format as string || "html").toLowerCase();
+    if (format === "pdf") {
+      try {
+        await generatePdfFromHtml(content, title.replace(/[^a-zA-Z0-9-_]/g, "_"), res);
+      } catch (e: any) {
+        res.status(500).json({ error: `Error PDF: ${e.message}` });
+      }
+      return;
+    }
+  
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-zA-Z0-9-_]/g, "_")}.html"`);
+    res.send(content);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/[^a-zA-Z0-9-_]/g, "_")}.html"`);
-  res.send(content);
 });
 
 router.get("/generator/history/:projectId", async (req: Request, res: Response): Promise<any> => {
-  const projectId = parseInt(String(req.params.projectId));
-  if (isNaN(projectId)) return res.status(400).json({ error: "ID inválido" });
-
-  const files = await db.select({
-    id: projectFilesTable.id,
-    fileType: projectFilesTable.fileType,
-    category: projectFilesTable.category,
-    title: projectFilesTable.title,
-    description: projectFilesTable.description,
-    mimeType: projectFilesTable.mimeType,
-    generatedBy: projectFilesTable.generatedBy,
-    createdAt: projectFilesTable.createdAt,
-  })
-    .from(projectFilesTable)
-    .where(eq(projectFilesTable.projectId, projectId))
-    .orderBy(desc(projectFilesTable.createdAt))
-    .limit(100);
-
-  const generatorFiles = files.filter(f => 
-    (f.generatedBy || "").includes("generator") || 
-    (f.category || "").includes("generator")
-  );
-
-  res.json({
-    success: true,
-    total: generatorFiles.length,
-    files: generatorFiles,
-  });
+  try {
+    const projectId = parseInt(String(req.params.projectId));
+    if (isNaN(projectId)) return res.status(400).json({ error: "ID inválido" });
+  
+    const files = await db.select({
+      id: projectFilesTable.id,
+      fileType: projectFilesTable.fileType,
+      category: projectFilesTable.category,
+      title: projectFilesTable.title,
+      description: projectFilesTable.description,
+      mimeType: projectFilesTable.mimeType,
+      generatedBy: projectFilesTable.generatedBy,
+      createdAt: projectFilesTable.createdAt,
+    })
+      .from(projectFilesTable)
+      .where(eq(projectFilesTable.projectId, projectId))
+      .orderBy(desc(projectFilesTable.createdAt))
+      .limit(100);
+  
+    const generatorFiles = files.filter(f => 
+      (f.generatedBy || "").includes("generator") || 
+      (f.category || "").includes("generator")
+    );
+  
+    res.json({
+      success: true,
+      total: generatorFiles.length,
+      files: generatorFiles,
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

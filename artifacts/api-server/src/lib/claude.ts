@@ -156,7 +156,7 @@ export async function askClaude(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
-  maxTokens = 4096,
+  maxTokens = 8192,
   timeoutMs = 180_000
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
@@ -187,7 +187,7 @@ export async function askClaudeJson<T>(
   projectId: number,
   prompt: string,
   systemPrompt?: string,
-  maxTokens = 4096,
+  maxTokens = 8192,
   timeoutMs = 180_000
 ): Promise<T> {
   const text = await askClaude(
@@ -225,7 +225,7 @@ export async function askClaudeWithVision(
   prompt: string,
   images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" }>,
   systemPrompt?: string,
-  maxTokens = 2048
+  maxTokens = 8192
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {

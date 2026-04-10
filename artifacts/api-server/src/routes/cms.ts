@@ -9,6 +9,7 @@ import { cmsContent, cmsVersions } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
+import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
 
@@ -232,6 +233,8 @@ router.post("/versions/:id/restore", async (req: Request, res: Response) => {
 });
 
 router.post("/ai/improve", async (req: Request, res: Response) => {
+  enableLongRunning(res);
+  
   try {
     const { text, instruction, context } = req.body as { text: string; instruction: string; context?: string };
     const systemPrompt = `Eres un copywriter experto para plataformas SaaS de marketing digital en español. Recibes un texto y una instrucción, y devuelves el texto mejorado. Contexto de la marca: Shopy Crafter — plataforma independiente de optimización IA para tiendas eCommerce, con OmniCore Brain (IA acumulativa). Shopy Crafter es una marca propia e independiente. Tono: profesional, persuasivo, premium, moderno. IMPORTANTE: devuelve SOLO el texto mejorado, sin explicaciones, sin comillas extra.`;
@@ -252,12 +255,17 @@ router.post("/ai/improve", async (req: Request, res: Response) => {
 });
 
 router.get("/events", (req: Request, res: Response) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.write("event: connected\ndata: {}\n\n");
-  sseClients.add(res);
-  req.on("close", () => sseClients.delete(res));
+  try {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.write("event: connected\ndata: {}\n\n");
+    sseClients.add(res);
+    req.on("close", () => sseClients.delete(res));
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

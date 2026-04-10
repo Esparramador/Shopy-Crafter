@@ -7,6 +7,7 @@ import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } fro
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
+import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
 
@@ -148,374 +149,391 @@ Devuelve SOLO JSON:
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {
-  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-  const parts: string[] | undefined = req.body?.parts;
-
-  const [product] = await db
-    .select()
-    .from(productsTable)
-    .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
-
-  if (!product) {
-    res.status(404).json({ error: "Producto no encontrado" });
-    return;
-  }
-
-  let result: RedesignOutput;
   try {
-    result = await doRedesign(projectId, shopifyProductId);
-  } catch (err: any) {
-    logger.error({ err, projectId, shopifyProductId }, "Redesign AI call failed");
-    res.status(500).json({ error: err.message || "Error en el rediseño IA" });
-    return;
-  }
-
-  if (parts && parts.length > 0) {
-    const allParts = ["title", "bodyHtml", "price", "tags", "seoMeta", "photoBriefs", "category", "metafields"];
-    for (const key of allParts) {
-      if (!parts.includes(key)) {
-        if (key === "title") result.title = product.title;
-        if (key === "bodyHtml" || key === "body_html") result.body_html = product.bodyHtml ?? "";
-        if (key === "price") {
-          result.price = product.price ?? "0";
-          result.compare_at_price = "";
-          result.price_reasoning = "Precio original mantenido (no incluido en rediseño parcial)";
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+    const parts: string[] | undefined = req.body?.parts;
+  
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+  
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+  
+    let result: RedesignOutput;
+    try {
+      result = await doRedesign(projectId, shopifyProductId);
+    } catch (err: any) {
+      logger.error({ err, projectId, shopifyProductId }, "Redesign AI call failed");
+      res.status(500).json({ error: err.message || "Error en el rediseño IA" });
+      return;
+    }
+  
+    if (parts && parts.length > 0) {
+      const allParts = ["title", "bodyHtml", "price", "tags", "seoMeta", "photoBriefs", "category", "metafields"];
+      for (const key of allParts) {
+        if (!parts.includes(key)) {
+          if (key === "title") result.title = product.title;
+          if (key === "bodyHtml" || key === "body_html") result.body_html = product.bodyHtml ?? "";
+          if (key === "price") {
+            result.price = product.price ?? "0";
+            result.compare_at_price = "";
+            result.price_reasoning = "Precio original mantenido (no incluido en rediseño parcial)";
+          }
+          if (key === "tags") result.tags = product.tags ?? "";
+          if (key === "seoMeta") {
+            result.meta_title = "";
+            result.meta_description = "";
+          }
+          if (key === "photoBriefs") result.photo_brief = [];
+          if (key === "category") result.category = "";
+          if (key === "metafields") result.metafields = [];
         }
-        if (key === "tags") result.tags = product.tags ?? "";
-        if (key === "seoMeta") {
-          result.meta_title = "";
-          result.meta_description = "";
-        }
-        if (key === "photoBriefs") result.photo_brief = [];
-        if (key === "category") result.category = "";
-        if (key === "metafields") result.metafields = [];
       }
     }
-  }
-
-  await db.insert(redesignsTable).values({
-    projectId,
-    shopifyProductId,
-    originalTitle: product.title,
-    originalPrice: product.price,
-    newTitle: result.title,
-    newBodyHtml: result.body_html,
-    newShortDescription: result.short_description,
-    newPrice: result.price,
-    newCompareAtPrice: result.compare_at_price,
-    newTags: result.tags,
-    metaTitle: result.meta_title,
-    metaDescription: result.meta_description,
-    photoBrief: result.photo_brief,
-    priceReasoning: result.price_reasoning,
-    newCategory: result.category || null,
-    newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
-  });
-
-  // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
-  const [redesignProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
-  learnFromOperation({
-    operationType: "redesign",
-    niche: redesignProj?.storeNiche ?? null,
-    productType: product.productType ?? null,
-    title: `Rediseño exitoso: ${result.title}`,
-    content: `Título optimizado: ${result.title}\nPrecio: €${result.price}\nRazonamiento: ${result.price_reasoning}\nMeta: ${result.meta_title}\nDescripción corta: ${result.short_description}\nTags: ${result.tags}`,
-    confidence: 0.72,
-    tags: result.tags ? result.tags.split(",").map(t => t.trim()).slice(0, 6) : [],
-  });
-
-  // Auto-guardar en vault: informe de rediseño completo
-  saveToVault({
-    projectId,
-    fileType: "redesign",
-    category: "full_redesign",
-    title: `Rediseño — ${product.title}`,
-    description: `Nuevo título: ${result.title} · Precio: €${result.price}`,
-    mimeType: "application/json",
-    productId: shopifyProductId,
-    productTitle: product.title,
-    generatedBy: "redesign_motor",
-    metadata: {
+  
+    await db.insert(redesignsTable).values({
+      projectId,
+      shopifyProductId,
       originalTitle: product.title,
       originalPrice: product.price,
       newTitle: result.title,
+      newBodyHtml: result.body_html,
+      newShortDescription: result.short_description,
       newPrice: result.price,
       newCompareAtPrice: result.compare_at_price,
+      newTags: result.tags,
       metaTitle: result.meta_title,
       metaDescription: result.meta_description,
       photoBrief: result.photo_brief,
       priceReasoning: result.price_reasoning,
-      body_html: result.body_html,
-      short_description: result.short_description,
+      newCategory: result.category || null,
+      newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
+    });
+  
+    // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
+    const [redesignProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
+    learnFromOperation({
+      operationType: "redesign",
+      niche: redesignProj?.storeNiche ?? null,
+      productType: product.productType ?? null,
+      title: `Rediseño exitoso: ${result.title}`,
+      content: `Título optimizado: ${result.title}\nPrecio: €${result.price}\nRazonamiento: ${result.price_reasoning}\nMeta: ${result.meta_title}\nDescripción corta: ${result.short_description}\nTags: ${result.tags}`,
+      confidence: 0.72,
+      tags: result.tags ? result.tags.split(",").map(t => t.trim()).slice(0, 6) : [],
+    });
+  
+    // Auto-guardar en vault: informe de rediseño completo
+    saveToVault({
+      projectId,
+      fileType: "redesign",
+      category: "full_redesign",
+      title: `Rediseño — ${product.title}`,
+      description: `Nuevo título: ${result.title} · Precio: €${result.price}`,
+      mimeType: "application/json",
+      productId: shopifyProductId,
+      productTitle: product.title,
+      generatedBy: "redesign_motor",
+      metadata: {
+        originalTitle: product.title,
+        originalPrice: product.price,
+        newTitle: result.title,
+        newPrice: result.price,
+        newCompareAtPrice: result.compare_at_price,
+        metaTitle: result.meta_title,
+        metaDescription: result.meta_description,
+        photoBrief: result.photo_brief,
+        priceReasoning: result.price_reasoning,
+        body_html: result.body_html,
+        short_description: result.short_description,
+        tags: result.tags,
+      },
+    }).catch(() => {});
+  
+    res.json({
+      productId: shopifyProductId,
+      title: result.title,
+      bodyHtml: result.body_html,
+      shortDescription: result.short_description,
+      price: result.price,
+      compareAtPrice: result.compare_at_price,
       tags: result.tags,
-    },
-  }).catch(() => {});
-
-  res.json({
-    productId: shopifyProductId,
-    title: result.title,
-    bodyHtml: result.body_html,
-    shortDescription: result.short_description,
-    price: result.price,
-    compareAtPrice: result.compare_at_price,
-    tags: result.tags,
-    metaTitle: result.meta_title,
-    metaDescription: result.meta_description,
-    photoBrief: result.photo_brief,
-    originalTitle: product.title,
-    originalPrice: product.price ?? "0",
-    priceReasoning: result.price_reasoning,
-    category: result.category || null,
-    metafields: Array.isArray(result.metafields) ? result.metafields : [],
-  });
+      metaTitle: result.meta_title,
+      metaDescription: result.meta_description,
+      photoBrief: result.photo_brief,
+      originalTitle: product.title,
+      originalPrice: product.price ?? "0",
+      priceReasoning: result.price_reasoning,
+      category: result.category || null,
+      metafields: Array.isArray(result.metafields) ? result.metafields : [],
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.post("/projects/:projectId/products/:productId/apply-redesign", async (req, res): Promise<void> => {
-  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-  const { fields: rawFields } = req.body as { fields?: string[]; redesignId?: number };
-  const fields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : ["title", "description", "tags", "meta", "price", "category", "metafields", "images"];
-
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-  const [redesign] = await db
-    .select()
-    .from(redesignsTable)
-    .where(and(eq(redesignsTable.projectId, projectId), eq(redesignsTable.shopifyProductId, shopifyProductId)))
-    .orderBy(desc(redesignsTable.createdAt))
-    .limit(1);
-
-  if (!project || !redesign) {
-    res.status(404).json({ error: "Proyecto o rediseño no encontrado" });
-    return;
-  }
-
-  const connectorData: Record<string, unknown> = {};
-  const shopifyFallbackData: Record<string, unknown> = {};
-
-  if (fields.includes("title")) {
-    connectorData.title = redesign.newTitle;
-    shopifyFallbackData.title = redesign.newTitle;
-  }
-  if (fields.includes("description")) {
-    connectorData.bodyHtml = redesign.newBodyHtml;
-    shopifyFallbackData.body_html = redesign.newBodyHtml;
-  }
-  if (fields.includes("tags")) {
-    connectorData.tags = redesign.newTags;
-    shopifyFallbackData.tags = redesign.newTags;
-  }
-  if (fields.includes("meta")) {
-    if (redesign.metaTitle || redesign.metaDescription) {
-      connectorData.seo = { metaTitle: redesign.metaTitle, metaDescription: redesign.metaDescription };
-      shopifyFallbackData.metafields_global_title_tag = redesign.metaTitle;
-      shopifyFallbackData.metafields_global_description_tag = redesign.metaDescription;
-      const { seoDataTable } = await import("@workspace/db");
-      await db.insert(seoDataTable).values({
-        projectId,
-        shopifyProductId,
-        metaTitle: redesign.metaTitle || null,
-        metaDescription: redesign.metaDescription || null,
-      }).onConflictDoNothing().catch(() => {});
-      await db.update(seoDataTable)
-        .set({ metaTitle: redesign.metaTitle || undefined, metaDescription: redesign.metaDescription || undefined, lastAuditedAt: new Date() })
-        .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, shopifyProductId)))
-        .catch(() => {});
+  enableLongRunning(res);
+  try {
+    
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+    const { fields: rawFields } = req.body as { fields?: string[]; redesignId?: number };
+    const fields = Array.isArray(rawFields) && rawFields.length > 0 ? rawFields : ["title", "description", "tags", "meta", "price", "category", "metafields", "images"];
+  
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [redesign] = await db
+      .select()
+      .from(redesignsTable)
+      .where(and(eq(redesignsTable.projectId, projectId), eq(redesignsTable.shopifyProductId, shopifyProductId)))
+      .orderBy(desc(redesignsTable.createdAt))
+      .limit(1);
+  
+    if (!project || !redesign) {
+      res.status(404).json({ error: "Proyecto o rediseño no encontrado" });
+      return;
     }
-  }
-
-  if (fields.includes("category") && redesign.newCategory) {
-    connectorData.productType = redesign.newCategory;
-    shopifyFallbackData.product_type = redesign.newCategory;
-  }
-
-  if (fields.includes("price")) {
-    connectorData.variants = [{ platformId: "", title: "", price: redesign.newPrice, compareAtPrice: redesign.newCompareAtPrice ?? undefined }];
-    shopifyFallbackData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice ?? null }];
-  }
-
-  if (Object.keys(connectorData).length > 0) {
-    const { getProjectConnector } = await import("../lib/platform-helper.js");
-    const connector = await getProjectConnector(projectId);
-    if (connector && connector.supportsFeature("product_update")) {
-      await connector.updateProduct(shopifyProductId, connectorData);
-    } else {
-      await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
-        method: "PUT",
-        body: JSON.stringify({ product: shopifyFallbackData }),
-      });
+  
+    const connectorData: Record<string, unknown> = {};
+    const shopifyFallbackData: Record<string, unknown> = {};
+  
+    if (fields.includes("title")) {
+      connectorData.title = redesign.newTitle;
+      shopifyFallbackData.title = redesign.newTitle;
     }
-  }
-
-  let metafieldsApplied = 0;
-  if (fields.includes("metafields") && redesign.newMetafields) {
-    const metafieldsArr = redesign.newMetafields as MetafieldEntry[];
-    if (Array.isArray(metafieldsArr) && metafieldsArr.length > 0) {
-      for (const mf of metafieldsArr) {
-        try {
-          await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`, {
-            method: "POST",
-            body: JSON.stringify({
-              metafield: {
-                namespace: mf.namespace || "custom",
-                key: mf.key,
-                value: mf.value,
-                type: mf.type || "single_line_text_field",
-              },
-            }),
-          });
-          metafieldsApplied++;
-        } catch {
-          try {
-            const existingMeta = await shopifyRequest<{ metafields: Array<{ id: number; namespace: string; key: string }> }>(
-              projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`
-            );
-            const existing = existingMeta?.metafields?.find(
-              (m) => m.namespace === (mf.namespace || "custom") && m.key === mf.key
-            );
-            if (existing) {
-              await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields/${existing.id}.json`, {
-                method: "PUT",
-                body: JSON.stringify({
-                  metafield: { id: existing.id, value: mf.value, type: mf.type || "single_line_text_field" },
-                }),
-              });
-              metafieldsApplied++;
-            }
-          } catch { /* skip individual metafield failure */ }
-        }
+    if (fields.includes("description")) {
+      connectorData.bodyHtml = redesign.newBodyHtml;
+      shopifyFallbackData.body_html = redesign.newBodyHtml;
+    }
+    if (fields.includes("tags")) {
+      connectorData.tags = redesign.newTags;
+      shopifyFallbackData.tags = redesign.newTags;
+    }
+    if (fields.includes("meta")) {
+      if (redesign.metaTitle || redesign.metaDescription) {
+        connectorData.seo = { metaTitle: redesign.metaTitle, metaDescription: redesign.metaDescription };
+        shopifyFallbackData.metafields_global_title_tag = redesign.metaTitle;
+        shopifyFallbackData.metafields_global_description_tag = redesign.metaDescription;
+        const { seoDataTable } = await import("@workspace/db");
+        await db.insert(seoDataTable).values({
+          projectId,
+          shopifyProductId,
+          metaTitle: redesign.metaTitle || null,
+          metaDescription: redesign.metaDescription || null,
+        }).onConflictDoNothing().catch(() => {});
+        await db.update(seoDataTable)
+          .set({ metaTitle: redesign.metaTitle || undefined, metaDescription: redesign.metaDescription || undefined, lastAuditedAt: new Date() })
+          .where(and(eq(seoDataTable.projectId, projectId), eq(seoDataTable.shopifyProductId, shopifyProductId)))
+          .catch(() => {});
       }
     }
-  }
-
-  await db
-    .update(redesignsTable)
-    .set({ appliedAt: new Date(), appliedFields: fields })
-    .where(eq(redesignsTable.id, redesign.id));
-
-  let imagesGenerated = 0;
-  let imageErrors: string[] = [];
-  const shouldGenerateImages = fields.includes("images") || fields.includes("photos");
-
-  if (shouldGenerateImages) {
-    try {
-      const existingImages = await shopifyRequest<{ images: Array<{ id: number; src: string; alt: string }> }>(
-        projectId, project.shopDomain, `/products/${shopifyProductId}/images.json`
-      ).catch(() => ({ images: [] }));
-
-      const referenceImageUrl = existingImages.images?.[0]?.src;
-
-      if (referenceImageUrl) {
-        const { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify, generateDynamicCreativeScenes } = await import("./reference-images.js");
-        const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
-        const { checkProductionLimit, recordUsage } = await import("../lib/plan-limits.js");
-
-        const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
-        const productType = product?.productType || "";
-        const storeNiche = project.storeNiche || "general";
-
-        const standardScenes = getScenesForProductType(productType, storeNiche);
-        const dynamicScenes = await generateDynamicCreativeScenes(projectId, redesign.newTitle, productType, storeNiche, standardScenes.length);
-        const allScenes = [...standardScenes, ...dynamicScenes];
-
-        const limitCheck = await checkProductionLimit(projectId, "image", allScenes.length);
-        const allowedCount = limitCheck.allowed ? allScenes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
-
-        if (allowedCount > 0) {
-          const referenceBuffer = await downloadImageToBuffer(referenceImageUrl);
-          const scenesToGenerate = allScenes.slice(0, allowedCount);
-          const existingImageCount = existingImages.images?.length ?? 0;
-
-          for (let i = 0; i < scenesToGenerate.length; i++) {
-            const scene = scenesToGenerate[i];
+  
+    if (fields.includes("category") && redesign.newCategory) {
+      connectorData.productType = redesign.newCategory;
+      shopifyFallbackData.product_type = redesign.newCategory;
+    }
+  
+    if (fields.includes("price")) {
+      connectorData.variants = [{ platformId: "", title: "", price: redesign.newPrice, compareAtPrice: redesign.newCompareAtPrice ?? undefined }];
+      shopifyFallbackData.variants = [{ price: redesign.newPrice, compare_at_price: redesign.newCompareAtPrice ?? null }];
+    }
+  
+    if (Object.keys(connectorData).length > 0) {
+      const { getProjectConnector } = await import("../lib/platform-helper.js");
+      const connector = await getProjectConnector(projectId);
+      if (connector && connector.supportsFeature("product_update")) {
+        await connector.updateProduct(shopifyProductId, connectorData);
+      } else {
+        await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ product: shopifyFallbackData }),
+        });
+      }
+    }
+  
+    let metafieldsApplied = 0;
+    if (fields.includes("metafields") && redesign.newMetafields) {
+      const metafieldsArr = redesign.newMetafields as MetafieldEntry[];
+      if (Array.isArray(metafieldsArr) && metafieldsArr.length > 0) {
+        for (const mf of metafieldsArr) {
+          try {
+            await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`, {
+              method: "POST",
+              body: JSON.stringify({
+                metafield: {
+                  namespace: mf.namespace || "custom",
+                  key: mf.key,
+                  value: mf.value,
+                  type: mf.type || "single_line_text_field",
+                },
+              }),
+            });
+            metafieldsApplied++;
+          } catch {
             try {
-              const prompt = scene.promptTemplate(redesign.newTitle, productType, storeNiche);
-              const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
-              const altText = `${redesign.newTitle} - ${scene.label}`;
-              const uploadResult = await uploadBufferToShopify({
-                projectId,
-                shopDomain: project.shopDomain,
-                shopifyProductId,
-                imageBuffer: generatedBuffer,
-                altText,
-                position: existingImageCount + i + 1,
-              });
-              if (uploadResult.success) {
-                imagesGenerated++;
-                await recordUsage(projectId, "image", 1);
-              } else {
-                imageErrors.push(`${scene.label}: upload failed`);
+              const existingMeta = await shopifyRequest<{ metafields: Array<{ id: number; namespace: string; key: string }> }>(
+                projectId, project.shopDomain, `/products/${shopifyProductId}/metafields.json`
+              );
+              const existing = existingMeta?.metafields?.find(
+                (m) => m.namespace === (mf.namespace || "custom") && m.key === mf.key
+              );
+              if (existing) {
+                await shopifyRequest(projectId, project.shopDomain, `/products/${shopifyProductId}/metafields/${existing.id}.json`, {
+                  method: "PUT",
+                  body: JSON.stringify({
+                    metafield: { id: existing.id, value: mf.value, type: mf.type || "single_line_text_field" },
+                  }),
+                });
+                metafieldsApplied++;
               }
-            } catch (e: unknown) {
-              imageErrors.push(`${scene.label}: ${e instanceof Error ? e.message : "error"}`);
-            }
+            } catch { /* skip individual metafield failure */ }
           }
         }
       }
-    } catch (imgErr: unknown) {
-      imageErrors.push(`Error general: ${imgErr instanceof Error ? imgErr.message : "error"}`);
     }
+  
+    await db
+      .update(redesignsTable)
+      .set({ appliedAt: new Date(), appliedFields: fields })
+      .where(eq(redesignsTable.id, redesign.id));
+  
+    let imagesGenerated = 0;
+    let imageErrors: string[] = [];
+    const shouldGenerateImages = fields.includes("images") || fields.includes("photos");
+  
+    if (shouldGenerateImages) {
+      try {
+        const existingImages = await shopifyRequest<{ images: Array<{ id: number; src: string; alt: string }> }>(
+          projectId, project.shopDomain, `/products/${shopifyProductId}/images.json`
+        ).catch(() => ({ images: [] }));
+  
+        const referenceImageUrl = existingImages.images?.[0]?.src;
+  
+        if (referenceImageUrl) {
+          const { getScenesForProductType, downloadImageToBuffer, uploadBufferToShopify, generateDynamicCreativeScenes } = await import("./reference-images.js");
+          const { editImageFromBuffer } = await import("@workspace/integrations-openai-ai-server/image");
+          const { checkProductionLimit, recordUsage } = await import("../lib/plan-limits.js");
+  
+          const [product] = await db.select().from(productsTable).where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+          const productType = product?.productType || "";
+          const storeNiche = project.storeNiche || "general";
+  
+          const standardScenes = getScenesForProductType(productType, storeNiche);
+          const dynamicScenes = await generateDynamicCreativeScenes(projectId, redesign.newTitle, productType, storeNiche, standardScenes.length);
+          const allScenes = [...standardScenes, ...dynamicScenes];
+  
+          const limitCheck = await checkProductionLimit(projectId, "image", allScenes.length);
+          const allowedCount = limitCheck.allowed ? allScenes.length : Math.max(0, limitCheck.remaining?.images ?? 0);
+  
+          if (allowedCount > 0) {
+            const referenceBuffer = await downloadImageToBuffer(referenceImageUrl);
+            const scenesToGenerate = allScenes.slice(0, allowedCount);
+            const existingImageCount = existingImages.images?.length ?? 0;
+  
+            for (let i = 0; i < scenesToGenerate.length; i++) {
+              const scene = scenesToGenerate[i];
+              try {
+                const prompt = scene.promptTemplate(redesign.newTitle, productType, storeNiche);
+                const generatedBuffer = await editImageFromBuffer(referenceBuffer, prompt, "reference.png");
+                const altText = `${redesign.newTitle} - ${scene.label}`;
+                const uploadResult = await uploadBufferToShopify({
+                  projectId,
+                  shopDomain: project.shopDomain,
+                  shopifyProductId,
+                  imageBuffer: generatedBuffer,
+                  altText,
+                  position: existingImageCount + i + 1,
+                });
+                if (uploadResult.success) {
+                  imagesGenerated++;
+                  await recordUsage(projectId, "image", 1);
+                } else {
+                  imageErrors.push(`${scene.label}: upload failed`);
+                }
+              } catch (e: unknown) {
+                imageErrors.push(`${scene.label}: ${e instanceof Error ? e.message : "error"}`);
+              }
+            }
+          }
+        }
+      } catch (imgErr: unknown) {
+        imageErrors.push(`Error general: ${imgErr instanceof Error ? imgErr.message : "error"}`);
+      }
+    }
+  
+    const messageParts: string[] = ["Cambios aplicados correctamente en tu tienda."];
+    if (metafieldsApplied > 0) messageParts.push(`${metafieldsApplied} metafields actualizados.`);
+    if (redesign.newCategory && fields.includes("category")) messageParts.push(`Categoría: ${redesign.newCategory}.`);
+    if (imagesGenerated > 0) messageParts.push(`${imagesGenerated} imágenes creativas generadas desde la foto de referencia.`);
+    if (imageErrors.length > 0) messageParts.push(`${imageErrors.length} errores en imágenes.`);
+  
+    res.json({
+      success: true,
+      message: messageParts.join(" "),
+      metafieldsApplied,
+      categoryApplied: !!(redesign.newCategory && fields.includes("category")),
+      imagesGenerated,
+      imageErrors: imageErrors.length > 0 ? imageErrors : undefined,
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  const messageParts: string[] = ["Cambios aplicados correctamente en tu tienda."];
-  if (metafieldsApplied > 0) messageParts.push(`${metafieldsApplied} metafields actualizados.`);
-  if (redesign.newCategory && fields.includes("category")) messageParts.push(`Categoría: ${redesign.newCategory}.`);
-  if (imagesGenerated > 0) messageParts.push(`${imagesGenerated} imágenes creativas generadas desde la foto de referencia.`);
-  if (imageErrors.length > 0) messageParts.push(`${imageErrors.length} errores en imágenes.`);
-
-  res.json({
-    success: true,
-    message: messageParts.join(" "),
-    metafieldsApplied,
-    categoryApplied: !!(redesign.newCategory && fields.includes("category")),
-    imagesGenerated,
-    imageErrors: imageErrors.length > 0 ? imageErrors : undefined,
-  });
 });
 
 router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void> => {
-  const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-  const { mode } = req.body as { mode: string; minGrade?: string };
-
-  let products;
-  if (mode === "weak") {
-    products = await db
-      .select()
-      .from(productsTable)
-      .where(and(eq(productsTable.projectId, projectId), lte(productsTable.auditScore, 74)));
-  } else {
-    products = await db
-      .select()
-      .from(productsTable)
-      .where(eq(productsTable.projectId, projectId));
-  }
-
-  const jobId = await createBulkJob(projectId, "bulk_redesign", products.length);
-
-  res.json({
-    jobId,
-    status: "running",
-    totalItems: products.length,
-    message: `Procesando ${products.length} productos...`,
-  });
-
-  runAsync(async () => {
-    let completed = 0;
-    let failed = 0;
-    for (const product of products) {
-      try {
-        await doRedesign(projectId, product.shopifyProductId);
-        completed++;
-        await updateJobProgress(jobId, completed, failed, `✓ ${product.title}`);
-      } catch (err) {
-        failed++;
-        const msg = err instanceof Error ? err.message : "Error";
-        await updateJobProgress(jobId, completed, failed, `✗ ${product.title}: ${msg}`);
-      }
-      await new Promise((r) => setTimeout(r, 1000));
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const { mode } = req.body as { mode: string; minGrade?: string };
+  
+    let products;
+    if (mode === "weak") {
+      products = await db
+        .select()
+        .from(productsTable)
+        .where(and(eq(productsTable.projectId, projectId), lte(productsTable.auditScore, 74)));
+    } else {
+      products = await db
+        .select()
+        .from(productsTable)
+        .where(eq(productsTable.projectId, projectId));
     }
-    await completeJob(jobId, { completed, failed });
-  });
+  
+    const jobId = await createBulkJob(projectId, "bulk_redesign", products.length);
+  
+    res.json({
+      jobId,
+      status: "running",
+      totalItems: products.length,
+      message: `Procesando ${products.length} productos...`,
+    });
+  
+    runAsync(async () => {
+      let completed = 0;
+      let failed = 0;
+      for (const product of products) {
+        try {
+          await doRedesign(projectId, product.shopifyProductId);
+          completed++;
+          await updateJobProgress(jobId, completed, failed, `✓ ${product.title}`);
+        } catch (err) {
+          failed++;
+          const msg = err instanceof Error ? err.message : "Error";
+          await updateJobProgress(jobId, completed, failed, `✗ ${product.title}: ${msg}`);
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      await completeJob(jobId, { completed, failed });
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

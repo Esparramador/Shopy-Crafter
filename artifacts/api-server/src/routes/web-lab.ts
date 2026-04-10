@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { enableLongRunning } from "../lib/long-running.js";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
@@ -189,10 +190,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
 
     if (!url) { res.status(400).json({ error: "URL requerida" }); return; }
 
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
+    enableLongRunning(res);
 
     const [extraction, pageSpeed, scraperData] = await Promise.all([
       extractFullWebContent(url),

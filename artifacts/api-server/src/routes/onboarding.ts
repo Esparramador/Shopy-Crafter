@@ -20,109 +20,129 @@ const ACHIEVEMENTS_CATALOG = [
 ];
 
 router.get("/onboarding/progress", async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
-  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-
-  const [progress] = await db.select().from(onboardingProgressTable)
-    .where(eq(onboardingProgressTable.userId, userId));
-
-  if (!progress) {
-    const [created] = await db.insert(onboardingProgressTable).values({ userId }).returning();
-    res.json({ progress: created, achievements: [] });
-    return;
+  try {
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  
+    const [progress] = await db.select().from(onboardingProgressTable)
+      .where(eq(onboardingProgressTable.userId, userId));
+  
+    if (!progress) {
+      const [created] = await db.insert(onboardingProgressTable).values({ userId }).returning();
+      res.json({ progress: created, achievements: [] });
+      return;
+    }
+  
+    const achievements = await db.select().from(achievementsTable)
+      .where(eq(achievementsTable.userId, userId));
+  
+    res.json({ progress, achievements });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  const achievements = await db.select().from(achievementsTable)
-    .where(eq(achievementsTable.userId, userId));
-
-  res.json({ progress, achievements });
 });
 
 router.post("/onboarding/step", async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
-  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-
-  const { step, projectId } = req.body;
-  const validSteps: Record<string, string> = {
-    store_connected: "stepStoreConnected",
-    audit_run: "stepAuditRun",
-    image_generated: "stepImageGenerated",
-    price_optimized: "stepPriceOptimized",
-    ab_test_active: "stepAbTestActive",
-    seo_applied: "stepSeoApplied",
-    client_invited: "stepClientInvited",
-  };
-
-  const field = validSteps[step];
-  if (!field) { res.status(400).json({ error: "Invalid step" }); return; }
-
-  const existing = await db.select().from(onboardingProgressTable)
-    .where(eq(onboardingProgressTable.userId, userId));
-
-  let progress;
-  if (existing.length === 0) {
-    [progress] = await db.insert(onboardingProgressTable).values({
-      userId, projectId, [field]: 1,
-    }).returning();
-  } else {
-    [progress] = await db.update(onboardingProgressTable)
-      .set({ [field]: 1, projectId, updatedAt: new Date() })
-      .where(eq(onboardingProgressTable.userId, userId))
-      .returning();
-  }
-
-  const steps = ["stepStoreConnected", "stepAuditRun", "stepImageGenerated",
-    "stepPriceOptimized", "stepAbTestActive", "stepSeoApplied", "stepClientInvited"];
-  const completed = steps.filter(s => (progress as any)[s] === 1).length;
-  const completionPct = Math.round((completed / steps.length) * 100);
-
-  await db.update(onboardingProgressTable)
-    .set({ completionPct, onboardingCompleted: completionPct === 100 ? 1 : 0 })
-    .where(eq(onboardingProgressTable.userId, userId));
-
-  const achievementMap: Record<string, string> = {
-    audit_run: "first_audit",
-    image_generated: "first_image",
-    ab_test_active: "first_abtest",
-    price_optimized: "first_price",
-    seo_applied: "first_seo",
-    client_invited: "first_client",
-  };
-
-  let newAchievement = null;
-  const achievementKey = achievementMap[step];
-  if (achievementKey) {
-    const exists = await db.select().from(achievementsTable)
-      .where(eq(achievementsTable.achievementKey, achievementKey));
-    if (exists.length === 0) {
-      await db.insert(achievementsTable).values({ id: randomUUID(), userId, achievementKey });
-      newAchievement = ACHIEVEMENTS_CATALOG.find(a => a.key === achievementKey);
+  try {
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  
+    const { step, projectId } = req.body;
+    const validSteps: Record<string, string> = {
+      store_connected: "stepStoreConnected",
+      audit_run: "stepAuditRun",
+      image_generated: "stepImageGenerated",
+      price_optimized: "stepPriceOptimized",
+      ab_test_active: "stepAbTestActive",
+      seo_applied: "stepSeoApplied",
+      client_invited: "stepClientInvited",
+    };
+  
+    const field = validSteps[step];
+    if (!field) { res.status(400).json({ error: "Invalid step" }); return; }
+  
+    const existing = await db.select().from(onboardingProgressTable)
+      .where(eq(onboardingProgressTable.userId, userId));
+  
+    let progress;
+    if (existing.length === 0) {
+      [progress] = await db.insert(onboardingProgressTable).values({
+        userId, projectId, [field]: 1,
+      }).returning();
+    } else {
+      [progress] = await db.update(onboardingProgressTable)
+        .set({ [field]: 1, projectId, updatedAt: new Date() })
+        .where(eq(onboardingProgressTable.userId, userId))
+        .returning();
     }
+  
+    const steps = ["stepStoreConnected", "stepAuditRun", "stepImageGenerated",
+      "stepPriceOptimized", "stepAbTestActive", "stepSeoApplied", "stepClientInvited"];
+    const completed = steps.filter(s => (progress as any)[s] === 1).length;
+    const completionPct = Math.round((completed / steps.length) * 100);
+  
+    await db.update(onboardingProgressTable)
+      .set({ completionPct, onboardingCompleted: completionPct === 100 ? 1 : 0 })
+      .where(eq(onboardingProgressTable.userId, userId));
+  
+    const achievementMap: Record<string, string> = {
+      audit_run: "first_audit",
+      image_generated: "first_image",
+      ab_test_active: "first_abtest",
+      price_optimized: "first_price",
+      seo_applied: "first_seo",
+      client_invited: "first_client",
+    };
+  
+    let newAchievement = null;
+    const achievementKey = achievementMap[step];
+    if (achievementKey) {
+      const exists = await db.select().from(achievementsTable)
+        .where(eq(achievementsTable.achievementKey, achievementKey));
+      if (exists.length === 0) {
+        await db.insert(achievementsTable).values({ id: randomUUID(), userId, achievementKey });
+        newAchievement = ACHIEVEMENTS_CATALOG.find(a => a.key === achievementKey);
+      }
+    }
+  
+    res.json({ progress: { ...progress, completionPct }, newAchievement, completionPct });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
-
-  res.json({ progress: { ...progress, completionPct }, newAchievement, completionPct });
 });
 
 router.get("/onboarding/achievements-catalog", async (_req, res): Promise<void> => {
-  res.json(ACHIEVEMENTS_CATALOG);
+  try {
+    res.json(ACHIEVEMENTS_CATALOG);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.get("/achievements", async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
-  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-
-  const unlocked = await db.select().from(achievementsTable)
-    .where(eq(achievementsTable.userId, userId));
-
-  const unlockedKeys = new Set(unlocked.map(a => a.achievementKey));
-  const catalog = ACHIEVEMENTS_CATALOG.map(a => ({
-    ...a,
-    unlocked: unlockedKeys.has(a.key),
-    unlockedAt: unlocked.find(u => u.achievementKey === a.key)?.unlockedAt ?? null,
-  }));
-
-  const totalXp = catalog.filter(a => a.unlocked).reduce((s, a) => s + a.xp, 0);
-  res.json({ achievements: catalog, totalXp, unlocked: unlocked.length, total: ACHIEVEMENTS_CATALOG.length });
+  try {
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  
+    const unlocked = await db.select().from(achievementsTable)
+      .where(eq(achievementsTable.userId, userId));
+  
+    const unlockedKeys = new Set(unlocked.map(a => a.achievementKey));
+    const catalog = ACHIEVEMENTS_CATALOG.map(a => ({
+      ...a,
+      unlocked: unlockedKeys.has(a.key),
+      unlockedAt: unlocked.find(u => u.achievementKey === a.key)?.unlockedAt ?? null,
+    }));
+  
+    const totalXp = catalog.filter(a => a.unlocked).reduce((s, a) => s + a.xp, 0);
+    res.json({ achievements: catalog, totalXp, unlocked: unlocked.length, total: ACHIEVEMENTS_CATALOG.length });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

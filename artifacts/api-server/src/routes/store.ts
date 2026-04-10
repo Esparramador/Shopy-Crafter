@@ -94,65 +94,75 @@ async function shopifyFetch(query: string, variables?: Record<string, any>) {
 }
 
 router.get("/store/products", async (_req, res): Promise<void> => {
-  const currency = process.env.SHOP_CURRENCY || "EUR";
   try {
-    // Try collection first
-    const collectionData = await shopifyFetch(COLLECTION_QUERY, { handle: COLLECTION_HANDLE() });
-    const collectionProducts = collectionData?.collectionByHandle?.products?.edges?.map((e: any) => e.node) || [];
-
-    if (collectionProducts.length > 0) {
+    const currency = process.env.SHOP_CURRENCY || "EUR";
+    try {
+      // Try collection first
+      const collectionData = await shopifyFetch(COLLECTION_QUERY, { handle: COLLECTION_HANDLE() });
+      const collectionProducts = collectionData?.collectionByHandle?.products?.edges?.map((e: any) => e.node) || [];
+  
+      if (collectionProducts.length > 0) {
+        res.set("Cache-Control", "public, max-age=1800");
+        res.json({ products: collectionProducts, currency });
+        return;
+      }
+  
+      // Fallback: all products (collection doesn't exist or is empty)
+      logger.info("Collection not found or empty — fetching all products");
+      const allData = await shopifyFetch(ALL_PRODUCTS_QUERY);
+      const allProducts = allData?.products?.edges?.map((e: any) => e.node) || [];
+  
       res.set("Cache-Control", "public, max-age=1800");
-      res.json({ products: collectionProducts, currency });
-      return;
+      res.json({ products: allProducts, currency });
+    } catch (err: any) {
+      logger.error("Storefront API error:", err.message);
+      res.set("Cache-Control", "no-cache");
+      res.json({ products: [], currency });
     }
-
-    // Fallback: all products (collection doesn't exist or is empty)
-    logger.info("Collection not found or empty — fetching all products");
-    const allData = await shopifyFetch(ALL_PRODUCTS_QUERY);
-    const allProducts = allData?.products?.edges?.map((e: any) => e.node) || [];
-
-    res.set("Cache-Control", "public, max-age=1800");
-    res.json({ products: allProducts, currency });
   } catch (err: any) {
-    logger.error("Storefront API error:", err.message);
-    res.set("Cache-Control", "no-cache");
-    res.json({ products: [], currency });
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
 router.post("/store/checkout", async (req, res): Promise<void> => {
-  const { variantId, quantity = 1 } = req.body;
-
-  if (!variantId) {
-    res.status(400).json({ error: "variantId required" });
-    return;
-  }
-
   try {
-    const response = await fetch(STOREFRONT_ENDPOINT(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN(),
-      },
-      body: JSON.stringify({
-        query: CHECKOUT_MUTATION,
-        variables: { lines: [{ merchandiseId: variantId, quantity }] },
-      }),
-    });
-
-    const data = await response.json() as any;
-    const checkoutUrl = data.data?.cartCreate?.cart?.checkoutUrl;
-    const errors = data.data?.cartCreate?.userErrors;
-
-    if (!checkoutUrl || (errors && errors.length > 0)) {
-      throw new Error(errors?.[0]?.message || "Checkout creation failed");
+    const { variantId, quantity = 1 } = req.body;
+  
+    if (!variantId) {
+      res.status(400).json({ error: "variantId required" });
+      return;
     }
-
-    res.json({ checkoutUrl });
+  
+    try {
+      const response = await fetch(STOREFRONT_ENDPOINT(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN(),
+        },
+        body: JSON.stringify({
+          query: CHECKOUT_MUTATION,
+          variables: { lines: [{ merchandiseId: variantId, quantity }] },
+        }),
+      });
+  
+      const data = await response.json() as any;
+      const checkoutUrl = data.data?.cartCreate?.cart?.checkoutUrl;
+      const errors = data.data?.cartCreate?.userErrors;
+  
+      if (!checkoutUrl || (errors && errors.length > 0)) {
+        throw new Error(errors?.[0]?.message || "Checkout creation failed");
+      }
+  
+      res.json({ checkoutUrl });
+    } catch (err: any) {
+      logger.error("Checkout error:", err.message);
+      res.status(500).json({ error: "Could not create checkout" });
+    }
   } catch (err: any) {
-    logger.error("Checkout error:", err.message);
-    res.status(500).json({ error: "Could not create checkout" });
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
   }
 });
 
