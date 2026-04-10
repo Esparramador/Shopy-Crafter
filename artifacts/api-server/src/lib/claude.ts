@@ -317,7 +317,7 @@ export async function askClaudeVisionWithBrain(
   });
 }
 
-export async function claude(prompt: string, maxTokens = 2048): Promise<string> {
+export async function claude(prompt: string, maxTokens = 8192): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = getDefaultClient();

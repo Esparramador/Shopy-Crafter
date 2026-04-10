@@ -154,6 +154,72 @@ app.use("/api/reference", aiLimiter);
 app.use("/api/agency/analyze", aiLimiter);
 app.use("/api/agency/proposal", aiLimiter);
 app.use("/api", apiLimiter);
+
+// ── Anti-502 middleware — auto-detects AI-heavy routes ────────────────────────
+const AI_HEAVY_PREFIXES = [
+  "/api/shopybrain/",
+  "/api/fusion-studio/",
+  "/api/agency/",
+  "/api/research/",
+  "/api/intelligence/",
+  "/api/competitors/",
+  "/api/web-lab/",
+  "/api/generator/",
+  "/api/email-templates/generate",
+  "/api/emails/generate",
+  "/api/emails/flows",
+  "/api/enrichment/",
+  "/api/klaviyo-ai/",
+  "/api/reference/analyze",
+  "/api/inventory/restock-email",
+  "/api/push/vapid-generate",
+  "/api/voice/command",
+  "/api/entity-research/",
+  "/api/absorber/",
+];
+
+const SEO_AI_PATTERNS = [
+  "/seo/generate-metas",
+  "/seo/keyword-intelligence",
+  "/seo/blog-strategy",
+  "/seo/generate-blog-post",
+  "/seo/fix-alt-texts",
+  "/seo/generate-schemas",
+];
+
+const PRODUCT_AI_PATTERNS = [
+  "/products/create",
+  "/catalog-opportunities",
+  "/financial-forecast",
+  "/analyze-competitors",
+  "/calculate-optimal-price",
+  "/ai-estimate-cogs",
+  "/bulk-redesign",
+  "/images/generate",
+  "/visual-dna",
+  "/repair-consistency",
+  "/audit/run",
+  "/exports/generate",
+  "/exports/run-full-audit",
+  "/ab-tests",
+  "/redesign/",
+];
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const p = req.path;
+  const isAiHeavy =
+    AI_HEAVY_PREFIXES.some(prefix => p.startsWith(prefix)) ||
+    SEO_AI_PATTERNS.some(pattern => p.includes(pattern)) ||
+    PRODUCT_AI_PATTERNS.some(pattern => p.includes(pattern));
+
+  if (isAiHeavy && (req.method === "POST" || req.method === "PUT")) {
+    res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("Cache-Control", "no-cache");
+  }
+  next();
+});
+
 app.use("/api", router);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
@@ -161,20 +227,26 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({ error: "Ruta no encontrada", path: req.path });
 });
 
-// ── Global error handler ─────────────────────────────────────────────────────
+// ── Global error handler (Express 5 catches async errors automatically) ──────
 app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
-  const message = err instanceof Error ? err.message : "Error interno del servidor";
-  const stack = err instanceof Error ? err.stack : undefined;
-
-  logger.error({ err, method: req.method, url: req.url }, "Unhandled error");
-
-  // Don't leak stack traces in production
-  const body: Record<string, unknown> = { error: message };
-  if (process.env.NODE_ENV !== "production" && stack) {
-    body.stack = stack;
+  if (res.headersSent) {
+    logger.error({ err, path: req.path }, "Error after headers sent — connection may be broken");
+    return;
   }
 
-  // Handle specific error types
+  const status = (err as any)?.status || (err as any)?.statusCode || 500;
+  const message = err instanceof Error ? err.message : "Error interno del servidor";
+
+  if (status >= 500) {
+    logger.error({ err, method: req.method, path: req.path, status }, `[UNHANDLED] ${req.method} ${req.path}`);
+  } else {
+    logger.warn({ message, method: req.method, path: req.path, status }, `[HANDLED] ${req.method} ${req.path}`);
+  }
+
+  const safeMessage = status >= 500
+    ? "Error interno del servidor. Inténtalo de nuevo."
+    : message;
+
   if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
     res.status(504).json({ error: "Tiempo de espera agotado — inténtalo de nuevo", code: "TIMEOUT" });
     return;
@@ -184,7 +256,11 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     return;
   }
 
-  res.status(500).json(body);
+  res.status(status).json({
+    error: safeMessage,
+    code: status,
+    ...(process.env.NODE_ENV !== "production" && { debug: message }),
+  });
 });
 
 export default app;
