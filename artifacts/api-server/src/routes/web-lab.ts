@@ -529,14 +529,25 @@ router.get("/web-lab/download-css/:vaultId", async (req: Request, res: Response)
 router.get("/web-lab/download-html/:vaultId", async (req: Request, res: Response): Promise<void> => {
   try {
     const vaultId = parseInt(String(req.params.vaultId));
-    const [file] = await db.select().from(projectFilesTable).where(
+    const [htmlFile] = await db.select().from(projectFilesTable).where(
       and(eq(projectFilesTable.id, vaultId), eq(projectFilesTable.fileType, "web-lab-html"))
     );
-    if (!file?.content) { res.status(404).json({ error: "HTML no encontrado" }); return; }
+    if (!htmlFile?.content) { res.status(404).json({ error: "HTML no encontrado" }); return; }
+
+    const cssFiles = await db.select().from(projectFilesTable).where(
+      and(
+        eq(projectFilesTable.projectId, htmlFile.projectId as number),
+        eq(projectFilesTable.fileType, "web-lab-css"),
+        eq(projectFilesTable.originalUrl, htmlFile.originalUrl ?? ""),
+      )
+    ).orderBy(desc(projectFilesTable.id));
+    const cssContent = cssFiles.length > 0 ? cssFiles[0].content ?? "" : "";
+
+    const fullHtml = buildStandalonePreviewHtml(htmlFile.content, cssContent, htmlFile.originalUrl ?? "URL desconocida");
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="improved-fragments.html"`);
-    res.send(file.content);
+    res.setHeader("Content-Disposition", `attachment; filename="improved-preview.html"`);
+    res.send(fullHtml);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -685,7 +696,19 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
       }
     }
 
-    const readme = `# Web Lab — Pack de Análisis\n\nURL analizada: ${targetUrl}\nFecha: ${new Date().toLocaleDateString("es-ES")}\n\n## Archivos incluidos\n\n- **informe-web-lab.html** — Informe profesional completo. Ábrelo en tu navegador.\n- **improved-styles.css** — CSS mejorado listo para copiar/pegar en tu proyecto.\n- **improved-fragments.html** — Fragmentos HTML mejorados como referencia.\n\n## Instrucciones para el equipo de desarrollo\n\n1. Abre el informe HTML en el navegador para ver el análisis completo\n2. Copia el contenido de improved-styles.css en tu archivo de estilos\n3. Revisa los fragmentos HTML para aplicar las mejoras estructurales\n4. Testea en móvil y escritorio antes de publicar\n\nGenerado por Shopy Crafter — shopycrafter.com`;
+    let cssContent = "";
+    let htmlFragments = "";
+    for (const f of [...relatedFiles].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))) {
+      if (f.fileType === "web-lab-css" && f.content) cssContent = f.content;
+      if (f.fileType === "web-lab-html" && f.content) htmlFragments = f.content;
+    }
+
+    if (cssContent || htmlFragments) {
+      const previewHtml = buildStandalonePreviewHtml(htmlFragments, cssContent, targetUrl);
+      archive.append(previewHtml, { name: "preview-visual.html" });
+    }
+
+    const readme = `# Web Lab — Pack de Análisis\n\nURL analizada: ${targetUrl}\nFecha: ${new Date().toLocaleDateString("es-ES")}\n\n## Archivos incluidos\n\n- **preview-visual.html** — Abre en el navegador para ver cómo se ve el CSS aplicado visualmente.\n- **informe-web-lab.html** — Informe profesional completo con scores, issues y recomendaciones.\n- **improved-styles.css** — CSS mejorado listo para copiar/pegar en tu proyecto.\n- **improved-fragments.html** — Fragmentos HTML mejorados como referencia.\n\n## Instrucciones para el equipo de desarrollo\n\n1. Abre preview-visual.html en el navegador para ver los estilos aplicados\n2. Abre el informe HTML para ver el análisis completo\n3. Copia el contenido de improved-styles.css en tu archivo de estilos\n4. Revisa los fragmentos HTML para aplicar las mejoras estructurales\n5. Testea en móvil y escritorio antes de publicar\n\nGenerado por Shopy Crafter — shopycrafter.com`;
 
     archive.append(readme, { name: "README.md" });
     await archive.finalize();
@@ -829,6 +852,84 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
     analysis,
     vaultIds: { report: vaultReportId, css: vaultCssId, html: vaultHtmlId },
   };
+}
+
+function buildStandalonePreviewHtml(htmlFragments: string, cssContent: string, url: string): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Visual — ${escapeHtml(url)}</title>
+  <style>
+${cssContent}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.shopy-preview-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 99999;
+  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 100%);
+  border-top: 2px solid #d4a843;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #ccc;
+  font-size: 12px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+}
+.shopy-preview-toolbar a {
+  color: #d4a843;
+  text-decoration: none;
+  font-weight: 600;
+}
+.shopy-preview-toolbar .shopy-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shopy-preview-toolbar .shopy-badge span {
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #d4a843, #b8860b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 480px) {
+  .shopy-preview-toolbar {
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+    padding: 8px 12px;
+  }
+}
+  </style>
+</head>
+<body>
+${htmlFragments}
+<div class="shopy-preview-toolbar">
+  <div class="shopy-badge">
+    <span>Shopy Crafter</span>
+    <span style="font-size:11px;font-weight:400;color:#888;">Preview Visual — CSS Mejorado</span>
+  </div>
+  <div>
+    <span style="color:#888;">Fuente: ${escapeHtml(url)}</span>
+    &nbsp;·&nbsp;
+    <a href="https://shopycrafter.com" target="_blank">shopycrafter.com</a>
+  </div>
+</div>
+</body>
+</html>`;
 }
 
 function buildReportBody(

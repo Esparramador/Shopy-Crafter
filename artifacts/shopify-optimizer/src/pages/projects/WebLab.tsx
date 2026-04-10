@@ -539,6 +539,24 @@ function WebLabInner({ projectId }: { projectId: number }) {
                     >
                       💾 Descargar .css
                     </button>
+                    <button
+                      onClick={() => {
+                        const fragments = (a.improvedHtmlFragments || []).map((f: any) => f.improved).join("\n");
+                        const toolbarCss = `.shopy-preview-toolbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#0a0a1a,#1a1a2e);border-top:2px solid #d4a843;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ccc;font-size:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.5)}.shopy-preview-toolbar a{color:#d4a843;text-decoration:none;font-weight:600}`;
+                        const toolbar = `<div class="shopy-preview-toolbar"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4a843,#b8860b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Shopy Crafter</span><span style="font-size:11px;color:#888">Preview Visual — CSS Mejorado</span></div><div><span style="color:#888">Fuente: ${url}</span> · <a href="https://shopycrafter.com" target="_blank">shopycrafter.com</a></div></div>`;
+                        const fullHtml = `<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview Visual — CSS Mejorado</title>\n<style>\n${a.improvedCss}\nbody{margin:0;padding:0;min-height:100vh}\n${toolbarCss}\n</style>\n</head>\n<body>\n${fragments}\n${toolbar}\n</body>\n</html>`;
+                        downloadFile(fullHtml, "preview-visual.html", "text/html");
+                      }}
+                      style={{
+                        padding: "8px 16px",
+                        background: "linear-gradient(135deg, #22c55e22, #16a34a22)",
+                        border: "1px solid #22c55e44",
+                        borderRadius: 8, color: "#22c55e",
+                        cursor: "pointer", fontSize: 13,
+                      }}
+                    >
+                      👁️ Descargar Preview HTML
+                    </button>
                   </div>
                 </div>
                 <pre style={{
