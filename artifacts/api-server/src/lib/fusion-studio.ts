@@ -3,10 +3,33 @@ import { askClaudeVisionWithBrain, learnFromOperation } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
 
 export interface ImageAnalysis {
+  sceneClassification: {
+    type: string;
+    subtype: string;
+    hasModel: boolean;
+    hasMultipleProducts: boolean;
+    isFood: boolean;
+    isTech: boolean;
+    isFashion: boolean;
+    isJewelry: boolean;
+    isArt: boolean;
+    isAnimal: boolean;
+    isInfographic: boolean;
+    renderType: string;
+    confidence: number;
+  };
   layers: Array<{
     name: string;
     description: string;
     coverage: string;
+  }>;
+  componentBreakdown: Array<{
+    partName: string;
+    material: string;
+    function: string;
+    position: string;
+    dimensions: string;
+    details: string;
   }>;
   colors: {
     dominant: string[];
@@ -25,7 +48,31 @@ export interface ImageAnalysis {
     depth: string;
     lighting: string;
     shadows: string;
+    focalLength: string;
+    productionTechnique: string;
   };
+  modelAnalysis: {
+    detected: boolean;
+    gender: string;
+    ageRange: string;
+    pose: string;
+    clothing: string;
+    interaction: string;
+    skinTone: string;
+    hairStyle: string;
+    expression: string;
+  } | null;
+  foodAnalysis: {
+    detected: boolean;
+    cuisineType: string;
+    dishName: string;
+    ingredients: string[];
+    cookingTechnique: string;
+    plating: string;
+    temperature: string;
+    garnishes: string[];
+    servingStyle: string;
+  } | null;
   product: {
     category: string;
     subcategory: string;
@@ -35,6 +82,20 @@ export interface ImageAnalysis {
     brandStyle: string;
     targetAudience: string;
     priceRange: string;
+    manufacturingProcess: string;
+    qualityLevel: string;
+    usageContext: string;
+    seasonality: string;
+  };
+  visualDna: {
+    styleFingerprint: string;
+    moodBoard: string[];
+    photographySchool: string;
+    editingStyle: string;
+    brandArchetype: string;
+    emotionalTone: string;
+    luxuryScore: number;
+    uniqueElements: string[];
   };
   productGeneration: {
     suggestedTitle: string;
@@ -72,58 +133,100 @@ export async function analyzeImageForFusion(
     }
   }
 
-  const prompt = `Eres el Fusion Studio de ShopyBrain — un analizador experto de imágenes de producto que descompone CUALQUIER imagen en todas sus capas, partículas, texturas, colores y materiales.
+  const prompt = `Eres el Fusion Studio de ShopyBrain — el motor de visión artificial más avanzado del mundo para eCommerce. Tu misión: EXTRAER EL 100% de la información de CUALQUIER imagen, sin importar el tipo (producto, comida, tecnología, moda, joyería, arte, mascota, persona con producto, infografía técnica, etc.).
 
-ANALIZA ${additionalImages?.length ? `estas ${1 + additionalImages.length} imágenes` : "esta imagen"} con precisión absoluta.
+ANALIZA ${additionalImages?.length ? `estas ${1 + additionalImages.length} imágenes` : "esta imagen"} como si fueras una combinación de:
+- Un ingeniero de materiales (identifica CADA componente y material)
+- Un fotógrafo de Vogue/Apple (analiza composición y técnica)
+- Un chef estrella Michelin (si hay comida: ingredientes, técnica, emplatado)
+- Un sastre de alta costura (si hay moda: tejidos, cortes, acabados)
+- Un joyero de Cartier (si hay joyería: metales, piedras, quilates)
+- Un director de arte de Apple (ADN visual, estilo único)
 
 ${context?.niche ? `Contexto: Nicho ${context.niche}. Tono: ${context.brandTone ?? "profesional"}. Audiencia: ${context.targetAudience ?? "adultos"}.` : ""}
 
-DESCOMPÓN la imagen en TODAS estas dimensiones:
+EXTRAE ABSOLUTAMENTE TODO:
 
-1. **CAPAS VISUALES**: Separa mentalmente la imagen en capas (fondo, producto, sombras, reflejos, texto, decoración, packaging). Para cada capa: nombre, descripción, % de cobertura.
+1. **CLASIFICACIÓN DE ESCENA**: ¿Qué tipo de imagen es?
+   - Tipo: product_only | product_with_model | food | tech | fashion | jewelry | art | animal | infographic | lifestyle | packaging
+   - ¿Hay modelo/persona? ¿Hay múltiples productos? ¿Es comida? ¿Es tecnología? ¿Es moda? ¿Es joyería? ¿Es arte/diseño? ¿Es animal/mascota? ¿Es una infografía/plano técnico?
+   - ¿Es foto real, CGI, ilustración, render 3D, foto editada?
+   - Nivel de confianza (0-1)
 
-2. **ANÁLISIS DE COLOR**: 
-   - Colores dominantes (hex exacto)
-   - Paleta completa con % de cada color
-   - Temperatura de color (cálida/fría/neutra)
-   - Tipo de armonía cromática
+2. **CAPAS VISUALES**: Separa la imagen en TODAS sus capas (fondo, producto, sombras, reflejos, texto, decoración, packaging, modelo, props). Para cada capa: nombre, descripción detallada, % de cobertura.
 
-3. **TEXTURAS Y MATERIALES**: 
-   - Identifica CADA material visible (algodón, metal, plástico, cuero, madera, vidrio, cerámica, etc.)
-   - Acabado de cada material (mate, brillante, satinado, rugoso, suave)
-   - En qué zona de la imagen está
+3. **DESGLOSE DE COMPONENTES** (como un plano técnico de ingeniería):
+   - Nombra CADA parte/componente visible del producto (ej: para un reloj → bisel, cristal, corona, esfera, correa, hebilla, fondo de caja...)
+   - Para CADA componente: material exacto, función, posición en el producto, dimensiones estimadas, detalles técnicos
+   - Si es comida: cada ingrediente visible, capa del plato, técnica de cocción de cada elemento
+   - Si es tech: cada componente electrónico, puerto, sensor, botón visible
+   - Si es moda: cada panel de tela, costura, cierre, etiqueta, acabado
 
-4. **COMPOSICIÓN**:
-   - Layout (centrado, tercios, diagonal, simétrico)
-   - Perspectiva (frontal, cenital, 3/4, isométrica, lifestyle)
-   - Profundidad de campo (plano, media, bokeh)
-   - Iluminación (tipo, dirección, dureza)
-   - Sombras (tipo, dirección)
+4. **ANÁLISIS DE COLOR**: Colores dominantes (hex exacto), paleta completa con %, temperatura (Kelvin estimado), armonía cromática
 
-5. **PRODUCTO DETECTADO**:
-   - Categoría y subcategoría del producto
-   - Materiales estimados de fabricación
+5. **TEXTURAS Y MATERIALES**: CADA material visible con su acabado (mate/brillante/satinado/rugoso/texturado), zona de la imagen
+
+6. **COMPOSICIÓN TÉCNICA**:
+   - Layout, perspectiva, profundidad de campo, iluminación (tipo, dirección, dureza, setup estimado)
+   - Sombras (tipo, dirección, dureza)
+   - Distancia focal estimada del lente
+   - Técnica de producción (foto estudio, foto natural, CGI, compositing, AI-generated)
+
+7. **ANÁLISIS DE MODELO** (si hay persona):
+   - Género, rango de edad, pose, ropa, cómo interactúa con el producto
+   - Tono de piel, estilo de pelo, expresión facial
+   - Si NO hay modelo, devolver null
+
+8. **ANÁLISIS GASTRONÓMICO** (si hay comida):
+   - Tipo de cocina (italiana, japonesa, francesa, fusión, etc.)
+   - Nombre del plato
+   - Ingredientes visibles (TODOS, uno por uno)
+   - Técnica de cocción (al horno, sous vide, a la brasa, fritura, etc.)
+   - Estilo de emplatado (fine dining, rústico, minimalista, abundante)
+   - Temperatura aparente (caliente con vapor, frío, temperatura ambiente)
+   - Guarniciones y decoraciones
+   - Estilo de servicio (plato individual, familiar, take away)
+   - Si NO hay comida, devolver null
+
+9. **PRODUCTO DETECTADO**:
+   - Categoría y subcategoría
+   - Materiales de fabricación
    - Peso y dimensiones estimados
-   - Estilo de marca que transmite
-   - Audiencia objetivo
-   - Rango de precio estimado
+   - Estilo de marca, audiencia, rango de precio
+   - Proceso de fabricación (artesanal, industrial, inyección, cosido a mano, 3D print, etc.)
+   - Nivel de calidad (premium/mid-range/budget/luxury/ultra-luxury)
+   - Contexto de uso (diario, ocasión especial, profesional, deportivo, etc.)
+   - Estacionalidad (todo el año, verano, invierno, festivo, etc.)
 
-6. **GENERACIÓN DE PRODUCTO** (para crear el producto en la tienda):
-   - Título SEO sugerido (70 chars máx, con keywords)
-   - Descripción HTML de 800+ palabras con 8 secciones (Descripción, Características, Material, Tallas/Medidas, Cuidados, Envío, FAQ, Trust badges)
-   - 15-25 tags SEO relevantes
-   - Categoría sugerida
-   - Precio sugerido basado en el análisis visual y materiales
-   - 5 keywords SEO principales
-   - 6 photo briefs para generar imágenes profesionales adicionales (hero, lifestyle, detalle, escala, packaging, UGC)
+10. **ADN VISUAL** (la "huella dactilar" estética de esta imagen):
+    - Fingerprint de estilo en 1 frase (ej: "Minimalismo escandinavo con acentos cobre")
+    - 5 palabras de mood board
+    - Escuela fotográfica (editorial, comercial, artística, documental, lifestyle, flat-lay)
+    - Estilo de edición (clean, moody, film-grain, high-contrast, muted, vibrant, HDR)
+    - Arquetipo de marca (Hero/Sage/Explorer/Creator/Rebel/Lover/Caregiver/Magician)
+    - Tono emocional (aspiracional, confianza, urgencia, exclusividad, calidez, aventura)
+    - Luxury score (1-10)
+    - Elementos únicos que hacen esta imagen memorable
 
-RESPONDE EXCLUSIVAMENTE con JSON válido con esta estructura:
+11. **GENERACIÓN DE PRODUCTO** (para crear el producto en la tienda):
+    - Título SEO (70 chars, keywords potentes)
+    - Descripción HTML de 800+ palabras con 8 secciones
+    - 15-25 tags SEO, categoría, precio sugerido real de mercado
+    - 5 keywords SEO principales
+    - 6 photo briefs detallados para generar imágenes profesionales (hero, lifestyle, detalle, escala, packaging, UGC)
+
+RESPONDE EXCLUSIVAMENTE con JSON válido:
 {
-  "layers": [...],
-  "colors": { "dominant": [...], "palette": [...], "temperature": "...", "harmony": "..." },
-  "textures": [...],
-  "composition": { "layout": "...", "perspective": "...", "depth": "...", "lighting": "...", "shadows": "..." },
-  "product": { "category": "...", "subcategory": "...", "estimatedMaterials": [...], "estimatedWeight": "...", "estimatedDimensions": "...", "brandStyle": "...", "targetAudience": "...", "priceRange": "..." },
+  "sceneClassification": { "type": "...", "subtype": "...", "hasModel": false, "hasMultipleProducts": false, "isFood": false, "isTech": false, "isFashion": false, "isJewelry": false, "isArt": false, "isAnimal": false, "isInfographic": false, "renderType": "photo|cgi|illustration|render3d|ai_generated", "confidence": 0.95 },
+  "layers": [{ "name": "...", "description": "...", "coverage": "..." }],
+  "componentBreakdown": [{ "partName": "...", "material": "...", "function": "...", "position": "...", "dimensions": "...", "details": "..." }],
+  "colors": { "dominant": ["#hex"], "palette": [{ "hex": "#...", "name": "...", "percentage": "..." }], "temperature": "...", "harmony": "..." },
+  "textures": [{ "material": "...", "finish": "...", "area": "..." }],
+  "composition": { "layout": "...", "perspective": "...", "depth": "...", "lighting": "...", "shadows": "...", "focalLength": "...", "productionTechnique": "..." },
+  "modelAnalysis": null,
+  "foodAnalysis": null,
+  "product": { "category": "...", "subcategory": "...", "estimatedMaterials": [...], "estimatedWeight": "...", "estimatedDimensions": "...", "brandStyle": "...", "targetAudience": "...", "priceRange": "...", "manufacturingProcess": "...", "qualityLevel": "...", "usageContext": "...", "seasonality": "..." },
+  "visualDna": { "styleFingerprint": "...", "moodBoard": [...], "photographySchool": "...", "editingStyle": "...", "brandArchetype": "...", "emotionalTone": "...", "luxuryScore": 7, "uniqueElements": [...] },
   "productGeneration": { "suggestedTitle": "...", "suggestedDescription": "...(HTML)...", "suggestedTags": [...], "suggestedCategory": "...", "suggestedPrice": "...", "seoKeywords": [...], "photoBriefs": [...] }
 }`;
 
@@ -131,28 +234,49 @@ RESPONDE EXCLUSIVAMENTE con JSON válido con esta estructura:
     0,
     prompt,
     allImages,
-    `Eres el Fusion Studio de ShopyBrain — sistema experto de descomposición visual de productos para eCommerce.`,
+    `Eres el Fusion Studio de ShopyBrain — el motor de visión artificial más avanzado del mundo para eCommerce. Extraes el 100% de la información de CUALQUIER imagen: productos, comida, tecnología, moda, joyería, arte, animales, personas. Desglosas cada componente como un plano técnico de ingeniería.`,
     "images",
     context?.niche,
-    16000,
+    24000,
   );
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON in Fusion Studio response");
 
   const analysis = JSON.parse(jsonMatch[0]) as ImageAnalysis;
 
+  if (!analysis.sceneClassification) analysis.sceneClassification = { type: "product_only", subtype: "", hasModel: false, hasMultipleProducts: false, isFood: false, isTech: false, isFashion: false, isJewelry: false, isArt: false, isAnimal: false, isInfographic: false, renderType: "photo", confidence: 0.5 };
+  if (!analysis.componentBreakdown) analysis.componentBreakdown = [];
+  if (!analysis.visualDna) analysis.visualDna = { styleFingerprint: "", moodBoard: [], photographySchool: "", editingStyle: "", brandArchetype: "", emotionalTone: "", luxuryScore: 5, uniqueElements: [] };
+  if (!analysis.modelAnalysis) analysis.modelAnalysis = null;
+  if (!analysis.foodAnalysis) analysis.foodAnalysis = null;
+  if (!analysis.layers) analysis.layers = [];
+  if (!analysis.colors) analysis.colors = { dominant: [], palette: [], temperature: "", harmony: "" };
+  if (!analysis.textures) analysis.textures = [];
+  if (!analysis.composition) analysis.composition = { layout: "", perspective: "", depth: "", lighting: "", shadows: "", focalLength: "", productionTechnique: "" };
+  if (!analysis.product) analysis.product = { category: "", subcategory: "", estimatedMaterials: [], estimatedWeight: "", estimatedDimensions: "", brandStyle: "", targetAudience: "", priceRange: "", manufacturingProcess: "", qualityLevel: "", usageContext: "", seasonality: "" };
+  if (!analysis.productGeneration) analysis.productGeneration = { suggestedTitle: "", suggestedDescription: "", suggestedTags: [], suggestedCategory: "", suggestedPrice: "", seoKeywords: [], photoBriefs: [] };
+
+  const sceneType = analysis.sceneClassification.type || "unknown";
+  const components = (analysis.componentBreakdown || []).map(c => c.partName).slice(0, 8).join(", ");
+  const visualDnaStr = analysis.visualDna.styleFingerprint || "";
+
   learnFromOperation({
     operationType: "fusion_studio_analysis",
-    title: `Fusion Studio: ${analysis.product?.category ?? "producto"} — ${analysis.product?.subcategory ?? ""}`,
-    content: `Análisis Fusion Studio: Categoría ${analysis.product?.category}. Materiales: ${analysis.textures?.map(t => t.material).join(", ")}. Colores: ${analysis.colors?.dominant?.join(", ")}. Estilo: ${analysis.product?.brandStyle}. Precio estimado: ${analysis.product?.priceRange}. Composición: ${analysis.composition?.layout}, ${analysis.composition?.lighting}.`,
-    confidence: 0.85,
-    tags: ["fusion-studio", analysis.product?.category ?? "product", "image-analysis"],
+    title: `Fusion Studio [${sceneType}]: ${analysis.product?.category ?? "producto"} — ${analysis.product?.subcategory ?? ""}`,
+    content: `Análisis Fusion Studio (${sceneType}): Categoría ${analysis.product?.category}. Componentes: ${components}. Materiales: ${analysis.textures?.map(t => t.material).join(", ")}. Colores: ${analysis.colors?.dominant?.join(", ")}. Estilo: ${analysis.product?.brandStyle}. Precio: ${analysis.product?.priceRange}. Calidad: ${analysis.product?.qualityLevel}. ADN Visual: ${visualDnaStr}. ${analysis.foodAnalysis?.detected ? `Comida: ${analysis.foodAnalysis.cuisineType} - ${analysis.foodAnalysis.dishName}. ` : ""}${analysis.modelAnalysis?.detected ? `Modelo: ${analysis.modelAnalysis.gender}, ${analysis.modelAnalysis.pose}. ` : ""}Fabricación: ${analysis.product?.manufacturingProcess}. Luxury: ${analysis.visualDna?.luxuryScore}/10.`,
+    confidence: 0.9,
+    tags: ["fusion-studio", sceneType, analysis.product?.category ?? "product", "image-analysis", ...(analysis.foodAnalysis?.detected ? ["food", analysis.foodAnalysis.cuisineType] : []), ...(analysis.modelAnalysis?.detected ? ["model"] : [])],
   });
 
   logger.info({
+    sceneType,
     category: analysis.product?.category,
+    components: analysis.componentBreakdown?.length,
     materials: analysis.textures?.length,
     colors: analysis.colors?.palette?.length,
+    hasModel: analysis.sceneClassification?.hasModel,
+    isFood: analysis.sceneClassification?.isFood,
+    luxuryScore: analysis.visualDna?.luxuryScore,
   }, "Fusion Studio analysis complete");
 
   return analysis;

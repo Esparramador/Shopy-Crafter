@@ -7,7 +7,7 @@ import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
-import { askClaudeJsonWithBrain, askClaudeWithBrain } from "../lib/claude.js";
+import { askClaudeJsonWithBrain, askClaudeWithBrain, askClaudeVisionWithBrain } from "../lib/claude.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
@@ -204,14 +204,58 @@ REGLAS:
   };
 }
 
+async function analyzeProductImageWithVision(imageDataUrl: string, niche: string): Promise<string> {
+  try {
+    const match = imageDataUrl.match(/^data:image\/([\w+]+);base64,(.+)$/);
+    if (!match) return "";
+    const rawType = match[1] === "jpg" ? "jpeg" : match[1];
+    const mediaType = `image/${rawType}` as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+    const base64 = match[2];
+
+    const visionResult = await askClaudeVisionWithBrain(
+      0,
+      `Analiza esta imagen de producto con PRECISIÓN TOTAL. Extrae:
+1. TIPO: ¿Qué es exactamente? (comida, ropa, tech, joyería, cosmética, etc.)
+2. COMPONENTES: Nombra CADA parte/ingrediente visible
+3. MATERIALES: Material de fabricación de cada componente
+4. CALIDAD: ¿Premium, artesanal, industrial, luxury?
+5. PRECIO ESTIMADO: Basado en materiales y calidad, ¿cuánto debería costar en el mercado?
+6. CONTEXTO: ¿Para qué se usa? ¿Quién lo compra?
+7. Si es COMIDA: tipo de cocina, ingredientes exactos, técnica de cocción, emplatado
+8. Si es MODA: tipo de prenda, tejido, corte, temporada
+9. Si es TECH: especificaciones técnicas visibles
+10. FOTOGRAFÍA: calidad de la foto, iluminación, estilo
+
+Responde en texto estructurado, no JSON.`,
+      [{ base64, mediaType }],
+      "Eres un experto analista visual de productos para eCommerce. Tu análisis se usa para crear fichas de producto perfectas.",
+      "general",
+      niche,
+      4000,
+    );
+    return visionResult;
+  } catch (err) {
+    logger.warn({ err }, "Vision analysis for product image failed (non-critical)");
+    return "";
+  }
+}
+
 async function generateProductSample(lead: LeadData): Promise<ProductSample | null> {
   if (!lead.productImageUrl && !lead.storeUrl) return null;
   try {
     const nicheInfo = lead.niche || "ecommerce general";
     const extraContext = lead.extraInfo ? `\nInformacion extra del negocio: ${lead.extraInfo}` : "";
-    const imageContext = lead.productImageUrl
-      ? `El cliente ha proporcionado una imagen de producto: ${lead.productImageUrl}`
-      : `Analiza la tienda ${lead.storeUrl} y elige un producto representativo para optimizar.`;
+
+    let visionAnalysis = "";
+    if (lead.productImageUrl?.startsWith("data:image/")) {
+      visionAnalysis = await analyzeProductImageWithVision(lead.productImageUrl, nicheInfo);
+    }
+
+    const imageContext = visionAnalysis
+      ? `ANÁLISIS VISUAL DEL PRODUCTO (extraído por IA de la foto):\n${visionAnalysis}\n\nUsa TODA esta información para crear un producto perfecto.`
+      : lead.productImageUrl
+        ? `El cliente ha proporcionado una imagen de producto.`
+        : `Analiza la tienda ${lead.storeUrl} y elige un producto representativo para optimizar.`;
 
     const isServiceBusiness = !lead.productImageUrl && (
       nicheInfo.toLowerCase().includes("servicio") ||

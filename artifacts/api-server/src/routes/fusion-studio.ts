@@ -264,6 +264,10 @@ router.post("/fusion-studio/generate-photos", upload.array("images", 10), async 
       { niche: parsedBrandDna?.sector, brandTone: parsedBrandDna?.style }
     );
 
+    const sceneType = analysis.sceneClassification?.type || "product_only";
+    const componentsList = (analysis.componentBreakdown || []).map(c => `${c.partName} (${c.material})`).join(", ");
+    const visualDna = analysis.visualDna || { styleFingerprint: "", moodBoard: [], photographySchool: "", editingStyle: "", emotionalTone: "", luxuryScore: 5 };
+
     const brandBlock = parsedBrandDna ? `
 [BRAND DNA — EVERY generated photo MUST reflect this brand identity]
 Brand: ${parsedBrandDna.brandInfo?.name || ""}
@@ -273,33 +277,63 @@ Photography ref: ${parsedBrandDna.instagramInfo?.photoLighting || ""}, ${parsedB
 Competitor photo standards: ${parsedBrandDna.competitorPhotography?.competitors?.map((c: any) => c.photoStyle).join("; ") || ""}
 ` : "";
 
-    const subjectProtocol = hasModel === "true" ? `
-[CRITICAL SUBJECT SEPARATION PROTOCOL]
-Image 1 = PRODUCT (${analysis.product?.category}). Last image = MODEL (human person).
+    const visualDnaBlock = visualDna ? `
+[VISUAL DNA — Preserve this aesthetic fingerprint]
+Style: ${visualDna.styleFingerprint || ""}
+Photography school: ${visualDna.photographySchool || ""}
+Editing: ${visualDna.editingStyle || ""}
+Mood: ${visualDna.moodBoard?.join(", ") || ""}
+Emotional tone: ${visualDna.emotionalTone || ""}
+Luxury level: ${visualDna.luxuryScore || 5}/10
+` : "";
+
+    const foodProtocol = analysis.foodAnalysis?.detected ? `
+[FOOD PHOTOGRAPHY PROTOCOL — CRITICAL]
+Cuisine: ${analysis.foodAnalysis.cuisineType}. Dish: ${analysis.foodAnalysis.dishName}.
+Ingredients: ${analysis.foodAnalysis.ingredients?.join(", ")}.
+Cooking: ${analysis.foodAnalysis.cookingTechnique}. Plating: ${analysis.foodAnalysis.plating}.
+Temperature: ${analysis.foodAnalysis.temperature}. Garnishes: ${analysis.foodAnalysis.garnishes?.join(", ")}.
+RULES: Food MUST look appetizing, fresh, and at the right temperature. Show steam if hot, frost if cold.
+Ingredients must be identifiable. Colors must be vibrant and natural. No artificial-looking food.
+` : "";
+
+    const modelProtocol = analysis.modelAnalysis?.detected || hasModel === "true" ? `
+[CRITICAL MODEL + PRODUCT PROTOCOL]
+Image 1 = PRODUCT (${analysis.product?.category} — ${componentsList}).
+Last image = MODEL.
+${analysis.modelAnalysis ? `Model reference: ${analysis.modelAnalysis.gender}, ${analysis.modelAnalysis.ageRange}, ${analysis.modelAnalysis.pose}` : ""}
 ABSOLUTE RULES:
-- The MODEL holds/wears/uses the PRODUCT. They INTERACT, never FUSE.
-- The product keeps its EXACT shape: ${analysis.composition?.layout || "original proportions"}
-- The product keeps its EXACT materials: ${analysis.textures?.map(t => t.material).join(", ") || "original materials"}
-- The person remains anatomically correct — 5 fingers, natural pose
-- NEVER put a human head on a product body or vice versa
-` : `
+- The MODEL holds/wears/uses the PRODUCT naturally. They INTERACT, never FUSE.
+- Product keeps EXACT shape, EXACT materials (${analysis.textures?.map(t => `${t.material}/${t.finish}`).join(", ")}), EXACT colors (${analysis.colors?.dominant?.join(", ")})
+- Person: anatomically correct — 5 fingers per hand, natural proportions, realistic skin
+- NEVER merge product into body or body into product
+- Product components preserved: ${componentsList}
+` : "";
+
+    const subjectProtocol = hasModel === "true" || analysis.modelAnalysis?.detected ? modelProtocol : `
 [PRODUCT INTEGRITY PROTOCOL]
-Preserve the product's EXACT: shape, materials (${analysis.textures?.map(t => `${t.material}/${t.finish}`).join(", ")}), colors (${analysis.colors?.dominant?.join(", ")}), proportions.
-Only the ENVIRONMENT changes — never the product itself.
+Scene type: ${sceneType}
+Product: ${analysis.product?.category} — ${analysis.product?.subcategory}
+Components (preserve ALL): ${componentsList}
+Materials (preserve EXACT): ${analysis.textures?.map(t => `${t.material}/${t.finish}`).join(", ")}
+Colors (preserve EXACT): ${analysis.colors?.dominant?.join(", ")}
+Quality level: ${analysis.product?.qualityLevel || "premium"}
+Manufacturing: ${analysis.product?.manufacturingProcess || "professional"}
+Only the ENVIRONMENT changes — the product itself remains IDENTICAL to the reference.
 `;
 
     const generationPlan = parsedModes.flatMap((mode: string) =>
       Array.from({ length: qty }, (_, i) => ({
         mode,
         index: i,
-        prompt: `${subjectProtocol}${brandBlock}
+        prompt: `${subjectProtocol}${foodProtocol}${brandBlock}${visualDnaBlock}
 [PHOTO MODE: ${mode}]
 [LIGHTING: ${lighting}]
 [BACKGROUND: ${background === "scene-custom" ? customScene : background}]
 [PERSPECTIVE: ${perspective}]
 ${extraPrompt ? `[ADDITIONAL DIRECTION: ${extraPrompt}]` : ""}
 [OUTPUT SIZE: ${outputFormat || "1024x1024"}]
-Generate a professional ${mode} product photograph.`,
+Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon Appétit quality.`,
       }))
     );
 
