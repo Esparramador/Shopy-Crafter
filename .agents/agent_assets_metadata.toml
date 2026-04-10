@@ -257,3 +257,9 @@ id = "1qCHshDNaL9wJQ6hGgTAu"
 uri = "file://CODE_PARTE_6_de_6.txt"
 type = "text"
 title = "Parte 6: Frontend Projects fin + Components + CSS Design System"
+
+[[outputs]]
+id = "d5Da8ioolR7LyNQbGdcBv"
+uri = "file://shopycrafter_full_code.txt"
+type = "text"
+title = "Shopy Crafter — Código Fuente Completo (96K líneas)"
