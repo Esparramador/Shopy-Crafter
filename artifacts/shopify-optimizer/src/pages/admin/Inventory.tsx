@@ -84,13 +84,13 @@ export default function Inventory() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--t)" }}>M7 Intelligent Inventory Engine</h1>
           <p style={{ fontSize: 13, color: "var(--t3)", marginTop: 4 }}>Control de stock predictivo con alertas automáticas</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: 180 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: "min(180px, 100%)" }}>
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <button className="btn-secondary" onClick={exportCSV} style={{ display: "flex", alignItems: "center", gap: 6 }}>

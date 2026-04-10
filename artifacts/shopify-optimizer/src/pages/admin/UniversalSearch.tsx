@@ -111,9 +111,9 @@ export default function UniversalSearch() {
         background: "linear-gradient(135deg, #111118 0%, #161622 100%)",
         border: "1px solid #1e1e2e", borderRadius: 16, padding: 24, marginBottom: 24,
       }}>
-        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <div style={{
-            flex: 1, display: "flex", alignItems: "center", gap: 10,
+            flex: 1, minWidth: "min(250px, 100%)", display: "flex", alignItems: "center", gap: 10,
             background: "#0c0c14", border: "1px solid #2a2a3a", borderRadius: 12,
             padding: "0 16px",
           }}>
@@ -146,7 +146,7 @@ export default function UniversalSearch() {
             onKeyDown={handleKeyDown}
             placeholder="Nicho (opcional)"
             style={{
-              width: 160, background: "#0c0c14", border: "1px solid #2a2a3a", borderRadius: 12,
+              width: "min(160px, 100%)", background: "#0c0c14", border: "1px solid #2a2a3a", borderRadius: 12,
               padding: "14px 16px", color: "#f5f5f7", fontSize: 14, outline: "none",
             }}
           />

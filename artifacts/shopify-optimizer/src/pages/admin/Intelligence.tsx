@@ -135,7 +135,7 @@ export default function Intelligence() {
             value={selectedProject}
             onChange={e => setSelectedProject(e.target.value)}
             className="input-field"
-            style={{ width: 180 }}
+            style={{ width: "min(180px, 100%)" }}
           >
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>

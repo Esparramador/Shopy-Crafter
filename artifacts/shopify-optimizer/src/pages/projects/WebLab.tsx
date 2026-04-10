@@ -206,7 +206,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
 
       <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 300 }}>
+          <div style={{ flex: 1, minWidth: "min(300px, 100%)" }}>
             <label style={{ fontSize: 12, color: "var(--t2, #888)", display: "block", marginBottom: 6 }}>URL a analizar</label>
             <input
               type="url"

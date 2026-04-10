@@ -91,7 +91,7 @@ export default function AdminProducts() {
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+        <div style={{ position: "relative", flex: 1, minWidth: "min(200px, 100%)" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--t4)" }} />
           <input
             value={search}

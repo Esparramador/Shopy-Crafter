@@ -287,7 +287,7 @@ export default function GlobalVault() {
               placeholder={selectedEntity ? "Buscar archivos..." : "Buscar empresas..."}
               style={{
                 background: "#111118", border: "1px solid #1e1e2e", borderRadius: 8,
-                padding: "8px 12px 8px 34px", color: "#f5f5f7", fontSize: 13, width: 200,
+                padding: "8px 12px 8px 34px", color: "#f5f5f7", fontSize: 13, width: "min(200px, 100%)",
                 outline: "none",
               }}
             />

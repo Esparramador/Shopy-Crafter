@@ -137,13 +137,13 @@ ${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--t)" }}>Competitor Intelligence</h1>
           <p style={{ fontSize: 13, color: "var(--t3)", marginTop: 4 }}>Monitoreo de competidores con análisis IA en tiempo real</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: 180 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="input-field" style={{ width: "min(180px, 100%)" }}>
             {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <SaveToVaultButton

@@ -123,15 +123,15 @@ export default function ShopyBrainMemories() {
       )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+        <div style={{ position: "relative", flex: 1, minWidth: "min(200px, 100%)" }}>
           <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)" }} />
           <input className="input-field" placeholder="Buscar memorias..." value={searchQ} onChange={e => setSearchQ(e.target.value)} style={{ paddingLeft: 32 }} />
         </div>
-        <select className="input-field" value={filterNiche} onChange={e => setFilterNiche(e.target.value)} style={{ width: 160 }}>
+        <select className="input-field" value={filterNiche} onChange={e => setFilterNiche(e.target.value)} style={{ width: "min(160px, 100%)" }}>
           <option value="">Todos los nichos</option>
           {NICHES.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
-        <select className="input-field" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: 180 }}>
+        <select className="input-field" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: "min(180px, 100%)" }}>
           <option value="">Todos los tipos</option>
           {MEMORY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
