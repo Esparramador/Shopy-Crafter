@@ -435,6 +435,7 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "exports", label: "Exportar", icon: "📥" },
       { id: "generator", label: "Generador IA", icon: "✨" },
       { id: "web-lab", label: "Lab Web", icon: "🔬" },
+      { id: "fusion-studio", label: "Fusion Studio", icon: "🧬" },
     ],
     shopybrain: [
       { label: "IA Brain", icon: "🧠", href: "/admin/shopybrain" },
