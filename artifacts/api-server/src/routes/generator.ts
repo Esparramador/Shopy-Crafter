@@ -131,10 +131,6 @@ router.post("/generator/run", async (req: Request, res: Response): Promise<any> 
     }
   
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
   
     const outputFormat = format || genType.outputFormats[0];
     const tpl: ReportTemplate = (["classic", "elegance", "prestige"].includes(template) ? template : "prestige") as ReportTemplate;
@@ -227,11 +223,15 @@ router.post("/generator/run", async (req: Request, res: Response): Promise<any> 
       }
     } catch (err: any) {
       logger.error({ err, type, projectId }, "Generator error");
-      res.status(500).json({ error: err.message || "Error en la generación" });
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message || "Error en la generación" });
+      }
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : "Internal server error";
+      res.status(500).json({ error: msg });
+    }
   }
 });
 

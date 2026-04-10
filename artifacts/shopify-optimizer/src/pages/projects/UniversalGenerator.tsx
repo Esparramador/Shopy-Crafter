@@ -58,7 +58,10 @@ export default function UniversalGenerator() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [externalUrl, setExternalUrl] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [generatingPhase, setGeneratingPhase] = useState(0);
+  const [generatingElapsed, setGeneratingElapsed] = useState(0);
   const [results, setResults] = useState<Record<string, GenerationResult>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [template, setTemplate] = useState<"classic" | "elegance" | "prestige">("prestige");
@@ -87,8 +90,31 @@ export default function UniversalGenerator() {
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
+  const GENERATION_PHASES = [
+    { label: "Preparando datos del proyecto...", icon: "📦" },
+    { label: "Investigando con ShopyBrain...", icon: "🧠" },
+    { label: "Analizando con IA (puede tardar 30-90s)...", icon: "🤖" },
+    { label: "Generando contenido profesional...", icon: "✍️" },
+    { label: "Guardando en Vault...", icon: "💾" },
+  ];
+
   const runGeneration = async (typeId: string, genType: GeneratorType) => {
     setGenerating(typeId);
+    setGeneratingPhase(0);
+    setGeneratingElapsed(0);
+    setErrors(prev => { const n = { ...prev }; delete n[typeId]; return n; });
+
+    const phaseTimer = setInterval(() => {
+      setGeneratingPhase(p => (p < GENERATION_PHASES.length - 1 ? p + 1 : p));
+    }, 12000);
+
+    const elapsedTimer = setInterval(() => {
+      setGeneratingElapsed(e => e + 1);
+    }, 1000);
+
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 300000);
+
     try {
       const body: Record<string, unknown> = { type: typeId, projectId: parseInt(projectId), template, level: reportLevel };
       if (genType.acceptsUrl && externalUrl) body.url = externalUrl;
@@ -99,8 +125,21 @@ export default function UniversalGenerator() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
-      const data = await res.json();
+
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText.trim());
+      } catch {
+        throw new Error(`Respuesta inválida del servidor (status ${res.status})`);
+      }
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Error del servidor (${res.status})`);
+      }
+
       setResults(prev => ({ ...prev, [typeId]: data }));
 
       if (data.redirect) {
@@ -108,10 +147,19 @@ export default function UniversalGenerator() {
       }
 
       loadHistory();
-    } catch (err) {
-      setResults(prev => ({ ...prev, [typeId]: { success: false, type: typeId, format: "", message: "Error de conexión" } }));
+    } catch (err: any) {
+      const msg = err.name === "AbortError"
+        ? "Tiempo de espera agotado (5 min). Intenta con un nivel menor."
+        : (err.message || "Error de conexión");
+      setErrors(prev => ({ ...prev, [typeId]: msg }));
+      setResults(prev => ({ ...prev, [typeId]: { success: false, type: typeId, format: "", message: msg } }));
     } finally {
+      clearTimeout(fetchTimeout);
+      clearInterval(phaseTimer);
+      clearInterval(elapsedTimer);
       setGenerating(null);
+      setGeneratingPhase(0);
+      setGeneratingElapsed(0);
     }
   };
 
@@ -350,6 +398,52 @@ export default function UniversalGenerator() {
                       <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, lineHeight: 1.5 }}>
                         {genType.description}
                       </p>
+
+                      {isGenerating && (
+                        <div style={{
+                          background: "linear-gradient(135deg, #1e1b4b, #312e81)", border: "1px solid #4338ca", borderRadius: 8,
+                          padding: "12px 14px", marginBottom: 10, fontSize: 12, color: "#c7d2fe",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 18, animation: "pulse 1.5s ease-in-out infinite" }}>
+                              {GENERATION_PHASES[generatingPhase]?.icon || "🤖"}
+                            </span>
+                            <div>
+                              <div style={{ fontWeight: 600, color: "#e0e7ff" }}>
+                                {GENERATION_PHASES[generatingPhase]?.label || "Procesando..."}
+                              </div>
+                              <div style={{ fontSize: 10, color: "#818cf8", marginTop: 2 }}>
+                                Paso {generatingPhase + 1}/{GENERATION_PHASES.length} · {generatingElapsed}s transcurridos
+                                {reportLevel >= 3 && " · Nivel alto = más tiempo"}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{
+                            height: 4, background: "#1e1b4b", borderRadius: 2, overflow: "hidden",
+                          }}>
+                            <div style={{
+                              height: "100%", background: "linear-gradient(90deg, #6366f1, #a78bfa)",
+                              width: `${Math.min(95, ((generatingPhase + 1) / GENERATION_PHASES.length) * 100)}%`,
+                              transition: "width 1s ease-out", borderRadius: 2,
+                            }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {errors[genType.id] && !isGenerating && (
+                        <div style={{
+                          background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8,
+                          padding: "10px 14px", marginBottom: 10, fontSize: 12, color: "#991b1b",
+                        }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                            ❌ Error en la generación
+                          </div>
+                          <p style={{ fontSize: 11, color: "#b91c1c" }}>{errors[genType.id]}</p>
+                          <p style={{ fontSize: 10, color: "#dc2626", marginTop: 4 }}>
+                            Puedes intentar de nuevo o bajar el nivel de detalle.
+                          </p>
+                        </div>
+                      )}
 
                       {result?.success && (
                         <div style={{
