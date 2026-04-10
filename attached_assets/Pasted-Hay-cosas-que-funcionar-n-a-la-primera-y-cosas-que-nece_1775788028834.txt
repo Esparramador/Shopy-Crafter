@@ -1,0 +1,27 @@
+Hay cosas que funcionarán a la primera y cosas que necesitarán ajuste. No te voy a vender humo:
+Lo que SÍ funcionará al 100% sin problemas:
+
+Los 3 middlewares de app.ts (error handler, anti-502, sanitización) — son código estándar de Express, no dependen de nada más
+Los 3 cambios de maxTokens en claude.ts — son literalmente cambiar un número
+Las 12 acciones nuevas en EXECUTABLE_ACTIONS del voice — es añadir strings a un array
+La animación pulse→pulseGold — es cambiar un string
+El botón gris cuando no hay soporte de voz — es un return condicional simple
+La tabla nueva de report_templates — es aditiva, no toca nada existente
+Los endpoints CRUD de report-templates — son rutas nuevas independientes
+Las rutas y tabs nuevos en App.tsx y AppLayout.tsx — son líneas añadidas
+
+Lo que puede dar PROBLEMAS y Replit debe tener cuidado:
+1. contentEditable en el preview del CMS. React y contentEditable se pelean. Cuando React re-renderiza un componente, sobrescribe lo que el usuario escribió en el contentEditable. La solución funciona SOLO si el onBlur actualiza el estado ANTES de que React re-renderice. Si hay un re-render entre que el usuario escribe y el blur, se pierde el texto. Replit debe probar esto manualmente y si hay conflicto, usar useRef para guardar el texto y un shouldComponentUpdate que no sobrescriba.
+2. Actualización del preview sin recarga. Mi código hace document.querySelector([data-cms-path="hero.headline"]).textContent = value. Esto funciona para texto. Pero NO funciona para colores (que son estilos CSS), ni para imágenes (que son atributos src), ni para elementos con HTML interno (que usan innerHTML). Replit necesitará distinguir el tipo de campo y aplicar la actualización correcta.
+3. SSE en CmsContext. El endpoint /api/cms/events existe pero NO verifiqué qué formato de datos envía. Si envía { type: "update", key: "hero.headline", value: "..." } en vez de { type: "content-updated", content: {...} }, el listener no lo capturará. Replit debe leer el endpoint SSE del backend y adaptar el listener al formato real.
+4. Los data-cms-key en páginas admin. Mi documento dice "añadir data-cms-key a los elementos que usan t()". Pero hay decenas de elementos distribuidos en 56 páginas. Esto no se hace en 5 minutos — Replit deberá ir página por página añadiendo los atributos, o crear un wrapper component que lo haga automáticamente.
+5. Alt+V del voice. El listening dentro del keydown handler será siempre el valor inicial (closure de JavaScript). Necesita un useRef que se sincronice con el state. Si Replit lo implementa sin el ref, Alt+V siempre intentará START y nunca STOP.
+6. Selección de voz española. Chrome carga las voces de forma asíncrona. getVoices() devuelve array vacío la primera vez. Necesita speechSynthesis.onvoiceschanged para esperar a que se carguen. Si Replit no añade esto, la primera vez que hable usará la voz por defecto.
+Mi recomendación para Replit: Implementar en este orden y probar CADA paso antes de avanzar:
+
+Primero los middlewares de app.ts + tokens de claude.ts (0% riesgo)
+Luego los voice fixes simples (B2, B4, B6, B7 — 0% riesgo)
+Luego los voice fixes complejos (B1, B3, B5 — bajo riesgo, probar)
+Luego el CMS inline edit (medio riesgo — probar contentEditable vs React)
+Luego el CMS live update (medio riesgo — verificar formato SSE)
+Al final Fusion Studio y Template Studio (0% riesgo — todo nuevo)

@@ -1208,6 +1208,7 @@ export default function CMSEditor() {
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
       if (iframeRef.current && e.source !== iframeRef.current.contentWindow) return;
       if (e.data?.type === "cms-click-to-edit" && typeof e.data.path === "string") {
         const path = e.data.path as string;
@@ -1226,6 +1227,26 @@ export default function CMSEditor() {
             if (input) input.focus();
           }
         }, 150);
+      }
+      if (e.data?.type === "cms-inline-edit" && typeof e.data.path === "string" && e.data.value !== undefined) {
+        const path = e.data.path as string;
+        if (!/^[a-zA-Z0-9._]+$/.test(path)) return;
+        setPending(prev => { const n = new Map(prev); n.set(path, e.data.value as string); return n; });
+        setContent(prev => {
+          if (!prev) return prev;
+          const keys = path.split(".");
+          const updated = JSON.parse(JSON.stringify(prev)) as Record<string, unknown>;
+          let cur: Record<string, unknown> | unknown[] = updated;
+          for (let i = 0; i < keys.length - 1; i++) {
+            const k = keys[i];
+            const nxt: unknown = Array.isArray(cur) ? (cur as unknown[])[parseInt(k)] : (cur as Record<string, unknown>)[k];
+            if (typeof nxt === "object" && nxt !== null) cur = nxt as Record<string, unknown>;
+          }
+          const last = keys[keys.length - 1];
+          if (Array.isArray(cur)) (cur as unknown[])[parseInt(last)] = e.data.value;
+          else (cur as Record<string, unknown>)[last] = e.data.value;
+          return updated;
+        });
       }
     };
     window.addEventListener("message", handler);
@@ -1276,6 +1297,13 @@ export default function CMSEditor() {
       else (cur as Record<string, unknown>)[last] = value;
       return updated;
     });
+    try {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: "cms-update-field",
+        path,
+        value,
+      }, window.location.origin);
+    } catch {}
   }, []);
 
   const save = async () => {

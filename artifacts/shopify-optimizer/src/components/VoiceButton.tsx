@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -10,6 +10,33 @@ declare global {
   }
 }
 
+const EXECUTABLE_ACTIONS = [
+  "store_status", "list_products", "list_all_products", "create_product",
+  "edit_product", "change_price", "set_product_status", "regenerate_token",
+  "get_scopes", "delete_product", "search_product", "publish_product",
+  "get_orders", "scan_store", "search_suppliers", "modify_audit_filter",
+  "diagnose_app", "inspect_code", "fix_code", "list_source_files",
+  "analyze_component",
+];
+
+function pickSpanishVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => v.lang === "es-ES" && v.localService)
+    || voices.find(v => v.lang === "es-ES")
+    || voices.find(v => v.lang.startsWith("es"))
+    || null;
+}
+
+function speakSpanish(text: string) {
+  if (!("speechSynthesis" in window)) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "es-ES";
+  utterance.rate = 1.0;
+  const voice = pickSpanishVoice();
+  if (voice) utterance.voice = voice;
+  window.speechSynthesis.speak(utterance);
+}
+
 export function VoiceButton() {
   const [listening, setListening] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
@@ -18,7 +45,21 @@ export function VoiceButton() {
   const [actionResult, setActionResult] = useState("");
   const [supported, setSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const listeningRef = useRef(false);
+  const executingRef = useRef(false);
   const [location, navigate] = useLocation();
+  const locationRef = useRef(location);
+  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { listeningRef.current = listening; }, [listening]);
+  useEffect(() => { locationRef.current = location; }, [location]);
+
+  useEffect(() => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {};
+    }
+  }, []);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -38,9 +79,17 @@ export function VoiceButton() {
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (e: any) => {
       setListening(false);
-      setTranscript("Error de reconocimiento");
+      const errorMessages: Record<string, string> = {
+        "not-allowed": "Micrófono no permitido. Actívalo en los ajustes del navegador.",
+        "no-speech": "No se detectó voz. Inténtalo de nuevo.",
+        "audio-capture": "No se encontró micrófono. Conecta uno.",
+        "network": "Error de red. Comprueba tu conexión.",
+        "aborted": "Reconocimiento cancelado.",
+        "service-not-available": "Servicio de voz no disponible en este navegador.",
+      };
+      setTranscript(errorMessages[e.error] || `Error: ${e.error || "desconocido"}`);
     };
 
     recognition.onend = () => {
@@ -48,6 +97,26 @@ export function VoiceButton() {
     };
 
     recognitionRef.current = recognition;
+
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.altKey && ev.key === "v") {
+        ev.preventDefault();
+        if (!recognitionRef.current) return;
+        if (listeningRef.current) {
+          recognitionRef.current.stop();
+          setListening(false);
+        } else {
+          setListening(true);
+          setShowBubble(true);
+          setTranscript("Escuchando...");
+          setResponse("");
+          setActionResult("");
+          recognitionRef.current.start();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const startListening = () => {
@@ -93,27 +162,22 @@ export function VoiceButton() {
     setTranscript(`"${text}"`);
     setResponse("Procesando...");
     setActionResult("");
+    executingRef.current = true;
 
-    const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
+    const currentLocation = locationRef.current;
+    const projectIdFromUrl = currentLocation.match(/\/projects\/(\d+)/)?.[1];
 
     try {
       const res = await fetch(`${API_BASE}/api/voice/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ transcript: text, currentPage: location, projectId: projectIdFromUrl }),
+        body: JSON.stringify({ transcript: text, currentPage: currentLocation, projectId: projectIdFromUrl }),
       });
       const data = await res.json();
       setResponse(data.response);
 
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(data.response);
-        utterance.lang = "es-ES";
-        utterance.rate = 1.0;
-        window.speechSynthesis.speak(utterance);
-      }
-
-      const EXECUTABLE_ACTIONS = ["store_status", "list_products", "create_product", "edit_product", "change_price", "regenerate_token", "get_scopes", "delete_product", "search_product", "publish_product", "get_orders"];
+      speakSpanish(data.response);
 
       if (data.action?.type === "navigate" && data.action.params?.path) {
         navigate(data.action.params.path);
@@ -122,22 +186,37 @@ export function VoiceButton() {
         const result = await executeAction(data.action.type, data.action.params || {});
         setActionResult(result);
 
-        if ("speechSynthesis" in window) {
-          const shortResult = result.length > 120 ? result.slice(0, 120) + "..." : result;
-          const utterance2 = new SpeechSynthesisUtterance(shortResult);
-          utterance2.lang = "es-ES";
-          utterance2.rate = 1.0;
-          window.speechSynthesis.speak(utterance2);
-        }
+        const shortResult = result.length > 120 ? result.slice(0, 120) + "..." : result;
+        speakSpanish(shortResult);
       }
     } catch {
       setResponse("Error al procesar el comando. Inténtalo de nuevo.");
     }
 
-    setTimeout(() => setShowBubble(false), 8000);
+    executingRef.current = false;
+    if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+    bubbleTimerRef.current = setTimeout(() => {
+      if (!executingRef.current) {
+        setShowBubble(false);
+      }
+    }, 12000);
   };
 
-  if (!supported) return null;
+  if (!supported) {
+    return (
+      <button
+        title="Comando de voz no disponible en este navegador. Usa Chrome o Edge."
+        disabled
+        style={{
+          position: "fixed", bottom: 88, right: 24, zIndex: 900,
+          width: 52, height: 52, borderRadius: "50%",
+          background: "var(--ink3)", border: "none",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 22, opacity: 0.3, cursor: "not-allowed",
+        }}
+      >🎙</button>
+    );
+  }
 
   return (
     <>
@@ -158,7 +237,7 @@ export function VoiceButton() {
             ? "0 0 0 4px rgba(220,53,69,0.3), 0 4px 16px rgba(0,0,0,0.4)"
             : "0 4px 16px rgba(200,168,75,0.4)",
           transition: "all 0.2s",
-          animation: listening ? "pulse 1s infinite" : "none",
+          animation: listening ? "pulse 1.5s ease-in-out infinite" : "none",
         }}
       >
         {listening ? "🔴" : "🎙"}

@@ -320,6 +320,27 @@ export default function Landing() {
         const idx = FP_SECTIONS.findIndex(s => s.id === e.data.sectionId);
         if (idx >= 0) goToSection(idx);
       }
+      if (e.data?.type === "cms-update-field" && e.data.path) {
+        const path = e.data.path as string;
+        if (!/^[a-zA-Z0-9._]+$/.test(path)) return;
+        const el = document.querySelector(`[data-cms-path="${CSS.escape(path)}"]`) as HTMLElement;
+        if (el && typeof e.data.value === "string") {
+          el.textContent = e.data.value;
+        }
+        setContent(prev => {
+          if (!prev) return prev;
+          const updated = JSON.parse(JSON.stringify(prev));
+          const keys = path.split(".");
+          let cur: any = updated;
+          for (let i = 0; i < keys.length - 1; i++) {
+            const nxt = cur[keys[i]];
+            if (typeof nxt === "object" && nxt !== null) cur = nxt;
+            else return prev;
+          }
+          cur[keys[keys.length - 1]] = e.data.value;
+          return updated as typeof prev;
+        });
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
@@ -497,8 +518,18 @@ export default function Landing() {
       onClick: (e: React.MouseEvent) => cmsNotify(path, e),
       title: `Editar: ${path}`,
       "data-cms-path": path,
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      onBlur: (e: React.FocusEvent<HTMLElement>) => {
+        const newText = e.currentTarget.innerText;
+        window.parent.postMessage({
+          type: "cms-inline-edit",
+          path,
+          value: newText,
+        }, parentOrigin || "*");
+      },
     };
-  }, [isPreview, cmsNotify]);
+  }, [isPreview, cmsNotify, parentOrigin]);
 
   const cmsData = useCallback((path: string) => {
     if (!isPreview) return {};
