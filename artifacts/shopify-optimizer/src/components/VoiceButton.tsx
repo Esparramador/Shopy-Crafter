@@ -237,7 +237,7 @@ export function VoiceButton() {
             ? "0 0 0 4px rgba(220,53,69,0.3), 0 4px 16px rgba(0,0,0,0.4)"
             : "0 4px 16px rgba(200,168,75,0.4)",
           transition: "all 0.2s",
-          animation: listening ? "pulse 1.5s ease-in-out infinite" : "none",
+          animation: listening ? "pulseGold 1.5s ease-in-out infinite" : "none",
         }}
       >
         {listening ? "🔴" : "🎙"}
