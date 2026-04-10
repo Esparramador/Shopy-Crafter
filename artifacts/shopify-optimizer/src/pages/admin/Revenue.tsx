@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, Users, DollarSign, BarChart3, Edit3, Check, X, ExternalLink, Plus } from "lucide-react";
+import { TrendingUp, Users, DollarSign, BarChart3, Edit3, Check, X, ExternalLink } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -35,13 +35,13 @@ const SERVICE_COLORS: Record<ServiceLevel, string> = {
   premium: "#c8a84b",
 };
 
-const STATUS_LABELS: Record<ClientStatus, string> = {
+const _STATUS_LABELS: Record<ClientStatus, string> = {
   active: "Activo",
   paused: "Pausado",
   completed: "Completado",
 };
 
-const STATUS_COLORS: Record<ClientStatus, string> = {
+const _STATUS_COLORS: Record<ClientStatus, string> = {
   active: "#10b981",
   paused: "#f59e0b",
   completed: "#6b7280",

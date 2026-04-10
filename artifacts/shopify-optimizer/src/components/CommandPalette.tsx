@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Search, Command } from "lucide-react";
+import { Search } from "lucide-react";
 
 const COMMANDS = [
   { id: "intelligence", label: "Revenue Intelligence", icon: "📊", path: "/admin/intelligence", category: "Páginas" },

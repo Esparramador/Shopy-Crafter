@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, bulkJobsTable, seoDataTable } from "@workspace/db";
+import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest, shopifyRequestPaged, shopifyGraphQL } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
-import { askClaudeJson, askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
+import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
 import { logger } from "../lib/logger";
 import { saveToVault } from "../lib/vault";

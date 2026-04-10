@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Plus, Brain, BarChart3, Mail, TrendingUp, Zap, Users, ShieldCheck, Globe } from "lucide-react";
+import { ArrowRight, Plus, Brain, Zap, Users, ShieldCheck, Globe } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";

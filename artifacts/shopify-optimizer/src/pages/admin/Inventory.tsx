@@ -14,7 +14,7 @@ export default function Inventory() {
   const { data: projects } = useListProjects();
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [inventory, setInventory] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [_orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState<string | null>(null);
   const [emailModal, setEmailModal] = useState<any>(null);

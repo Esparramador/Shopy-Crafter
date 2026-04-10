@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { requireAdmin, requireAuth } from "../lib/auth.js";
+import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { recordAudit } from "../lib/audit.helper.js";
@@ -12,7 +12,7 @@ import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 const router = Router();
 router.use(requireAdmin);
 
-router.get("/users", async (req, res): Promise<void> => {
+router.get("/users", async (_req, res): Promise<void> => {
   try {
     const users = await db.select({
       id: usersTable.id,
@@ -252,7 +252,7 @@ router.post("/impersonate/:userId", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/audit-log", async (req, res): Promise<void> => {
+router.get("/audit-log", async (_req, res): Promise<void> => {
   try {
     const logs = await db.select().from(auditLogTable)
       .orderBy(desc(auditLogTable.createdAt)).limit(100);

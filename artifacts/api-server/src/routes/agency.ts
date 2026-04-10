@@ -47,7 +47,7 @@ async function ensureDefaultCostStructure() {
   }
 }
 
-router.get("/agency/cost-structure", requireAdmin, async (req, res): Promise<void> => {
+router.get("/agency/cost-structure", requireAdmin, async (_req, res): Promise<void> => {
   try {
     await ensureDefaultCostStructure();
     const [costs] = await db.select().from(agencyCostStructureTable);
@@ -73,7 +73,7 @@ router.put("/agency/cost-structure", requireAdmin, async (req, res): Promise<voi
   }
 });
 
-router.get("/agency/services", requireAdmin, async (req, res): Promise<void> => {
+router.get("/agency/services", requireAdmin, async (_req, res): Promise<void> => {
   try {
     await ensureDefaultServices();
     const services = await db.select().from(serviceCatalogTable).orderBy(serviceCatalogTable.serviceType);
@@ -97,7 +97,7 @@ router.put("/agency/services/:id", requireAdmin, async (req, res): Promise<void>
   }
 });
 
-router.post("/agency/analyze-pricing", requireAdmin, async (req, res): Promise<void> => {
+router.post("/agency/analyze-pricing", requireAdmin, async (_req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -479,7 +479,7 @@ router.put("/agency/services/:id/shopify-variant", requireAdmin, async (req, res
   }
 });
 
-router.get("/agency/pricing-decisions", requireAdmin, async (req, res): Promise<void> => {
+router.get("/agency/pricing-decisions", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const decisions = await db.select().from(pricingDecisionsTable)
       .orderBy(desc(pricingDecisionsTable.createdAt))

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, memo } from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -10,7 +10,7 @@ export interface GlassCardProps {
   style?: React.CSSProperties;
 }
 
-export function GlassCard({ children, className, hoverEffect = false, delay = 0, style }: GlassCardProps) {
+export const GlassCard = memo(function GlassCard({ children, className, hoverEffect = false, delay = 0, style }: GlassCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -26,4 +26,4 @@ export function GlassCard({ children, className, hoverEffect = false, delay = 0,
       {children}
     </motion.div>
   );
-}
+});

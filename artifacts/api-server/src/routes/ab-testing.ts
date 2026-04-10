@@ -2,8 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { shopifyRequest } from "../lib/shopify";
-import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
@@ -296,7 +295,7 @@ router.get("/projects/:projectId/ab-tests/:testId", async (req, res): Promise<vo
       return;
     }
   
-    const { confidence, winner } = calculateSignificance(
+    const { confidence } = calculateSignificance(
       test.variantAConversions, test.variantAVisitors,
       test.variantBConversions, test.variantBVisitors
     );
@@ -333,7 +332,7 @@ router.post("/projects/:projectId/ab-tests/:testId/declare-winner", async (req, 
   try {
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const testId = parseInt(Array.isArray(req.params.testId) ? req.params.testId[0] : req.params.testId, 10);
-    const { winner, applyToShopify } = req.body as { winner: string; applyToShopify: boolean };
+    const { winner } = req.body as { winner: string; applyToShopify: boolean };
   
     const [test] = await db
       .select()

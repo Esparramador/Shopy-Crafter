@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -65,8 +66,9 @@ export default function AdminProducts() {
 
   useEffect(() => { loadProducts(1); }, [filterProject, filterGrade]);
 
-  const filtered = search
-    ? products.filter(p => p.title.toLowerCase().includes(search.toLowerCase()) || p.handle?.toLowerCase().includes(search.toLowerCase()))
+  const debouncedSearch = useDebounce(search, 250);
+  const filtered = debouncedSearch
+    ? products.filter(p => p.title.toLowerCase().includes(debouncedSearch.toLowerCase()) || p.handle?.toLowerCase().includes(debouncedSearch.toLowerCase()))
     : products;
 
   return (

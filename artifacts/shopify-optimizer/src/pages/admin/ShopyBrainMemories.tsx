@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Database, Plus, Trash2, Filter, Search, Star } from "lucide-react";
+import { Database, Plus, Trash2, Search, Star } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 

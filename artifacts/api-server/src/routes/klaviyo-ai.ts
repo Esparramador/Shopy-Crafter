@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
-import { askGeminiJson, askGemini } from "../lib/gemini.js";
+import { askGeminiJson } from "../lib/gemini.js";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable } from "@workspace/db/schema";

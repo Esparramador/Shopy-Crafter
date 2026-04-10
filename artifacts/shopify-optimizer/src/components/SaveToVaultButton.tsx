@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Check, Loader2, Archive } from "lucide-react";
+import { Check, Loader2, Archive } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 

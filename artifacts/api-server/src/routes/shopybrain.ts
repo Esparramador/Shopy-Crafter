@@ -13,9 +13,9 @@ import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
-import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { buildCoverPage } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
-import { processUploadedFile, filesToClaudeContent } from "../lib/file-processor.js";
+import { processUploadedFile } from "../lib/file-processor.js";
 import { generateLeveledReport } from "../lib/report-levels.js";
 import multer from "multer";
 import * as fs from "fs";
@@ -250,7 +250,7 @@ async function ensureDomains() {
   return ensureAllKnowledgeDomains();
 }
 
-router.get("/shopybrain/status", requireAdmin, async (req, res): Promise<void> => {
+router.get("/shopybrain/status", requireAdmin, async (_req, res): Promise<void> => {
   try {
     await ensureDomains();
     const memories = await db.select({ count: sql<number>`count(*)` }).from(omnicoreMemoriesTable);
@@ -1402,7 +1402,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   }
 });
 
-router.get("/shopybrain/sessions", requireAdmin, async (req, res): Promise<void> => {
+router.get("/shopybrain/sessions", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const sessions = await db.select().from(omnicoreStudySessionsTable)
       .orderBy(desc(omnicoreStudySessionsTable.createdAt))
@@ -1414,7 +1414,7 @@ router.get("/shopybrain/sessions", requireAdmin, async (req, res): Promise<void>
   }
 });
 
-router.get("/shopybrain/niche-profiles", requireAdmin, async (req, res): Promise<void> => {
+router.get("/shopybrain/niche-profiles", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const profiles = await db.select().from(omnicoreNicheProfilesTable)
       .orderBy(desc(omnicoreNicheProfilesTable.storesAnalyzed));
@@ -1447,7 +1447,7 @@ router.post("/shopybrain/niche-profiles", requireAdmin, async (req, res): Promis
   }
 });
 
-router.get("/shopybrain/prompt-library", requireAdmin, async (req, res): Promise<void> => {
+router.get("/shopybrain/prompt-library", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const prompts = await db.select().from(omnicorePromptLibraryTable)
       .orderBy(desc(omnicorePromptLibraryTable.useCount));
@@ -1480,7 +1480,7 @@ router.post("/shopybrain/prompt-library", requireAdmin, async (req, res): Promis
 });
 
 // ─── TRIGGERS MANUALES 24/7 ──────────────────────────────────────────────────
-router.post("/shopybrain/run/micro-learning", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/run/micro-learning", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { runOmniCoreMicroLearning } = await import("../lib/scheduler.js");
     res.json({ started: true, message: "⚡ Micro-learning cycle iniciado" });
@@ -1490,7 +1490,7 @@ router.post("/shopybrain/run/micro-learning", requireAdmin, async (req, res): Pr
   }
 });
 
-router.post("/shopybrain/run/consolidation", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/run/consolidation", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { runOmniCoreMemoryConsolidation } = await import("../lib/scheduler.js");
     res.json({ started: true, message: "🧠 Memory consolidation iniciada" });
@@ -1500,7 +1500,7 @@ router.post("/shopybrain/run/consolidation", requireAdmin, async (req, res): Pro
   }
 });
 
-router.post("/shopybrain/run/cross-synthesis", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/run/cross-synthesis", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { runOmniCoreCrossConnections } = await import("../lib/scheduler.js");
     res.json({ started: true, message: "🔗 Cross-domain synthesis iniciada" });
@@ -1510,7 +1510,7 @@ router.post("/shopybrain/run/cross-synthesis", requireAdmin, async (req, res): P
   }
 });
 
-router.post("/shopybrain/run/daily-study", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/run/daily-study", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { runOmniCoreDailyDeepStudy } = await import("../lib/scheduler.js");
     res.json({ started: true, message: "🎓 Daily deep study iniciado (14 dominios)" });
@@ -1520,7 +1520,7 @@ router.post("/shopybrain/run/daily-study", requireAdmin, async (req, res): Promi
   }
 });
 
-router.post("/shopybrain/run/mega-synthesis", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/run/mega-synthesis", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { runOmniCoreMegaSynthesis } = await import("../lib/scheduler.js");
     res.json({ started: true, message: "🚀 Mega-synthesis semanal iniciada" });
@@ -6735,7 +6735,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
           const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
           if (!proj) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
-          const { getActiveTheme, listThemeAssets, buildFileTree, categorizeFile, getThemeStructureSummary } = await import("../lib/shopify-theme.js");
+          const { getActiveTheme, getThemeStructureSummary } = await import("../lib/shopify-theme.js");
           let themeId = params?.themeId ? parseInt(params.themeId) : undefined;
           if (!themeId) {
             const active = await getActiveTheme(parseInt(projectId), proj.shopDomain);
@@ -6934,7 +6934,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
           const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
           if (!proj) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
-          const { getActiveTheme, getThemeStructureSummary, readThemeFile, analyzeThemeFileContent, THEME_ARCHITECTURE_KNOWLEDGE } = await import("../lib/shopify-theme.js");
+          const { getActiveTheme, getThemeStructureSummary, readThemeFile, analyzeThemeFileContent } = await import("../lib/shopify-theme.js");
           let themeId = params?.themeId ? parseInt(params.themeId) : undefined;
           if (!themeId) {
             const active = await getActiveTheme(parseInt(projectId), proj.shopDomain);
@@ -7196,8 +7196,6 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const header = storeTheme.header as Record<string, unknown>;
           const hero = storeTheme.hero as Record<string, unknown>;
           const announcement = storeTheme.announcementBar as Record<string, unknown>;
-          const loginRedirect = storeTheme.loginRedirect as Record<string, unknown>;
-          const purchaseProtection = storeTheme.purchaseProtection as Record<string, unknown>;
           const changes: string[] = [];
   
           if (header) {
@@ -9437,7 +9435,6 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               const errData = await resp.json().catch(() => ({})) as Record<string, unknown>;
               result = { error: true, message: `❌ ${errData.error ?? "Error ejecutando auditoría completa"}` }; break;
             }
-            const text = await resp.text();
             result = { message: `📊 **Auditoría completa ejecutada y guardada**\n\nEl informe completo está disponible en:\n🔗 /api/projects/${projectId}/exports/complete-report\n\nIncluye: SEO, productos, financiero, competidores, inventario, A/B tests, imágenes.` };
           } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
           break;

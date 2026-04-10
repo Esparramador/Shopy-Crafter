@@ -1,13 +1,12 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, seoDataTable, bulkJobsTable } from "@workspace/db";
+import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
-import { getConnector } from "../lib/connectors/index";
 import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 
@@ -489,7 +488,7 @@ router.post("/projects/:projectId/seo/keyword-intelligence", async (req, res): P
   try {
     
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-    const { productName, productId } = req.body as { productName: string; productId?: string };
+    const { productName } = req.body as { productName: string; productId?: string };
   
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     const niche = project?.storeNiche ?? "e-commerce";
@@ -739,7 +738,7 @@ router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promi
   try {
     
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-    const { applyToShopify = false, productIds } = (req.body || {}) as { applyToShopify?: boolean; productIds?: string[] };
+    const { applyToShopify: _applyToShopify = false, productIds } = (req.body || {}) as { applyToShopify?: boolean; productIds?: string[] };
   
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }

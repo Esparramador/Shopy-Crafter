@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
 
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const DEFAULT_NAV_ITEMS = [
   { href: "/client",           label: "Dashboard",    icon: "📊" },

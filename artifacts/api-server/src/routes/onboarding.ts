@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { onboardingProgressTable, achievementsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { cached } from "../lib/cache.js";
 
 const router = Router();
 
@@ -33,8 +34,9 @@ router.get("/onboarding/progress", async (req, res): Promise<void> => {
       return;
     }
   
-    const achievements = await db.select().from(achievementsTable)
-      .where(eq(achievementsTable.userId, userId));
+    const achievements = await cached(`achievements-${userId}`, 120_000, () =>
+      db.select().from(achievementsTable).where(eq(achievementsTable.userId, userId))
+    );
   
     res.json({ progress, achievements });
   } catch (err: any) {

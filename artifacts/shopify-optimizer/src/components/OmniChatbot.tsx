@@ -1044,7 +1044,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const gradeIcon = (g: string) => g === "A" ? "🟢" : g === "B" ? "🟡" : g === "C" ? "🟠" : "🔴";
         const auditW = result.auditWarnings as { unpublished?: number; noCompare?: number; lowImages?: number; shortDesc?: number } | undefined;
         let msg = `📦 **${result.total} productos:**\n\n`;
-        msg += prods.map((p, i) => {
+        msg += prods.map((p, _i) => {
           const grade = p.auditGrade || "D";
           let line = `${gradeIcon(grade)} **${p.title}** — ${p.price}€`;
           if (p.compareAtPrice) line += ` ~~${p.compareAtPrice}€~~`;
@@ -1485,7 +1485,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   };
 
   // ─── Quick knowledge check before full research ────────────────────────────
-  const checkExistingKnowledge = async (name: string): Promise<{
+  const _checkExistingKnowledge = async (name: string): Promise<{
     found: boolean; memoriesFound?: number; knowledgeAge?: string;
   }> => {
     try {

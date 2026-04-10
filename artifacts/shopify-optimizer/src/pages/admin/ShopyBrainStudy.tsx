@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BookOpen, Play, Brain, CheckCircle, Zap, RefreshCw, Link, Star, Activity } from "lucide-react";
+import { BookOpen, Play, Brain, CheckCircle, RefreshCw, Activity } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");

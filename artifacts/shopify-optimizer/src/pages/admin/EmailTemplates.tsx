@@ -87,7 +87,7 @@ export default function EmailTemplates() {
   const [pushing, setPushing] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [showHtmlEditor, setShowHtmlEditor] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [copywritingNotes, setCopywritingNotes] = useState("");
 
   const [form, setForm] = useState({
@@ -129,7 +129,7 @@ export default function EmailTemplates() {
     { enabled: view === "editor" }
   );
 
-  const { isOnline } = useOnlineStatus(useCallback(() => {
+  const { isOnline: _isOnline } = useOnlineStatus(useCallback(() => {
     if (selectedProjectId) fetchTemplates();
   }, [selectedProjectId]));
 

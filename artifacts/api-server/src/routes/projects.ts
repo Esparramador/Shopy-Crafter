@@ -4,11 +4,12 @@ import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import type { PlatformType } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { refreshToken, validateToken, shopifyRequest, normalizeShopDomain } from "../lib/shopify";
+import { refreshToken, validateToken, normalizeShopDomain } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
 import { learnFromOperation } from "../lib/claude";
+import { cached, invalidateCache } from "../lib/cache.js";
 
 const router = Router();
 
@@ -222,12 +223,11 @@ router.get("/shopify/oauth/check", async (_req, res): Promise<void> => {
   }
 });
 
-router.get("/projects", async (req, res): Promise<void> => {
+router.get("/projects", async (_req, res): Promise<void> => {
   try {
-    const projects = await db
-      .select()
-      .from(projectsTable)
-      .orderBy(projectsTable.createdAt);
+    const projects = await cached("projects-list", 30_000, () =>
+      db.select().from(projectsTable).orderBy(projectsTable.createdAt)
+    );
   
     const sanitized = projects.map((p) => ({
       ...p,
@@ -322,6 +322,7 @@ router.post("/projects", async (req, res): Promise<void> => {
   
     const normalizedDomain = isShopify ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
   
+    invalidateCache("projects-");
     const [project] = await db.insert(projectsTable).values({
       name,
       platformType,

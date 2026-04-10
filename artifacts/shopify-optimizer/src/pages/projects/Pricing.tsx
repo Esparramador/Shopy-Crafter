@@ -10,25 +10,9 @@ import {
   useGetProjectProducts,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
-import {
-  DollarSign,
-  TrendingUp,
-  AlertTriangle,
-  Scale,
-  Loader2,
-  CheckCircle,
-  Edit3,
-  ChevronDown,
-  ChevronUp,
-  X,
-  Package,
-  Calculator,
-  BarChart3,
-  Target,
-  Brain,
-} from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line, CartesianGrid } from "recharts";
-import { useState, useCallback } from "react";
+import{ TrendingUp, AlertTriangle, Scale, Loader2, CheckCircle, ChevronDown, ChevronUp, X, Package, Calculator, BarChart3, Target, Brain }from "lucide-react";
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line, CartesianGrid } from "recharts";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import SaveReportButton from "@/components/SaveReportButton";

@@ -38,7 +38,7 @@ const ROADMAP_PHASES = [
 
 export default function Roadmap() {
   const [progress, setProgress] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/onboarding/progress`, { credentials: "include" })

@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  Zap, RefreshCw, Package, ShoppingCart, Key, Shield, Plus, Search,
-  Trash2, CheckCircle, AlertTriangle, Loader2, Eye, DollarSign, Send
-} from "lucide-react";
+import{ Zap, Package, ShoppingCart, Key, Shield, Plus, Search, CheckCircle, AlertTriangle, Loader2, Eye, Send }from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 

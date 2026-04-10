@@ -2,7 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
-import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { enableLongRunning } from "../lib/long-running.js";
 

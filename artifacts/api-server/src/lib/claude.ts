@@ -737,7 +737,7 @@ export async function askClaudeJsonWithBrain<T>(
 }
 
 async function detectAndSaveCrossConnections(
-  operationType: string, content: string, niche: string | null, tags: string[]
+  operationType: string, content: string, _niche: string | null, _tags: string[]
 ): Promise<void> {
   const domainKeywords: Record<string, RegExp> = {
     pricing: /precio|margen|cogs|revenue|profit|coste|€|\$|margin|break.?even/i,
@@ -754,7 +754,6 @@ async function detectAndSaveCrossConnections(
   }
 
   if (detectedDomains.length >= 2) {
-    const connectionContent = `Operación "${operationType}" en nicho "${niche}" conecta conocimiento de: ${detectedDomains.join(", ")}. Contexto: ${content.slice(0, 500)}`;
 
     await db.insert(omnicoreCrossConnectionsTable).values({
       id: randomBytes(12).toString("hex"),

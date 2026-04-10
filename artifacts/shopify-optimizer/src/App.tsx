@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,72 +8,75 @@ import { AuthProvider, useAuth, getLastRoute, saveLastRoute, clearLastRoute } fr
 import { CmsProvider } from "@/contexts/CmsContext";
 import { Loader2 } from "lucide-react";
 import SCCursor from "@/components/ui/SCCursor";
-
-import Home from "@/pages/Home";
-import NewProject from "@/pages/NewProject";
-import Landing from "@/pages/Landing";
-import CMSEditor from "@/pages/admin/CMSEditor";
-import Intelligence from "@/pages/admin/Intelligence";
-import GeminiIntelligence from "@/pages/admin/GeminiIntelligence";
-import Inventory from "@/pages/admin/Inventory";
-import Achievements from "@/pages/admin/Achievements";
-import Roadmap from "@/pages/admin/Roadmap";
-import ApkManager from "@/pages/admin/ApkManager";
-import Competitors from "@/pages/admin/Competitors";
-import Revenue from "@/pages/admin/Revenue";
-import Tienda from "@/pages/Tienda";
-import Forecast from "@/pages/admin/Forecast";
-import SystemHealth from "@/pages/admin/SystemHealth";
-import ShopyBrain from "@/pages/admin/ShopyBrain";
-import ShopyBrainMemories from "@/pages/admin/ShopyBrainMemories";
-import ShopyBrainInsights from "@/pages/admin/ShopyBrainInsights";
-import ShopyBrainStudy from "@/pages/admin/ShopyBrainStudy";
-import MyPricing from "@/pages/admin/MyPricing";
-import CommandCenter from "@/pages/admin/CommandCenter";
-import Emails from "@/pages/admin/Emails";
-import EmailTemplates from "@/pages/admin/EmailTemplates";
-import ProjectVault from "@/pages/admin/ProjectVault";
-import GlobalVault from "@/pages/admin/GlobalVault";
-import UniversalSearch from "@/pages/admin/UniversalSearch";
-import ExportCenter from "@/pages/projects/ExportCenter";
-import UniversalGenerator from "@/pages/projects/UniversalGenerator";
-import WebLab, { WebLabStandalone } from "@/pages/projects/WebLab";
-import FusionStudio from "@/pages/projects/FusionStudio";
-import ForgotPassword from "@/pages/ForgotPassword";
-import OAuthSuccess from "@/pages/OAuthSuccess";
-import AuditPage from "@/pages/projects/Audit";
-import RedesignPage from "@/pages/projects/Redesign";
-import ImagesPage from "@/pages/projects/Images";
-import ConsistencyPage from "@/pages/projects/Consistency";
-import ABTestingPage from "@/pages/projects/ABTesting";
-import PricingPage from "@/pages/projects/Pricing";
-import SEOPage from "@/pages/projects/SEO";
-import SettingsPage from "@/pages/projects/Settings";
-import NotFound from "@/pages/not-found";
-import LoginPage from "@/pages/Login";
-import InviteSetupPage from "@/pages/InviteSetup";
-import AdminClients from "@/pages/AdminClients";
-import AdminSettings from "@/pages/admin/AdminSettings";
-import AdminProducts from "@/pages/admin/AdminProducts";
-import AdminABTests from "@/pages/admin/AdminABTests";
-import AdminAutomations from "@/pages/admin/AdminAutomations";
-import TemplateStudio from "@/pages/admin/TemplateStudio";
-
-import ClientDashboard from "@/pages/client/ClientDashboard";
-import ClientApprovals from "@/pages/client/ClientApprovals";
-import ClientMessages from "@/pages/client/ClientMessages";
-import ClientProducts from "@/pages/client/ClientProducts";
-import ClientReports from "@/pages/client/ClientReports";
-import ResetPassword from "@/pages/ResetPassword";
-import HelpConnections from "@/pages/HelpConnections";
-
-import { VoiceButton } from "@/components/VoiceButton";
-import { CommandPalette } from "@/components/CommandPalette";
-import { OnboardingWidget } from "@/components/OnboardingWidget";
-import { CoachMarks } from "@/components/CoachMarks";
-import OmniChatbot from "@/components/OmniChatbot";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { initGlobalErrorHandlers } from "@/lib/global-error-handler";
+
+const Home = lazy(() => import("@/pages/Home"));
+const NewProject = lazy(() => import("@/pages/NewProject"));
+const Landing = lazy(() => import("@/pages/Landing"));
+const Tienda = lazy(() => import("@/pages/Tienda"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const OAuthSuccess = lazy(() => import("@/pages/OAuthSuccess"));
+const LoginPage = lazy(() => import("@/pages/Login"));
+const InviteSetupPage = lazy(() => import("@/pages/InviteSetup"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const HelpConnections = lazy(() => import("@/pages/HelpConnections"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminClients = lazy(() => import("@/pages/AdminClients"));
+
+const CMSEditor = lazy(() => import("@/pages/admin/CMSEditor"));
+const Intelligence = lazy(() => import("@/pages/admin/Intelligence"));
+const GeminiIntelligence = lazy(() => import("@/pages/admin/GeminiIntelligence"));
+const Inventory = lazy(() => import("@/pages/admin/Inventory"));
+const Achievements = lazy(() => import("@/pages/admin/Achievements"));
+const Roadmap = lazy(() => import("@/pages/admin/Roadmap"));
+const ApkManager = lazy(() => import("@/pages/admin/ApkManager"));
+const Competitors = lazy(() => import("@/pages/admin/Competitors"));
+const Revenue = lazy(() => import("@/pages/admin/Revenue"));
+const Forecast = lazy(() => import("@/pages/admin/Forecast"));
+const SystemHealth = lazy(() => import("@/pages/admin/SystemHealth"));
+const ShopyBrain = lazy(() => import("@/pages/admin/ShopyBrain"));
+const ShopyBrainMemories = lazy(() => import("@/pages/admin/ShopyBrainMemories"));
+const ShopyBrainInsights = lazy(() => import("@/pages/admin/ShopyBrainInsights"));
+const ShopyBrainStudy = lazy(() => import("@/pages/admin/ShopyBrainStudy"));
+const MyPricing = lazy(() => import("@/pages/admin/MyPricing"));
+const CommandCenter = lazy(() => import("@/pages/admin/CommandCenter"));
+const Emails = lazy(() => import("@/pages/admin/Emails"));
+const EmailTemplates = lazy(() => import("@/pages/admin/EmailTemplates"));
+const ProjectVault = lazy(() => import("@/pages/admin/ProjectVault"));
+const GlobalVault = lazy(() => import("@/pages/admin/GlobalVault"));
+const UniversalSearch = lazy(() => import("@/pages/admin/UniversalSearch"));
+const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
+const AdminProducts = lazy(() => import("@/pages/admin/AdminProducts"));
+const AdminABTests = lazy(() => import("@/pages/admin/AdminABTests"));
+const AdminAutomations = lazy(() => import("@/pages/admin/AdminAutomations"));
+const TemplateStudio = lazy(() => import("@/pages/admin/TemplateStudio"));
+
+const AuditPage = lazy(() => import("@/pages/projects/Audit"));
+const RedesignPage = lazy(() => import("@/pages/projects/Redesign"));
+const ImagesPage = lazy(() => import("@/pages/projects/Images"));
+const ConsistencyPage = lazy(() => import("@/pages/projects/Consistency"));
+const ABTestingPage = lazy(() => import("@/pages/projects/ABTesting"));
+const PricingPage = lazy(() => import("@/pages/projects/Pricing"));
+const SEOPage = lazy(() => import("@/pages/projects/SEO"));
+const SettingsPage = lazy(() => import("@/pages/projects/Settings"));
+const ExportCenter = lazy(() => import("@/pages/projects/ExportCenter"));
+const UniversalGenerator = lazy(() => import("@/pages/projects/UniversalGenerator"));
+const WebLab = lazy(() => import("@/pages/projects/WebLab"));
+const WebLabStandalone = lazy(() => import("@/pages/projects/WebLab").then(m => ({ default: m.WebLabStandalone })));
+const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
+
+const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
+const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
+const ClientMessages = lazy(() => import("@/pages/client/ClientMessages"));
+const ClientProducts = lazy(() => import("@/pages/client/ClientProducts"));
+const ClientReports = lazy(() => import("@/pages/client/ClientReports"));
+
+const VoiceButton = lazy(() => import("@/components/VoiceButton").then(m => ({ default: m.VoiceButton })));
+const CommandPalette = lazy(() => import("@/components/CommandPalette").then(m => ({ default: m.CommandPalette })));
+const OnboardingWidget = lazy(() => import("@/components/OnboardingWidget").then(m => ({ default: m.OnboardingWidget })));
+const CoachMarks = lazy(() => import("@/components/CoachMarks").then(m => ({ default: m.CoachMarks })));
+const OmniChatbot = lazy(() => import("@/components/OmniChatbot"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +97,20 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function PageLoader() {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      height: "60vh", color: "var(--t3)", fontSize: 13,
+    }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 24, marginBottom: 8, animation: "pulseGold 1.5s ease-in-out infinite" }}>⚡</div>
+        <div>Cargando...</div>
+      </div>
+    </div>
+  );
+}
 
 function LoadingScreen() {
   return (
@@ -122,7 +139,7 @@ function RequireClient({ children }: { children: React.ReactNode }) {
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Landing />;
+  if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
   if (user.role === "client") return <Redirect to="/client" />;
   const saved = getLastRoute();
   if (saved && saved !== "/" && saved !== "/login") {
@@ -172,11 +189,11 @@ function AdminWrapper({ children }: { children: React.ReactNode }) {
     <>
       <PageErrorBoundary>{children}</PageErrorBoundary>
       {user?.role === "admin" && (
-        <>
+        <Suspense fallback={null}>
           <VoiceButton />
           <OnboardingWidget />
           <CoachMarks />
-        </>
+        </Suspense>
       )}
     </>
   );
@@ -185,7 +202,7 @@ function AdminWrapper({ children }: { children: React.ReactNode }) {
 function AdminOnlyExtras() {
   const { user } = useAuth();
   if (!user || user.role !== "admin") return null;
-  return <CommandPalette />;
+  return <Suspense fallback={null}><CommandPalette /></Suspense>;
 }
 
 function RoutePersistence() {
@@ -201,6 +218,10 @@ function RoutePersistence() {
   return null;
 }
 
+function S({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
+
 function Router() {
   return (
     <>
@@ -209,24 +230,24 @@ function Router() {
       <AdminOnlyExtras />
       <Switch>
         {/* Public */}
-        <Route path="/login" component={LoginPage} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
-        <Route path="/invite/:token" component={InviteSetupPage} />
-        <Route path="/tienda" component={Tienda} />
-        <Route path="/oauth-success" component={OAuthSuccess} />
+        <Route path="/login">{() => <S><LoginPage /></S>}</Route>
+        <Route path="/forgot-password">{() => <S><ForgotPassword /></S>}</Route>
+        <Route path="/reset-password">{() => <S><ResetPassword /></S>}</Route>
+        <Route path="/invite/:token">{() => <S><InviteSetupPage /></S>}</Route>
+        <Route path="/tienda">{() => <S><Tienda /></S>}</Route>
+        <Route path="/oauth-success">{() => <S><OAuthSuccess /></S>}</Route>
 
-        {/* Landing — always visible (for CMS preview & admin viewing) */}
-        <Route path="/landing" component={Landing} />
+        {/* Landing */}
+        <Route path="/landing">{() => <S><Landing /></S>}</Route>
 
         {/* Root — redirects by role */}
         <Route path="/">
           <HomeRedirect />
         </Route>
 
-        {/* Admin home — projects dashboard */}
+        {/* Admin home */}
         <Route path="/home">
-          <RequireAdmin><AppLayout><Home /></AppLayout></RequireAdmin>
+          <RequireAdmin><AppLayout><S><Home /></S></AppLayout></RequireAdmin>
         </Route>
 
         {/* Admin base redirects */}
@@ -242,201 +263,91 @@ function Router() {
 
         {/* Admin routes */}
         <Route path="/new-project">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><NewProject /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><NewProject /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
-
         <Route path="/help/connections">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><HelpConnections /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><HelpConnections /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
-
         <Route path="/admin/clients">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AdminClients /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminClients /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/cms">
-          <RequireAdmin><CMSEditor /></RequireAdmin>
+          <RequireAdmin><S><CMSEditor /></S></RequireAdmin>
         </Route>
         <Route path="/admin/intelligence">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Intelligence /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Intelligence /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/gemini-intel">
-          <RequireAdmin><AppLayout><GeminiIntelligence /></AppLayout></RequireAdmin>
+          <RequireAdmin><AppLayout><S><GeminiIntelligence /></S></AppLayout></RequireAdmin>
         </Route>
         <Route path="/admin/inventory">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Inventory /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Inventory /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/achievements">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Achievements /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Achievements /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/roadmap">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Roadmap /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Roadmap /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/command-center">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><CommandCenter /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><CommandCenter /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/apk">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ApkManager /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ApkManager /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/competitors">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Competitors /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Competitors /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/revenue">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Revenue /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Revenue /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/forecast">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Forecast /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Forecast /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/system">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><SystemHealth /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><SystemHealth /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/vault">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><GlobalVault /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><GlobalVault /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/search">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><UniversalSearch /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><UniversalSearch /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/template-studio">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><TemplateStudio /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><TemplateStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain/memories">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ShopyBrainMemories /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrainMemories /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain/insights">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ShopyBrainInsights /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrainInsights /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain/study">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ShopyBrainStudy /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrainStudy /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ShopyBrain /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrain /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/my-pricing">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><MyPricing /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><MyPricing /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/emails">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><EmailTemplates /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><EmailTemplates /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/email-flows">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><Emails /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Emails /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/settings">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AdminSettings /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminSettings /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/products">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AdminProducts /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminProducts /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/abtests">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AdminABTests /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminABTests /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/automations">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AdminAutomations /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminAutomations /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Base project route → audit */}
@@ -448,128 +359,76 @@ function Router() {
         </Route>
 
         <Route path="/projects/:id/audit">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><AuditPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><AuditPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/redesign">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><RedesignPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><RedesignPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/images">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ImagesPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ImagesPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/consistency">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ConsistencyPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ConsistencyPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/ab-testing">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ABTestingPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ABTestingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/pricing">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><PricingPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><PricingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/seo">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><SEOPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><SEOPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/settings">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><SettingsPage /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><SettingsPage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/vault">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><ProjectVault /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><ProjectVault /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/exports">
           {(params: { id: string }) => (
             <RequireAdmin>
               <AdminWrapper>
-                <AppLayout><ExportCenter projectId={parseInt(params.id)} /></AppLayout>
+                <AppLayout><S><ExportCenter projectId={parseInt(params.id)} /></S></AppLayout>
               </AdminWrapper>
             </RequireAdmin>
           )}
         </Route>
 
         <Route path="/projects/:id/generator">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><UniversalGenerator /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><UniversalGenerator /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/web-lab">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><WebLab /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><WebLab /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/fusion-studio">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><FusionStudio /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/web-lab">
-          <RequireAdmin>
-            <AdminWrapper>
-              <AppLayout><WebLabStandalone /></AppLayout>
-            </AdminWrapper>
-          </RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><WebLabStandalone /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Client routes */}
         <Route path="/client">
-          <RequireClient><ClientDashboard /></RequireClient>
+          <RequireClient><S><ClientDashboard /></S></RequireClient>
         </Route>
         <Route path="/client/products">
-          <RequireClient><ClientProducts /></RequireClient>
+          <RequireClient><S><ClientProducts /></S></RequireClient>
         </Route>
         <Route path="/client/approvals">
-          <RequireClient><ClientApprovals /></RequireClient>
+          <RequireClient><S><ClientApprovals /></S></RequireClient>
         </Route>
         <Route path="/client/messages">
-          <RequireClient><ClientMessages /></RequireClient>
+          <RequireClient><S><ClientMessages /></S></RequireClient>
         </Route>
         <Route path="/client/reports">
-          <RequireClient><ClientReports /></RequireClient>
+          <RequireClient><S><ClientReports /></S></RequireClient>
         </Route>
 
-        <Route component={NotFound as any} />
+        <Route>{() => <S><NotFound /></S>}</Route>
       </Switch>
     </>
   );
@@ -586,7 +445,9 @@ function App() {
             <AuthProvider>
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                 <Router />
-                <OmniChatbot />
+                <Suspense fallback={null}>
+                  <OmniChatbot />
+                </Suspense>
               </WouterRouter>
             </AuthProvider>
           </CmsProvider>

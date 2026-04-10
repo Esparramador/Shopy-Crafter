@@ -1,13 +1,5 @@
 import type { Project } from "@workspace/db";
-import {
-  shopifyRequest,
-  shopifyRequestPaged,
-  shopifyGraphQL,
-  refreshToken,
-  normalizeShopDomain,
-  validateToken,
-  getShopifyHeaders,
-} from "../shopify";
+import { shopifyRequest, shopifyRequestPaged, shopifyGraphQL, refreshToken, validateToken, getShopifyHeaders } from "../shopify";
 import { safeDecrypt } from "../crypto.js";
 import type {
   IPlatformConnector,

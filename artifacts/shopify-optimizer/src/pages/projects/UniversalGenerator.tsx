@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Download, ExternalLink, Search, Brain, CheckCircle, FolderOpen, Sparkles, RotateCcw } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface GeneratorType {
   id: string;
@@ -168,9 +169,10 @@ export default function UniversalGenerator() {
     return true;
   });
 
+  const debouncedSearch = useDebounce(search, 250);
   const matchesSearch = (t: GeneratorType) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
+    if (!debouncedSearch) return true;
+    const q = debouncedSearch.toLowerCase();
     return t.label.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.id.includes(q);
   };
 

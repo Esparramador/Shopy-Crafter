@@ -26,7 +26,7 @@ const BRAND = {
 
 function extractMetricBlocks(text: string): { metrics: Array<{ value: string; label: string }>; cleanText: string } {
   const metrics: Array<{ value: string; label: string }> = [];
-  const metricPatterns = [
+  const _metricPatterns = [
     /(\d+[\.,]?\d*)\s*(?:productos?|items?)/gi,
     /(?:score|puntuaci[oó]n)[:\s]*(\d+)\/100/gi,
     /(?:grade|grado)[:\s]*([A-F][+\-]?)/gi,

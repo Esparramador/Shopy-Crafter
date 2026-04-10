@@ -60,7 +60,7 @@ router.delete("/push/subscribe", async (req, res): Promise<void> => {
 
 router.post("/push/send", async (req, res): Promise<void> => {
   try {
-    const { userId, title, body, url } = req.body;
+    const { userId, title, body } = req.body;
   
     const { publicKey } = await getVapidKeys();
     if (!publicKey) {
@@ -95,7 +95,7 @@ router.get("/push/vapid-key", async (_req, res): Promise<void> => {
   }
 });
 
-router.post("/push/vapid-generate", async (req, res): Promise<void> => {
+router.post("/push/vapid-generate", async (_req, res): Promise<void> => {
   try {
     const existing = await getVapidKeys();
     if (existing.publicKey) {

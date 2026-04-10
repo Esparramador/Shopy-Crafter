@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, Brain, RefreshCw, AlertCircle } from "lucide-react";
+import { TrendingUp, Brain, AlertCircle } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");

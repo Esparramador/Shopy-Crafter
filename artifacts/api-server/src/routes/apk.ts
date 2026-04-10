@@ -79,7 +79,7 @@ router.post("/apk/build", requireAdmin, async (_req, res): Promise<void> => {
   }
 });
 
-router.get("/apk/download", async (req, res): Promise<void> => {
+router.get("/apk/download", async (_req, res): Promise<void> => {
   try {
     if (!GITHUB_TOKEN) {
       res.status(503).json({ error: "Descarga no disponible — GITHUB_API_TOKEN no configurado" });

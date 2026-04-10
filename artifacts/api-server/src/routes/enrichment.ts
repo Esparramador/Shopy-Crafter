@@ -71,7 +71,7 @@ function mapToShopifyTaxonomy(productType: string, title: string): string {
   return "Business & Industrial > Business Services";
 }
 
-function generateMetafields(productType: string, title: string, price: string): Array<{ namespace: string; key: string; value: string; type: string }> {
+function generateMetafields(productType: string, title: string, _price: string): Array<{ namespace: string; key: string; value: string; type: string }> {
   const lower = (productType + " " + title).toLowerCase();
   const mfs: Array<{ namespace: string; key: string; value: string; type: string }> = [];
 

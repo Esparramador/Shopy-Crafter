@@ -128,7 +128,7 @@ router.post("/billing/affiliate/join", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/billing/invoices", async (req, res): Promise<void> => {
+router.get("/billing/invoices", async (_req, res): Promise<void> => {
   try {
     const invoices = [
       { id: "INV-001", date: new Date().toISOString(), amount: 297, plan: "Pro", status: "paid" },

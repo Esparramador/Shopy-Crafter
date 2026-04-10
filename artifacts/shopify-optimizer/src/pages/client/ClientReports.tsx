@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { Download, FileText, TrendingUp, Package, Image, Search, Loader2, Calendar, ArrowUpRight, BarChart3 } from "lucide-react";
+import { timeSince } from "@/lib/utils";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -16,16 +17,6 @@ interface ReportsData {
     details: string;
     createdAt: string;
   }>;
-}
-
-function timeSince(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "hace un momento";
-  if (mins < 60) return `hace ${mins}min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `hace ${hrs}h`;
-  return `hace ${Math.floor(hrs / 24)}d`;
 }
 
 function ScoreBar({ score, label }: { score: number; label: string }) {

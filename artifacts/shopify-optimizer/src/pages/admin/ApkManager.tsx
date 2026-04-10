@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Loader2, Download, Play, RefreshCw, CheckCircle, AlertCircle, Clock, Smartphone, Github, ExternalLink, Copy } from "lucide-react";
+import { Loader2, Download, Play, RefreshCw, CheckCircle, AlertCircle, Smartphone, Github, ExternalLink, Copy } from "lucide-react";
+import { timeSince } from "@/lib/utils";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -18,17 +19,6 @@ interface BuildStep {
   title: string;
   detail: string;
   done: boolean;
-}
-
-function timeSince(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  const h = Math.floor(min / 60);
-  const d = Math.floor(h / 24);
-  if (d > 0) return `hace ${d} día${d > 1 ? "s" : ""}`;
-  if (h > 0) return `hace ${h}h`;
-  if (min > 0) return `hace ${min}min`;
-  return "ahora mismo";
 }
 
 export default function ApkManager() {

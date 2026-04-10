@@ -162,7 +162,7 @@ export default function KnowledgeGraph() {
       .style("cursor", "pointer")
       .on("mouseover", function (_event, d) {
         d3.select(this).attr("stroke", "#c8a84b").attr("stroke-width", 3);
-        const rect = container.getBoundingClientRect();
+        const _rect = container.getBoundingClientRect();
         const x = (d.x ?? 0);
         const y = (d.y ?? 0);
         setTooltip({

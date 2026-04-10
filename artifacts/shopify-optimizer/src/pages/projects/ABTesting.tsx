@@ -8,20 +8,7 @@ import {
   useGetProjectProducts,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  SplitSquareHorizontal,
-  Trophy,
-  TrendingUp,
-  Users,
-  Plus,
-  X,
-  Loader2,
-  CheckCircle,
-  Clock,
-  BarChart2,
-  DollarSign,
-  ImageIcon,
-} from "lucide-react";
+import{ SplitSquareHorizontal, Trophy, TrendingUp, Users, Plus, X, Loader2, CheckCircle, DollarSign, ImageIcon }from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";

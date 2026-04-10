@@ -15,7 +15,7 @@ import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
-import { getClaudeClient, askClaudeWithBrain, askClaudeJsonWithBrain, buildShopyBrainContext, buildBrandDnaContext, learnFromOperation, CLAUDE_MODEL } from "../lib/claude.js";
+import { getClaudeClient, askClaudeWithBrain, buildShopyBrainContext, buildBrandDnaContext, learnFromOperation, CLAUDE_MODEL } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";

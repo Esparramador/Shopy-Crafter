@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useRoute, useLocation } from "wouter";
-import { LogOut, Settings, Bell, Sun, Moon, Menu, X, WifiOff } from "lucide-react";
+import { LogOut, Settings, Sun, Moon, Menu, X, WifiOff } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";

@@ -33,7 +33,7 @@ const jobLastRun = new Map<string, { time: string; result: string }>();
 function parseNextRun(schedule: string): string {
   const now = new Date();
   const parts = schedule.split(" ");
-  const [min, hour, dom, mon, dow] = parts;
+  const [min, hour, _dom, _mon, dow] = parts;
 
   if (min.startsWith("*/") || hour.startsWith("*/")) {
     const interval = min.startsWith("*/")
@@ -156,7 +156,7 @@ const JOB_RUNNERS: Record<string, () => Promise<void>> = {
   "token-refresh": runTokenRefresh,
 };
 
-router.get("/automations/jobs", async (req, res): Promise<void> => {
+router.get("/automations/jobs", async (_req, res): Promise<void> => {
   try {
     const jobs = JOBS.map(job => {
       const lastRun = jobLastRun.get(job.id);

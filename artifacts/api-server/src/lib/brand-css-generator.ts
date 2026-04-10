@@ -1053,7 +1053,6 @@ color: ${colors.primary};</div>
 
 export async function generateAiBrandCss(projectId: number, profile: BrandProfile): Promise<string> {
   const colors = resolveColors(profile);
-  const fonts = resolveTypography(profile);
 
   const prompt = `Genera un CSS COMPLETO y PROFESIONAL personalizado para la tienda "${profile.shopName}" (${profile.shopDomain}).
   

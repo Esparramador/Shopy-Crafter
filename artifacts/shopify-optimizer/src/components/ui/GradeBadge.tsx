@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { cn, getGradeColor } from "@/lib/utils";
 
-export function GradeBadge({ grade, className }: { grade?: string | null; className?: string }) {
+export const GradeBadge = memo(function GradeBadge({ grade, className }: { grade?: string | null; className?: string }) {
   const displayGrade = grade || "N/A";
   
   return (
@@ -12,4 +13,4 @@ export function GradeBadge({ grade, className }: { grade?: string | null; classN
       {displayGrade}
     </div>
   );
-}
+});

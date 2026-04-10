@@ -189,7 +189,7 @@ export default function NewProject() {
     : formData.shopDomain && formData.clientId && formData.clientSecret;
 
   const canTestConnection = !isUniversal && isValid;
-  const connectionTested = connectionTest.status === "success";
+  const _connectionTested = connectionTest.status === "success";
 
   const domainLabel = isWoo
     ? "URL de tu tienda WordPress *"

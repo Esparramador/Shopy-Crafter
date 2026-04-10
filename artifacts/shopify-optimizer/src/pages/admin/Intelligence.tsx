@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Zap, BarChart3, DollarSign, RefreshCw, Download, ShoppingCart } from "lucide-react";
+import { TrendingUp, TrendingDown, Zap, BarChart3, RefreshCw, Download, ShoppingCart } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import GenerationProgress from "@/components/GenerationProgress";
 import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";

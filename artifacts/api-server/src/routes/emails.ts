@@ -2,7 +2,6 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
-import { safeDecrypt } from "../lib/crypto.js";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { enableLongRunning } from "../lib/long-running.js";
@@ -42,7 +41,7 @@ const TRIGGER_MAP: Record<string, string> = {
   welcome: "Subscribed to List",
 };
 
-const DELAY_MAP: Record<string, number> = {
+const _DELAY_MAP: Record<string, number> = {
   immediate: 0,
   "1h": 3600,
   "3h": 10800,
@@ -304,7 +303,6 @@ router.post("/emails/flows/:id/push", async (req, res): Promise<void> => {
       const klaviyoFlowId = flowRes.data?.id;
       if (!klaviyoFlowId) throw new Error("Flow creation failed");
   
-      const delaySeconds = DELAY_MAP[flow.send_delay] || 3600;
   
       await klaviyoPost("/flow-actions/", {
         data: {
@@ -377,7 +375,6 @@ router.post("/emails/flows/:id/sync", async (req, res): Promise<void> => {
         const data = await metricsRes.json() as any;
         const action = data.data?.[0];
         if (action) {
-          const stats = action.attributes?.tracking_options;
           await pool.query(
             `UPDATE email_flows SET last_synced_at = NOW(), updated_at = NOW() WHERE id = $1`,
             [flowId]

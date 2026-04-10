@@ -8,30 +8,7 @@ import {
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  RefreshCw,
-  Search,
-  AlertCircle,
-  TrendingUp,
-  Lightbulb,
-  Package,
-  ShoppingBag,
-  Tag,
-  DollarSign,
-  CheckCircle2,
-  Plus,
-  X,
-  Sparkles,
-  Loader2,
-  ExternalLink,
-  Key,
-  Edit3,
-  Save,
-  Eye,
-  EyeOff,
-  Archive,
-  FileText,
-} from "lucide-react";
+import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff }from "lucide-react";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
@@ -39,8 +16,7 @@ import SaveReportButton from "@/components/SaveReportButton";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-interface EditableProduct {
-  id: string;
+interface EditableProduct{ id: string;
   title: string;
   handle: string;
   bodyHtml: string;
@@ -788,7 +764,7 @@ export default function AuditPage() {
   const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const { data, isLoading, refetch } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
-  const syncProducts = useSyncProducts();
+  const _syncProducts = useSyncProducts();
   const getCatalogOpps = useGetCatalogOpportunities();
   const oppsData = getCatalogOpps.data ?? [];
   const isLoadingOpps = getCatalogOpps.isPending;

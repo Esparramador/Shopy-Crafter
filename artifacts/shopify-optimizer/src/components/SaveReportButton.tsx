@@ -1,4 +1,4 @@
-import { Save, CheckCircle, Loader2, AlertCircle, FolderOpen } from "lucide-react";
+import { CheckCircle, Loader2, AlertCircle, FolderOpen } from "lucide-react";
 import { useSaveReport } from "../hooks/useSaveReport";
 
 interface SaveReportButtonProps {

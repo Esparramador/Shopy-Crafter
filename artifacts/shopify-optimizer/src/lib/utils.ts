@@ -25,3 +25,27 @@ export function getGradeColor(grade: string | null | undefined): string {
     default: return "text-muted-foreground bg-muted border-border";
   }
 }
+
+export function timeSince(dateStr: string | null, labels?: { never?: string; today?: string; yesterday?: string }): string {
+  if (!dateStr) return labels?.never ?? "Nunca";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "hace un momento";
+  if (mins < 60) return `hace ${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (labels) {
+    if (days === 0) return labels.today ?? "Hoy";
+    if (days === 1) return labels.yesterday ?? "Ayer";
+    return `Hace ${days} días`;
+  }
+  return `hace ${days}d`;
+}
+
+export function scoreColor(score: number): string {
+  if (score >= 80) return "#22c55e";
+  if (score >= 60) return "#eab308";
+  if (score >= 40) return "#f97316";
+  return "#ef4444";
+}

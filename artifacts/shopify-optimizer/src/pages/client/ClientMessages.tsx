@@ -21,7 +21,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function ClientMessages() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { t } = useCmsSection("labels.clientMessages");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);

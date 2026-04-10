@@ -346,7 +346,7 @@ export default function Landing() {
     return () => window.removeEventListener("message", handler);
   }, [isPreview, goToSection]);
 
-  const isFpActive = useCallback(() => {
+  const _isFpActive = useCallback(() => {
     return window.innerWidth > 900 && window.innerHeight > 500;
   }, []);
 

@@ -1,9 +1,5 @@
 import { useState, useCallback } from "react";
-import {
-  Search, Globe, Instagram, Store, ExternalLink, Loader2,
-  FileText, Download, Clock, ChevronRight, Sparkles, Building2,
-  ArrowRight, Eye,
-} from "lucide-react";
+import{ Search, Globe, Instagram, Store, ExternalLink, Loader2, Download, Clock, ChevronRight, Sparkles, Building2, ArrowRight, Eye }from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 

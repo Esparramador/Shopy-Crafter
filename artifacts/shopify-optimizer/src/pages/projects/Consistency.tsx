@@ -8,27 +8,11 @@ import {
   useGetJobStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Palette,
-  Fingerprint,
-  RefreshCcw,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Eye,
-  Sparkles,
-} from "lucide-react";
+import { Palette, Fingerprint, RefreshCcw, AlertTriangle, XCircle, Loader2, Eye, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import SaveReportButton from "@/components/SaveReportButton";
-
-function RepairPoller({
-  projectId,
-  jobId,
-  onComplete,
-}: {
+function RepairPoller({ projectId, jobId, onComplete }: {
   projectId: number;
   jobId: string;
   onComplete: () => void;
@@ -114,7 +98,7 @@ type ScoresData = {
 export default function ConsistencyPage() {
   const [, params] = useRoute("/projects/:id/consistency");
   const projectId = parseInt(params?.id || "0");
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
   const { toast } = useToast();
 
   const {

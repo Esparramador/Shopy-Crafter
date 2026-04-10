@@ -27,7 +27,7 @@ interface SceneConfig {
   promptTemplate: (productDesc: string, productType: string, niche: string) => string;
 }
 
-function getScenesForProductType(productType: string, niche: string): SceneConfig[] {
+function getScenesForProductType(productType: string, _niche: string): SceneConfig[] {
   const lower = productType.toLowerCase();
 
   if (/camis|camiseta|polo|sudadera|hoodie|jersey|blusa|top|vest|shirt|t-?shirt|ropa/i.test(lower)) {

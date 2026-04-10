@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import GenerationProgress from "@/components/GenerationProgress";
+import SaveReportButton from "@/components/SaveReportButton";
 import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
 import {
   Wand2,
@@ -27,10 +28,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import SaveReportButton from "@/components/SaveReportButton";
-
-type RedesignResult = {
-  title?: string;
+type RedesignResult ={ title?: string;
   bodyHtml?: string;
   shortDescription?: string;
   price?: number;
@@ -38,8 +36,7 @@ type RedesignResult = {
   tags?: string;
   metaTitle?: string;
   metaDescription?: string;
-  photoBriefs?: string[];
-};
+  photoBriefs?: string[]; };
 
 function BulkProgressPoller({
   projectId,
@@ -169,7 +166,7 @@ export default function RedesignPage() {
   const [activeRedesign, setActiveRedesign] = useState<string | null>(null);
   const [redesignResults, setRedesignResults] = useState<Record<string, RedesignResult>>({});
   const [bulkJobId, setBulkJobId] = useState<string | null>(null);
-  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
+  const [_referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const [expandedHtml, setExpandedHtml] = useState<Record<string, boolean>>({});
   const [photoBriefsModal, setPhotoBriefsModal] = useState<{
     productId: string;
@@ -352,7 +349,7 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
         <BulkProgressPoller
           projectId={projectId}
           jobId={bulkJobId}
-          onComplete={(d) => {
+          onComplete={(_d) => {
             setBulkJobId(null);
             queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
             toast({ title: "✓ Rediseño masivo completado" });

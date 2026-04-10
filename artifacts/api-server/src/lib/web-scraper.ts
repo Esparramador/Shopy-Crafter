@@ -1,4 +1,3 @@
-import { logger } from "./logger.js";
 import { resolve as dnsResolve } from "node:dns/promises";
 
 export interface WebScrapingResult {

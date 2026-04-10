@@ -9,6 +9,7 @@ import { cmsContent, cmsVersions } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
+import { cached, invalidateCache } from "../lib/cache.js";
 import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
@@ -102,9 +103,9 @@ async function saveVersion(content: unknown, version: number, savedBy: string) {
   }
 }
 
-router.get("/content", async (req: Request, res: Response) => {
+router.get("/content", async (_req: Request, res: Response) => {
   try {
-    const row = await getOrInitContent();
+    const row = await cached("cms-content", 60_000, () => getOrInitContent());
     res.json(row.content);
   } catch (e) {
     res.status(500).json({ error: "Failed to load content" });
@@ -113,6 +114,7 @@ router.get("/content", async (req: Request, res: Response) => {
 
 router.patch("/content", async (req: Request, res: Response) => {
   try {
+    invalidateCache("cms-");
     const { path: fieldPath, value } = req.body as { path: string; value: unknown };
     const row = await getOrInitContent();
     await saveVersion(row.content, row.version, req.session?.userId?.toString() || "admin");
@@ -128,6 +130,7 @@ router.patch("/content", async (req: Request, res: Response) => {
 
 router.post("/content/batch", async (req: Request, res: Response) => {
   try {
+    invalidateCache("cms-");
     const { changes } = req.body as { changes: Array<{ path: string; value: unknown }> };
     const row = await getOrInitContent();
     await saveVersion(row.content, row.version, req.session?.userId?.toString() || "admin");
@@ -144,11 +147,12 @@ router.post("/content/batch", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/content/reset", async (req: Request, res: Response) => {
+router.post("/content/reset", async (_req: Request, res: Response) => {
   try {
     const row = await getOrInitContent();
     await saveVersion(row.content, row.version, "admin");
     await db.update(cmsContent).set({ content: DEFAULT_CMS_CONTENT, version: row.version + 1, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
+    invalidateCache("cms-");
     broadcast("content_updated", { reset: true });
     res.json({ success: true });
   } catch (e) {
@@ -208,7 +212,7 @@ router.delete("/media/:filename", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/versions", async (req: Request, res: Response) => {
+router.get("/versions", async (_req: Request, res: Response) => {
   try {
     const versions = await db.select({ id: cmsVersions.id, version: cmsVersions.version, savedAt: cmsVersions.savedAt, savedBy: cmsVersions.savedBy, label: cmsVersions.label }).from(cmsVersions).orderBy(desc(cmsVersions.savedAt)).limit(30);
     res.json(versions);
@@ -225,6 +229,7 @@ router.post("/versions/:id/restore", async (req: Request, res: Response) => {
     const row = await getOrInitContent();
     await saveVersion(row.content, row.version, "admin");
     await db.update(cmsContent).set({ content: ver.content as Record<string, unknown>, version: row.version + 1, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
+    invalidateCache("cms-");
     broadcast("version_restored", { id, version: ver.version });
     res.json({ success: true });
   } catch (e) {

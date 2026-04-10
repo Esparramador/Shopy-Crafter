@@ -1022,7 +1022,7 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
   }
 });
 
-router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
+router.get("/leads", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const { pool } = await import("@workspace/db");
     const result = await pool.query(
@@ -1040,7 +1040,7 @@ router.get("/leads", requireAdmin, async (req, res): Promise<void> => {
   }
 });
 
-router.get("/lead-reports", requireAdmin, async (req, res): Promise<void> => {
+router.get("/lead-reports", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const reports = await db.select({
       id: projectFilesTable.id,

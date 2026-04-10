@@ -35,7 +35,7 @@ async function klaviyoPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 // ─── GET LISTS ────────────────────────────────────────────────────────────────
-router.get("/klaviyo/lists", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/lists", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet("/lists/?fields[list]=name,created,updated,opt_in_process");
     res.json(data);
@@ -46,7 +46,7 @@ router.get("/klaviyo/lists", requireAdmin, async (req, res): Promise<void> => {
 });
 
 // ─── GET CAMPAIGNS ────────────────────────────────────────────────────────────
-router.get("/klaviyo/campaigns", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/campaigns", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet("/campaigns/?filter=equals(messages.channel,'email')&fields[campaign]=name,status,created_at,updated_at,send_time");
     res.json(data);
@@ -57,7 +57,7 @@ router.get("/klaviyo/campaigns", requireAdmin, async (req, res): Promise<void> =
 });
 
 // ─── GET METRICS (overview stats) ────────────────────────────────────────────
-router.get("/klaviyo/metrics", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/metrics", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet("/metrics/?fields[metric]=name,created,updated,integration");
     res.json(data);
@@ -68,7 +68,7 @@ router.get("/klaviyo/metrics", requireAdmin, async (req, res): Promise<void> => 
 });
 
 // ─── GET PROFILES (subscriber count) ─────────────────────────────────────────
-router.get("/klaviyo/profiles/count", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/profiles/count", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet<{ data: unknown[]; links?: { next?: string } }>("/profiles/?page[size]=1&fields[profile]=id");
     res.json({ count: (data as { data: unknown[] }).data?.length ?? 0 });
@@ -79,7 +79,7 @@ router.get("/klaviyo/profiles/count", requireAdmin, async (req, res): Promise<vo
 });
 
 // ─── GET FLOWS ────────────────────────────────────────────────────────────────
-router.get("/klaviyo/flows", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/flows", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet("/flows/?fields[flow]=name,status,created,updated,trigger_type");
     res.json(data);
@@ -188,7 +188,7 @@ router.post("/klaviyo/send-email", requireAdmin, async (req, res): Promise<void>
 });
 
 // ─── TEST CONNECTION ──────────────────────────────────────────────────────────
-router.get("/klaviyo/test", requireAdmin, async (req, res): Promise<void> => {
+router.get("/klaviyo/test", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const data = await klaviyoGet<{ data: Array<{ id: string; attributes: { name: string } }>; meta?: { total: number } }>("/lists/");
     res.json({

@@ -11,6 +11,7 @@ import {
   useGenerateBlogPost,
   useAuditPageSpeed,
 } from "@workspace/api-client-react";
+import SaveReportButton from "@/components/SaveReportButton";
 import {
   Search,
   Globe,
@@ -33,12 +34,9 @@ import {
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import SaveReportButton from "@/components/SaveReportButton";
-
-export default function SEOPage() {
-  const [, params] = useRoute("/projects/:id/seo");
+export default function SEOPage(){ const [, params] = useRoute("/projects/:id/seo");
   const projectId = parseInt(params?.id || "0");
-  const { toast } = useToast();
+  const { toast }= useToast();
 
   const [seoData, setSeoData] = useState<{
     globalScore?: number;
@@ -55,7 +53,7 @@ export default function SEOPage() {
   const [keywords, setKeywords] = useState<{ primary?: string[]; secondary?: string[]; longTail?: string[] } | null>(null);
   const [blogStrategy, setBlogStrategy] = useState<{ pillars?: Array<{ title: string; words: number; difficulty: string }> } | null>(null);
   const [generatedPost, setGeneratedPost] = useState<{ title?: string; content?: string } | null>(null);
-  const [selectedPillar, setSelectedPillar] = useState<string>("");
+  const [selectedPillar, _setSelectedPillar] = useState<string>("");
 
   const [psUrl, setPsUrl] = useState("");
   const [psStrategy, setPsStrategy] = useState<"mobile" | "desktop">("mobile");

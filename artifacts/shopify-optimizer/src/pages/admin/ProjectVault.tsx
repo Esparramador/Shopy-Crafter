@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
   FolderOpen, Download, Trash2, Image, FileText, RefreshCw,
@@ -245,10 +245,10 @@ export default function ProjectVault() {
     day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 
-  const isImage = (file: VaultFile) => file.fileType === "image" || file.mimeType?.startsWith("image/");
+  const _isImage = (file: VaultFile) => file.fileType === "image" || file.mimeType?.startsWith("image/");
   const imageUrl = (file: VaultFile) => file.originalUrl ?? null;
 
-  const getFolderFiles = (folderId: string) => {
+  const _getFolderFiles = (folderId: string) => {
     const folder = FOLDER_CONFIG.find(f => f.id === folderId);
     if (!folder) return [];
     return files.filter(f => folder.matchTypes.includes(f.fileType));
@@ -304,7 +304,7 @@ export default function ProjectVault() {
   );
 
   const displayFiles = getDisplayFiles();
-  const visibleSelected = displayFiles.filter(f => selectedIds.has(f.id)).length;
+  const _visibleSelected = displayFiles.filter(f => selectedIds.has(f.id)).length;
 
   return (
     <div className="page-inner">

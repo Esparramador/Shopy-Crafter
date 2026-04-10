@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { db, usersTable, auditLogTable, rateLimitsTable } from "@workspace/db";
+import { db, usersTable, rateLimitsTable } from "@workspace/db";
 import { eq, lt, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { recordAudit } from "../lib/audit.helper.js";

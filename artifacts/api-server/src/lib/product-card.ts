@@ -196,7 +196,6 @@ export function buildProductCard(product: ProductCardData): string {
     : `<div style="width:140px;height:140px;flex-shrink:0;border-radius:12px;overflow:hidden;background:${BRAND.surface};border:1px solid ${BRAND.border};display:flex;align-items:center;justify-content:center;color:${BRAND.muted};font-size:32px;">&#128247;</div>`;
 
   const imgCountColor = product.imageCount === 0 ? BRAND.red : product.imageCount < 3 ? BRAND.orange : product.imageCount < 8 ? BRAND.gold : BRAND.jade;
-  const imgCountBg = product.imageCount === 0 ? BRAND.redBg : product.imageCount < 3 ? BRAND.orangeBg : product.imageCount < 8 ? "rgba(200,168,75,.1)" : BRAND.jadeBg;
 
   const tagsColor = product.tagsCount < 5 ? BRAND.red : product.tagsCount < 15 ? BRAND.orange : product.tagsCount < 22 ? BRAND.gold : BRAND.jade;
 

@@ -1,5 +1,5 @@
 import { db, omnicoreInsightsTable, omnicorePromptLibraryTable } from "@workspace/db";
-import { sql, desc, gte, or, ilike } from "drizzle-orm";
+import { sql, desc, or, ilike } from "drizzle-orm";
 import { logger } from "./logger.js";
 
 const USE_CASE_DOMAIN_MAP: Record<string, string[]> = {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CreditCard, Check, Zap, TrendingUp, Users, Copy } from "lucide-react";
+import { CreditCard, Check, Copy } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 

@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { ClientLayout } from "./ClientLayout";
 import { Clock, Loader2 } from "lucide-react";
+import { timeSince } from "@/lib/utils";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -24,16 +25,6 @@ interface DashboardData {
   enginesActive: number;
   lastOptimized: string | null;
   recentActivity: Array<{ id: string; action: string; details: string; createdAt: string }>;
-}
-
-function timeSince(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "hace un momento";
-  if (mins < 60) return `hace ${mins}min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `hace ${hrs}h`;
-  return `hace ${Math.floor(hrs / 24)}d`;
 }
 
 function ScoreCircle({ score }: { score: number }) {

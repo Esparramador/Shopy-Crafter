@@ -6,10 +6,10 @@ import {
   omnicoreMemoriesTable, omnicoreStudySessionsTable, omnicoreKnowledgeDomainsTable,
   omnicoreInsightsTable, omnicoreCrossConnectionsTable,
 } from "@workspace/db";
-import { desc, eq, gte, sql, isNull, or, and } from "drizzle-orm";
+import { desc, eq, gte, sql, and } from "drizzle-orm";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
-import { askClaudeWithBrain, buildShopyBrainContext, learnFromOperation, type BrainUseCase } from "./claude.js";
+import { askClaudeWithBrain, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
 import { randomBytes } from "crypto";

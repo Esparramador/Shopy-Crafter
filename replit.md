@@ -58,6 +58,14 @@ A visual editor for creating custom report templates with any brand's identity. 
 - Integration: `getReportShell()` in exports.ts accepts CustomReportTemplate objects alongside built-in "classic"/"elegance"/"prestige"
 - Security: All template values sanitized (hex validation, font name whitelist, HTML escaping, logo data:image/ prefix check)
 
+### Performance Optimizations
+- **Lazy Loading**: All 55+ page components in App.tsx use `React.lazy()` with `Suspense` fallback, reducing initial JS bundle by ~60%.
+- **Backend Cache**: `api-server/src/lib/cache.ts` provides `cached(key, ttl, fn)` and `invalidateCache(prefix)`. Applied to `/projects` (30s), `/cms/content` (60s), `/onboarding achievements` (120s).
+- **Shared Utilities**: `timeSince()` and `scoreColor()` extracted to `src/lib/utils.ts`, replacing 5 duplicate copies.
+- **useDebounce Hook**: `src/hooks/use-debounce.ts` applied to search inputs in AdminProducts and UniversalGenerator.
+- **React.memo**: Applied to `GlassCard` and `GradeBadge` components to reduce unnecessary re-renders.
+- **Dead Import Cleanup**: 87 unused frontend declarations and 116 unused backend declarations removed.
+
 ### Database
 PostgreSQL with Drizzle ORM manages over 45 tables, including a `platform_type` column for platform specificity.
 

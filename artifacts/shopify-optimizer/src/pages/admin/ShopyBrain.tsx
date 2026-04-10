@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Brain, Zap, TrendingUp, BookOpen, Clock, Star, Play, Database, Layers, ArrowRight } from "lucide-react";
+import { Brain, Zap, TrendingUp, BookOpen, Clock, Play, Database, Layers, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
 
 const KnowledgeGraph = lazy(() => import("../../components/KnowledgeGraph"));

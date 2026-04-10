@@ -1,11 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, cogsTable, priceHistoryTable } from "@workspace/db";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch } from "../lib/gemini.js";
-import { getConnector } from "../lib/connectors/index.js";
 import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
 import { enableLongRunning } from "../lib/long-running.js";
 
@@ -69,7 +68,7 @@ function calculateCogs(data: Record<string, any>): {
   };
 }
 
-function psychologicalPrice(price: number): number {
+function _psychologicalPrice(price: number): number {
   if (price < 10) return Math.floor(price) - 0.01 + 1;
   if (price < 20) return Math.floor(price) + 0.95;
   if (price < 50) return Math.round(price / 5) * 5 - 0.05;

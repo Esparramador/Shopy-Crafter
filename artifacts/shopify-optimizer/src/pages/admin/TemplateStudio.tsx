@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Palette, Type, Layout, Image, Save, Trash2, Copy, Share2, Sparkles, Plus, Eye, ChevronDown, Loader2, ArrowLeft, ExternalLink } from "lucide-react";
+import { Palette, Save, Trash2, Share2, Sparkles, Plus, Eye, Loader2, ArrowLeft } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 

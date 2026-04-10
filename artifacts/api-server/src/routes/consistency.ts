@@ -2,7 +2,6 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, visualDnaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { enableLongRunning } from "../lib/long-running.js";
@@ -245,7 +244,7 @@ router.post("/projects/:projectId/repair-consistency", async (req, res): Promise
     });
   
     runAsync(async () => {
-      const [dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
+      const [_dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
       let completed = 0;
       let failed = 0;
   

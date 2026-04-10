@@ -28,7 +28,7 @@ import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useOnlineStatus } from "@/hooks/use-draft-persistence";
+import{ useOnlineStatus }from "@/hooks/use-draft-persistence";
 
 const IMAGE_TYPES = [
   { id: "hero", label: "Hero (Studio)", icon: "📸", model: "Flux 1.1 Pro", color: "blue" },
@@ -91,7 +91,7 @@ function PromptModal({
     dallePrompt?: string;
     photographerDirection?: string;
   } | null>(null);
-  const [referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
+  const [_referenceIntelligence, setReferenceIntelligence] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -414,7 +414,7 @@ export default function ImagesPage() {
         <JobPoller
           projectId={projectId}
           jobId={bulkJobId}
-          onComplete={(d) => {
+          onComplete={(_d) => {
             setBulkJobId(null);
             toast({ title: "Boost Masivo completado" });
             queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });

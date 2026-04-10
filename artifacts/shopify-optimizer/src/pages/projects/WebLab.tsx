@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useRoute } from "wouter";
+import { scoreColor } from "@/lib/utils";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -86,13 +87,6 @@ const sevColors: Record<string, string> = {
   medium: "#eab308",
   low: "#22c55e",
 };
-
-function scoreColor(s: number): string {
-  if (s >= 80) return "#22c55e";
-  if (s >= 60) return "#eab308";
-  if (s >= 40) return "#f97316";
-  return "#ef4444";
-}
 
 export default function WebLab() {
   const [, params] = useRoute("/projects/:id/web-lab");

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brain, Search, TrendingUp, Users, Building2, Package, Zap, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Brain, Search, TrendingUp, Building2, Package, Zap, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import SaveToVaultButton from "@/components/SaveToVaultButton";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronDown, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink, Link, ShoppingBag, Download, Printer, Plus, Trash2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calculator, FileText, RefreshCw, Save, ChevronUp, DollarSign, Upload, CheckCircle, AlertTriangle, ExternalLink, ShoppingBag, Download, Printer, Plus, Trash2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -70,8 +70,8 @@ export default function MyPricing() {
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string | null }>>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
-  const [shopifyConfigured, setShopifyConfigured] = useState<boolean | null>(null);
-  const [shopifyMsg, setShopifyMsg] = useState("");
+  const [_shopifyConfigured, setShopifyConfigured] = useState<boolean | null>(null);
+  const [_shopifyMsg, setShopifyMsg] = useState("");
   const [loadingShopify, setLoadingShopify] = useState(false);
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>({});

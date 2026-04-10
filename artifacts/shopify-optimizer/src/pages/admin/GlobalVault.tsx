@@ -70,7 +70,7 @@ interface VaultFile {
 }
 
 export default function GlobalVault() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [files, setFiles] = useState<VaultFile[]>([]);

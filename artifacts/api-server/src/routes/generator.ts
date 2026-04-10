@@ -1,15 +1,14 @@
 import { Router, type Request, type Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
-import { db, projectsTable, productsTable, seoDataTable } from "@workspace/db";
-import { brandDnaTable, visualDnaTable, competitorsTable, competitorSnapshotsTable, projectFilesTable } from "@workspace/db/schema";
+import { db, projectsTable, productsTable } from "@workspace/db";
+import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askClaudeWithBrain, learnFromOperation, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
-import { shopifyRequest } from "../lib/shopify.js";
 import { getReportShell, type ReportTemplate } from "./exports.js";
 import { generateLeveledReport, type LeveledReportResult } from "../lib/report-levels.js";
 import { REPORT_LEVELS } from "../lib/config.js";
@@ -259,7 +258,6 @@ export async function runGeneratorDirect(type: string, params: GenParams): Promi
 
 async function runGenerator(type: string, params: GenParams): Promise<GenResult> {
   const { projectId, url, format, template = "prestige" } = params;
-  const baseUrl = `http://localhost:${process.env.PORT || 8080}/api`;
 
   switch (type) {
     case "seo-audit":

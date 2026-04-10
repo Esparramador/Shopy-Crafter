@@ -19,7 +19,7 @@ import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
-import { buildProductCard, buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
+import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
@@ -2048,7 +2048,7 @@ function scoreColor(score: number): string {
   return BRAND.red;
 }
 
-function fmt(n: number | null | undefined, decimals = 2): string {
+function _fmt(n: number | null | undefined, decimals = 2): string {
   if (n == null || isNaN(n)) return "—";
   return n.toFixed(decimals);
 }
@@ -2789,7 +2789,6 @@ router.post("/projects/:projectId/exports/generate-ai-report", async (req, res):
         ? { min: Math.min(...catalogPrices), max: Math.max(...catalogPrices) }
         : { min: 0, max: 0 };
   
-      const top10ByPrice = [...products].sort((a, b) => parseFloat(b.price ?? "0") - parseFloat(a.price ?? "0")).slice(0, 10);
       const worst5Seo = [...liveAudit].sort((a, b) => a.score - b.score).slice(0, 5);
       const best5Seo = [...liveAudit].sort((a, b) => b.score - a.score).slice(0, 5);
   
@@ -3081,7 +3080,6 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     const jobs = await db.select().from(generationJobsTable).where(eq(generationJobsTable.projectId, projectId));
     const redesigns = await db.select().from(redesignsTable).where(eq(redesignsTable.projectId, projectId));
     const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectId)));
-    const inventory = await db.select().from(inventoryTrackingTable).where(eq(inventoryTrackingTable.projectId, String(projectId)));
     const revenueSnapshots = await db.select().from(revenueSnapshotsTable).where(eq(revenueSnapshotsTable.projectId, String(projectId))).orderBy(desc(revenueSnapshotsTable.date)).limit(90);
     const memories = await db.select().from(omnicoreMemoriesTable).orderBy(desc(omnicoreMemoriesTable.createdAt)).limit(10);
     const priceHistory = await db.select().from(priceHistoryTable).where(eq(priceHistoryTable.projectId, projectId)).orderBy(desc(priceHistoryTable.recordedAt)).limit(20);
@@ -3116,12 +3114,10 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
     const totalCogs = allCogs.reduce((s, c) => s + c.totalCogs, 0);
     const avgMargin = totalCatalogValue > 0 ? ((totalCatalogValue - totalCogs) / totalCatalogValue) * 100 : 0;
     const imagesGenerated = jobs.filter(j => j.status === "succeeded").length;
-    const imagesFailed = jobs.filter(j => j.status === "failed").length;
     const withSchema = liveAudit.filter(a => a.hasSchema).length;
     const withAltTexts = liveAudit.filter(a => a.hasAltTexts).length;
     const withMetaTitle = liveAudit.filter(a => a.hasMetaTitle).length;
     const withMetaDesc = liveAudit.filter(a => a.hasMetaDesc).length;
-    const withCleanHandle = liveAudit.filter(a => a.cleanHandle).length;
     const withLongDesc = liveAudit.filter(a => a.descLen >= 300).length;
     const completedTests = tests.filter(t => t.status === "completed" || t.status === "winner_applied").length;
     const activeTests = tests.filter(t => t.status === "running").length;

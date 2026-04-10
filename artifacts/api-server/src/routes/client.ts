@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, usersTable, approvalsTable, messagesTable, productsTable, auditLogTable } from "@workspace/db";
+import { db, approvalsTable, messagesTable, productsTable, auditLogTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
-import { requireAuth, requireClientAccess } from "../lib/auth.js";
+import { requireAuth } from "../lib/auth.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 
 const router = Router();
