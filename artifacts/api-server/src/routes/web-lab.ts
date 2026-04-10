@@ -550,7 +550,7 @@ router.get("/web-lab/download-report/:vaultId", async (req: Request, res: Respon
 
         let analysis: WebLabAnalysis;
         try { analysis = meta.analysis ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis) : null; } catch { analysis = null as any; }
-        if (!analysis) analysis = { overallScore: meta.score ?? 50, categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } } as WebLabAnalysis;
+        if (!analysis) analysis = { overallScore: meta.score ?? 50, categories: meta.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] }, structure: [] } as WebLabAnalysis;
 
         const reportBody = buildReportBody(analysis, meta.url, null, null, null);
         const reportHtml = getReportShell(tpl)(
@@ -611,7 +611,7 @@ router.post("/web-lab/download-report", async (req: Request, res: Response): Pro
 
     let analysis: WebLabAnalysis;
     try { analysis = meta?.analysis ? (typeof meta.analysis === "string" ? JSON.parse(meta.analysis) : meta.analysis) : null; } catch { analysis = null as any; }
-    if (!analysis) analysis = { overallScore: meta?.score ?? 50, categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] } } as WebLabAnalysis;
+    if (!analysis) analysis = { overallScore: meta?.score ?? 50, categories: meta?.categories ?? { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 }, summary: file.description ?? "", issues: [], improvedCss: "", improvedHtmlFragments: [], colorPalette: { current: [], improved: [] }, typography: { current: [], improved: [] }, structure: [] } as WebLabAnalysis;
 
     const reportBody = buildReportBody(analysis, url, null, null, null);
     const reportHtml = getReportShell(tpl)(

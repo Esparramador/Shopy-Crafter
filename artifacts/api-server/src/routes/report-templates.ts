@@ -38,7 +38,7 @@ router.get("/report-templates", async (req: Request, res: Response): Promise<voi
 
 router.get("/report-templates/:idOrToken", async (req: Request, res: Response): Promise<void> => {
   try {
-    const param = req.params.idOrToken;
+    const param = String(req.params.idOrToken);
     const id = parseInt(param);
     let template;
     if (!isNaN(id)) {
@@ -108,7 +108,7 @@ router.post("/report-templates", upload.single("logo"), async (req: Request, res
 
 router.put("/report-templates/:id", upload.single("logo"), async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
     const userId = (req as any).user?.id;
     const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
@@ -158,7 +158,7 @@ router.put("/report-templates/:id", upload.single("logo"), async (req: Request, 
 
 router.delete("/report-templates/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
     const userId = (req as any).user?.id;
     const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));

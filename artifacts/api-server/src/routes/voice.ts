@@ -92,16 +92,20 @@ router.post("/voice/command", async (req, res): Promise<void> => {
         confidence: parsed?.confidence || 0.8,
       });
     } catch (e: unknown) {
-      res.status(500).json({
-        response: "Lo siento, hubo un error procesando tu comando.",
-        action: null,
-        executed: false,
-        confidence: 0,
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          response: "Lo siento, hubo un error procesando tu comando.",
+          action: null,
+          executed: false,
+          confidence: 0,
+        });
+      }
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : "Internal server error";
+      res.status(500).json({ error: msg });
+    }
   }
 });
 

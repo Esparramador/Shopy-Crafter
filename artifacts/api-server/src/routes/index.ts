@@ -67,7 +67,9 @@ router.get("/report-templates/:token", (req, res, next) => {
   return requireAdmin(req, res, next);
 }, async (req, res) => {
   const { db } = await import("@workspace/db");
-  const { reportTemplatesTable } = await import("@workspace/db/schema");
+  const schemaModule = await import("@workspace/db/schema");
+  const reportTemplatesTable = (schemaModule as Record<string, unknown>).reportTemplatesTable as typeof import("@workspace/db/schema").reportTemplatesTable;
+  if (!reportTemplatesTable) { res.status(500).json({ error: "Schema not available" }); return; }
   const { eq } = await import("drizzle-orm");
   const [tpl] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.shareToken, req.params.token));
   if (!tpl || !tpl.isPublic) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
