@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { enableLongRunning } from "../lib/long-running.js";
 import { db, projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { brandDnaTable, visualDnaTable, competitorsTable, competitorSnapshotsTable, projectFilesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -113,6 +114,7 @@ router.get("/generator/types", (_req: Request, res: Response) => {
 });
 
 router.post("/generator/run", async (req: Request, res: Response): Promise<any> => {
+  enableLongRunning(res);
   try {
     const { type, projectId, url, format, template, level, params: extraParams } = req.body;
     const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));

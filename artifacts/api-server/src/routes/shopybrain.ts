@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { enableLongRunning } from "../lib/long-running.js";
 import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
@@ -370,6 +371,7 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 });
 
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
+  enableLongRunning(res);
   try {
     const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute } = req.body;
     if (!query) {
@@ -378,11 +380,6 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
     }
   
     if (returnRaw) {
-     res.setHeader("Content-Type", "application/json; charset=utf-8");
-     res.setHeader("Cache-Control", "no-cache");
-     res.setHeader("X-Accel-Buffering", "no");
-     res.setHeader("Connection", "keep-alive");
-     res.flushHeaders();
   
      try {
       let entityKnowledgeContext = "";
@@ -1726,12 +1723,11 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
 }
 
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
+  enableLongRunning(res);
   const { action, params } = req.body;
   if (!action) { res.status(400).json({ error: "action requerida" }); return; }
   
-    enableLongRunning(res);
-  
-    const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
+  const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
   
     if (params?.projectId && isNaN(parseInt(String(params.projectId)))) {
       const allProjects = await db.select({ id: projectsTable.id, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(10);

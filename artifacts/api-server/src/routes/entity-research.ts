@@ -16,6 +16,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { enableLongRunning } from "../lib/long-running.js";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";

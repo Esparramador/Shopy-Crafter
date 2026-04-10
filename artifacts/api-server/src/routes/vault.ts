@@ -418,6 +418,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
 
 // ─── DESCARGAR ARCHIVOS SELECCIONADOS COMO ZIP ────────────────────────────────
 router.post("/projects/:projectId/vault/download-selected", requireAuth, async (req, res): Promise<void> => {
+  try {
   const projectId = parseInt(String(req.params.projectId));
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
@@ -512,6 +513,10 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
   }, null, 2), { name: "vault_index.json" });
 
   await archive.finalize();
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    if (!res.headersSent) res.status(500).json({ error: msg });
+  }
 });
 
 // ─── REGISTRAR ARCHIVO GENERADO (llamado internamente por los motores) ────────
