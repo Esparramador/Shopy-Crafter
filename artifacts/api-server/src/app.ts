@@ -99,6 +99,30 @@ startRateLimitCleanup();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// ── Global input sanitization — strips prototype pollution on all POST/PUT ──
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (req.body && typeof req.body === "object") {
+    const bodyStr = JSON.stringify(req.body);
+    if (bodyStr.length > 50_000_000) {
+      const err: any = new Error("Request body too large");
+      err.status = 413;
+      return next(err);
+    }
+    const sanitize = (obj: any): any => {
+      if (obj === null || typeof obj !== "object") return obj;
+      if (Array.isArray(obj)) return obj.map(sanitize);
+      const clean: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+        clean[key] = sanitize(value);
+      }
+      return clean;
+    };
+    req.body = sanitize(req.body);
+  }
+  next();
+});
+
 // ── Session ───────────────────────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) throw new Error("SESSION_SECRET not set");
@@ -155,64 +179,51 @@ app.use("/api/agency/analyze", aiLimiter);
 app.use("/api/agency/proposal", aiLimiter);
 app.use("/api", apiLimiter);
 
-// ── Anti-502 middleware — auto-detects AI-heavy routes ────────────────────────
-const AI_HEAVY_PREFIXES = [
-  "/api/shopybrain/",
-  "/api/fusion-studio/",
-  "/api/agency/",
-  "/api/research/",
-  "/api/intelligence/",
-  "/api/competitors/",
-  "/api/web-lab/",
-  "/api/generator/",
-  "/api/email-templates/generate",
-  "/api/emails/generate",
-  "/api/emails/flows",
-  "/api/enrichment/",
-  "/api/klaviyo-ai/",
-  "/api/reference/analyze",
-  "/api/inventory/restock-email",
-  "/api/push/vapid-generate",
-  "/api/voice/command",
-  "/api/entity-research/",
-  "/api/absorber/",
-];
-
-const SEO_AI_PATTERNS = [
-  "/seo/generate-metas",
-  "/seo/keyword-intelligence",
-  "/seo/blog-strategy",
-  "/seo/generate-blog-post",
-  "/seo/fix-alt-texts",
-  "/seo/generate-schemas",
-];
-
-const PRODUCT_AI_PATTERNS = [
-  "/products/create",
-  "/catalog-opportunities",
-  "/financial-forecast",
-  "/analyze-competitors",
-  "/calculate-optimal-price",
-  "/ai-estimate-cogs",
-  "/bulk-redesign",
-  "/images/generate",
-  "/visual-dna",
-  "/repair-consistency",
-  "/audit/run",
-  "/exports/generate",
-  "/exports/run-full-audit",
-  "/ab-tests",
-  "/redesign/",
+// ── Anti-502 middleware — regex-based auto-detection of AI-heavy routes ───────
+const AI_ROUTE_PATTERNS = [
+  /^\/api\/shopybrain\/(absorb|create-product|supplier|research|audit|search|study|execute|chat)/,
+  /^\/api\/fusion-studio\//,
+  /^\/api\/agency\/(analyze|quote|budget|proposal)/,
+  /^\/api\/research\//,
+  /^\/api\/intelligence\//,
+  /^\/api\/competitors\/(scan|auto-discover)/,
+  /^\/api\/web-lab\//,
+  /^\/api\/generator\/run/,
+  /^\/api\/email-templates\/generate/,
+  /^\/api\/emails\/(generate|flows)/,
+  /^\/api\/enrichment\//,
+  /^\/api\/klaviyo-ai\//,
+  /^\/api\/reference\/analyze/,
+  /^\/api\/inventory\/restock-email/,
+  /^\/api\/push\/vapid-generate/,
+  /^\/api\/voice\/command/,
+  /^\/api\/entity-research\//,
+  /^\/api\/absorber\//,
+  /\/audit\/run$/,
+  /\/visual-dna$/,
+  /\/repair-consistency$/,
+  /\/ab-tests$/,
+  /\/seo\/(generate|keyword|blog|fix-alt|generate-schemas)/,
+  /\/products\/create$/,
+  /\/catalog-opportunities$/,
+  /\/financial-forecast$/,
+  /\/analyze-competitors$/,
+  /\/calculate-optimal-price$/,
+  /\/ai-estimate-cogs$/,
+  /\/bulk-redesign$/,
+  /\/images\/generate/,
+  /\/exports\/(generate|run-full)/,
+  /\/redesign$/,
+  /\/apply-redesign$/,
+  /\/enrich-batch$/,
+  /\/build-image-prompt$/,
+  /\/plan\/check$/,
 ];
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const p = req.path;
-  const isAiHeavy =
-    AI_HEAVY_PREFIXES.some(prefix => p.startsWith(prefix)) ||
-    SEO_AI_PATTERNS.some(pattern => p.includes(pattern)) ||
-    PRODUCT_AI_PATTERNS.some(pattern => p.includes(pattern));
-
-  if (isAiHeavy && (req.method === "POST" || req.method === "PUT")) {
+  if (req.method !== "POST" && req.method !== "PUT") return next();
+  const isAiHeavy = AI_ROUTE_PATTERNS.some(pattern => pattern.test(req.path));
+  if (isAiHeavy) {
     res.setHeader("X-Accel-Buffering", "no");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("Cache-Control", "no-cache");
@@ -228,38 +239,54 @@ app.use((req: Request, res: Response) => {
 });
 
 // ── Global error handler (Express 5 catches async errors automatically) ──────
-app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   if (res.headersSent) {
-    logger.error({ err, path: req.path }, "Error after headers sent — connection may be broken");
+    logger.error({ err: err?.message, path: req.path }, "Error after headers sent");
     return;
   }
 
-  const status = (err as any)?.status || (err as any)?.statusCode || 500;
-  const message = err instanceof Error ? err.message : "Error interno del servidor";
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Error interno del servidor";
 
   if (status >= 500) {
-    logger.error({ err, method: req.method, path: req.path, status }, `[UNHANDLED] ${req.method} ${req.path}`);
+    logger.error({ err, method: req.method, path: req.path, body: req.body ? Object.keys(req.body) : [] }, `[UNHANDLED ${status}] ${req.method} ${req.path}`);
   } else {
-    logger.warn({ message, method: req.method, path: req.path, status }, `[HANDLED] ${req.method} ${req.path}`);
+    logger.warn({ message, path: req.path, status }, `[${status}] ${req.method} ${req.path}`);
+  }
+
+  if (status === 429 || message.includes("429") || message.includes("rate limit")) {
+    res.status(429).json({ error: "Límite de solicitudes alcanzado. Espera un momento.", code: 429 });
+    return;
+  }
+  if (status === 413 || message.includes("too large") || message.includes("payload")) {
+    res.status(413).json({ error: "El contenido es demasiado grande. Reduce el tamaño.", code: 413 });
+    return;
+  }
+  if (status === 401) {
+    res.status(401).json({ error: "No autenticado. Inicia sesión.", code: 401 });
+    return;
+  }
+  if (status === 403) {
+    res.status(403).json({ error: "No autorizado para esta acción.", code: 403 });
+    return;
+  }
+  if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
+    res.status(504).json({ error: "Tiempo de espera agotado — inténtalo de nuevo.", code: 504 });
+    return;
+  }
+  if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
+    res.status(503).json({ error: "Servicio temporalmente no disponible.", code: 503 });
+    return;
   }
 
   const safeMessage = status >= 500
     ? "Error interno del servidor. Inténtalo de nuevo."
     : message;
 
-  if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
-    res.status(504).json({ error: "Tiempo de espera agotado — inténtalo de nuevo", code: "TIMEOUT" });
-    return;
-  }
-  if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
-    res.status(503).json({ error: "Servicio temporalmente no disponible", code: "SERVICE_UNAVAILABLE" });
-    return;
-  }
-
   res.status(status).json({
     error: safeMessage,
     code: status,
-    ...(process.env.NODE_ENV !== "production" && { debug: message }),
+    ...(process.env.NODE_ENV !== "production" ? { debug: message } : {}),
   });
 });
 
