@@ -24,3 +24,4 @@ export * from "./priceHistory";
 export * from "./email_templates";
 export * from "./email_flows";
 export * from "./audit_results";
+export * from "./report_templates";

@@ -45,6 +45,7 @@ import enrichmentRouter from "./enrichment.js";
 import generatorRouter from "./generator.js";
 import webLabRouter from "./web-lab.js";
 import fusionStudioRouter from "./fusion-studio.js";
+import reportTemplatesRouter from "./report-templates.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -60,6 +61,18 @@ router.use("/cms", (req, res, next) => {
 router.use(storeRouter);
 router.use(contactRouter);
 router.use(apkRouter);
+
+router.get("/report-templates/:token", (req, res, next) => {
+  if (/^[a-f0-9]{64}$/.test(req.params.token)) return next();
+  return requireAdmin(req, res, next);
+}, async (req, res) => {
+  const { db } = await import("@workspace/db");
+  const { reportTemplatesTable } = await import("@workspace/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const [tpl] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.shareToken, req.params.token));
+  if (!tpl || !tpl.isPublic) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+  res.json(tpl);
+});
 
 router.use(requireAdmin);
 router.use(projectsRouter);
@@ -100,5 +113,6 @@ router.use("/enrichment", enrichmentRouter);
 router.use(generatorRouter);
 router.use(webLabRouter);
 router.use(fusionStudioRouter);
+router.use(reportTemplatesRouter);
 
 export default router;

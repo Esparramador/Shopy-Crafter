@@ -45,8 +45,21 @@ A standalone search and audit tool accessible from the sidebar. It allows search
 ### Universal Web Audit System
 This system audits any website using the Google PageSpeed Insights API, an internal web scraper, and Claude AI for analysis, storing results in the `audit_results` table. Each audit contributes to ShopyBrain's learning.
 
+### Template Studio (`/admin/template-studio`)
+A visual editor for creating custom report templates with any brand's identity. Features:
+- 7-color design system (primary, secondary, accent, text, background, card, border)
+- Typography selection (heading + body fonts from Google Fonts)
+- Logo upload (base64, max 2MB)
+- Layout styles (cover: centered/left-aligned/minimal, sections: card/accent-bar/minimal)
+- Live preview via sandboxed iframe with real-time updates
+- AI-powered brand analysis via Gemini Search (input URL/Instagram/brand name)
+- Public sharing via 64-char hex token (accessible without auth when isPublic=true)
+- DB: `report_templates` table (25 columns), backend: 6 CRUD + AI endpoints
+- Integration: `getReportShell()` in exports.ts accepts CustomReportTemplate objects alongside built-in "classic"/"elegance"/"prestige"
+- Security: All template values sanitized (hex validation, font name whitelist, HTML escaping, logo data:image/ prefix check)
+
 ### Database
-PostgreSQL with Drizzle ORM manages over 44 tables, including a `platform_type` column for platform specificity.
+PostgreSQL with Drizzle ORM manages over 45 tables, including a `platform_type` column for platform specificity.
 
 ### AI Stack (Single Brain Architecture — MEGA-BRAIN)
 "ShopyBrain" is the central mega-brain that receives, distributes, and stores all requests and knowledge, injecting accumulated intelligence into every AI call. It's a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. All Claude calls are routed through specific brain-aware functions (`askClaudeWithBrain`, etc.) to ensure proper context injection and API key management.

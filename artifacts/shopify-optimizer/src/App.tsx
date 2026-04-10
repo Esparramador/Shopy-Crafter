@@ -57,6 +57,7 @@ import AdminSettings from "@/pages/admin/AdminSettings";
 import AdminProducts from "@/pages/admin/AdminProducts";
 import AdminABTests from "@/pages/admin/AdminABTests";
 import AdminAutomations from "@/pages/admin/AdminAutomations";
+import TemplateStudio from "@/pages/admin/TemplateStudio";
 
 import ClientDashboard from "@/pages/client/ClientDashboard";
 import ClientApprovals from "@/pages/client/ClientApprovals";
@@ -350,6 +351,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><UniversalSearch /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/admin/template-studio">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><TemplateStudio /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

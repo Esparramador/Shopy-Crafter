@@ -1227,6 +1227,26 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
 
 export type ReportTemplate = "classic" | "elegance" | "prestige";
 
+export interface CustomReportTemplate {
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  textColor?: string | null;
+  bgColor?: string | null;
+  cardBg?: string | null;
+  borderColor?: string | null;
+  headingFont?: string | null;
+  bodyFont?: string | null;
+  headingWeight?: string | null;
+  coverStyle?: string | null;
+  sectionStyle?: string | null;
+  logoBase64?: string | null;
+  companyName?: string | null;
+  tagline?: string | null;
+  footerText?: string | null;
+  showPageNumbers?: boolean | null;
+}
+
 const ELEGANCE = {
   navy: "#0b1628",
   navyLight: "#0f1d35",
@@ -1918,10 +1938,96 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
 </html>`;
 }
 
-export function getReportShell(template: ReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
+export function getReportShell(template: ReportTemplate | CustomReportTemplate = "prestige"): (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => string {
+  if (typeof template === "object" && template.primaryColor) {
+    return buildCustomReportShell(template);
+  }
   if (template === "elegance") return reportShellElegance;
   if (template === "prestige") return reportShellPrestige;
   return (t, s, b, d, c) => reportShell(t, s, b, d, c);
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+const HEX_VALID = /^#[0-9a-fA-F]{3,8}$/;
+function safeHex(v: string | null | undefined, fb: string): string {
+  return (v && HEX_VALID.test(v)) ? v : fb;
+}
+function safeFont(v: string | null | undefined, fb: string): string {
+  if (!v) return fb;
+  return v.replace(/[^a-zA-Z0-9 ]/g, "") || fb;
+}
+
+function buildCustomReportShell(tpl: CustomReportTemplate) {
+  const hf = safeFont(tpl.headingFont, "Helvetica Neue");
+  const bf = safeFont(tpl.bodyFont, "Helvetica Neue");
+  const pc = safeHex(tpl.primaryColor, "#c8a84b");
+  const sc = safeHex(tpl.secondaryColor, "#08080e");
+  const tc = safeHex(tpl.textColor, "#f0f0f5");
+  const bg = safeHex(tpl.bgColor, "#08080e");
+  const cb = safeHex(tpl.cardBg, "#12121a");
+  const bc = safeHex(tpl.borderColor, "#1a1a22");
+  const ac = safeHex(tpl.accentColor, "#44cc88");
+  const hw = /^[0-9]{3}$/.test(tpl.headingWeight || "") ? tpl.headingWeight! : "700";
+  const cs = ["centered", "left-aligned", "minimal"].includes(tpl.coverStyle || "") ? tpl.coverStyle! : "centered";
+  const ss = ["card", "accent-bar", "minimal"].includes(tpl.sectionStyle || "") ? tpl.sectionStyle! : "card";
+
+  return (title: string, subtitle: string, body: string, date: string, targetCompany?: string) => `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(hf)}:wght@400;600;700&family=${encodeURIComponent(bf)}:wght@300;400;500;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: '${bf}', sans-serif; background: ${bg}; color: ${tc}; }
+  .cover { background: ${sc}; padding: 80px 48px; text-align: ${cs === "left-aligned" ? "left" : "center"}; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+  .cover-logo { max-width: 120px; max-height: 120px; border-radius: 16px; margin-bottom: 24px; ${cs === "centered" ? "margin-left:auto;margin-right:auto;" : ""} }
+  .cover-title { font-family: '${hf}', serif; font-size: 32px; font-weight: ${hw}; color: ${pc}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; }
+  .cover-subtitle { font-size: 16px; color: ${tc}80; margin-bottom: 24px; }
+  .cover-company { font-size: 14px; color: ${pc}60; letter-spacing: 2px; text-transform: uppercase; }
+  .cover-date { font-size: 12px; color: ${tc}40; margin-top: 16px; }
+  .report-body { padding: 48px; max-width: 900px; margin: 0 auto; }
+  .section { margin-bottom: 32px; }
+  .section-title { font-family: '${hf}', serif; font-size: 20px; font-weight: ${hw}; color: ${pc}; margin-bottom: 16px; ${ss === "accent-bar" ? `border-left: 4px solid ${pc}; padding-left: 16px;` : ""} }
+  .card { background: ${cb}; border: 1px solid ${bc}; border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+  .metric-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .metric { flex: 1; min-width: 120px; text-align: center; background: ${cb}; border: 1px solid ${bc}; border-radius: 12px; padding: 20px; }
+  .metric .value { font-size: 32px; font-weight: 800; color: ${pc}; }
+  .metric .label { font-size: 12px; color: ${tc}60; margin-top: 4px; }
+  .recommendation { background: ${cb}; border-left: 4px solid ${ac}; padding: 16px; margin-bottom: 8px; border-radius: 0 8px 8px 0; font-size: 14px; line-height: 1.6; }
+  .grade { display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 14px; }
+  .grade-a { background: ${ac}20; color: ${ac}; }
+  .grade-b { background: ${pc}20; color: ${pc}; }
+  .grade-c { background: #ffa50020; color: #ffa500; }
+  .grade-d { background: #ff555520; color: #ff5555; }
+  .grade-f { background: #ff333320; color: #ff3333; }
+  .score-bar { height: 8px; background: ${bc}; border-radius: 4px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+  .footer { text-align: center; padding: 32px; border-top: 1px solid ${bc}; margin-top: 48px; }
+  .footer-text { font-size: 12px; color: ${tc}40; }
+  @media print { body { background: white; color: #222; } .card { border: 1px solid #ddd; } .cover { background: white; } }
+</style>
+</head>
+<body>
+  <div class="cover">
+    ${tpl.logoBase64 && String(tpl.logoBase64).startsWith("data:image/") ? `<img class="cover-logo" src="${tpl.logoBase64}" alt="Logo" />` : ""}
+    <div class="cover-title">${title}</div>
+    <div class="cover-subtitle">${subtitle}</div>
+    ${targetCompany ? `<div class="cover-company">${targetCompany}</div>` : ""}
+    ${tpl.tagline ? `<div style="font-size:13px;color:${tc}50;margin-top:8px;">${esc(tpl.tagline)}</div>` : ""}
+    <div class="cover-date">${date}</div>
+  </div>
+  <div class="report-body">
+    ${body}
+  </div>
+  <div class="footer">
+    <div class="footer-text">${esc(tpl.footerText || tpl.companyName || "Informe generado con IA")}</div>
+  </div>
+</body>
+</html>`;
 }
 
 function gradeClass(grade: string): string {
