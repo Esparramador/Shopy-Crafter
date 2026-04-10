@@ -144,7 +144,7 @@ Devuelve SOLO JSON:
   "metafields": [{"namespace":"custom","key":"material","value":"valor real","type":"single_line_text_field"},{"namespace":"custom","key":"color","value":"valor","type":"single_line_text_field"},{"namespace":"custom","key":"care_instructions","value":"instrucciones detalladas","type":"multi_line_text_field"},{"namespace":"custom","key":"origin","value":"país/región","type":"single_line_text_field"},{"namespace":"custom","key":"warranty","value":"info garantía","type":"single_line_text_field"},{"namespace":"custom","key":"weight_detail","value":"peso con unidad","type":"single_line_text_field"}]
 }`;
 
-  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 12000);
+  return await askClaudeJsonWithBrain<RedesignOutput>(projectId, prompt, SHOPIFY_EXPERT_SYSTEM, "redesign", project.storeNiche ?? undefined, 32000);
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {

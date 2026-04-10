@@ -51,6 +51,14 @@ PostgreSQL with Drizzle ORM manages over 44 tables, including a `platform_type` 
 ### AI Stack (Single Brain Architecture — MEGA-BRAIN)
 "ShopyBrain" is the central mega-brain that receives, distributes, and stores all requests and knowledge, injecting accumulated intelligence into every AI call. It's a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. All Claude calls are routed through specific brain-aware functions (`askClaudeWithBrain`, etc.) to ensure proper context injection and API key management.
 
+**Token Limits & Anti-Truncation (April 2026):**
+- Claude Brain functions (`askClaudeWithBrain`, `askClaudeJsonWithBrain`) default to 32,000 tokens (Claude Sonnet 4 supports up to 64K output).
+- Gemini maxOutputTokens: 65,536 (Flash max). ThinkingBudget: 6K-10K per function.
+- Dual AI synthesis cap: 32,000 tokens. Redesign: 32,000 tokens.
+- All AI providers log `⚠️ RESPONSE TRUNCATED` warnings when `stop_reason`/`finishReason` indicates token limit hit.
+- Claude has robust rate-limit retry via `claude-queue.ts` (4 retries, exponential backoff, detects 429/500/502/503/529/overloaded).
+- Gemini has rate-limit-aware retry via `withRetry` (2 retries, aggressive backoff on 429/RESOURCE_EXHAUSTED).
+
 ### Lab Web (`/projects/:id/web-lab`)
 A deep web design analysis tool that extracts HTML+CSS from any URL, runs PageSpeed + scraper analysis, and sends the code to Claude for design review. It outputs improved CSS, HTML fragments, a professional report, and before/after visual previews.
 

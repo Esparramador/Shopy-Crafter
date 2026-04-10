@@ -173,6 +173,10 @@ export async function askClaude(
       { signal: AbortSignal.timeout(timeoutMs) }
     );
 
+    if (response.stop_reason === "max_tokens") {
+      logger.warn({ maxTokens, model: CLAUDE_MODEL, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+    }
+
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
     return content.text;
@@ -254,6 +258,10 @@ export async function askClaudeWithVision(
       { signal: AbortSignal.timeout(120_000) }
     );
 
+    if (response.stop_reason === "max_tokens") {
+      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude Vision] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+    }
+
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
     return content.text;
@@ -299,6 +307,10 @@ export async function askClaudeVisionWithBrain(
       { signal: AbortSignal.timeout(120_000) }
     );
 
+    if (response.stop_reason === "max_tokens") {
+      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude VisionBrain] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+    }
+
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
     return content.text;
@@ -317,6 +329,11 @@ export async function claude(prompt: string, maxTokens = 2048): Promise<string> 
       },
       { signal: AbortSignal.timeout(120_000) }
     );
+
+    if (response.stop_reason === "max_tokens") {
+      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+    }
+
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text response");
     return content.text;
@@ -684,7 +701,7 @@ export async function askClaudeWithBrain(
   systemPrompt?: string,
   useCase: BrainUseCase = "general",
   niche?: string,
-  maxTokens = 16000,
+  maxTokens = 32000,
   timeoutMs = 180_000
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
@@ -706,7 +723,7 @@ export async function askClaudeJsonWithBrain<T>(
   systemPrompt: string,
   useCase: BrainUseCase = "general",
   niche?: string,
-  maxTokens = 16000,
+  maxTokens = 32000,
   timeoutMs = 180_000
 ): Promise<T> {
   const platform = await resolvePlatformType(projectId);

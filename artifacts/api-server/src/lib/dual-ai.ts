@@ -199,7 +199,7 @@ INSTRUCCIONES DE SÍNTESIS:
   let synthesis: string;
   let synthTime: number;
   try {
-    synthesis = await callClaudeBrain(projectId, synthPrompt, opts.claudeSystemPrompt ?? opts.systemPrompt, useCase, niche, Math.min(Math.round(maxTokens * 1.5), 16000));
+    synthesis = await callClaudeBrain(projectId, synthPrompt, opts.claudeSystemPrompt ?? opts.systemPrompt, useCase, niche, Math.min(Math.round(maxTokens * 1.5), 32000));
     synthTime = Date.now() - t0s;
   } catch (synthErr) {
     logger.warn({ err: String(synthErr) }, "Dual AI: Synthesis failed, falling back to Claude result");

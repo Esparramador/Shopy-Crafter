@@ -61,10 +61,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): P
   ]);
 }
 
-// ─── Utility: retry once on failure with delay ────────────────────────────────
+// ─── Utility: retry with rate-limit-aware backoff ──────────────────────────────
 async function withRetry<T>(
   fn: () => Promise<T>,
-  retries = 1,
+  retries = 2,
   delayMs = 3_000,
   label = "call"
 ): Promise<T> {
@@ -73,8 +73,13 @@ async function withRetry<T>(
       return await fn();
     } catch (err) {
       if (attempt < retries) {
-        logger.warn({ label, attempt, err: String(err) }, `Retrying ${label} in ${delayMs}ms…`);
-        await new Promise(r => setTimeout(r, delayMs));
+        const errStr = String(err);
+        const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("rate");
+        const backoff = isRateLimit
+          ? Math.min(60_000, delayMs * Math.pow(3, attempt))
+          : delayMs * Math.pow(2, attempt);
+        logger.warn({ label, attempt, backoff, isRateLimit, err: errStr }, `Retrying ${label} in ${backoff}ms…`);
+        await new Promise(r => setTimeout(r, backoff));
       } else {
         throw err;
       }
@@ -102,6 +107,11 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
     `askGemini(${model})`
   );
 
+  const candidate = response.candidates?.[0];
+  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+    logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  }
+
   return response.text ?? "";
 }
 
@@ -124,6 +134,11 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
     GEMINI_CALL_TIMEOUT_MS,
     `askGeminiJson(${model})`
   );
+
+  const jsonCandidate = response.candidates?.[0];
+  if ((jsonCandidate as any)?.finishReason === "MAX_TOKENS") {
+    logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  }
 
   const text = response.text ?? "{}";
   try {
@@ -322,8 +337,11 @@ export async function askGeminiWithSearch(
     `askGeminiWithSearch`
   );
 
-  // Extract source URLs from grounding metadata
   const candidate        = response.candidates?.[0];
+  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+    logger.warn({ maxOutputTokens: 65536 }, "[Gemini Search] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  }
+
   const groundingMeta    = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
   const groundingChunks  = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
   const searchQueries    = groundingMeta?.webSearchQueries as string[] | undefined;
@@ -363,6 +381,10 @@ export async function askGeminiWithUrls(
   );
 
   const candidate       = response.candidates?.[0];
+  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+    logger.warn({ maxOutputTokens: 65536 }, "[Gemini URLs] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  }
+
   const groundingMeta   = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
   const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
   const sources         = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
