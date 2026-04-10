@@ -531,6 +531,7 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
       return;
     }
   
+    invalidateCache("projects-");
     res.json({
       ...updated,
       clientSecret: "••••••••",
@@ -559,6 +560,7 @@ router.post("/projects/:projectId/disconnect", async (req, res): Promise<void> =
       tokenExpiresAt: null,
     }).where(eq(projectsTable.id, id));
   
+    invalidateCache("projects-");
     req.log.info({ projectId: id, domain: project.shopDomain }, "Store disconnected (credentials cleared, data preserved)");
     res.json({
       success: true,
@@ -599,6 +601,7 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
   
       const token = await refreshToken(id, domain, clientId, clientSecret);
   
+      invalidateCache("projects-");
       req.log.info({ projectId: id, domain }, "Store reconnected with new credentials");
       res.json({ success: true, message: "Tienda reconectada correctamente.", tokenUpdated: true });
     } catch (err) {
@@ -631,6 +634,7 @@ router.delete("/projects/:projectId", async (req, res): Promise<void> => {
         details: `Dissociated store from project ${id}`,
         ipAddress: req.ip ?? "unknown",
       });
+      invalidateCache("projects-");
       res.json({ success: true, message: "Tienda desasociada. Tus productos, COGS, SEO e imágenes se conservan." });
     } else {
       await db.delete(projectsTable).where(eq(projectsTable.id, id));
@@ -641,6 +645,7 @@ router.delete("/projects/:projectId", async (req, res): Promise<void> => {
         details: `Deleted project ${id}`,
         ipAddress: req.ip ?? "unknown",
       });
+      invalidateCache("projects-");
       res.json({ success: true, message: "Proyecto eliminado completamente" });
     }
   } catch (err: any) {
@@ -692,6 +697,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
         details: `Manual token update for project ${id}`,
         ipAddress: req.ip ?? "unknown",
       });
+      invalidateCache("projects-");
       res.json({ success: true, message: "Token actualizado y validado correctamente." });
       return;
     }
@@ -707,6 +713,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
         details: `Token refreshed for project ${id} (${project.shopDomain})`,
         ipAddress: req.ip ?? "unknown",
       });
+      invalidateCache("projects-");
       res.json({
         success: true,
         message: "Token regenerado correctamente.",
