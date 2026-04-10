@@ -744,7 +744,7 @@
 
 /* ════════════ SECTION 05: PRICING ════════════ */
 .fp-pricing-layout { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
-.fp-pricing-carousel-wrap { position: relative; width: 100%; overflow: visible; }
+.fp-pricing-carousel-wrap { position: relative; width: 100%; overflow: visible; padding: 0 48px; }
 .fp-pricing-row {
   display: flex;
   gap: 14px;
@@ -769,11 +769,11 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: 510;
   width: 36px; height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(200,168,75,0.3);
-  background: rgba(16,16,24,0.85);
+  background: rgba(16,16,24,0.95);
   color: var(--l-gold);
   font-size: 22px;
   display: flex; align-items: center; justify-content: center;
@@ -782,8 +782,8 @@
   backdrop-filter: blur(8px);
 }
 .fp-pricing-arrow:hover { background: rgba(200,168,75,0.15); border-color: var(--l-gold); }
-.fp-pricing-arrow-left { left: -18px; }
-.fp-pricing-arrow-right { right: -18px; }
+.fp-pricing-arrow-left { left: 4px; }
+.fp-pricing-arrow-right { right: 54px; }
 .fp-pricing-dots {
   display: flex; gap: 8px; justify-content: center; margin-top: 4px;
 }
@@ -888,8 +888,8 @@
   .fp-section::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.2); border-radius: 2px; }
   .fp-pricing-row > * { flex: 0 0 calc(45% - 10px) !important; min-width: 240px; max-width: 320px; }
   .fp-pricing-arrow { width: 32px; height: 32px; font-size: 18px; }
-  .fp-pricing-arrow-left { left: -12px; }
-  .fp-pricing-arrow-right { right: -12px; }
+  .fp-pricing-arrow-left { left: 4px; }
+  .fp-pricing-arrow-right { right: 50px; }
   .fp-contact-form { max-height: none !important; overflow: visible !important; }
 }
 
@@ -1070,8 +1070,8 @@
     max-width: 340px;
   }
   .fp-pricing-arrow { width: 30px; height: 30px; font-size: 16px; }
-  .fp-pricing-arrow-left { left: -8px; }
-  .fp-pricing-arrow-right { right: -8px; }
+  .fp-pricing-arrow-left { left: 4px; }
+  .fp-pricing-arrow-right { right: 48px; }
   .fp-footer-inner { grid-template-columns: 1fr 1fr; }
   .fp-footer-brand { grid-column: 1 / -1; }
   .l-features-grid { grid-template-columns: 1fr 1fr; }
@@ -1164,8 +1164,8 @@
     max-width: 340px;
   }
   .fp-pricing-arrow { width: 28px; height: 28px; font-size: 16px; }
-  .fp-pricing-arrow-left { left: -4px; }
-  .fp-pricing-arrow-right { right: -4px; }
+  .fp-pricing-arrow-left { left: 2px; }
+  .fp-pricing-arrow-right { right: 2px; }
   .l-pricing-card { padding: 24px 20px; }
   .l-pricing-featured { transform: none !important; }
 

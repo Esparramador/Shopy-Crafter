@@ -1620,8 +1620,10 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
   .cover-portfolio {
     width: 100%;
     background: #120e0a;
-    text-align: center; padding: 60px 40px 40px; overflow: hidden;
+    text-align: center; padding: 80px 40px 60px; overflow: hidden;
     border-bottom: 2px solid ${PRESTIGE.border}; page-break-after: always;
+    min-height: 50vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
 
   .cover-inner { max-width: 680px; margin: 0 auto; }

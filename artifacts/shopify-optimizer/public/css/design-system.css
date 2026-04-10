@@ -311,25 +311,35 @@ body::after {
 }
 
 /* ── MODULE TAB NAV ── */
+.module-tabs-wrap {
+  display: flex;
+  align-items: stretch;
+  background: var(--ink2);
+  border-bottom: 1px solid var(--bdr);
+  position: relative;
+  flex-shrink: 0;
+}
+.module-tabs-arrow {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; min-width: 28px;
+  background: var(--ink2); border: none;
+  color: var(--t2); font-size: 18px; cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  padding: 0; flex-shrink: 0;
+  border-bottom: 1px solid var(--bdr);
+}
+.module-tabs-arrow:hover { color: var(--gold2); background: rgba(200,168,75,.06); }
 .module-tabs {
   display: flex; gap: 0;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--bdr);
+  padding: 0 4px;
   background: var(--ink2);
   overflow-x: auto;
-  flex-shrink: 0;
-  /* Hidden scrollbar + fade-right gradient hint */
+  flex: 1; min-width: 0;
   scrollbar-width: none;
   -ms-overflow-style: none;
   position: relative;
 }
 .module-tabs::-webkit-scrollbar { display: none; }
-.module-tabs::after {
-  content: '';
-  position: absolute; top: 0; right: 0; bottom: 1px;
-  width: 40px; pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--ink2));
-}
 .module-tab {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 14px;

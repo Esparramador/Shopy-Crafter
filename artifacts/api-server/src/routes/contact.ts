@@ -440,7 +440,7 @@ function buildReportHtml(
   const esc = sanitizeHtml;
 
   function safeUrl(url: string): string {
-    if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(url.slice(0, 200))) return url;
+    if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(url)) return url;
     try {
       const u = new URL(url.startsWith("http") ? url : `https://${url}`);
       if (u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:") return u.href;
@@ -539,7 +539,11 @@ function buildReportHtml(
     ["Mensaje", `<em>"${esc(lead.message || "—")}"</em>`],
   ];
   if (lead.extraInfo) leadRows.push(["Info Adicional", esc(lead.extraInfo)]);
-  if (lead.productImageUrl) leadRows.push(["Imagen Producto", `<div class="product-img-cell"><img src="${safeUrl(lead.productImageUrl)}" alt="Producto" class="product-img-thumb" onerror="this.style.display='none'" /><a href="${safeUrl(lead.productImageUrl)}" class="link product-img-link">${esc(lead.productImageUrl)}</a></div>`]);
+  if (lead.productImageUrl) {
+    const isBase64Img = lead.productImageUrl.startsWith("data:image/");
+    const imgLabel = isBase64Img ? "📷 Imagen adjunta del producto" : esc(lead.productImageUrl);
+    leadRows.push(["Imagen Producto", `<div class="product-img-cell"><img src="${safeUrl(lead.productImageUrl)}" alt="Producto" class="product-img-thumb" style="max-width:280px;max-height:200px;border-radius:8px;display:block;margin-bottom:8px;object-fit:contain;" onerror="this.style.display='none'" /><span class="muted" style="font-size:12px;">${imgLabel}</span></div>`]);
+  }
 
   const leadTableHtml = leadRows.map(([label, value]) =>
     `<tr><td class="table-label">${label}</td><td class="table-value">${value}</td></tr>`

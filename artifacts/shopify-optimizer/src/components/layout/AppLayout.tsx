@@ -481,22 +481,40 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Module tab nav (only when a project is active) */}
         {activeProject && (
-          <div className="module-tabs" role="tablist">
-            {moduleNav.map((item: any) => {
-              const isActive = currentPage === item.id;
-              return (
-                <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>
-                  <div
-                    className={`module-tab${isActive ? " active" : ""}`}
-                    role="tab"
-                    aria-selected={isActive}
-                  >
-                    <span style={{ fontSize: 13 }}>{item.icon}</span>
-                    <span className="module-tab-label">{item.label}</span>
-                  </div>
-                </Link>
-              );
-            })}
+          <div className="module-tabs-wrap">
+            <button
+              className="module-tabs-arrow module-tabs-arrow-left"
+              aria-label="Scroll tabs left"
+              onClick={() => {
+                const el = document.querySelector('.module-tabs');
+                if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
+              }}
+            >‹</button>
+            <div className="module-tabs" role="tablist">
+              {moduleNav.map((item: any) => {
+                const isActive = currentPage === item.id;
+                return (
+                  <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>
+                    <div
+                      className={`module-tab${isActive ? " active" : ""}`}
+                      role="tab"
+                      aria-selected={isActive}
+                    >
+                      <span style={{ fontSize: 13 }}>{item.icon}</span>
+                      <span className="module-tab-label">{item.label}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <button
+              className="module-tabs-arrow module-tabs-arrow-right"
+              aria-label="Scroll tabs right"
+              onClick={() => {
+                const el = document.querySelector('.module-tabs');
+                if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
+              }}
+            >›</button>
           </div>
         )}
 
