@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { analyzeImageForFusion } from "../lib/fusion-studio.js";
+import { analyzeImageForFusion, researchBrandForFusion, autoSuggestPhotoSettings } from "../lib/fusion-studio.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { db, projectsTable } from "@workspace/db";
@@ -9,7 +9,7 @@ import multer from "multer";
 import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 5 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 10 } });
 
 router.post("/fusion-studio/analyze", upload.array("images", 5), async (req: Request, res: Response) => {
   enableLongRunning(res);
@@ -146,6 +146,186 @@ router.post("/fusion-studio/create-product", upload.array("images", 5), async (r
     const errMsg = err instanceof Error ? err.message : "Error creando producto";
     logger.error({ err }, "Fusion Studio create-product failed");
     res.status(500).json({ error: errMsg });
+  }
+});
+
+router.post("/fusion-studio/brand-research", async (req: Request, res: Response) => {
+  enableLongRunning(res);
+
+  try {
+    const { url, instagram, companyName, niche, brandStyle, colors } = req.body;
+
+    if (!url && !instagram && !companyName) {
+      res.status(400).json({ error: "Proporciona al menos URL, Instagram o nombre de empresa" });
+      return;
+    }
+
+    logger.info({ url, instagram, companyName, niche }, "Fusion Studio: Starting brand research");
+
+    const brandDna = await researchBrandForFusion({ url, instagram, companyName, niche, brandStyle, colors });
+
+    learnFromOperation({
+      operationType: "fusion_studio_brand_research",
+      title: `Brand research: ${companyName || instagram || url}`,
+      content: `Fusion Studio brand DNA: ${JSON.stringify(brandDna).substring(0, 500)}`,
+      confidence: 0.85,
+      tags: ["fusion-studio", "brand-research", companyName || instagram || "unknown"],
+    });
+
+    res.json({ success: true, brandDna });
+  } catch (err) {
+    logger.error({ err }, "Fusion Studio brand research failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error en investigación de marca" });
+  }
+});
+
+router.post("/fusion-studio/auto-suggest", async (req: Request, res: Response) => {
+  enableLongRunning(res);
+
+  try {
+    const { productAnalysis, brandDna } = req.body;
+    if (!productAnalysis) {
+      res.status(400).json({ error: "productAnalysis requerido" });
+      return;
+    }
+    const suggestions = await autoSuggestPhotoSettings(productAnalysis, brandDna);
+    res.json({ success: true, suggestions });
+  } catch (err) {
+    logger.error({ err }, "Fusion Studio auto-suggest failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error en sugerencias" });
+  }
+});
+
+router.post("/fusion-studio/generate-photos", upload.array("images", 10), async (req: Request, res: Response) => {
+  enableLongRunning(res);
+
+  try {
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) {
+      res.status(400).json({ error: "Se requiere al menos 1 imagen" });
+      return;
+    }
+
+    const {
+      projectId,
+      modes,
+      lighting,
+      background,
+      perspective,
+      quantity,
+      brandDna,
+      extraPrompt,
+      outputFormat,
+      customScene,
+      hasModel,
+    } = req.body;
+
+    let parsedModes: string[];
+    try {
+      parsedModes = typeof modes === "string" ? JSON.parse(modes) : modes;
+    } catch {
+      res.status(400).json({ error: "modes debe ser un JSON array válido" });
+      return;
+    }
+    if (!Array.isArray(parsedModes) || parsedModes.length === 0) {
+      res.status(400).json({ error: "Se requiere al menos 1 modo de foto" });
+      return;
+    }
+
+    let parsedBrandDna: any = null;
+    try {
+      parsedBrandDna = brandDna ? (typeof brandDna === "string" ? JSON.parse(brandDna) : brandDna) : null;
+    } catch {
+      parsedBrandDna = null;
+    }
+
+    const qty = Math.min(Math.max(parseInt(quantity || "1") || 1, 1), 4);
+    const pid = parseInt(projectId || "0") || 0;
+
+    logger.info({
+      modes: parsedModes, lighting, background, quantity: qty,
+      hasModel: hasModel === "true", imageCount: files.length
+    }, "Fusion Studio: Starting photo generation");
+
+    const productFiles = hasModel === "true" ? files.slice(0, -1) : files;
+    if (productFiles.length === 0) {
+      res.status(400).json({ error: "Se requiere al menos 1 imagen de producto (separada de la imagen del modelo)" });
+      return;
+    }
+
+    const mainBase64 = productFiles[0].buffer.toString("base64");
+    const additionalImages = productFiles.slice(1).map(f => ({
+      base64: f.buffer.toString("base64"),
+      mimeType: f.mimetype,
+    }));
+
+    const analysis = await analyzeImageForFusion(
+      mainBase64, productFiles[0].mimetype, additionalImages,
+      { niche: parsedBrandDna?.sector, brandTone: parsedBrandDna?.style }
+    );
+
+    const brandBlock = parsedBrandDna ? `
+[BRAND DNA — EVERY generated photo MUST reflect this brand identity]
+Brand: ${parsedBrandDna.brandInfo?.name || ""}
+Style: ${parsedBrandDna.brandInfo?.style || ""}
+Colors: ${JSON.stringify(parsedBrandDna.brandInfo?.colors || [])}
+Photography ref: ${parsedBrandDna.instagramInfo?.photoLighting || ""}, ${parsedBrandDna.instagramInfo?.photoBackgrounds?.join(", ") || ""}
+Competitor photo standards: ${parsedBrandDna.competitorPhotography?.competitors?.map((c: any) => c.photoStyle).join("; ") || ""}
+` : "";
+
+    const subjectProtocol = hasModel === "true" ? `
+[CRITICAL SUBJECT SEPARATION PROTOCOL]
+Image 1 = PRODUCT (${analysis.product?.category}). Last image = MODEL (human person).
+ABSOLUTE RULES:
+- The MODEL holds/wears/uses the PRODUCT. They INTERACT, never FUSE.
+- The product keeps its EXACT shape: ${analysis.composition?.layout || "original proportions"}
+- The product keeps its EXACT materials: ${analysis.textures?.map(t => t.material).join(", ") || "original materials"}
+- The person remains anatomically correct — 5 fingers, natural pose
+- NEVER put a human head on a product body or vice versa
+` : `
+[PRODUCT INTEGRITY PROTOCOL]
+Preserve the product's EXACT: shape, materials (${analysis.textures?.map(t => `${t.material}/${t.finish}`).join(", ")}), colors (${analysis.colors?.dominant?.join(", ")}), proportions.
+Only the ENVIRONMENT changes — never the product itself.
+`;
+
+    const generationPlan = parsedModes.flatMap((mode: string) =>
+      Array.from({ length: qty }, (_, i) => ({
+        mode,
+        index: i,
+        prompt: `${subjectProtocol}${brandBlock}
+[PHOTO MODE: ${mode}]
+[LIGHTING: ${lighting}]
+[BACKGROUND: ${background === "scene-custom" ? customScene : background}]
+[PERSPECTIVE: ${perspective}]
+${extraPrompt ? `[ADDITIONAL DIRECTION: ${extraPrompt}]` : ""}
+[OUTPUT SIZE: ${outputFormat || "1024x1024"}]
+Generate a professional ${mode} product photograph.`,
+      }))
+    );
+
+    if (pid > 0) {
+      await saveToVault({
+        projectId: pid,
+        fileType: "fusion-studio-session",
+        category: "fusion-studio",
+        title: `Fusion Session: ${analysis.product?.category} — ${parsedModes.length} modos × ${qty}`,
+        mimeType: "application/json",
+        generatedBy: "fusion-studio",
+        content: JSON.stringify({ analysis, brandDna: parsedBrandDna, generationPlan, settings: { lighting, background, perspective, quantity: qty } }, null, 2),
+        metadata: { modes: parsedModes, photoCount: generationPlan.length },
+      });
+    }
+
+    res.json({
+      success: true,
+      analysis,
+      generationPlan,
+      totalPhotos: generationPlan.length,
+      settings: { lighting, background, perspective, quantity: qty, outputFormat },
+    });
+  } catch (err) {
+    logger.error({ err }, "Fusion Studio generate-photos failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error generando fotos" });
   }
 });
 

@@ -1,5 +1,6 @@
 import { logger } from "./logger.js";
 import { askClaudeVisionWithBrain, learnFromOperation } from "./claude.js";
+import { askGeminiWithSearch } from "./gemini.js";
 
 export interface ImageAnalysis {
   layers: Array<{
@@ -155,4 +156,102 @@ RESPONDE EXCLUSIVAMENTE con JSON válido con esta estructura:
   }, "Fusion Studio analysis complete");
 
   return analysis;
+}
+
+export async function researchBrandForFusion(opts: {
+  url?: string;
+  instagram?: string;
+  companyName?: string;
+  niche?: string;
+  brandStyle?: string;
+  colors?: string[];
+}): Promise<{
+  brandInfo: Record<string, unknown> | null;
+  instagramInfo: Record<string, unknown> | null;
+  competitorPhotography: Record<string, unknown> | null;
+  photographyTrends: Record<string, unknown> | null;
+}> {
+  const searchName = opts.companyName || opts.url?.replace(/https?:\/\/(www\.)?/, "").split("/")[0] || "brand";
+
+  const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
+    if (r.status !== "fulfilled") return null;
+    try {
+      const text = r.value?.text ?? "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch { return null; }
+  };
+
+  logger.info({ searchName, url: opts.url, instagram: opts.instagram }, "Fusion Studio: Starting brand research with 4 parallel Gemini searches");
+
+  const [brandResult, igResult, compPhotoResult, trendsResult] = await Promise.allSettled([
+    askGeminiWithSearch(
+      `Research "${searchName}"${opts.url ? ` (${opts.url})` : ""}. Find: industry, target audience (age, gender, income), brand style (luxury/streetwear/minimal/artisanal/tech/etc), brand colors (hex codes), price range, brand values, photography style used in their marketing. Return ONLY JSON: { "name": "", "sector": "", "audience": "", "style": "", "colors": [], "values": [], "priceRange": "", "photographyStyle": "", "luxuryLevel": 0, "designAdjectives": [] }`,
+      "Brand photography analyst. Return ONLY valid JSON."
+    ),
+    opts.instagram
+      ? askGeminiWithSearch(
+          `Analyze @${opts.instagram} on Instagram. Focus on PHOTOGRAPHY STYLE: lighting (natural/studio/dramatic), backgrounds (white/lifestyle/outdoor), angles (frontal/3-4/overhead), editing (high contrast/muted/vibrant), props commonly used, composition patterns. JSON: { "handle": "", "followers": "", "aesthetic": "", "photoLighting": "", "photoBackgrounds": [], "photoAngles": [], "editingStyle": "", "propsUsed": [], "colors": [], "mood": "" }`,
+          "Instagram product photography analyst. Return ONLY JSON."
+        )
+      : askGeminiWithSearch(
+          `Search for "${searchName}" official Instagram. If found, analyze their product photography style. JSON: { "handle": "", "found": false, "aesthetic": "", "photoLighting": "", "photoBackgrounds": [] }`,
+          "Social media researcher. Return ONLY JSON."
+        ),
+    askGeminiWithSearch(
+      `Find 3 competitors of "${searchName}" in ${opts.niche || "ecommerce"}. Analyze their PRODUCT PHOTOGRAPHY specifically: backgrounds, lighting, props, angles, editing style. JSON: { "competitors": [{ "name": "", "url": "", "photoStyle": "", "backgrounds": [], "lighting": "", "props": [], "highlights": "" }] }`,
+      "Competitive product photography analyst. Return ONLY JSON."
+    ),
+    askGeminiWithSearch(
+      `What are the best product photography trends for ${opts.niche || searchName + "'s sector"} in 2026? Find award-winning product photos in this industry. What lighting, backgrounds, angles, props work best? JSON: { "trends": [], "bestPractices": { "lighting": "", "backgrounds": [], "angles": [], "props": [], "editing": "" }, "examples": [{ "brand": "", "why": "" }] }`,
+      "Product photography trend analyst. Return ONLY JSON."
+    ),
+  ]);
+
+  logger.info({ searchName }, "Fusion Studio: Brand research complete");
+
+  return {
+    brandInfo: parseSafe(brandResult),
+    instagramInfo: parseSafe(igResult),
+    competitorPhotography: parseSafe(compPhotoResult),
+    photographyTrends: parseSafe(trendsResult),
+  };
+}
+
+export async function autoSuggestPhotoSettings(
+  productAnalysis: ImageAnalysis,
+  brandDna: Record<string, unknown> | null,
+): Promise<{
+  lighting: string;
+  background: string;
+  perspective: string;
+  props: string[];
+  colorGrading: string;
+  reasoning: string;
+}> {
+  const prompt = `You are a SENIOR PRODUCT PHOTOGRAPHER. Based on this product analysis and brand DNA, suggest the OPTIMAL photo settings.
+
+PRODUCT: ${productAnalysis.product?.category} — ${productAnalysis.product?.subcategory}
+Materials: ${productAnalysis.textures?.map(t => `${t.material} (${t.finish})`).join(", ")}
+Colors: ${productAnalysis.colors?.dominant?.join(", ")}
+Brand style: ${productAnalysis.product?.brandStyle}
+${brandDna ? `BRAND DNA: ${JSON.stringify(brandDna)}` : ""}
+
+Return JSON:
+{
+  "lighting": "studio-3pt | natural-window | dramatic-rembrandt | soft-diffused | golden-hour | neon-accent | rim-silhouette | low-key-moody | high-key-bright | backlit",
+  "background": "white-pure | grey-soft | dark-black | gradient-brand | marble-luxury | wood-natural | concrete | nature-outdoor | fabric-textile | scene-custom",
+  "perspective": "Frontal 0° | 3/4 (45°) | Lateral 90° | Cenital (top-down) | Contrapicado | Isométrica | Dutch Angle | Nivel de ojo",
+  "props": ["prop1", "prop2", "prop3"],
+  "colorGrading": "warm | cool | neutral | muted | vibrant | high-contrast | film-grain",
+  "reasoning": "Brief explanation of why these settings work for this product+brand"
+}`;
+
+  const text = await askClaudeVisionWithBrain(0, prompt, [], undefined, "images", undefined, 2048);
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : { lighting: "studio-3pt", background: "white-pure", perspective: "3/4 (45°)", props: [], colorGrading: "neutral", reasoning: "Default settings" };
+  } catch {
+    return { lighting: "studio-3pt", background: "white-pure", perspective: "3/4 (45°)", props: [], colorGrading: "neutral", reasoning: "Default settings" };
+  }
 }

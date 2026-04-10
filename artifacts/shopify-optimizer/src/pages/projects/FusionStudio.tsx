@@ -1,0 +1,811 @@
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useRoute } from "wouter";
+
+const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+const PHOTO_MODES = [
+  { id: "hero", label: "Hero Shot", icon: "✦", desc: "Producto protagonista, fondo limpio, iluminación perfecta", cat: "product" },
+  { id: "lifestyle", label: "Lifestyle", icon: "◉", desc: "En contexto real de uso, ambiente natural", cat: "product" },
+  { id: "detail", label: "Macro Detail", icon: "◎", desc: "Zoom extremo en texturas, materiales, acabados", cat: "product" },
+  { id: "flat-lay", label: "Flat Lay", icon: "▣", desc: "Vista cenital, composición editorial", cat: "product" },
+  { id: "model-fashion", label: "Modelo Fashion", icon: "◈", desc: "Modelo vistiendo el producto — editorial", cat: "model" },
+  { id: "model-holding", label: "Modelo Holding", icon: "✿", desc: "Modelo sosteniendo/mostrando el producto", cat: "model" },
+  { id: "model-using", label: "Modelo Usando", icon: "◇", desc: "Modelo interactuando con el producto en acción", cat: "model" },
+  { id: "scale", label: "Escala / Tamaño", icon: "⊞", desc: "Mostrando tamaño real en mano o contexto", cat: "product" },
+  { id: "packaging", label: "Packaging", icon: "▥", desc: "Presentación del empaque y unboxing", cat: "product" },
+  { id: "multi-angle", label: "Multi-Ángulo (4)", icon: "↻", desc: "Frontal + lateral + trasera + 3/4", cat: "product" },
+  { id: "ambient", label: "Ambient / Cinematic", icon: "◐", desc: "Escena cinematográfica, producto como focal point", cat: "scene" },
+  { id: "ugc", label: "UGC / Authentic", icon: "◪", desc: "Estilo contenido de usuario, natural e imperfecto", cat: "scene" },
+  { id: "social-ig", label: "Instagram Ready", icon: "▪", desc: "1:1, optimizado para feed de Instagram", cat: "social" },
+  { id: "social-story", label: "Story / Reel", icon: "▫", desc: "9:16 vertical, optimizado para stories", cat: "social" },
+  { id: "banner", label: "Banner / Header", icon: "▬", desc: "16:9 horizontal para web o marketplace", cat: "social" },
+  { id: "comparison", label: "Before / After", icon: "⇔", desc: "Split comparativo del producto", cat: "product" },
+];
+
+const LIGHTING = [
+  { id: "studio-3pt", label: "Estudio 3-Point", icon: "💡" },
+  { id: "natural-window", label: "Ventana Natural", icon: "🪟" },
+  { id: "dramatic-rembrandt", label: "Rembrandt", icon: "🎭" },
+  { id: "soft-diffused", label: "Suave Difuso", icon: "☁️" },
+  { id: "golden-hour", label: "Golden Hour", icon: "🌅" },
+  { id: "neon-accent", label: "Neón / Color", icon: "💜" },
+  { id: "rim-silhouette", label: "Rim / Silueta", icon: "🌗" },
+  { id: "low-key-moody", label: "Low Key Moody", icon: "🌑" },
+  { id: "high-key-bright", label: "High Key Bright", icon: "⬜" },
+  { id: "backlit", label: "Contraluz", icon: "🔆" },
+];
+
+const BACKGROUNDS = [
+  { id: "white-pure", label: "Blanco puro", preview: "#ffffff" },
+  { id: "grey-soft", label: "Gris suave", preview: "#d4d4d4" },
+  { id: "dark-black", label: "Negro", preview: "#111111" },
+  { id: "gradient-brand", label: "Gradiente marca", preview: "linear-gradient(135deg,#1a1a2e,#2d1b4e)" },
+  { id: "marble-luxury", label: "Mármol", preview: "#e8e0d4" },
+  { id: "wood-natural", label: "Madera", preview: "#8B6914" },
+  { id: "concrete", label: "Hormigón", preview: "#888" },
+  { id: "nature-outdoor", label: "Naturaleza", preview: "#2d5a27" },
+  { id: "fabric-textile", label: "Tela / Textil", preview: "#c2b5a0" },
+  { id: "scene-custom", label: "Escena custom", preview: "#555" },
+];
+
+const PERSPECTIVES = [
+  "Frontal 0°", "3/4 (45°)", "Lateral 90°", "Cenital (top-down)",
+  "Contrapicado", "Isométrica", "Dutch Angle", "Nivel de ojo",
+  "Worm's eye", "Over-the-shoulder"
+];
+
+const NICHES = [
+  "Moda / Ropa", "Cosmética / Belleza", "Joyería / Accesorios", "Alimentación / Bebidas",
+  "Tecnología / Electrónica", "Hogar / Decoración", "Deportes / Fitness", "Infantil / Juguetes",
+  "Mascotas", "Arte / Artesanía", "Salud / Bienestar", "Automoción", "Herramientas / Industrial",
+  "Papelería / Oficina", "Jardinería", "Música / Instrumentos", "Otro"
+];
+
+const BRAND_STYLES = [
+  "Luxury / Premium", "Minimalista / Clean", "Streetwear / Urban", "Artesanal / Handmade",
+  "Tech / Futurista", "Orgánico / Natural", "Bold / Impactante", "Elegante / Clásico",
+  "Retro / Vintage", "Playful / Colorido", "Corporate / Profesional", "Bohemio / Free"
+];
+
+type Phase = "brand" | "product" | "generate" | "gallery";
+
+interface GeneratedPhoto {
+  id: string;
+  mode: string;
+  label: string;
+  prompt: string;
+}
+
+export default function FusionStudio() {
+  const [, params] = useRoute("/projects/:id/fusion-studio");
+  const projectId = params?.id ? parseInt(params.id) : 0;
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  const [brandUrl, setBrandUrl] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [niche, setNiche] = useState("");
+  const [brandStyle, setBrandStyle] = useState("");
+  const [brandColors, setBrandColors] = useState(["#000000", "#ffffff", "#c8a84b"]);
+  const [brandDna, setBrandDna] = useState<any>(null);
+  const [isFetchingBrand, setIsFetchingBrand] = useState(false);
+  const [brandError, setBrandError] = useState("");
+
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [productFiles, setProductFiles] = useState<File[]>([]);
+  const [modelImage, setModelImage] = useState<string | null>(null);
+  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [productAnalysis, setProductAnalysis] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const [selectedModes, setSelectedModes] = useState(["hero", "lifestyle"]);
+  const [lighting, setLighting] = useState("studio-3pt");
+  const [background, setBackground] = useState("white-pure");
+  const [perspective, setPerspective] = useState("3/4 (45°)");
+  const [customScene, setCustomScene] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [extraPrompt, setExtraPrompt] = useState("");
+  const [outputFormat, setOutputFormat] = useState("1024x1024");
+
+  const [phase, setPhase] = useState<Phase>("brand");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedPhotos, setGeneratedPhotos] = useState<GeneratedPhoto[]>([]);
+  const [autoSuggestReasoning, setAutoSuggestReasoning] = useState("");
+
+  const fileRefs = { product: useRef<HTMLInputElement>(null), model: useRef<HTMLInputElement>(null), ref: useRef<HTMLInputElement>(null) };
+
+  const [accordionOpen, setAccordionOpen] = useState<Record<string, boolean>>({});
+  const toggleAccordion = (key: string) => setAccordionOpen(p => ({ ...p, [key]: !p[key] }));
+
+  const fetchBrandDNA = useCallback(async () => {
+    if (!brandUrl && !instagram && !companyName) return;
+    setIsFetchingBrand(true);
+    setBrandError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/fusion-studio/brand-research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: brandUrl, instagram, companyName, niche, brandStyle, colors: brandColors }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Error de red" }));
+        throw new Error(errData.error || "Error investigando marca");
+      }
+      const data = await res.json();
+      const dna = data.brandDna;
+      const merged = {
+        name: dna.brandInfo?.name || companyName || "Marca",
+        sector: dna.brandInfo?.sector || niche || "",
+        audience: dna.brandInfo?.audience || "",
+        style: dna.brandInfo?.style || brandStyle || "",
+        colors: dna.brandInfo?.colors || brandColors,
+        values: dna.brandInfo?.values || [],
+        photographyStyle: dna.brandInfo?.photographyStyle || "",
+        instagramAesthetic: dna.instagramInfo?.aesthetic || null,
+        designAdjectives: dna.brandInfo?.designAdjectives || [],
+        raw: dna,
+      };
+      setBrandDna(merged);
+      setPhase("product");
+    } catch (err: any) {
+      setBrandError(err.message || "Error investigando marca");
+    } finally {
+      setIsFetchingBrand(false);
+    }
+  }, [brandUrl, instagram, companyName, niche, brandStyle, brandColors]);
+
+  const handleProductUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      setProductFiles(prev => [...prev.slice(0, 4), file]);
+      const reader = new FileReader();
+      reader.onload = () => setProductImages(prev => [...prev.slice(0, 4), reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const handleModelUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setModelFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setModelImage(reader.result as string);
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleRefUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => setReferenceImages(prev => [...prev.slice(0, 7), reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const analyzeProduct = useCallback(async () => {
+    if (productFiles.length === 0) return;
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      productFiles.forEach(f => formData.append("images", f));
+      formData.append("projectId", String(projectId));
+      if (niche) formData.append("niche", niche);
+      if (brandStyle) formData.append("brandTone", brandStyle);
+
+      const res = await fetch(`${API_BASE}/api/fusion-studio/analyze`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Error analizando producto");
+      const data = await res.json();
+      setProductAnalysis(data.analysis);
+
+      try {
+        const suggestRes = await fetch(`${API_BASE}/api/fusion-studio/auto-suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ productAnalysis: data.analysis, brandDna: brandDna?.raw || null }),
+        });
+        if (suggestRes.ok) {
+          const suggestData = await suggestRes.json();
+          const s = suggestData.suggestions;
+          if (s) {
+            setLighting(s.lighting || "studio-3pt");
+            setBackground(s.background || "white-pure");
+            setPerspective(s.perspective || "3/4 (45°)");
+            setAutoSuggestReasoning(s.reasoning || "");
+          }
+        }
+      } catch {}
+
+      setPhase("generate");
+    } catch (err: any) {
+      alert(err.message || "Error analizando producto");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [productFiles, projectId, niche, brandStyle, brandDna]);
+
+  useEffect(() => {
+    if (productFiles.length > 0 && !productAnalysis && !isAnalyzing && phase === "product") {
+      analyzeProduct();
+    }
+  }, [productFiles, productAnalysis, isAnalyzing, analyzeProduct, phase]);
+
+  const generatePhotos = useCallback(async () => {
+    if (productFiles.length === 0 || selectedModes.length === 0) return;
+    setIsGenerating(true);
+    setPhase("gallery");
+    try {
+      const formData = new FormData();
+      productFiles.forEach(f => formData.append("images", f));
+      if (modelFile) formData.append("images", modelFile);
+      formData.append("projectId", String(projectId));
+      formData.append("modes", JSON.stringify(selectedModes));
+      formData.append("lighting", lighting);
+      formData.append("background", background);
+      formData.append("perspective", perspective);
+      formData.append("quantity", String(quantity));
+      formData.append("brandDna", JSON.stringify(brandDna?.raw || null));
+      formData.append("extraPrompt", extraPrompt);
+      formData.append("outputFormat", outputFormat);
+      if (customScene) formData.append("customScene", customScene);
+      formData.append("hasModel", String(!!modelFile));
+
+      const res = await fetch(`${API_BASE}/api/fusion-studio/generate-photos`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Error generando fotos");
+      const data = await res.json();
+      setGeneratedPhotos(data.generationPlan.map((p: any) => ({
+        id: `${p.mode}-${p.index}`,
+        mode: p.mode,
+        label: PHOTO_MODES.find(m => m.id === p.mode)?.label || p.mode,
+        prompt: p.prompt,
+      })));
+    } catch (err: any) {
+      alert(err.message || "Error generando fotos");
+      setPhase("generate");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [productFiles, modelFile, projectId, selectedModes, lighting, background, perspective, quantity, brandDna, extraPrompt, outputFormat, customScene]);
+
+  const toggleMode = (id: string) => setSelectedModes(p => p.includes(id) ? p.filter(m => m !== id) : [...p, id]);
+  const hasModel = !!modelImage;
+  const productModes = PHOTO_MODES.filter(m => m.cat === "product");
+  const modelModes = PHOTO_MODES.filter(m => m.cat === "model");
+  const sceneModes = PHOTO_MODES.filter(m => m.cat === "scene");
+  const socialModes = PHOTO_MODES.filter(m => m.cat === "social");
+  const totalPhotos = selectedModes.length * quantity;
+
+  const V = {
+    root: { minHeight: "100vh", background: "#08080c", color: "#e2e2e8", fontFamily: "'Satoshi', 'DM Sans', sans-serif" } as React.CSSProperties,
+    header: { padding: "14px 24px", borderBottom: "1px solid #1a1a22", display: "flex", alignItems: "center", gap: 16, background: "#0c0c12", flexWrap: "wrap" as const } as React.CSSProperties,
+    brand: { display: "flex", alignItems: "center", gap: 10, flex: "0 0 auto" } as React.CSSProperties,
+    brandIcon: { width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg,#c8a84b,#8a6d2b)", display: "grid", placeItems: "center", fontSize: 15, fontWeight: 900, color: "#08080c" } as React.CSSProperties,
+    brandText: { fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" } as React.CSSProperties,
+    brandSub: { fontSize: 9, color: "#c8a84b88", letterSpacing: "0.18em", textTransform: "uppercase" as const } as React.CSSProperties,
+    phases: { display: "flex", gap: 2, margin: isMobile ? "8px 0" : "0 auto", background: "#12121a", borderRadius: 8, padding: 2, flexWrap: "wrap" as const } as React.CSSProperties,
+    phaseBtn: (a: boolean): React.CSSProperties => ({ padding: "7px 20px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer", background: a ? "#c8a84b18" : "transparent", color: a ? "#f0d68a" : "#666", transition: "all .2s" }),
+    body: (isMobile ? { display: "flex", flexDirection: "column" as const, minHeight: "calc(100vh - 55px)" } : { display: "flex", minHeight: "calc(100vh - 55px)" }) as React.CSSProperties,
+    sidebar: (isMobile ? { width: "100%", padding: 18, borderBottom: "1px solid #1a1a22" } : { width: 320, borderRight: "1px solid #1a1a22", padding: 18, overflowY: "auto" as const, maxHeight: "calc(100vh - 55px)", flexShrink: 0 }) as React.CSSProperties,
+    main: (isMobile ? { flex: 1, padding: 16, overflowY: "auto" as const } : { flex: 1, padding: 24, overflowY: "auto" as const, maxHeight: "calc(100vh - 55px)" }) as React.CSSProperties,
+    right: (isMobile ? { width: "100%", padding: 18, borderTop: "1px solid #1a1a22" } : { width: 280, borderLeft: "1px solid #1a1a22", padding: 18, overflowY: "auto" as const, maxHeight: "calc(100vh - 55px)", flexShrink: 0 }) as React.CSSProperties,
+    sec: { marginBottom: 22 } as React.CSSProperties,
+    secTitle: { fontSize: 10, fontWeight: 700, color: "#c8a84b99", letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 } as React.CSSProperties,
+    input: { width: "100%", background: "#12121a", border: "1px solid #22222e", borderRadius: 8, padding: "9px 12px", color: "#e2e2e8", fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const } as React.CSSProperties,
+    select: { width: "100%", background: "#12121a", border: "1px solid #22222e", borderRadius: 8, padding: "9px 12px", color: "#e2e2e8", fontSize: 12, fontFamily: "inherit", outline: "none", appearance: "none" as const, boxSizing: "border-box" as const } as React.CSSProperties,
+    textarea: { width: "100%", background: "#12121a", border: "1px solid #22222e", borderRadius: 8, padding: "10px 12px", color: "#e2e2e8", fontSize: 12, fontFamily: "inherit", resize: "vertical" as const, minHeight: 56, outline: "none", boxSizing: "border-box" as const } as React.CSSProperties,
+    uploadZone: (has: boolean): React.CSSProperties => ({ width: "100%", aspectRatio: "5/3", borderRadius: 12, border: has ? "2px solid #c8a84b44" : "2px dashed #22222e", background: has ? "transparent" : "#0c0c12", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", position: "relative", transition: "all .25s" }),
+    uploadMini: (has: boolean): React.CSSProperties => ({ width: 56, height: 56, borderRadius: 8, border: has ? "1.5px solid #c8a84b44" : "1.5px dashed #22222e", display: "grid", placeItems: "center", cursor: "pointer", overflow: "hidden", fontSize: has ? 0 : 18, color: "#333", flexShrink: 0 }),
+    chip: (a: boolean, gold?: boolean): React.CSSProperties => ({ padding: "7px 11px", borderRadius: 7, border: a ? `1.5px solid ${gold ? "#c8a84b66" : "#4466ff66"}` : "1px solid #1a1a22", background: a ? (gold ? "#c8a84b0d" : "#4466ff0d") : "#0c0c12", cursor: "pointer", fontSize: 11, color: a ? (gold ? "#f0d68a" : "#88aaff") : "#666", fontWeight: a ? 600 : 400, transition: "all .2s", textAlign: "left" }),
+    modeCard: (a: boolean, sug?: boolean): React.CSSProperties => ({ padding: "10px 12px", borderRadius: 9, border: a ? "1.5px solid #c8a84b55" : sug ? "1px solid #c8a84b22" : "1px solid #16161e", background: a ? "#c8a84b08" : "#0e0e14", cursor: "pointer", transition: "all .2s" }),
+    goldBtn: (dis: boolean): React.CSSProperties => ({ width: "100%", padding: 14, borderRadius: 10, border: "none", background: dis ? "#333" : "linear-gradient(135deg,#c8a84b,#9a7a30)", color: dis ? "#666" : "#08080c", fontSize: 13, fontWeight: 700, cursor: dis ? "default" : "pointer", letterSpacing: "-0.01em" }),
+    badge: (c: string): React.CSSProperties => ({ display: "inline-flex", padding: "2px 8px", borderRadius: 12, fontSize: 9, fontWeight: 600, background: `${c}14`, color: c, border: `1px solid ${c}28` }),
+    colorDot: (h: string): React.CSSProperties => ({ width: 18, height: 18, borderRadius: "50%", background: h, border: "1.5px solid #22222e", cursor: "pointer", flexShrink: 0 }),
+    dnaCard: { background: "#c8a84b06", border: "1px solid #c8a84b18", borderRadius: 10, padding: 14 } as React.CSSProperties,
+    guardCard: { background: "#4466ff06", border: "1px solid #4466ff18", borderRadius: 10, padding: 14 } as React.CSSProperties,
+    statNum: { fontSize: 28, fontWeight: 800, color: "#f0d68a", lineHeight: 1 } as React.CSSProperties,
+    statLabel: { fontSize: 9, color: "#666", marginTop: 2 } as React.CSSProperties,
+    galleryGrid: { display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(220px,1fr))", gap: 14 } as React.CSSProperties,
+    galleryCard: { borderRadius: 10, overflow: "hidden", border: "1px solid #1a1a22", background: "#0e0e14", cursor: "pointer", transition: "all .2s" } as React.CSSProperties,
+    accordionHeader: { cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" } as React.CSSProperties,
+  };
+
+  const img100: React.CSSProperties = { width: "100%", height: "100%", objectFit: "contain" };
+  const img100cover: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
+
+  const renderAccordionOrDirect = (key: string, title: string, content: React.ReactNode) => {
+    if (!isMobile) return content;
+    return (
+      <div style={{ marginBottom: 12, borderBottom: "1px solid #1a1a22" }}>
+        <div style={V.accordionHeader} onClick={() => toggleAccordion(key)}>
+          <div style={V.secTitle}>{title}</div>
+          <span style={{ color: "#666", fontSize: 14 }}>{accordionOpen[key] ? "▾" : "▸"}</span>
+        </div>
+        {accordionOpen[key] && content}
+      </div>
+    );
+  };
+
+  return (
+    <div style={V.root}>
+      <div style={V.header}>
+        <div style={V.brand}>
+          <div style={V.brandIcon}>F</div>
+          <div>
+            <div style={V.brandText}>Fusion Studio</div>
+            <div style={V.brandSub}>Product Intelligence</div>
+          </div>
+        </div>
+        <div style={V.phases}>
+          {([["brand", "① Marca"], ["product", "② Producto"], ["generate", "③ Generar"], ["gallery", "④ Galería"]] as const).map(([id, label]) => (
+            <button key={id} style={V.phaseBtn(phase === id)} onClick={() => setPhase(id as Phase)}>{label}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          {brandDna && <span style={V.badge("#c8a84b")}>{brandDna.name}</span>}
+          {productAnalysis && <span style={V.badge("#44cc88")}>{(productAnalysis.product?.category || "").split("/")[0].trim()}</span>}
+          {totalPhotos > 0 && phase === "generate" && <span style={V.badge("#6688ff")}>{totalPhotos} fotos</span>}
+        </div>
+      </div>
+
+      <div style={V.body}>
+        {phase === "brand" && (
+          <div style={{ ...V.main, maxWidth: 720, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 6 }}>Inteligencia de Marca</div>
+              <div style={{ fontSize: 13, color: "#666", maxWidth: 500, margin: "0 auto" }}>
+                Cuanta más información proporciones, más precisas serán las fotos. La IA investigará la marca en Google e Instagram para entender su estética real.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div style={V.sec}>
+                <div style={V.secTitle}>🏢 Nombre de la empresa/marca</div>
+                <input style={V.input} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Ej: Hendrick's Gin" />
+              </div>
+              <div style={V.sec}>
+                <div style={V.secTitle}>📸 Instagram</div>
+                <input style={V.input} value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="@hendricksgin" />
+              </div>
+            </div>
+
+            <div style={V.sec}>
+              <div style={V.secTitle}>🌐 URL de la web</div>
+              <input style={V.input} value={brandUrl} onChange={e => setBrandUrl(e.target.value)} placeholder="https://www.hendricksgin.com" />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 20 }}>
+              <div style={V.sec}>
+                <div style={V.secTitle}>🏷️ Nicho / Sector</div>
+                <select style={V.select} value={niche} onChange={e => setNiche(e.target.value)}>
+                  <option value="">Seleccionar nicho...</option>
+                  {NICHES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div style={V.sec}>
+                <div style={V.secTitle}>🎨 Estilo de marca</div>
+                <select style={V.select} value={brandStyle} onChange={e => setBrandStyle(e.target.value)}>
+                  <option value="">Seleccionar estilo...</option>
+                  {BRAND_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={V.sec}>
+              <div style={V.secTitle}>🎨 Colores de marca (click para cambiar)</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                {brandColors.map((c, i) => (
+                  <label key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                    <input type="color" value={c} onChange={e => setBrandColors(p => p.map((x, j) => j === i ? e.target.value : x))} style={{ width: 36, height: 36, borderRadius: 8, border: "none", cursor: "pointer", padding: 0 }} />
+                    <span style={{ fontSize: 9, color: "#555", fontFamily: "monospace" }}>{c}</span>
+                  </label>
+                ))}
+                <button onClick={() => setBrandColors(p => [...p, "#888888"])} style={{ width: 36, height: 36, borderRadius: 8, border: "1.5px dashed #22222e", background: "none", color: "#444", fontSize: 18, cursor: "pointer" }}>+</button>
+              </div>
+            </div>
+
+            <button
+              style={V.goldBtn(isFetchingBrand || (!brandUrl && !instagram && !companyName))}
+              onClick={fetchBrandDNA}
+              disabled={isFetchingBrand || (!brandUrl && !instagram && !companyName)}
+            >
+              {isFetchingBrand ? "⟳ Investigando marca en Google + Instagram..." : "🔍 Investigar Marca y Extraer DNA"}
+            </button>
+
+            {brandError && <div style={{ color: "#ff6666", fontSize: 12, marginTop: 8, textAlign: "center" }}>{brandError}</div>}
+
+            {!brandUrl && !instagram && !companyName && (
+              <div style={{ textAlign: "center", marginTop: 16 }}>
+                <button onClick={() => setPhase("product")} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
+                  Saltar → ir directo al producto
+                </button>
+              </div>
+            )}
+
+            {brandDna && (
+              <div style={{ ...V.dnaCard, marginTop: 20 }}>
+                <div style={{ ...V.secTitle, color: "#c8a84b" }}>Brand DNA Extraído</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{brandDna.name}</div>
+                <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Sector: {brandDna.sector} · Audiencia: {brandDna.audience}</div>
+                <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Estilo: {brandDna.style}</div>
+                <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Fotografía: {brandDna.photographyStyle}</div>
+                {brandDna.instagramAesthetic && <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Instagram: {brandDna.instagramAesthetic}</div>}
+                <div style={{ fontSize: 10, color: "#c8a84b88", marginTop: 8 }}>Adjetivos: {brandDna.designAdjectives?.join(" · ")}</div>
+                <button onClick={() => setPhase("product")} style={{ ...V.goldBtn(false), marginTop: 12 }}>Siguiente → Subir Producto</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase === "product" && (
+          <>
+            <div style={V.sidebar}>
+              <div style={V.sec}>
+                <div style={V.secTitle}>📦 Imágenes del producto ({productImages.length}/5)</div>
+                <div style={V.uploadZone(productImages.length > 0)} onClick={() => fileRefs.product.current?.click()}>
+                  {productImages.length > 0 ? (
+                    <img src={productImages[0]} style={img100} alt="product" />
+                  ) : (
+                    <div style={{ textAlign: "center", color: "#444", padding: 20 }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>Sube tu producto</div>
+                      <div style={{ fontSize: 10, marginTop: 4, color: "#555" }}>Hasta 5 ángulos. La IA extraerá materiales, texturas, colores y forma.</div>
+                    </div>
+                  )}
+                  <input ref={fileRefs.product} type="file" accept="image/*" multiple hidden onChange={handleProductUpload} />
+                </div>
+                {productImages.length > 1 && (
+                  <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                    {productImages.slice(1).map((img, i) => (
+                      <div key={i} style={V.uploadMini(true)}><img src={img} style={img100cover} alt="" /></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={V.sec}>
+                <div style={V.secTitle}>👤 Modelo / Persona (opcional)</div>
+                <div style={{ ...V.uploadZone(!!modelImage), aspectRatio: "4/3" }} onClick={() => fileRefs.model.current?.click()}>
+                  {modelImage ? (
+                    <img src={modelImage} style={img100} alt="model" />
+                  ) : (
+                    <div style={{ textAlign: "center", color: "#444" }}>
+                      <div style={{ fontSize: 24, marginBottom: 4 }}>👤</div>
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>Modelo de referencia</div>
+                      <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>La IA NUNCA fusionará cuerpos</div>
+                    </div>
+                  )}
+                  <input ref={fileRefs.model} type="file" accept="image/*" hidden onChange={handleModelUpload} />
+                </div>
+              </div>
+
+              <div style={V.sec}>
+                <div style={V.secTitle}>🖼️ Referencias de estilo ({referenceImages.length}/8)</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {referenceImages.map((img, i) => (
+                    <div key={i} style={V.uploadMini(true)}><img src={img} style={img100cover} alt="" /></div>
+                  ))}
+                  {referenceImages.length < 8 && (
+                    <div style={V.uploadMini(false)} onClick={() => fileRefs.ref.current?.click()}>+</div>
+                  )}
+                  <input ref={fileRefs.ref} type="file" accept="image/*" multiple hidden onChange={handleRefUpload} />
+                </div>
+              </div>
+            </div>
+
+            <div style={V.main}>
+              {isAnalyzing && (
+                <div style={{ textAlign: "center", padding: 60 }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>🔬</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Analizando producto...</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>Extrayendo capas · texturas · materiales · colores · composición · forma</div>
+                </div>
+              )}
+
+              {productAnalysis && (
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, letterSpacing: "-0.03em" }}>Análisis del Producto</div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>CATEGORÍA</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{productAnalysis.product?.category}</div>
+                      <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{productAnalysis.product?.subcategory}</div>
+                    </div>
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>MATERIALES</div>
+                      {productAnalysis.product?.estimatedMaterials?.map((m: string, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>• {m}</div>
+                      ))}
+                    </div>
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>COMPOSICIÓN</div>
+                      <div style={{ fontSize: 11, color: "#aaa" }}>{productAnalysis.composition?.layout}</div>
+                      <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{productAnalysis.composition?.perspective}</div>
+                      <div style={{ fontSize: 11, color: "#888" }}>{productAnalysis.composition?.lighting}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>TEXTURAS</div>
+                      {productAnalysis.textures?.map((t: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>• {t.material} ({t.finish})</div>
+                      ))}
+                    </div>
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#c8a84b", marginBottom: 6 }}>COLORES DETECTADOS</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {productAnalysis.colors?.dominant?.map((c: string, i: number) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={V.colorDot(c)} />
+                            <span style={{ fontSize: 10, color: "#888", fontFamily: "monospace" }}>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {autoSuggestReasoning && (
+                    <div style={V.dnaCard}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#44cc88", marginBottom: 6 }}>💡 AUTO-INTELIGENCIA — La IA ha elegido la configuración óptima</div>
+                      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>
+                        <strong>Iluminación:</strong> {LIGHTING.find(l => l.id === lighting)?.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>
+                        <strong>Fondo:</strong> {BACKGROUNDS.find(b => b.id === background)?.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>
+                        <strong>Perspectiva:</strong> {perspective}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#888", marginTop: 8, fontStyle: "italic" }}>{autoSuggestReasoning}</div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setPhase("generate")} style={{ ...V.goldBtn(false), marginTop: 16 }}>
+                    Siguiente → Configurar sesión de fotos
+                  </button>
+                </div>
+              )}
+
+              {!productAnalysis && !isAnalyzing && (
+                <div style={{ textAlign: "center", padding: 80, color: "#444" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>Sube una imagen del producto</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>La IA lo descompondrá en capas, texturas, materiales y colores</div>
+                </div>
+              )}
+            </div>
+
+            {brandDna && (
+              <div style={V.right}>
+                <div style={V.sec}>
+                  <div style={V.secTitle}>🧬 Brand DNA Activo</div>
+                  <div style={V.dnaCard}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{brandDna.name}</div>
+                    <div style={{ fontSize: 10, color: "#888" }}>{brandDna.sector}</div>
+                    <div style={{ fontSize: 10, color: "#888" }}>{brandDna.style}</div>
+                    <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
+                      {brandDna.colors?.map((c: string, i: number) => <div key={i} style={V.colorDot(c)} />)}
+                    </div>
+                  </div>
+                </div>
+                <div style={V.guardCard}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#6688ff", letterSpacing: "0.1em", marginBottom: 6 }}>IA GUARD</div>
+                  <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
+                    {hasModel ? "Producto + Modelo detectados. La IA posicionará la persona USANDO/SOSTENIENDO el producto. Nunca fusionará cuerpos." : "Solo producto. La IA respetará forma, materiales y proporciones exactas."}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {phase === "generate" && (
+          <>
+            <div style={V.sidebar}>
+              {renderAccordionOrDirect("lighting", "💡 Iluminación", (
+                <div style={V.sec}>
+                  {!isMobile && <div style={V.secTitle}>💡 Iluminación</div>}
+                  {LIGHTING.map(l => (
+                    <div key={l.id} style={{ ...V.chip(lighting === l.id, true), marginBottom: 3, display: "block" }} onClick={() => setLighting(l.id)}>
+                      {l.icon} {l.label}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {renderAccordionOrDirect("background", "🖼️ Fondo", (
+                <div style={V.sec}>
+                  {!isMobile && <div style={V.secTitle}>🖼️ Fondo</div>}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    {BACKGROUNDS.map(bg => (
+                      <div key={bg.id} style={{ ...V.chip(background === bg.id, true), display: "flex", alignItems: "center", gap: 5 }} onClick={() => setBackground(bg.id)}>
+                        <div style={{ width: 12, height: 12, borderRadius: 3, background: bg.preview, border: "1px solid #333", flexShrink: 0 }} />
+                        <span style={{ fontSize: 10 }}>{bg.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {background === "scene-custom" && (
+                    <textarea style={{ ...V.textarea, marginTop: 6 }} placeholder="Describe la escena..." value={customScene} onChange={e => setCustomScene(e.target.value)} />
+                  )}
+                </div>
+              ))}
+              {renderAccordionOrDirect("perspective", "📐 Perspectiva", (
+                <div style={V.sec}>
+                  {!isMobile && <div style={V.secTitle}>📐 Perspectiva</div>}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    {PERSPECTIVES.map(p => (
+                      <div key={p} style={V.chip(perspective === p, true)} onClick={() => setPerspective(p)}>{p}</div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={V.main}>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, letterSpacing: "-0.02em" }}>Sesión de Fotos</div>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>Selecciona los tipos de foto. Los marcados con ★ son sugeridos por la IA según tu producto.</div>
+
+              {[
+                { label: "Producto Solo", modes: productModes },
+                ...(hasModel ? [{ label: "Con Modelo", modes: modelModes }] : []),
+                { label: "Escenas", modes: sceneModes },
+                { label: "Social Media", modes: socialModes },
+              ].map(group => (
+                <div key={group.label} style={{ marginBottom: 16 }}>
+                  <div style={{ ...V.secTitle, color: "#888" }}>{group.label}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 6 }}>
+                    {group.modes.map(mode => {
+                      const a = selectedModes.includes(mode.id);
+                      const sug = productAnalysis?.productGeneration?.photoBriefs?.some((b: any) => b.type?.toLowerCase().includes(mode.id));
+                      return (
+                        <div key={mode.id} style={V.modeCard(a, sug)} onClick={() => toggleMode(mode.id)}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: a ? 700 : 400, color: a ? "#f0d68a" : "#aaa" }}>
+                            <span style={{ fontSize: 14 }}>{mode.icon}</span>{mode.label}
+                            {sug && !a && <span style={{ marginLeft: "auto", fontSize: 8, color: "#c8a84b" }}>★</span>}
+                          </div>
+                          <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>{mode.desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <div style={V.sec}>
+                <div style={V.secTitle}>📝 Instrucciones adicionales</div>
+                <textarea style={V.textarea} value={extraPrompt} onChange={e => setExtraPrompt(e.target.value)} placeholder="Ej: Que la botella tenga gotas de condensación, fondo de bar premium con luces cálidas difusas..." />
+              </div>
+
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>Fotos por modo</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[1, 2, 3, 4].map(n => (
+                      <button key={n} onClick={() => setQuantity(n)} style={{ width: 34, height: 34, borderRadius: 7, border: quantity === n ? "1.5px solid #c8a84b" : "1px solid #1a1a22", background: quantity === n ? "#c8a84b0d" : "transparent", color: quantity === n ? "#f0d68a" : "#555", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{n}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>Resolución</div>
+                  <select style={{ ...V.select, width: 160 }} value={outputFormat} onChange={e => setOutputFormat(e.target.value)}>
+                    <option value="1024x1024">1024×1024 (1:1)</option>
+                    <option value="1024x1536">1024×1536 (2:3)</option>
+                    <option value="1536x1024">1536×1024 (3:2)</option>
+                    <option value="1080x1920">1080×1920 (9:16)</option>
+                    <option value="1920x1080">1920×1080 (16:9)</option>
+                  </select>
+                </div>
+                <div style={{ marginLeft: "auto", textAlign: "center" }}>
+                  <div style={V.statNum}>{totalPhotos}</div>
+                  <div style={V.statLabel}>fotos totales</div>
+                </div>
+              </div>
+
+              <button
+                style={V.goldBtn(productFiles.length === 0 || selectedModes.length === 0 || isGenerating)}
+                onClick={generatePhotos}
+                disabled={productFiles.length === 0 || selectedModes.length === 0 || isGenerating}
+              >
+                {isGenerating ? "⟳ Generando sesión de fotos..." : `✦ Generar ${totalPhotos} Fotos Profesionales`}
+              </button>
+            </div>
+
+            <div style={V.right}>
+              {productAnalysis && (
+                <div style={V.sec}>
+                  <div style={V.secTitle}>📦 Producto</div>
+                  {productImages[0] && (
+                    <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", marginBottom: 8 }}>
+                      <img src={productImages[0]} style={img100} alt="" />
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2 }}>{productAnalysis.product?.category}</div>
+                  <div style={{ fontSize: 10, color: "#666" }}>{productAnalysis.product?.estimatedMaterials?.join(" · ")}</div>
+                </div>
+              )}
+              {brandDna && (
+                <div style={{ ...V.dnaCard, marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#c8a84b", marginBottom: 4 }}>BRAND DNA</div>
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>{brandDna.name}</div>
+                  <div style={{ fontSize: 10, color: "#888" }}>{brandDna.style}</div>
+                  <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+                    {brandDna.colors?.map((c: string, i: number) => <div key={i} style={V.colorDot(c)} />)}
+                  </div>
+                </div>
+              )}
+              <div style={V.guardCard}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#6688ff", marginBottom: 4 }}>IA GUARD</div>
+                <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
+                  {hasModel ? "Modelo detectado. La persona USARÁ el producto, nunca se fusionarán." : "Solo producto. Forma y materiales se respetarán al 100%."}
+                  {referenceImages.length > 0 && <><br />🎯 {referenceImages.length} ref. — estilo y composición se imitarán.</>}
+                  {brandDna && <><br />🧬 Brand DNA activo — colores, estilo y audiencia inyectados.</>}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {phase === "gallery" && (
+          <div style={{ ...V.main, maxWidth: "100%" }}>
+            {isGenerating ? (
+              <div style={{ textAlign: "center", padding: 80 }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>✦</div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Generando sesión de fotos...</div>
+                <div style={{ fontSize: 12, color: "#666" }}>{totalPhotos} fotos profesionales · {selectedModes.length} modos · {quantity} por modo</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#f0d68a" }}>Sesión Configurada</div>
+                    <div style={{ fontSize: 12, color: "#666" }}>{generatedPhotos.length} prompts generados — listos para producción</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setPhase("generate")} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #22222e", background: "transparent", color: "#aaa", fontSize: 11, cursor: "pointer" }}>← Editar sesión</button>
+                  </div>
+                </div>
+                <div style={V.galleryGrid}>
+                  {generatedPhotos.map(photo => (
+                    <div key={photo.id} style={V.galleryCard}>
+                      <div style={{ aspectRatio: "4/3", background: "#111", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {productImages[0] ? (
+                          <img src={productImages[0]} style={{ ...img100, filter: "brightness(0.95) contrast(1.05)" }} alt="" />
+                        ) : (
+                          <div style={{ color: "#333", fontSize: 32 }}>✦</div>
+                        )}
+                      </div>
+                      <div style={{ padding: "10px 12px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#f0d68a" }}>{photo.label}</div>
+                        <div style={{ fontSize: 9, color: "#555", marginTop: 4, maxHeight: 40, overflow: "hidden" }}>{photo.mode}</div>
+                        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                          <button style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #c8a84b44", background: "none", color: "#c8a84b", fontSize: 9, fontWeight: 600, cursor: "pointer" }}>Ver Prompt</button>
+                          <button style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #22222e", background: "none", color: "#666", fontSize: 9, cursor: "pointer" }}>↻ Regen</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

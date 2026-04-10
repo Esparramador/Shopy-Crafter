@@ -38,6 +38,7 @@ import UniversalSearch from "@/pages/admin/UniversalSearch";
 import ExportCenter from "@/pages/projects/ExportCenter";
 import UniversalGenerator from "@/pages/projects/UniversalGenerator";
 import WebLab, { WebLabStandalone } from "@/pages/projects/WebLab";
+import FusionStudio from "@/pages/projects/FusionStudio";
 import ForgotPassword from "@/pages/ForgotPassword";
 import OAuthSuccess from "@/pages/OAuthSuccess";
 import AuditPage from "@/pages/projects/Audit";
@@ -525,6 +526,13 @@ function Router() {
           <RequireAdmin>
             <AdminWrapper>
               <AppLayout><WebLab /></AppLayout>
+            </AdminWrapper>
+          </RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/fusion-studio">
+          <RequireAdmin>
+            <AdminWrapper>
+              <AppLayout><FusionStudio /></AppLayout>
             </AdminWrapper>
           </RequireAdmin>
         </Route>

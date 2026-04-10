@@ -23,6 +23,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "exports",     label: "Exportar",     icon: "📥" },
   { id: "generator",   label: "Generador IA", icon: "✨" },
   { id: "web-lab",     label: "Lab Web",      icon: "🔬" },
+  { id: "fusion-studio", label: "Fusion Studio", icon: "🧬" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
