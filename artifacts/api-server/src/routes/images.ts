@@ -227,7 +227,8 @@ export async function runImageGeneration(params: {
         return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("429") && attempt <= 5) {
+        const isRetryable = msg.includes("429") || msg.includes("500") || msg.includes("502") || msg.includes("503") || msg.includes("529") || msg.includes("overloaded") || msg.includes("rate");
+        if (isRetryable && attempt <= 5) {
           const delay = Math.min(15_000 * attempt, 60_000);
           await new Promise(r => setTimeout(r, delay));
           return runWithRetry(attempt + 1);

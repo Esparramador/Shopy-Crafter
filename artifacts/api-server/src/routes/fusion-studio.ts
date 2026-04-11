@@ -82,15 +82,16 @@ function extractUrl(val: unknown): string {
   return String(val);
 }
 
-async function replicateWithRetry(fn: () => Promise<unknown>, label: string, maxRetries = 3): Promise<unknown> {
+async function replicateWithRetry(fn: () => Promise<unknown>, label: string, maxRetries = 5): Promise<unknown> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("429") && attempt < maxRetries) {
+      const isRetryable = msg.includes("429") || msg.includes("500") || msg.includes("502") || msg.includes("503") || msg.includes("529") || msg.includes("overloaded") || msg.includes("rate");
+      if (isRetryable && attempt < maxRetries) {
         const delay = Math.min(15_000 * attempt, 60_000);
-        logger.warn({ attempt, delay, label }, "Fusion Studio TryOn: Rate limited, retrying");
+        logger.warn({ attempt, maxRetries, delay, label, errorSnippet: msg.slice(0, 120) }, "Fusion Studio: Replicate transient error, retrying");
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -695,36 +696,23 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
 
             logger.info({ mode: item.mode, index: item.index, model }, "Fusion Studio: Generating image");
 
-            const runWithRetry = async (attempt = 1): Promise<unknown> => {
-              try {
-                let runPromise: Promise<unknown>;
-                if (model.includes("flux-1.1-pro")) {
-                  runPromise = replicate.run(model as `${string}/${string}`, {
-                    input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_outputs: 1, output_format: "png", output_quality: 100 },
-                  });
-                } else if (model.includes("recraft")) {
-                  runPromise = replicate.run(model as `${string}/${string}`, {
-                    input: { prompt: item.replicatePrompt, size: `${size.width}x${size.height}`, style: "realistic_image" },
-                  });
-                } else {
-                  runPromise = replicate.run(model as `${string}/${string}`, {
-                    input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
-                  });
-                }
-                return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model} (${item.mode})`);
-              } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : String(err);
-                if (msg.includes("429") && attempt <= 5) {
-                  const delay = Math.min(15_000 * attempt, 60_000);
-                  logger.warn({ attempt, delay, mode: item.mode }, "Fusion Studio: Rate limited, retrying");
-                  await new Promise(r => setTimeout(r, delay));
-                  return runWithRetry(attempt + 1);
-                }
-                throw err;
+            const output = await replicateWithRetry(() => {
+              let runPromise: Promise<unknown>;
+              if (model.includes("flux-1.1-pro")) {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_outputs: 1, output_format: "png", output_quality: 100 },
+                });
+              } else if (model.includes("recraft")) {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, size: `${size.width}x${size.height}`, style: "realistic_image" },
+                });
+              } else {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
+                });
               }
-            };
-
-            const output = await runWithRetry();
+              return withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model} (${item.mode})`);
+            }, `fusion-${item.mode}`);
             const raw = Array.isArray(output) ? output[0] : output;
             const imageUrl = extractUrl(raw);
 
