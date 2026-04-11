@@ -263,7 +263,7 @@ async function analyzeImageWithClaude(
         },
       };
   
-  const res = await client.messages.create({
+  const absorbStream = client.messages.stream({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
     system: `ShopyBrain Vision Analysis Engine.${brainCtx}`,
@@ -278,6 +278,7 @@ async function analyzeImageWithClaude(
       ],
     }],
   });
+  const res = await absorbStream.finalMessage();
   
   const text = res.content[0].type === "text" ? res.content[0].text : "{}";
   try {
@@ -702,7 +703,7 @@ router.post("/shopybrain/create-product-from-image",
               },
             };
   
-        const visionRes = await productClient.messages.create({
+        const visionStream = productClient.messages.stream({
           model: CLAUDE_MODEL,
           max_tokens: 16000,
           system: `ShopyBrain Product Intelligence Engine.${brainCtx2}${brandDna2}`,
@@ -748,6 +749,7 @@ router.post("/shopybrain/create-product-from-image",
             ],
           }],
         });
+        const visionRes = await visionStream.finalMessage();
   
         const visionText = (visionRes.content[0] as { type: string; text: string }).text;
         const visionMatch = visionText.match(/\{[\s\S]*\}/);
@@ -815,7 +817,7 @@ router.post("/shopybrain/create-product-from-image",
           geminiSources: pricingResult.sources?.length
         }, "Pricing research complete");
   
-        const copyRes = await productClient.messages.create({
+        const copyStream = productClient.messages.stream({
           model: CLAUDE_MODEL,
           max_tokens: 16000,
           system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
@@ -844,6 +846,7 @@ router.post("/shopybrain/create-product-from-image",
   }`,
           }],
         });
+        const copyRes = await copyStream.finalMessage();
   
         const copyText = (copyRes.content[0] as { type: string; text: string }).text;
         const copyMatch = copyText.match(/\{[\s\S]*\}/);
@@ -1128,7 +1131,7 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
   
       const supplierBrainCtx = await buildShopyBrainContext(undefined, "ecommerce", `sourcing suppliers for ${productName}`);
       const supplierClient = await getClaudeClient(0);
-      const synthesisRes = await supplierClient.messages.create({
+      const synthesisStream = supplierClient.messages.stream({
         model: CLAUDE_MODEL,
         max_tokens: 16000,
         system: `Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.${supplierBrainCtx}`,
@@ -1170,6 +1173,7 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
   }`,
         }],
       });
+      const synthesisRes = await synthesisStream.finalMessage();
   
       let synthesis: Record<string, unknown> = {};
       try {

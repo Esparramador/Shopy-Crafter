@@ -163,7 +163,7 @@ export async function askClaude(
   return withClaudeQueue(async () => {
     const client = await getClaudeClient(projectId);
 
-    const response = await client.messages.create(
+    const stream = client.messages.stream(
       {
         model: CLAUDE_MODEL,
         max_tokens: maxTokens,
@@ -172,6 +172,7 @@ export async function askClaude(
       },
       { signal: AbortSignal.timeout(timeoutMs) }
     );
+    const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
       logger.warn({ maxTokens, model: CLAUDE_MODEL, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
@@ -225,7 +226,8 @@ export async function askClaudeWithVision(
   prompt: string,
   images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" }>,
   systemPrompt?: string,
-  maxTokens = 8192
+  maxTokens = 8192,
+  timeoutMs = 300_000
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
@@ -240,7 +242,7 @@ export async function askClaudeWithVision(
       },
     }));
 
-    const response = await client.messages.create(
+    const stream = client.messages.stream(
       {
         model: CLAUDE_MODEL,
         max_tokens: maxTokens,
@@ -255,8 +257,9 @@ export async function askClaudeWithVision(
           },
         ],
       },
-      { signal: AbortSignal.timeout(120_000) }
+      { signal: AbortSignal.timeout(timeoutMs) }
     );
+    const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
       logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude Vision] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
@@ -275,7 +278,8 @@ export async function askClaudeVisionWithBrain(
   systemPrompt?: string,
   useCase: BrainUseCase = "general",
   niche?: string,
-  maxTokens = 8192
+  maxTokens = 8192,
+  timeoutMs = 300_000
 ): Promise<string> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
@@ -294,7 +298,7 @@ export async function askClaudeVisionWithBrain(
       source: { type: "base64", media_type: img.mediaType, data: img.base64 },
     }));
 
-    const response = await client.messages.create(
+    const stream = client.messages.stream(
       {
         model: CLAUDE_MODEL,
         max_tokens: maxTokens,
@@ -304,8 +308,9 @@ export async function askClaudeVisionWithBrain(
           content: [...imageBlocks, { type: "text", text: budget.user }],
         }],
       },
-      { signal: AbortSignal.timeout(120_000) }
+      { signal: AbortSignal.timeout(timeoutMs) }
     );
+    const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
       logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude VisionBrain] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
@@ -321,7 +326,7 @@ export async function claude(prompt: string, maxTokens = 8192): Promise<string> 
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = getDefaultClient();
-    const response = await client.messages.create(
+    const stream = client.messages.stream(
       {
         model: CLAUDE_MODEL,
         max_tokens: maxTokens,
@@ -329,6 +334,7 @@ export async function claude(prompt: string, maxTokens = 8192): Promise<string> 
       },
       { signal: AbortSignal.timeout(120_000) }
     );
+    const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
       logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");

@@ -186,7 +186,7 @@ router.post("/reference/analyze-image", async (req, res): Promise<void> => {
       } else {
         const client = (await import("@anthropic-ai/sdk")).default;
         const ant = new client({ apiKey: process.env.ANTHROPIC_API_KEY });
-        const resp = await ant.messages.create(
+        const stream = ant.messages.stream(
           {
             model: "claude-sonnet-4-5",
             max_tokens: 16000,
@@ -204,6 +204,7 @@ router.post("/reference/analyze-image", async (req, res): Promise<void> => {
           },
           { signal: AbortSignal.timeout(180_000) }
         );
+        const resp = await stream.finalMessage();
         const c = resp.content[0];
         intelligence = c.type === "text" ? c.text : "";
       }
