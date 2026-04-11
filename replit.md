@@ -86,14 +86,14 @@ A deep web design analysis tool that extracts HTML+CSS from any URL, runs PageSp
 ### Universal Generator (`/projects/:id/generator`)
 A comprehensive content generation tool with 41 types across 9 categories. Every generation produces downloadable content, saves to Vault, and triggers `learnFromOperation`. It features a 5-Level Report System for varied depth of analysis and output.
 
-### Fusion Studio (Product Intelligence Engine + Brand DNA)
-An AI-powered product photography intelligence engine at `/projects/:id/fusion-studio`. Features 4 phases:
+### Fusion Studio (Product Intelligence Engine + Real Image Generation)
+An AI-powered product photography engine at `/projects/:id/fusion-studio`. Features 4 phases:
 1. **Brand Intelligence**: URL + Instagram + company name → 4 parallel Gemini searches extract brand DNA (identity, Instagram aesthetic, competitor photography, industry trends).
 2. **Product Analysis**: Upload product images → Claude Vision decomposes into layers, textures, materials, colors, composition. Auto-suggests optimal photo settings (lighting, background, perspective) via Claude.
 3. **Generation Config**: 16 photo modes (hero, lifestyle, macro, flat-lay, model variants, ambient, UGC, social formats), 10 lighting options, 10 backgrounds, 10 perspectives. AI suggestions marked with ★.
-4. **Gallery**: Generation plan with structured prompts per mode × quantity, saved to vault.
+4. **Gallery**: Real AI-generated images via Replicate (Flux 1.1 Pro, Flux Dev, Recraft V3). Images generated in parallel batches of 3. Each image saved to Vault with cost tracking. Graceful fallback to prompt-only mode when no Replicate token is configured.
 
-Backend: `lib/fusion-studio.ts` (researchBrandForFusion, autoSuggestPhotoSettings, analyzeImageForFusion), `routes/fusion-studio.ts` (5 endpoints: analyze, create-product, brand-research, auto-suggest, generate-photos). All endpoints use `enableLongRunning` anti-502 headers. Responsive layout with accordion controls on mobile (<768px).
+Backend: `lib/fusion-studio.ts` (researchBrandForFusion, autoSuggestPhotoSettings, analyzeImageForFusion), `routes/fusion-studio.ts` (5 endpoints: analyze, create-product, brand-research, auto-suggest, generate-photos). The `generate-photos` endpoint: 1) analyzes product via Claude Vision, 2) converts art-direction to Replicate-ready prompts via Claude, 3) generates real images via Replicate with per-mode model selection, 4) saves all images to Vault with cost/model metadata. Plan limits enforced via `checkProductionLimit/recordUsage`. All endpoints use `enableLongRunning` anti-502 headers. Responsive layout with accordion controls on mobile (<768px).
 
 ### File Upload System
 A universal file processor with multer integration, supporting various text files, images, spreadsheets, and PDFs up to 20MB.

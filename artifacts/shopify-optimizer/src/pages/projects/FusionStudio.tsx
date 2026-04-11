@@ -74,6 +74,10 @@ interface GeneratedPhoto {
   mode: string;
   label: string;
   prompt: string;
+  imageUrl: string | null;
+  model: string;
+  cost: number;
+  error?: string;
 }
 
 export default function FusionStudio() {
@@ -118,6 +122,8 @@ export default function FusionStudio() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPhotos, setGeneratedPhotos] = useState<GeneratedPhoto[]>([]);
   const [autoSuggestReasoning, setAutoSuggestReasoning] = useState("");
+  const [generationWarning, setGenerationWarning] = useState("");
+  const [totalCost, setTotalCost] = useState(0);
 
   const fileRefs = { product: useRef<HTMLInputElement>(null), model: useRef<HTMLInputElement>(null), ref: useRef<HTMLInputElement>(null) };
 
@@ -246,6 +252,8 @@ export default function FusionStudio() {
     if (productFiles.length === 0 || selectedModes.length === 0) return;
     setIsGenerating(true);
     setPhase("gallery");
+    setGenerationWarning("");
+    setTotalCost(0);
     try {
       const formData = new FormData();
       productFiles.forEach(f => formData.append("images", f));
@@ -267,14 +275,37 @@ export default function FusionStudio() {
         credentials: "include",
         body: formData,
       });
-      if (!res.ok) throw new Error("Error generando fotos");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Error de red" }));
+        throw new Error(errData.error || "Error generando fotos");
+      }
       const data = await res.json();
-      setGeneratedPhotos(data.generationPlan.map((p: any) => ({
-        id: `${p.mode}-${p.index}`,
-        mode: p.mode,
-        label: PHOTO_MODES.find(m => m.id === p.mode)?.label || p.mode,
-        prompt: p.prompt,
-      })));
+
+      if (data.warning) setGenerationWarning(data.warning);
+      if (data.totalCost) setTotalCost(data.totalCost);
+
+      if (data.generatedImages && data.generatedImages.length > 0) {
+        setGeneratedPhotos(data.generatedImages.map((img: any) => ({
+          id: `${img.mode}-${img.index}`,
+          mode: img.mode,
+          label: PHOTO_MODES.find(m => m.id === img.mode)?.label || img.mode,
+          prompt: img.prompt || "",
+          imageUrl: img.imageUrl || null,
+          model: img.model || "",
+          cost: img.cost || 0,
+          error: img.error || undefined,
+        })));
+      } else if (data.generationPlan) {
+        setGeneratedPhotos(data.generationPlan.map((p: any) => ({
+          id: `${p.mode}-${p.index}`,
+          mode: p.mode,
+          label: PHOTO_MODES.find(m => m.id === p.mode)?.label || p.mode,
+          prompt: p.prompt || p.contextPrompt || "",
+          imageUrl: null,
+          model: "",
+          cost: 0,
+        })));
+      }
     } catch (err: any) {
       alert(err.message || "Error generando fotos");
       setPhase("generate");
@@ -765,37 +796,83 @@ export default function FusionStudio() {
           <div style={{ ...V.main, maxWidth: "100%" }}>
             {isGenerating ? (
               <div style={{ textAlign: "center", padding: 80 }}>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>✦</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Generando sesión de fotos...</div>
-                <div style={{ fontSize: 12, color: "#666" }}>{totalPhotos} fotos profesionales · {selectedModes.length} modos · {quantity} por modo</div>
+                <div style={{ fontSize: 40, marginBottom: 16, animation: "spin 2s linear infinite" }}>✦</div>
+                <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Generando fotos con IA...</div>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>{totalPhotos} fotos profesionales · {selectedModes.length} modos · {quantity} por modo</div>
+                <div style={{ fontSize: 11, color: "#555", maxWidth: 420, margin: "0 auto" }}>
+                  Analizando producto, generando prompts especializados y renderizando con Replicate. Esto puede tardar varios minutos...
+                </div>
               </div>
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: "#f0d68a" }}>Sesión Configurada</div>
-                    <div style={{ fontSize: 12, color: "#666" }}>{generatedPhotos.length} prompts generados — listos para producción</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#f0d68a" }}>
+                      {generatedPhotos.some(p => p.imageUrl) ? "Fotos Generadas" : "Sesión Configurada"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      {generatedPhotos.filter(p => p.imageUrl).length > 0
+                        ? `${generatedPhotos.filter(p => p.imageUrl).length}/${generatedPhotos.length} fotos generadas${totalCost > 0 ? ` · $${totalCost.toFixed(3)} USD` : ""}`
+                        : `${generatedPhotos.length} prompts generados — configura tu token de Replicate para generar imágenes`}
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => setPhase("generate")} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #22222e", background: "transparent", color: "#aaa", fontSize: 11, cursor: "pointer" }}>← Editar sesión</button>
                   </div>
                 </div>
+
+                {generationWarning && (
+                  <div style={{ padding: "12px 16px", borderRadius: 8, background: "#c8a84b12", border: "1px solid #c8a84b33", marginBottom: 16, fontSize: 12, color: "#f0d68a" }}>
+                    {generationWarning}
+                  </div>
+                )}
+
                 <div style={V.galleryGrid}>
                   {generatedPhotos.map(photo => (
                     <div key={photo.id} style={V.galleryCard}>
-                      <div style={{ aspectRatio: "4/3", background: "#111", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {productImages[0] ? (
-                          <img src={productImages[0]} style={{ ...img100, filter: "brightness(0.95) contrast(1.05)" }} alt="" />
+                      <div style={{ aspectRatio: "1/1", background: "#0a0a0f", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        {photo.imageUrl ? (
+                          <img src={photo.imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={photo.label} loading="lazy" />
+                        ) : photo.error ? (
+                          <div style={{ textAlign: "center", padding: 16 }}>
+                            <div style={{ fontSize: 24, marginBottom: 8 }}>⚠</div>
+                            <div style={{ fontSize: 10, color: "#ff6b6b" }}>Error</div>
+                            <div style={{ fontSize: 9, color: "#553333", marginTop: 4, maxWidth: 160 }}>{photo.error.slice(0, 80)}</div>
+                          </div>
                         ) : (
-                          <div style={{ color: "#333", fontSize: 32 }}>✦</div>
+                          <div style={{ textAlign: "center", padding: 16 }}>
+                            <div style={{ fontSize: 24, marginBottom: 8, color: "#333" }}>✦</div>
+                            <div style={{ fontSize: 10, color: "#444" }}>Solo prompt</div>
+                          </div>
+                        )}
+                        {photo.imageUrl && (
+                          <div style={{ position: "absolute", top: 6, right: 6, padding: "2px 6px", borderRadius: 4, background: "#000a", fontSize: 8, color: "#0f0", fontWeight: 600 }}>IA</div>
                         )}
                       </div>
                       <div style={{ padding: "10px 12px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#f0d68a" }}>{photo.label}</div>
-                        <div style={{ fontSize: 9, color: "#555", marginTop: 4, maxHeight: 40, overflow: "hidden" }}>{photo.mode}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: photo.imageUrl ? "#f0d68a" : "#666" }}>{photo.label}</div>
+                        {photo.model && <div style={{ fontSize: 9, color: "#444", marginTop: 2 }}>{photo.model.split("/").pop()}</div>}
+                        {photo.cost > 0 && <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>${photo.cost.toFixed(3)}</div>}
                         <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                          <button style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #c8a84b44", background: "none", color: "#c8a84b", fontSize: 9, fontWeight: 600, cursor: "pointer" }}>Ver Prompt</button>
-                          <button style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #22222e", background: "none", color: "#666", fontSize: 9, cursor: "pointer" }}>↻ Regen</button>
+                          {photo.imageUrl && (
+                            <a href={photo.imageUrl} target="_blank" rel="noopener noreferrer" style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #c8a84b44", background: "none", color: "#c8a84b", fontSize: 9, fontWeight: 600, cursor: "pointer", textAlign: "center", textDecoration: "none" }}>
+                              Descargar
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              const el = document.createElement("textarea");
+                              el.value = photo.prompt;
+                              document.body.appendChild(el);
+                              el.select();
+                              document.execCommand("copy");
+                              document.body.removeChild(el);
+                            }}
+                            style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #22222e", background: "none", color: "#666", fontSize: 9, cursor: "pointer" }}
+                          >
+                            Copiar Prompt
+                          </button>
                         </div>
                       </div>
                     </div>
