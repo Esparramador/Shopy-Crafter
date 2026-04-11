@@ -36,7 +36,7 @@ Return ONLY valid JSON:
       "You are a garment analysis expert specializing in identifying the front and back of clothing items. Be precise.",
       "images",
       undefined,
-      1024,
+      8192,
     );
 
     const match = text.match(/\{[\s\S]*\}/);
@@ -487,7 +487,7 @@ Return JSON:
   "reasoning": "Brief explanation of why these settings work for this product+brand"
 }`;
 
-  const text = await askClaudeVisionWithBrain(0, prompt, [], undefined, "images", undefined, 2048);
+  const text = await askClaudeVisionWithBrain(0, prompt, [], undefined, "images", undefined, 8192);
   try {
     const match = text.match(/\{[\s\S]*\}/);
     return match ? JSON.parse(match[0]) : { lighting: "studio-3pt", background: "white-pure", perspective: "3/4 (45°)", props: [], colorGrading: "neutral", reasoning: "Default settings" };

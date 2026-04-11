@@ -666,7 +666,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
               "You are an expert image prompt engineer for Flux and Stable Diffusion models. Convert detailed art direction into concise, effective prompts. Include specific details: subject, lighting, composition, materials, colors, background. Always add: ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading. Never include text, watermarks, or logos.",
               "images",
               project!.storeNiche ?? undefined,
-              8192,
+              32000,
             );
             prompt = prompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").replace(/^\*\*.*?\*\*\s*/gm, "").trim();
             if (prompt.length < 30) throw new Error("Prompt too short");
