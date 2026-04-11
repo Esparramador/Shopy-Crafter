@@ -4,11 +4,14 @@ import { useRoute } from "wouter";
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const PHOTO_MODES = [
+  { id: "tryon-front", label: "Try-On Frontal", icon: "👕", desc: "Modelo IA vistiendo tu prenda — vista frontal exacta", cat: "tryon" },
+  { id: "tryon-back", label: "Try-On Trasera", icon: "👔", desc: "Modelo IA vistiendo tu prenda — vista trasera exacta", cat: "tryon" },
+  { id: "tryon-lifestyle", label: "Try-On Lifestyle", icon: "🧑", desc: "Modelo IA vistiendo tu prenda en contexto real", cat: "tryon" },
   { id: "hero", label: "Hero Shot", icon: "✦", desc: "Producto protagonista, fondo limpio, iluminación perfecta", cat: "product" },
   { id: "lifestyle", label: "Lifestyle", icon: "◉", desc: "En contexto real de uso, ambiente natural", cat: "product" },
   { id: "detail", label: "Macro Detail", icon: "◎", desc: "Zoom extremo en texturas, materiales, acabados", cat: "product" },
   { id: "flat-lay", label: "Flat Lay", icon: "▣", desc: "Vista cenital, composición editorial", cat: "product" },
-  { id: "model-fashion", label: "Modelo Fashion", icon: "◈", desc: "Modelo vistiendo el producto — editorial", cat: "model" },
+  { id: "model-fashion", label: "Modelo Fashion", icon: "◈", desc: "Modelo vistiendo el producto — editorial (IA creativa)", cat: "model" },
   { id: "model-holding", label: "Modelo Holding", icon: "✿", desc: "Modelo sosteniendo/mostrando el producto", cat: "model" },
   { id: "model-using", label: "Modelo Usando", icon: "◇", desc: "Modelo interactuando con el producto en acción", cat: "model" },
   { id: "scale", label: "Escala / Tamaño", icon: "⊞", desc: "Mostrando tamaño real en mano o contexto", cat: "product" },
@@ -316,6 +319,21 @@ export default function FusionStudio() {
 
   const toggleMode = (id: string) => setSelectedModes(p => p.includes(id) ? p.filter(m => m !== id) : [...p, id]);
   const hasModel = !!modelImage;
+  const isApparel = !!(productAnalysis?.sceneClassification?.isFashion ||
+    (productAnalysis?.product?.category || "").toLowerCase().match(/apparel|fashion|clothing|ropa|moda|camiset|t-shirt|shirt|hoodie|jacket|sweater|polo/));
+
+  useEffect(() => {
+    if (!productAnalysis) return;
+    if (isApparel) {
+      setSelectedModes(["tryon-front", "tryon-back"]);
+    } else {
+      setSelectedModes(prev => prev.filter(m => !m.startsWith("tryon-")).length > 0
+        ? prev.filter(m => !m.startsWith("tryon-"))
+        : ["hero", "lifestyle"]);
+    }
+  }, [productAnalysis, isApparel]);
+
+  const tryonModes = PHOTO_MODES.filter(m => m.cat === "tryon");
   const productModes = PHOTO_MODES.filter(m => m.cat === "product");
   const modelModes = PHOTO_MODES.filter(m => m.cat === "model");
   const sceneModes = PHOTO_MODES.filter(m => m.cat === "scene");
@@ -517,8 +535,8 @@ export default function FusionStudio() {
                   ) : (
                     <div style={{ textAlign: "center", color: "#444" }}>
                       <div style={{ fontSize: 24, marginBottom: 4 }}>👤</div>
-                      <div style={{ fontSize: 11, fontWeight: 600 }}>Modelo de referencia</div>
-                      <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>La IA NUNCA fusionará cuerpos</div>
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>Modelo de referencia (opcional)</div>
+                      <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Si no subes modelo, la IA generará uno automáticamente para Try-On</div>
                     </div>
                   )}
                   <input ref={fileRefs.model} type="file" accept="image/*" hidden onChange={handleModelUpload} />
@@ -639,7 +657,11 @@ export default function FusionStudio() {
                 <div style={V.guardCard}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#6688ff", letterSpacing: "0.1em", marginBottom: 6 }}>IA GUARD</div>
                   <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
-                    {hasModel ? "Producto + Modelo detectados. La IA posicionará la persona USANDO/SOSTENIENDO el producto. Nunca fusionará cuerpos." : "Solo producto. La IA respetará forma, materiales y proporciones exactas."}
+                    {isApparel
+                      ? `Prenda detectada. Try-On disponible: la IA ${hasModel ? "usará tu modelo" : "generará modelos IA"} vistiendo tu producto EXACTO.`
+                      : hasModel
+                        ? "Producto + Modelo detectados. La IA posicionará la persona USANDO/SOSTENIENDO el producto."
+                        : "Solo producto. La IA respetará forma, materiales y proporciones exactas."}
                   </div>
                 </div>
               </div>
@@ -693,13 +715,15 @@ export default function FusionStudio() {
               <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>Selecciona los tipos de foto. Los marcados con ★ son sugeridos por la IA según tu producto.</div>
 
               {[
-                { label: "Producto Solo", modes: productModes },
-                ...(hasModel ? [{ label: "Con Modelo", modes: modelModes }] : []),
-                { label: "Escenas", modes: sceneModes },
-                { label: "Social Media", modes: socialModes },
+                ...(isApparel ? [{ label: "👕 Virtual Try-On — Tu prenda EXACTA en modelo IA", modes: tryonModes, highlight: true }] : []),
+                { label: "Producto Solo", modes: productModes, highlight: false },
+                ...(hasModel ? [{ label: "Con Modelo (IA creativa)", modes: modelModes, highlight: false }] : []),
+                { label: "Escenas", modes: sceneModes, highlight: false },
+                { label: "Social Media", modes: socialModes, highlight: false },
               ].map(group => (
-                <div key={group.label} style={{ marginBottom: 16 }}>
-                  <div style={{ ...V.secTitle, color: "#888" }}>{group.label}</div>
+                <div key={group.label} style={{ marginBottom: 16, ...(group.highlight ? { background: "#c8a84b08", border: "1px solid #c8a84b22", borderRadius: 12, padding: 14 } : {}) }}>
+                  <div style={{ ...V.secTitle, color: group.highlight ? "#c8a84b" : "#888" }}>{group.label}</div>
+                  {group.highlight && <div style={{ fontSize: 10, color: "#888", marginBottom: 8, marginTop: -4 }}>La IA detecta frente/espalda de tu prenda y genera modelos IA vistiéndola. Si subes foto de modelo, usará esa persona.</div>}
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 6 }}>
                     {group.modes.map(mode => {
                       const a = selectedModes.includes(mode.id);
@@ -783,7 +807,9 @@ export default function FusionStudio() {
               <div style={V.guardCard}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#6688ff", marginBottom: 4 }}>IA GUARD</div>
                 <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
-                  {hasModel ? "Modelo detectado. La persona USARÁ el producto, nunca se fusionarán." : "Solo producto. Forma y materiales se respetarán al 100%."}
+                  {isApparel && selectedModes.some(m => m.startsWith("tryon-"))
+                    ? `Try-On activo: ${hasModel ? "tu modelo" : "modelo IA auto-generado"} vestirá tu prenda EXACTA.`
+                    : hasModel ? "Modelo detectado. La persona USARÁ el producto, nunca se fusionarán." : "Solo producto. Forma y materiales se respetarán al 100%."}
                   {referenceImages.length > 0 && <><br />🎯 {referenceImages.length} ref. — estilo y composición se imitarán.</>}
                   {brandDna && <><br />🧬 Brand DNA activo — colores, estilo y audiencia inyectados.</>}
                 </div>

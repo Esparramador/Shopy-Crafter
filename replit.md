@@ -90,10 +90,20 @@ A comprehensive content generation tool with 41 types across 9 categories. Every
 An AI-powered product photography engine at `/projects/:id/fusion-studio`. Features 4 phases:
 1. **Brand Intelligence**: URL + Instagram + company name → 4 parallel Gemini searches extract brand DNA (identity, Instagram aesthetic, competitor photography, industry trends).
 2. **Product Analysis**: Upload product images → Claude Vision decomposes into layers, textures, materials, colors, composition. Auto-suggests optimal photo settings (lighting, background, perspective) via Claude.
-3. **Generation Config**: 16 photo modes (hero, lifestyle, macro, flat-lay, model variants, ambient, UGC, social formats), 10 lighting options, 10 backgrounds, 10 perspectives. AI suggestions marked with ★.
-4. **Gallery**: Real AI-generated images via Replicate (Flux 1.1 Pro, Flux Dev, Recraft V3). Images generated in parallel batches of 3. Each image saved to Vault with cost tracking. Graceful fallback to prompt-only mode when no Replicate token is configured.
+3. **Generation Config**: 16+ photo modes (hero, lifestyle, macro, flat-lay, model variants, ambient, UGC, social formats, virtual try-on), 10 lighting options, 10 backgrounds, 10 perspectives. AI suggestions marked with ★.
+4. **Gallery**: Real AI-generated images via Replicate (Flux 1.1 Pro, Flux Dev, Recraft V3, IDM-VTON). Images generated in parallel batches of 3. Each image saved to Vault with cost tracking. Graceful fallback to prompt-only mode when no Replicate token is configured.
 
-Backend: `lib/fusion-studio.ts` (researchBrandForFusion, autoSuggestPhotoSettings, analyzeImageForFusion), `routes/fusion-studio.ts` (5 endpoints: analyze, create-product, brand-research, auto-suggest, generate-photos). The `generate-photos` endpoint: 1) analyzes product via Claude Vision, 2) converts art-direction to Replicate-ready prompts via Claude, 3) generates real images via Replicate with per-mode model selection, 4) saves all images to Vault with cost/model metadata. Plan limits enforced via `checkProductionLimit/recordUsage`. All endpoints use `enableLongRunning` anti-502 headers. Responsive layout with accordion controls on mobile (<768px).
+**Virtual Try-On Pipeline** (for apparel products):
+- Auto-detects apparel via `isFashion` flag and category keyword matching.
+- `detectGarmentSides()`: Claude Vision identifies front/back garment sides from uploaded photos.
+- `getGarmentCategory()`: Maps product category to IDM-VTON categories (upper_body, lower_body, dresses).
+- `buildModelPersonPrompt()`: Generates prompt for AI model person (age, gender, pose, setting based on brand DNA).
+- Pipeline: 1) Generate AI model person via Flux 1.1 Pro ($0.04), 2) Apply garment via IDM-VTON (`cuuupid/idm-vton`) ($0.05) ≈ $0.09/image.
+- If user uploads a model photo, step 1 is skipped (cost reduced to $0.05).
+- Try-on modes: `tryon-front`, `tryon-back`, `tryon-lifestyle`. Frontend auto-selects try-on modes when apparel is detected.
+- Both try-on pipeline steps have retry logic with backoff for 429 rate limiting.
+
+Backend: `lib/fusion-studio.ts` (researchBrandForFusion, autoSuggestPhotoSettings, analyzeImageForFusion, detectGarmentSides, getGarmentCategory, buildModelPersonPrompt), `routes/fusion-studio.ts` (5 endpoints: analyze, create-product, brand-research, auto-suggest, generate-photos). The `generate-photos` endpoint: 1) analyzes product via Claude Vision, 2) splits plan into regular modes + try-on modes, 3) for regular: converts art-direction to Replicate-ready prompts via Claude, generates real images via Replicate with per-mode model selection, 4) for try-on: detects garment sides, generates model person, applies garment via IDM-VTON, 5) saves all images to Vault with cost/model metadata. Plan limits enforced via `checkProductionLimit/recordUsage`. All endpoints use `enableLongRunning` anti-502 headers. Responsive layout with accordion controls on mobile (<768px).
 
 ### File Upload System
 A universal file processor with multer integration, supporting various text files, images, spreadsheets, and PDFs up to 20MB.

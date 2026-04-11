@@ -1,6 +1,107 @@
 import { logger } from "./logger.js";
-import { askClaudeVisionWithBrain, learnFromOperation } from "./claude.js";
+import { askClaudeVisionWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
+
+export interface GarmentSide {
+  imageIndex: number;
+  side: "front" | "back" | "unknown";
+  reason: string;
+}
+
+export async function detectGarmentSides(
+  files: Array<{ buffer: Buffer; mimetype: string }>,
+  productCategory?: string,
+): Promise<GarmentSide[]> {
+  if (files.length === 0) return [];
+  if (files.length === 1) return [{ imageIndex: 0, side: "front", reason: "Single image defaults to front" }];
+
+  type VisionMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  const images = files.map(f => ({
+    base64: f.buffer.toString("base64"),
+    mediaType: f.mimetype as VisionMediaType,
+  }));
+
+  try {
+    const text = await askClaudeVisionWithBrain(
+      0,
+      `You are analyzing ${images.length} images of a garment (${productCategory || "clothing"}).
+For EACH image, determine if it shows the FRONT or BACK of the garment.
+
+Front indicators: smaller logo/brand mark on chest, front collar view, buttons/zippers visible from front, main facing side
+Back indicators: larger print/artwork on back, back of collar/neck, back label, viewing the garment from behind, large graphic design
+
+Return ONLY valid JSON:
+{ "sides": [${images.map((_, i) => `{ "imageIndex": ${i}, "side": "front" | "back", "reason": "brief reason" }`).join(", ")}] }`,
+      images,
+      "You are a garment analysis expert specializing in identifying the front and back of clothing items. Be precise.",
+      "images",
+      undefined,
+      1024,
+    );
+
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (parsed.sides && Array.isArray(parsed.sides)) {
+        logger.info({ sides: parsed.sides }, "Fusion Studio: Garment sides detected");
+        return parsed.sides;
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "Fusion Studio: Garment side detection failed, using defaults");
+  }
+
+  return files.map((_, i) => ({
+    imageIndex: i,
+    side: i === 0 ? "front" as const : "back" as const,
+    reason: "Default assignment",
+  }));
+}
+
+export function getGarmentCategory(productCategory: string, subcategory: string): "tops" | "bottoms" | "one-pieces" {
+  const lower = `${productCategory} ${subcategory}`.toLowerCase();
+  if (lower.match(/pantal|jeans|shorts|falda|skirt|trouser|pant|leggin/)) return "bottoms";
+  if (lower.match(/vestido|dress|mono|jumpsuit|overall|onesie|romper|body/)) return "one-pieces";
+  return "tops";
+}
+
+export function buildModelPersonPrompt(
+  mode: string,
+  analysis: ImageAnalysis,
+  brandDna: Record<string, unknown> | null,
+  extraPrompt?: string,
+): string {
+  const audience = analysis.product?.targetAudience || "young adults";
+  const style = analysis.product?.brandStyle || "streetwear";
+  const isUrban = style.toLowerCase().match(/street|urban|casual|sport/);
+  const isLuxury = (analysis.visualDna?.luxuryScore ?? 5) >= 7;
+
+  let pose = "standing naturally, relaxed confident pose, arms at sides";
+  let setting = "clean studio background, professional photography lighting";
+  let facing = "facing the camera, front view";
+
+  if (mode === "tryon-back") {
+    facing = "facing AWAY from camera, BACK view, showing their back to the viewer";
+    pose = "standing naturally, slight head turn showing jawline, viewed from behind";
+  } else if (mode === "tryon-lifestyle") {
+    setting = isUrban
+      ? "urban city street, golden hour sunlight, graffiti walls in background"
+      : isLuxury
+        ? "luxury minimalist interior, soft natural window light"
+        : "outdoor park setting, natural dappled sunlight, bokeh background";
+    pose = "walking casually, mid-stride natural movement, candid authentic feel";
+  }
+
+  const genderHint = audience.toLowerCase().includes("women") || audience.toLowerCase().includes("mujer")
+    ? "female" : audience.toLowerCase().includes("men") || audience.toLowerCase().includes("hombre")
+    ? "male" : "person";
+
+  const ageHint = audience.toLowerCase().includes("teen") ? "18-22 year old"
+    : audience.toLowerCase().includes("adult") || audience.toLowerCase().includes("adulto") ? "25-35 year old"
+    : "25-30 year old";
+
+  return `Full body photograph of an attractive ${ageHint} ${genderHint} model, ${facing}, ${pose}, wearing a plain simple white t-shirt and dark fitted jeans, ${setting}, shot on Canon EOS R5, 85mm f/1.4 lens, shallow depth of field, 4K ultra high resolution, professional fashion photography, sharp focus, natural skin texture, photorealistic${extraPrompt ? `, ${extraPrompt}` : ""}`;
+}
 
 export interface ImageAnalysis {
   sceneClassification: {

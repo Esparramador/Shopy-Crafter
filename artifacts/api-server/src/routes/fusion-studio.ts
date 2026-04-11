@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { analyzeImageForFusion, researchBrandForFusion, autoSuggestPhotoSettings } from "../lib/fusion-studio.js";
+import { analyzeImageForFusion, researchBrandForFusion, autoSuggestPhotoSettings, detectGarmentSides, getGarmentCategory, buildModelPersonPrompt } from "../lib/fusion-studio.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { db, projectsTable } from "@workspace/db";
@@ -12,6 +12,9 @@ import { safeDecrypt } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
+const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
+const TRYON_MODEL_COST = 0.04;
+const TRYON_GARMENT_COST = 0.05;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -55,6 +58,113 @@ function getOutputSize(mode: string, format: string): { width: number; height: n
   if (mode === "banner") return { width: 1920, height: 1080 };
   if (mode === "social-ig") return { width: 1080, height: 1080 };
   return { width: 1440, height: 1440 };
+}
+
+function isFashionProduct(analysis: any): boolean {
+  const cat = `${analysis.product?.category ?? ""} ${analysis.product?.subcategory ?? ""}`.toLowerCase();
+  return !!(
+    analysis.sceneClassification?.isFashion ||
+    cat.match(/apparel|fashion|clothing|ropa|moda|camiset|t-shirt|shirt|hoodie|jacket|sweater|polo|vest|pantal|jeans|shorts|dress|vestido/)
+  );
+}
+
+function extractUrl(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val && typeof val === "object") {
+    const s = val.toString();
+    if (s.startsWith("http")) return s;
+    if (typeof (val as any).url === "function") {
+      const u = (val as any).url();
+      return u?.href ?? String(u);
+    }
+    if (typeof (val as any).url === "string") return (val as any).url;
+  }
+  return String(val);
+}
+
+async function replicateWithRetry(fn: () => Promise<unknown>, label: string, maxRetries = 3): Promise<unknown> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("429") && attempt < maxRetries) {
+        const delay = Math.min(15_000 * attempt, 60_000);
+        logger.warn({ attempt, delay, label }, "Fusion Studio TryOn: Rate limited, retrying");
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(`${label}: max retries exceeded`);
+}
+
+async function generateModelPerson(
+  replicate: any,
+  prompt: string,
+  width: number,
+  height: number,
+): Promise<string> {
+  logger.info({ promptPreview: prompt.slice(0, 100) }, "Fusion Studio TryOn: Generating AI model person");
+  const output = await replicateWithRetry(
+    () => withTimeout(
+      replicate.run("black-forest-labs/flux-1.1-pro" as `${string}/${string}`, {
+        input: {
+          prompt,
+          width: Math.min(width, 1024),
+          height: Math.min(height, 1536),
+          num_outputs: 1,
+          output_format: "png",
+          output_quality: 95,
+        },
+      }),
+      REPLICATE_TIMEOUT_MS,
+      "Flux model-person generation",
+    ),
+    "generateModelPerson",
+  );
+  const raw = Array.isArray(output) ? output[0] : output;
+  const url = extractUrl(raw);
+  if (!url?.startsWith("http")) throw new Error(`Invalid model person URL: ${String(raw).slice(0, 200)}`);
+  logger.info({ url: url.slice(0, 80) }, "Fusion Studio TryOn: Model person generated");
+  return url;
+}
+
+async function applyVirtualTryon(
+  replicate: any,
+  modelImageUrl: string,
+  garmentDataUri: string,
+  category: "tops" | "bottoms" | "one-pieces",
+  garmentDescription?: string,
+): Promise<string> {
+  const catMap: Record<string, string> = { tops: "upper_body", bottoms: "lower_body", "one-pieces": "dresses" };
+  const idmCategory = catMap[category] || "upper_body";
+
+  logger.info({ category: idmCategory }, "Fusion Studio TryOn: Applying virtual try-on via IDM-VTON");
+  const output = await replicateWithRetry(
+    () => withTimeout(
+      replicate.run("cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985" as `${string}/${string}:${string}`, {
+        input: {
+          human_img: modelImageUrl,
+          garm_img: garmentDataUri,
+          garment_des: garmentDescription || "Short sleeve t-shirt",
+          category: idmCategory,
+          crop: true,
+          steps: 30,
+          seed: 42,
+        },
+      }),
+      REPLICATE_TIMEOUT_MS,
+      "IDM-VTON virtual try-on",
+    ),
+    "applyVirtualTryon",
+  );
+  const raw = Array.isArray(output) ? output[0] : output;
+  const url = extractUrl(raw);
+  if (!url?.startsWith("http")) throw new Error(`Invalid try-on URL: ${String(raw).slice(0, 200)}`);
+  logger.info({ url: url.slice(0, 80) }, "Fusion Studio TryOn: Virtual try-on complete");
+  return url;
 }
 
 const router = Router();
@@ -373,7 +483,10 @@ Only the ENVIRONMENT changes — the product itself remains IDENTICAL to the ref
 
     const contextBlock = `${subjectProtocol}${foodProtocol}${brandBlock}${visualDnaBlock}`;
 
-    const generationPlan = parsedModes.flatMap((mode: string) =>
+    const regularModes = parsedModes.filter((m: string) => !TRYON_MODES.has(m));
+    const tryonModesSelected = parsedModes.filter((m: string) => TRYON_MODES.has(m));
+
+    const generationPlan = regularModes.flatMap((mode: string) =>
       Array.from({ length: qty }, (_, i) => ({
         mode,
         index: i,
@@ -388,6 +501,12 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
       }))
     );
 
+    const tryonPlan = tryonModesSelected.flatMap((mode: string) =>
+      Array.from({ length: qty }, (_, i) => ({ mode, index: i }))
+    );
+
+    const totalPhotos = generationPlan.length + tryonPlan.length;
+
     let project: { replicateApiToken: string | null; storeNiche: string | null; brandTone: string | null } | null = null;
     if (pid > 0) {
       const [p] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid));
@@ -399,63 +518,33 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
       res.json({
         success: true,
         analysis,
-        generationPlan: generationPlan.map(p => ({ mode: p.mode, index: p.index, prompt: p.contextPrompt })),
+        generationPlan: [...generationPlan.map(p => ({ mode: p.mode, index: p.index, prompt: p.contextPrompt })), ...tryonPlan.map(p => ({ mode: p.mode, index: p.index, prompt: `Virtual try-on: ${p.mode}` }))],
         generatedImages: [],
-        totalPhotos: generationPlan.length,
+        totalPhotos,
         settings: { lighting, background, perspective, quantity: qty, outputFormat },
         warning: "No hay token de Replicate configurado — solo se generó el plan de fotos sin imágenes reales. Configura tu Replicate API token en Ajustes del proyecto.",
       });
       return;
     }
 
-    const limitCheck = await checkProductionLimit(pid, "image", generationPlan.length);
+    const limitCheck = await checkProductionLimit(pid, "image", totalPhotos);
     if (!limitCheck.allowed) {
       res.json({
         success: true,
         analysis,
         generationPlan: generationPlan.map(p => ({ mode: p.mode, index: p.index, prompt: p.contextPrompt })),
         generatedImages: [],
-        totalPhotos: generationPlan.length,
+        totalPhotos,
         settings: { lighting, background, perspective, quantity: qty, outputFormat },
         warning: `Límite de imágenes alcanzado: ${limitCheck.reason}`,
       });
       return;
     }
 
-    logger.info({ totalPhotos: generationPlan.length }, "Fusion Studio: Converting prompts to Replicate-ready via Claude");
-
     const Replicate = (await import("replicate")).default;
     const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
     const replicate = new Replicate({ auth: replicateToken });
 
-    const replicatePrompts = await Promise.all(
-      generationPlan.map(async (item) => {
-        try {
-          let prompt = await askClaudeWithBrain(
-            pid,
-            [{ role: "user", content: `Convert the following Fusion Studio art direction into a SINGLE, concise image generation prompt (max 200 words, English only). Output ONLY the prompt — no explanations:\n\n${item.contextPrompt}` }],
-            "You are an expert image prompt engineer for Flux and Stable Diffusion models. Convert detailed art direction into concise, effective prompts. Include specific details: subject, lighting, composition, materials, colors, background. Always add: ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading. Never include text, watermarks, or logos.",
-            "images",
-            project!.storeNiche ?? undefined,
-            8192,
-          );
-          prompt = prompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").replace(/^\*\*.*?\*\*\s*/gm, "").trim();
-          if (prompt.length < 30) throw new Error("Prompt too short");
-          return { ...item, replicatePrompt: prompt };
-        } catch (err) {
-          logger.warn({ mode: item.mode, err }, "Fusion Studio: Claude prompt conversion failed, using fallback");
-          const productDesc = analysis.product?.category || "product";
-          return {
-            ...item,
-            replicatePrompt: `Professional ${item.mode} photograph of ${productDesc}. ${lighting} lighting, ${background} background, ${perspective} perspective. Ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading.`,
-          };
-        }
-      })
-    );
-
-    logger.info({ totalPhotos: replicatePrompts.length }, "Fusion Studio: Generating images with Replicate");
-
-    const MAX_PARALLEL = 3;
     const generatedImages: Array<{
       mode: string;
       index: number;
@@ -464,104 +553,220 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
       model: string;
       cost: number;
       error?: string;
+      tryonPipeline?: boolean;
     }> = [];
 
-    for (let batch = 0; batch < replicatePrompts.length; batch += MAX_PARALLEL) {
-      const chunk = replicatePrompts.slice(batch, batch + MAX_PARALLEL);
-      const results = await Promise.allSettled(
-        chunk.map(async (item) => {
-          const model = FUSION_MODEL_MAP[item.mode] || "black-forest-labs/flux-1.1-pro";
-          const cost = COST_MAP[model] ?? 0.04;
-          const size = getOutputSize(item.mode, outputFormat || "");
+    if (tryonPlan.length > 0 && isFashionProduct(analysis)) {
+      logger.info({ tryonModes: tryonModesSelected, tryonCount: tryonPlan.length }, "Fusion Studio TryOn: Starting virtual try-on pipeline");
 
-          logger.info({ mode: item.mode, index: item.index, model }, "Fusion Studio: Generating image");
+      const garmentSides = await detectGarmentSides(
+        productFiles.map(f => ({ buffer: f.buffer, mimetype: f.mimetype })),
+        analysis.product?.category,
+      );
+      const garmentCat = getGarmentCategory(analysis.product?.category || "", analysis.product?.subcategory || "");
 
-          const runWithRetry = async (attempt = 1): Promise<unknown> => {
-            try {
-              let runPromise: Promise<unknown>;
-              if (model.includes("flux-1.1-pro")) {
-                runPromise = replicate.run(model as `${string}/${string}`, {
-                  input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_outputs: 1, output_format: "png", output_quality: 100 },
-                });
-              } else if (model.includes("recraft")) {
-                runPromise = replicate.run(model as `${string}/${string}`, {
-                  input: { prompt: item.replicatePrompt, size: `${size.width}x${size.height}`, style: "realistic_image" },
-                });
-              } else {
-                runPromise = replicate.run(model as `${string}/${string}`, {
-                  input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
-                });
-              }
-              return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model} (${item.mode})`);
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              if (msg.includes("429") && attempt <= 5) {
-                const delay = Math.min(15_000 * attempt, 60_000);
-                logger.warn({ attempt, delay, mode: item.mode }, "Fusion Studio: Rate limited, retrying");
-                await new Promise(r => setTimeout(r, delay));
-                return runWithRetry(attempt + 1);
-              }
-              throw err;
-            }
-          };
+      const frontIndex = garmentSides.find(s => s.side === "front")?.imageIndex ?? 0;
+      const backIndex = garmentSides.find(s => s.side === "back")?.imageIndex ?? (productFiles.length > 1 ? 1 : 0);
 
-          const output = await runWithRetry();
+      logger.info({ frontIndex, backIndex, garmentCat, sides: garmentSides }, "Fusion Studio TryOn: Garment sides mapped");
 
-          function extractUrl(val: unknown): string {
-            if (typeof val === "string") return val;
-            if (val && typeof val === "object") {
-              const s = val.toString();
-              if (s.startsWith("http")) return s;
-              if (typeof (val as any).url === "function") {
-                const u = (val as any).url();
-                return u?.href ?? String(u);
-              }
-              if (typeof (val as any).url === "string") return (val as any).url;
-            }
-            return String(val);
+      const modelFile = hasModel === "true" && files.length > productFiles.length
+        ? files[files.length - 1] : null;
+
+      for (const item of tryonPlan) {
+        try {
+          const isFrontView = item.mode !== "tryon-back";
+          const garmentFileIdx = isFrontView ? frontIndex : backIndex;
+          const garmentFile = productFiles[garmentFileIdx] || productFiles[0];
+          const garmentDataUri = `data:${garmentFile.mimetype};base64,${garmentFile.buffer.toString("base64")}`;
+
+          let modelImageUrl: string;
+          if (modelFile) {
+            modelImageUrl = `data:${modelFile.mimetype};base64,${modelFile.buffer.toString("base64")}`;
+            logger.info("Fusion Studio TryOn: Using uploaded model photo");
+          } else {
+            const modelPrompt = buildModelPersonPrompt(item.mode, analysis, parsedBrandDna, extraPrompt || undefined);
+            const size = getOutputSize(item.mode, outputFormat || "");
+            modelImageUrl = await generateModelPerson(replicate, modelPrompt, size.width, size.height);
           }
 
-          const raw = Array.isArray(output) ? output[0] : output;
-          const imageUrl = extractUrl(raw);
-
-          if (!imageUrl || !imageUrl.startsWith("http")) {
-            throw new Error(`Invalid image URL: ${String(raw).slice(0, 200)}`);
-          }
-
-          logger.info({ mode: item.mode, index: item.index, url: imageUrl.slice(0, 80) }, "Fusion Studio: Image generated");
+          const garmentDesc = `${analysis.product?.category || "Garment"} - ${analysis.product?.subcategory || "clothing item"}`;
+          const tryonUrl = await applyVirtualTryon(replicate, modelImageUrl, garmentDataUri, garmentCat, garmentDesc);
+          const totalItemCost = (modelFile ? 0 : TRYON_MODEL_COST) + TRYON_GARMENT_COST;
 
           if (pid > 0) {
             await saveToVault({
               projectId: pid,
               fileType: "image",
               category: `fusion-${item.mode}`,
-              title: `Fusion ${item.mode} — ${analysis.product?.category || "Producto"}`,
-              originalUrl: imageUrl,
+              title: `Fusion ${item.mode} — ${analysis.product?.category || "Producto"} (Virtual Try-On)`,
+              originalUrl: tryonUrl,
               mimeType: "image/png",
-              generatedBy: "fusion-studio",
-              metadata: { model, prompt: item.replicatePrompt.slice(0, 500), cost, mode: item.mode },
+              generatedBy: "fusion-studio-tryon",
+              metadata: {
+                model: "cuuupid/idm-vton",
+                garmentSide: isFrontView ? "front" : "back",
+                cost: totalItemCost,
+                mode: item.mode,
+                pipeline: "virtual-tryon",
+              },
             });
           }
 
-          return { mode: item.mode, index: item.index, imageUrl, prompt: item.replicatePrompt, model, cost };
+          generatedImages.push({
+            mode: item.mode,
+            index: item.index,
+            imageUrl: tryonUrl,
+            prompt: `Virtual try-on (${isFrontView ? "front" : "back"} garment)`,
+            model: "fashn/tryon",
+            cost: totalItemCost,
+            tryonPipeline: true,
+          });
+
+          logger.info({ mode: item.mode, index: item.index, url: tryonUrl.slice(0, 80) }, "Fusion Studio TryOn: Try-on image complete");
+        } catch (err) {
+          logger.error({ mode: item.mode, err }, "Fusion Studio TryOn: Try-on generation failed");
+          generatedImages.push({
+            mode: item.mode,
+            index: item.index,
+            imageUrl: null,
+            prompt: `Virtual try-on failed`,
+            model: "fashn/tryon",
+            cost: 0,
+            error: err instanceof Error ? err.message : String(err),
+            tryonPipeline: true,
+          });
+        }
+      }
+    } else if (tryonPlan.length > 0) {
+      logger.warn("Fusion Studio: Try-on modes selected but product is not fashion — skipping try-on");
+      for (const item of tryonPlan) {
+        generatedImages.push({
+          mode: item.mode,
+          index: item.index,
+          imageUrl: null,
+          prompt: "",
+          model: "fashn/tryon",
+          cost: 0,
+          error: "Virtual try-on solo funciona con productos de moda/ropa. Sube una prenda y selecciona estos modos.",
+        });
+      }
+    }
+
+    if (generationPlan.length > 0) {
+      logger.info({ totalPhotos: generationPlan.length }, "Fusion Studio: Converting prompts to Replicate-ready via Claude");
+
+      const replicatePrompts = await Promise.all(
+        generationPlan.map(async (item) => {
+          try {
+            let prompt = await askClaudeWithBrain(
+              pid,
+              [{ role: "user", content: `Convert the following Fusion Studio art direction into a SINGLE, concise image generation prompt (max 200 words, English only). Output ONLY the prompt — no explanations:\n\n${item.contextPrompt}` }],
+              "You are an expert image prompt engineer for Flux and Stable Diffusion models. Convert detailed art direction into concise, effective prompts. Include specific details: subject, lighting, composition, materials, colors, background. Always add: ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading. Never include text, watermarks, or logos.",
+              "images",
+              project!.storeNiche ?? undefined,
+              8192,
+            );
+            prompt = prompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").replace(/^\*\*.*?\*\*\s*/gm, "").trim();
+            if (prompt.length < 30) throw new Error("Prompt too short");
+            return { ...item, replicatePrompt: prompt };
+          } catch (err) {
+            logger.warn({ mode: item.mode, err }, "Fusion Studio: Claude prompt conversion failed, using fallback");
+            const productDesc = analysis.product?.category || "product";
+            return {
+              ...item,
+              replicatePrompt: `Professional ${item.mode} photograph of ${productDesc}. ${lighting} lighting, ${background} background, ${perspective} perspective. Ultra high resolution 4K, commercial photography quality, sharp focus, professional color grading.`,
+            };
+          }
         })
       );
 
-      for (const r of results) {
-        if (r.status === "fulfilled") {
-          generatedImages.push(r.value);
-        } else {
-          const failedItem = chunk[results.indexOf(r)];
-          logger.error({ mode: failedItem?.mode, err: r.reason }, "Fusion Studio: Image generation failed");
-          generatedImages.push({
-            mode: failedItem?.mode || "unknown",
-            index: failedItem?.index || 0,
-            imageUrl: null,
-            prompt: failedItem?.replicatePrompt || "",
-            model: FUSION_MODEL_MAP[failedItem?.mode || "hero"] || "unknown",
-            cost: 0,
-            error: r.reason instanceof Error ? r.reason.message : String(r.reason),
-          });
+      logger.info({ totalPhotos: replicatePrompts.length }, "Fusion Studio: Generating images with Replicate");
+
+      const MAX_PARALLEL = 3;
+
+      for (let batch = 0; batch < replicatePrompts.length; batch += MAX_PARALLEL) {
+        const chunk = replicatePrompts.slice(batch, batch + MAX_PARALLEL);
+        const results = await Promise.allSettled(
+          chunk.map(async (item) => {
+            const model = FUSION_MODEL_MAP[item.mode] || "black-forest-labs/flux-1.1-pro";
+            const cost = COST_MAP[model] ?? 0.04;
+            const size = getOutputSize(item.mode, outputFormat || "");
+
+            logger.info({ mode: item.mode, index: item.index, model }, "Fusion Studio: Generating image");
+
+            const runWithRetry = async (attempt = 1): Promise<unknown> => {
+              try {
+                let runPromise: Promise<unknown>;
+                if (model.includes("flux-1.1-pro")) {
+                  runPromise = replicate.run(model as `${string}/${string}`, {
+                    input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_outputs: 1, output_format: "png", output_quality: 100 },
+                  });
+                } else if (model.includes("recraft")) {
+                  runPromise = replicate.run(model as `${string}/${string}`, {
+                    input: { prompt: item.replicatePrompt, size: `${size.width}x${size.height}`, style: "realistic_image" },
+                  });
+                } else {
+                  runPromise = replicate.run(model as `${string}/${string}`, {
+                    input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
+                  });
+                }
+                return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model} (${item.mode})`);
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (msg.includes("429") && attempt <= 5) {
+                  const delay = Math.min(15_000 * attempt, 60_000);
+                  logger.warn({ attempt, delay, mode: item.mode }, "Fusion Studio: Rate limited, retrying");
+                  await new Promise(r => setTimeout(r, delay));
+                  return runWithRetry(attempt + 1);
+                }
+                throw err;
+              }
+            };
+
+            const output = await runWithRetry();
+            const raw = Array.isArray(output) ? output[0] : output;
+            const imageUrl = extractUrl(raw);
+
+            if (!imageUrl || !imageUrl.startsWith("http")) {
+              throw new Error(`Invalid image URL: ${String(raw).slice(0, 200)}`);
+            }
+
+            logger.info({ mode: item.mode, index: item.index, url: imageUrl.slice(0, 80) }, "Fusion Studio: Image generated");
+
+            if (pid > 0) {
+              await saveToVault({
+                projectId: pid,
+                fileType: "image",
+                category: `fusion-${item.mode}`,
+                title: `Fusion ${item.mode} — ${analysis.product?.category || "Producto"}`,
+                originalUrl: imageUrl,
+                mimeType: "image/png",
+                generatedBy: "fusion-studio",
+                metadata: { model, prompt: item.replicatePrompt.slice(0, 500), cost, mode: item.mode },
+              });
+            }
+
+            return { mode: item.mode, index: item.index, imageUrl, prompt: item.replicatePrompt, model, cost };
+          })
+        );
+
+        for (const r of results) {
+          if (r.status === "fulfilled") {
+            generatedImages.push(r.value);
+          } else {
+            const failedItem = chunk[results.indexOf(r)];
+            logger.error({ mode: failedItem?.mode, err: r.reason }, "Fusion Studio: Image generation failed");
+            generatedImages.push({
+              mode: failedItem?.mode || "unknown",
+              index: failedItem?.index || 0,
+              imageUrl: null,
+              prompt: failedItem?.replicatePrompt || "",
+              model: FUSION_MODEL_MAP[failedItem?.mode || "hero"] || "unknown",
+              cost: 0,
+              error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+            });
+          }
         }
       }
     }
@@ -578,11 +783,11 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
         projectId: pid,
         fileType: "fusion-studio-session",
         category: "fusion-studio",
-        title: `Fusion Session: ${analysis.product?.category} — ${successCount}/${generationPlan.length} fotos generadas`,
+        title: `Fusion Session: ${analysis.product?.category} — ${successCount}/${totalPhotos} fotos generadas`,
         mimeType: "application/json",
         generatedBy: "fusion-studio",
         content: JSON.stringify({ analysis, brandDna: parsedBrandDna, generatedImages, settings: { lighting, background, perspective, quantity: qty } }, null, 2),
-        metadata: { modes: parsedModes, photoCount: generationPlan.length, successCount, totalCost },
+        metadata: { modes: parsedModes, photoCount: totalPhotos, successCount, totalCost, hasTryon: tryonPlan.length > 0 },
       });
     }
 
@@ -590,19 +795,19 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
       operationType: "images",
       niche: project.storeNiche ?? null,
       productType: analysis.product?.category ?? null,
-      title: `Fusion Studio session: ${successCount}/${generationPlan.length} fotos`,
+      title: `Fusion Studio session: ${successCount}/${totalPhotos} fotos${tryonPlan.length > 0 ? " (incl. try-on)" : ""}`,
       content: `Modos: ${parsedModes.join(", ")}. Modelos: ${[...new Set(generatedImages.map(i => i.model))].join(", ")}. Costo total: $${totalCost.toFixed(3)}`,
-      confidence: successCount === generationPlan.length ? 0.85 : 0.5,
-      tags: ["fusion-studio", ...parsedModes],
+      confidence: successCount === totalPhotos ? 0.85 : 0.5,
+      tags: ["fusion-studio", ...parsedModes, ...(tryonPlan.length > 0 ? ["virtual-tryon"] : [])],
     });
 
-    logger.info({ successCount, totalPhotos: generationPlan.length, totalCost }, "Fusion Studio: Generation complete");
+    logger.info({ successCount, totalPhotos, totalCost, tryonCount: tryonPlan.length }, "Fusion Studio: Generation complete");
 
     res.json({
       success: true,
       analysis,
       generatedImages,
-      totalPhotos: generationPlan.length,
+      totalPhotos,
       successCount,
       totalCost,
       settings: { lighting, background, perspective, quantity: qty, outputFormat },
