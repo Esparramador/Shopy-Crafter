@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -332,6 +333,7 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
   const [sendState, setSendState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [saveState, setSaveState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [dlState, setDlState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const safeTimeout = useSafeTimeout();
   const [loc] = useLocation();
   const projectId = parseInt(loc.match(/\/projects\/(\d+)/)?.[1] ?? "1", 10);
 
@@ -349,7 +351,7 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
       if (res.ok) setSendState("done");
       else setSendState("error");
     } catch { setSendState("error"); }
-    setTimeout(() => setSendState("idle"), 3000);
+    safeTimeout(() => setSendState("idle"), 3000);
   };
 
   const handleSave = async () => {
@@ -363,7 +365,7 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
       if (res.ok) setSaveState("done");
       else setSaveState("error");
     } catch { setSaveState("error"); }
-    setTimeout(() => setSaveState("idle"), 3000);
+    safeTimeout(() => setSaveState("idle"), 3000);
   };
 
   const handleDownload = async () => {
@@ -387,7 +389,7 @@ function ActionButtons({ actionName, content, rawData, isMobile }: {
         setDlState("done");
       } else { setDlState("error"); }
     } catch { setDlState("error"); }
-    setTimeout(() => setDlState("idle"), 3000);
+    safeTimeout(() => setDlState("idle"), 3000);
   };
 
   const btnBase: React.CSSProperties = {
@@ -1432,36 +1434,44 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   };
 
   const absorbFile = async (file: File, niche?: string, signal?: AbortSignal): Promise<AbsorbResult> => {
-    if (isDocumentFile(file)) {
-      const text = await readFileAsText(file);
-      const res = await fetch(`${API}/api/shopybrain/absorb-document`, {
-        method: "POST", credentials: "include", signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, fileName: file.name, fileType: file.type, niche, label: file.name }),
+    try {
+      if (isDocumentFile(file)) {
+        const text = await readFileAsText(file);
+        const res = await fetch(`${API}/api/shopybrain/absorb-document`, {
+          method: "POST", credentials: "include", signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, fileName: file.name, fileType: file.type, niche, label: file.name }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("label", file.name);
+      if (niche) formData.append("niche", niche);
+      const res = await fetch(`${API}/api/shopybrain/absorb-image`, {
+        method: "POST", credentials: "include", body: formData, signal,
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Error absorbing file");
     }
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("label", file.name);
-    if (niche) formData.append("niche", niche);
-    const res = await fetch(`${API}/api/shopybrain/absorb-image`, {
-      method: "POST", credentials: "include", body: formData, signal,
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
   };
 
   // ─── Absorb URL ────────────────────────────────────────────────────────────
   const absorbUrl = async (url: string, niche?: string, signal?: AbortSignal): Promise<AbsorbResult> => {
-    const res = await fetch(`${API}/api/shopybrain/absorb-url`, {
-      method: "POST", credentials: "include", signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, niche }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    try {
+      const res = await fetch(`${API}/api/shopybrain/absorb-url`, {
+        method: "POST", credentials: "include", signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, niche }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Error absorbing URL");
+    }
   };
 
   // ─── Detect entity research request ───────────────────────────────────────
@@ -1499,13 +1509,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
   // ─── Exhaustive entity research API call ───────────────────────────────────
   const researchEntity = async (input: string, niche?: string, signal?: AbortSignal): Promise<EntityResearchResult> => {
-    const res = await fetch(`${API}/api/shopybrain/research-entity-sync`, {
-      method: "POST", credentials: "include", signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input, niche, market: "es" }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    try {
+      const res = await fetch(`${API}/api/shopybrain/research-entity-sync`, {
+        method: "POST", credentials: "include", signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, niche, market: "es" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Error researching entity");
+    }
   };
 
   // ─── Detect Klaviyo request ────────────────────────────────────────────────

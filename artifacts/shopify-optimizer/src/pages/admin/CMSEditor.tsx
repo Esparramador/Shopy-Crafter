@@ -800,6 +800,8 @@ function AIImprovePopover({ text, onApply, onClose }: { text: string; onApply: (
       const data = await res.json() as { improved?: string; error?: string };
       if (data.improved) setResult(data.improved);
       else toast({ title: "Error IA", description: data.error, variant: "destructive" });
+    } catch {
+      toast({ title: "Error de conexión", variant: "destructive" });
     } finally { setLoading(false); }
   };
 
@@ -1328,21 +1330,29 @@ export default function CMSEditor() {
   };
 
   const restoreVersion = async (id: number) => {
-    await fetch(`${BASE_URL}/api/cms/versions/${id}/restore`, { method: "POST", credentials: "include" });
-    await loadContent();
-    await loadVersions();
-    setIframeKey(k => k + 1);
-    setShowVersions(false);
-    toast({ title: "Versión restaurada" });
+    try {
+      await fetch(`${BASE_URL}/api/cms/versions/${id}/restore`, { method: "POST", credentials: "include" });
+      await loadContent();
+      await loadVersions();
+      setIframeKey(k => k + 1);
+      setShowVersions(false);
+      toast({ title: "Versión restaurada" });
+    } catch {
+      toast({ title: "Error al restaurar versión", variant: "destructive" });
+    }
   };
 
   const resetToDefaults = async () => {
     if (!confirm("¿Restaurar todo el contenido a los valores por defecto?")) return;
-    await fetch(`${BASE_URL}/api/cms/content/reset`, { method: "POST", credentials: "include" });
-    await loadContent();
-    setPending(new Map());
-    setIframeKey(k => k + 1);
-    toast({ title: "Contenido restaurado" });
+    try {
+      await fetch(`${BASE_URL}/api/cms/content/reset`, { method: "POST", credentials: "include" });
+      await loadContent();
+      setPending(new Map());
+      setIframeKey(k => k + 1);
+      toast({ title: "Contenido restaurado" });
+    } catch {
+      toast({ title: "Error al restaurar contenido", variant: "destructive" });
+    }
   };
 
   const toggleSection = (id: string) => setOpenSections(prev => {

@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import{ Search, Globe, Instagram, Store, ExternalLink, Loader2, Download, Clock, ChevronRight, Sparkles, Building2, ArrowRight, Eye }from "lucide-react";
+import { useListProjects } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -18,6 +19,8 @@ interface RecentSearch {
 }
 
 export default function UniversalSearch() {
+  const { data: projects } = useListProjects();
+  const activeProjectId = projects?.[0]?.id ?? 0;
   const [input, setInput] = useState("");
   const [niche, setNiche] = useState("");
   const [loading, setLoading] = useState(false);
@@ -60,6 +63,7 @@ export default function UniversalSearch() {
           input: input.trim(),
           niche: niche.trim() || undefined,
           market: "es",
+          projectId: activeProjectId || undefined,
         }),
       });
 

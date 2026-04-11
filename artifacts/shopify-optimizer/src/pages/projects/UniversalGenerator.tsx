@@ -144,7 +144,10 @@ export default function UniversalGenerator() {
       setResults(prev => ({ ...prev, [typeId]: data }));
 
       if (data.redirect) {
-        window.open(api(data.redirect.replace("/api", "")), "_blank");
+        const redirectUrl = data.redirect.startsWith("/api")
+          ? api(data.redirect.replace("/api", ""))
+          : api(data.redirect);
+        window.open(redirectUrl, "_blank");
       }
 
       loadHistory();

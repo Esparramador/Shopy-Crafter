@@ -30,24 +30,26 @@ export default function Competitors() {
         fetch(`${API_BASE}/api/competitors?projectId=${selectedProject}`, { credentials: "include" }),
         fetch(`${API_BASE}/api/competitors/alerts?projectId=${selectedProject}`, { credentials: "include" }),
       ]);
-      setCompetitors(await compRes.json());
-      setAlerts(await alertRes.json());
-    } finally {
+      if (compRes.ok) setCompetitors(await compRes.json());
+      if (alertRes.ok) setAlerts(await alertRes.json());
+    } catch {} finally {
       setLoading(false);
     }
   };
 
   const addCompetitor = async () => {
     if (!newComp.name || !newComp.url) return;
-    await fetch(`${API_BASE}/api/competitors`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ projectId: selectedProject, ...newComp }),
-    });
-    setShowAdd(false);
-    setNewComp({ name: "", url: "", type: "direct" });
-    loadData();
+    try {
+      await fetch(`${API_BASE}/api/competitors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId: selectedProject, ...newComp }),
+      });
+      setShowAdd(false);
+      setNewComp({ name: "", url: "", type: "direct" });
+      loadData();
+    } catch {}
   };
 
   const scan = async (competitorId: string) => {
@@ -60,19 +62,23 @@ export default function Competitors() {
         body: JSON.stringify({ projectId: selectedProject, competitorId }),
       });
       loadData();
-    } finally {
+    } catch {} finally {
       setScanning(null);
     }
   };
 
   const deleteComp = async (id: string) => {
-    await fetch(`${API_BASE}/api/competitors/${id}`, { method: "DELETE", credentials: "include" });
-    loadData();
+    try {
+      await fetch(`${API_BASE}/api/competitors/${id}`, { method: "DELETE", credentials: "include" });
+      loadData();
+    } catch {}
   };
 
   const dismissAlert = async (id: string) => {
-    await fetch(`${API_BASE}/api/competitors/alerts/${id}/dismiss`, { method: "POST", credentials: "include" });
-    setAlerts(prev => prev.filter(a => a.id !== id));
+    try {
+      await fetch(`${API_BASE}/api/competitors/alerts/${id}/dismiss`, { method: "POST", credentials: "include" });
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch {}
   };
 
   const exportReport = () => {

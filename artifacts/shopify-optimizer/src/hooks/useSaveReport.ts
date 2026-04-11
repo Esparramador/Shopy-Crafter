@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSafeTimeout } from "./useSafeTimeout";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -17,6 +18,7 @@ export function useSaveReport() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const safeTimeout = useSafeTimeout();
 
   const saveReport = async (params: SaveReportParams) => {
     setSaving(true);
@@ -42,7 +44,7 @@ export function useSaveReport() {
         throw new Error(data.error || "Error guardando informe");
       }
       setSaved(true);
-      setTimeout(() => setSaved(false), 4000);
+      safeTimeout(() => setSaved(false), 4000);
       return await res.json();
     } catch (e: any) {
       setError(e.message);

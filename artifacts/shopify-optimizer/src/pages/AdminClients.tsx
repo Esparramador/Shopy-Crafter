@@ -200,7 +200,8 @@ function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalPro
   useEffect(() => {
     fetch(`${API_BASE}/api/agency/services`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setServices(Array.isArray(d) ? d : []); setLoadingServices(false); });
+      .then((d) => { setServices(Array.isArray(d) ? d : []); setLoadingServices(false); })
+      .catch(() => setLoadingServices(false));
   }, []);
 
   const generate = async () => {
@@ -486,7 +487,8 @@ function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
     if (!projectId) return;
     fetch(`${API_BASE}/api/admin/projects/${projectId}/messages`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setMessages(Array.isArray(d) ? d : []); setLoading(false); });
+      .then((d) => { setMessages(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [projectId]);
@@ -495,11 +497,15 @@ function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
   const send = async () => {
     if (!text.trim() || !projectId) return;
     setSending(true);
-    await fetch(`${API_BASE}/api/admin/projects/${projectId}/messages`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-      body: JSON.stringify({ content: text.trim() }),
-    });
-    setText(""); setSending(false); load();
+    try {
+      await fetch(`${API_BASE}/api/admin/projects/${projectId}/messages`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ content: text.trim() }),
+      });
+      setText("");
+    } catch {} finally {
+      setSending(false); load();
+    }
   };
 
   return (
@@ -613,16 +619,20 @@ export default function AdminClients() {
   const load = () => {
     fetch(`${API_BASE}/api/admin/users`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setUsers(Array.isArray(d) ? d : []); setLoading(false); });
+      .then((d) => { setUsers(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
   const toggleActive = async (u: User) => {
     setProcessing(u.id);
-    const action = u.isActive ? "deactivate" : "activate";
-    await fetch(`${API_BASE}/api/admin/users/${u.id}/${action}`, { method: "POST", credentials: "include" });
-    setProcessing(null); load();
+    try {
+      const action = u.isActive ? "deactivate" : "activate";
+      await fetch(`${API_BASE}/api/admin/users/${u.id}/${action}`, { method: "POST", credentials: "include" });
+    } catch {} finally {
+      setProcessing(null); load();
+    }
   };
 
   const copyLink = async (link: string) => {

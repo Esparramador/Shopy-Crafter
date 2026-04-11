@@ -144,8 +144,13 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
   try {
     return JSON.parse(text) as T;
   } catch {
-    const match = text.match(/```json\s*([\s\S]*?)```/);
-    return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+    try {
+      const match = text.match(/```json\s*([\s\S]*?)```/);
+      return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+    } catch {
+      logger.error({ textPreview: text.slice(0, 300) }, "[Gemini JSON] Double parse failure");
+      throw new Error("Gemini returned invalid JSON even after cleanup");
+    }
   }
 }
 

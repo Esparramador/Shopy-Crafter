@@ -207,17 +207,22 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
 
     if (!url) { res.status(400).json({ error: "URL requerida" }); return; }
 
+    let normalizedUrl = url.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) {
+      normalizedUrl = "https://" + normalizedUrl;
+    }
+
     enableLongRunning(res);
 
     const [extraction, pageSpeed, scraperData] = await Promise.all([
-      extractFullWebContent(url),
-      runPageSpeedAudit(url, "mobile").catch(() => null),
-      scrapeWebsite(url).catch(() => null),
+      extractFullWebContent(normalizedUrl),
+      runPageSpeedAudit(normalizedUrl, "mobile").catch(() => null),
+      scrapeWebsite(normalizedUrl).catch(() => null),
     ]);
 
     let pageSpeedDesktop = null;
     try {
-      pageSpeedDesktop = await runPageSpeedAudit(url, "desktop");
+      pageSpeedDesktop = await runPageSpeedAudit(normalizedUrl, "desktop");
     } catch {}
 
     const pid = projectId ?? 0;
@@ -246,7 +251,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       sectorDesign: null,
     };
 
-    const parsedUrl = new URL(url);
+    const parsedUrl = new URL(normalizedUrl);
     const domain = parsedUrl.hostname.replace("www.", "");
     const searchName = brandName || domain.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
 
@@ -722,11 +727,16 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   analysis: WebLabAnalysis;
   vaultIds: { report: number | null; css: number | null; html: number | null };
 }> {
+  let normalizedUrl = url.trim();
+  if (!/^https?:\/\//i.test(normalizedUrl)) {
+    normalizedUrl = "https://" + normalizedUrl;
+  }
+
   const [extraction, pageSpeed, pageSpeedDesktop, scraperData] = await Promise.all([
-    extractFullWebContent(url),
-    runPageSpeedAudit(url, "mobile").catch(() => null),
-    runPageSpeedAudit(url, "desktop").catch(() => null),
-    scrapeWebsite(url).catch(() => null),
+    extractFullWebContent(normalizedUrl),
+    runPageSpeedAudit(normalizedUrl, "mobile").catch(() => null),
+    runPageSpeedAudit(normalizedUrl, "desktop").catch(() => null),
+    scrapeWebsite(normalizedUrl).catch(() => null),
   ]);
 
   let projectName = "Análisis externo";

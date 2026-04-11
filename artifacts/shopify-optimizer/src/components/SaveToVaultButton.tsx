@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Loader2, Archive } from "lucide-react";
+import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -27,6 +28,7 @@ export default function SaveToVaultButton({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const safeTimeout = useSafeTimeout();
 
   const handleSave = async () => {
     if (saving || saved) return;
@@ -64,15 +66,15 @@ export default function SaveToVaultButton({
 
       if (res.ok) {
         setSaved(true);
-        setTimeout(() => setSaved(false), 4000);
+        safeTimeout(() => setSaved(false), 4000);
       } else {
         const data = await res.json().catch(() => ({}));
         setError(data.error || "Error al guardar");
-        setTimeout(() => setError(null), 3000);
+        safeTimeout(() => setError(null), 3000);
       }
     } catch {
       setError("Error de conexión");
-      setTimeout(() => setError(null), 3000);
+      safeTimeout(() => setError(null), 3000);
     }
     setSaving(false);
   };

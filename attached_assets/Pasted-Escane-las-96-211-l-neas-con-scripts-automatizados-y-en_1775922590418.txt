@@ -1,0 +1,11 @@
+Escaneé las 96,211 líneas con scripts automatizados y encontré 59 bugs reales, no teóricos:
+4 crashes de servidor (🔴): JSON.parse sin try/catch en 4 archivos backend. Si Claude o Gemini devuelven JSON malformado (que pasa más de lo que crees — sobre todo cuando truncan), el servidor crashea con un 500 sin mensaje. El peor es fusion-studio.ts línea 9250 — cada análisis de imagen pasa por ahí. Y gemini.ts línea 9422 tiene un JSON.parse DENTRO de un catch, así que si el primer parse falla Y el segundo también, crashea sin que nadie lo atrape.
+37 fetch sin catch en frontend (🔴): Cuando la API no responde (502, timeout, red caída), estos fetch lanzan una excepción no capturada que congela el componente React. Los peores están en OmniChatbot (4 fetches de absorb sin protección), AdminClients (mensajes y acciones de usuario), y CMSEditor (restore version y reset content). El fix es envolver cada uno en try/catch o crear un helper safeFetch reutilizable.
+15 setTimeout sin cleanup (🟡): En SaveToVaultButton, AdminAutomations, ApkManager, AdminClients, ShopyBrainStudy. Cuando el usuario navega a otra página antes de que el timeout se ejecute, React intenta hacer setState en un componente desmontado → warning en consola + memory leak acumulativo. Fix: hook useSafeTimeout que auto-limpia.
+Bugs específicos por herramienta:
+El Buscador Universal funciona pero no envía projectId al backend — las búsquedas no se guardan en el vault del proyecto activo, solo en el vault global.
+El Generador IA tiene un bug en el redirect de descarga — data.redirect.replace("/api", "") puede romper URLs que ya no empiezan con /api.
+El Web Lab crashea si escribes "google.com" sin "https://" — new URL(url) lanza excepción. Fix: normalizar la URL al inicio del endpoint.
+El Fusion Studio backend funciona pero tiene el JSON.parse sin protección Y no tiene página frontend.
+El ShopyBrain Chat funciona bien en los endpoints principales (search, study, execute-action) pero los 4 endpoints de absorb (url, image, text, document) no tienen anti-502.
+Ya son 11 documentos. Este es el último que faltaba — los bugs reales con código exacto para cada fix.

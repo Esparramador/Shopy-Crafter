@@ -242,7 +242,22 @@ RESPONDE EXCLUSIVAMENTE con JSON válido:
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON in Fusion Studio response");
 
-  const analysis = JSON.parse(jsonMatch[0]) as ImageAnalysis;
+  let analysis: ImageAnalysis;
+  try {
+    analysis = JSON.parse(jsonMatch[0]) as ImageAnalysis;
+  } catch (parseErr) {
+    logger.warn({ textPreview: jsonMatch[0].slice(0, 300) }, "Fusion Studio: JSON parse failed, attempting cleanup");
+    const cleaned = jsonMatch[0]
+      .replace(/,\s*([}\]])/g, "$1")
+      .replace(/[\x00-\x1f]/g, " ")
+      .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+    try {
+      analysis = JSON.parse(cleaned) as ImageAnalysis;
+    } catch {
+      logger.error({ parseErr }, "Fusion Studio: Double parse failure");
+      throw new Error("Fusion Studio: AI returned invalid JSON");
+    }
+  }
 
   if (!analysis.sceneClassification) analysis.sceneClassification = { type: "product_only", subtype: "", hasModel: false, hasMultipleProducts: false, isFood: false, isTech: false, isFashion: false, isJewelry: false, isArt: false, isAnimal: false, isInfographic: false, renderType: "photo", confidence: 0.5 };
   if (!analysis.componentBreakdown) analysis.componentBreakdown = [];

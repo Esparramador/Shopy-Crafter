@@ -453,6 +453,7 @@ export const DEFAULT_CMS_CONTENT = {
       { label: "Informes y Auditorías", icon: "📋", href: "/projects/2/exports" },
       { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
       { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
+      { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
     ],
     admin: [
       { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },

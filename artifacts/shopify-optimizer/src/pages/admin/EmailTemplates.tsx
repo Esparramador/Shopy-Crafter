@@ -307,25 +307,31 @@ export default function EmailTemplates() {
 
   async function deleteTemplate(id: number) {
     if (!confirm("¿Eliminar esta plantilla?")) return;
-    await fetch(`${API}/api/email-templates/${id}`, { method: "DELETE", credentials: "include" });
-    await fetchTemplates();
-    if (selectedTemplate?.id === id) { setSelectedTemplate(null); setView("gallery"); }
+    try {
+      await fetch(`${API}/api/email-templates/${id}`, { method: "DELETE", credentials: "include" });
+      await fetchTemplates();
+      if (selectedTemplate?.id === id) { setSelectedTemplate(null); setView("gallery"); }
+    } catch {}
   }
 
   async function duplicateTemplate(id: number) {
-    const res = await fetch(`${API}/api/email-templates/${id}/duplicate`, {
-      method: "POST", credentials: "include",
-    });
-    if (res.ok) { await fetchTemplates(); }
+    try {
+      const res = await fetch(`${API}/api/email-templates/${id}/duplicate`, {
+        method: "POST", credentials: "include",
+      });
+      if (res.ok) { await fetchTemplates(); }
+    } catch {}
   }
 
   async function toggleFavorite(id: number, current: boolean) {
-    await fetch(`${API}/api/email-templates/${id}`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_favorite: !current }),
-    });
-    await fetchTemplates();
+    try {
+      await fetch(`${API}/api/email-templates/${id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_favorite: !current }),
+      });
+      await fetchTemplates();
+    } catch {}
   }
 
   async function pushToKlaviyo() {

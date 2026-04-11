@@ -317,9 +317,11 @@ export default function Emails() {
 
   async function deleteFlow(id: number) {
     if (!confirm("¿Eliminar este flow?")) return;
-    await fetch(`${API}/api/emails/flows/${id}`, { method: "DELETE", credentials: "include" });
-    await fetchFlows();
-    if (selectedFlow?.id === id) { setSelectedFlow(null); setShowBuilder(false); }
+    try {
+      await fetch(`${API}/api/emails/flows/${id}`, { method: "DELETE", credentials: "include" });
+      await fetchFlows();
+      if (selectedFlow?.id === id) { setSelectedFlow(null); setShowBuilder(false); }
+    } catch {}
   }
 
   const liveFlow = selectedFlow ? flows.find(f => f.id === selectedFlow.id) : null;

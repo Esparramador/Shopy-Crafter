@@ -1095,7 +1095,13 @@ Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "con
       return;
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      log("adaptive-study", "⚠️ Failed to parse study results JSON");
+      parsed = { insights: [], crossConnections: [] };
+    }
     const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
 
     let savedCount = 0;
