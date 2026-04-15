@@ -690,7 +690,7 @@ export default function Landing() {
                 <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Descubre nuestros planes→"}</a>
                 <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToSection(2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
               </div>
-              <ApkDownloadButton labels={content.apkLabels} />
+              
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {content.hero.trustItems.map((item, i) => (
                   <div key={i} className="l-trust-item" {...cmsProps(`hero.trustItems.${i}`)}><div className="l-trust-check">✓</div>{item}</div>
