@@ -37,7 +37,7 @@ COGS estimation and optimal pricing calculation use Gemini with Google Search fo
 The `discover_competitors` action uses Gemini with Google Search to identify 8-12 real competitors in the same niche.
 
 ### Global Vault
-A centralized "Bóveda Global" stores reports, images, and research from projects and external entities, managed via a `project_files` database table.
+A centralized "Bóveda Global" stores reports, images, and research from projects and external entities, managed via a `project_files` database table. Both project and global vaults support inline preview (opens in new tab with CSP protection) and multi-format download (HTML/PDF/Word). Reports stored as JSON metadata are rendered through `buildBrandedHtmlFromMetadata()` for consistent branded output across all endpoints (download, preview, ZIP export). Preview endpoints: `/api/projects/:id/vault/:fileId/preview` and `/api/vault/global/:fileId/preview`.
 
 ### Universal Search
 A standalone search and audit tool for any URL, Shopify store, Instagram account, or brand name, performing deep AI research and saving results to the vault.

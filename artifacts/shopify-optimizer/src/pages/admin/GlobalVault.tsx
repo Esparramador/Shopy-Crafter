@@ -67,6 +67,7 @@ interface VaultFile {
   entityUrl?: string;
   createdAt: string;
   downloadUrl?: string;
+  previewUrl?: string;
 }
 
 export default function GlobalVault() {
@@ -552,10 +553,10 @@ export default function GlobalVault() {
                     </div>
 
                     <div style={{ display: "flex", gap: 6 }}>
-                      {file.category === "lead_prereport" && (
+                      {file.previewUrl && (
                         <button
-                          onClick={() => window.open(`${API_BASE}/api/lead-reports/${file.id}/download`, "_blank")}
-                          title="Ver en navegador"
+                          onClick={() => window.open(`${API_BASE}${file.previewUrl}`, "_blank")}
+                          title="Vista previa"
                           style={{
                             background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)",
                             borderRadius: 8, padding: 7, cursor: "pointer", color: "#3b82f6",

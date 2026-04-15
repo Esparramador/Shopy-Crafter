@@ -13,11 +13,16 @@ import sharp from "sharp";
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
 
-function metadataToReportHtml(file: { title: string; metadata: string | null; fileType: string; description?: string | null }): string {
-  let meta: Record<string, unknown> = {};
-  try { meta = file.metadata ? JSON.parse(file.metadata) : {}; } catch {}
-  const content = typeof meta === "object" ? JSON.stringify(meta, null, 2) : String(meta);
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${file.title}</title></head><body><h1>${file.title}</h1>${file.description ? `<p>${file.description}</p>` : ""}<pre>${content}</pre></body></html>`;
+function metadataToReportHtml(file: { title: string; metadata: string | null; fileType: string; description?: string | null; category?: string | null; productTitle?: string | null; generatedBy?: string | null; createdAt?: Date | string | null }): string {
+  return buildBrandedHtmlFromMetadata({
+    title: file.title,
+    fileType: file.fileType ?? "report",
+    category: file.category ?? null,
+    productTitle: file.productTitle ?? null,
+    generatedBy: file.generatedBy ?? null,
+    createdAt: file.createdAt ?? null,
+    metadata: file.metadata,
+  }, "prestige");
 }
 
 const router = Router();
@@ -93,6 +98,9 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
       downloadUrl: (f.objectPath || f.hasContent)
         ? `/api/projects/${projectId}/vault/${f.id}/download`
         : f.originalUrl ?? null,
+      previewUrl: (f.objectPath || f.hasContent || f.metadata)
+        ? `/api/projects/${projectId}/vault/${f.id}/preview`
+        : null,
     }));
   
     res.json({ files: filesWithUrls, total: Number(count) });
@@ -339,6 +347,63 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   }
 
   res.status(410).json({ error: "Archivo ya no disponible en origen" });
+});
+
+// ─── PREVISUALIZAR UN ARCHIVO (inline, sin descarga) ─────────────────────────
+router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req, res): Promise<void> => {
+  const projectId = parseInt(String(req.params.projectId));
+  const fileId = parseInt(String(req.params.fileId));
+  if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
+
+  const session = req.session as any;
+  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    res.status(403).json({ error: "Sin acceso" }); return;
+  }
+
+  const [file] = await db.select().from(projectFilesTable)
+    .where(and(eq(projectFilesTable.id, fileId), eq(projectFilesTable.projectId, projectId)))
+    .limit(1);
+
+  if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+  res.setHeader("Content-Disposition", "inline");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+
+  if (file.objectPath) {
+    try {
+      const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+      const response = await getStorage().downloadObject(gcsFile);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
+      return;
+    } catch { /* fallback */ }
+  }
+
+  if (file.content) {
+    const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+    if (isJson) {
+      try {
+        const parsed = JSON.parse(file.content);
+        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+        res.send(htmlReport);
+        return;
+      } catch {}
+    }
+    res.send(file.content);
+    return;
+  }
+
+  if (file.metadata) {
+    try {
+      const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+      res.send(htmlReport);
+      return;
+    } catch {}
+  }
+
+  res.status(410).json({ error: "Archivo ya no disponible" });
 });
 
 // ─── DESCARGAR TODO EL VAULT COMO ZIP ────────────────────────────────────────
@@ -1175,6 +1240,11 @@ router.get("/vault/global", requireAuth, async (req, res): Promise<void> => {
             ? `/api/projects/${f.projectId}/vault/${f.id}/download`
             : `/api/vault/global/${f.id}/download`)
         : f.originalUrl ?? null,
+      previewUrl: (f.objectPath || f.hasContent || f.metadata)
+        ? (f.projectId
+            ? `/api/projects/${f.projectId}/vault/${f.id}/preview`
+            : `/api/vault/global/${f.id}/preview`)
+        : null,
     }));
   
     res.json({ files: filesWithUrls, total: Number(count) });
@@ -1263,9 +1333,9 @@ router.get("/vault/global/:fileId/download", requireAuth, async (req, res): Prom
     const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, fileId)).limit(1);
     if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
   
-    const filename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.${getExtension(file.mimeType ?? "application/octet-stream")}`;
+    const filename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", file.mimeType ?? "application/octet-stream");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
   
     if (file.objectPath) {
       try {
@@ -1278,19 +1348,79 @@ router.get("/vault/global/:fileId/download", requireAuth, async (req, res): Prom
     }
   
     if (file.content) {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+      if (isJson) {
+        try {
+          const parsed = JSON.parse(file.content);
+          const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          res.send(htmlReport);
+          return;
+        } catch {}
+      }
       res.send(file.content);
       return;
     }
   
     if (file.metadata) {
       const reportHtml = metadataToReportHtml(file);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.send(reportHtml);
       return;
     }
   
     res.status(404).json({ error: "No se pudo recuperar el archivo" });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/vault/global/:fileId/preview", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const session = req.session as any;
+    if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+
+    const fileId = parseInt(String(req.params.fileId));
+    if (isNaN(fileId)) { res.status(400).json({ error: "fileId inválido" }); return; }
+
+    const [file] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, fileId)).limit(1);
+    if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    if (file.objectPath) {
+      try {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const response = await getStorage().downloadObject(gcsFile);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
+        return;
+      } catch { /* fallback */ }
+    }
+
+    if (file.content) {
+      const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+      if (isJson) {
+        try {
+          const parsed = JSON.parse(file.content);
+          const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          res.send(htmlReport);
+          return;
+        } catch {}
+      }
+      res.send(file.content);
+      return;
+    }
+
+    if (file.metadata) {
+      const reportHtml = metadataToReportHtml(file);
+      res.send(reportHtml);
+      return;
+    }
+
+    res.status(404).json({ error: "Archivo ya no disponible" });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
@@ -1325,24 +1455,34 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
     archive.pipe(res);
   
     for (const file of files) {
-      const ext = getExtension(file.mimeType ?? "text/html");
-      const safeName = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60)}.${ext}`;
+      const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
       const folder = file.fileType || "otros";
-  
+
       if (file.objectPath) {
         try {
           const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
           const response = await getStorage().downloadObject(gcsFile);
           const buffer = Buffer.from(await response.arrayBuffer());
-          archive.append(buffer, { name: `${folder}/${safeName}` });
+          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.html` });
           continue;
         } catch { /* fallback */ }
       }
       if (file.content) {
-        archive.append(file.content, { name: `${folder}/${safeName}` });
+        const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+        if (isJsonContent) {
+          try {
+            const parsed = JSON.parse(file.content);
+            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, "prestige");
+            archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          } catch {
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          }
+        } else {
+          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+        }
       } else if (file.metadata) {
         const html = metadataToReportHtml(file);
-        archive.append(html, { name: `${folder}/${safeName}` });
+        archive.append(html, { name: `${folder}/${safeTitle}_${file.id}.html` });
       }
     }
   
