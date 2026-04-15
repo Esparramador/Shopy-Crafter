@@ -31,7 +31,7 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "nav-3", label: "Precios", href: "#pricing" },
       { id: "nav-4", label: "Clientes", href: "#testimonials" },
     ],
-    ctaPrimary: { label: "Solicitar acceso →", href: "#cta" },
+    ctaPrimary: { label: "Solicitar acceso →", href: "#fp-contact" },
     ctaSecondary: { label: "Iniciar sesión", href: "/login" },
   },
   hero: {

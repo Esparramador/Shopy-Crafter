@@ -609,7 +609,7 @@ export default function Landing() {
           ) : (
             <>
               <Link href="/login" className="l-btn-ghost" {...cmsData("nav.ctaSecondary.label")}>{content.nav.ctaSecondary.label}</Link>
-              <a href="#fp-pricing" className="l-btn-gold" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("nav.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
+              <a href="#fp-contact" className="l-btn-gold" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("nav.ctaPrimary.label", e) : goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
             </>
           )}
         </div>
@@ -979,7 +979,7 @@ export default function Landing() {
                         </li>
                       ))}
                     </ul>
-                    <Link href={plan.cta.href || "/login"} className={`l-pricing-cta ${plan.cta.style}`} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</Link>
+                    <a href={plan.cta.href || "#fp-contact"} className={`l-pricing-cta ${plan.cta.style}`} onClick={e => { const href = plan.cta.href || "#fp-contact"; if (href.startsWith("#")) { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf(href.replace("#", "")); if (idx >= 0) goToSection(idx); } }} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</a>
                   </div>
                 ))}
               </div>
