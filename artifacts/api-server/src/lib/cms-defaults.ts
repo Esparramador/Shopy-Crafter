@@ -39,7 +39,7 @@ export const DEFAULT_CMS_CONTENT = {
     headline: "Optimizamos tu tienda\nShopify con IA\n24/7 por ti",
     headlineHighlight: "24/7",
     subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático. Un solo cerebro para toda tu agencia.",
-    ctaPrimary: { label: "Empezar gratis 14 días →", href: "#cta" },
+    ctaPrimary: { label: "Descubre nuestros planes→", href: "#cta" },
     ctaSecondary: { label: "▶ Ver en acción", href: "#how" },
     ctaApk: { label: "📱 Descargar App Android", href: "#" },
     trustItems: ["Sin tarjeta de crédito", "Setup en 5 minutos", "Cancela cuando quieras", "RGPD compliant"],
