@@ -24,7 +24,7 @@ const ALLOWED_SECTION = ["card", "accent-bar", "minimal"];
 
 router.get("/report-templates", async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.session.userId;
     if (!userId) { res.json([]); return; }
     const templates = await db.select().from(reportTemplatesTable)
       .where(eq(reportTemplatesTable.userId, userId))
@@ -48,7 +48,7 @@ router.get("/report-templates/:idOrToken", async (req: Request, res: Response): 
       [template] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.shareToken, param));
     }
     if (!template) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
-    const userId = (req as any).user?.id;
+    const userId = req.session.userId;
     if (template.userId !== userId && !template.isPublic) { res.status(403).json({ error: "Sin acceso" }); return; }
     res.json(template);
   } catch (err) {
@@ -59,7 +59,7 @@ router.get("/report-templates/:idOrToken", async (req: Request, res: Response): 
 
 router.post("/report-templates", upload.single("logo"), async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.session.userId;
     if (!userId) { res.status(401).json({ error: "No autenticado" }); return; }
     const b = req.body;
     const name = sanitizeStr(b.name, 200);
@@ -110,7 +110,7 @@ router.put("/report-templates/:id", upload.single("logo"), async (req: Request, 
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
-    const userId = (req as any).user?.id;
+    const userId = req.session.userId;
     const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
     if (!existing) { res.status(404).json({ error: "No encontrada" }); return; }
     if (existing.userId !== userId) { res.status(403).json({ error: "Sin permiso" }); return; }
@@ -160,7 +160,7 @@ router.delete("/report-templates/:id", async (req: Request, res: Response): Prom
   try {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
-    const userId = (req as any).user?.id;
+    const userId = req.session.userId;
     const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
     if (!existing) { res.status(404).json({ error: "No encontrada" }); return; }
     if (existing.userId !== userId) { res.status(403).json({ error: "Sin permiso" }); return; }

@@ -378,12 +378,18 @@ function buildPreviewHtml(t: Template): string {
   const bf = safeFont(t.bodyFont);
   const hw = /^[0-9]{3}$/.test(t.headingWeight) ? t.headingWeight : "700";
 
+  const company = escHtml(t.companyName || "Nombre de Empresa");
+  const tagline = t.tagline ? escHtml(t.tagline) : "";
+  const footer = escHtml(t.footerText || t.companyName || "Generado con ShopyCrafter");
+  const dateStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(hf)}:wght@400;600;700&family=${encodeURIComponent(bf)}:wght@300;400;500;600&display=swap">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'${bf}',sans-serif;background:${bg};color:${tc};font-size:13px}
-.cover{background:${sc};padding:60px 40px;text-align:${t.coverStyle === "left-aligned" ? "left" : "center"};min-height:45vh;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid ${bc}}
+.page{min-height:45vh;position:relative}
+.cover{background:${sc};padding:60px 40px;text-align:${t.coverStyle === "left-aligned" ? "left" : "center"};min-height:50vh;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid ${bc}}
 .cover-logo{max-width:80px;max-height:80px;border-radius:12px;margin-bottom:16px;${t.coverStyle === "centered" ? "margin-left:auto;margin-right:auto;" : ""}}
 .cover h1{font-family:'${hf}',serif;font-size:24px;font-weight:${hw};color:${pc};letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .cover p{font-size:13px;color:${tc}80}
@@ -399,35 +405,146 @@ body{font-family:'${bf}',sans-serif;background:${bg};color:${tc};font-size:13px}
 .rec{background:${cb};border-left:3px solid ${ac};padding:12px;margin-bottom:6px;border-radius:0 8px 8px 0;font-size:12px}
 .grade{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:700;font-size:12px;background:${ac}20;color:${ac}}
 .footer{text-align:center;padding:20px;border-top:1px solid ${bc};font-size:11px;color:${tc}40}
+.backcover{background:${sc};padding:60px 40px;text-align:center;min-height:40vh;display:flex;flex-direction:column;justify-content:center;align-items:center;border-top:3px solid ${pc}}
+.backcover .logo-back{max-width:60px;max-height:60px;border-radius:10px;margin-bottom:16px;opacity:0.9}
+.backcover .company-name{font-family:'${hf}',serif;font-size:18px;font-weight:${hw};color:${pc};letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}
+.backcover .tagline-back{font-size:12px;color:${tc}60;margin-bottom:20px}
+.backcover .contact-line{font-size:11px;color:${tc}40;margin-bottom:4px}
+.placeholder{border:1.5px dashed ${pc}40;border-radius:8px;padding:10px 14px;color:${tc}40;font-size:11px;font-style:italic;text-align:center;margin-bottom:8px}
+.page-divider{border:none;border-top:1px dashed ${bc};margin:32px 0;position:relative}
+.page-divider::after{content:'nueva pagina';position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:${bg};padding:0 12px;font-size:9px;color:${tc}25;text-transform:uppercase;letter-spacing:2px}
+.toc-item{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px dotted ${bc};font-size:12px}
+.toc-item .toc-title{color:${tc}}
+.toc-item .toc-page{color:${pc};font-weight:600}
 </style></head><body>
-<div class="cover">
+
+<!-- PORTADA -->
+<div class="cover page">
 ${t.logoBase64 && t.logoBase64.startsWith("data:image/") ? `<img class="cover-logo" src="${t.logoBase64}" alt="Logo">` : ""}
-<h1>Informe de Auditoría SEO</h1>
-<p>Análisis completo de posicionamiento orgánico</p>
-<div class="company">${escHtml(t.companyName || "Nombre de Empresa")}</div>
-${t.tagline ? `<p style="font-size:11px;color:${tc}40;margin-top:6px">${escHtml(t.tagline)}</p>` : ""}
-<p style="font-size:10px;color:${tc}30;margin-top:12px">${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}</p>
+<h1 style="color:${pc}">Titulo del Informe</h1>
+<p>Subtitulo o descripcion del informe</p>
+<div class="company">${company}</div>
+${tagline ? `<p style="font-size:11px;color:${tc}40;margin-top:6px">${tagline}</p>` : ""}
+<p style="font-size:10px;color:${tc}30;margin-top:12px">${dateStr}</p>
 </div>
-<div class="body">
-<div class="metrics">
-<div class="metric"><div class="val">47</div><div class="lbl">Productos</div></div>
-<div class="metric"><div class="val">73</div><div class="lbl">Score SEO</div></div>
-<div class="metric"><div class="val">12</div><div class="lbl">Con Schema</div></div>
-<div class="metric"><div class="val">89%</div><div class="lbl">Alt Texts</div></div>
-</div>
+
+<hr class="page-divider">
+
+<!-- INDICE -->
+<div class="body page">
 <div class="section">
-<div class="section-title">Distribución de Grados</div>
+<div class="section-title">Indice</div>
 <div class="card">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="grade">A</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:35%;height:100%;background:${ac};border-radius:3px"></div></div><span style="font-size:11px">16 (35%)</span></div>
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="grade" style="background:${pc}20;color:${pc}">B</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:45%;height:100%;background:${pc};border-radius:3px"></div></div><span style="font-size:11px">21 (45%)</span></div>
-<div style="display:flex;align-items:center;gap:8px"><span class="grade" style="background:#ffa50020;color:#ffa500">C</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:20%;height:100%;background:#ffa500;border-radius:3px"></div></div><span style="font-size:11px">10 (20%)</span></div>
-</div></div>
+<div class="toc-item"><span class="toc-title">1. Resumen Ejecutivo</span><span class="toc-page">3</span></div>
+<div class="toc-item"><span class="toc-title">2. Metricas Principales</span><span class="toc-page">4</span></div>
+<div class="toc-item"><span class="toc-title">3. Analisis Detallado</span><span class="toc-page">5</span></div>
+<div class="toc-item"><span class="toc-title">4. Distribucion y Resultados</span><span class="toc-page">6</span></div>
+<div class="toc-item"><span class="toc-title">5. Recomendaciones</span><span class="toc-page">7</span></div>
+<div class="toc-item"><span class="toc-title">6. Conclusiones</span><span class="toc-page">8</span></div>
+</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- RESUMEN EJECUTIVO -->
+<div class="body page">
 <div class="section">
-<div class="section-title">Recomendaciones Prioritarias</div>
-<div class="rec">Implementar Schema JSON-LD en los 35 productos que faltan — mejora CTR +30%</div>
-<div class="rec">Optimizar meta descriptions en 12 productos con descripciones cortas</div>
-<div class="rec">Añadir alt texts a 47 imágenes para mejorar tráfico de Google Images</div>
-</div></div>
-<div class="footer">${escHtml(t.footerText || t.companyName || "Informe generado con IA")}${t.showPageNumbers ? " · Página 1" : ""}</div>
+<div class="section-title">1. Resumen Ejecutivo</div>
+<div class="card">
+<p style="color:${tc}80;line-height:1.6;margin-bottom:8px">Este espacio contendra un resumen general del informe adaptado al tipo de analisis realizado. Se rellenara automaticamente con los datos reales del proyecto.</p>
+<div class="placeholder">Contenido dinamico del resumen</div>
+</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- METRICAS -->
+<div class="body page">
+<div class="section">
+<div class="section-title">2. Metricas Principales</div>
+<div class="metrics">
+<div class="metric"><div class="val">--</div><div class="lbl">Metrica 1</div></div>
+<div class="metric"><div class="val">--</div><div class="lbl">Metrica 2</div></div>
+<div class="metric"><div class="val">--</div><div class="lbl">Metrica 3</div></div>
+<div class="metric"><div class="val">--</div><div class="lbl">Metrica 4</div></div>
+</div>
+<div class="placeholder">Las metricas se adaptan al tipo de informe: SEO, ventas, inventario, competencia, etc.</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- ANALISIS DETALLADO -->
+<div class="body page">
+<div class="section">
+<div class="section-title">3. Analisis Detallado</div>
+<div class="card">
+<p style="font-weight:600;color:${pc};margin-bottom:4px">Seccion de datos</p>
+<p style="color:${tc}60;font-size:12px;line-height:1.5;margin-bottom:8px">Aqui se mostraran tablas, graficos o listas con el desglose detallado de los datos analizados.</p>
+<div class="placeholder">Tablas / graficos / listas dinamicas</div>
+</div>
+<div class="card">
+<p style="font-weight:600;color:${pc};margin-bottom:4px">Observaciones</p>
+<p style="color:${tc}60;font-size:12px;line-height:1.5">Notas y observaciones generadas a partir del analisis de los datos.</p>
+</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- DISTRIBUCION -->
+<div class="body page">
+<div class="section">
+<div class="section-title">4. Distribucion y Resultados</div>
+<div class="card">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="grade">A</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:35%;height:100%;background:${ac};border-radius:3px"></div></div><span style="font-size:11px">Excelente</span></div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="grade" style="background:${pc}20;color:${pc}">B</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:45%;height:100%;background:${pc};border-radius:3px"></div></div><span style="font-size:11px">Bueno</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="grade" style="background:#ffa50020;color:#ffa500">C</span><div style="flex:1;height:6px;background:${bc};border-radius:3px;overflow:hidden"><div style="width:20%;height:100%;background:#ffa500;border-radius:3px"></div></div><span style="font-size:11px">Mejorable</span></div>
+</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- RECOMENDACIONES -->
+<div class="body page">
+<div class="section">
+<div class="section-title">5. Recomendaciones</div>
+<div class="rec">Recomendacion prioritaria 1 — se generara automaticamente</div>
+<div class="rec">Recomendacion prioritaria 2 — basada en los datos analizados</div>
+<div class="rec">Recomendacion prioritaria 3 — con impacto estimado</div>
+<div class="placeholder">Las recomendaciones se generan con IA segun el tipo de informe</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- CONCLUSIONES -->
+<div class="body page">
+<div class="section">
+<div class="section-title">6. Conclusiones</div>
+<div class="card">
+<p style="color:${tc}80;line-height:1.6">Seccion de conclusiones finales con un resumen de los hallazgos principales y proximos pasos recomendados para el cliente.</p>
+<div class="placeholder">Conclusiones generadas automaticamente</div>
+</div>
+</div>
+</div>
+
+<hr class="page-divider">
+
+<!-- CONTRAPORTADA -->
+<div class="backcover page">
+${t.logoBase64 && t.logoBase64.startsWith("data:image/") ? `<img class="logo-back" src="${t.logoBase64}" alt="Logo">` : `<div style="width:50px;height:50px;border-radius:10px;background:${pc};margin-bottom:16px;display:grid;place-items:center;font-size:20px;font-weight:800;color:${sc}">${(t.companyName || "E")[0].toUpperCase()}</div>`}
+<div class="company-name">${company}</div>
+${tagline ? `<div class="tagline-back">${tagline}</div>` : ""}
+<div style="width:40px;height:2px;background:${pc};margin:16px auto"></div>
+<div class="contact-line">www.ejemplo.com</div>
+<div class="contact-line">contacto@ejemplo.com</div>
+<div class="contact-line" style="margin-top:12px;font-size:10px;color:${tc}25">Documento confidencial · ${dateStr}</div>
+</div>
+
+<div class="footer">${footer}${t.showPageNumbers ? " · Pagina 1 de 8" : ""}</div>
 </body></html>`;
 }
