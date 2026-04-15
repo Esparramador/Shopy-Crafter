@@ -378,6 +378,7 @@ router.post("/fusion-studio/generate-photos", upload.array("images", 10), async 
       outputFormat,
       customScene,
       hasModel,
+      referenceStyles,
     } = req.body;
 
     let parsedModes: string[];
@@ -482,7 +483,18 @@ Manufacturing: ${analysis.product?.manufacturingProcess || "professional"}
 Only the ENVIRONMENT changes — the product itself remains IDENTICAL to the reference.
 `;
 
-    const contextBlock = `${subjectProtocol}${foodProtocol}${brandBlock}${visualDnaBlock}`;
+    let parsedRefStyles: string[] = [];
+    try {
+      parsedRefStyles = referenceStyles ? (typeof referenceStyles === "string" ? JSON.parse(referenceStyles) : referenceStyles) : [];
+    } catch { parsedRefStyles = []; }
+
+    const referenceBlock = parsedRefStyles.length > 0 ? `
+[STYLE REFERENCES — ${parsedRefStyles.length} images provided by user]
+CRITICAL: Match the visual style, lighting, composition, color grading, and mood of these reference images.
+Adapt the product photography to feel cohesive with these reference styles while maintaining product accuracy.
+` : "";
+
+    const contextBlock = `${subjectProtocol}${foodProtocol}${brandBlock}${visualDnaBlock}${referenceBlock}`;
 
     const regularModes = parsedModes.filter((m: string) => !TRYON_MODES.has(m));
     const tryonModesSelected = parsedModes.filter((m: string) => TRYON_MODES.has(m));
@@ -619,7 +631,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
             index: item.index,
             imageUrl: tryonUrl,
             prompt: `Virtual try-on (${isFrontView ? "front" : "back"} garment)`,
-            model: "fashn/tryon",
+            model: "cuuupid/idm-vton",
             cost: totalItemCost,
             tryonPipeline: true,
           });
@@ -632,7 +644,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
             index: item.index,
             imageUrl: null,
             prompt: `Virtual try-on failed`,
-            model: "fashn/tryon",
+            model: "cuuupid/idm-vton",
             cost: 0,
             error: err instanceof Error ? err.message : String(err),
             tryonPipeline: true,
@@ -647,7 +659,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
           index: item.index,
           imageUrl: null,
           prompt: "",
-          model: "fashn/tryon",
+          model: "cuuupid/idm-vton",
           cost: 0,
           error: "Virtual try-on solo funciona con productos de moda/ropa. Sube una prenda y selecciona estos modos.",
         });

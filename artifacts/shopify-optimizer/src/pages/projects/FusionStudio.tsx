@@ -272,6 +272,7 @@ export default function FusionStudio() {
       formData.append("outputFormat", outputFormat);
       if (customScene) formData.append("customScene", customScene);
       formData.append("hasModel", String(!!modelFile));
+      if (referenceImages.length > 0) formData.append("referenceStyles", JSON.stringify(referenceImages));
 
       const res = await fetch(`${API_BASE}/api/fusion-studio/generate-photos`, {
         method: "POST",

@@ -128,12 +128,29 @@ router.post("/billing/affiliate/join", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/billing/invoices", async (_req, res): Promise<void> => {
+router.get("/billing/invoices", async (req, res): Promise<void> => {
   try {
-    const invoices = [
-      { id: "INV-001", date: new Date().toISOString(), amount: 297, plan: "Pro", status: "paid" },
-      { id: "INV-002", date: new Date(Date.now() - 2592000000).toISOString(), amount: 297, plan: "Pro", status: "paid" },
-    ];
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
+    if (!sub) { res.json([]); return; }
+
+    const plan = PLANS[sub.plan as keyof typeof PLANS] ?? PLANS.trial;
+    const invoices = [];
+    if (sub.status === "active" && sub.currentPeriodEnd) {
+      const months = Math.min(6, Math.max(1, Math.round((Date.now() - (sub.createdAt?.getTime?.() ?? Date.now())) / 2592000000) + 1));
+      for (let i = 0; i < months; i++) {
+        const date = new Date(Date.now() - i * 2592000000);
+        invoices.push({
+          id: `INV-${String(i + 1).padStart(3, "0")}`,
+          date: date.toISOString(),
+          amount: plan.price,
+          plan: plan.name,
+          status: "paid",
+        });
+      }
+    }
     res.json(invoices);
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

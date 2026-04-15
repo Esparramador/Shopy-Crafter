@@ -46,6 +46,7 @@ import generatorRouter from "./generator.js";
 import webLabRouter from "./web-lab.js";
 import fusionStudioRouter from "./fusion-studio.js";
 import reportTemplatesRouter from "./report-templates.js";
+import billingRouter from "./billing.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -116,5 +117,6 @@ router.use(generatorRouter);
 router.use(webLabRouter);
 router.use(fusionStudioRouter);
 router.use(reportTemplatesRouter);
+router.use(billingRouter);
 
 export default router;
