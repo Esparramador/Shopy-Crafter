@@ -263,3 +263,9 @@ id = "d5Da8ioolR7LyNQbGdcBv"
 uri = "file://shopycrafter_full_code.txt"
 type = "text"
 title = "Shopy Crafter — Código Fuente Completo (96K líneas)"
+
+[[outputs]]
+id = "77MBQydZfGflTbR2gjA4w"
+uri = "file://exports/shopycrafter_codigo_completo.tar.gz"
+type = "unspecified"
+title = "Código completo de Shopy Crafter (para auditoría)"
