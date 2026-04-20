@@ -269,3 +269,9 @@ id = "77MBQydZfGflTbR2gjA4w"
 uri = "file://exports/shopycrafter_codigo_completo.tar.gz"
 type = "unspecified"
 title = "Código completo de Shopy Crafter (con lib/) para auditoría"
+
+[[outputs]]
+id = "9EBNXSCoAuzFUxs_JRsOb"
+uri = "file://exports/shopycrafter_lib.tar.gz"
+type = "unspecified"
+title = "Carpeta lib/ de Shopy Crafter"
