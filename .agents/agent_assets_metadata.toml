@@ -275,3 +275,9 @@ id = "9EBNXSCoAuzFUxs_JRsOb"
 uri = "file://exports/shopycrafter_lib.tar.gz"
 type = "unspecified"
 title = "Carpeta lib/ de Shopy Crafter"
+
+[[outputs]]
+id = "PvgLuR3SnHBvPcT0QzoC9"
+uri = "file://exports/api-server-lib.tar.gz"
+type = "unspecified"
+title = "artifacts/api-server/src/lib"
