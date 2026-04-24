@@ -311,3 +311,9 @@ id = "EYzYq2EzWoDpA1HDaEqJS"
 uri = "file://exports/prod_table_sizes.txt"
 type = "text"
 title = "Tamaños de tablas en prod (pg_stat_user_tables.n_live_tup)"
+
+[[outputs]]
+id = "AcZaW7m4xV4G3G-qQ_gT-"
+uri = "file://exports/prod_enum_preflight.txt"
+type = "text"
+title = "Pre-flight enums — SELECT DISTINCT por columna en prod"
