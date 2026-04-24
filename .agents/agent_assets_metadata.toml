@@ -293,3 +293,9 @@ id = "aHkn4w9WGgD4_s2kcfAof"
 uri = "file://exports/MANIFEST.txt"
 type = "text"
 title = "Listado de archivos incluidos (verificación)"
+
+[[outputs]]
+id = "7lUwHpFxJWHBwP1P2ruTv"
+uri = "file://exports/frontend-completo.tar.gz"
+type = "unspecified"
+title = "Frontend completo de Shopy Crafter (pages, components, contexts, hooks)"
