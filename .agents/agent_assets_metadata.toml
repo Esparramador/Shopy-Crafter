@@ -268,7 +268,7 @@ title = "Shopy Crafter — Código Fuente Completo (96K líneas)"
 id = "77MBQydZfGflTbR2gjA4w"
 uri = "file://exports/shopycrafter_codigo_completo.tar.gz"
 type = "unspecified"
-title = "Código completo de Shopy Crafter (con lib/) para auditoría"
+title = "Código COMPLETO de Shopy Crafter (714 archivos)"
 
 [[outputs]]
 id = "9EBNXSCoAuzFUxs_JRsOb"
@@ -287,3 +287,9 @@ id = "VPc_XgHrW_f5iYVgce7-o"
 uri = "file://exports/frontend-lib-y-app.tar.gz"
 type = "unspecified"
 title = "Frontend lib/ + App.tsx + cliente API generado"
+
+[[outputs]]
+id = "aHkn4w9WGgD4_s2kcfAof"
+uri = "file://exports/MANIFEST.txt"
+type = "text"
+title = "Listado de archivos incluidos (verificación)"
