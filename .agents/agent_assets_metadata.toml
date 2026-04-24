@@ -299,3 +299,15 @@ id = "7lUwHpFxJWHBwP1P2ruTv"
 uri = "file://exports/frontend-completo.tar.gz"
 type = "unspecified"
 title = "Frontend completo de Shopy Crafter (pages, components, contexts, hooks)"
+
+[[outputs]]
+id = "q7G35UfOpbhM3n1pVHUtb"
+uri = "file://exports/prod_schema_dump.txt"
+type = "text"
+title = "Schema dump de producción (information_schema, equivalente a pg_dump --schema-only)"
+
+[[outputs]]
+id = "EYzYq2EzWoDpA1HDaEqJS"
+uri = "file://exports/prod_table_sizes.txt"
+type = "text"
+title = "Tamaños de tablas en prod (pg_stat_user_tables.n_live_tup)"

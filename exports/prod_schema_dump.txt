@@ -1,0 +1,1321 @@
+# PRODUCTION SCHEMA DUMP (information_schema-based, equivalent to pg_dump --schema-only)
+  # Generated: 2026-04-24T05:04:47.134Z
+
+  ================================================================================
+  ## SECTION 1: COLUMNS (per table)
+  ================================================================================
+  table_schema,table_name,column_name,ordinal_position,data_type,character_maximum_length,numeric_precision,numeric_scale,is_nullable,column_default
+_system,replit_database_migrations_v1,id,1,bigint,,64,0,NO,nextval('_system.replit_database_migrations_v1_id_seq'::regclass)
+_system,replit_database_migrations_v1,build_id,2,text,,,,NO,
+_system,replit_database_migrations_v1,deployment_id,3,text,,,,NO,
+_system,replit_database_migrations_v1,statement_count,4,bigint,,64,0,NO,
+_system,replit_database_migrations_v1,applied_at,5,timestamp with time zone,,,,YES,CURRENT_TIMESTAMP
+public,ab_tests,id,1,integer,,32,0,NO,nextval('ab_tests_id_seq'::regclass)
+public,ab_tests,project_id,2,integer,,32,0,NO,
+public,ab_tests,shopify_product_id,3,text,,,,NO,
+public,ab_tests,product_title,4,text,,,,NO,
+public,ab_tests,image_type,5,text,,,,NO,
+public,ab_tests,hypothesis,6,text,,,,NO,
+public,ab_tests,variant_a_url,7,text,,,,YES,
+public,ab_tests,variant_a_shopify_image_id,8,text,,,,YES,
+public,ab_tests,variant_b_url,9,text,,,,YES,
+public,ab_tests,variant_b_shopify_image_id,10,text,,,,YES,
+public,ab_tests,variant_a_visitors,11,integer,,32,0,NO,0
+public,ab_tests,variant_b_visitors,12,integer,,32,0,NO,0
+public,ab_tests,variant_a_conversions,13,integer,,32,0,NO,0
+public,ab_tests,variant_b_conversions,14,integer,,32,0,NO,0
+public,ab_tests,variant_a_revenue,15,real,,24,,NO,0
+public,ab_tests,variant_b_revenue,16,real,,24,,NO,0
+public,ab_tests,confidence,17,real,,24,,NO,0
+public,ab_tests,winner,18,text,,,,YES,
+public,ab_tests,status,19,text,,,,NO,'running'::text
+public,ab_tests,target_metric,20,text,,,,NO,'conversion'::text
+public,ab_tests,minimum_sample_size,21,integer,,32,0,NO,100
+public,ab_tests,start_date,22,timestamp with time zone,,,,NO,now()
+public,ab_tests,end_date,23,timestamp with time zone,,,,YES,
+public,ab_tests,created_at,24,timestamp with time zone,,,,NO,now()
+public,ab_tests,updated_at,25,timestamp with time zone,,,,NO,now()
+public,ab_tests,test_type,26,text,,,,NO,'image'::text
+public,ab_tests,variant_a_price,27,text,,,,YES,
+public,ab_tests,variant_b_price,28,text,,,,YES,
+public,ab_tests,ai_prediction,29,jsonb,,,,YES,
+public,achievements,id,1,text,,,,NO,
+public,achievements,user_id,2,text,,,,NO,
+public,achievements,achievement_key,3,text,,,,NO,
+public,achievements,unlocked_at,4,timestamp without time zone,,,,YES,now()
+public,affiliates,id,1,text,,,,NO,
+public,affiliates,user_id,2,text,,,,NO,
+public,affiliates,referral_code,3,text,,,,NO,
+public,affiliates,clicks,4,integer,,32,0,YES,0
+public,affiliates,signups,5,integer,,32,0,YES,0
+public,affiliates,conversions,6,integer,,32,0,YES,0
+public,affiliates,pending_payout,7,real,,24,,YES,0
+public,affiliates,total_earned,8,real,,24,,YES,0
+public,affiliates,stripe_connect_id,9,text,,,,YES,
+public,affiliates,created_at,10,timestamp without time zone,,,,YES,now()
+public,agency_cost_structure,id,1,text,,,,NO,
+public,agency_cost_structure,cost_claude_api,2,real,,24,,YES,0
+public,agency_cost_structure,cost_replicate,3,real,,24,,YES,0
+public,agency_cost_structure,cost_hosting,4,real,,24,,YES,0
+public,agency_cost_structure,cost_stripe_fees_fixed,5,real,,24,,YES,0
+public,agency_cost_structure,cost_domain_tools,6,real,,24,,YES,0
+public,agency_cost_structure,cost_your_time_hourly,7,real,,24,,YES,80
+public,agency_cost_structure,avg_hours_per_client,8,real,,24,,YES,4
+public,agency_cost_structure,cost_per_image_generated,9,real,,24,,YES,0.25
+public,agency_cost_structure,cost_per_audit_run,10,real,,24,,YES,0.08
+public,agency_cost_structure,cost_per_boost_masivo,11,real,,24,,YES,2.5
+public,agency_cost_structure,cost_per_seo_update,12,real,,24,,YES,0.15
+public,agency_cost_structure,cost_per_ab_test_setup,13,real,,24,,YES,0.05
+public,agency_cost_structure,cost_per_report_pdf,14,real,,24,,YES,0.2
+public,agency_cost_structure,target_margin_setup,15,real,,24,,YES,0.7
+public,agency_cost_structure,target_margin_retainer,16,real,,24,,YES,0.65
+public,agency_cost_structure,target_margin_extras,17,real,,24,,YES,0.75
+public,agency_cost_structure,minimum_hourly_rate,18,real,,24,,YES,80
+public,agency_cost_structure,updated_at,19,timestamp without time zone,,,,YES,now()
+public,approvals,id,1,text,,,,NO,
+public,approvals,project_id,2,text,,,,NO,
+public,approvals,type,3,text,,,,NO,
+public,approvals,title,4,text,,,,NO,
+public,approvals,description,5,text,,,,NO,
+public,approvals,before_value,6,text,,,,YES,
+public,approvals,after_value,7,text,,,,YES,
+public,approvals,reasoning,8,text,,,,YES,
+public,approvals,estimated_impact,9,text,,,,YES,
+public,approvals,status,10,text,,,,NO,'pending'::text
+public,approvals,client_comment,11,text,,,,YES,
+public,approvals,reviewed_at,12,timestamp without time zone,,,,YES,
+public,approvals,created_at,13,timestamp without time zone,,,,YES,now()
+public,audit_log,id,1,text,,,,NO,
+public,audit_log,user_id,2,text,,,,NO,
+public,audit_log,project_id,3,text,,,,YES,
+public,audit_log,action,4,text,,,,NO,
+public,audit_log,details,5,text,,,,YES,
+public,audit_log,ip_address,6,text,,,,YES,
+public,audit_log,created_at,7,timestamp without time zone,,,,YES,now()
+public,audit_results,id,1,integer,,32,0,NO,nextval('audit_results_id_seq'::regclass)
+public,audit_results,project_id,2,integer,,32,0,NO,
+public,audit_results,url,3,text,,,,NO,
+public,audit_results,overall_score,4,real,,24,,YES,
+public,audit_results,performance_score,5,real,,24,,YES,
+public,audit_results,seo_score,6,real,,24,,YES,
+public,audit_results,accessibility_score,7,real,,24,,YES,
+public,audit_results,best_practices_score,8,real,,24,,YES,
+public,audit_results,content_quality_score,9,real,,24,,YES,
+public,audit_results,mobile_friendliness_score,10,real,,24,,YES,
+public,audit_results,technical_seo_score,11,real,,24,,YES,
+public,audit_results,pagespeed_mobile,12,jsonb,,,,YES,
+public,audit_results,pagespeed_desktop,13,jsonb,,,,YES,
+public,audit_results,scraping_result,14,jsonb,,,,YES,
+public,audit_results,ai_analysis,15,jsonb,,,,YES,
+public,audit_results,issues,16,jsonb,,,,YES,
+public,audit_results,recommendations,17,jsonb,,,,YES,
+public,audit_results,audited_at,18,timestamp with time zone,,,,NO,now()
+public,audit_results,created_at,19,timestamp with time zone,,,,NO,now()
+public,brand_dna,id,1,integer,,32,0,NO,nextval('brand_dna_id_seq'::regclass)
+public,brand_dna,project_id,2,integer,,32,0,NO,
+public,brand_dna,primary_colors,3,ARRAY,,,,YES,
+public,brand_dna,typography_style,4,text,,,,YES,
+public,brand_dna,layout_pattern,5,text,,,,YES,
+public,brand_dna,visual_density,6,text,,,,YES,
+public,brand_dna,tone_of_voice,7,text,,,,YES,
+public,brand_dna,value_propositions,8,ARRAY,,,,YES,
+public,brand_dna,urgency_tactics,9,ARRAY,,,,YES,
+public,brand_dna,target_audience,10,text,,,,YES,
+public,brand_dna,photography_style,11,text,,,,YES,
+public,brand_dna,brand_personality,12,text,,,,YES,
+public,brand_dna,competitive_position,13,text,,,,YES,
+public,brand_dna,extracted_from_url,14,text,,,,YES,
+public,brand_dna,extracted_at,15,timestamp with time zone,,,,YES,now()
+public,brand_dna,updated_at,16,timestamp with time zone,,,,YES,now()
+public,bulk_jobs,id,1,integer,,32,0,NO,nextval('bulk_jobs_id_seq'::regclass)
+public,bulk_jobs,job_id,2,text,,,,NO,
+public,bulk_jobs,project_id,3,integer,,32,0,NO,
+public,bulk_jobs,job_type,4,text,,,,NO,
+public,bulk_jobs,status,5,text,,,,NO,'pending'::text
+public,bulk_jobs,total_items,6,integer,,32,0,NO,0
+public,bulk_jobs,completed_items,7,integer,,32,0,NO,0
+public,bulk_jobs,failed_items,8,integer,,32,0,NO,0
+public,bulk_jobs,log,9,ARRAY,,,,YES,
+public,bulk_jobs,result,10,jsonb,,,,YES,
+public,bulk_jobs,created_at,11,timestamp with time zone,,,,NO,now()
+public,bulk_jobs,updated_at,12,timestamp with time zone,,,,NO,now()
+public,cms_content,id,1,integer,,32,0,NO,nextval('cms_content_id_seq'::regclass)
+public,cms_content,content,2,jsonb,,,,NO,
+public,cms_content,updated_at,3,timestamp without time zone,,,,NO,now()
+public,cms_content,updated_by,4,text,,,,YES,
+public,cms_content,version,5,integer,,32,0,NO,1
+public,cms_versions,id,1,integer,,32,0,NO,nextval('cms_versions_id_seq'::regclass)
+public,cms_versions,content,2,jsonb,,,,NO,
+public,cms_versions,saved_at,3,timestamp without time zone,,,,NO,now()
+public,cms_versions,saved_by,4,text,,,,YES,
+public,cms_versions,version,5,integer,,32,0,NO,
+public,cms_versions,label,6,text,,,,YES,
+public,cogs,id,1,integer,,32,0,NO,nextval('cogs_id_seq'::regclass)
+public,cogs,project_id,2,integer,,32,0,NO,
+public,cogs,shopify_product_id,3,text,,,,NO,
+public,cogs,unit_cost,4,real,,24,,NO,0
+public,cogs,packaging_cost,5,real,,24,,NO,0
+public,cogs,label_cost,6,real,,24,,NO,0
+public,cogs,shipping_cost_domestic,7,real,,24,,NO,0
+public,cogs,shipping_cost_international,8,real,,24,,NO,0
+public,cogs,fulfillment_fee,9,real,,24,,NO,0
+public,cogs,return_rate,10,real,,24,,NO,0.08
+public,cogs,return_processing_cost,11,real,,24,,NO,0
+public,cogs,shopify_payment_fee,12,real,,24,,NO,0.015
+public,cogs,shopify_plan_cost_per_order,13,real,,24,,NO,0
+public,cogs,cac,14,real,,24,,NO,0
+public,cogs,affiliate_fee,15,real,,24,,NO,0
+public,cogs,overhead_per_unit,16,real,,24,,NO,0
+public,cogs,total_cogs,17,real,,24,,NO,0
+public,cogs,break_even_price,18,real,,24,,NO,0
+public,cogs,minimum_viable_price,19,real,,24,,NO,0
+public,cogs,last_competitor_analysis,20,jsonb,,,,YES,
+public,cogs,last_pricing_recommendation,21,jsonb,,,,YES,
+public,cogs,created_at,22,timestamp with time zone,,,,NO,now()
+public,cogs,updated_at,23,timestamp with time zone,,,,NO,now()
+public,cogs,material_cost,24,real,,24,,NO,0
+public,cogs,fabric_cost,25,real,,24,,NO,0
+public,cogs,printing_cost,26,real,,24,,NO,0
+public,cogs,screen_printing_cost,27,real,,24,,NO,0
+public,cogs,mold_amortization,28,real,,24,,NO,0
+public,cogs,assembly_cost,29,real,,24,,NO,0
+public,cogs,labor_cost_per_unit,30,real,,24,,NO,0
+public,cogs,quality_control_cost,31,real,,24,,NO,0
+public,cogs,warehouse_cost_per_unit,32,real,,24,,NO,0
+public,cogs,customs_duty,33,real,,24,,NO,0
+public,cogs,insurance_cost,34,real,,24,,NO,0
+public,cogs,payment_processing_fee,35,real,,24,,NO,0
+public,cogs,platform_commission,36,real,,24,,NO,0
+public,cogs,digital_marketing_cost,37,real,,24,,NO,0
+public,cogs,influencer_cost_per_unit,38,real,,24,,NO,0
+public,cogs,seo_cost_per_unit,39,real,,24,,NO,0
+public,cogs,vat_rate,40,real,,24,,NO,0.21
+public,cogs,corporate_tax_rate,41,real,,24,,NO,0
+public,cogs,consulting_fee,42,real,,24,,NO,0
+public,cogs,legal_cost_per_unit,43,real,,24,,NO,0
+public,cogs,ai_api_cost_per_unit,44,real,,24,,NO,0
+public,cogs,design_cost_per_unit,45,real,,24,,NO,0
+public,cogs,custom_costs,46,jsonb,,,,YES,'[]'::jsonb
+public,cogs,notes,47,text,,,,YES,
+public,cogs,total_cogs_with_vat,48,real,,24,,NO,0
+public,cogs,break_even_price_with_vat,49,real,,24,,NO,0
+public,competitor_alerts,id,1,text,,,,NO,
+public,competitor_alerts,project_id,2,text,,,,NO,
+public,competitor_alerts,competitor_id,3,text,,,,NO,
+public,competitor_alerts,alert_type,4,text,,,,YES,
+public,competitor_alerts,severity,5,text,,,,YES,
+public,competitor_alerts,title,6,text,,,,YES,
+public,competitor_alerts,description,7,text,,,,YES,
+public,competitor_alerts,action_suggestion,8,text,,,,YES,
+public,competitor_alerts,dismissed,9,integer,,32,0,YES,0
+public,competitor_alerts,created_at,10,timestamp without time zone,,,,YES,now()
+public,competitor_snapshots,id,1,text,,,,NO,
+public,competitor_snapshots,competitor_id,2,text,,,,NO,
+public,competitor_snapshots,scanned_at,3,timestamp without time zone,,,,YES,now()
+public,competitor_snapshots,products_found,4,integer,,32,0,YES,
+public,competitor_snapshots,price_min,5,real,,24,,YES,
+public,competitor_snapshots,price_max,6,real,,24,,YES,
+public,competitor_snapshots,price_median,7,real,,24,,YES,
+public,competitor_snapshots,new_products,8,text,,,,YES,
+public,competitor_snapshots,out_of_stock,9,text,,,,YES,
+public,competitor_snapshots,promotions_detected,10,text,,,,YES,
+public,competitor_snapshots,meta_title,11,text,,,,YES,
+public,competitor_snapshots,meta_description,12,text,,,,YES,
+public,competitor_snapshots,raw_data,13,text,,,,YES,
+public,competitors,id,1,text,,,,NO,
+public,competitors,project_id,2,text,,,,NO,
+public,competitors,name,3,text,,,,NO,
+public,competitors,url,4,text,,,,NO,
+public,competitors,type,5,text,,,,YES,'direct'::text
+public,competitors,last_scanned,6,timestamp without time zone,,,,YES,
+public,competitors,active,7,integer,,32,0,YES,1
+public,competitors,created_at,8,timestamp without time zone,,,,YES,now()
+public,email_flows,id,1,integer,,32,0,NO,nextval('email_flows_id_seq'::regclass)
+public,email_flows,project_id,2,integer,,32,0,YES,
+public,email_flows,name,3,character varying,255,,,NO,
+public,email_flows,flow_type,4,character varying,100,,,YES,
+public,email_flows,trigger_type,5,character varying,100,,,YES,
+public,email_flows,send_delay,6,character varying,20,,,YES,'1h'::character varying
+public,email_flows,subject_a,7,text,,,,YES,
+public,email_flows,subject_b,8,text,,,,YES,
+public,email_flows,preview_text,9,text,,,,YES,
+public,email_flows,tone,10,character varying,50,,,YES,'urgente'::character varying
+public,email_flows,language,11,character varying,10,,,YES,'es'::character varying
+public,email_flows,html_content,12,text,,,,YES,
+public,email_flows,text_content,13,text,,,,YES,
+public,email_flows,variables_used,14,text,,,,YES,
+public,email_flows,from_email,15,character varying,255,,,YES,
+public,email_flows,from_name,16,character varying,255,,,YES,
+public,email_flows,reply_email,17,character varying,255,,,YES,
+public,email_flows,klaviyo_template_id,18,character varying,100,,,YES,
+public,email_flows,klaviyo_flow_id,19,character varying,100,,,YES,
+public,email_flows,klaviyo_status,20,character varying,20,,,YES,'draft'::character varying
+public,email_flows,klaviyo_error,21,text,,,,YES,
+public,email_flows,open_rate,22,real,,24,,YES,
+public,email_flows,click_rate,23,real,,24,,YES,
+public,email_flows,pushed_at,24,timestamp with time zone,,,,YES,
+public,email_flows,last_synced_at,25,timestamp with time zone,,,,YES,
+public,email_flows,created_at,26,timestamp with time zone,,,,YES,now()
+public,email_flows,updated_at,27,timestamp with time zone,,,,YES,now()
+public,email_templates,id,1,integer,,32,0,NO,nextval('email_templates_id_seq'::regclass)
+public,email_templates,project_id,2,integer,,32,0,YES,
+public,email_templates,name,3,character varying,255,,,NO,
+public,email_templates,template_type,4,character varying,100,,,NO,
+public,email_templates,category,5,character varying,50,,,NO,'agency'::character varying
+public,email_templates,subject_a,6,text,,,,YES,
+public,email_templates,subject_b,7,text,,,,YES,
+public,email_templates,preview_text,8,text,,,,YES,
+public,email_templates,html_content,9,text,,,,YES,
+public,email_templates,text_content,10,text,,,,YES,
+public,email_templates,tone,11,character varying,50,,,YES,'profesional'::character varying
+public,email_templates,language,12,character varying,10,,,YES,'es'::character varying
+public,email_templates,brand_name,13,character varying,255,,,YES,
+public,email_templates,brand_logo_url,14,text,,,,YES,
+public,email_templates,brand_colors,15,jsonb,,,,YES,'{}'::jsonb
+public,email_templates,brand_tagline,16,text,,,,YES,
+public,email_templates,variables_used,17,text,,,,YES,
+public,email_templates,from_email,18,character varying,255,,,YES,
+public,email_templates,from_name,19,character varying,255,,,YES,
+public,email_templates,reply_email,20,character varying,255,,,YES,
+public,email_templates,klaviyo_template_id,21,character varying,100,,,YES,
+public,email_templates,klaviyo_status,22,character varying,20,,,YES,'draft'::character varying
+public,email_templates,klaviyo_error,23,text,,,,YES,
+public,email_templates,pushed_at,24,timestamp with time zone,,,,YES,
+public,email_templates,is_favorite,25,boolean,,,,YES,false
+public,email_templates,version,26,integer,,32,0,YES,1
+public,email_templates,created_at,27,timestamp with time zone,,,,YES,now()
+public,email_templates,updated_at,28,timestamp with time zone,,,,YES,now()
+public,events,id,1,text,,,,NO,
+public,events,project_id,2,text,,,,NO,
+public,events,event_type,3,text,,,,NO,
+public,events,product_id,4,text,,,,YES,
+public,events,payload,5,text,,,,YES,
+public,events,revenue_before,6,real,,24,,YES,
+public,events,revenue_after,7,real,,24,,YES,
+public,events,revenue_delta,8,real,,24,,YES,
+public,events,attributed_revenue,9,real,,24,,YES,0
+public,events,created_at,10,timestamp without time zone,,,,YES,now()
+public,express_rate_limits,key,1,text,,,,NO,
+public,express_rate_limits,total_hits,2,integer,,32,0,NO,0
+public,express_rate_limits,reset_at,3,timestamp with time zone,,,,NO,
+public,forecasts,id,1,text,,,,NO,
+public,forecasts,project_id,2,text,,,,NO,
+public,forecasts,forecast_date,3,text,,,,YES,
+public,forecasts,forecast_type,4,text,,,,YES,
+public,forecasts,product_id,5,text,,,,YES,
+public,forecasts,predicted_value,6,real,,24,,YES,
+public,forecasts,confidence_low,7,real,,24,,YES,
+public,forecasts,confidence_high,8,real,,24,,YES,
+public,forecasts,confidence_pct,9,integer,,32,0,YES,
+public,forecasts,reasoning,10,text,,,,YES,
+public,forecasts,created_at,11,timestamp without time zone,,,,YES,now()
+public,gemini_conversations,id,1,integer,,32,0,NO,nextval('gemini_conversations_id_seq'::regclass)
+public,gemini_conversations,title,2,text,,,,NO,
+public,gemini_conversations,created_at,3,timestamp with time zone,,,,NO,now()
+public,gemini_messages,id,1,integer,,32,0,NO,nextval('gemini_messages_id_seq'::regclass)
+public,gemini_messages,conversation_id,2,integer,,32,0,NO,
+public,gemini_messages,role,3,text,,,,NO,
+public,gemini_messages,content,4,text,,,,NO,
+public,gemini_messages,created_at,5,timestamp with time zone,,,,NO,now()
+public,generation_jobs,id,1,integer,,32,0,NO,nextval('generation_jobs_id_seq'::regclass)
+public,generation_jobs,project_id,2,integer,,32,0,NO,
+public,generation_jobs,shopify_product_id,3,text,,,,NO,
+public,generation_jobs,image_type,4,text,,,,NO,
+public,generation_jobs,status,5,text,,,,NO,'pending'::text
+public,generation_jobs,prompt,6,text,,,,YES,
+public,generation_jobs,negative_prompt,7,text,,,,YES,
+public,generation_jobs,model,8,text,,,,YES,
+public,generation_jobs,replicate_prediction_id,9,text,,,,YES,
+public,generation_jobs,image_url,10,text,,,,YES,
+public,generation_jobs,shopify_image_id,11,bigint,,64,0,YES,
+public,generation_jobs,alt_text,12,text,,,,YES,
+public,generation_jobs,estimated_cost,13,real,,24,,YES,
+public,generation_jobs,error_message,14,text,,,,YES,
+public,generation_jobs,completed_at,15,timestamp with time zone,,,,YES,
+public,generation_jobs,created_at,16,timestamp with time zone,,,,NO,now()
+public,inventory_tracking,id,1,text,,,,NO,
+public,inventory_tracking,project_id,2,text,,,,NO,
+public,inventory_tracking,product_id,3,text,,,,NO,
+public,inventory_tracking,variant_id,4,text,,,,YES,
+public,inventory_tracking,product_title,5,text,,,,YES,
+public,inventory_tracking,current_stock,6,integer,,32,0,YES,
+public,inventory_tracking,avg_daily_sales,7,real,,24,,YES,
+public,inventory_tracking,days_remaining,8,integer,,32,0,YES,
+public,inventory_tracking,restock_threshold,9,integer,,32,0,YES,15
+public,inventory_tracking,supplier_email,10,text,,,,YES,
+public,inventory_tracking,supplier_lead_days,11,integer,,32,0,YES,14
+public,inventory_tracking,last_restock_date,12,text,,,,YES,
+public,inventory_tracking,status,13,text,,,,YES,
+public,inventory_tracking,updated_at,14,timestamp without time zone,,,,YES,now()
+public,inventory_tracking,variant_title,15,text,,,,YES,
+public,inventory_tracking,sku,16,text,,,,YES,
+public,inventory_tracking,barcode,17,text,,,,YES,
+public,inventory_tracking,option1_name,18,text,,,,YES,
+public,inventory_tracking,option1_value,19,text,,,,YES,
+public,inventory_tracking,option2_name,20,text,,,,YES,
+public,inventory_tracking,option2_value,21,text,,,,YES,
+public,inventory_tracking,option3_name,22,text,,,,YES,
+public,inventory_tracking,option3_value,23,text,,,,YES,
+public,inventory_tracking,product_type,24,text,,,,YES,
+public,inventory_tracking,vendor,25,text,,,,YES,
+public,inventory_tracking,cost_per_item,26,real,,24,,YES,
+public,inventory_tracking,price,27,real,,24,,YES,
+public,inventory_tracking,compare_at_price,28,real,,24,,YES,
+public,inventory_tracking,weight,29,real,,24,,YES,
+public,inventory_tracking,weight_unit,30,text,,,,YES,
+public,inventory_tracking,total_units_sold,31,integer,,32,0,YES,0
+public,inventory_tracking,inventory_policy,32,text,,,,YES,
+public,inventory_tracking,requires_shipping,33,integer,,32,0,YES,1
+public,messages,id,1,text,,,,NO,
+public,messages,project_id,2,text,,,,NO,
+public,messages,from_role,3,text,,,,NO,
+public,messages,from_name,4,text,,,,NO,
+public,messages,content,5,text,,,,NO,
+public,messages,is_read,6,integer,,32,0,YES,0
+public,messages,created_at,7,timestamp without time zone,,,,YES,now()
+public,omnicore_absorbed_content,id,1,text,,,,NO,
+public,omnicore_absorbed_content,source_type,2,text,,,,NO,
+public,omnicore_absorbed_content,source_url,3,text,,,,YES,
+public,omnicore_absorbed_content,source_label,4,text,,,,YES,
+public,omnicore_absorbed_content,raw_content,5,text,,,,YES,
+public,omnicore_absorbed_content,visual_composition,6,text,,,,YES,
+public,omnicore_absorbed_content,color_palette,7,text,,,,YES,
+public,omnicore_absorbed_content,texture_analysis,8,text,,,,YES,
+public,omnicore_absorbed_content,topology_structure,9,text,,,,YES,
+public,omnicore_absorbed_content,rendering_technique,10,text,,,,YES,
+public,omnicore_absorbed_content,technical_specs,11,text,,,,YES,
+public,omnicore_absorbed_content,chemical_composition,12,text,,,,YES,
+public,omnicore_absorbed_content,brand_elements,13,text,,,,YES,
+public,omnicore_absorbed_content,main_themes,14,text,,,,YES,
+public,omnicore_absorbed_content,ecommerce_insights,15,text,,,,YES,
+public,omnicore_absorbed_content,marketing_angles,16,text,,,,YES,
+public,omnicore_absorbed_content,competitive_data,17,text,,,,YES,
+public,omnicore_absorbed_content,audience_signals,18,text,,,,YES,
+public,omnicore_absorbed_content,full_analysis,19,jsonb,,,,YES,
+public,omnicore_absorbed_content,extracted_entities,20,jsonb,,,,YES,
+public,omnicore_absorbed_content,niche,21,text,,,,YES,
+public,omnicore_absorbed_content,confidence,22,real,,24,,YES,0.7
+public,omnicore_absorbed_content,absorbed_to_memory,23,integer,,32,0,YES,0
+public,omnicore_absorbed_content,memory_ids,24,text,,,,YES,
+public,omnicore_absorbed_content,processing_model,25,text,,,,YES,
+public,omnicore_absorbed_content,created_at,26,timestamp without time zone,,,,YES,now()
+public,omnicore_cross_connections,id,1,text,,,,NO,
+public,omnicore_cross_connections,insight_a,2,text,,,,NO,
+public,omnicore_cross_connections,insight_b,3,text,,,,NO,
+public,omnicore_cross_connections,connection_type,4,text,,,,YES,
+public,omnicore_cross_connections,connection_strength,5,real,,24,,YES,0.5
+public,omnicore_cross_connections,discovered_at,6,timestamp without time zone,,,,YES,now()
+public,omnicore_insights,id,1,text,,,,NO,
+public,omnicore_insights,domain,2,text,,,,NO,
+public,omnicore_insights,sub_domain,3,text,,,,YES,
+public,omnicore_insights,insight_type,4,text,,,,NO,
+public,omnicore_insights,title,5,text,,,,NO,
+public,omnicore_insights,insight,6,text,,,,NO,
+public,omnicore_insights,evidence,7,text,,,,YES,
+public,omnicore_insights,confidence,8,real,,24,,YES,0.5
+public,omnicore_insights,impact_score,9,real,,24,,YES,0.5
+public,omnicore_insights,related_domains,10,text,,,,YES,
+public,omnicore_insights,related_insights,11,text,,,,YES,
+public,omnicore_insights,times_applied,12,integer,,32,0,YES,0
+public,omnicore_insights,times_successful,13,integer,,32,0,YES,0
+public,omnicore_insights,times_failed,14,integer,,32,0,YES,0
+public,omnicore_insights,success_rate,15,real,,24,,YES,0
+public,omnicore_insights,source,16,text,,,,YES,'manual'::text
+public,omnicore_insights,retroactive_version,17,integer,,32,0,YES,0
+public,omnicore_insights,last_retroactive_update,18,timestamp without time zone,,,,YES,
+public,omnicore_insights,created_at,19,timestamp without time zone,,,,YES,now()
+public,omnicore_insights,updated_at,20,timestamp without time zone,,,,YES,now()
+public,omnicore_knowledge_domains,id,1,text,,,,NO,
+public,omnicore_knowledge_domains,domain,2,text,,,,NO,
+public,omnicore_knowledge_domains,knowledge_depth,3,integer,,32,0,YES,0
+public,omnicore_knowledge_domains,verified_insights,4,integer,,32,0,YES,0
+public,omnicore_knowledge_domains,total_insights,5,integer,,32,0,YES,0
+public,omnicore_knowledge_domains,last_study_session,6,timestamp without time zone,,,,YES,
+public,omnicore_knowledge_domains,specialty_prompt,7,text,,,,YES,
+public,omnicore_knowledge_domains,core_principles,8,text,,,,YES,
+public,omnicore_knowledge_domains,common_mistakes,9,text,,,,YES,
+public,omnicore_knowledge_domains,best_practices,10,text,,,,YES,
+public,omnicore_knowledge_domains,updated_at,11,timestamp without time zone,,,,YES,now()
+public,omnicore_memories,id,1,text,,,,NO,
+public,omnicore_memories,memory_type,2,text,,,,NO,
+public,omnicore_memories,niche,3,text,,,,YES,
+public,omnicore_memories,sub_niche,4,text,,,,YES,
+public,omnicore_memories,product_type,5,text,,,,YES,
+public,omnicore_memories,market,6,text,,,,YES,'es'::text
+public,omnicore_memories,title,7,text,,,,NO,
+public,omnicore_memories,content,8,text,,,,NO,
+public,omnicore_memories,confidence,9,real,,24,,YES,0.5
+public,omnicore_memories,use_count,10,integer,,32,0,YES,0
+public,omnicore_memories,success_count,11,integer,,32,0,YES,0
+public,omnicore_memories,success_rate,12,real,,24,,YES,0
+public,omnicore_memories,source_type,13,text,,,,YES,'manual'::text
+public,omnicore_memories,tags,14,text,,,,YES,
+public,omnicore_memories,is_verified,15,integer,,32,0,YES,0
+public,omnicore_memories,last_used_at,16,timestamp without time zone,,,,YES,
+public,omnicore_memories,created_at,17,timestamp without time zone,,,,YES,now()
+public,omnicore_memories,updated_at,18,timestamp without time zone,,,,YES,now()
+public,omnicore_niche_profiles,id,1,text,,,,NO,
+public,omnicore_niche_profiles,niche,2,text,,,,NO,
+public,omnicore_niche_profiles,sub_niches,3,text,,,,YES,
+public,omnicore_niche_profiles,avg_price_min,4,real,,24,,YES,
+public,omnicore_niche_profiles,avg_price_max,5,real,,24,,YES,
+public,omnicore_niche_profiles,avg_price_sweet_spot,6,real,,24,,YES,
+public,omnicore_niche_profiles,typical_margin_pct,7,real,,24,,YES,
+public,omnicore_niche_profiles,seasonal_peaks,8,text,,,,YES,
+public,omnicore_niche_profiles,top_keywords,9,text,,,,YES,
+public,omnicore_niche_profiles,top_image_types,10,text,,,,YES,
+public,omnicore_niche_profiles,best_cta_words,11,text,,,,YES,
+public,omnicore_niche_profiles,tone_description,12,text,,,,YES,
+public,omnicore_niche_profiles,known_competitors,13,text,,,,YES,
+public,omnicore_niche_profiles,avg_competitor_count,14,integer,,32,0,YES,
+public,omnicore_niche_profiles,market_saturation,15,text,,,,YES,'medium'::text
+public,omnicore_niche_profiles,best_prompt_style,16,text,,,,YES,
+public,omnicore_niche_profiles,product_description_template,17,text,,,,YES,
+public,omnicore_niche_profiles,pricing_psychology,18,text,,,,YES,
+public,omnicore_niche_profiles,stores_analyzed,19,integer,,32,0,YES,0
+public,omnicore_niche_profiles,updated_at,20,timestamp without time zone,,,,YES,now()
+public,omnicore_prompt_library,id,1,text,,,,NO,
+public,omnicore_prompt_library,name,2,text,,,,NO,
+public,omnicore_prompt_library,description,3,text,,,,YES,
+public,omnicore_prompt_library,niche,4,text,,,,YES,
+public,omnicore_prompt_library,use_case,5,text,,,,YES,
+public,omnicore_prompt_library,prompt_template,6,text,,,,NO,
+public,omnicore_prompt_library,variables,7,text,,,,YES,
+public,omnicore_prompt_library,avg_quality_score,8,real,,24,,YES,0
+public,omnicore_prompt_library,use_count,9,integer,,32,0,YES,0
+public,omnicore_prompt_library,created_by,10,text,,,,YES,'system'::text
+public,omnicore_prompt_library,is_public,11,integer,,32,0,YES,1
+public,omnicore_prompt_library,created_at,12,timestamp without time zone,,,,YES,now()
+public,omnicore_study_sessions,id,1,text,,,,NO,
+public,omnicore_study_sessions,session_type,2,text,,,,NO,
+public,omnicore_study_sessions,domains_studied,3,text,,,,YES,
+public,omnicore_study_sessions,trigger,4,text,,,,YES,
+public,omnicore_study_sessions,duration_seconds,5,integer,,32,0,YES,
+public,omnicore_study_sessions,insights_created,6,integer,,32,0,YES,0
+public,omnicore_study_sessions,insights_updated,7,integer,,32,0,YES,0
+public,omnicore_study_sessions,insights_invalidated,8,integer,,32,0,YES,0
+public,omnicore_study_sessions,retroactive_updates,9,integer,,32,0,YES,0
+public,omnicore_study_sessions,summary,10,text,,,,YES,
+public,omnicore_study_sessions,key_discoveries,11,text,,,,YES,
+public,omnicore_study_sessions,tokens_used,12,integer,,32,0,YES,
+public,omnicore_study_sessions,created_at,13,timestamp without time zone,,,,YES,now()
+public,onboarding_progress,user_id,1,text,,,,NO,
+public,onboarding_progress,project_id,2,text,,,,YES,
+public,onboarding_progress,step_store_connected,3,integer,,32,0,YES,0
+public,onboarding_progress,step_audit_run,4,integer,,32,0,YES,0
+public,onboarding_progress,step_image_generated,5,integer,,32,0,YES,0
+public,onboarding_progress,step_price_optimized,6,integer,,32,0,YES,0
+public,onboarding_progress,step_ab_test_active,7,integer,,32,0,YES,0
+public,onboarding_progress,step_seo_applied,8,integer,,32,0,YES,0
+public,onboarding_progress,step_client_invited,9,integer,,32,0,YES,0
+public,onboarding_progress,completion_pct,10,integer,,32,0,YES,0
+public,onboarding_progress,onboarding_completed,11,integer,,32,0,YES,0
+public,onboarding_progress,completed_at,12,timestamp without time zone,,,,YES,
+public,onboarding_progress,updated_at,13,timestamp without time zone,,,,YES,now()
+public,plan_credit_packs,id,1,integer,,32,0,NO,nextval('plan_credit_packs_id_seq'::regclass)
+public,plan_credit_packs,project_id,2,integer,,32,0,NO,
+public,plan_credit_packs,pack_type,3,text,,,,NO,
+public,plan_credit_packs,products_included,4,integer,,32,0,NO,
+public,plan_credit_packs,images_included,5,integer,,32,0,NO,
+public,plan_credit_packs,shopify_product_id,6,text,,,,YES,
+public,plan_credit_packs,shopify_order_id,7,text,,,,YES,
+public,plan_credit_packs,purchased_at,8,timestamp with time zone,,,,NO,now()
+public,platform_settings,key,1,text,,,,NO,
+public,platform_settings,value,2,text,,,,NO,
+public,platform_settings,updated_at,3,timestamp without time zone,,,,YES,now()
+public,price_history,id,1,integer,,32,0,NO,nextval('price_history_id_seq'::regclass)
+public,price_history,project_id,2,integer,,32,0,NO,
+public,price_history,shopify_product_id,3,text,,,,NO,
+public,price_history,old_price,4,real,,24,,YES,
+public,price_history,new_price,5,real,,24,,NO,
+public,price_history,change_source,6,text,,,,YES,'sync'::text
+public,price_history,recorded_at,7,timestamp with time zone,,,,NO,now()
+public,pricing_decisions,id,1,text,,,,NO,
+public,pricing_decisions,decision_type,2,text,,,,YES,
+public,pricing_decisions,entity_id,3,text,,,,YES,
+public,pricing_decisions,entity_name,4,text,,,,YES,
+public,pricing_decisions,old_price,5,real,,24,,YES,
+public,pricing_decisions,new_price,6,real,,24,,YES,
+public,pricing_decisions,price_delta,7,real,,24,,YES,
+public,pricing_decisions,price_delta_pct,8,real,,24,,YES,
+public,pricing_decisions,reasoning,9,text,,,,YES,
+public,pricing_decisions,data_used,10,text,,,,YES,
+public,pricing_decisions,confidence,11,real,,24,,YES,
+public,pricing_decisions,risk_level,12,text,,,,YES,'medium'::text
+public,pricing_decisions,expected_impact,13,text,,,,YES,
+public,pricing_decisions,decision_made_at,14,timestamp without time zone,,,,YES,
+public,pricing_decisions,decision_by,15,text,,,,YES,'omnicore_auto'::text
+public,pricing_decisions,outcome_measured_at,16,timestamp without time zone,,,,YES,
+public,pricing_decisions,actual_revenue_change,17,real,,24,,YES,
+public,pricing_decisions,actual_conversion_change,18,real,,24,,YES,
+public,pricing_decisions,prediction_accuracy,19,real,,24,,YES,
+public,pricing_decisions,created_at,20,timestamp without time zone,,,,YES,now()
+public,pricing_rules,id,1,text,,,,NO,
+public,pricing_rules,project_id,2,text,,,,NO,
+public,pricing_rules,rule_name,3,text,,,,YES,
+public,pricing_rules,rule_type,4,text,,,,YES,
+public,pricing_rules,condition_json,5,text,,,,YES,
+public,pricing_rules,action_json,6,text,,,,YES,
+public,pricing_rules,limits_json,7,text,,,,YES,
+public,pricing_rules,is_active,8,integer,,32,0,YES,1
+public,pricing_rules,auto_apply,9,integer,,32,0,YES,0
+public,pricing_rules,requires_approval,10,integer,,32,0,YES,1
+public,pricing_rules,times_triggered,11,integer,,32,0,YES,0
+public,pricing_rules,last_triggered,12,timestamp without time zone,,,,YES,
+public,pricing_rules,created_at,13,timestamp without time zone,,,,YES,now()
+public,products,id,1,integer,,32,0,NO,nextval('products_id_seq'::regclass)
+public,products,project_id,2,integer,,32,0,NO,
+public,products,shopify_product_id,3,text,,,,NO,
+public,products,title,4,text,,,,NO,
+public,products,handle,5,text,,,,NO,
+public,products,body_html,6,text,,,,YES,
+public,products,vendor,7,text,,,,YES,
+public,products,product_type,8,text,,,,YES,
+public,products,status,9,text,,,,NO,'active'::text
+public,products,tags,10,text,,,,YES,
+public,products,price,11,text,,,,YES,
+public,products,compare_at_price,12,text,,,,YES,
+public,products,image_count,13,integer,,32,0,NO,0
+public,products,variant_count,14,integer,,32,0,NO,1
+public,products,images_json,15,jsonb,,,,YES,
+public,products,audit_score,16,real,,24,,YES,
+public,products,audit_grade,17,text,,,,YES,
+public,products,title_score,18,real,,24,,YES,
+public,products,description_score,19,real,,24,,YES,
+public,products,price_score,20,real,,24,,YES,
+public,products,image_score,21,real,,24,,YES,
+public,products,seo_score,22,real,,24,,YES,
+public,products,audit_problems,23,ARRAY,,,,YES,
+public,products,last_audited_at,24,timestamp with time zone,,,,YES,
+public,products,created_at,25,timestamp with time zone,,,,NO,now()
+public,products,updated_at,26,timestamp with time zone,,,,NO,now()
+public,products,published_at,27,text,,,,YES,
+public,project_files,id,1,integer,,32,0,NO,nextval('project_files_id_seq'::regclass)
+public,project_files,project_id,2,integer,,32,0,YES,
+public,project_files,file_type,3,text,,,,NO,
+public,project_files,category,4,text,,,,YES,
+public,project_files,title,5,text,,,,NO,
+public,project_files,description,6,text,,,,YES,
+public,project_files,object_path,7,text,,,,YES,
+public,project_files,original_url,8,text,,,,YES,
+public,project_files,mime_type,9,text,,,,YES,
+public,project_files,file_size_bytes,10,integer,,32,0,YES,
+public,project_files,product_id,11,text,,,,YES,
+public,project_files,product_title,12,text,,,,YES,
+public,project_files,generated_by,13,text,,,,YES,
+public,project_files,metadata,14,text,,,,YES,
+public,project_files,is_public,15,integer,,32,0,YES,0
+public,project_files,created_at,16,timestamp without time zone,,,,YES,now()
+public,project_files,content,17,text,,,,YES,
+public,project_files,entity_name,18,text,,,,YES,
+public,project_files,entity_url,19,text,,,,YES,
+public,projects,id,1,integer,,32,0,NO,nextval('projects_id_seq'::regclass)
+public,projects,name,2,text,,,,NO,
+public,projects,shop_domain,3,text,,,,NO,
+public,projects,client_id,4,text,,,,NO,
+public,projects,client_secret,5,text,,,,NO,
+public,projects,access_token,6,text,,,,YES,
+public,projects,token_expires_at,7,timestamp with time zone,,,,YES,
+public,projects,store_niche,8,text,,,,YES,
+public,projects,brand_tone,9,text,,,,YES,
+public,projects,target_audience,10,text,,,,YES,
+public,projects,store_markets,11,text,,,,YES,
+public,projects,replicate_api_token,12,text,,,,YES,
+public,projects,anthropic_api_key,13,text,,,,YES,
+public,projects,auto_pilot_enabled,14,boolean,,,,NO,false
+public,projects,product_count,15,integer,,32,0,YES,
+public,projects,avg_audit_score,16,real,,24,,YES,
+public,projects,webhook_id,17,text,,,,YES,
+public,projects,created_at,18,timestamp with time zone,,,,NO,now()
+public,projects,updated_at,19,timestamp with time zone,,,,NO,now()
+public,projects,plan,20,text,,,,NO,'starter'::text
+public,projects,products_used_this_month,21,integer,,32,0,NO,0
+public,projects,images_used_this_month,22,integer,,32,0,NO,0
+public,projects,credits_products,23,integer,,32,0,NO,0
+public,projects,credits_images,24,integer,,32,0,NO,0
+public,projects,plan_renews_at,25,timestamp with time zone,,,,YES,
+public,projects,ai_report_json,26,text,,,,YES,
+public,projects,ai_report_generated_at,27,timestamp with time zone,,,,YES,
+public,projects,platform_type,28,text,,,,NO,'shopify'::text
+public,rate_limits,key,1,text,,,,NO,
+public,rate_limits,count,2,integer,,32,0,NO,0
+public,rate_limits,blocked_until,3,timestamp without time zone,,,,YES,
+public,rate_limits,updated_at,4,timestamp without time zone,,,,YES,now()
+public,redesigns,id,1,integer,,32,0,NO,nextval('redesigns_id_seq'::regclass)
+public,redesigns,project_id,2,integer,,32,0,NO,
+public,redesigns,shopify_product_id,3,text,,,,NO,
+public,redesigns,original_title,4,text,,,,NO,
+public,redesigns,original_price,5,text,,,,YES,
+public,redesigns,new_title,6,text,,,,NO,
+public,redesigns,new_body_html,7,text,,,,NO,
+public,redesigns,new_short_description,8,text,,,,NO,
+public,redesigns,new_price,9,text,,,,NO,
+public,redesigns,new_compare_at_price,10,text,,,,NO,
+public,redesigns,new_tags,11,text,,,,NO,
+public,redesigns,meta_title,12,text,,,,NO,
+public,redesigns,meta_description,13,text,,,,NO,
+public,redesigns,photo_brief,14,ARRAY,,,,YES,
+public,redesigns,price_reasoning,15,text,,,,YES,
+public,redesigns,applied_at,16,timestamp with time zone,,,,YES,
+public,redesigns,applied_fields,17,ARRAY,,,,YES,
+public,redesigns,created_at,18,timestamp with time zone,,,,NO,now()
+public,redesigns,new_category,19,text,,,,YES,
+public,redesigns,new_metafields,20,jsonb,,,,YES,
+public,referral_tracking,id,1,text,,,,NO,
+public,referral_tracking,affiliate_id,2,text,,,,NO,
+public,referral_tracking,referred_user_id,3,text,,,,YES,
+public,referral_tracking,signup_date,4,timestamp without time zone,,,,YES,
+public,referral_tracking,converted_date,5,timestamp without time zone,,,,YES,
+public,referral_tracking,commission_rate,6,real,,24,,YES,0.2
+public,referral_tracking,commission_earned,7,real,,24,,YES,0
+public,referral_tracking,status,8,text,,,,YES,'pending'::text
+public,report_templates,id,1,integer,,32,0,NO,nextval('report_templates_id_seq'::regclass)
+public,report_templates,user_id,2,integer,,32,0,YES,
+public,report_templates,name,3,character varying,200,,,NO,
+public,report_templates,slug,4,character varying,100,,,NO,
+public,report_templates,logo_base64,5,text,,,,YES,
+public,report_templates,company_name,6,character varying,200,,,YES,
+public,report_templates,tagline,7,character varying,300,,,YES,
+public,report_templates,primary_color,8,character varying,9,,,YES,'#c8a84b'::character varying
+public,report_templates,secondary_color,9,character varying,9,,,YES,'#08080e'::character varying
+public,report_templates,accent_color,10,character varying,9,,,YES,'#44cc88'::character varying
+public,report_templates,text_color,11,character varying,9,,,YES,'#f0f0f5'::character varying
+public,report_templates,bg_color,12,character varying,9,,,YES,'#08080e'::character varying
+public,report_templates,card_bg,13,character varying,9,,,YES,'#12121a'::character varying
+public,report_templates,border_color,14,character varying,9,,,YES,'#1a1a22'::character varying
+public,report_templates,heading_font,15,character varying,100,,,YES,'Helvetica Neue'::character varying
+public,report_templates,body_font,16,character varying,100,,,YES,'Helvetica Neue'::character varying
+public,report_templates,heading_weight,17,character varying,10,,,YES,'700'::character varying
+public,report_templates,cover_style,18,character varying,20,,,YES,'centered'::character varying
+public,report_templates,section_style,19,character varying,20,,,YES,'card'::character varying
+public,report_templates,footer_text,20,character varying,300,,,YES,
+public,report_templates,show_page_numbers,21,boolean,,,,YES,true
+public,report_templates,is_public,22,boolean,,,,YES,false
+public,report_templates,share_token,23,character varying,64,,,YES,
+public,report_templates,created_at,24,timestamp with time zone,,,,YES,now()
+public,report_templates,updated_at,25,timestamp with time zone,,,,YES,now()
+public,restock_orders,id,1,text,,,,NO,
+public,restock_orders,project_id,2,text,,,,NO,
+public,restock_orders,product_id,3,text,,,,YES,
+public,restock_orders,product_title,4,text,,,,YES,
+public,restock_orders,quantity_suggested,5,integer,,32,0,YES,
+public,restock_orders,urgency,6,text,,,,YES,
+public,restock_orders,email_draft,7,text,,,,YES,
+public,restock_orders,sent_at,8,timestamp without time zone,,,,YES,
+public,restock_orders,admin_approved,9,integer,,32,0,YES,0
+public,restock_orders,created_at,10,timestamp without time zone,,,,YES,now()
+public,revenue_snapshots,id,1,text,,,,NO,
+public,revenue_snapshots,project_id,2,text,,,,NO,
+public,revenue_snapshots,date,3,text,,,,NO,
+public,revenue_snapshots,revenue,4,real,,24,,YES,
+public,revenue_snapshots,orders,5,integer,,32,0,YES,
+public,revenue_snapshots,conversion_rate,6,real,,24,,YES,
+public,revenue_snapshots,aov,7,real,,24,,YES,
+public,revenue_snapshots,gross_margin,8,real,,24,,YES,
+public,revenue_snapshots,created_at,9,timestamp without time zone,,,,YES,now()
+public,sales_analytics,id,1,text,,,,NO,
+public,sales_analytics,project_id,2,text,,,,NO,
+public,sales_analytics,order_id,3,text,,,,NO,
+public,sales_analytics,order_number,4,text,,,,YES,
+public,sales_analytics,order_date,5,timestamp without time zone,,,,YES,
+public,sales_analytics,customer_id,6,text,,,,YES,
+public,sales_analytics,customer_email,7,text,,,,YES,
+public,sales_analytics,customer_name,8,text,,,,YES,
+public,sales_analytics,product_id,9,text,,,,YES,
+public,sales_analytics,variant_id,10,text,,,,YES,
+public,sales_analytics,product_title,11,text,,,,YES,
+public,sales_analytics,variant_title,12,text,,,,YES,
+public,sales_analytics,sku,13,text,,,,YES,
+public,sales_analytics,option1_name,14,text,,,,YES,
+public,sales_analytics,option1_value,15,text,,,,YES,
+public,sales_analytics,option2_name,16,text,,,,YES,
+public,sales_analytics,option2_value,17,text,,,,YES,
+public,sales_analytics,option3_name,18,text,,,,YES,
+public,sales_analytics,option3_value,19,text,,,,YES,
+public,sales_analytics,quantity,20,integer,,32,0,YES,1
+public,sales_analytics,unit_price,21,real,,24,,YES,
+public,sales_analytics,total_price,22,real,,24,,YES,
+public,sales_analytics,discount,23,real,,24,,YES,0
+public,sales_analytics,currency,24,text,,,,YES,'EUR'::text
+public,sales_analytics,fulfillment_status,25,text,,,,YES,
+public,sales_analytics,financial_status,26,text,,,,YES,
+public,sales_analytics,country,27,text,,,,YES,
+public,sales_analytics,city,28,text,,,,YES,
+public,sales_analytics,created_at,29,timestamp without time zone,,,,YES,now()
+public,seo_data,id,1,integer,,32,0,NO,nextval('seo_data_id_seq'::regclass)
+public,seo_data,project_id,2,integer,,32,0,NO,
+public,seo_data,shopify_product_id,3,text,,,,NO,
+public,seo_data,meta_title,4,text,,,,YES,
+public,seo_data,meta_description,5,text,,,,YES,
+public,seo_data,has_schema,6,boolean,,,,NO,false
+public,seo_data,schema_json,7,text,,,,YES,
+public,seo_data,has_alt_texts,8,boolean,,,,NO,false
+public,seo_data,clean_handle,9,boolean,,,,NO,false
+public,seo_data,seo_score,10,real,,24,,YES,
+public,seo_data,seo_grade,11,text,,,,YES,
+public,seo_data,description_length,12,integer,,32,0,YES,0
+public,seo_data,keyword_strategy,13,jsonb,,,,YES,
+public,seo_data,page_speed_score,14,real,,24,,YES,
+public,seo_data,lcp,15,real,,24,,YES,
+public,seo_data,cls,16,real,,24,,YES,
+public,seo_data,inp,17,real,,24,,YES,
+public,seo_data,last_audited_at,18,timestamp with time zone,,,,YES,
+public,seo_data,created_at,19,timestamp with time zone,,,,NO,now()
+public,seo_data,updated_at,20,timestamp with time zone,,,,NO,now()
+public,service_catalog,id,1,text,,,,NO,
+public,service_catalog,service_name,2,text,,,,NO,
+public,service_catalog,service_type,3,text,,,,YES,
+public,service_catalog,cost_time_hours,4,real,,24,,YES,0
+public,service_catalog,cost_platform,5,real,,24,,YES,0
+public,service_catalog,cost_tools,6,real,,24,,YES,0
+public,service_catalog,total_cost,7,real,,24,,YES,0
+public,service_catalog,price_current,8,real,,24,,YES,
+public,service_catalog,price_suggested,9,real,,24,,YES,
+public,service_catalog,price_min,10,real,,24,,YES,
+public,service_catalog,price_max,11,real,,24,,YES,
+public,service_catalog,market_avg_price,12,real,,24,,YES,
+public,service_catalog,market_price_low,13,real,,24,,YES,
+public,service_catalog,market_price_high,14,real,,24,,YES,
+public,service_catalog,our_positioning,15,text,,,,YES,'premium'::text
+public,service_catalog,times_sold,16,integer,,32,0,YES,0
+public,service_catalog,times_rejected,17,integer,,32,0,YES,0
+public,service_catalog,avg_client_satisfaction,18,real,,24,,YES,
+public,service_catalog,last_price_review,19,timestamp without time zone,,,,YES,
+public,service_catalog,omnicore_recommendation,20,text,,,,YES,
+public,service_catalog,omnicore_confidence,21,real,,24,,YES,
+public,service_catalog,price_change_suggested,22,real,,24,,YES,
+public,service_catalog,is_active,23,integer,,32,0,YES,1
+public,service_catalog,created_at,24,timestamp without time zone,,,,YES,now()
+public,service_catalog,shopify_variant_id,25,text,,,,YES,
+public,service_catalog,shopify_product_id,26,text,,,,YES,
+public,subscriptions,user_id,1,text,,,,NO,
+public,subscriptions,stripe_customer_id,2,text,,,,YES,
+public,subscriptions,stripe_subscription_id,3,text,,,,YES,
+public,subscriptions,plan,4,text,,,,YES,'trial'::text
+public,subscriptions,status,5,text,,,,YES,'active'::text
+public,subscriptions,trial_ends_at,6,timestamp without time zone,,,,YES,
+public,subscriptions,current_period_end,7,timestamp without time zone,,,,YES,
+public,subscriptions,stores_limit,8,integer,,32,0,YES,1
+public,subscriptions,images_included,9,integer,,32,0,YES,100
+public,subscriptions,images_used,10,integer,,32,0,YES,0
+public,subscriptions,cancel_at_period_end,11,integer,,32,0,YES,0
+public,subscriptions,created_at,12,timestamp without time zone,,,,YES,now()
+public,track_events,id,1,integer,,32,0,NO,nextval('track_events_id_seq'::regclass)
+public,track_events,test_id,2,text,,,,NO,
+public,track_events,variant,3,text,,,,NO,
+public,track_events,event_type,4,text,,,,NO,
+public,track_events,shopify_product_id,5,text,,,,NO,
+public,track_events,session_id,6,text,,,,NO,
+public,track_events,revenue,7,real,,24,,YES,
+public,track_events,created_at,8,timestamp with time zone,,,,NO,now()
+public,user_sessions,sid,1,character varying,,,,NO,
+public,user_sessions,sess,2,json,,,,NO,
+public,user_sessions,expire,3,timestamp without time zone,,,,NO,
+public,users,id,1,text,,,,NO,
+public,users,email,2,text,,,,NO,
+public,users,password,3,text,,,,NO,
+public,users,name,4,text,,,,NO,
+public,users,role,5,text,,,,NO,
+public,users,client_id,6,text,,,,YES,
+public,users,is_active,7,integer,,32,0,NO,1
+public,users,avatar_color,8,text,,,,YES,'#5b4eff'::text
+public,users,invite_token,9,text,,,,YES,
+public,users,invite_expires,10,timestamp without time zone,,,,YES,
+public,users,last_login,11,timestamp without time zone,,,,YES,
+public,users,created_at,12,timestamp without time zone,,,,YES,now()
+public,users,reset_token,13,text,,,,YES,
+public,users,reset_expires,14,timestamp without time zone,,,,YES,
+public,visual_dna,id,1,integer,,32,0,NO,nextval('visual_dna_id_seq'::regclass)
+public,visual_dna,project_id,2,integer,,32,0,NO,
+public,visual_dna,background_style,3,text,,,,YES,
+public,visual_dna,lighting_style,4,text,,,,YES,
+public,visual_dna,color_temp,5,text,,,,YES,
+public,visual_dna,composition,6,text,,,,YES,
+public,visual_dna,mood,7,text,,,,YES,
+public,visual_dna,props,8,ARRAY,,,,YES,
+public,visual_dna,human_presence,9,text,,,,YES,
+public,visual_dna,consistency_score,10,real,,24,,YES,
+public,visual_dna,brand_colors,11,ARRAY,,,,YES,
+public,visual_dna,extracted_at,12,timestamp with time zone,,,,YES,
+public,visual_dna,created_at,13,timestamp with time zone,,,,NO,now()
+public,visual_dna,updated_at,14,timestamp with time zone,,,,NO,now()
+
+
+  ================================================================================
+  ## SECTION 2: CONSTRAINTS (PK / FK / UNIQUE / CHECK)
+  ================================================================================
+  table_schema,table_name,constraint_name,constraint_type,column_name,foreign_table_name,foreign_column_name
+_system,replit_database_migrations_v1,32768_32770_1_not_null,CHECK,,,
+_system,replit_database_migrations_v1,32768_32770_2_not_null,CHECK,,,
+_system,replit_database_migrations_v1,32768_32770_3_not_null,CHECK,,,
+_system,replit_database_migrations_v1,32768_32770_4_not_null,CHECK,,,
+_system,replit_database_migrations_v1,replit_database_migrations_v1_pkey,PRIMARY KEY,id,replit_database_migrations_v1,id
+public,ab_tests,2200_16504_11_not_null,CHECK,,,
+public,ab_tests,2200_16504_12_not_null,CHECK,,,
+public,ab_tests,2200_16504_13_not_null,CHECK,,,
+public,ab_tests,2200_16504_14_not_null,CHECK,,,
+public,ab_tests,2200_16504_15_not_null,CHECK,,,
+public,ab_tests,2200_16504_16_not_null,CHECK,,,
+public,ab_tests,2200_16504_17_not_null,CHECK,,,
+public,ab_tests,2200_16504_19_not_null,CHECK,,,
+public,ab_tests,2200_16504_1_not_null,CHECK,,,
+public,ab_tests,2200_16504_20_not_null,CHECK,,,
+public,ab_tests,2200_16504_21_not_null,CHECK,,,
+public,ab_tests,2200_16504_22_not_null,CHECK,,,
+public,ab_tests,2200_16504_24_not_null,CHECK,,,
+public,ab_tests,2200_16504_25_not_null,CHECK,,,
+public,ab_tests,2200_16504_26_not_null,CHECK,,,
+public,ab_tests,2200_16504_2_not_null,CHECK,,,
+public,ab_tests,2200_16504_3_not_null,CHECK,,,
+public,ab_tests,2200_16504_4_not_null,CHECK,,,
+public,ab_tests,2200_16504_5_not_null,CHECK,,,
+public,ab_tests,2200_16504_6_not_null,CHECK,,,
+public,ab_tests,ab_tests_pkey,PRIMARY KEY,id,ab_tests,id
+public,ab_tests,ab_tests_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,achievements,2200_16523_1_not_null,CHECK,,,
+public,achievements,2200_16523_2_not_null,CHECK,,,
+public,achievements,2200_16523_3_not_null,CHECK,,,
+public,achievements,achievements_pkey,PRIMARY KEY,id,achievements,id
+public,affiliates,2200_16529_1_not_null,CHECK,,,
+public,affiliates,2200_16529_2_not_null,CHECK,,,
+public,affiliates,2200_16529_3_not_null,CHECK,,,
+public,affiliates,affiliates_pkey,PRIMARY KEY,id,affiliates,id
+public,affiliates,affiliates_referral_code_unique,UNIQUE,referral_code,affiliates,referral_code
+public,agency_cost_structure,2200_16540_1_not_null,CHECK,,,
+public,agency_cost_structure,agency_cost_structure_pkey,PRIMARY KEY,id,agency_cost_structure,id
+public,approvals,2200_16563_10_not_null,CHECK,,,
+public,approvals,2200_16563_1_not_null,CHECK,,,
+public,approvals,2200_16563_2_not_null,CHECK,,,
+public,approvals,2200_16563_3_not_null,CHECK,,,
+public,approvals,2200_16563_4_not_null,CHECK,,,
+public,approvals,2200_16563_5_not_null,CHECK,,,
+public,approvals,approvals_pkey,PRIMARY KEY,id,approvals,id
+public,audit_log,2200_16570_1_not_null,CHECK,,,
+public,audit_log,2200_16570_2_not_null,CHECK,,,
+public,audit_log,2200_16570_4_not_null,CHECK,,,
+public,audit_log,audit_log_pkey,PRIMARY KEY,id,audit_log,id
+public,audit_results,2200_1187841_18_not_null,CHECK,,,
+public,audit_results,2200_1187841_19_not_null,CHECK,,,
+public,audit_results,2200_1187841_1_not_null,CHECK,,,
+public,audit_results,2200_1187841_2_not_null,CHECK,,,
+public,audit_results,2200_1187841_3_not_null,CHECK,,,
+public,audit_results,audit_results_pkey,PRIMARY KEY,id,audit_results,id
+public,audit_results,audit_results_project_id_fkey,FOREIGN KEY,project_id,projects,id
+public,brand_dna,2200_122892_1_not_null,CHECK,,,
+public,brand_dna,2200_122892_2_not_null,CHECK,,,
+public,brand_dna,brand_dna_pkey,PRIMARY KEY,id,brand_dna,id
+public,brand_dna,brand_dna_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,bulk_jobs,2200_16576_11_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_12_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_1_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_2_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_3_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_4_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_5_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_6_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_7_not_null,CHECK,,,
+public,bulk_jobs,2200_16576_8_not_null,CHECK,,,
+public,bulk_jobs,bulk_jobs_job_id_unique,UNIQUE,job_id,bulk_jobs,job_id
+public,bulk_jobs,bulk_jobs_pkey,PRIMARY KEY,id,bulk_jobs,id
+public,bulk_jobs,bulk_jobs_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,cms_content,2200_16588_1_not_null,CHECK,,,
+public,cms_content,2200_16588_2_not_null,CHECK,,,
+public,cms_content,2200_16588_3_not_null,CHECK,,,
+public,cms_content,2200_16588_5_not_null,CHECK,,,
+public,cms_content,cms_content_pkey,PRIMARY KEY,id,cms_content,id
+public,cms_versions,2200_16596_1_not_null,CHECK,,,
+public,cms_versions,2200_16596_2_not_null,CHECK,,,
+public,cms_versions,2200_16596_3_not_null,CHECK,,,
+public,cms_versions,2200_16596_5_not_null,CHECK,,,
+public,cms_versions,cms_versions_pkey,PRIMARY KEY,id,cms_versions,id
+public,cogs,2200_16603_10_not_null,CHECK,,,
+public,cogs,2200_16603_11_not_null,CHECK,,,
+public,cogs,2200_16603_12_not_null,CHECK,,,
+public,cogs,2200_16603_13_not_null,CHECK,,,
+public,cogs,2200_16603_14_not_null,CHECK,,,
+public,cogs,2200_16603_15_not_null,CHECK,,,
+public,cogs,2200_16603_16_not_null,CHECK,,,
+public,cogs,2200_16603_17_not_null,CHECK,,,
+public,cogs,2200_16603_18_not_null,CHECK,,,
+public,cogs,2200_16603_19_not_null,CHECK,,,
+public,cogs,2200_16603_1_not_null,CHECK,,,
+public,cogs,2200_16603_22_not_null,CHECK,,,
+public,cogs,2200_16603_23_not_null,CHECK,,,
+public,cogs,2200_16603_24_not_null,CHECK,,,
+public,cogs,2200_16603_25_not_null,CHECK,,,
+public,cogs,2200_16603_26_not_null,CHECK,,,
+public,cogs,2200_16603_27_not_null,CHECK,,,
+public,cogs,2200_16603_28_not_null,CHECK,,,
+public,cogs,2200_16603_29_not_null,CHECK,,,
+public,cogs,2200_16603_2_not_null,CHECK,,,
+public,cogs,2200_16603_30_not_null,CHECK,,,
+public,cogs,2200_16603_31_not_null,CHECK,,,
+public,cogs,2200_16603_32_not_null,CHECK,,,
+public,cogs,2200_16603_33_not_null,CHECK,,,
+public,cogs,2200_16603_34_not_null,CHECK,,,
+public,cogs,2200_16603_35_not_null,CHECK,,,
+public,cogs,2200_16603_36_not_null,CHECK,,,
+public,cogs,2200_16603_37_not_null,CHECK,,,
+public,cogs,2200_16603_38_not_null,CHECK,,,
+public,cogs,2200_16603_39_not_null,CHECK,,,
+public,cogs,2200_16603_3_not_null,CHECK,,,
+public,cogs,2200_16603_40_not_null,CHECK,,,
+public,cogs,2200_16603_41_not_null,CHECK,,,
+public,cogs,2200_16603_42_not_null,CHECK,,,
+public,cogs,2200_16603_43_not_null,CHECK,,,
+public,cogs,2200_16603_44_not_null,CHECK,,,
+public,cogs,2200_16603_45_not_null,CHECK,,,
+public,cogs,2200_16603_48_not_null,CHECK,,,
+public,cogs,2200_16603_49_not_null,CHECK,,,
+public,cogs,2200_16603_4_not_null,CHECK,,,
+public,cogs,2200_16603_5_not_null,CHECK,,,
+public,cogs,2200_16603_6_not_null,CHECK,,,
+public,cogs,2200_16603_7_not_null,CHECK,,,
+public,cogs,2200_16603_8_not_null,CHECK,,,
+public,cogs,2200_16603_9_not_null,CHECK,,,
+public,cogs,cogs_pkey,PRIMARY KEY,id,cogs,id
+public,cogs,cogs_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,competitor_alerts,2200_16627_1_not_null,CHECK,,,
+public,competitor_alerts,2200_16627_2_not_null,CHECK,,,
+public,competitor_alerts,2200_16627_3_not_null,CHECK,,,
+public,competitor_alerts,competitor_alerts_pkey,PRIMARY KEY,id,competitor_alerts,id
+public,competitor_snapshots,2200_16634_1_not_null,CHECK,,,
+public,competitor_snapshots,2200_16634_2_not_null,CHECK,,,
+public,competitor_snapshots,competitor_snapshots_pkey,PRIMARY KEY,id,competitor_snapshots,id
+public,competitors,2200_16640_1_not_null,CHECK,,,
+public,competitors,2200_16640_2_not_null,CHECK,,,
+public,competitors,2200_16640_3_not_null,CHECK,,,
+public,competitors,2200_16640_4_not_null,CHECK,,,
+public,competitors,competitors_pkey,PRIMARY KEY,id,competitors,id
+public,email_flows,2200_131073_1_not_null,CHECK,,,
+public,email_flows,2200_131073_3_not_null,CHECK,,,
+public,email_flows,email_flows_pkey,PRIMARY KEY,id,email_flows,id
+public,email_flows,email_flows_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,email_templates,2200_131088_1_not_null,CHECK,,,
+public,email_templates,2200_131088_3_not_null,CHECK,,,
+public,email_templates,2200_131088_4_not_null,CHECK,,,
+public,email_templates,2200_131088_5_not_null,CHECK,,,
+public,email_templates,email_templates_pkey,PRIMARY KEY,id,email_templates,id
+public,email_templates,email_templates_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,events,2200_16662_1_not_null,CHECK,,,
+public,events,2200_16662_2_not_null,CHECK,,,
+public,events,2200_16662_3_not_null,CHECK,,,
+public,events,events_pkey,PRIMARY KEY,id,events,id
+public,express_rate_limits,2200_335872_1_not_null,CHECK,,,
+public,express_rate_limits,2200_335872_2_not_null,CHECK,,,
+public,express_rate_limits,2200_335872_3_not_null,CHECK,,,
+public,express_rate_limits,express_rate_limits_pkey,PRIMARY KEY,key,express_rate_limits,key
+public,forecasts,2200_16669_1_not_null,CHECK,,,
+public,forecasts,2200_16669_2_not_null,CHECK,,,
+public,forecasts,forecasts_pkey,PRIMARY KEY,id,forecasts,id
+public,gemini_conversations,2200_40981_1_not_null,CHECK,,,
+public,gemini_conversations,2200_40981_2_not_null,CHECK,,,
+public,gemini_conversations,2200_40981_3_not_null,CHECK,,,
+public,gemini_conversations,gemini_conversations_pkey,PRIMARY KEY,id,gemini_conversations,id
+public,gemini_messages,2200_40961_1_not_null,CHECK,,,
+public,gemini_messages,2200_40961_2_not_null,CHECK,,,
+public,gemini_messages,2200_40961_3_not_null,CHECK,,,
+public,gemini_messages,2200_40961_4_not_null,CHECK,,,
+public,gemini_messages,2200_40961_5_not_null,CHECK,,,
+public,gemini_messages,gemini_messages_conversation_id_gemini_conversations_id_fk,FOREIGN KEY,conversation_id,gemini_conversations,id
+public,gemini_messages,gemini_messages_pkey,PRIMARY KEY,id,gemini_messages,id
+public,generation_jobs,2200_16675_16_not_null,CHECK,,,
+public,generation_jobs,2200_16675_1_not_null,CHECK,,,
+public,generation_jobs,2200_16675_2_not_null,CHECK,,,
+public,generation_jobs,2200_16675_3_not_null,CHECK,,,
+public,generation_jobs,2200_16675_4_not_null,CHECK,,,
+public,generation_jobs,2200_16675_5_not_null,CHECK,,,
+public,generation_jobs,generation_jobs_pkey,PRIMARY KEY,id,generation_jobs,id
+public,generation_jobs,generation_jobs_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,inventory_tracking,2200_16683_1_not_null,CHECK,,,
+public,inventory_tracking,2200_16683_2_not_null,CHECK,,,
+public,inventory_tracking,2200_16683_3_not_null,CHECK,,,
+public,inventory_tracking,inventory_tracking_pkey,PRIMARY KEY,id,inventory_tracking,id
+public,messages,2200_16691_1_not_null,CHECK,,,
+public,messages,2200_16691_2_not_null,CHECK,,,
+public,messages,2200_16691_3_not_null,CHECK,,,
+public,messages,2200_16691_4_not_null,CHECK,,,
+public,messages,2200_16691_5_not_null,CHECK,,,
+public,messages,messages_pkey,PRIMARY KEY,id,messages,id
+public,omnicore_absorbed_content,2200_40970_1_not_null,CHECK,,,
+public,omnicore_absorbed_content,2200_40970_2_not_null,CHECK,,,
+public,omnicore_absorbed_content,omnicore_absorbed_content_pkey,PRIMARY KEY,id,omnicore_absorbed_content,id
+public,omnicore_cross_connections,2200_16698_1_not_null,CHECK,,,
+public,omnicore_cross_connections,2200_16698_2_not_null,CHECK,,,
+public,omnicore_cross_connections,2200_16698_3_not_null,CHECK,,,
+public,omnicore_cross_connections,omnicore_cross_connections_pkey,PRIMARY KEY,id,omnicore_cross_connections,id
+public,omnicore_insights,2200_16705_1_not_null,CHECK,,,
+public,omnicore_insights,2200_16705_2_not_null,CHECK,,,
+public,omnicore_insights,2200_16705_4_not_null,CHECK,,,
+public,omnicore_insights,2200_16705_5_not_null,CHECK,,,
+public,omnicore_insights,2200_16705_6_not_null,CHECK,,,
+public,omnicore_insights,omnicore_insights_pkey,PRIMARY KEY,id,omnicore_insights,id
+public,omnicore_knowledge_domains,2200_16720_1_not_null,CHECK,,,
+public,omnicore_knowledge_domains,2200_16720_2_not_null,CHECK,,,
+public,omnicore_knowledge_domains,omnicore_knowledge_domains_domain_unique,UNIQUE,domain,omnicore_knowledge_domains,domain
+public,omnicore_knowledge_domains,omnicore_knowledge_domains_pkey,PRIMARY KEY,id,omnicore_knowledge_domains,id
+public,omnicore_memories,2200_16729_1_not_null,CHECK,,,
+public,omnicore_memories,2200_16729_2_not_null,CHECK,,,
+public,omnicore_memories,2200_16729_7_not_null,CHECK,,,
+public,omnicore_memories,2200_16729_8_not_null,CHECK,,,
+public,omnicore_memories,omnicore_memories_pkey,PRIMARY KEY,id,omnicore_memories,id
+public,omnicore_niche_profiles,2200_16743_1_not_null,CHECK,,,
+public,omnicore_niche_profiles,2200_16743_2_not_null,CHECK,,,
+public,omnicore_niche_profiles,omnicore_niche_profiles_niche_unique,UNIQUE,niche,omnicore_niche_profiles,niche
+public,omnicore_niche_profiles,omnicore_niche_profiles_pkey,PRIMARY KEY,id,omnicore_niche_profiles,id
+public,omnicore_prompt_library,2200_16751_1_not_null,CHECK,,,
+public,omnicore_prompt_library,2200_16751_2_not_null,CHECK,,,
+public,omnicore_prompt_library,2200_16751_6_not_null,CHECK,,,
+public,omnicore_prompt_library,omnicore_prompt_library_pkey,PRIMARY KEY,id,omnicore_prompt_library,id
+public,omnicore_study_sessions,2200_16761_1_not_null,CHECK,,,
+public,omnicore_study_sessions,2200_16761_2_not_null,CHECK,,,
+public,omnicore_study_sessions,omnicore_study_sessions_pkey,PRIMARY KEY,id,omnicore_study_sessions,id
+public,onboarding_progress,2200_16771_1_not_null,CHECK,,,
+public,onboarding_progress,onboarding_progress_pkey,PRIMARY KEY,user_id,onboarding_progress,user_id
+public,plan_credit_packs,2200_65537_1_not_null,CHECK,,,
+public,plan_credit_packs,2200_65537_2_not_null,CHECK,,,
+public,plan_credit_packs,2200_65537_3_not_null,CHECK,,,
+public,plan_credit_packs,2200_65537_4_not_null,CHECK,,,
+public,plan_credit_packs,2200_65537_5_not_null,CHECK,,,
+public,plan_credit_packs,2200_65537_8_not_null,CHECK,,,
+public,plan_credit_packs,plan_credit_packs_pkey,PRIMARY KEY,id,plan_credit_packs,id
+public,plan_credit_packs,plan_credit_packs_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,platform_settings,2200_57344_1_not_null,CHECK,,,
+public,platform_settings,2200_57344_2_not_null,CHECK,,,
+public,platform_settings,platform_settings_pkey,PRIMARY KEY,key,platform_settings,key
+public,price_history,2200_122881_1_not_null,CHECK,,,
+public,price_history,2200_122881_2_not_null,CHECK,,,
+public,price_history,2200_122881_3_not_null,CHECK,,,
+public,price_history,2200_122881_5_not_null,CHECK,,,
+public,price_history,2200_122881_7_not_null,CHECK,,,
+public,price_history,price_history_pkey,PRIMARY KEY,id,price_history,id
+public,price_history,price_history_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,pricing_decisions,2200_16786_1_not_null,CHECK,,,
+public,pricing_decisions,pricing_decisions_pkey,PRIMARY KEY,id,pricing_decisions,id
+public,pricing_rules,2200_16794_1_not_null,CHECK,,,
+public,pricing_rules,2200_16794_2_not_null,CHECK,,,
+public,pricing_rules,pricing_rules_pkey,PRIMARY KEY,id,pricing_rules,id
+public,products,2200_16804_13_not_null,CHECK,,,
+public,products,2200_16804_14_not_null,CHECK,,,
+public,products,2200_16804_1_not_null,CHECK,,,
+public,products,2200_16804_25_not_null,CHECK,,,
+public,products,2200_16804_26_not_null,CHECK,,,
+public,products,2200_16804_2_not_null,CHECK,,,
+public,products,2200_16804_3_not_null,CHECK,,,
+public,products,2200_16804_4_not_null,CHECK,,,
+public,products,2200_16804_5_not_null,CHECK,,,
+public,products,2200_16804_9_not_null,CHECK,,,
+public,products,products_pkey,PRIMARY KEY,id,products,id
+public,products,products_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,project_files,2200_16815_1_not_null,CHECK,,,
+public,project_files,2200_16815_3_not_null,CHECK,,,
+public,project_files,2200_16815_5_not_null,CHECK,,,
+public,project_files,project_files_pkey,PRIMARY KEY,id,project_files,id
+public,projects,2200_16823_14_not_null,CHECK,,,
+public,projects,2200_16823_18_not_null,CHECK,,,
+public,projects,2200_16823_19_not_null,CHECK,,,
+public,projects,2200_16823_1_not_null,CHECK,,,
+public,projects,2200_16823_20_not_null,CHECK,,,
+public,projects,2200_16823_21_not_null,CHECK,,,
+public,projects,2200_16823_22_not_null,CHECK,,,
+public,projects,2200_16823_23_not_null,CHECK,,,
+public,projects,2200_16823_24_not_null,CHECK,,,
+public,projects,2200_16823_28_not_null,CHECK,,,
+public,projects,2200_16823_2_not_null,CHECK,,,
+public,projects,2200_16823_3_not_null,CHECK,,,
+public,projects,2200_16823_4_not_null,CHECK,,,
+public,projects,2200_16823_5_not_null,CHECK,,,
+public,projects,projects_pkey,PRIMARY KEY,id,projects,id
+public,rate_limits,2200_212992_1_not_null,CHECK,,,
+public,rate_limits,2200_212992_2_not_null,CHECK,,,
+public,rate_limits,rate_limits_pkey,PRIMARY KEY,key,rate_limits,key
+public,redesigns,2200_16832_10_not_null,CHECK,,,
+public,redesigns,2200_16832_11_not_null,CHECK,,,
+public,redesigns,2200_16832_12_not_null,CHECK,,,
+public,redesigns,2200_16832_13_not_null,CHECK,,,
+public,redesigns,2200_16832_18_not_null,CHECK,,,
+public,redesigns,2200_16832_1_not_null,CHECK,,,
+public,redesigns,2200_16832_2_not_null,CHECK,,,
+public,redesigns,2200_16832_3_not_null,CHECK,,,
+public,redesigns,2200_16832_4_not_null,CHECK,,,
+public,redesigns,2200_16832_6_not_null,CHECK,,,
+public,redesigns,2200_16832_7_not_null,CHECK,,,
+public,redesigns,2200_16832_8_not_null,CHECK,,,
+public,redesigns,2200_16832_9_not_null,CHECK,,,
+public,redesigns,redesigns_pkey,PRIMARY KEY,id,redesigns,id
+public,redesigns,redesigns_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,referral_tracking,2200_16839_1_not_null,CHECK,,,
+public,referral_tracking,2200_16839_2_not_null,CHECK,,,
+public,referral_tracking,referral_tracking_pkey,PRIMARY KEY,id,referral_tracking,id
+public,report_templates,2200_1736705_1_not_null,CHECK,,,
+public,report_templates,2200_1736705_3_not_null,CHECK,,,
+public,report_templates,2200_1736705_4_not_null,CHECK,,,
+public,report_templates,report_templates_pkey,PRIMARY KEY,id,report_templates,id
+public,restock_orders,2200_16847_1_not_null,CHECK,,,
+public,restock_orders,2200_16847_2_not_null,CHECK,,,
+public,restock_orders,restock_orders_pkey,PRIMARY KEY,id,restock_orders,id
+public,revenue_snapshots,2200_16854_1_not_null,CHECK,,,
+public,revenue_snapshots,2200_16854_2_not_null,CHECK,,,
+public,revenue_snapshots,2200_16854_3_not_null,CHECK,,,
+public,revenue_snapshots,revenue_snapshots_pkey,PRIMARY KEY,id,revenue_snapshots,id
+public,sales_analytics,2200_548864_1_not_null,CHECK,,,
+public,sales_analytics,2200_548864_2_not_null,CHECK,,,
+public,sales_analytics,2200_548864_3_not_null,CHECK,,,
+public,sales_analytics,sales_analytics_pkey,PRIMARY KEY,id,sales_analytics,id
+public,seo_data,2200_16860_19_not_null,CHECK,,,
+public,seo_data,2200_16860_1_not_null,CHECK,,,
+public,seo_data,2200_16860_20_not_null,CHECK,,,
+public,seo_data,2200_16860_2_not_null,CHECK,,,
+public,seo_data,2200_16860_3_not_null,CHECK,,,
+public,seo_data,2200_16860_6_not_null,CHECK,,,
+public,seo_data,2200_16860_8_not_null,CHECK,,,
+public,seo_data,2200_16860_9_not_null,CHECK,,,
+public,seo_data,seo_data_pkey,PRIMARY KEY,id,seo_data,id
+public,seo_data,seo_data_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+public,service_catalog,2200_16872_1_not_null,CHECK,,,
+public,service_catalog,2200_16872_2_not_null,CHECK,,,
+public,service_catalog,service_catalog_pkey,PRIMARY KEY,id,service_catalog,id
+public,subscriptions,2200_16891_1_not_null,CHECK,,,
+public,subscriptions,subscriptions_pkey,PRIMARY KEY,user_id,subscriptions,user_id
+public,subscriptions,subscriptions_stripe_customer_id_unique,UNIQUE,stripe_customer_id,subscriptions,stripe_customer_id
+public,track_events,2200_16903_1_not_null,CHECK,,,
+public,track_events,2200_16903_2_not_null,CHECK,,,
+public,track_events,2200_16903_3_not_null,CHECK,,,
+public,track_events,2200_16903_4_not_null,CHECK,,,
+public,track_events,2200_16903_5_not_null,CHECK,,,
+public,track_events,2200_16903_6_not_null,CHECK,,,
+public,track_events,2200_16903_8_not_null,CHECK,,,
+public,track_events,track_events_pkey,PRIMARY KEY,id,track_events,id
+public,user_sessions,2200_49152_1_not_null,CHECK,,,
+public,user_sessions,2200_49152_2_not_null,CHECK,,,
+public,user_sessions,2200_49152_3_not_null,CHECK,,,
+public,user_sessions,user_sessions_pkey,PRIMARY KEY,sid,user_sessions,sid
+public,users,2200_16915_1_not_null,CHECK,,,
+public,users,2200_16915_2_not_null,CHECK,,,
+public,users,2200_16915_3_not_null,CHECK,,,
+public,users,2200_16915_4_not_null,CHECK,,,
+public,users,2200_16915_5_not_null,CHECK,,,
+public,users,2200_16915_7_not_null,CHECK,,,
+public,users,users_email_unique,UNIQUE,email,users,email
+public,users,users_pkey,PRIMARY KEY,id,users,id
+public,visual_dna,2200_16923_13_not_null,CHECK,,,
+public,visual_dna,2200_16923_14_not_null,CHECK,,,
+public,visual_dna,2200_16923_1_not_null,CHECK,,,
+public,visual_dna,2200_16923_2_not_null,CHECK,,,
+public,visual_dna,visual_dna_pkey,PRIMARY KEY,id,visual_dna,id
+public,visual_dna,visual_dna_project_id_projects_id_fk,FOREIGN KEY,project_id,projects,id
+
+
+  ================================================================================
+  ## SECTION 3: INDEXES (with full CREATE INDEX definitions)
+  ================================================================================
+  schemaname,tablename,indexname,indexdef
+_system,replit_database_migrations_v1,idx_replit_database_migrations_v1_build_id,CREATE UNIQUE INDEX idx_replit_database_migrations_v1_build_id ON _system.replit_database_migrations_v1 USING btree (build_id)
+_system,replit_database_migrations_v1,replit_database_migrations_v1_pkey,CREATE UNIQUE INDEX replit_database_migrations_v1_pkey ON _system.replit_database_migrations_v1 USING btree (id)
+public,ab_tests,ab_tests_pkey,CREATE UNIQUE INDEX ab_tests_pkey ON public.ab_tests USING btree (id)
+public,achievements,achievements_pkey,CREATE UNIQUE INDEX achievements_pkey ON public.achievements USING btree (id)
+public,affiliates,affiliates_pkey,CREATE UNIQUE INDEX affiliates_pkey ON public.affiliates USING btree (id)
+public,affiliates,affiliates_referral_code_unique,CREATE UNIQUE INDEX affiliates_referral_code_unique ON public.affiliates USING btree (referral_code)
+public,agency_cost_structure,agency_cost_structure_pkey,CREATE UNIQUE INDEX agency_cost_structure_pkey ON public.agency_cost_structure USING btree (id)
+public,approvals,approvals_pkey,CREATE UNIQUE INDEX approvals_pkey ON public.approvals USING btree (id)
+public,audit_log,audit_log_pkey,CREATE UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
+public,audit_results,audit_results_pkey,CREATE UNIQUE INDEX audit_results_pkey ON public.audit_results USING btree (id)
+public,brand_dna,brand_dna_pkey,CREATE UNIQUE INDEX brand_dna_pkey ON public.brand_dna USING btree (id)
+public,bulk_jobs,bulk_jobs_job_id_unique,CREATE UNIQUE INDEX bulk_jobs_job_id_unique ON public.bulk_jobs USING btree (job_id)
+public,bulk_jobs,bulk_jobs_pkey,CREATE UNIQUE INDEX bulk_jobs_pkey ON public.bulk_jobs USING btree (id)
+public,cms_content,cms_content_pkey,CREATE UNIQUE INDEX cms_content_pkey ON public.cms_content USING btree (id)
+public,cms_versions,cms_versions_pkey,CREATE UNIQUE INDEX cms_versions_pkey ON public.cms_versions USING btree (id)
+public,cogs,cogs_pkey,CREATE UNIQUE INDEX cogs_pkey ON public.cogs USING btree (id)
+public,competitor_alerts,competitor_alerts_pkey,CREATE UNIQUE INDEX competitor_alerts_pkey ON public.competitor_alerts USING btree (id)
+public,competitor_snapshots,competitor_snapshots_pkey,CREATE UNIQUE INDEX competitor_snapshots_pkey ON public.competitor_snapshots USING btree (id)
+public,competitors,competitors_pkey,CREATE UNIQUE INDEX competitors_pkey ON public.competitors USING btree (id)
+public,email_flows,email_flows_pkey,CREATE UNIQUE INDEX email_flows_pkey ON public.email_flows USING btree (id)
+public,email_templates,email_templates_pkey,CREATE UNIQUE INDEX email_templates_pkey ON public.email_templates USING btree (id)
+public,events,events_pkey,CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)
+public,express_rate_limits,express_rate_limits_pkey,CREATE UNIQUE INDEX express_rate_limits_pkey ON public.express_rate_limits USING btree (key)
+public,forecasts,forecasts_pkey,CREATE UNIQUE INDEX forecasts_pkey ON public.forecasts USING btree (id)
+public,gemini_conversations,gemini_conversations_pkey,CREATE UNIQUE INDEX gemini_conversations_pkey ON public.gemini_conversations USING btree (id)
+public,gemini_messages,gemini_messages_pkey,CREATE UNIQUE INDEX gemini_messages_pkey ON public.gemini_messages USING btree (id)
+public,generation_jobs,generation_jobs_pkey,CREATE UNIQUE INDEX generation_jobs_pkey ON public.generation_jobs USING btree (id)
+public,inventory_tracking,inventory_tracking_pkey,CREATE UNIQUE INDEX inventory_tracking_pkey ON public.inventory_tracking USING btree (id)
+public,messages,messages_pkey,CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id)
+public,omnicore_absorbed_content,omnicore_absorbed_content_pkey,CREATE UNIQUE INDEX omnicore_absorbed_content_pkey ON public.omnicore_absorbed_content USING btree (id)
+public,omnicore_cross_connections,omnicore_cross_connections_pkey,CREATE UNIQUE INDEX omnicore_cross_connections_pkey ON public.omnicore_cross_connections USING btree (id)
+public,omnicore_insights,omnicore_insights_pkey,CREATE UNIQUE INDEX omnicore_insights_pkey ON public.omnicore_insights USING btree (id)
+public,omnicore_knowledge_domains,omnicore_knowledge_domains_domain_unique,CREATE UNIQUE INDEX omnicore_knowledge_domains_domain_unique ON public.omnicore_knowledge_domains USING btree (domain)
+public,omnicore_knowledge_domains,omnicore_knowledge_domains_pkey,CREATE UNIQUE INDEX omnicore_knowledge_domains_pkey ON public.omnicore_knowledge_domains USING btree (id)
+public,omnicore_memories,omnicore_memories_pkey,CREATE UNIQUE INDEX omnicore_memories_pkey ON public.omnicore_memories USING btree (id)
+public,omnicore_niche_profiles,omnicore_niche_profiles_niche_unique,CREATE UNIQUE INDEX omnicore_niche_profiles_niche_unique ON public.omnicore_niche_profiles USING btree (niche)
+public,omnicore_niche_profiles,omnicore_niche_profiles_pkey,CREATE UNIQUE INDEX omnicore_niche_profiles_pkey ON public.omnicore_niche_profiles USING btree (id)
+public,omnicore_prompt_library,omnicore_prompt_library_pkey,CREATE UNIQUE INDEX omnicore_prompt_library_pkey ON public.omnicore_prompt_library USING btree (id)
+public,omnicore_study_sessions,omnicore_study_sessions_pkey,CREATE UNIQUE INDEX omnicore_study_sessions_pkey ON public.omnicore_study_sessions USING btree (id)
+public,onboarding_progress,onboarding_progress_pkey,CREATE UNIQUE INDEX onboarding_progress_pkey ON public.onboarding_progress USING btree (user_id)
+public,plan_credit_packs,plan_credit_packs_pkey,CREATE UNIQUE INDEX plan_credit_packs_pkey ON public.plan_credit_packs USING btree (id)
+public,platform_settings,platform_settings_pkey,CREATE UNIQUE INDEX platform_settings_pkey ON public.platform_settings USING btree (key)
+public,price_history,price_history_pkey,CREATE UNIQUE INDEX price_history_pkey ON public.price_history USING btree (id)
+public,pricing_decisions,pricing_decisions_pkey,CREATE UNIQUE INDEX pricing_decisions_pkey ON public.pricing_decisions USING btree (id)
+public,pricing_rules,pricing_rules_pkey,CREATE UNIQUE INDEX pricing_rules_pkey ON public.pricing_rules USING btree (id)
+public,products,products_pkey,CREATE UNIQUE INDEX products_pkey ON public.products USING btree (id)
+public,products,products_project_shopify_unique,"CREATE UNIQUE INDEX products_project_shopify_unique ON public.products USING btree (project_id, shopify_product_id)"
+public,project_files,project_files_pkey,CREATE UNIQUE INDEX project_files_pkey ON public.project_files USING btree (id)
+public,projects,projects_pkey,CREATE UNIQUE INDEX projects_pkey ON public.projects USING btree (id)
+public,rate_limits,rate_limits_pkey,CREATE UNIQUE INDEX rate_limits_pkey ON public.rate_limits USING btree (key)
+public,redesigns,redesigns_pkey,CREATE UNIQUE INDEX redesigns_pkey ON public.redesigns USING btree (id)
+public,referral_tracking,referral_tracking_pkey,CREATE UNIQUE INDEX referral_tracking_pkey ON public.referral_tracking USING btree (id)
+public,report_templates,report_templates_pkey,CREATE UNIQUE INDEX report_templates_pkey ON public.report_templates USING btree (id)
+public,restock_orders,restock_orders_pkey,CREATE UNIQUE INDEX restock_orders_pkey ON public.restock_orders USING btree (id)
+public,revenue_snapshots,revenue_snapshots_pkey,CREATE UNIQUE INDEX revenue_snapshots_pkey ON public.revenue_snapshots USING btree (id)
+public,sales_analytics,sales_analytics_pkey,CREATE UNIQUE INDEX sales_analytics_pkey ON public.sales_analytics USING btree (id)
+public,seo_data,seo_data_pkey,CREATE UNIQUE INDEX seo_data_pkey ON public.seo_data USING btree (id)
+public,service_catalog,service_catalog_pkey,CREATE UNIQUE INDEX service_catalog_pkey ON public.service_catalog USING btree (id)
+public,subscriptions,subscriptions_pkey,CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (user_id)
+public,subscriptions,subscriptions_stripe_customer_id_unique,CREATE UNIQUE INDEX subscriptions_stripe_customer_id_unique ON public.subscriptions USING btree (stripe_customer_id)
+public,track_events,track_events_pkey,CREATE UNIQUE INDEX track_events_pkey ON public.track_events USING btree (id)
+public,user_sessions,IDX_session_expire,"CREATE INDEX ""IDX_session_expire"" ON public.user_sessions USING btree (expire)"
+public,user_sessions,user_sessions_pkey,CREATE UNIQUE INDEX user_sessions_pkey ON public.user_sessions USING btree (sid)
+public,users,users_email_unique,CREATE UNIQUE INDEX users_email_unique ON public.users USING btree (email)
+public,users,users_pkey,CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+public,visual_dna,visual_dna_pkey,CREATE UNIQUE INDEX visual_dna_pkey ON public.visual_dna USING btree (id)
+
+
+  ================================================================================
+  ## SECTION 4: ENUM TYPES
+  ================================================================================
+  schema,enum_name,value,enumsortorder
+
+
+  ================================================================================
+  ## SECTION 5: SEQUENCES
+  ================================================================================
+  sequence_schema,sequence_name,data_type,start_value,increment,minimum_value,maximum_value
+public,ab_tests_id_seq,integer,1,1,1,2147483647
+public,bulk_jobs_id_seq,integer,1,1,1,2147483647
+public,cms_content_id_seq,integer,1,1,1,2147483647
+public,cms_versions_id_seq,integer,1,1,1,2147483647
+public,cogs_id_seq,integer,1,1,1,2147483647
+public,generation_jobs_id_seq,integer,1,1,1,2147483647
+public,products_id_seq,integer,1,1,1,2147483647
+public,project_files_id_seq,integer,1,1,1,2147483647
+public,projects_id_seq,integer,1,1,1,2147483647
+public,redesigns_id_seq,integer,1,1,1,2147483647
+public,seo_data_id_seq,integer,1,1,1,2147483647
+public,track_events_id_seq,integer,1,1,1,2147483647
+public,visual_dna_id_seq,integer,1,1,1,2147483647
+public,gemini_messages_id_seq,integer,1,1,1,2147483647
+public,gemini_conversations_id_seq,integer,1,1,1,2147483647
+public,plan_credit_packs_id_seq,integer,1,1,1,2147483647
+public,email_flows_id_seq,integer,1,1,1,2147483647
+public,price_history_id_seq,integer,1,1,1,2147483647
+public,brand_dna_id_seq,integer,1,1,1,2147483647
+public,email_templates_id_seq,integer,1,1,1,2147483647
+public,audit_results_id_seq,integer,1,1,1,2147483647
+public,report_templates_id_seq,integer,1,1,1,2147483647
+_system,replit_database_migrations_v1_id_seq,bigint,1,1,1,9223372036854775807
+
+
+  ================================================================================
+  ## SECTION 6: VIEWS
+  ================================================================================
+  table_schema,table_name,view_definition
+
+  
