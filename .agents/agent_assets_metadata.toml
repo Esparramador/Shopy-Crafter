@@ -281,3 +281,9 @@ id = "PvgLuR3SnHBvPcT0QzoC9"
 uri = "file://exports/api-server-lib.tar.gz"
 type = "unspecified"
 title = "artifacts/api-server/src/lib"
+
+[[outputs]]
+id = "VPc_XgHrW_f5iYVgce7-o"
+uri = "file://exports/frontend-lib-y-app.tar.gz"
+type = "unspecified"
+title = "Frontend lib/ + App.tsx + cliente API generado"
