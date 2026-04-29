@@ -1,15 +1,21 @@
 import { Router } from "express";
-import crypto from "node:crypto";
 import { db, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+// FIX C6: real push delivery via web-push (was a stub before)
+import webpush from "web-push";
 
 const router = Router();
 
-const subscriptions: Map<string, any> = new Map();
-
-async function getVapidKeys(): Promise<{ publicKey: string | null; privateKey: string | null }> {
+// ─── VAPID KEY MANAGEMENT (env or platform_settings table) ──────────────────
+async function getVapidKeys(): Promise<{ publicKey: string | null; privateKey: string | null; subject: string }> {
+  const subject = process.env.VAPID_SUBJECT || "mailto:craftershopy@gmail.com";
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    return { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
+    return {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY,
+      subject,
+    };
   }
   try {
     const [pubRow] = await db.select().from(platformSettingsTable)
@@ -17,32 +23,94 @@ async function getVapidKeys(): Promise<{ publicKey: string | null; privateKey: s
     const [privRow] = await db.select().from(platformSettingsTable)
       .where(eq(platformSettingsTable.key, "vapid_private_key")).limit(1);
     if (pubRow?.value && privRow?.value) {
-      return { publicKey: pubRow.value, privateKey: privRow.value };
+      return { publicKey: pubRow.value, privateKey: privRow.value, subject };
     }
-  } catch {}
-  return { publicKey: null, privateKey: null };
+  } catch (err) {
+    logger.error({ err }, "push: failed to read VAPID keys from DB");
+  }
+  return { publicKey: null, privateKey: null, subject };
+}
+
+let webpushInitialized = false;
+async function ensureWebpushInitialized(): Promise<{ publicKey: string; privateKey: string } | null> {
+  const k = await getVapidKeys();
+  if (!k.publicKey || !k.privateKey) return null;
+  if (webpushInitialized) return { publicKey: k.publicKey, privateKey: k.privateKey };
+  try {
+    webpush.setVapidDetails(k.subject, k.publicKey, k.privateKey);
+    webpushInitialized = true;
+    return { publicKey: k.publicKey, privateKey: k.privateKey };
+  } catch (err) {
+    logger.error({ err }, "push: webpush.setVapidDetails failed");
+    return null;
+  }
 }
 
 function generateVapidKeys(): { publicKey: string; privateKey: string } {
-  const ecdh = crypto.createECDH("prime256v1");
-  ecdh.generateKeys();
-  const publicKey = ecdh.getPublicKey("base64url") as string;
-  const privateKey = ecdh.getPrivateKey("base64url") as string;
-  return { publicKey, privateKey };
+  // web-push.generateVAPIDKeys returns proper VAPID-formatted P-256 keys
+  const keys = webpush.generateVAPIDKeys();
+  return { publicKey: keys.publicKey, privateKey: keys.privateKey };
 }
+
+// ─── PERSISTENT SUBSCRIPTION STORAGE (platform_settings as KV) ──────────────
+// FIX C6: was Map<string,any> in RAM → lost on every restart. Now persisted in DB.
+const SUB_KEY_PREFIX = "push_sub::";
+
+async function upsert(key: string, value: string): Promise<void> {
+  const [existing] = await db.select().from(platformSettingsTable)
+    .where(eq(platformSettingsTable.key, key)).limit(1);
+  if (existing) {
+    await db.update(platformSettingsTable)
+      .set({ value, updatedAt: new Date() })
+      .where(eq(platformSettingsTable.key, key));
+  } else {
+    await db.insert(platformSettingsTable).values({ key, value });
+  }
+}
+
+async function saveSubscription(userId: string, subscription: webpush.PushSubscription): Promise<void> {
+  await upsert(SUB_KEY_PREFIX + userId, JSON.stringify(subscription));
+}
+
+async function loadSubscription(userId: string): Promise<webpush.PushSubscription | null> {
+  try {
+    const [row] = await db.select().from(platformSettingsTable)
+      .where(eq(platformSettingsTable.key, SUB_KEY_PREFIX + userId)).limit(1);
+    if (!row?.value) return null;
+    return JSON.parse(row.value) as webpush.PushSubscription;
+  } catch (err) {
+    logger.error({ err, userId }, "push: failed to load subscription");
+    return null;
+  }
+}
+
+async function deleteSubscription(userId: string): Promise<void> {
+  try {
+    await db.delete(platformSettingsTable).where(eq(platformSettingsTable.key, SUB_KEY_PREFIX + userId));
+  } catch (err) {
+    logger.error({ err, userId }, "push: failed to delete subscription");
+  }
+}
+
+// ─── ENDPOINTS ───────────────────────────────────────────────────────────────
 
 router.post("/push/subscribe", async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  
+
     const { subscription } = req.body;
-    if (!subscription) { res.status(400).json({ error: "subscription required" }); return; }
-  
-    subscriptions.set(userId, subscription);
+    if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+      res.status(400).json({ error: "Invalid subscription payload (missing endpoint or keys)" });
+      return;
+    }
+
+    await saveSubscription(userId, subscription);
+    logger.info({ userId, endpoint: String(subscription.endpoint).slice(0, 50) }, "push: subscription saved");
     res.json({ ok: true, message: "Push notifications activadas" });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
+    logger.error({ err }, "push: subscribe failed");
     res.status(500).json({ error: msg });
   }
 });
@@ -50,7 +118,7 @@ router.post("/push/subscribe", async (req, res): Promise<void> => {
 router.delete("/push/subscribe", async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
-    if (userId) subscriptions.delete(userId);
+    if (userId) await deleteSubscription(userId);
     res.json({ ok: true });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -60,23 +128,44 @@ router.delete("/push/subscribe", async (req, res): Promise<void> => {
 
 router.post("/push/send", async (req, res): Promise<void> => {
   try {
-    const { userId, title, body } = req.body;
-  
-    const { publicKey } = await getVapidKeys();
-    if (!publicKey) {
+    const { userId, title, body, url } = req.body as { userId?: string; title: string; body: string; url?: string };
+
+    const init = await ensureWebpushInitialized();
+    if (!init) {
       res.status(503).json({ error: "Push notifications not configured (VAPID keys missing)" });
       return;
     }
-  
-    const sub = userId ? subscriptions.get(userId) : null;
+
+    if (!title || !body) {
+      res.status(400).json({ error: "title and body are required" });
+      return;
+    }
+
+    const sub = userId ? await loadSubscription(userId) : null;
     if (!sub) {
       res.status(404).json({ error: "No subscription found for user" });
       return;
     }
-  
-    res.json({ ok: true, message: "Notification queued", title, body });
+
+    const payload = JSON.stringify({ title, body, url: url || "/" });
+    try {
+      // FIX C6: actually send the notification (was missing before)
+      await webpush.sendNotification(sub, payload);
+      logger.info({ userId, title }, "push: notification sent");
+      res.json({ ok: true, message: "Notification sent" });
+    } catch (sendErr: any) {
+      // Subscription is stale (410 Gone) → delete it
+      if (sendErr?.statusCode === 410 || sendErr?.statusCode === 404) {
+        if (userId) await deleteSubscription(userId);
+        res.status(410).json({ error: "Subscription expired and was removed" });
+        return;
+      }
+      logger.error({ err: sendErr, userId }, "push: webpush.sendNotification failed");
+      res.status(502).json({ error: "Failed to deliver notification" });
+    }
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
+    logger.error({ err }, "push: send failed");
     res.status(500).json({ error: msg });
   }
 });
@@ -84,10 +173,7 @@ router.post("/push/send", async (req, res): Promise<void> => {
 router.get("/push/vapid-key", async (_req, res): Promise<void> => {
   try {
     const { publicKey } = await getVapidKeys();
-    if (!publicKey) {
-      res.json({ key: null, configured: false });
-      return;
-    }
+    if (!publicKey) { res.json({ key: null, configured: false }); return; }
     res.json({ key: publicKey, configured: true });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -98,31 +184,18 @@ router.get("/push/vapid-key", async (_req, res): Promise<void> => {
 router.post("/push/vapid-generate", async (_req, res): Promise<void> => {
   try {
     const existing = await getVapidKeys();
-    if (existing.publicKey) {
-      res.json({ publicKey: existing.publicKey, message: "VAPID keys already configured" });
+    if (existing.publicKey && existing.privateKey) {
+      res.status(409).json({ error: "VAPID keys already configured. Delete from platform_settings first to regenerate." });
       return;
     }
-  
-    const keys = generateVapidKeys();
-  
-    try {
-      await db.insert(platformSettingsTable).values({ key: "vapid_public_key", value: keys.publicKey });
-      await db.insert(platformSettingsTable).values({ key: "vapid_private_key", value: keys.privateKey });
-    } catch {
-      try {
-        await db.update(platformSettingsTable).set({ value: keys.publicKey })
-          .where(eq(platformSettingsTable.key, "vapid_public_key"));
-        await db.update(platformSettingsTable).set({ value: keys.privateKey })
-          .where(eq(platformSettingsTable.key, "vapid_private_key"));
-      } catch {}
-    }
-  
-    process.env.VAPID_PUBLIC_KEY = keys.publicKey;
-    process.env.VAPID_PRIVATE_KEY = keys.privateKey;
-  
-    res.json({ publicKey: keys.publicKey, message: "VAPID keys generated and saved" });
+    const { publicKey, privateKey } = generateVapidKeys();
+    await upsert("vapid_public_key", publicKey);
+    await upsert("vapid_private_key", privateKey);
+    webpushInitialized = false; // force re-init on next send
+    res.json({ ok: true, publicKey, message: "Claves VAPID generadas y guardadas." });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
+    logger.error({ err }, "push: vapid-generate failed");
     res.status(500).json({ error: msg });
   }
 });

@@ -10,6 +10,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { MODEL_MAP, COST_MAP, NEGATIVE_PROMPT } from "./images.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
+import { generateVideoFromImage, type RunwayModel, type RunwayDuration, type RunwayRatio } from "../lib/runway.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
 const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
@@ -815,6 +816,149 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
   } catch (err) {
     logger.error({ err }, "Fusion Studio generate-photos failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Error generando fotos" });
+  }
+});
+
+// ============================================================
+// VIDEO GENERATION (Runway Gen-3 / Gen-4 Turbo)
+// ============================================================
+const ALLOWED_RATIOS: RunwayRatio[] = [
+  "1280:768", "768:1280", "1104:832", "832:1104", "960:960", "1584:672",
+];
+
+router.post("/fusion-studio/generate-video", async (req: Request, res: Response): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    const {
+      projectId,
+      imageUrl,
+      promptText,
+      model,
+      duration,
+      ratio,
+      seed,
+    } = req.body ?? {};
+
+    const pid = Number.parseInt(String(projectId ?? ""), 10);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      res.status(400).json({ error: "projectId inválido" });
+      return;
+    }
+    if (!imageUrl || typeof imageUrl !== "string") {
+      res.status(400).json({ error: "imageUrl requerido" });
+      return;
+    }
+    if (!promptText || typeof promptText !== "string" || promptText.trim().length < 3) {
+      res.status(400).json({ error: "promptText requerido (mín. 3 caracteres)" });
+      return;
+    }
+
+    // FIX CRITICAL ACL: comparar project.clientId vs session.clientId (NO contra pid)
+    // y denegar siempre a no-admin sin clientId válido.
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid));
+    if (!project) {
+      res.status(404).json({ error: "Proyecto no encontrado" });
+      return;
+    }
+    const sessionRole = (req.session as any)?.role;
+    const sessionClientId = (req.session as any)?.clientId;
+    if (sessionRole !== "admin") {
+      if (!sessionClientId || String(sessionClientId) !== String(project.clientId)) {
+        res.status(403).json({ error: "Sin acceso a este proyecto" });
+        return;
+      }
+    }
+
+    const safeModel: RunwayModel = model === "gen4_turbo" ? "gen4_turbo" : "gen3a_turbo";
+    const safeDuration: RunwayDuration = Number(duration) === 10 ? 10 : 5;
+    // Un video Runway cuesta ~6× más que una imagen → contabilizar como créditos de imagen
+    // proporcionales a la duración (5s = 6 créditos, 10s = 12 créditos)
+    const videoImageCredits = safeDuration === 10 ? 12 : 6;
+    const limitCheck = await checkProductionLimit(pid, "image", videoImageCredits);
+    if (!limitCheck.allowed) {
+      res.status(429).json({ error: limitCheck.reason || "Límite de plan alcanzado" });
+      return;
+    }
+    const safeRatio: RunwayRatio = ALLOWED_RATIOS.includes(ratio) ? ratio : "1280:768";
+    const safeSeed = typeof seed === "number" && Number.isFinite(seed) ? Math.floor(seed) : undefined;
+
+    logger.info({ pid, model: safeModel, duration: safeDuration, ratio: safeRatio }, "Fusion Studio: generando video");
+
+    const result = await generateVideoFromImage({
+      promptImage: imageUrl,
+      promptText: promptText.trim(),
+      model: safeModel,
+      duration: safeDuration,
+      ratio: safeRatio,
+      seed: safeSeed,
+    });
+
+    await saveToVault({
+      projectId: pid,
+      fileType: "video",
+      category: "fusion-video",
+      title: `Fusion Video — ${promptText.trim().slice(0, 60)}`,
+      originalUrl: result.videoUrl,
+      mimeType: "video/mp4",
+      generatedBy: "runway",
+      metadata: {
+        model: result.model,
+        durationSec: result.durationSec,
+        ratio: safeRatio,
+        promptText: promptText.trim().slice(0, 500),
+        sourceImage: imageUrl.slice(0, 500),
+        cost: result.cost,
+        taskId: result.taskId,
+      },
+    });
+
+    // FIX HIGH: recordUsage debe ser bloqueante; si falla tras generar el video,
+    // logueamos como ERROR (no warn) para que pueda auditarse y reconciliarse.
+    try {
+      await recordUsage(pid, "image", videoImageCredits);
+    } catch (err) {
+      logger.error({ err, pid, videoImageCredits, taskId: result.taskId }, "CRITICAL: recordUsage falló tras generar video — créditos NO descontados");
+    }
+
+    learnFromOperation({
+      operationType: "fusion_video_generated",
+      title: `Video generado: ${promptText.trim().slice(0, 80)}`,
+      content: `Video Runway ${result.model} ${result.durationSec}s ${safeRatio}. Coste $${result.cost.toFixed(2)}. Prompt: ${promptText.trim().slice(0, 200)}`,
+      confidence: 0.9,
+      tags: ["fusion-studio", "video", result.model],
+    });
+
+    res.json({
+      success: true,
+      videoUrl: result.videoUrl,
+      durationSec: result.durationSec,
+      model: result.model,
+      ratio: safeRatio,
+      cost: result.cost,
+      taskId: result.taskId,
+    });
+  } catch (err: any) {
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : "Error generando video";
+      logger.error({ err: msg }, "Fusion video error");
+      // FIX MEDIUM: clasificar errores upstream (429/quota/timeout) sin filtrar detalles
+      const lower = msg.toLowerCase();
+      if (lower.includes("429") || lower.includes("rate") || lower.includes("quota")) {
+        res.status(429).json({ error: "Servicio de video temporalmente saturado. Reintenta en unos minutos." });
+      } else if (lower.includes("402") || lower.includes("payment") || lower.includes("billing")) {
+        res.status(402).json({ error: "Servicio de video sin saldo. Contacta al administrador." });
+      } else if (lower.includes("timeout")) {
+        res.status(504).json({ error: "El generador de video tardó demasiado. Intenta de nuevo." });
+      } else {
+        res.status(500).json({ error: "Error generando video. El equipo ha sido notificado." });
+      }
+    }
   }
 });
 

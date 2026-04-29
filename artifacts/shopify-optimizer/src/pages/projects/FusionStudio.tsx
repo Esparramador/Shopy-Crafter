@@ -133,6 +133,112 @@ export default function FusionStudio() {
   const [accordionOpen, setAccordionOpen] = useState<Record<string, boolean>>({});
   const toggleAccordion = (key: string) => setAccordionOpen(p => ({ ...p, [key]: !p[key] }));
 
+  // ─── Create product in Shopify (uses /api/fusion-studio/create-product) ──
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [createdProductResult, setCreatedProductResult] = useState<{ id?: string; title?: string; url?: string; error?: string; refCount?: number; genCount?: number } | null>(null);
+
+  const createProductInShopify = useCallback(async () => {
+    if (!projectId || productFiles.length === 0) {
+      setCreatedProductResult({ error: "Necesitas haber subido al menos 1 imagen de producto." });
+      return;
+    }
+    setCreatingProduct(true);
+    setCreatedProductResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      // Reference images (uploaded by user)
+      productFiles.slice(0, 5).forEach(f => fd.append("images", f));
+      // FIX: also send AI-generated photos from the gallery phase
+      const generatedUrls = generatedPhotos
+        .filter(p => p.imageUrl && p.imageUrl.startsWith("http"))
+        .map(p => p.imageUrl!)
+        .slice(0, 20);
+      if (generatedUrls.length > 0) {
+        fd.append("generatedPhotoUrls", JSON.stringify(generatedUrls));
+      }
+      const res = await fetch(`${API_BASE}/api/fusion-studio/create-product`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreatedProductResult({ error: data.error || `Error ${res.status}` });
+        return;
+      }
+      setCreatedProductResult({
+        id: data.product?.platformId || data.product?.id,
+        title: data.product?.title || data.analysis?.productGeneration?.suggestedTitle,
+        url: data.product?.url || undefined,
+        refCount: data.uploadedReferenceCount,
+        genCount: data.uploadedGeneratedCount,
+      });
+    } catch (e: any) {
+      setCreatedProductResult({ error: e?.message || "Error de red" });
+    } finally {
+      setCreatingProduct(false);
+    }
+  }, [projectId, productFiles, generatedPhotos]);
+
+  // ─── Generate advertising video (uses /api/fusion-studio/generate-video) ─
+  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string }>>([]);
+  const [videoModel, setVideoModel] = useState<string>("seedance-fast");
+  const [videoDuration, setVideoDuration] = useState<number>(5);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<string>("9:16");
+  const [videoPrompt, setVideoPrompt] = useState<string>("");
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoResult, setVideoResult] = useState<{ url?: string; error?: string; model?: string; duration?: number } | null>(null);
+  const [videoSourceUrl, setVideoSourceUrl] = useState<string>("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/fusion-studio/video-models`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.models) setVideoModels(d.models);
+      })
+      .catch(() => {});
+  }, []);
+
+  const generateVideo = useCallback(async () => {
+    if (!projectId) { setVideoResult({ error: "projectId requerido" }); return; }
+    // Source image: from gallery if user clicked one, else first uploaded product file
+    if (!videoSourceUrl && productFiles.length === 0) {
+      setVideoResult({ error: "Necesitas una imagen origen: sube producto o genera la galería primero." });
+      return;
+    }
+    setVideoGenerating(true);
+    setVideoResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("model", videoModel);
+      fd.append("duration", String(videoDuration));
+      fd.append("aspectRatio", videoAspectRatio);
+      fd.append("prompt", videoPrompt || `Cinematic product video, ${productAnalysis?.product?.category || "premium product"}, soft studio lighting, slow camera movement, professional advertising style`);
+      if (videoSourceUrl) {
+        fd.append("sourceImageUrl", videoSourceUrl);
+      } else if (productFiles[0]) {
+        fd.append("images", productFiles[0]);
+      }
+      const res = await fetch(`${API_BASE}/api/fusion-studio/generate-video`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setVideoResult({ error: data.error || `Error ${res.status}` });
+        return;
+      }
+      setVideoResult({ url: data.videoUrl, model: data.model, duration: data.duration });
+    } catch (e: any) {
+      setVideoResult({ error: e?.message || "Error de red al generar video" });
+    } finally {
+      setVideoGenerating(false);
+    }
+  }, [projectId, productFiles, videoModel, videoDuration, videoAspectRatio, videoPrompt, videoSourceUrl, productAnalysis]);
+
   const fetchBrandDNA = useCallback(async () => {
     if (!brandUrl && !instagram && !companyName) return;
     setIsFetchingBrand(true);
@@ -844,10 +950,52 @@ export default function FusionStudio() {
                         : `${generatedPhotos.length} prompts generados — configura tu token de Replicate para generar imágenes`}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button onClick={() => setPhase("generate")} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #22222e", background: "transparent", color: "#aaa", fontSize: 11, cursor: "pointer" }}>← Editar sesión</button>
+                    <button
+                      onClick={createProductInShopify}
+                      disabled={creatingProduct || productFiles.length === 0}
+                      title={productFiles.length === 0 ? "Sube al menos 1 imagen del producto" : "Crear producto en la tienda del cliente con las imágenes subidas"}
+                      style={{
+                        padding: "8px 16px", borderRadius: 8,
+                        border: "1px solid #c8a84b44",
+                        background: creatingProduct ? "#c8a84b22" : "linear-gradient(135deg, #c8a84b, #a88b3a)",
+                        color: creatingProduct ? "#c8a84b" : "#000",
+                        fontSize: 11, fontWeight: 700, cursor: creatingProduct || productFiles.length === 0 ? "not-allowed" : "pointer",
+                        opacity: productFiles.length === 0 ? 0.45 : 1,
+                      }}
+                    >
+                      {creatingProduct ? "Creando…" : "🛍️ Crear producto en Shopify"}
+                    </button>
                   </div>
                 </div>
+
+                {createdProductResult && !createdProductResult.error && (
+                  <div style={{ padding: "14px 18px", borderRadius: 10, background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 20 }}>✅</div>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#2dd49f", marginBottom: 2 }}>Producto creado en Shopify</div>
+                      <div style={{ fontSize: 11, color: "#aaa" }}>
+                        {createdProductResult.title}{createdProductResult.id ? ` · ID: ${createdProductResult.id}` : ""}
+                      </div>
+                      {(createdProductResult.refCount !== undefined || createdProductResult.genCount !== undefined) && (
+                        <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>
+                          📸 {createdProductResult.refCount ?? 0} de referencia · ✨ {createdProductResult.genCount ?? 0} generadas IA
+                        </div>
+                      )}
+                    </div>
+                    {createdProductResult.url && (
+                      <a href={createdProductResult.url} target="_blank" rel="noopener noreferrer" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(45,212,159,0.3)", color: "#2dd49f", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+                        Abrir en Shopify →
+                      </a>
+                    )}
+                  </div>
+                )}
+                {createdProductResult?.error && (
+                  <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.3)", marginBottom: 16, fontSize: 12, color: "#ff8a95" }}>
+                    ⚠ {createdProductResult.error}
+                  </div>
+                )}
 
                 {generationWarning && (
                   <div style={{ padding: "12px 16px", borderRadius: 8, background: "#c8a84b12", border: "1px solid #c8a84b33", marginBottom: 16, fontSize: 12, color: "#f0d68a" }}>
@@ -905,6 +1053,131 @@ export default function FusionStudio() {
                     </div>
                   ))}
                 </div>
+
+                {/* ─── VIDEO ADVERTISING PANEL (NEW) ─── */}
+                {generatedPhotos.some(p => p.imageUrl) && (
+                  <div style={{ marginTop: 32, padding: 20, borderRadius: 12, background: "linear-gradient(135deg, rgba(99,102,241,0.06), rgba(168,85,247,0.04))", border: "1px solid rgba(99,102,241,0.25)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#a5b4fc", display: "flex", alignItems: "center", gap: 8 }}>
+                          🎬 Generar video publicitario IA
+                        </h3>
+                        <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>
+                          Image-to-video con Kling, Seedance, Hailuo, Wan. Para Reels, TikTok, anuncios. Cuesta 4 créditos por video.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* MODEL PICKER */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Modelo IA</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 6 }}>
+                        {videoModels.map(m => (
+                          <button key={m.key} onClick={() => setVideoModel(m.key)}
+                            style={{
+                              padding: "10px 12px", borderRadius: 8, fontSize: 11, cursor: "pointer", textAlign: "left", lineHeight: 1.3,
+                              background: videoModel === m.key ? "rgba(99,102,241,0.15)" : "#0a0a14",
+                              border: `1px solid ${videoModel === m.key ? "#6366f1" : "#22222e"}`,
+                              color: videoModel === m.key ? "#a5b4fc" : "#aaa",
+                            }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                              <strong style={{ fontSize: 12 }}>{m.label}</strong>
+                              {m.badge && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 8, background: "rgba(45,212,159,0.15)", color: "#2dd49f", fontWeight: 700 }}>{m.badge}</span>}
+                            </div>
+                            <div style={{ fontSize: 10, color: "#666" }}>{m.description}</div>
+                            <div style={{ fontSize: 9, color: "#555", marginTop: 3 }}>${m.costPerSec}/seg</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* DURATION + RATIO */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Duración</label>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {[3, 5, 6, 8, 10].map(d => (
+                            <button key={d} onClick={() => setVideoDuration(d)}
+                              style={{ flex: 1, padding: "8px 4px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", background: videoDuration === d ? "#6366f1" : "#0a0a14", color: videoDuration === d ? "#fff" : "#888", border: `1px solid ${videoDuration === d ? "#6366f1" : "#22222e"}` }}>
+                              {d}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Aspecto</label>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {["9:16", "1:1", "16:9", "4:3"].map(r => (
+                            <button key={r} onClick={() => setVideoAspectRatio(r)}
+                              style={{ flex: 1, padding: "8px 4px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", background: videoAspectRatio === r ? "#6366f1" : "#0a0a14", color: videoAspectRatio === r ? "#fff" : "#888", border: `1px solid ${videoAspectRatio === r ? "#6366f1" : "#22222e"}` }}>
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PROMPT */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Prompt creativo (opcional)</label>
+                      <textarea value={videoPrompt} onChange={e => setVideoPrompt(e.target.value)}
+                        placeholder="Slow camera dolly-in, soft cinematic lighting, premium product reveal..."
+                        style={{ width: "100%", minHeight: 50, padding: 10, borderRadius: 8, background: "#0a0a14", border: "1px solid #22222e", color: "#fff", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
+                    </div>
+
+                    {/* IMAGE SOURCE PICKER from gallery */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
+                        Imagen origen {videoSourceUrl ? "(elegida de la galería)" : "(usará la primera del producto)"}
+                      </label>
+                      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
+                        <div onClick={() => setVideoSourceUrl("")} style={{ flex: "0 0 60px", height: 60, borderRadius: 6, border: !videoSourceUrl ? "2px solid #6366f1" : "1px solid #22222e", background: "#0a0a14", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 9, color: "#666", textAlign: "center", padding: 4 }}>
+                          Producto<br/>original
+                        </div>
+                        {generatedPhotos.filter(p => p.imageUrl).map(photo => (
+                          <div key={photo.id} onClick={() => setVideoSourceUrl(photo.imageUrl!)}
+                            style={{ flex: "0 0 60px", height: 60, borderRadius: 6, border: videoSourceUrl === photo.imageUrl ? "2px solid #6366f1" : "1px solid #22222e", overflow: "hidden", cursor: "pointer", position: "relative" }}>
+                            <img src={photo.imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={photo.label} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* GENERATE BUTTON */}
+                    <button onClick={generateVideo} disabled={videoGenerating || (!videoSourceUrl && productFiles.length === 0)}
+                      style={{
+                        width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: videoGenerating ? "not-allowed" : "pointer",
+                        background: videoGenerating ? "#1f1f3a" : "linear-gradient(135deg, #6366f1, #a855f7)",
+                        color: "#fff", border: "none",
+                        opacity: (!videoSourceUrl && productFiles.length === 0) ? 0.5 : 1,
+                      }}>
+                      {videoGenerating ? "🎥 Generando video... esto tarda 1-3 minutos" : `🎬 Generar video con ${videoModels.find(m => m.key === videoModel)?.label || videoModel}`}
+                    </button>
+
+                    {/* RESULT */}
+                    {videoResult?.url && (
+                      <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#2dd49f", marginBottom: 8 }}>
+                          ✅ Video generado · {videoResult.model} · {videoResult.duration}s
+                        </div>
+                        <video src={videoResult.url} controls style={{ width: "100%", maxHeight: 400, borderRadius: 8, background: "#000" }} />
+                        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <a href={videoResult.url} download target="_blank" rel="noopener noreferrer" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(45,212,159,0.3)", color: "#2dd49f", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+                            ⬇ Descargar MP4
+                          </a>
+                          <button onClick={() => setVideoResult(null)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #22222e", color: "#888", fontSize: 11, background: "transparent", cursor: "pointer" }}>
+                            Generar otro
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {videoResult?.error && (
+                      <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: "rgba(232,69,88,0.08)", border: "1px solid rgba(232,69,88,0.3)", fontSize: 12, color: "#ff8a95" }}>
+                        ⚠ {videoResult.error}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

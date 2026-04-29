@@ -2,6 +2,17 @@
 
 ## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
 
+**Fusion Studio Pro + Ad Studio + BrainSync + Runway/ElevenLabs (29 abr)** — paquete `shopycrafter-audit.tar.gz` aplicado íntegro:
+- **Vídeo (Runway)**: `lib/runway.ts` con `validateImageUrl` (HTTPS-only, bloquea localhost/RFC1918/IPv6 ULA/link-local/CGNAT/IPv4-mapped) + endpoint `/fusion-studio/generate-video` (gen3a_turbo / gen4_turbo, polling 5min, vault auto-save).
+- **Voz (ElevenLabs)**: `lib/elevenlabs.ts` con `synthesizeSpeech`, voice cloning, SFX. Endpoint `/voice/tts` con rate-limit en memoria (10 req/min, 50 000 chars/h por usuario) + `recordUsage` bloqueante. **Sin filtración** del `voiceId` por header `X-Voice-Id`.
+- **Fusion Studio Pro** (`lib/fusion-studio-pro.ts` + `routes/fs-pro.ts`): 12 capacidades AI (generate-image, edit, remove-bg, replace-bg, upscale, enhance-faces, video, voice clone, TTS, SFX, music, etc.). `fetchToBuffer` ahora valida URL contra SSRF reusando `validateImageUrl`. `/fs-pro/tts` comparte `checkTtsQuota` con `/voice/tts` para evitar bypass del rate-limit.
+- **Ad Studio Pro** (`lib/adstudio.ts` + `routes/ad-studio.ts`): pipeline SSE multi-paso (script → voiceover → b-roll → composición ffmpeg → archive zip).
+- **BrainSync admin** (`pages/admin/BrainSync.tsx`): panel para sincronizar memorias entre proyectos.
+- **Push notifications** (`routes/push.ts`): web-push real con VAPID; arranque seguro (devuelve 503 si faltan claves, no panic).
+- **Crypto** (`lib/crypto.ts`): hard-fail en `NODE_ENV=production` si falta `ENCRYPTION_KEY`.
+- **Auth** (`lib/auth.ts`): nuevo middleware `requireProjectAccess` que verifica `project.clientId === session.clientId` (admin pasa siempre). Aplicado a `/projects/:projectId/exports`.
+- **Frontend**: `App.tsx`, `AppLayout.tsx`, `FusionStudio.tsx` (acepta `generatedPhotoUrls` del paquete + mantiene flujo /generate-video), `Audit.tsx` (multi-platform), `Revenue.tsx`, `AdminClients.tsx` (PlansModal), `CMSEditor.tsx`, `capacitor.config.ts` (iOS), nuevo `lib/api.ts`, `hooks/use-push-subscription.tsx`, `public/service-worker.js`.
+
 **Bloque D + E final (29 abr)** — fixes restantes auditoría aplicados:
 - `auth.ts` (D-15): rate limit de login DUAL — ahora limita por IP **y** por email (`login_ip:` + `login_email:`), evitando bypass con IPs rotantes contra una misma cuenta.
 - `admin.ts` (D-10): `/projects/:id/invite` valida email con regex y nombre ≥ 2 chars antes de tocar BD/Klaviyo.

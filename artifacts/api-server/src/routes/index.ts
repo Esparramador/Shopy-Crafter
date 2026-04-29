@@ -45,9 +45,11 @@ import enrichmentRouter from "./enrichment.js";
 import generatorRouter from "./generator.js";
 import webLabRouter from "./web-lab.js";
 import fusionStudioRouter from "./fusion-studio.js";
+import adStudioRouter from "./ad-studio.js";
+import fsProRouter from "./fs-pro.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
@@ -105,6 +107,8 @@ router.use(klaviyoAiRouter);
 router.use(absorberRouter);
 router.use(entityResearchRouter);
 router.use(plansRouter);
+// SECURITY: project-scoped exports require auth + ownership.
+router.use("/projects/:projectId/exports", requireAuth, requireProjectAccess);
 router.use(exportsRouter);
 router.use(scripttagRouter);
 router.use(automationsRouter);
@@ -116,6 +120,8 @@ router.use("/enrichment", enrichmentRouter);
 router.use(generatorRouter);
 router.use(webLabRouter);
 router.use(fusionStudioRouter);
+router.use(adStudioRouter);
+router.use(fsProRouter);
 router.use(reportTemplatesRouter);
 router.use(billingRouter);
 

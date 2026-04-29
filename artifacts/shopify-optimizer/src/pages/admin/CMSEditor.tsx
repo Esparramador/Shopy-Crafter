@@ -880,7 +880,7 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(`${BASE_URL}/api/cms/media/upload`, { method: "POST", credentials: "include", body: form });
+      const res = await fetch(`${BASE_URL}/api/cms/media/upload`, { method: "POST", body: form, credentials: "include" });
       if (!res.ok) { toast({ title: "Error al subir imagen", variant: "destructive" }); setUploading(false); return; }
       const data = await res.json() as { url: string };
       if (data.url) onChange(data.url);
@@ -898,7 +898,7 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
   const remove = async () => {
     if (value) {
       const filename = value.split("/").pop();
-      if (filename) await fetch(`${BASE_URL}/api/cms/media/${filename}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+      if (filename) await fetch(`${BASE_URL}/api/cms/media/${filename}`, { method: "DELETE" }).catch(() => {});
     }
     onChange("");
   };

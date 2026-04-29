@@ -72,6 +72,8 @@ router.get("/projects-list", async (_req, res): Promise<void> => {
       name: projectsTable.name,
       shopDomain: projectsTable.shopDomain,
       storeNiche: projectsTable.storeNiche,
+      clientId: projectsTable.clientId,
+      plan: projectsTable.plan,
     }).from(projectsTable).orderBy(desc(projectsTable.createdAt));
     res.json(projects);
   } catch (err: any) {
@@ -84,24 +86,11 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
   try {
     const { projectId } = req.params;
     const { email, name } = req.body as { email: string; name: string };
-
-    // FIX D-10: validar y normalizar email y name antes de cualquier escritura a BD/Klaviyo
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || typeof email !== "string" || !emailRegex.test(email.trim())) {
-      res.status(400).json({ error: "Email inválido" });
-      return;
-    }
-    if (!name || typeof name !== "string" || name.trim().length < 2) {
-      res.status(400).json({ error: "Nombre requerido (mínimo 2 caracteres)" });
-      return;
-    }
-    const normalizedEmail = email.trim().toLowerCase().slice(0, 254);
-    const normalizedName = name.trim().slice(0, 120);
-
+  
     const token = randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
   
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
   
     if (existing) {
       await db.update(usersTable).set({
@@ -114,7 +103,7 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
       const id = randomBytes(16).toString("hex");
       const tempPw = await bcrypt.hash(randomBytes(16).toString("hex"), 12);
       await db.insert(usersTable).values({
-        id, email: normalizedEmail, password: tempPw, name: normalizedName,
+        id, email: email.toLowerCase(), password: tempPw, name,
         role: "client", clientId: projectId,
         inviteToken: token, inviteExpires: expires, isActive: 0,
       });
@@ -229,11 +218,6 @@ router.post("/users/:userId/reset-password", async (req, res): Promise<void> => 
   try {
     const targetId = req.params["userId"]!;
     const { password } = req.body as { password: string };
-    // FIX D-11: validar password antes de bcrypt.hash (que crashea con undefined)
-    if (!password || typeof password !== "string" || password.length < 8) {
-      res.status(400).json({ error: "Contraseña debe tener al menos 8 caracteres" });
-      return;
-    }
     const hashed = await bcrypt.hash(password, 12);
     await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, targetId));
     await recordAudit({

@@ -770,6 +770,76 @@ export default function AuditPage() {
   const isLoadingOpps = getCatalogOpps.isPending;
   const refetchOpps = () => getCatalogOpps.mutate({ projectId });
 
+  // ─── STORE AUDIT (universal, multi-platform via /audit/run) ────────────────
+  // FIX A15: connect orphan endpoints /audit/{run,results,history}
+  const [storeAuditStatus, setStoreAuditStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [storeAuditMsg, setStoreAuditMsg] = useState<string>("");
+  const [storeAuditResults, setStoreAuditResults] = useState<any>(null);
+  const [storeAuditHistory, setStoreAuditHistory] = useState<any[]>([]);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+
+  const fetchStoreAuditResults = async () => {
+    try {
+      const r = await fetch(`${API}/api/projects/${projectId}/audit/results`, { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json();
+        setStoreAuditResults(d);
+      }
+    } catch {}
+  };
+
+  const fetchStoreAuditHistory = async () => {
+    try {
+      const r = await fetch(`${API}/api/projects/${projectId}/audit/history`, { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json();
+        setStoreAuditHistory(Array.isArray(d) ? d : (d.history || []));
+      }
+    } catch {}
+  };
+
+  const runStoreAudit = async () => {
+    setStoreAuditStatus("running");
+    setStoreAuditMsg("Auditoría en curso. Análisis de PageSpeed + scraping + Claude... esto tarda 1-3 minutos");
+    setShowAuditModal(true);
+    try {
+      const res = await fetch(`${API}/api/projects/${projectId}/audit/run`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      setStoreAuditMsg(data.message || "Auditoría iniciada. Refresca en 1-2 minutos para ver resultados.");
+      // FIX: avoid stale closure — read fetch response directly inside interval, not state
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const r = await fetch(`${API}/api/projects/${projectId}/audit/results`, { credentials: "include" });
+          if (r.ok) {
+            const d = await r.json();
+            if (d && (d.scores || d.summary || d.recommendations)) {
+              setStoreAuditResults(d);
+              clearInterval(poll);
+              setStoreAuditStatus("done");
+              await fetchStoreAuditHistory();
+              return;
+            }
+          }
+        } catch {}
+        if (attempts >= 16) {
+          clearInterval(poll);
+          setStoreAuditStatus("done");
+          await fetchStoreAuditHistory();
+        }
+      }, 15000);
+    } catch (e: any) {
+      setStoreAuditStatus("error");
+      setStoreAuditMsg(e?.message || "Error en auditoría");
+    }
+  };
+
   const handleScan = async () => {
     setScanStatus("syncing");
     setScanError("");
@@ -947,6 +1017,15 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           >
             <Plus className="w-5 h-5" />
             Crear Producto
+          </button>
+          <button
+            onClick={runStoreAudit}
+            disabled={storeAuditStatus === "running"}
+            title="Auditoría completa de la tienda: PageSpeed + SEO + accesibilidad + recomendaciones"
+            className="border border-purple-500/40 text-purple-300 px-4 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-purple-500/10 transition-all disabled:opacity-60"
+          >
+            {storeAuditStatus === "running" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            {storeAuditStatus === "running" ? "Auditando tienda..." : "🔍 Auditoría Tienda"}
           </button>
           <button
             onClick={handleRegenerateToken}
@@ -1389,6 +1468,108 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Store Audit Modal ─── */}
+      {showAuditModal && (
+        <div onClick={() => setShowAuditModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--ink, #0a0a0f)", border: "1px solid var(--bdr, #22222e)", borderRadius: 16, maxWidth: 900, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--bdr)", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "var(--ink, #0a0a0f)", zIndex: 1 }}>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: "#c084fc", display: "flex", alignItems: "center", gap: 10, margin: 0 }}>
+                  🔍 Auditoría completa de tienda
+                </h2>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3, #888)" }}>PageSpeed · SEO · Accesibilidad · Mobile · Recomendaciones IA</p>
+              </div>
+              <button onClick={() => setShowAuditModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 6 }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: 24 }}>
+              {storeAuditStatus === "running" && (
+                <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                  <Loader2 size={36} className="animate-spin" style={{ color: "#c084fc", margin: "0 auto 16px" }} />
+                  <p style={{ fontSize: 14, color: "var(--t1, #fff)", marginBottom: 8, fontWeight: 600 }}>Auditando tu tienda...</p>
+                  <p style={{ fontSize: 12, color: "var(--t3)" }}>{storeAuditMsg}</p>
+                </div>
+              )}
+              {storeAuditStatus === "error" && (
+                <div style={{ padding: 20, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5", fontSize: 13 }}>
+                  ⚠ {storeAuditMsg}
+                </div>
+              )}
+              {storeAuditStatus === "done" && storeAuditResults && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+                    {storeAuditResults.scores && Object.entries(storeAuditResults.scores).map(([k, v]: [string, any]) => {
+                      const score = v?.score ?? 0;
+                      const color = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
+                      return (
+                        <div key={k} style={{ padding: 14, borderRadius: 10, border: `1px solid ${color}33`, background: `${color}0a`, textAlign: "center" }}>
+                          <div style={{ fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>{score}</div>
+                          <div style={{ fontSize: 10, color: "var(--t2)", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 6 }}>{k}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {storeAuditResults.summary && (
+                    <div style={{ padding: 16, borderRadius: 10, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr)", marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Resumen</div>
+                      <p style={{ fontSize: 13, color: "var(--t1)", lineHeight: 1.6, margin: 0 }}>{storeAuditResults.summary}</p>
+                    </div>
+                  )}
+                  {Array.isArray(storeAuditResults.recommendations) && storeAuditResults.recommendations.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--t1)", marginBottom: 10 }}>💡 Recomendaciones</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {storeAuditResults.recommendations.slice(0, 10).map((r: any, i: number) => (
+                          <div key={i} style={{ padding: "10px 14px", borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)" }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: r.impact === "high" ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)", color: r.impact === "high" ? "#ef4444" : "#f59e0b" }}>
+                                {r.impact?.toUpperCase() || "MEDIUM"}
+                              </span>
+                              <strong style={{ fontSize: 13, color: "var(--t1)" }}>{r.title}</strong>
+                            </div>
+                            <p style={{ margin: 0, fontSize: 12, color: "var(--t2)", lineHeight: 1.5 }}>{r.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {Array.isArray(storeAuditResults.issues) && storeAuditResults.issues.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--t1)", marginBottom: 10 }}>⚠ Problemas detectados</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {storeAuditResults.issues.slice(0, 15).map((issue: any, i: number) => (
+                          <div key={i} style={{ padding: "8px 12px", borderRadius: 6, background: issue.severity === "critical" ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.06)", borderLeft: `3px solid ${issue.severity === "critical" ? "#ef4444" : "#f59e0b"}`, fontSize: 12, color: "var(--t2)" }}>
+                            <strong style={{ color: "var(--t1)" }}>{issue.title}</strong> — {issue.description}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {storeAuditHistory.length > 0 && (
+                    <details style={{ marginTop: 20 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--t2)", padding: "8px 0" }}>
+                        📜 Historial de auditorías ({storeAuditHistory.length})
+                      </summary>
+                      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {storeAuditHistory.slice(0, 10).map((h: any, i: number) => (
+                          <div key={i} style={{ padding: "8px 12px", fontSize: 12, color: "var(--t3)", background: "var(--ink2)", borderRadius: 6 }}>
+                            {h.createdAt ? new Date(h.createdAt).toLocaleString() : "—"} · Score: <strong style={{ color: "var(--t1)" }}>{h.overallScore ?? "—"}/100</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              )}
+              {storeAuditStatus === "done" && !storeAuditResults && (
+                <p style={{ fontSize: 13, color: "var(--t2)", textAlign: "center", padding: 30 }}>
+                  No hay resultados disponibles aún. La auditoría puede tardar 1-3 minutos. Refresca el modal con el botón de arriba.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

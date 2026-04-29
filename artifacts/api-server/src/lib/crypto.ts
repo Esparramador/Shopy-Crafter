@@ -7,6 +7,16 @@ let tempKeyGenerated = false;
 export function validateEncryptionKey(): void {
   const keyHex = process.env.ENCRYPTION_KEY;
   if (!keyHex) {
+    // SECURITY FIX C5: In production, fail hard instead of generating a
+    // temporary key that would be lost on restart — silently corrupting all
+    // previously-encrypted data (Shopify tokens, etc.).
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "ENCRYPTION_KEY is required in production. Generate a persistent key with:\n" +
+        "  node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"\n" +
+        "then set it as an environment variable.",
+      );
+    }
     const generated = randomBytes(32).toString("hex");
     process.env.ENCRYPTION_KEY = generated;
     tempKeyGenerated = true;
@@ -15,6 +25,7 @@ export function validateEncryptionKey(): void {
     console.warn("║  A temporary key has been generated for this session.       ║");
     console.warn("║  Data encrypted now will NOT be decryptable after restart.  ║");
     console.warn("║  Set ENCRYPTION_KEY env var with a 64-char hex string.      ║");
+    console.warn("║  (In production, the service would refuse to boot.)         ║");
     console.warn("╚══════════════════════════════════════════════════════════════╝");
   } else if (keyHex.length !== 64 || !/^[0-9a-fA-F]+$/.test(keyHex)) {
     throw new Error("ENCRYPTION_KEY must be a 64-character hex string (32 bytes)");

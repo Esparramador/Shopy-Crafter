@@ -3,8 +3,157 @@ import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { synthesizeSpeech, listVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
+
+// ============================================================
+// TEXT-TO-SPEECH (ElevenLabs)
+// ============================================================
+const ALLOWED_TTS_MODELS: ElevenModel[] = [
+  "eleven_multilingual_v2",
+  "eleven_turbo_v2_5",
+  "eleven_flash_v2_5",
+];
+const ALLOWED_OUTPUT_FORMATS: ElevenOutputFormat[] = [
+  "mp3_44100_128",
+  "mp3_44100_64",
+  "mp3_22050_32",
+];
+
+// FIX HIGH: rate limit + metering por usuario en memoria (in-process, OK para single-instance dev)
+// En producción multi-instancia, considerar mover a Redis/PG.
+const TTS_WINDOW_MS = 60 * 1000;
+const TTS_MAX_REQUESTS_PER_MIN = 10;
+const TTS_MAX_CHARS_PER_HOUR = 50_000;
+const HOUR_MS = 60 * 60 * 1000;
+
+interface TtsBucket {
+  windowStart: number;
+  count: number;
+  hourStart: number;
+  charsHour: number;
+}
+const ttsBuckets = new Map<string, TtsBucket>();
+
+export function checkTtsQuota(userId: string, chars: number): { ok: true } | { ok: false; reason: string; retryAfter: number } {
+  const now = Date.now();
+  let b = ttsBuckets.get(userId);
+  if (!b) {
+    b = { windowStart: now, count: 0, hourStart: now, charsHour: 0 };
+    ttsBuckets.set(userId, b);
+  }
+  if (now - b.windowStart > TTS_WINDOW_MS) {
+    b.windowStart = now;
+    b.count = 0;
+  }
+  if (now - b.hourStart > HOUR_MS) {
+    b.hourStart = now;
+    b.charsHour = 0;
+  }
+  if (b.count >= TTS_MAX_REQUESTS_PER_MIN) {
+    return { ok: false, reason: "Demasiadas peticiones de voz. Espera un momento.", retryAfter: Math.ceil((TTS_WINDOW_MS - (now - b.windowStart)) / 1000) };
+  }
+  if (b.charsHour + chars > TTS_MAX_CHARS_PER_HOUR) {
+    return { ok: false, reason: `Cuota horaria de TTS excedida (${TTS_MAX_CHARS_PER_HOUR} caracteres/hora).`, retryAfter: Math.ceil((HOUR_MS - (now - b.hourStart)) / 1000) };
+  }
+  b.count += 1;
+  b.charsHour += chars;
+  return { ok: true };
+}
+
+router.post("/voice/tts", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    const { text, voiceId, modelId, outputFormat, languageCode, voiceSettings } = req.body ?? {};
+
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+      res.status(400).json({ error: "text requerido" });
+      return;
+    }
+    if (text.length > 5000) {
+      res.status(413).json({ error: "text excede 5000 caracteres" });
+      return;
+    }
+
+    // FIX HIGH: rate limit + metering por usuario
+    const quota = checkTtsQuota(String(userId), text.length);
+    if (!quota.ok) {
+      res.setHeader("Retry-After", String(quota.retryAfter));
+      res.status(429).json({ error: quota.reason });
+      return;
+    }
+
+    const safeModel: ElevenModel = ALLOWED_TTS_MODELS.includes(modelId)
+      ? modelId
+      : "eleven_multilingual_v2";
+    const safeFormat: ElevenOutputFormat = ALLOWED_OUTPUT_FORMATS.includes(outputFormat)
+      ? outputFormat
+      : "mp3_44100_128";
+    const safeLang = typeof languageCode === "string" && /^[a-z]{2}(-[A-Z]{2})?$/.test(languageCode)
+      ? languageCode
+      : "es";
+
+    const result = await synthesizeSpeech({
+      text: text.trim(),
+      voiceId: typeof voiceId === "string" ? voiceId : undefined,
+      modelId: safeModel,
+      outputFormat: safeFormat,
+      languageCode: safeLang,
+      voiceSettings,
+    });
+
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Content-Length", String(result.audio.length));
+    res.setHeader("Cache-Control", "private, max-age=60");
+    // FIX LOW: NO devolver X-Voice-Id/X-Voice-Model — pueden filtrar IDs de voces clonadas privadas.
+    res.send(result.audio);
+  } catch (err: any) {
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : "Error generando voz";
+      logger.error({ err: msg, userId: (req.session as any)?.userId }, "TTS error");
+      // FIX MEDIUM: clasificar errores upstream sin filtrar detalles
+      const lower = msg.toLowerCase();
+      if (lower.includes("429") || lower.includes("rate") || lower.includes("quota")) {
+        res.status(429).json({ error: "Servicio de voz saturado. Reintenta en unos minutos." });
+      } else if (lower.includes("402") || lower.includes("payment") || lower.includes("billing")) {
+        res.status(402).json({ error: "Servicio de voz sin saldo. Contacta al administrador." });
+      } else if (lower.includes("invalid") && lower.includes("voiceid")) {
+        res.status(400).json({ error: "voiceId inválido" });
+      } else {
+        res.status(500).json({ error: "Error generando voz. El equipo ha sido notificado." });
+      }
+    }
+  }
+});
+
+router.get("/voice/voices", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+    const voices = await listVoices();
+    const filtered = voices.map(v => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      labels: v.labels,
+    }));
+    res.json({ voices: filtered });
+  } catch (err: any) {
+    if (!res.headersSent) {
+      const msg = err instanceof Error ? err.message : "Error obteniendo voces";
+      res.status(500).json({ error: msg });
+    }
+  }
+});
 
 router.post("/voice/command", async (req, res): Promise<void> => {
   enableLongRunning(res);
