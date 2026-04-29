@@ -26,8 +26,21 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
 import type { Request, Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
+import { requireProjectAccess } from "../lib/auth.js";
 
 const router = Router();
+
+// FIX E-01 (CRITICAL): require auth + project ownership for ALL export endpoints.
+// Without this, any authenticated user could read another user's exported data
+// (SEO audit, financials, brand brief, full report, ZIP archive, etc.) by
+// guessing or enumerating projectId. router.use(path,...) matches by prefix in
+// Express 5, so this single line covers every /projects/:projectId/exports/*.
+router.use("/projects/:projectId/exports", requireProjectAccess);
+// Cover the second URL pattern used by brand-kit / brand-css / report-css /
+// report-png exports — the projectId is at the END of the path, not after
+// /projects/. These leak the same data (brand kit, CSS, PNGs of reports).
+router.use("/exports/:type/:projectId", requireProjectAccess);
+router.use("/exports/:type/:projectId/:area", requireProjectAccess);
 
 async function sendHtmlOrPdf(req: Request, res: Response, html: string, filename: string): Promise<void> {
   const format = (req.query.format as string || "").toLowerCase();
