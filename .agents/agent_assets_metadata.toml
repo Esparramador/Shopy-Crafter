@@ -120,6 +120,18 @@ uri = "file://attached_assets/generated_images/pack_30_productos_1.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "C5rZUv0RLHCI6DoV5y2Uf"
+uri = "file://attached_assets/generated_images/comic_crafter_ad_hero_9x16.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "RaQEF17_2fbo6I8gkvlNp"
+uri = "file://attached_assets/generated_images/comic_crafter_ad_feed_1x1.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "9EyhiMCidMT9gdjJwunVq"
 uri = "file://all-css-for-claude.txt"
@@ -323,3 +335,15 @@ id = "2i2wQ028xd1_DPe4kyfDQ"
 uri = "file://attached_assets/AUDITORIA_FINAL_2026-04-29.md"
 type = "text"
 title = "Auditoría exhaustiva — comparativa 46 patches vs estado real"
+
+[[outputs]]
+id = "V3ER6BWanoWjfw3E6hu0G"
+uri = "file://attached_assets/generated_images/comic_crafter_ad_hero_9x16.png"
+type = "image"
+title = "Anuncio Comic Crafter — Reels/TikTok 9:16 (Hero shot)"
+
+[[outputs]]
+id = "_UdtA7W-87qObL03Khh50"
+uri = "file://attached_assets/generated_images/comic_crafter_ad_feed_1x1.png"
+type = "image"
+title = "Anuncio Comic Crafter — Feed 1:1 (Triple producto)"
