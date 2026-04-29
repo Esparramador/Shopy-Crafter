@@ -56,8 +56,8 @@ export async function fetchApi<T = unknown>(
 ): Promise<T> {
   try {
     return await customFetch<T>(buildUrl(path), options);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
+  } catch (err: unknown) {
+    if (err instanceof ApiError && (err as ApiError).status === 401) {
       // Session expired or not authenticated — force re-login.
       // Exception: don't redirect if we're already on a public route
       const p = window.location.pathname;

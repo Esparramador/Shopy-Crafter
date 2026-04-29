@@ -2,6 +2,14 @@
 
 ## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
 
+**Fase 6 — Cierre auditoría 21 ZIPs (29 abr)** — patches residuales aplicados tras revisión cruzada de los markdowns de cierre (`01-PATCHES-EXTRA.md`, `06-FINAL-CLOSURE.md`, `08-DEEP-AUDIT-WITH-CONTEXT.md`, `shopybrain-VERIFIED-patches.ts`):
+- **A13** `lib/auth.ts`: eliminada `requireClientAccess` (dead code, 0 referencias en todo el repo).
+- **A16** eliminado `routes/klaviyo.ts` + import en `routes/index.ts` (dead code; el frontend solo usa `klaviyo-ai.ts`, y `lib/klaviyo-headers.ts` se conserva).
+- **shopybrain Patch 12 — `sync_catalog_prices`**: añadido confirmation gate obligatorio + warning de catálogo HARDCODED de Shopy Crafter (NO aplicar a tiendas de cliente). Por defecto ahora corre dryRun salvo `confirmed:true && dryRun:false`.
+- **shopybrain Patch 12 — `create_collection`**: confirmation gate antes de crear colección Shopify (evita que la IA llene la tienda de colecciones basura).
+- **M9 redirect validation** (`UniversalGenerator.tsx`): `data.redirect` solo se abre si empieza con `/`, no `//` ni `/\`, y matchea prefijo conocido (`/api/`, `/vault/`, `/generator/`, `/exports/`, `/projects/`). `window.open` con `noopener,noreferrer`.
+- **`lib/api-client-react/src/index.ts`**: re-exportados `customFetch`, `ApiError`, `ResponseParseError` y tipos (`AuthTokenGetter`, `CustomFetchOptions`, `ErrorType`, `BodyType`) — desbloquea el wrapper `shopify-optimizer/src/lib/api.ts` y elimina 4 errores TS.
+
 **Fusion Studio Pro + Ad Studio + BrainSync + Runway/ElevenLabs (29 abr)** — paquete `shopycrafter-audit.tar.gz` aplicado íntegro:
 - **Vídeo (Runway)**: `lib/runway.ts` con `validateImageUrl` (HTTPS-only, bloquea localhost/RFC1918/IPv6 ULA/link-local/CGNAT/IPv4-mapped) + endpoint `/fusion-studio/generate-video` (gen3a_turbo / gen4_turbo, polling 5min, vault auto-save).
 - **Voz (ElevenLabs)**: `lib/elevenlabs.ts` con `synthesizeSpeech`, voice cloning, SFX. Endpoint `/voice/tts` con rate-limit en memoria (10 req/min, 50 000 chars/h por usuario) + `recordUsage` bloqueante. **Sin filtración** del `voiceId` por header `X-Voice-Id`.
