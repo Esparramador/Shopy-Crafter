@@ -11,8 +11,18 @@ export interface CoverPageOptions {
   template?: CoverTemplate;
 }
 
+// FIX: HTML escape to prevent XSS in PDF cover pages
+function escHtml(s: string): string {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function buildCoverPage(opts: CoverPageOptions): string {
-  const { companyName, template = "prestige" } = opts;
+  const { template = "prestige" } = opts;
+  const companyName = escHtml(opts.companyName);
 
   if (template === "classic") return buildClassicCover(companyName);
   if (template === "elegance") return buildEleganceCover(companyName);
@@ -81,12 +91,24 @@ function buildPrestigeCover(companyName: string): string {
 }
 
 export function buildTableOfContents(body: string, template: CoverTemplate = "prestige"): string {
-  const sectionRegex = /<div\s+class="section-title"[^>]*>([^<]+)<\/div>/g;
+  // FIX: regex más permisiva (acepta div o h1-h6 con class section-title)
+  const sectionRegex = /<(?:div|h[1-6])\s+[^>]*class=['"][^'"]*section-title[^'"]*['"][^>]*>([\s\S]*?)<\/(?:div|h[1-6])>/g;
   const titles: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = sectionRegex.exec(body)) !== null) {
-    const t = match[1].trim();
-    if (t && !titles.includes(t)) titles.push(t);
+    const t = match[1].replace(/<[^>]+>/g, "").trim();
+    if (t && !titles.includes(t) && t.length < 200) titles.push(t);
+  }
+  // FIX: fallback a <h2> si no se encontraron section-title
+  if (titles.length === 0) {
+    const h2Regex = /<h2[^>]*>([^<]+)<\/h2>/g;
+    let m: RegExpExecArray | null;
+    while ((m = h2Regex.exec(body)) !== null) {
+      const cleaned = m[1].trim().replace(/^[🔴🟠🟡🟢✅❌→·•\s]+/, "");
+      if (cleaned && !titles.includes(cleaned) && cleaned.length < 120) {
+        titles.push(cleaned);
+      }
+    }
   }
   if (titles.length === 0) return "";
 
@@ -112,15 +134,19 @@ export function buildTableOfContents(body: string, template: CoverTemplate = "pr
   };
   const c = colors[template];
 
-  const items = titles.map((t, i) => `
+  const items = titles.map((t, i) => {
+    // FIX: escapar título para evitar XSS via section title
+    const safeTitle = escHtml(t);
+    return `
     <tr>
       <td width="48" style="padding:14px 8px 14px 0;vertical-align:middle;border-bottom:1px solid ${c.line};">
         <div style="width:36px;height:36px;border-radius:10px;background:${c.numBg};text-align:center;line-height:36px;">
           <span style="font-size:14px;font-weight:700;color:${c.numColor};font-family:${c.font};">${String(i + 1).padStart(2, "0")}</span>
         </div>
       </td>
-      <td style="padding:14px 0;vertical-align:middle;font-size:15px;font-weight:500;color:${c.text};letter-spacing:.3px;font-family:${c.font};border-bottom:1px solid ${c.line};">${t}</td>
-    </tr>`).join("");
+      <td style="padding:14px 0;vertical-align:middle;font-size:15px;font-weight:500;color:${c.text};letter-spacing:.3px;font-family:${c.font};border-bottom:1px solid ${c.line};">${safeTitle}</td>
+    </tr>`;
+  }).join("");
 
   return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.bg};page-break-after:always;">

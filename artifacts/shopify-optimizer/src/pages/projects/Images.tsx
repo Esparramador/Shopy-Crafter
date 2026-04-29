@@ -1,4 +1,5 @@
 import { useRoute } from "wouter";
+import DOMPurify from "dompurify";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
   useGetProjectProducts,
@@ -559,14 +560,19 @@ export default function ImagesPage() {
                       />
                     )}
 
-                    {/* SVG preview — sanitized before rendering */}
+                    {/* SVG preview — sanitized before rendering (FIX F-05) */}
                     {svgContent && (
                       <div
                         className="w-full aspect-square overflow-hidden bg-black/50"
-                        dangerouslySetInnerHTML={{ __html: svgContent
-                          .replace(/<script[\s\S]*?<\/script>/gi, "")
-                          .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
-                          .replace(/javascript:/gi, "")
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(svgContent, {
+                            USE_PROFILES: { svg: true, svgFilters: true },
+                            FORBID_TAGS: ["foreignObject", "script", "style", "animate", "set"],
+                            FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus"],
+                            ALLOW_DATA_ATTR: false,
+                            ALLOW_UNKNOWN_PROTOCOLS: false,
+                            WHOLE_DOCUMENT: false,
+                          }),
                         }}
                       />
                     )}

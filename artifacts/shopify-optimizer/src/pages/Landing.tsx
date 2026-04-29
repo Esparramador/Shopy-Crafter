@@ -205,10 +205,11 @@ export default function Landing() {
         Object.entries(contactForm).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(contactServices));
         fd.append("referenceImage", refImageFile);
-        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", body: fd });
+        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
       } else {
         res = await fetch(`${BASE_URL}/api/contact`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...contactForm, services: contactServices }),
         });
@@ -226,7 +227,7 @@ export default function Landing() {
   const currentRef = useRef(0);
 
   useEffect(() => {
-    fetch(`${BASE_URL}/api/cms/content`).then(r => r.json()).then(setContent).catch(() => {});
+    fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" }).then(r => r.json()).then(setContent).catch(() => {});
   }, []);
 
 

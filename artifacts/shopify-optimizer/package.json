@@ -46,6 +46,7 @@
     "@tanstack/react-query": "catalog:",
     "@types/canvas-confetti": "^1.9.0",
     "@types/d3": "^7.4.3",
+    "@types/dompurify": "^3.2.0",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -81,6 +82,7 @@
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "canvas-confetti": "^1.9.4",
-    "d3": "^7.9.0"
+    "d3": "^7.9.0",
+    "dompurify": "^3.4.1"
   }
 }

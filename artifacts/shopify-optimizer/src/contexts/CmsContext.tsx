@@ -36,7 +36,7 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   const load = useCallback(() => {
-    fetch(`${API_BASE}/api/cms/content`)
+    fetch(`${API_BASE}/api/cms/content`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) {

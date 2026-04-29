@@ -6,45 +6,57 @@ export function useDraftPersistence<T>(
   key: string,
   data: T,
   setData: (d: T) => void,
-  opts?: { enabled?: boolean; debounceMs?: number }
+  opts?: {
+    enabled?: boolean;
+    debounceMs?: number;
+    sensitive?: boolean;            // FIX F-17: si es true, NO persiste (datos sensibles)
+    storage?: "local" | "session";  // FIX F-17: opcional usar sessionStorage
+  }
 ) {
-  const enabled = opts?.enabled ?? true;
+  // Sensitive data nunca se persiste en localStorage/sessionStorage
+  const enabled = (opts?.enabled ?? true) && !(opts?.sensitive);
   const debounce = opts?.debounceMs ?? DEBOUNCE_MS;
+  const storage =
+    typeof window === "undefined"
+      ? null
+      : opts?.storage === "session"
+        ? window.sessionStorage
+        : window.localStorage;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
 
   useEffect(() => {
-    if (!enabled || loaded.current) return;
+    if (!enabled || loaded.current || !storage) return;
     try {
-      const raw = localStorage.getItem(key);
+      const raw = storage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw) as { data: T; savedAt: number };
         const age = Date.now() - (parsed.savedAt || 0);
         if (age < 24 * 60 * 60 * 1000) {
           setData(parsed.data);
         } else {
-          localStorage.removeItem(key);
+          storage.removeItem(key);
         }
       }
     } catch {
-      localStorage.removeItem(key);
+      try { storage.removeItem(key); } catch {}
     }
     loaded.current = true;
   }, [key, enabled]);
 
   useEffect(() => {
-    if (!enabled || !loaded.current) return;
+    if (!enabled || !loaded.current || !storage) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
-        localStorage.setItem(key, JSON.stringify({ data, savedAt: Date.now() }));
+        storage.setItem(key, JSON.stringify({ data, savedAt: Date.now() }));
       } catch {}
     }, debounce);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [key, data, enabled, debounce]);
 
   const clear = useCallback(() => {
-    localStorage.removeItem(key);
+    try { storage?.removeItem(key); } catch {}
   }, [key]);
 
   return { clear };

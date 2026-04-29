@@ -957,6 +957,7 @@ export default function PricingPage() {
       try {
         const res = await fetch(`${API_BASE}/api/projects/${projectId}/products/${product.id}/ai-estimate-cogs`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
         });
         if (res.ok) {

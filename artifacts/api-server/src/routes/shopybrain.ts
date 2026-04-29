@@ -17,6 +17,13 @@ import { buildCoverPage } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
 import { processUploadedFile } from "../lib/file-processor.js";
 import { generateLeveledReport } from "../lib/report-levels.js";
+import {
+  getSessionProjectId,
+  fetchImageWithSizeLimit,
+  requireConfirmation,
+  validateFixCodePath,
+  normalizeListDirectory,
+} from "../lib/shopybrain-helpers.js";
 import multer from "multer";
 import * as fs from "fs";
 import * as path from "path";
@@ -4049,9 +4056,19 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             return results;
           };
   
-          const frontendDir = directory ? (directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "")) : "src";
+          // FIX CRIT-5: rechazar rutas traversal y normalizar path
+          const dirStr = String(directory).trim();
+          if (dirStr.includes("..") || path.isAbsolute(dirStr) || dirStr.includes("\0")) {
+            result = { error: true, message: "🚫 Path inválido: no se permiten rutas con '..', absolutas ni caracteres nulos." };
+            break;
+          }
+          const frontendDir = normalizeListDirectory(dirStr, FRONTEND_ROOT);
+          const backendDir = normalizeListDirectory(dirStr, BACKEND_ROOT);
+          if (!frontendDir || !backendDir) {
+            result = { error: true, message: "🚫 Directory fuera del workspace permitido. Solo se pueden listar subdirectorios de src/." };
+            break;
+          }
           const frontendFiles = listDir(FRONTEND_ROOT, frontendDir, "[frontend] ");
-          const backendDir = directory ? (directory.startsWith("src") ? directory : `src/${directory}`.replace(/\/+/g, "/").replace(/\/$/, "")) : "src";
           const backendFiles = listDir(BACKEND_ROOT, backendDir, "[backend] ");
   
           result = {
@@ -4082,8 +4099,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
           if (params?.analyze !== false) {
             try {
+              const inspectProjectId = getSessionProjectId(req, params);
               analysis = await askClaudeWithBrain(
-                parseInt(params?.projectId) || 2,
+                inspectProjectId,
                 [{
                   role: "user",
                   content: `Analiza este archivo de código fuente de una app Shopify (React+TypeScript frontend, Express+Node backend).
@@ -4148,8 +4166,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           };
   
           try {
+            const componentProjectId = getSessionProjectId(req, params);
             const componentAnalysis = await askClaudeWithBrain(
-              parseInt(params?.projectId) || 2,
+              componentProjectId,
               [{
                 role: "user",
                 content: `Eres un senior developer auditando código de producción de una app Shopify (React+Vite frontend, Express+Node backend, PostgreSQL, Drizzle ORM).
@@ -4207,13 +4226,41 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const oldCode = params?.oldCode;
           const newCode = params?.newCode;
           const description = params?.description || "Fix aplicado por Shopy Crafter";
+          const confirmed = params?.confirmed === true || params?.confirmed === "true";
   
           if (!filePath || !oldCode || newCode === undefined) {
             res.status(400).json({ error: "filePath, oldCode y newCode son requeridos" });
             return;
           }
           if (String(filePath).includes("..") || path.isAbsolute(String(filePath))) { res.status(400).json({ error: "Path inválido: no se permiten rutas absolutas ni '..'." }); return; }
-  
+
+          // FIX CRIT-1: whitelist estricta de paths modificables
+          const pathError = validateFixCodePath(String(filePath));
+          if (pathError) {
+            result = { error: true, message: `🚫 ${pathError}` };
+            break;
+          }
+
+          // FIX CRIT-6: confirmación explícita requerida para acciones destructivas
+          if (!confirmed) {
+            result = {
+              requiresConfirmation: true,
+              action: "fix_code",
+              filePath,
+              description,
+              preview: {
+                summary: `Modificar código en ${filePath}: ${description}`,
+                before: String(oldCode).slice(0, 300),
+                after: String(newCode).slice(0, 300),
+              },
+              message: `⚠️ **Confirmación requerida para fix_code en \`${filePath}\`**\n\n` +
+                       `**Descripción:** ${description}\n` +
+                       `**Cambio:** ${String(newCode).split("\n").length} líneas modificadas\n\n` +
+                       `Re-envía la acción con \`"confirmed": true\` para aplicar el cambio.`,
+            };
+            break;
+          }
+
           const resolvedPath = resolveFilePath(String(filePath));
           if (!resolvedPath) {
             res.status(404).json({ error: `Archivo no encontrado: ${filePath}. Prueba con list_source_files para ver los archivos disponibles.` });
@@ -5699,10 +5746,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           if (!imageUrl) { result = { error: true, message: "❌ Falta imageUrl — proporciona la URL de la imagen a analizar" }; break; }
           if (!isPublicUrl(String(imageUrl))) { result = { error: true, message: "❌ La URL debe ser pública (https). No se permiten URLs internas." }; break; }
           try {
-            const imgResp = await fetch(String(imageUrl));
-            if (!imgResp.ok) throw new Error(`No se pudo descargar la imagen: ${imgResp.status}`);
-            const imgBuf = Buffer.from(await imgResp.arrayBuffer());
-            const mimeType = imgResp.headers.get("content-type") || "image/jpeg";
+            // FIX CRIT-4: límite de 15MB con check de content-length para prevenir DoS
+            const { buffer: imgBuf, mimeType } = await fetchImageWithSizeLimit(String(imageUrl), 15 * 1024 * 1024);
             const analysis = await analyzeImageForFusion(imgBuf.toString("base64"), mimeType);
             const colorList = analysis.colors.palette.map(c => `${c.name} (${c.hex}) ${c.percentage}`).join(", ");
             const textureList = analysis.textures.map(t => `${t.material} (${t.finish})`).join(", ");
@@ -5734,10 +5779,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           if (!imageUrl) { result = { error: true, message: "❌ Falta imageUrl — proporciona la URL de la imagen" }; break; }
           if (!isPublicUrl(String(imageUrl))) { result = { error: true, message: "❌ La URL debe ser pública (https). No se permiten URLs internas." }; break; }
           try {
-            const imgResp = await fetch(String(imageUrl));
-            if (!imgResp.ok) throw new Error(`No se pudo descargar la imagen: ${imgResp.status}`);
-            const imgBuf = Buffer.from(await imgResp.arrayBuffer());
-            const imgMime = imgResp.headers.get("content-type") || "image/jpeg";
+            // FIX CRIT-4: límite de 15MB con check de content-length para prevenir DoS
+            const { buffer: imgBuf, mimeType: imgMime } = await fetchImageWithSizeLimit(String(imageUrl), 15 * 1024 * 1024);
             const analysis = await analyzeImageForFusion(imgBuf.toString("base64"), imgMime);
             const title = params?.title || analysis.productGeneration.suggestedTitle || "Producto Fusion";
             const price = params?.price || analysis.productGeneration.suggestedPrice || "29.99";
@@ -6541,8 +6584,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
   Responde en español, de forma directa y accionable.`;
   
+            const auditOfferingsProjectId = getSessionProjectId(req, params);
             const auditText = await askClaudeWithBrain(
-              parseInt(params?.projectId) || 2,
+              auditOfferingsProjectId,
               [{ role: "user", content: auditPrompt }],
               "Eres un consultor de negocio SaaS especializado en agencias Shopify. Auditas productos y generas recomendaciones concretas y accionables.",
               "general",
@@ -6640,16 +6684,36 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
     "summary": "resumen del cambio"
   }`;
   
+            const modifyUiProjectId = getSessionProjectId(req, params);
             const uiText = await askClaudeWithBrain(
-              parseInt(params?.projectId) || 2,
+              modifyUiProjectId,
               [{ role: "user", content: analyzePrompt }],
               "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
               "general",
               undefined,
               3000
             );
-            let uiJson: any = {};
-            try { uiJson = JSON.parse(uiText.match(/\{[\s\S]*\}/)?.[0] || "{}"); } catch { uiJson = {}; }
+            // HIGH-1: parsing robusto de JSON con fallback en cascada
+            let uiJson: { files?: Array<{ filePath: string; changes: Array<{ oldCode: string; newCode: string; description?: string }> }>; summary?: string } = {};
+            try {
+              uiJson = JSON.parse(uiText);
+            } catch {
+              const m = uiText.match(/\{[\s\S]*\}/);
+              if (m) {
+                try { uiJson = JSON.parse(m[0]); }
+                catch {
+                  const cleaned = uiText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+                  try { uiJson = JSON.parse(cleaned); }
+                  catch {
+                    result = { error: true, message: `❌ Claude devolvió JSON inválido. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
+                    break;
+                  }
+                }
+              } else {
+                result = { error: true, message: `❌ Claude no devolvió JSON. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
+                break;
+              }
+            }
   
             let changesApplied = 0;
             const appliedFiles: string[] = [];
@@ -6659,6 +6723,15 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             if (uiJson.files) {
               for (const file of uiJson.files) {
                 const rawPath = String(file.filePath).replace(/^src\//, "");
+
+                // FIX CRIT-1 bis: aplicar también whitelist en modify_ui (no solo fix_code)
+                const pathToValidate = rawPath.startsWith("src/") ? rawPath : `src/${rawPath}`;
+                const pathError = validateFixCodePath(pathToValidate);
+                if (pathError) {
+                  failedFiles.push(`${file.filePath} (🚫 ${pathError})`);
+                  continue;
+                }
+
                 const fullPath = resolveFilePath(`src/${rawPath}`) || resolveFilePath(rawPath);
                 if (!fullPath) {
                   failedFiles.push(`${file.filePath} (intentado: src/${rawPath}, ${rawPath})`);

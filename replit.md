@@ -1,5 +1,31 @@
 # Shopy Crafter Agency Platform
 
+## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
+
+**Hardening de seguridad Tier-1 + Bloque A (shopybrain CRIT/HIGH)**:
+- **Frontend** (`shopify-optimizer`): añadido `credentials:'include'` a 7 fetch() de cross-origin (Pricing, CMSEditor, ForgotPassword, ResetPassword, Landing, CmsContext) para evitar pérdida de sesión.
+- **XSS**: `Redesign.tsx` (HTML rich) e `Images.tsx` (SVG) ahora sanitizan con DOMPurify allowlist en lugar de regex casero. Instalado `dompurify` + `@types/dompurify`.
+- **Backend hardenings** (`api-server/src/lib`):
+  - `pdf-generator.ts`: timeout 60s, bloqueo de scripts/CSS/fonts externos vía request interception, max HTML 5MB, sin `--disable-web-security`.
+  - `vault.ts`: límite 10MB por contenido, helper `getVaultContent(fileId, projectId)` con ACL anti-IDOR.
+  - `report-cover.ts`: escape HTML en `companyName`, regex de TOC permisivo (`div|h1-6` + fallback a `h2`), escape de títulos.
+  - `connectors/prestashop.ts`: 3 ubicaciones fuerzan `https://` rechazando HTTP plano.
+  - `billing.ts`: `/upgrade` devuelve 503 `PAYMENT_SYSTEM_PENDING` (Stripe pendiente) — bloquea upgrades free a Enterprise.
+  - `hooks/use-draft-persistence.ts`: nuevas opciones `sensitive` (no persiste) y `storage:'session'` (SSR-safe).
+- **shopybrain.ts** (`api-server/src/routes`): nuevo `lib/shopybrain-helpers.ts` con helpers críticos:
+  - **CRIT-1**: `fix_code` + `modify_ui` ahora validan whitelist de paths (solo `src/pages|components|routes|lib...`), bloquean `package.json`, `.env`, `drizzle.config`, etc., extensión limitada (`.ts|.tsx|.css|.md`), confirmación obligatoria con `params.confirmed`.
+  - **CRIT-2/CRIT-3**: 4 `parseInt(params?.projectId) || 2` hardcoded → `getSessionProjectId(req, params)` (sin fallback peligroso).
+  - **CRIT-4**: `fusion_analyze` y `fusion_create_product` usan `fetchImageWithSizeLimit(url, 15MB)` con HEAD precheck + streaming reader (anti-DoS).
+  - **CRIT-5**: `list_source_files` rechaza `..`, `/` absoluto, NUL y normaliza paths con `resolve+startsWith` dentro de `src/`.
+  - **HIGH-1**: `modify_ui` parsea JSON de Claude en cascada (`JSON.parse` → match `{...}` → strip code fences → error claro).
+
+**Skipped intencionalmente** (riesgo > beneficio):
+- Migraciones SQL manuales 0001-0015 (este repo usa Drizzle `db:push`, NUNCA SQL manual).
+- Cambio de tipos PK (`users.id=text`, `projects.id=serial`).
+- Sustitución wholesale de schemas TS existentes.
+- Particionado de `events` (prematuro: max 3.190 filas).
+- Refactor split shopybrain.ts en 7 módulos (opcional, 14h).
+
 ## Overview
 Shopy Crafter is a multi-user Shopify AI optimization agency platform that uses a Dual AI Engine (Gemini + Claude), named "ShopyBrain," for comprehensive e-commerce optimization. It offers AI-driven insights, automation, product creation, image generation, SEO optimization, financial analysis, and a Universal Web Audit system. The platform aims to be a leading AI-driven solution for e-commerce, expanding across various platforms and providing extensive agency-level services to enhance client ROI.
 

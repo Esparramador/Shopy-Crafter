@@ -57,35 +57,18 @@ router.get("/billing/plans", async (_req, res): Promise<void> => {
 });
 
 router.post("/billing/upgrade", async (req, res): Promise<void> => {
-  try {
-    const userId = (req.session as any).userId;
-    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  
-    const { plan } = req.body;
-    if (!PLANS[plan as keyof typeof PLANS]) { res.status(400).json({ error: "Invalid plan" }); return; }
-  
-    const planData = PLANS[plan as keyof typeof PLANS];
-    const periodEnd = new Date();
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-  
-    const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
-    let sub;
-    if (existing.length > 0) {
-      [sub] = await db.update(subscriptionsTable)
-        .set({ plan, status: "active", currentPeriodEnd: periodEnd, storesLimit: planData.storesLimit, imagesIncluded: planData.imagesIncluded })
-        .where(eq(subscriptionsTable.userId, userId)).returning();
-    } else {
-      [sub] = await db.insert(subscriptionsTable).values({
-        userId, plan, status: "active", currentPeriodEnd: periodEnd,
-        storesLimit: planData.storesLimit, imagesIncluded: planData.imagesIncluded,
-      }).returning();
-    }
-  
-    res.json({ subscription: sub, message: `Actualizado a ${planData.name} (modo demo — Stripe pendiente de configurar)` });
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
-  }
+  // FIX D-03: bloqueado hasta que el sistema de pagos (Stripe) esté integrado.
+  // Permitir upgrades libres permitiría a cualquier usuario autenticado obtener
+  // un plan Enterprise sin pagar.
+  const userId = (req.session as any).userId;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  res.status(503).json({
+    error: "El sistema de pagos está siendo configurado.",
+    message: "Para cambiar de plan, contacta con soporte: soporte@shopycrafter.com",
+    code: "PAYMENT_SYSTEM_PENDING",
+  });
+  return;
 });
 
 router.get("/billing/affiliate", async (req, res): Promise<void> => {

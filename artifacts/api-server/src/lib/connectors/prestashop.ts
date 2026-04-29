@@ -38,9 +38,12 @@ export class PrestaShopConnector implements IPlatformConnector {
   }
 
   private get baseUrl(): string {
-    const domain = this.storeDomain.replace(/\/api\/?$/, "");
-    const scheme = domain.startsWith("http") ? "" : "https://";
-    return `${scheme}${domain}/api`;
+    // FIX F-16: forzar HTTPS siempre (rechazar HTTP plano)
+    const cleanDomain = this.storeDomain
+      .replace(/\/api\/?$/, "")
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "");
+    return `https://${cleanDomain}/api`;
   }
 
   private get authHeader(): string {
@@ -408,9 +411,11 @@ export class PrestaShopConnector implements IPlatformConnector {
       throw new Error(`PrestaShop image upload failed (${res.status}): ${text.slice(0, 300)}`);
     }
 
-    const domain = this.storeDomain.replace(/\/+$/, "");
-    const scheme = domain.startsWith("http") ? "" : "https://";
-    const imgSrc = `${scheme}${domain}/api/images/products/${platformProductId}`;
+    // FIX F-16: forzar HTTPS
+    const cleanDomain = this.storeDomain
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "");
+    const imgSrc = `https://${cleanDomain}/api/images/products/${platformProductId}`;
 
     learnFromOperation({
       operationType: "image_generation",
@@ -825,10 +830,12 @@ export class PrestaShopConnector implements IPlatformConnector {
     if (p.associations?.images) {
       for (let i = 0; i < p.associations.images.length; i++) {
         const img = p.associations.images[i];
-        const domain = this.storeDomain.replace(/\/+$/, "");
-        const scheme = domain.startsWith("http") ? "" : "https://";
+        // FIX F-16: forzar HTTPS
+        const cleanDomain = this.storeDomain
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
         images.push({
-          src: `${scheme}${domain}/api/images/products/${p.id}/${img.id}`,
+          src: `https://${cleanDomain}/api/images/products/${p.id}/${img.id}`,
           position: i,
         });
       }

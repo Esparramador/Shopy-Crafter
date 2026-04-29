@@ -1,4 +1,5 @@
 import { useRoute } from "wouter";
+import DOMPurify from "dompurify";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import {
@@ -510,7 +511,15 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
                             >
                               <div
                                 className="prose prose-invert prose-sm max-w-none bg-black/20 rounded-xl p-4 border border-white/5 text-muted-foreground text-xs mb-3 max-h-60 overflow-y-auto"
-                                dangerouslySetInnerHTML={{ __html: result.bodyHtml || "" }}
+                                dangerouslySetInnerHTML={{
+                                  __html: DOMPurify.sanitize(result.bodyHtml || "", {
+                                    ALLOWED_TAGS: ["p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "span", "div", "a", "img"],
+                                    ALLOWED_ATTR: ["href", "src", "alt", "class"],
+                                    FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "style"],
+                                    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "onsubmit"],
+                                    ALLOW_DATA_ATTR: false,
+                                  }),
+                                }}
                               />
                             </motion.div>
                           )}
