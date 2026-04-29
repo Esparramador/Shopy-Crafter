@@ -608,14 +608,7 @@ export async function composeAd(opts: ComposeOptions): Promise<Buffer> {
       await fs.writeFile(musicPath, opts.musicBuffer);
     }
 
-    let ffmpeg: any;
-    try {
-      ffmpeg = (await import("fluent-ffmpeg")).default;
-      const ffmpegPath = (await import("ffmpeg-static")).default as unknown as string;
-      ffmpeg.setFfmpegPath(ffmpegPath);
-    } catch {
-      throw new Error("FFmpeg no instalado. Run: pnpm add fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg");
-    }
+    const ffmpeg = await loadFfmpeg();
 
     return await new Promise<Buffer>((resolve, reject) => {
       const cmd = ffmpeg().input(videoPath);
@@ -694,13 +687,37 @@ export interface ConcatOptions {
   musicVolume?: number;
 }
 
+/**
+ * Load fluent-ffmpeg and configure binary paths.
+ * Tries `ffmpeg-static`/`ffprobe-static` first (works in dev). If those return
+ * paths that don't exist on disk (common in pnpm + bundled production builds),
+ * falls back to the system `ffmpeg`/`ffprobe` resolved via PATH (which is
+ * always available in the Replit Nix runtime).
+ */
+async function loadFfmpeg(): Promise<any> {
+  let ffmpeg: any;
+  try {
+    ffmpeg = (await import("fluent-ffmpeg")).default;
+  } catch {
+    throw new Error("FFmpeg no disponible. Run: pnpm add fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg");
+  }
+  const fsSync = await import("node:fs");
+  try {
+    const p = (await import("ffmpeg-static")).default as unknown as string;
+    if (p && fsSync.existsSync(p)) ffmpeg.setFfmpegPath(p);
+  } catch { /* fall through to system PATH */ }
+  try {
+    // ffprobe-static is optional; not declared in deps. If absent, fall back to PATH.
+    // @ts-ignore – optional runtime-only dependency
+    const pp = ((await import("ffprobe-static")).default as any)?.path;
+    if (pp && fsSync.existsSync(pp)) ffmpeg.setFfprobePath(pp);
+  } catch { /* fall through to system PATH */ }
+  return ffmpeg;
+}
+
 /** Probe a video file with ffprobe and return its duration in seconds. */
 async function probeDurationSec(filePath: string): Promise<number> {
-  const ffmpeg: any = (await import("fluent-ffmpeg")).default;
-  try {
-    const ffprobePath = ((await import("ffprobe-static")).default as any)?.path;
-    if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath);
-  } catch { /* ffprobe-static optional */ }
+  const ffmpeg: any = await loadFfmpeg();
   return new Promise<number>((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err: Error | null, data: any) => {
       if (err) return reject(err);
@@ -737,15 +754,7 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
     }
     const outPath = path.join(tmp, "concat.mp4");
 
-    let ffmpeg: any;
-    let ffmpegPath: string;
-    try {
-      ffmpeg = (await import("fluent-ffmpeg")).default;
-      ffmpegPath = (await import("ffmpeg-static")).default as unknown as string;
-      ffmpeg.setFfmpegPath(ffmpegPath);
-    } catch {
-      throw new Error("FFmpeg no disponible. Run: pnpm add fluent-ffmpeg ffmpeg-static");
-    }
+    const ffmpeg: any = await loadFfmpeg();
 
     // Pre-write voice/music to disk if present (we'll add them as inputs below)
     if (opts.voiceBuffer) await fs.writeFile(path.join(tmp, "voice.mp3"), opts.voiceBuffer);

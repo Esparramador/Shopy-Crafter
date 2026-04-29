@@ -56,3 +56,29 @@ PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` fo
 - **@google/genai**: For direct Gemini API integration.
 - **Runway**: For video generation.
 - **ElevenLabs**: For voice synthesis and cloning.
+## 2026-04-29 — E2E real verification + bug fixes
+
+End-to-end practical test of `/fs-pro/concat` (generated 2 dummy MP4s with
+ffmpeg, inserted into vault, called concat endpoint, downloaded, verified with
+ffprobe). Surfaced **4 real bugs** that smoke tests had missed:
+
+1. **`ffmpeg-static` resolved to a non-existent path** in pnpm runtime
+   (`node_modules/.pnpm/.../ffmpeg` not present after install). Affected both
+   `composeAd` and `concatVideos`. Fix: new `loadFfmpeg()` helper in
+   `lib/fusion-studio-pro.ts` that tries `ffmpeg-static`/`ffprobe-static` first
+   and falls back to system `ffmpeg`/`ffprobe` via PATH (Replit Nix runtime
+   provides both).
+2. **Duplicate import** of `requireProjectAccess` in `routes/exports.ts` (one
+   from `lib/access.js`, one stale from `lib/auth.js`). Removed the stale one.
+3. **`req.params.projectId` typed as `string | string[]`** in 6 export handlers
+   when an extra middleware is added (TS overload inference quirk). Fixed
+   with `parseInt(String(req.params.projectId), 10)`.
+4. **Vault `/download` endpoint corrupted binaries < 2MB**: `saveToVaultSmart`
+   stores them as base64 in `content`, but the download handler was sending
+   the raw base64 string as utf-8. Fix in `routes/vault.ts`: detect binary
+   mimeType (everything that isn't text/*, json, xml, javascript) and decode
+   with `Buffer.from(content, "base64")`. Text-based downloads (HTML reports,
+   CSV, CSS) are unaffected.
+
+Final verification: clip 2s + 2s concat → MP4 4.000s exactos; with xfade 0.5s
+→ MP4 3.500s exactos (matemáticas correctas, durations vienen de ffprobe real).

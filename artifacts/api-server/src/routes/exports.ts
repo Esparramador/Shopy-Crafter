@@ -27,7 +27,6 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
 import type { Request, Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
-import { requireProjectAccess } from "../lib/auth.js";
 
 const router = Router();
 
@@ -4832,7 +4831,7 @@ router.get("/projects/:projectId/exports/xlsx/full", requireProjectAccess, async
 
 router.get("/exports/brand-css/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const profile = await fetchBrandProfile(projectId);
     if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -4862,7 +4861,7 @@ router.get("/exports/brand-css/:projectId", requireProjectAccess, async (req, re
 
 router.get("/exports/brand-guide/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const profile = await fetchBrandProfile(projectId);
     if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -4890,7 +4889,7 @@ router.get("/exports/brand-guide/:projectId", requireProjectAccess, async (req, 
 
 router.get("/exports/brand-kit/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const profile = await fetchBrandProfile(projectId);
     if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -4986,7 +4985,7 @@ CONTENIDO DE ESTE KIT:
 
 router.get("/exports/report-css/:projectId/:area", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const area = req.params.area as string;
     const profile = await fetchBrandProfile(projectId);
     if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
@@ -5023,7 +5022,7 @@ router.get("/exports/report-css/:projectId/:area", requireProjectAccess, async (
 
 router.get("/exports/report-png/:projectId/:area", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const area = req.params.area as ReportArea;
     const profile = await fetchBrandProfile(projectId);
 
@@ -5147,7 +5146,7 @@ body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,He
 
 router.get("/exports/brand-kit-full/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const profile = await fetchBrandProfile(projectId);
     if (!profile) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 

@@ -316,8 +316,20 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
         return;
       } catch {}
     }
-    const buf = Buffer.from(file.content, "utf-8");
-    res.setHeader("Content-Type", file.mimeType ?? "text/html");
+    // FIX: binary mime types are stored as base64 in `content` by saveToVaultSmart
+    // (when buffer < 2MB and object storage isn't used). Decode them properly
+    // instead of sending the base64 string as utf-8 (which corrupts binaries).
+    const mt = file.mimeType ?? "text/html";
+    const isBinary = !mt.startsWith("text/")
+      && !mt.startsWith("application/json")
+      && !mt.startsWith("application/xml")
+      && !mt.startsWith("application/javascript")
+      && !mt.includes("+xml")
+      && !mt.includes("+json");
+    const buf = isBinary
+      ? Buffer.from(file.content, "base64")
+      : Buffer.from(file.content, "utf-8");
+    res.setHeader("Content-Type", mt);
     res.send(buf);
     return;
   }
