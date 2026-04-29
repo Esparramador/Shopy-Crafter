@@ -9243,6 +9243,20 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const userId = params?.userId;
           const password = params?.password;
           if (!userId || !password) { result = { error: true, message: "❌ Falta userId o password" }; break; }
+          // CRIT-5: prevenir self-password reset accidental por OmniChatbot.
+          // Para cambiar la propia password el admin debe usar el flujo dedicado de "Mi cuenta".
+          // Confirmación ESTRICTA: solo `true` o `"true"` cuentan como confirmación válida
+          // (igual que el patrón de `requireConfirmation` para `confirmed`).
+          const sessionUserId = (req.session as { userId?: string }).userId;
+          const selfResetConfirmed =
+            params?.confirmSelfReset === true || params?.confirmSelfReset === "true";
+          if (sessionUserId && String(sessionUserId) === String(userId) && !selfResetConfirmed) {
+            result = {
+              error: true,
+              message: "⚠️ **Bloqueado por seguridad:** estás intentando resetear tu propia contraseña desde el chat. Usa la página \"Mi cuenta\" o re-ejecuta esta acción con `confirmSelfReset: true` para confirmar.",
+            };
+            break;
+          }
           try {
             const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
             const resp = await fetch(`${baseUrl}/api/admin/users/${userId}/reset-password`, {

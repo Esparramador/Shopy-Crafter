@@ -526,19 +526,29 @@ export async function generateVideoFromImage(
   if (cfg.provider === "runway") {
     const apiKey = getRunwayKey();
     const dataUri = bufferToDataUri(imageBuffer, imageMime);
-    // Per Runway 2024-11-06: ratio must be a specific resolution string.
-    // Documented values: 1280:720, 720:1280, 1104:832, 832:1104, 960:960, 1584:672
-    const ratioMap: Record<string, string> = {
+    // Runway API ratios: gen3a accepts "1280:768" / "768:1280"; gen4 turbo
+    // accepts the same plus "1104:832", "832:1104", "960:960", "1584:672".
+    // We map common aspect strings to the closest supported value per model.
+    const isGen3 = model === "runway-gen3-alpha";
+    const ratioMap: Record<string, string> = isGen3 ? {
+      "16:9": "1280:768",
+      "9:16": "768:1280",
+      "4:3": "1280:768",   // gen3a only has horizontal/vertical
+      "3:4": "768:1280",
+      "4:5": "768:1280",
+      "1:1": "768:1280",   // closest supported
+      "21:9": "1280:768",
+    } : {
       "16:9": "1280:720",
       "9:16": "720:1280",
       "4:3": "1104:832",
       "3:4": "832:1104",
-      "4:5": "832:1104",  // closest supported
+      "4:5": "832:1104",
       "1:1": "960:960",
       "21:9": "1584:672",
     };
-    const ratio = ratioMap[opts.aspect || "9:16"] || "720:1280";
-    const runwayModel = model === "runway-gen3-alpha" ? "gen3a_turbo" : "gen4_turbo";
+    const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
+    const runwayModel = isGen3 ? "gen3a_turbo" : "gen4_turbo";
     const runwayDur = duration >= 8 ? 10 : 5;
 
     const createRes = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {

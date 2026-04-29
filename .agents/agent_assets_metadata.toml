@@ -347,3 +347,9 @@ id = "_UdtA7W-87qObL03Khh50"
 uri = "file://attached_assets/generated_images/comic_crafter_ad_feed_1x1.png"
 type = "image"
 title = "Anuncio Comic Crafter — Feed 1:1 (Triple producto)"
+
+[[outputs]]
+id = "8-0FdPnGajp22rCiEUf20"
+uri = "file://attached_assets/generated_videos/comic_crafter_ad_cinematic_showcase.mp4"
+type = "video"
+title = "Video Anuncio Comic Crafter — Cinematic Showcase 9:16 (6s, 720x1280, H.264 + AAC)"

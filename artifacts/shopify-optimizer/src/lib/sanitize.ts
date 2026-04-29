@@ -1,6 +1,6 @@
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config } from "dompurify";
 
-const HTML_CONFIG: DOMPurify.Config = {
+const HTML_CONFIG: Config = {
   ALLOWED_TAGS: [
     "p", "div", "span", "br", "hr",
     "h1", "h2", "h3", "h4", "h5", "h6",
@@ -29,9 +29,9 @@ const HTML_CONFIG: DOMPurify.Config = {
 
 export function cleanHtml(raw: string | null | undefined): string {
   if (!raw) return "";
-  const clean = DOMPurify.sanitize(String(raw), HTML_CONFIG);
-  return clean.replace(/<a\s+([^>]*)>/gi, (_match, attrs) => {
-    let out = attrs as string;
+  const clean = String(DOMPurify.sanitize(String(raw), HTML_CONFIG));
+  return clean.replace(/<a\s+([^>]*)>/gi, (_match: string, attrs: string) => {
+    let out = attrs;
     if (!/\btarget\s*=/i.test(out)) out = `${out.trim()} target="_blank"`;
     if (!/\brel\s*=/i.test(out)) out = `${out.trim()} rel="noopener noreferrer"`;
     else if (!/noopener/i.test(out)) {
@@ -41,7 +41,7 @@ export function cleanHtml(raw: string | null | undefined): string {
   });
 }
 
-const SVG_CONFIG: DOMPurify.Config = {
+const SVG_CONFIG: Config = {
   USE_PROFILES: { svg: true, svgFilters: true },
   FORBID_TAGS: ["script", "foreignObject"],
   FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
@@ -49,7 +49,7 @@ const SVG_CONFIG: DOMPurify.Config = {
 
 export function cleanSvg(raw: string | null | undefined): string {
   if (!raw) return "";
-  return DOMPurify.sanitize(String(raw), SVG_CONFIG);
+  return String(DOMPurify.sanitize(String(raw), SVG_CONFIG));
 }
 
 export function cleanMarkdownLite(raw: string | null | undefined): string {

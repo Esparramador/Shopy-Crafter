@@ -82,3 +82,49 @@ ffprobe). Surfaced **4 real bugs** that smoke tests had missed:
 
 Final verification: clip 2s + 2s concat → MP4 4.000s exactos; with xfade 0.5s
 → MP4 3.500s exactos (matemáticas correctas, durations vienen de ffprobe real).
+
+---
+
+## Sesión 2026-04-29 (T6) — Verificación auditoría Tier-1 + CRIT-5 patch
+
+Verificación exhaustiva del session plan "Aplicar correcciones auditoría Claude
+Opus 4.7". La mayoría de patches Tier-1 ya estaban aplicados de sesiones
+previas. Confirmado en código:
+
+**Ya aplicado:** `shopybrain-helpers.ts` (8 helpers), credentials:include en
+todos los fetch frontend, DOMPurify XSS en Redesign.tsx + Images.tsx (SVG),
+loginLimiter dual + DUMMY_BCRYPT, billing FIX D-03 (Enterprise free 503),
+exports `requireProjectAccess` 27 rutas, pdf-generator 20s timeout +
+setRequestInterception external fonts, report-cover escHtml(), vault
+canAccessProject en todas rutas, use-draft-persistence flag `sensitive`,
+shopybrain CRIT-1 (validateFixCodePath), CRIT-2/3 (getSessionProjectId),
+CRIT-4 (fetchImageWithSizeLimit 15MB), CRIT-6 (requireConfirmation +
+DESTRUCTIVE_ACTIONS), schema express_rate_limits.
+
+**Aplicado en esta sesión:**
+- **shopybrain CRIT-5:** guard self-password reset en case `reset_user_password`
+  (L9249). Comparación `String(sessionUserId) === String(userId)` con
+  confirmación ESTRICTA `=== true || === "true"` (no truthy permisivo).
+  Mensaje claro indicando usar "Mi cuenta" o flag `confirmSelfReset: true`.
+  Verificado e2e que bloquea bypass por `"false"`, `"0"`, `"yes"`, `0`, `1` y
+  permite confirmación válida con `true`/`"true"`.
+- **Fix TS errors en `shopify-optimizer/src/lib/sanitize.ts`:** la API actual
+  de `dompurify` no expone `DOMPurify.Config` como namespace y
+  `DOMPurify.sanitize()` puede devolver `TrustedHTML`. Cambios:
+  `import DOMPurify, { type Config } from "dompurify"` y cast `String()` en
+  los retornos. Limpia los 6 errores de tsc del frontend.
+- **Fix runway ratio mapping (gen3 vs gen4) en `fusion-studio-pro.ts`:**
+  Runway gen3a_turbo y gen4_turbo aceptan distintas resoluciones. La API
+  rechaza `720:1280` para gen3a (debe ser `768:1280`). Mapas separados por
+  modelo. Detectado al intentar generar video real con Runway antes del
+  bloqueo final por créditos insuficientes en la cuenta del usuario.
+
+**Verificación final:** `pnpm tsc --noEmit` × 3 paquetes → CERO errores.
+API server reinicia OK, login admin 200, e2e CRIT-5 OK.
+
+**Pendientes (no scope de esta sesión, anotados):**
+- `admin/users/:userId/reset-password` no valida que `userId` exista (devuelve
+  success para fakes). Bug separado del endpoint admin.
+- 3 cuentas externas vacías de saldo (Replicate 402, Gemini 429 cap mensual,
+  Runway sin créditos) — requiere recarga del usuario para test e2e de
+  generación real.
