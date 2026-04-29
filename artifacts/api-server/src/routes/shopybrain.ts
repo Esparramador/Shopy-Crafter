@@ -6764,7 +6764,6 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                   failedFiles.push(`${file.filePath} (solo se permiten cambios en frontend/backend)`);
                   continue;
                 }
-  
                 let content = fs.readFileSync(fullPath, "utf-8");
                 let fileChanged = false;
                 for (const ch of file.changes || []) {

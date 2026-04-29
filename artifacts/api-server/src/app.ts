@@ -26,7 +26,17 @@ app.use(helmet({
 }));
 
 // ── Gzip compression for all responses ──────────────────────────────────────
-app.use(compression());
+// Skip compression when X-No-Compression header is set by enableLongRunning(),
+// otherwise the heartbeat whitespace gets buffered and the proxy still times
+// out at ~60s. Long-running endpoints opt out via that header.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (res.getHeader("X-No-Compression")) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // ── Request logger ───────────────────────────────────────────────────────────
 app.use(

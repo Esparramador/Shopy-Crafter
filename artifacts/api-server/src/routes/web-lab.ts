@@ -214,16 +214,15 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
 
     enableLongRunning(res);
 
-    const [extraction, pageSpeed, scraperData] = await Promise.all([
+    // FIX 502 Lab Web: paralelizar PageSpeed mobile + desktop (antes desktop
+    // corría secuencialmente añadiendo 30-90s extra). Junto al heartbeat HTTP
+    // del enableLongRunning evita que el proxy corte la conexión a 60s.
+    const [extraction, pageSpeed, pageSpeedDesktop, scraperData] = await Promise.all([
       extractFullWebContent(normalizedUrl),
       runPageSpeedAudit(normalizedUrl, "mobile").catch(() => null),
+      runPageSpeedAudit(normalizedUrl, "desktop").catch(() => null),
       scrapeWebsite(normalizedUrl).catch(() => null),
     ]);
-
-    let pageSpeedDesktop = null;
-    try {
-      pageSpeedDesktop = await runPageSpeedAudit(normalizedUrl, "desktop");
-    } catch {}
 
     const pid = projectId ?? 0;
     let projectName = "Análisis externo";
