@@ -66,27 +66,6 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
-export function requireClientAccess(req: Request, res: Response, next: NextFunction): void {
-  if (!req.session.userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  if (req.session.role === "admin") {
-    next();
-    return;
-  }
-  if (req.session.role === "client") {
-    const projectId = req.params["projectId"] || req.params["id"];
-    if (!projectId) { res.status(400).json({ error: "Missing project ID" }); return; }
-    if (req.session.clientId === projectId) {
-      next();
-      return;
-    }
-    res.status(403).json({ error: "Access denied to this store" });
-    return;
-  }
-  res.status(403).json({ error: "Forbidden" });
-}
 
 declare module "express-session" {
   interface SessionData {

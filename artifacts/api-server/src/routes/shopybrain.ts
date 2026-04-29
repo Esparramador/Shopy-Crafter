@@ -4807,6 +4807,17 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const title = params?.title;
           if (!title) { res.status(400).json({ error: "title requerido para la colección" }); return; }
   
+          // ── CONFIRMATION GATE ──
+          if (!params?.confirmed) {
+            result = {
+              success: false,
+              requiresConfirmation: true,
+              targetLabel: `colección "${title}"`,
+              message: `⚠️ ¿Crear la colección **"${title}"** (${params?.type || "custom"}) en la tienda? Envía con \`confirmed: true\` para proceder.`,
+            };
+            break;
+          }
+  
           const collectionType = params?.type || "custom";
           let bodyHtml = params?.bodyHtml || "";
           let seoTitle = params?.seoTitle || "";
@@ -5482,7 +5493,19 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         case "sync_catalog_prices": {
           const projectId = params?.projectId;
           if (!projectId) { result = { error: true, message: "❌ Falta projectId" }; break; }
-          const dryRun = params?.dryRun === true || params?.dryRun === "true";
+          // ── PROTECCIÓN: catálogo hardcoded de Shopy Crafter (no aplicar a tiendas de cliente) ──
+          // dryRun por defecto ON salvo confirmación explícita
+          const explicitWrite = params?.confirmed === true && (params?.dryRun === false || params?.dryRun === "false");
+          const dryRun = !explicitWrite;
+          if (!params?.confirmed) {
+            result = {
+              success: false,
+              requiresConfirmation: true,
+              warning: "⚠️ Esta acción usa el catálogo OFICIAL de Shopy Crafter. Sólo aplicar a la tienda matriz, NUNCA a tiendas de clientes.",
+              message: "⚠️ ¿Sincronizar precios con el catálogo oficial Shopy Crafter? Por defecto se ejecuta en modo simulación. Para aplicar cambios reales envía `confirmed: true` y `dryRun: false`.",
+            };
+            break;
+          }
           try {
             const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
             if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }

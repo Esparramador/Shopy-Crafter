@@ -143,11 +143,20 @@ export default function UniversalGenerator() {
 
       setResults(prev => ({ ...prev, [typeId]: data }));
 
-      if (data.redirect) {
-        const redirectUrl = data.redirect.startsWith("/api")
-          ? api(data.redirect.replace("/api", ""))
-          : api(data.redirect);
-        window.open(redirectUrl, "_blank");
+      if (data.redirect && typeof data.redirect === "string") {
+        // M9: validar que sea un path interno (evitar open redirect a hosts externos)
+        const r = data.redirect.trim();
+        const isSafeInternalPath =
+          r.startsWith("/") &&
+          !r.startsWith("//") &&
+          !r.startsWith("/\\") &&
+          (r.startsWith("/api/") || r.startsWith("/vault/") || r.startsWith("/generator/") || r.startsWith("/exports/") || r.startsWith("/projects/"));
+        if (isSafeInternalPath) {
+          const redirectUrl = r.startsWith("/api")
+            ? api(r.replace("/api", ""))
+            : api(r);
+          window.open(redirectUrl, "_blank", "noopener,noreferrer");
+        }
       }
 
       loadHistory();
@@ -202,7 +211,6 @@ export default function UniversalGenerator() {
           </p>
         </div>
       </div>
-
       <div style={{
         display: "flex", gap: 10, marginBottom: 16, alignItems: "center",
         background: "linear-gradient(90deg, #0f172a, #1e293b)", padding: "10px 16px", borderRadius: 10, border: "1px solid #334155"
@@ -233,7 +241,6 @@ export default function UniversalGenerator() {
           Aplica a todos los informes y contenidos generados
         </span>
       </div>
-
       <div style={{
         display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap",
         background: "linear-gradient(90deg, #0f172a, #1e293b)", padding: "10px 16px", borderRadius: 10, border: "1px solid #334155"
@@ -268,7 +275,6 @@ export default function UniversalGenerator() {
           </span>
         )}
       </div>
-
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 300px" }}>
           <Search size={16} style={{ position: "absolute", left: 12, top: 10, color: "#94a3b8" }} />
@@ -302,7 +308,6 @@ export default function UniversalGenerator() {
           <FolderOpen size={14} style={{ marginRight: 4 }} /> Historial
         </Button>
       </div>
-
       <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", background: "rgba(79,70,229,.08)", padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(99,102,241,.25)" }}>
         <ExternalLink size={16} style={{ color: "#818cf8", flexShrink: 0 }} />
         <span style={{ fontSize: 13, color: "#a5b4fc", fontWeight: 500, whiteSpace: "nowrap" }}>URL externa:</span>
@@ -314,7 +319,6 @@ export default function UniversalGenerator() {
         />
         <span style={{ fontSize: 11, color: "#818cf8", whiteSpace: "nowrap" }}>Para analizar cualquier tienda</span>
       </div>
-
       {showHistory && history.length > 0 && (
         <Card style={{ marginBottom: 20 }}>
           <CardHeader>
@@ -352,7 +356,6 @@ export default function UniversalGenerator() {
           </CardContent>
         </Card>
       )}
-
       {filteredCategories.map(([catId, cat]) => {
         const visibleTypes = cat.types.filter(matchesSearch);
         if (visibleTypes.length === 0) return null;
@@ -383,7 +386,9 @@ export default function UniversalGenerator() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 24 }}>{genType.icon}</span>
                           <div>
-                            <h3 style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{genType.label}</h3>
+                            <h3
+                              style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}
+                              className="text-[#0c81f5]">{genType.label}</h3>
                             <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
                               {genType.outputFormats.map(f => (
                                 <Badge key={f} variant="outline" style={{ fontSize: 9, padding: "0 4px", textTransform: "uppercase" }}>
@@ -517,7 +522,6 @@ export default function UniversalGenerator() {
           </div>
         );
       })}
-
       {totalTypes === 0 && (
         <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 16px" }} />
