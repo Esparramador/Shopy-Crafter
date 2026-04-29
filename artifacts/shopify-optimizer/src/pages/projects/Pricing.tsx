@@ -932,7 +932,8 @@ export default function PricingPage() {
   const [competitorUrl, setCompetitorUrl] = useState("");
   const [competitorResult, setCompetitorResult] = useState<{
     analysis?: string;
-    recommendations?: string[];
+    positioningRecommendation?: string;
+    recommendations?: Array<string | { priority?: string; action?: string; impact?: string; kpi?: string }>;
   } | null>(null);
 
   const handleCompetitorAnalysis = () => {
@@ -1183,12 +1184,45 @@ ${products.slice(0, 50).map((p: any) => `<tr><td>${p.title}</td><td>${p.price ? 
             {competitorResult.analysis && (
               <p className="text-sm text-muted-foreground mb-3">{competitorResult.analysis}</p>
             )}
-            {competitorResult.recommendations?.map((rec, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-foreground mb-2">
-                <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                {rec}
-              </div>
-            ))}
+            {competitorResult.positioningRecommendation && (
+              <p className="text-sm text-foreground mb-3">
+                <strong className="text-amber-400">Posicionamiento: </strong>
+                {competitorResult.positioningRecommendation}
+              </p>
+            )}
+            {competitorResult.recommendations?.map((rec, i) => {
+              const isObj = rec && typeof rec === "object";
+              const priority = isObj ? (rec as any).priority : undefined;
+              const action = isObj ? (rec as any).action : undefined;
+              const impact = isObj ? (rec as any).impact : undefined;
+              const kpi = isObj ? (rec as any).kpi : undefined;
+              const text = typeof rec === "string"
+                ? rec
+                : (action || JSON.stringify(rec));
+              return (
+                <div key={i} className="flex items-start gap-2 text-sm text-foreground mb-2">
+                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    {priority && (
+                      <span className="inline-block text-[10px] px-1.5 py-0.5 mr-2 rounded bg-amber-500/20 text-amber-300 uppercase font-bold">
+                        {String(priority)}
+                      </span>
+                    )}
+                    <span>{text}</span>
+                    {impact && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        <strong>Impacto:</strong> {String(impact)}
+                      </div>
+                    )}
+                    {kpi && (
+                      <div className="text-xs text-muted-foreground">
+                        <strong>KPI:</strong> {String(kpi)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </GlassCard>
