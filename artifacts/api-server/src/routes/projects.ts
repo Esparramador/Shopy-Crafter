@@ -500,7 +500,12 @@ router.get("/projects/:projectId", async (req, res): Promise<void> => {
 router.put("/projects/:projectId", async (req, res): Promise<void> => {
   try {
     const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
-    const { name, shopDomain, clientId, clientSecret, storeNiche, brandTone, targetAudience, storeMarkets, replicateApiToken, anthropicApiKey, autoPilotEnabled } = req.body;
+    const {
+      name, shopDomain, clientId, clientSecret, storeNiche, brandTone, targetAudience, storeMarkets,
+      replicateApiToken, anthropicApiKey, autoPilotEnabled,
+      service_level, service_monthly_value, service_notes,
+      client_contact_name, client_contact_email, client_contact_phone, status,
+    } = req.body;
   
     const [existing] = await db.select({ platformType: projectsTable.platformType }).from(projectsTable).where(eq(projectsTable.id, id));
     const platform = existing?.platformType ?? "shopify";
@@ -519,6 +524,13 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
     if (replicateApiToken !== undefined) updateData.replicateApiToken = replicateApiToken ? encrypt(replicateApiToken) : null;
     if (anthropicApiKey !== undefined) updateData.anthropicApiKey = anthropicApiKey ? encrypt(anthropicApiKey) : null;
     if (autoPilotEnabled !== undefined) updateData.autoPilotEnabled = autoPilotEnabled;
+    if (service_level !== undefined) updateData.serviceLevel = service_level;
+    if (service_monthly_value !== undefined) updateData.serviceMonthlyValue = Number(service_monthly_value) || 0;
+    if (service_notes !== undefined) updateData.serviceNotes = service_notes;
+    if (client_contact_name !== undefined) updateData.clientContactName = client_contact_name;
+    if (client_contact_email !== undefined) updateData.clientContactEmail = client_contact_email;
+    if (client_contact_phone !== undefined) updateData.clientContactPhone = client_contact_phone;
+    if (status !== undefined) updateData.status = status;
   
     const [updated] = await db
       .update(projectsTable)

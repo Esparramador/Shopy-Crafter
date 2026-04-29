@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { TrendingUp, Users, DollarSign, BarChart3, Edit3, Check, X, ExternalLink } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -48,6 +49,7 @@ const _STATUS_COLORS: Record<ClientStatus, string> = {
 };
 
 export default function Revenue() {
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -69,17 +71,26 @@ export default function Revenue() {
   async function saveEdit(id: number) {
     setSaving(true);
     try {
-      await fetch(`${API}/api/projects/${id}`, {
-        method: "PATCH",
+      const res = await fetch(`${API}/api/projects/${id}`, {
+        method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editData),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: err.error || `Error ${res.status}`, variant: "destructive" });
+        return;
+      }
       setProjects(prev => prev.map(p => p.id === id ? { ...p, ...editData } : p));
       setEditingId(null);
       setEditData({});
-    } catch { }
-    setSaving(false);
+      toast({ title: "Proyecto actualizado" });
+    } catch (e: any) {
+      toast({ title: e?.message || "Error de conexión", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   const filtered = filter === "all" ? projects : projects.filter(p => p.service_level === filter);

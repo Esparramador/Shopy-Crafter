@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList, Eye, CreditCard } from "lucide-react";
 import { timeSince } from "@/lib/utils";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -604,6 +604,257 @@ function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+// ─── PLANS & CRÉDITOS MODAL ───────────────────────────────────────────────
+// Lets admin manage plan + packs + usage for each project of a client
+interface PlansModalProps { client: User; onClose: () => void; }
+
+function PlansModal({ client, onClose }: PlansModalProps) {
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [planStatus, setPlanStatus] = useState<any>(null);
+  const [definitions, setDefinitions] = useState<{ plans: any[]; packs: any[] } | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [addingPack, setAddingPack] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    // FIX: /admin/users/:id/projects no existe — usamos projects-list y filtramos por clientId localmente
+    if (!client.clientId) { setLoadingProjects(false); return; }
+    Promise.all([
+      fetch(`${API_BASE}/api/admin/projects-list`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => []),
+      fetch(`${API_BASE}/api/plans/definitions`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null),
+    ]).then(([allProjects, defs]) => {
+      const all = Array.isArray(allProjects) ? allProjects : (allProjects?.projects ?? []);
+      // Filter to projects belonging to this client
+      const list = all.filter((p: any) => String(p.id) === String(client.clientId));
+      setClientProjects(list);
+      if (list.length === 1) setSelectedProjectId(list[0].id);
+      setDefinitions(defs);
+      setLoadingProjects(false);
+    });
+  }, [client.id, client.clientId]);
+
+  useEffect(() => {
+    if (!selectedProjectId) { setPlanStatus(null); return; }
+    setLoadingStatus(true);
+    fetch(`${API_BASE}/api/projects/${selectedProjectId}/plan`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setPlanStatus(d); setLoadingStatus(false); })
+      .catch(() => setLoadingStatus(false));
+  }, [selectedProjectId]);
+
+  const refreshStatus = async () => {
+    if (!selectedProjectId) return;
+    const r = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/plan`, { credentials: "include" });
+    if (r.ok) setPlanStatus(await r.json());
+  };
+
+  const showToast = (msg: string, ok: boolean) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const changePlan = async (newPlan: string) => {
+    if (!selectedProjectId) return;
+    if (!confirm(`¿Cambiar plan a "${newPlan}"? Se actualiza inmediatamente.`)) return;
+    setSavingPlan(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/plan`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error");
+      showToast(`Plan actualizado a "${newPlan}"`, true);
+      await refreshStatus();
+    } catch (e: any) {
+      showToast(e?.message || "Error cambiando plan", false);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const addPack = async (packKey: string) => {
+    if (!selectedProjectId) return;
+    const def = definitions?.packs?.find(p => p.key === packKey);
+    if (!confirm(`¿Asignar "${def?.label || packKey}"? (+${def?.productsIncluded} productos, +${def?.imagesIncluded} imágenes)`)) return;
+    setAddingPack(packKey);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/plan/credits`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packType: packKey }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error");
+      showToast(`Pack "${def?.label}" asignado`, true);
+      await refreshStatus();
+    } catch (e: any) {
+      showToast(e?.message || "Error asignando pack", false);
+    } finally {
+      setAddingPack(null);
+    }
+  };
+
+  const resetUsage = async () => {
+    if (!selectedProjectId) return;
+    if (!confirm("¿Resetear el contador mensual de uso? Se pondrá a 0.")) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/plan/reset-usage`, {
+        method: "POST", credentials: "include",
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error");
+      showToast("Contador reseteado", true);
+      await refreshStatus();
+    } catch (e: any) {
+      showToast(e?.message || "Error reseteando", false);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--ink, #0a0a0f)", border: "1px solid var(--bdr, #22222e)", borderRadius: 16, maxWidth: 760, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--bdr)", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "var(--ink)", zIndex: 1 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--gold, #c8a84b)", display: "flex", alignItems: "center", gap: 8 }}>
+              💳 Plan & Créditos — {client.name}
+            </h2>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3, #888)" }}>{client.email}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 6 }}><X size={18} /></button>
+        </div>
+
+        {toast && (
+          <div style={{ margin: "12px 22px 0", padding: "10px 14px", borderRadius: 8, fontSize: 13, background: toast.ok ? "rgba(45,212,159,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${toast.ok ? "rgba(45,212,159,0.3)" : "rgba(239,68,68,0.3)"}`, color: toast.ok ? "#2dd49f" : "#ef4444" }}>
+            {toast.ok ? "✅ " : "⚠ "}{toast.msg}
+          </div>
+        )}
+
+        <div style={{ padding: 22 }}>
+          {loadingProjects && <p style={{ fontSize: 13, color: "var(--t2)" }}>Cargando proyectos...</p>}
+          {!loadingProjects && clientProjects.length === 0 && (
+            <p style={{ fontSize: 13, color: "var(--t2)" }}>Este cliente no tiene proyectos asignados.</p>
+          )}
+
+          {clientProjects.length > 1 && (
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 11, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Proyecto</label>
+              <select value={selectedProjectId ?? ""} onChange={e => setSelectedProjectId(e.target.value ? parseInt(e.target.value) : null)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr)", color: "var(--t1)", fontSize: 13 }}>
+                <option value="">— Selecciona un proyecto —</option>
+                {clientProjects.map(p => <option key={p.id} value={p.id}>{p.name || p.shopDomain || `Proyecto ${p.id}`}</option>)}
+              </select>
+            </div>
+          )}
+
+          {selectedProjectId && (
+            <>
+              {loadingStatus && <p style={{ fontSize: 13, color: "var(--t2)" }}>Cargando plan...</p>}
+
+              {!loadingStatus && planStatus && (
+                <>
+                  {/* CURRENT PLAN STATUS */}
+                  <div style={{ padding: 16, borderRadius: 10, background: "linear-gradient(135deg, rgba(200,168,75,0.06), transparent)", border: "1px solid rgba(200,168,75,0.2)", marginBottom: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5 }}>Plan actual</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: "var(--gold)", marginTop: 2 }}>{planStatus.plan || "trial"}</div>
+                      </div>
+                      <button onClick={resetUsage} disabled={resetting} className="btn btn-sm btn-ghost" title="Resetear contador del mes">
+                        {resetting ? "..." : "↻ Reset"}
+                      </button>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 8 }}>
+                      <div style={{ padding: 10, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)" }}>
+                        <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase" }}>Productos este mes</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--t1)" }}>{planStatus.usage?.products ?? 0} / {planStatus.limits?.productsPerMonth ?? "—"}</div>
+                      </div>
+                      <div style={{ padding: 10, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)" }}>
+                        <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase" }}>Imágenes este mes</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--t1)" }}>{planStatus.usage?.images ?? 0} / {planStatus.limits?.maxImagesPerMonth ?? "—"}</div>
+                      </div>
+                    </div>
+                    {planStatus.activePacks && planStatus.activePacks.length > 0 && (
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--bdr)" }}>
+                        <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 6 }}>Packs activos</div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {planStatus.activePacks.map((p: any, i: number) => (
+                            <span key={i} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 12, background: "rgba(45,212,159,0.1)", color: "#2dd49f", border: "1px solid rgba(45,212,159,0.3)" }}>
+                              {p.label || p.packKey} ({p.imagesRemaining ?? "—"} imgs)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CHANGE PLAN */}
+                  {definitions?.plans && (
+                    <div style={{ marginBottom: 18 }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--t1)", marginBottom: 8 }}>Cambiar plan</h3>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
+                        {definitions.plans.map(p => (
+                          <button key={p.key} onClick={() => changePlan(p.key)} disabled={savingPlan || p.key === planStatus.plan}
+                            style={{
+                              padding: "10px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: p.key === planStatus.plan ? "default" : "pointer",
+                              background: p.key === planStatus.plan ? "rgba(200,168,75,0.15)" : "var(--ink2)",
+                              border: `1px solid ${p.key === planStatus.plan ? "var(--gold)" : "var(--bdr)"}`,
+                              color: p.key === planStatus.plan ? "var(--gold)" : "var(--t2)",
+                              textAlign: "left", lineHeight: 1.3,
+                            }}>
+                            <div style={{ fontWeight: 700, marginBottom: 2 }}>{p.label}</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)" }}>{p.productsPerMonth ?? "∞"}p · {p.maxImagesPerMonth ?? "∞"}img</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ADD PACK */}
+                  {definitions?.packs && (
+                    <div>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--t1)", marginBottom: 8 }}>Asignar pack de créditos</h3>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                        {definitions.packs.map(p => (
+                          <button key={p.key} onClick={() => addPack(p.key)} disabled={!!addingPack}
+                            style={{
+                              padding: "12px 14px", borderRadius: 8, fontSize: 12, cursor: addingPack ? "not-allowed" : "pointer",
+                              background: addingPack === p.key ? "rgba(45,212,159,0.15)" : "var(--ink2)",
+                              border: "1px solid var(--bdr)", color: "var(--t1)", textAlign: "left", lineHeight: 1.4,
+                              opacity: addingPack && addingPack !== p.key ? 0.5 : 1,
+                            }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                              <strong style={{ fontSize: 13 }}>{p.label}</strong>
+                              <span style={{ color: "var(--gold)", fontWeight: 700 }}>€{p.price}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--t3)" }}>+{p.productsIncluded} productos · +{p.imagesIncluded} imágenes</div>
+                            {addingPack === p.key && <div style={{ fontSize: 10, color: "#2dd49f", marginTop: 4 }}>Asignando...</div>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminClients() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -615,6 +866,7 @@ export default function AdminClients() {
   const [chatInitialMsg, setChatInitialMsg] = useState<string | undefined>(undefined);
   const [paymentClient, setPaymentClient] = useState<User | null>(null);
   const [suggestionClient, setSuggestionClient] = useState<User | null>(null);
+  const [plansClient, setPlansClient] = useState<User | null>(null);
 
   const load = () => {
     fetch(`${API_BASE}/api/admin/users`, { credentials: "include" })
@@ -632,6 +884,24 @@ export default function AdminClients() {
       await fetch(`${API_BASE}/api/admin/users/${u.id}/${action}`, { method: "POST", credentials: "include" });
     } catch {} finally {
       setProcessing(null); load();
+    }
+  };
+
+  const impersonate = async (u: User) => {
+    if (!u.clientId) return;
+    if (!confirm(`¿Suplantar a ${u.name} (${u.email})? Verás la app como cliente hasta que pulses "Salir" en el banner superior.`)) return;
+    setProcessing(u.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/impersonate/${u.id}`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Error al suplantar"); setProcessing(null); return; }
+      // Full reload forces AuthContext to pick up new session role
+      window.location.href = "/client";
+    } catch (e: any) {
+      alert(e?.message || "Error de red");
+      setProcessing(null);
     }
   };
 
@@ -674,6 +944,12 @@ export default function AdminClients() {
         <SuggestionModal
           client={suggestionClient}
           onClose={() => setSuggestionClient(null)}
+        />
+      )}
+      {plansClient && (
+        <PlansModal
+          client={plansClient}
+          onClose={() => setPlansClient(null)}
         />
       )}
 
@@ -780,6 +1056,25 @@ export default function AdminClients() {
                             <button onClick={() => setSuggestionClient(u)} className="btn btn-sm btn-ghost" title="Enviar propuesta al cliente" style={{ borderColor: "rgba(45,212,159,0.25)", color: "var(--jade)" }}>
                               <ClipboardList size={11} />
                               Propuesta
+                            </button>
+                            <button
+                              onClick={() => impersonate(u)}
+                              disabled={processing === u.id || !u.isActive}
+                              className="btn btn-sm btn-ghost"
+                              title={u.isActive ? "Ver la app como este cliente" : "Activa al cliente primero"}
+                              style={{ borderColor: "rgba(99,102,241,0.25)", color: "#6366f1" }}
+                            >
+                              <Eye size={11} />
+                              Ver como
+                            </button>
+                            <button
+                              onClick={() => setPlansClient(u)}
+                              className="btn btn-sm btn-ghost"
+                              title="Gestionar plan y créditos del proyecto"
+                              style={{ borderColor: "rgba(200,168,75,0.3)", color: "var(--gold)" }}
+                            >
+                              <CreditCard size={11} />
+                              Plan
                             </button>
                           </>
                         )}

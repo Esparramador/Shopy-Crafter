@@ -40,6 +40,13 @@ export const projectsTable = pgTable("projects", {
   creditsProducts: integer("credits_products").notNull().default(0),
   creditsImages: integer("credits_images").notNull().default(0),
   planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
+  serviceLevel: text("service_level").notNull().default("none").$type<"none" | "audit" | "managed" | "premium" | "enterprise">(),
+  serviceMonthlyValue: integer("service_monthly_value").notNull().default(0),
+  serviceNotes: text("service_notes"),
+  clientContactName: text("client_contact_name"),
+  clientContactEmail: text("client_contact_email"),
+  clientContactPhone: text("client_contact_phone"),
+  status: text("status").notNull().default("active").$type<"active" | "paused" | "churned" | "prospect">(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
