@@ -12,6 +12,10 @@ import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
 import { PgRateLimitStore, startRateLimitCleanup } from "./lib/pg-rate-limit-store.js";
+import { validateEncryptionKey } from "./lib/crypto.js";
+
+// BE-8: validar ENCRYPTION_KEY ANTES de cualquier inicialización (fail-fast)
+validateEncryptionKey();
 
 const PgSession = ConnectPg(session);
 

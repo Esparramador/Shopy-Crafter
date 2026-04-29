@@ -1035,6 +1035,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   };
 
   const formatActionResult = (action: string, result: any): string => {
+    // CRIT-6 frontend: handle global confirmation responses uniformly.
+    // Backend sends { requiresConfirmation: true, action, preview, message }
+    // for any DESTRUCTIVE_ACTIONS without "confirmed: true". Show the message
+    // and stop — don't render success-formatted output below.
+    if (result && result.requiresConfirmation === true) {
+      return (
+        result.message ||
+        `⚠️ Confirmación requerida para \`${action}\`. Re-envía la acción añadiendo "confirma" al mensaje.`
+      );
+    }
     if (result.error) return `❌ ${result.message}`;
 
     switch (action) {

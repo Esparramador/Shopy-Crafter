@@ -2,6 +2,17 @@
 
 ## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
 
+**Fase 7 — CRIT-6 + sesión final (29 abr)** — cierre de los hallazgos pendientes del audit con guard centralizado:
+- **CRIT-6 (`shopybrain.ts` línea 1761)**: añadido guard centralizado `requireConfirmation(params, action, {...})` antes del `switch (action)` — cubre los 24 cases catastróficos del `DESTRUCTIVE_ACTIONS` set (delete_*, bulk_*, optimize_all_products, deactivate_user, reset_*, edit_theme_*, sync_store_theme, setup_full_store, fix_code, modify_ui) en una sola edición sin tocar cada case individual. Si la action está en el set y `params.confirmed !== true`, devuelve JSON `{requiresConfirmation:true, action, preview, message}` y no ejecuta nada.
+- **OmniChatbot global handler**: `formatActionResult()` ahora detecta `result.requiresConfirmation === true` AL INICIO y devuelve `result.message` directamente para cualquier action — antes solo `delete_product` lo manejaba, otras destructivas mostraban `✅` falsamente.
+- **`/error-report` IP detection**: cambia `req.headers["x-forwarded-for"]` (spoofable) por `req.ip` (respeta `app.set("trust proxy", 1)` ya configurado en `app.ts`).
+- **`lib/sanitize.ts`** (FE-A7): nuevo módulo con `cleanHtml`, `cleanSvg`, `cleanMarkdownLite` (DOMPurify endurecido — sin script/style/iframe, sin handlers inline, URI restringidas).
+- **`validateEncryptionKey()` en startup** (`app.ts` línea 21): invocado tras imports → fallo duro en producción si falta `ENCRYPTION_KEY`.
+- **`/error-report` endpoint** (`health.ts`): rate limit 30/min/IP en memoria, sanitización de payload por truncado.
+- **Android backup hardening**: `allowBackup="false"` + `dataExtractionRules` referenciado en `AndroidManifest.xml` + nuevo `res/xml/data_extraction_rules.xml` (excluye sesiones, tokens, cifrado).
+- **`Billing.tsx` rebuilt** (250→442L): react-query (`useQuery`/`useMutation`/invalidations), `apiGet/apiPost` del wrapper centralizado, redirect a Shopify Billing (`confirmationUrl`/`checkoutUrl` → `window.top.location.href`), responsive.
+- **Verificado YA APLICADO** (sesiones previas): CRIT-1 `validateFixCodePath` (línea 4238 + 6752), CRIT-3 hardcoded `|| 2` (0 ocurrencias), CRIT-4 `fetchImageWithSizeLimit` en fusion_analyze/fusion_create_product (líneas 5773 + 5806), CRIT-5 `normalizeListDirectory` en list_source_files (4065-4066), schema `express_rate_limits.ts`, schemas approvals/audit_log/messages/rate_limits en users.ts.
+
 **Fase 6 — Cierre auditoría 21 ZIPs (29 abr)** — patches residuales aplicados tras revisión cruzada de los markdowns de cierre (`01-PATCHES-EXTRA.md`, `06-FINAL-CLOSURE.md`, `08-DEEP-AUDIT-WITH-CONTEXT.md`, `shopybrain-VERIFIED-patches.ts`):
 - **A13** `lib/auth.ts`: eliminada `requireClientAccess` (dead code, 0 referencias en todo el repo).
 - **A16** eliminado `routes/klaviyo.ts` + import en `routes/index.ts` (dead code; el frontend solo usa `klaviyo-ai.ts`, y `lib/klaviyo-headers.ts` se conserva).

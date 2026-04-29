@@ -1757,7 +1757,22 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
     try {
       let result: Record<string, unknown> = {};
-  
+
+      // CRIT-6: Confirmación obligatoria para acciones destructivas (centralizado)
+      const confirmationGuard = requireConfirmation(params, action, {
+        summary:
+          `Vas a ejecutar la acción \`${action}\`` +
+          (params?.projectId ? ` sobre el proyecto ${params.projectId}` : "") +
+          (params?.productId ? `, producto ${params.productId}` : "") +
+          (params?.collectionId ? `, colección ${params.collectionId}` : "") +
+          (params?.userId ? `, usuario ${params.userId}` : "") +
+          ". Esta operación es destructiva o de gran alcance y no se puede deshacer fácilmente.",
+      });
+      if (confirmationGuard) {
+        res.json(confirmationGuard);
+        return;
+      }
+
       switch (action) {
         case "store_status": {
           const projectId = params?.projectId;
