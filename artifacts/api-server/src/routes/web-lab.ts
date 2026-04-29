@@ -212,11 +212,23 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       normalizedUrl = "https://" + normalizedUrl;
     }
 
+    // FIX 502 Lab Web (parte 2): forzar flush de headers ANTES del trabajo
+    // pesado. enableLongRunning() programa heartbeats cada 25s pero solo
+    // escribe si res.headersSent===true. Antes de este flush, el primer
+    // heartbeat se ignoraba porque headersSent quedaba en false hasta el
+    // res.end() final, momento en que el proxy ya había cortado a los 60s.
+    // Comprometemos status 200 + Content-Type aquí; los caminos de error
+    // posteriores ya usan res.end(JSON.stringify({error})) en el catch.
+    res.status(200);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     enableLongRunning(res);
+    if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
+      (res as unknown as { flushHeaders: () => void }).flushHeaders();
+    }
 
-    // FIX 502 Lab Web: paralelizar PageSpeed mobile + desktop (antes desktop
-    // corría secuencialmente añadiendo 30-90s extra). Junto al heartbeat HTTP
-    // del enableLongRunning evita que el proxy corte la conexión a 60s.
+    // FIX 502 Lab Web (parte 1): paralelizar PageSpeed mobile + desktop
+    // (antes desktop corría secuencialmente añadiendo 30-90s extra). Junto al
+    // heartbeat HTTP del enableLongRunning evita que el proxy corte a 60s.
     const [extraction, pageSpeed, pageSpeedDesktop, scraperData] = await Promise.all([
       extractFullWebContent(normalizedUrl),
       runPageSpeedAudit(normalizedUrl, "mobile").catch(() => null),

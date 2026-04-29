@@ -128,3 +128,44 @@ API server reinicia OK, login admin 200, e2e CRIT-5 OK.
 - 3 cuentas externas vacías de saldo (Replicate 402, Gemini 429 cap mensual,
   Runway sin créditos) — requiere recarga del usuario para test e2e de
   generación real.
+
+---
+
+## Sesión 2026-04-29 (T7) — Fix 502 Lab Web
+
+**Problema raíz:** `enableLongRunning(res)` programaba heartbeats cada 25s
+para mantener viva la conexión, pero solo escribía si `res.headersSent ===
+true`. En `/web-lab/analyze` los headers nunca se flusheaban hasta el
+`res.end()` final (al cabo de 1-3 min), así que **ningún heartbeat llegaba al
+proxy** y la conexión se cortaba a los 60s con 502 Bad Gateway, aunque la
+paralelización de PageSpeed (mobile+desktop) ya estaba aplicada.
+
+**Fix (3 líneas en `routes/web-lab.ts` ANTES del trabajo pesado):**
+```ts
+res.status(200);
+res.setHeader("Content-Type", "application/json; charset=utf-8");
+enableLongRunning(res);
+res.flushHeaders?.();
+```
+
+Esto compromete el status/Content-Type tempranamente (lo cual es seguro
+porque el handler ya usa `res.end(JSON.stringify(...))` en el camino feliz y
+tiene fallback `res.end(JSON.stringify({error}))` en el catch).
+
+**Validación e2e con `https://example.com`:**
+- TTFB: **4.8 ms** (antes >60s y caía a 502)
+- Total: 172.9 s (Claude askClaudeJsonWithBrain tarda 2-3 min con maxTokens
+  16000, dentro de su timeout de 300s)
+- HTTP **200**, Content-Type `application/json; charset=utf-8`
+- 177 KB de body, **6 heartbeats** (espacios) al inicio + JSON completo
+- `JSON.parse` tolera el leading whitespace por spec RFC 8259 → respuesta
+  parseada OK con todas las keys: `success`, `analysis`, `brandResearch`,
+  `reportHtml`, `vaultIds`, `pageSpeed`, `scraperData`, `url`
+- `overallScore: 45` retornado correctamente
+
+**No tocado (alcance limitado al endpoint reportado):** otros 32 endpoints
+que también usan `enableLongRunning` heredan el mismo bug latente. Anotado
+como seguimiento; aplicar el mismo patrón cuando se reporten 502 en
+otras rutas largas, o refactorizar el helper para hacer flushHeaders por
+defecto (cambio de mayor riesgo, requiere auditar cada handler para
+asegurar que ningún `res.status(...)` vive después de enableLongRunning).
