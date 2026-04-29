@@ -451,6 +451,9 @@ export async function generateMusic(
 export type VideoModel =
   | "runway-gen4-turbo"
   | "runway-gen3-alpha"
+  | "veo-3-fast"
+  | "veo-3"
+  | "veo-2"
   | "kling-master"
   | "kling-2.1"
   | "seedance-pro"
@@ -458,15 +461,18 @@ export type VideoModel =
   | "hailuo-02"
   | "wan-2.5-fast";
 
-export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
-  "runway-gen4-turbo":  { provider: "runway",                                              description: "Top quality, control fino, 5/10s",          costPerSec: 0.10, quality: 10, maxDuration: 10 },
-  "runway-gen3-alpha":  { provider: "runway",                                              description: "Buena calidad, mejor precio que Gen-4",     costPerSec: 0.08, quality: 8,  maxDuration: 10 },
-  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",     description: "Top motion, audio nativo, multi-shot",      costPerSec: 0.18, quality: 10, maxDuration: 10 },
-  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-v2.1",            description: "1080p motion realista hasta 10s",           costPerSec: 0.09, quality: 9,  maxDuration: 10 },
-  "seedance-pro":       { provider: "replicate", modelId: "bytedance/seedance-1-pro",      description: "Cinema-quality, multi-reference (9 imgs)",  costPerSec: 0.07, quality: 9,  maxDuration: 10 },
-  "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast", description: "Rápido y barato, calidad pro suficiente",   costPerSec: 0.05, quality: 7,  maxDuration: 10 },
-  "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",             description: "Buen balance velocidad/calidad",            costPerSec: 0.05, quality: 7,  maxDuration: 6  },
-  "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",    description: "Open-source, el más barato del mercado",   costPerSec: 0.018, quality: 6, maxDuration: 5  },
+export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
+  "runway-gen4-turbo":  { provider: "runway",                                              description: "Runway Gen-4 — top quality, control fino, 5/10s",        costPerSec: 0.10, quality: 10, maxDuration: 10 },
+  "runway-gen3-alpha":  { provider: "runway",                                              description: "Runway Gen-3 Alpha — buena calidad, mejor precio",       costPerSec: 0.08, quality: 8,  maxDuration: 10 },
+  "veo-3-fast":         { provider: "gemini",  modelId: "veo-3.0-fast-generate-preview",  description: "Google Veo 3 Fast — rápido + audio nativo (8s, 16:9)",  costPerSec: 0.40, quality: 9,  maxDuration: 8  },
+  "veo-3":              { provider: "gemini",  modelId: "veo-3.0-generate-preview",       description: "Google Veo 3 — máxima calidad + audio nativo (8s, 16:9)",costPerSec: 0.75, quality: 10, maxDuration: 8  },
+  "veo-2":              { provider: "gemini",  modelId: "veo-2.0-generate-001",           description: "Google Veo 2 — soporta 9:16 y 16:9, hasta 8s (sin audio)",costPerSec: 0.35, quality: 8,  maxDuration: 8  },
+  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",     description: "Kling Master — top motion, audio nativo, multi-shot",   costPerSec: 0.18, quality: 10, maxDuration: 10 },
+  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-v2.1",            description: "Kling 2.1 — 1080p motion realista hasta 10s",           costPerSec: 0.09, quality: 9,  maxDuration: 10 },
+  "seedance-pro":       { provider: "replicate", modelId: "bytedance/seedance-1-pro",      description: "Seedance Pro — cinema-quality, multi-reference (9 imgs)",costPerSec: 0.07, quality: 9,  maxDuration: 10 },
+  "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast", description: "Seedance Fast — rápido y barato, calidad pro",          costPerSec: 0.05, quality: 7,  maxDuration: 10 },
+  "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",             description: "Hailuo 02 — buen balance velocidad/calidad",            costPerSec: 0.05, quality: 7,  maxDuration: 6  },
+  "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",    description: "Wan 2.5 — open-source, el más barato del mercado",      costPerSec: 0.018, quality: 6, maxDuration: 5  },
 };
 
 export async function generateVideoFromImage(
@@ -478,6 +484,44 @@ export async function generateVideoFromImage(
   const cfg = VIDEO_MODELS[model];
   if (!cfg) throw new Error(`Modelo de video desconocido: ${model}`);
   const duration = Math.min(Math.max(opts.duration || 5, 3), cfg.maxDuration);
+
+  // ── Google Veo (Gemini) ────────────────────────────────────────────────
+  if (cfg.provider === "gemini") {
+    const apiKey = getGeminiKey();
+    const ai = new GoogleGenAI({ apiKey });
+    const veoModel = cfg.modelId!;
+    // Veo 3 only supports 16:9; Veo 2 supports 16:9 and 9:16.
+    const isVeo3 = veoModel.startsWith("veo-3");
+    const requested = opts.aspect || "9:16";
+    const aspectRatio = isVeo3 ? "16:9" : (requested === "16:9" || requested === "9:16" ? requested : "9:16");
+    const veoDur = Math.min(Math.max(opts.duration || 8, 4), 8);
+
+    const config: any = { aspectRatio, numberOfVideos: 1, personGeneration: "allow_all" };
+    if (!isVeo3) config.durationSeconds = veoDur;
+
+    let operation: any = await ai.models.generateVideos({
+      model: veoModel,
+      prompt: prompt.slice(0, 1500),
+      image: { imageBytes: imageBuffer.toString("base64"), mimeType: imageMime },
+      config,
+    });
+
+    const deadline = Date.now() + 6 * 60_000;
+    while (!operation.done && Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 10_000));
+      operation = await ai.operations.getVideosOperation({ operation });
+    }
+    if (!operation.done) throw new Error("Veo timed out (>6min)");
+    const generated = operation?.response?.generatedVideos?.[0];
+    if (!generated?.video?.uri) throw new Error("Veo no devolvió video URI");
+
+    const downloadUrl = generated.video.uri.includes("?")
+      ? `${generated.video.uri}&key=${apiKey}`
+      : `${generated.video.uri}?key=${apiKey}`;
+    const r = await fetch(downloadUrl);
+    if (!r.ok) throw new Error(`Veo download failed: ${r.status}`);
+    return Buffer.from(await r.arrayBuffer());
+  }
 
   if (cfg.provider === "runway") {
     const apiKey = getRunwayKey();
@@ -616,6 +660,179 @@ export async function composeAd(opts: ComposeOptions): Promise<Buffer> {
           try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
         })
         .on("error", (err: Error) => reject(new Error(`FFmpeg error: ${err.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 11.5: CONCATENATE MULTIPLE VIDEO CLIPS INTO ONE
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ConcatOptions {
+  /** Source video clips in order */
+  videoBuffers: Buffer[];
+  /** Output resolution (default 1080x1920 vertical, use 1920x1080 for horizontal). */
+  width?: number;
+  height?: number;
+  /** Optional fps normalization (default 30) */
+  fps?: number;
+  /** Optional crossfade in seconds between clips (0 = hard cut) */
+  crossfadeSec?: number;
+  /**
+   * Optional explicit clip durations in seconds. Required for accurate xfade
+   * offsets when `crossfadeSec` > 0. If omitted while crossfade is enabled,
+   * `concatVideos` probes each clip with ffprobe to detect duration.
+   */
+  clipDurationsSec?: number[];
+  /** Optional voiceover/music to mux on top of the concatenated stream */
+  voiceBuffer?: Buffer;
+  musicBuffer?: Buffer;
+  voiceVolume?: number;
+  musicVolume?: number;
+}
+
+/** Probe a video file with ffprobe and return its duration in seconds. */
+async function probeDurationSec(filePath: string): Promise<number> {
+  const ffmpeg: any = (await import("fluent-ffmpeg")).default;
+  try {
+    const ffprobePath = ((await import("ffprobe-static")).default as any)?.path;
+    if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath);
+  } catch { /* ffprobe-static optional */ }
+  return new Promise<number>((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err: Error | null, data: any) => {
+      if (err) return reject(err);
+      const dur = data?.format?.duration;
+      const n = typeof dur === "number" ? dur : parseFloat(String(dur));
+      if (!isFinite(n) || n <= 0) return reject(new Error("ffprobe: duración inválida"));
+      resolve(n);
+    });
+  });
+}
+
+/**
+ * Concatenate N video clips into a single MP4. Re-encodes for compatibility
+ * (different sources can have different codecs/resolutions). Optional crossfade
+ * between clips and optional audio overlay (voice + music).
+ */
+export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
+  if (!opts.videoBuffers?.length) throw new Error("concatVideos: videoBuffers vacío");
+  if (opts.videoBuffers.length === 1 && !opts.voiceBuffer && !opts.musicBuffer) {
+    return opts.videoBuffers[0];
+  }
+  const tmp = await makeTmpDir("concat");
+  const w = opts.width ?? 1080;
+  const h = opts.height ?? 1920;
+  const fps = opts.fps ?? 30;
+  const crossfade = Math.max(0, opts.crossfadeSec ?? 0);
+  try {
+    // Write each clip to disk
+    const inputPaths: string[] = [];
+    for (let i = 0; i < opts.videoBuffers.length; i++) {
+      const p = path.join(tmp, `clip_${i}.mp4`);
+      await fs.writeFile(p, opts.videoBuffers[i]);
+      inputPaths.push(p);
+    }
+    const outPath = path.join(tmp, "concat.mp4");
+
+    let ffmpeg: any;
+    let ffmpegPath: string;
+    try {
+      ffmpeg = (await import("fluent-ffmpeg")).default;
+      ffmpegPath = (await import("ffmpeg-static")).default as unknown as string;
+      ffmpeg.setFfmpegPath(ffmpegPath);
+    } catch {
+      throw new Error("FFmpeg no disponible. Run: pnpm add fluent-ffmpeg ffmpeg-static");
+    }
+
+    // Pre-write voice/music to disk if present (we'll add them as inputs below)
+    if (opts.voiceBuffer) await fs.writeFile(path.join(tmp, "voice.mp3"), opts.voiceBuffer);
+    if (opts.musicBuffer) await fs.writeFile(path.join(tmp, "music.mp3"), opts.musicBuffer);
+
+    // If crossfade is requested, we need accurate per-clip durations to compute
+    // xfade offsets. Use explicit durations if provided, otherwise probe each
+    // clip with ffprobe.
+    let durations: number[] | null = null;
+    if (crossfade > 0 && inputPaths.length > 1) {
+      if (opts.clipDurationsSec && opts.clipDurationsSec.length === inputPaths.length) {
+        durations = opts.clipDurationsSec.map(d => Math.max(0.5, Number(d) || 5));
+      } else {
+        durations = await Promise.all(inputPaths.map(p => probeDurationSec(p).catch(() => 5)));
+      }
+    }
+
+    return await new Promise<Buffer>((resolve, reject) => {
+      const cmd = ffmpeg();
+      for (const p of inputPaths) cmd.input(p);
+
+      // Build filter graph: normalize each input to same w/h/fps, then concat
+      const N = inputPaths.length;
+      const filters: string[] = [];
+      for (let i = 0; i < N; i++) {
+        filters.push(`[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=${fps}[v${i}]`);
+      }
+
+      if (crossfade > 0 && N > 1 && durations) {
+        // Chain xfade with REAL clip durations. The offset of xfade on the
+        // i-th transition is the cumulative duration of clips 0..i-1 minus
+        // (i * crossfade) — i.e. each transition removes `crossfade` seconds
+        // of overlap from the running timeline.
+        let prev = "v0";
+        let runningEnd = durations[0];
+        for (let i = 1; i < N; i++) {
+          const out = i === N - 1 ? "vout" : `xf${i}`;
+          const offset = Math.max(0, runningEnd - crossfade);
+          filters.push(`[${prev}][v${i}]xfade=transition=fade:duration=${crossfade}:offset=${offset.toFixed(3)}[${out}]`);
+          prev = out;
+          runningEnd = offset + durations[i]; // new timeline length after this xfade
+        }
+      } else {
+        // Simple concat (hard cuts) — no per-clip duration needed
+        const concatInputs = Array.from({ length: N }, (_, i) => `[v${i}]`).join("");
+        filters.push(`${concatInputs}concat=n=${N}:v=1:a=0[vout]`);
+      }
+
+      const outputMaps: string[] = ["vout"];
+
+      // Audio overlay (optional)
+      const audioInputs: number[] = [];
+      if (opts.voiceBuffer) {
+        const vp = path.join(tmp, "voice.mp3");
+        require("node:fs").writeFileSync(vp, opts.voiceBuffer);
+        cmd.input(vp);
+        audioInputs.push(N + audioInputs.length);
+      }
+      if (opts.musicBuffer) {
+        const mp = path.join(tmp, "music.mp3");
+        require("node:fs").writeFileSync(mp, opts.musicBuffer);
+        cmd.input(mp);
+        audioInputs.push(N + audioInputs.length);
+      }
+      if (audioInputs.length === 1) {
+        const isVoice = !!opts.voiceBuffer;
+        filters.push(`[${audioInputs[0]}:a]volume=${(isVoice ? opts.voiceVolume : opts.musicVolume) ?? 1.0}[aout]`);
+        outputMaps.push("aout");
+      } else if (audioInputs.length === 2) {
+        filters.push(`[${audioInputs[0]}:a]volume=${opts.voiceVolume ?? 1.0}[av]`);
+        filters.push(`[${audioInputs[1]}:a]volume=${opts.musicVolume ?? 0.25}[am]`);
+        filters.push(`[av][am]amix=inputs=2:duration=longest:dropout_transition=0[aout]`);
+        outputMaps.push("aout");
+      }
+
+      cmd.complexFilter(filters, outputMaps);
+      cmd.videoCodec("libx264")
+        .audioCodec(audioInputs.length ? "aac" : "copy")
+        .outputOptions([
+          "-pix_fmt yuv420p",
+          "-movflags +faststart",
+          ...(audioInputs.length ? ["-shortest"] : []),
+        ])
+        .on("end", async () => {
+          try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        })
+        .on("error", (err: Error) => reject(new Error(`FFmpeg concat error: ${err.message}`)))
         .save(outPath);
     });
   } finally {

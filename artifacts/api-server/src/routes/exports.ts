@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireProjectAccess } from "../lib/access.js";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { cogsTable, projectFilesTable } from "@workspace/db/schema";
@@ -2089,7 +2090,7 @@ function _fmt(n: number | null | undefined, decimals = 2): string {
   return n.toFixed(decimals);
 }
 
-router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/seo-audit", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2234,7 +2235,7 @@ router.get("/projects/:projectId/exports/seo-audit", async (req, res): Promise<v
   }
 });
 
-router.get("/projects/:projectId/exports/product-catalog", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/product-catalog", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2311,7 +2312,7 @@ router.get("/projects/:projectId/exports/product-catalog", async (req, res): Pro
   }
 });
 
-router.get("/projects/:projectId/exports/financial", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/financial", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2434,7 +2435,7 @@ router.get("/projects/:projectId/exports/financial", async (req, res): Promise<v
   }
 });
 
-router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/brand-brief", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2518,7 +2519,7 @@ router.get("/projects/:projectId/exports/brand-brief", async (req, res): Promise
   }
 });
 
-router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/ab-tests", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2569,7 +2570,7 @@ router.get("/projects/:projectId/exports/ab-tests", async (req, res): Promise<vo
   }
 });
 
-router.get("/projects/:projectId/exports/images-gallery", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/images-gallery", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -2619,7 +2620,7 @@ router.get("/projects/:projectId/exports/images-gallery", async (req, res): Prom
   }
 });
 
-router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/exports/run-full-audit", requireProjectAccess, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -2781,7 +2782,7 @@ router.post("/projects/:projectId/exports/run-full-audit", async (req, res): Pro
   }
 });
 
-router.post("/projects/:projectId/exports/generate-ai-report", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/exports/generate-ai-report", requireProjectAccess, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -3101,7 +3102,7 @@ function pageHdr(title: string, num: number) {
   return `<div class="page-header"><div class="page-header-title">${sanitizeHtml(title)}</div><div class="page-header-num">Pagina ${num}</div></div>`;
 }
 
-router.get("/projects/:projectId/exports/complete-report", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/complete-report", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     if (isNaN(projectId) || projectId <= 0) { res.status(400).json({ error: "ID de proyecto invalido" }); return; }
@@ -3782,7 +3783,7 @@ router.get("/projects/:projectId/exports/complete-report", async (req, res): Pro
   }
 });
 
-router.get("/projects/:projectId/exports/csv/products", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/csv/products", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
@@ -3827,7 +3828,7 @@ router.get("/projects/:projectId/exports/csv/products", async (req, res): Promis
   }
 });
 
-router.get("/projects/:projectId/exports/competitors", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/competitors", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -3899,7 +3900,7 @@ router.get("/projects/:projectId/exports/competitors", async (req, res): Promise
   }
 });
 
-router.get("/projects/:projectId/exports/consistency", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/consistency", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4000,7 +4001,7 @@ router.get("/projects/:projectId/exports/consistency", async (req, res): Promise
   }
 });
 
-router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/inventory", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4107,7 +4108,7 @@ router.get("/projects/:projectId/exports/inventory", async (req, res): Promise<v
   }
 });
 
-router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/redesigns", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4201,7 +4202,7 @@ router.get("/projects/:projectId/exports/redesigns", async (req, res): Promise<v
   }
 });
 
-router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/revenue", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4321,7 +4322,7 @@ router.get("/projects/:projectId/exports/revenue", async (req, res): Promise<voi
   }
 });
 
-router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/shopybrain", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4404,7 +4405,7 @@ router.get("/projects/:projectId/exports/shopybrain", async (req, res): Promise<
   }
 });
 
-router.get("/projects/:projectId/exports/json/products", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/json/products", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
@@ -4439,7 +4440,7 @@ router.get("/projects/:projectId/exports/json/products", async (req, res): Promi
   }
 });
 
-router.get("/projects/:projectId/exports/json/full", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/json/full", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4480,7 +4481,7 @@ router.get("/projects/:projectId/exports/json/full", async (req, res): Promise<v
   }
 });
 
-router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4578,7 +4579,7 @@ router.get("/projects/:projectId/exports/zip/all", async (req, res): Promise<voi
   }
 });
 
-router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/xlsx/products", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4717,7 +4718,7 @@ router.get("/projects/:projectId/exports/xlsx/products", async (req, res): Promi
   }
 });
 
-router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/exports/xlsx/full", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -4829,7 +4830,7 @@ router.get("/projects/:projectId/exports/xlsx/full", async (req, res): Promise<v
   }
 });
 
-router.get("/exports/brand-css/:projectId", async (req, res): Promise<void> => {
+router.get("/exports/brand-css/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const profile = await fetchBrandProfile(projectId);
@@ -4859,7 +4860,7 @@ router.get("/exports/brand-css/:projectId", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/exports/brand-guide/:projectId", async (req, res): Promise<void> => {
+router.get("/exports/brand-guide/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const profile = await fetchBrandProfile(projectId);
@@ -4887,7 +4888,7 @@ router.get("/exports/brand-guide/:projectId", async (req, res): Promise<void> =>
   }
 });
 
-router.get("/exports/brand-kit/:projectId", async (req, res): Promise<void> => {
+router.get("/exports/brand-kit/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const profile = await fetchBrandProfile(projectId);
@@ -4983,7 +4984,7 @@ CONTENIDO DE ESTE KIT:
   }
 });
 
-router.get("/exports/report-css/:projectId/:area", async (req, res): Promise<void> => {
+router.get("/exports/report-css/:projectId/:area", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const area = req.params.area as string;
@@ -5020,7 +5021,7 @@ router.get("/exports/report-css/:projectId/:area", async (req, res): Promise<voi
   }
 });
 
-router.get("/exports/report-png/:projectId/:area", async (req, res): Promise<void> => {
+router.get("/exports/report-png/:projectId/:area", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const area = req.params.area as ReportArea;
@@ -5144,7 +5145,7 @@ body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,He
   }
 });
 
-router.get("/exports/brand-kit-full/:projectId", async (req, res): Promise<void> => {
+router.get("/exports/brand-kit-full/:projectId", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(req.params.projectId);
     const profile = await fetchBrandProfile(projectId);

@@ -4,6 +4,7 @@ import { db, projectFilesTable, projectsTable } from "@workspace/db";
 import { generationJobsTable } from "@workspace/db/schema";
 import { eq, and, desc, sql, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { canAccessProject } from "../lib/access.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
@@ -33,21 +34,7 @@ function getStorage() {
 }
 
 // ─── ACCESS CHECK ─────────────────────────────────────────────────────────────
-// Solo puede acceder: admin (role='admin') O el usuario cuyo clientId coincide
-// con el client_id del proyecto
-async function canAccessProject(
-  sessionRole: string | undefined,
-  sessionClientId: string | null | undefined,
-  projectId: number
-): Promise<boolean> {
-  if (sessionRole === "admin") return true;
-  if (!sessionClientId) return false;
-  const [project] = await db.select({ clientId: projectsTable.clientId })
-    .from(projectsTable)
-    .where(eq(projectsTable.id, projectId))
-    .limit(1);
-  return project?.clientId === sessionClientId;
-}
+// canAccessProject moved to ../lib/access.ts (canonical, shared helper).
 
 // ─── LISTAR ARCHIVOS DE UN PROYECTO ──────────────────────────────────────────
 router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<void> => {

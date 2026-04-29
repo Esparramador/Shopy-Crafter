@@ -898,7 +898,7 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
   const remove = async () => {
     if (value) {
       const filename = value.split("/").pop();
-      if (filename) await fetch(`${BASE_URL}/api/cms/media/${filename}`, { method: "DELETE" }).catch(() => {});
+      if (filename) await fetch(`${BASE_URL}/api/cms/media/${filename}`, { method: "DELETE", credentials: "include" }).catch(() => {});
     }
     onChange("");
   };

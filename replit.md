@@ -40,7 +40,7 @@ A standalone search and audit tool for any URL, Shopify store, Instagram account
 The Universal Generator provides a comprehensive content generation tool with 41 types across 9 categories. Every generation produces downloadable content, saves to Vault, and triggers `learnFromOperation`.
 
 ### Security
-Employs AES-256-GCM encryption, audit logging, database-backed rate limiting (per IP and email for login), AI API concurrency queues, admin route protection, CORS, secure session management, SVG/HTML sanitization (DOMPurify), PostMessage origin validation, and robust input validation for critical actions and user data. `validateEncryptionKey()` enforces key presence in production. PDF generation includes timeout, external resource blocking, and content limits. Image fetching includes size limits and pre-checks.
+Employs AES-256-GCM encryption, audit logging, database-backed rate limiting (per IP and email for login), AI API concurrency queues, admin route protection, CORS, secure session management, SVG/HTML sanitization (DOMPurify), PostMessage origin validation, and robust input validation for critical actions and user data. `validateEncryptionKey()` enforces key presence in production. PDF generation includes timeout, external resource blocking, and content limits. Image fetching includes size limits and pre-checks. **Project-scoped ACL is centralized in `lib/access.ts` (`canAccessProject` + `requireProjectAccess` middleware) — admin or owning client only**; applied to vault and all 27 export endpoints to prevent cross-tenant data leaks.
 
 ### Database
 PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` for platform specificity.

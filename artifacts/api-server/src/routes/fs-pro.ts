@@ -15,7 +15,7 @@ import {
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
-  generateVideoFromImage, composeAd, packAssetsAsZip,
+  generateVideoFromImage, composeAd, concatVideos, packAssetsAsZip,
   fetchToBuffer,
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
@@ -523,6 +523,105 @@ router.post("/fs-pro/compose", requireAdmin, async (req, res) => {
   } catch (err: any) {
     logger.error({ err }, "fs-pro compose failed");
     res.status(500).json({ error: err?.message || "Error componiendo" });
+  }
+});
+
+// ─── CONCATENATE MULTIPLE VIDEO CLIPS INTO ONE ─────────────────────────────
+// POST /fs-pro/concat
+// Body: { projectId, videoVaultIds: number[], voiceVaultId?, musicVaultId?,
+//          width?, height?, fps?, crossfadeSec?, voiceVolume?, musicVolume? }
+// Concatenates the listed vault videos in order, optionally adds voice/music
+// overlay, normalizes to common w/h/fps, and saves the final MP4 back to vault.
+router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const {
+      projectId, videoVaultIds, voiceVaultId, musicVaultId,
+      width, height, fps, crossfadeSec, voiceVolume, musicVolume,
+    } = req.body as {
+      projectId: number;
+      videoVaultIds: number[];
+      voiceVaultId?: number;
+      musicVaultId?: number;
+      width?: number;
+      height?: number;
+      fps?: number;
+      crossfadeSec?: number;
+      voiceVolume?: number;
+      musicVolume?: number;
+    };
+    if (!projectId || !Array.isArray(videoVaultIds) || videoVaultIds.length === 0) {
+      res.status(400).json({ error: "projectId + videoVaultIds[] requeridos" });
+      return;
+    }
+
+    // Fetch all referenced vault rows
+    const allIds = [...videoVaultIds, voiceVaultId, musicVaultId].filter((x): x is number => typeof x === "number");
+    const rows = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), inArray(projectFilesTable.id, allIds)),
+    );
+    const rowMap = new Map(rows.map(r => [r.id, r]));
+
+    // Helper: fetch buffer from vault row (URL → objectStorage → base64 content)
+    const fetchVaultContent = async (file: any): Promise<Buffer | undefined> => {
+      if (!file) return undefined;
+      if (file.originalUrl?.startsWith("http")) {
+        try { return await fetchToBuffer(file.originalUrl); } catch { /* fallthrough */ }
+      }
+      if (file.objectPath) {
+        try {
+          const svc = getStorage();
+          const gcsFile = await svc.getObjectEntityFile(file.objectPath);
+          const resp = await svc.downloadObject(gcsFile);
+          return Buffer.from(await resp.arrayBuffer());
+        } catch (err) {
+          logger.warn({ err, fileId: file.id }, "fs-pro concat: objectStorage read failed");
+        }
+      }
+      if (file.content) {
+        try { return Buffer.from(file.content, "base64"); } catch { /* */ }
+      }
+      return undefined;
+    };
+
+    // Resolve clips in the requested order
+    const videoBuffers: Buffer[] = [];
+    for (const vid of videoVaultIds) {
+      const buf = await fetchVaultContent(rowMap.get(vid));
+      if (!buf) {
+        res.status(404).json({ error: `Video vault id=${vid} no se pudo leer` });
+        return;
+      }
+      videoBuffers.push(buf);
+    }
+    const voiceBuf = voiceVaultId ? await fetchVaultContent(rowMap.get(voiceVaultId)) : undefined;
+    const musicBuf = musicVaultId ? await fetchVaultContent(rowMap.get(musicVaultId)) : undefined;
+
+    const finalBuf = await concatVideos({
+      videoBuffers,
+      width: width ? Number(width) : undefined,
+      height: height ? Number(height) : undefined,
+      fps: fps ? Number(fps) : undefined,
+      crossfadeSec: crossfadeSec ? Number(crossfadeSec) : undefined,
+      voiceBuffer: voiceBuf,
+      musicBuffer: musicBuf,
+      voiceVolume: voiceVolume ? parseFloat(String(voiceVolume)) : undefined,
+      musicVolume: musicVolume ? parseFloat(String(musicVolume)) : undefined,
+    });
+
+    const vaultId = await saveToVaultSmart({
+      projectId,
+      fileType: "fs-pro-concat",
+      category: "fusion-studio-pro",
+      title: `FS Pro Concat: ${videoBuffers.length} clips`,
+      mimeType: "video/mp4",
+      generatedBy: "fs-pro:ffmpeg-concat",
+      buffer: finalBuf,
+    });
+    res.json({ success: true, vaultId, sizeBytes: finalBuf.length, clipsCount: videoBuffers.length });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro concat failed");
+    res.status(500).json({ error: err?.message || "Error concatenando" });
   }
 });
 
