@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRoute } from "wouter";
+import FusionStudioPro from "./FusionStudioPro";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -85,7 +86,12 @@ interface GeneratedPhoto {
 
 export default function FusionStudio() {
   const [, params] = useRoute("/projects/:id/fusion-studio");
-  const projectId = params?.id ? parseInt(params.id) : 0;
+  const [, paramsPro] = useRoute("/projects/:id/fusion-studio-pro");
+  const projectId = params?.id ? parseInt(params.id) : (paramsPro?.id ? parseInt(paramsPro.id) : 0);
+
+  // Modo de trabajo: workflow guiado (galería + vídeo) o estudio pro (8 herramientas libres).
+  // Si la URL es /fusion-studio-pro arrancamos directamente en modo Pro (retro-compat).
+  const [viewMode, setViewMode] = useState<"workflow" | "pro">(paramsPro ? "pro" : "workflow");
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
@@ -517,21 +523,55 @@ export default function FusionStudio() {
           <div style={V.brandIcon}>F</div>
           <div>
             <div style={V.brandText}>Fusion Studio</div>
-            <div style={V.brandSub}>Product Intelligence</div>
+            <div style={V.brandSub}>{viewMode === "workflow" ? "Product Intelligence" : "Estudio Pro · 8 herramientas"}</div>
           </div>
         </div>
-        <div style={V.phases}>
-          {([["brand", "① Marca"], ["product", "② Producto"], ["generate", "③ Generar"], ["gallery", "④ Galería"]] as const).map(([id, label]) => (
-            <button key={id} style={V.phaseBtn(phase === id)} onClick={() => setPhase(id as Phase)}>{label}</button>
-          ))}
+        {/* MODE TOGGLE: Workflow Guiado vs Estudio Pro */}
+        <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 10, background: "#0a0a14", border: "1px solid #22222e" }}>
+          <button
+            data-testid="button-mode-workflow"
+            onClick={() => setViewMode("workflow")}
+            style={{
+              padding: "8px 14px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none",
+              background: viewMode === "workflow" ? "linear-gradient(135deg, rgba(200,168,75,0.18), rgba(200,168,75,0.05))" : "transparent",
+              color: viewMode === "workflow" ? "#c8a84b" : "#888",
+            }}>
+            🧬 Workflow Guiado
+          </button>
+          <button
+            data-testid="button-mode-pro"
+            onClick={() => setViewMode("pro")}
+            style={{
+              padding: "8px 14px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none",
+              background: viewMode === "pro" ? "linear-gradient(135deg, rgba(200,168,75,0.18), rgba(200,168,75,0.05))" : "transparent",
+              color: viewMode === "pro" ? "#c8a84b" : "#888",
+            }}>
+            ✨ Estudio Pro
+          </button>
         </div>
+        {viewMode === "workflow" ? (
+          <div style={V.phases}>
+            {([["brand", "① Marca"], ["product", "② Producto"], ["generate", "③ Generar"], ["gallery", "④ Galería"]] as const).map(([id, label]) => (
+              <button key={id} style={V.phaseBtn(phase === id)} onClick={() => setPhase(id as Phase)}>{label}</button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {brandDna && <span style={V.badge("#c8a84b")}>{brandDna.name}</span>}
           {productAnalysis && <span style={V.badge("#44cc88")}>{(productAnalysis.product?.category || "").split("/")[0].trim()}</span>}
-          {totalPhotos > 0 && phase === "generate" && <span style={V.badge("#6688ff")}>{totalPhotos} fotos</span>}
+          {totalPhotos > 0 && phase === "generate" && viewMode === "workflow" && <span style={V.badge("#6688ff")}>{totalPhotos} fotos</span>}
         </div>
       </div>
 
+      {viewMode === "pro" && (
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          <FusionStudioPro projectId={projectId} />
+        </div>
+      )}
+
+      {viewMode === "workflow" && (
       <div style={V.body}>
         {phase === "brand" && (
           <div style={{ ...V.main, maxWidth: 720, margin: "0 auto" }}>
@@ -1067,9 +1107,8 @@ export default function FusionStudio() {
                   ))}
                 </div>
 
-                {/* ─── VIDEO ADVERTISING PANEL (NEW) ─── */}
-                {generatedPhotos.some(p => p.imageUrl) && (
-                  <div style={{ marginTop: 32, padding: 20, borderRadius: 12, background: "linear-gradient(135deg, rgba(99,102,241,0.06), rgba(168,85,247,0.04))", border: "1px solid rgba(99,102,241,0.25)" }}>
+                {/* ─── VIDEO ADVERTISING PANEL ─── (siempre visible; el botón se deshabilita si no hay fotos) */}
+                <div style={{ marginTop: 32, padding: 20, borderRadius: 12, background: "linear-gradient(135deg, rgba(99,102,241,0.06), rgba(168,85,247,0.04))", border: "1px solid rgba(99,102,241,0.25)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                       <div>
                         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#a5b4fc", display: "flex", alignItems: "center", gap: 8 }}>
@@ -1150,7 +1189,7 @@ export default function FusionStudio() {
                         {generatedPhotos.filter(p => p.imageUrl).map(photo => (
                           <div key={photo.id} onClick={() => setVideoSourceUrl(photo.imageUrl!)}
                             style={{ flex: "0 0 60px", height: 60, borderRadius: 6, border: videoSourceUrl === photo.imageUrl ? "2px solid #6366f1" : "1px solid #22222e", overflow: "hidden", cursor: "pointer", position: "relative" }}>
-                            <img src={photo.imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={photo.label} />
+                            <img src={photo.imageUrl ?? undefined} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={photo.label} />
                           </div>
                         ))}
                       </div>
@@ -1190,12 +1229,12 @@ export default function FusionStudio() {
                       </div>
                     )}
                   </div>
-                )}
               </>
             )}
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

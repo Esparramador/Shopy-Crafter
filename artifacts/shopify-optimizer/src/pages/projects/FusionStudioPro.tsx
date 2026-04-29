@@ -36,9 +36,17 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
 
-export default function FusionStudioPro() {
+interface FusionStudioProProps {
+  /** Cuando se embebe dentro de FusionStudio se pasa el projectId vía prop;
+   * si no, se obtiene del path (/projects/:id/fusion-studio-pro). */
+  projectId?: number;
+}
+
+export default function FusionStudioPro({ projectId: projectIdProp }: FusionStudioProProps = {}) {
   const [, params] = useRoute("/projects/:id/fusion-studio-pro");
-  const projectId = params?.id ? parseInt(params.id) : 0;
+  const [, paramsFs] = useRoute("/projects/:id/fusion-studio");
+  const projectId = projectIdProp
+    ?? (params?.id ? parseInt(params.id) : (paramsFs?.id ? parseInt(paramsFs.id) : 0));
 
   const [tab, setTab] = useState<Tab>("generate");
   const [caps, setCaps] = useState<Capabilities | null>(null);
