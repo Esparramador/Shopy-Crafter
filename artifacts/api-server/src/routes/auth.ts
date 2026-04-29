@@ -81,11 +81,18 @@ router.post("/login", async (req, res): Promise<void> => {
       return;
     }
   
-    await new Promise((r) => setTimeout(r, 200));
-  
+    // FIX BE-5: timing-attack hardening. SIEMPRE ejecutamos bcrypt.compare
+    // (con un hash dummy si el usuario no existe) para que el tiempo de
+    // respuesta sea constante e impida enumerar emails válidos.
+    const DUMMY_BCRYPT_HASH =
+      "$2a$12$CwTycUXWue0Thq9StjUM0uJ8N5cCUGn8RHW6X3HqQe3fFDrHBZpNu";
+
     const [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
-  
-    if (!user || !user.isActive) {
+
+    const passwordHash = user?.password ?? DUMMY_BCRYPT_HASH;
+    const passwordOk = await bcrypt.compare(password, passwordHash);
+
+    if (!user || !user.isActive || !passwordOk) {
       await Promise.all([
         incrementRateLimit(rateLimitKeyIp),
         incrementRateLimit(rateLimitKeyEmail),
@@ -93,8 +100,8 @@ router.post("/login", async (req, res): Promise<void> => {
       res.status(401).json({ error: "Credenciales incorrectas" });
       return;
     }
-  
-    const valid = await bcrypt.compare(password, user.password);
+
+    const valid = passwordOk;
     if (!valid) {
       await Promise.all([
         incrementRateLimit(rateLimitKeyIp),

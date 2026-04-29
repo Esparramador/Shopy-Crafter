@@ -317,3 +317,9 @@ id = "AcZaW7m4xV4G3G-qQ_gT-"
 uri = "file://exports/prod_enum_preflight.txt"
 type = "text"
 title = "Pre-flight enums — SELECT DISTINCT por columna en prod"
+
+[[outputs]]
+id = "2i2wQ028xd1_DPe4kyfDQ"
+uri = "file://attached_assets/AUDITORIA_FINAL_2026-04-29.md"
+type = "text"
+title = "Auditoría exhaustiva — comparativa 46 patches vs estado real"
