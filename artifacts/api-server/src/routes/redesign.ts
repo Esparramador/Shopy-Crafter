@@ -149,6 +149,7 @@ Devuelve SOLO JSON:
 }
 
 router.post("/projects/:projectId/products/:productId/redesign", async (req, res): Promise<void> => {
+  enableLongRunning(res);
   try {
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;

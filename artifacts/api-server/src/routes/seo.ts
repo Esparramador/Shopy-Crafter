@@ -455,6 +455,7 @@ router.post("/projects/:projectId/seo/generate-sitemap", async (req, res): Promi
 });
 
 router.post("/projects/:projectId/seo/audit-page-speed", async (req, res): Promise<void> => {
+  enableLongRunning(res);
   try {
     const { url, strategy = "mobile" } = req.body as { url: string; strategy?: "mobile" | "desktop" };
   

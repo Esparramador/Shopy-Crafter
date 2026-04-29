@@ -91,7 +91,13 @@ function BusinessResult({ data }: { data: { profile: ReturnType<typeof Object>; 
       </div>
 
       <Section title="🧠 Plan estratégico">
-        <pre style={{ fontSize: 12, color: "var(--t2)", whiteSpace: "pre-wrap", lineHeight: 1.7, margin: 0, fontFamily: "inherit" }}>{data.strategicPlan}</pre>
+        <pre style={{ fontSize: 12, color: "var(--t2)", whiteSpace: "pre-wrap", lineHeight: 1.7, margin: 0, fontFamily: "inherit" }}>
+          {typeof data.strategicPlan === "string"
+            ? data.strategicPlan
+            : data.strategicPlan != null
+              ? JSON.stringify(data.strategicPlan, null, 2)
+              : ""}
+        </pre>
       </Section>
     </div>
   );

@@ -80,10 +80,15 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
   const rawShopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
-  const firstProjectId = projects?.[0]?.id ?? 2;
-  const shopybrainNav = rawShopybrainNav.map((item: any) =>
-    item.href.includes("/projects/2/") ? { ...item, href: item.href.replace("/projects/2/", `/projects/${firstProjectId}/`) } : item
-  );
+  const firstProjectId: number | null = projects?.[0]?.id ?? null;
+  const shopybrainNav = rawShopybrainNav
+    .map((item: any) => {
+      if (!item.href.includes("/projects/2/")) return item;
+      // Si no hay proyectos disponibles, marcar el item como deshabilitado
+      if (firstProjectId === null) return { ...item, disabled: true, href: "#" };
+      return { ...item, href: item.href.replace("/projects/2/", `/projects/${firstProjectId}/`) };
+    })
+    .filter((item: any) => !item.disabled || isLoading);
   const adminNav: any[] = cmsNav?.admin ?? DEFAULT_ADMIN_NAV;
   const ap = cmsPanel ?? {};
 
