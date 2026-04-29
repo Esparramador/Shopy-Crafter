@@ -73,6 +73,14 @@ export interface AdCampaignInput {
   variantsCount: number;           // 1-5
   customPrompt?: string;           // extra user instruction
   sourceImageUrl?: string;         // base image for video/hero (optional: if absent, we generate with Nano Banana first)
+  /** Optional curated genre template (key from AD_TEMPLATES). Pre-loads
+   *  copySystemAddon, heroStyle, cameraPreset, voiceProfile, musicBrief,
+   *  transitionPreset, recommendLipSync, burnSubsByDefault. */
+  template?: string;
+  /** Force burn subtitles into the final MP4 (overrides template default). */
+  burnSubs?: boolean;
+  /** Subtitle language (ISO 639-1) for Whisper. Defaults to "auto". */
+  subsLanguage?: string;
 }
 
 export interface AdAssetPaths {
@@ -127,11 +135,20 @@ async function makeTmpDir(prefix = "adstudio"): Promise<string> {
   return dir;
 }
 
-async function fetchToBuffer(url: string, timeoutMs = 120_000): Promise<Buffer> {
+async function fetchToBuffer(url: string, timeoutMs = 120_000, opts: { ssrfGuard?: boolean } = {}): Promise<Buffer> {
+  if (opts.ssrfGuard) {
+    const { validateImageUrl } = await import("./runway.js");
+    validateImageUrl(url); // throws if internal/private/localhost
+  }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ctrl.signal });
+    // SSRF hardening: refuse to follow redirects when guard is active
+    // (open-redirect attacks could otherwise rebound to internal hosts).
+    const r = await fetch(url, {
+      signal: ctrl.signal,
+      ...(opts.ssrfGuard ? { redirect: "error" as const } : {}),
+    });
     if (!r.ok) throw new Error(`Fetch ${url} failed ${r.status}`);
     return Buffer.from(await r.arrayBuffer());
   } finally {
@@ -139,16 +156,27 @@ async function fetchToBuffer(url: string, timeoutMs = 120_000): Promise<Buffer> 
   }
 }
 
+const SUPPORTED_VIDEO_PROVIDERS = new Set([
+  "runway-gen4-turbo",
+  "runway-gen3",
+  "replicate-seedance-fast",
+  "replicate-kling",
+  "replicate-hailuo",
+]);
+
 // ─── STEP 1: COPY GENERATION (Claude, reuses existing askClaudeJsonWithBrain) ──
 
 export async function generateAdCopy(input: AdCampaignInput, variants: number): Promise<AdCopyVariant[]> {
   const { askClaudeJsonWithBrain } = await import("./claude.js");
+  const { getTemplate } = await import("./ad-templates.js");
 
+  const tpl = getTemplate(input.template);
   const toneHint = input.brandTone ? ` Brand tone: ${input.brandTone}.` : "";
   const audienceHint = input.targetAudience ? ` Target audience: ${input.targetAudience}.` : "";
   const extraHint = input.customPrompt ? ` Additional context: ${input.customPrompt}.` : "";
+  const tplHint = tpl ? ` Genre template: ${tpl.label}. ${tpl.copySystemAddon}` : "";
 
-  const sys = `You are an elite advertising copywriter specialized in e-commerce video ads (Meta, TikTok, YouTube Shorts). You write hooks that stop the scroll, bodies that build desire, and CTAs that convert.`;
+  const sys = `You are an elite advertising copywriter specialized in e-commerce video ads (Meta, TikTok, YouTube Shorts). You write hooks that stop the scroll, bodies that build desire, and CTAs that convert.${tplHint}`;
 
   const prompt = `Generate ${variants} distinct ad copy variants for this product:
 
@@ -194,12 +222,15 @@ export async function generateHeroImage(
   input: AdCampaignInput,
   copy: AdCopyVariant,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  const { getTemplate } = await import("./ad-templates.js");
+  const tpl = getTemplate(input.template);
   const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
 
   const aspectHint = input.aspect === "9:16" ? "vertical portrait (9:16 aspect)"
     : input.aspect === "16:9" ? "cinematic wide (16:9 aspect)"
     : input.aspect === "4:5" ? "portrait (4:5 aspect)"
     : "square (1:1 aspect)";
+  const styleLine = tpl ? `\nStyle (template "${tpl.label}"): ${tpl.heroStyle}` : "";
 
   const prompt = `Ultra-premium product hero shot for advertising.
 
@@ -207,7 +238,7 @@ Product: ${input.productTitle}, ${input.productCategory}
 Brand tone: ${input.brandTone || "premium modern"}
 Campaign hook: "${copy.hook}"
 Mood: ${copy.tone}
-Aspect: ${aspectHint}
+Aspect: ${aspectHint}${styleLine}
 
 Requirements:
 - Professional commercial photography quality
@@ -274,7 +305,12 @@ async function generateVideoRunway(
   // Duration: Runway supports 5 or 10
   const duration = input.videoDurationSec >= 8 ? 10 : 5;
 
-  const runwayPrompt = `${copy.body}. Cinematic product advertising shot. Smooth camera movement, professional lighting, ${copy.tone} atmosphere.`;
+  const { getTemplate } = await import("./ad-templates.js");
+  const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");
+  const tpl = getTemplate(input.template);
+  const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
+  const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
+  const runwayPrompt = `${copy.body}. Cinematic product advertising shot.${cameraLine} Professional lighting, ${copy.tone} atmosphere.`;
 
   // 1. Create task
   const createRes = await fetch(`${RUNWAY_BASE}/image_to_video`, {
@@ -340,7 +376,12 @@ async function generateVideoReplicate(
   };
   const modelId = modelMap[input.videoProvider] || modelMap["replicate-seedance-fast"];
 
-  const prompt = `${copy.body}. Cinematic product advertising, professional lighting, ${copy.tone} mood, smooth camera.`;
+  const { getTemplate } = await import("./ad-templates.js");
+  const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");
+  const tpl = getTemplate(input.template);
+  const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
+  const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
+  const prompt = `${copy.body}. Cinematic product advertising,${cameraLine} professional lighting, ${copy.tone} mood, smooth camera.`;
 
   const input_params: any = modelId.startsWith("bytedance/")
     ? { prompt, image: dataUri, duration: input.videoDurationSec, resolution: "1080p" }
@@ -367,6 +408,9 @@ export async function generateVideo(
   imageMime: string,
   projectReplicateToken?: string,
 ): Promise<Buffer> {
+  if (!SUPPORTED_VIDEO_PROVIDERS.has(input.videoProvider)) {
+    throw new Error(`Proveedor de video no soportado: "${input.videoProvider}". Disponibles: ${[...SUPPORTED_VIDEO_PROVIDERS].join(", ")}`);
+  }
   if (input.videoProvider.startsWith("runway-")) {
     return await generateVideoRunway(input, copy, imageBuffer, imageMime);
   }
@@ -561,7 +605,7 @@ export async function runAdCampaign(
       onProgress?.({ stage: "image", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando imagen hero con Nano Banana...` });
       let imgBuf: Buffer; let imgMime: string;
       if (input.sourceImageUrl) {
-        imgBuf = await fetchToBuffer(input.sourceImageUrl);
+        imgBuf = await fetchToBuffer(input.sourceImageUrl, 120_000, { ssrfGuard: true });
         imgMime = "image/jpeg";
       } else {
         const hero = await generateHeroImage(input, copy);
@@ -581,7 +625,39 @@ export async function runAdCampaign(
 
       // STEP 6: Compose
       onProgress?.({ stage: "compose", variantIndex: i, message: `[${i + 1}/${copies.length}] Componiendo video final con FFmpeg...` });
-      const finalMp4 = await composeFinalAd(videoBuf, voiceBuf, sfxBuf);
+      let finalMp4 = await composeFinalAd(videoBuf, voiceBuf, sfxBuf);
+
+      // STEP 7 (optional): Burn auto-subtitles via Whisper + FFmpeg subtitles filter
+      const { getTemplate } = await import("./ad-templates.js");
+      const tplRun = getTemplate(input.template);
+      const wantSubs = input.burnSubs ?? tplRun?.burnSubsByDefault ?? false;
+      if (wantSubs) {
+        try {
+          onProgress?.({ stage: "subtitles", variantIndex: i, message: `[${i + 1}/${copies.length}] Transcribiendo y quemando subtítulos...` });
+          const { transcribeAudioToSrt, burnSubtitlesIntoVideo } = await import("./fusion-studio-pro.js");
+          const { srt } = await transcribeAudioToSrt(voiceBuf, {
+            language: input.subsLanguage ?? "auto",
+            replicateToken: projectReplicateToken,
+            audioMime: "audio/mpeg",
+          });
+          if (srt?.trim()) {
+            finalMp4 = await burnSubtitlesIntoVideo(finalMp4, srt, {
+              fontName: "Arial",
+              fontSizePx: input.aspect === "9:16" ? 36 : 28,
+              primaryColorHex: "FFFFFF",
+              outlineColorHex: "000000",
+              outlinePx: 3,
+              alignment: 2,
+              marginVPx: input.aspect === "9:16" ? 120 : 60,
+            });
+          }
+        } catch (subErr: any) {
+          // Non-fatal: subtitles are a nice-to-have. Log and continue with the
+          // un-subtitled video — caller still receives a working ad.
+          logger.warn({ err: subErr, variant: i }, "adstudio: burn-subs failed, continuing");
+          errors.push(`Variant ${i + 1} subs: ${subErr?.message || "unknown"}`);
+        }
+      }
 
       // Save to tmp for caller to persist
       const tmp = await makeTmpDir(`final-${i}`);

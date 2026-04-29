@@ -17,8 +17,12 @@ import {
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
   generateVideoFromImage, composeAd, concatVideos, packAssetsAsZip,
   fetchToBuffer,
+  CAMERA_PRESETS, TRANSITION_PRESETS,
+  lipSyncVideoToAudio, transcribeAudioToSrt, burnSubtitlesIntoVideo,
+  transferMotionToImage,
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
+import { listTemplates } from "../lib/ad-templates.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
@@ -123,6 +127,23 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       { key: "eleven_turbo_v2_5", label: "Turbo v2.5", description: "Más rápido, calidad alta" },
       { key: "eleven_flash_v2_5", label: "Flash v2.5", description: "El más rápido, baja latencia" },
     ],
+    cameraPresets: Object.entries(CAMERA_PRESETS).map(([k, v]) => ({
+      key: k, label: v.label, description: v.promptPrefix,
+    })),
+    transitionPresets: Object.entries(TRANSITION_PRESETS).map(([k, v]) => ({
+      key: k, label: v.label, xfade: v.xfade, defaultDurationSec: v.defaultDurationSec,
+    })),
+    pollopaParity: [
+      { key: "lip-sync", label: "Lip-sync (video↔audio)", description: "Sincronización labial sobre video existente" },
+      { key: "burn-subs", label: "Subtítulos quemados (Whisper + FFmpeg)", description: "Transcribe el audio y quema los subs en el video" },
+      { key: "transcribe", label: "Transcripción a SRT", description: "Genera SRT desde audio (Whisper)" },
+      { key: "motion-transfer", label: "Motion transfer", description: "Anima imagen estática con movimiento de un video referencia" },
+    ],
+    adTemplates: listTemplates().map((t) => ({
+      key: t.key, label: t.label, description: t.description,
+      cameraPreset: t.cameraPreset, transitionPreset: t.transitionPreset,
+      defaultAspect: t.defaultAspect, defaultDurationSec: t.defaultDurationSec,
+    })),
   });
 });
 
@@ -320,7 +341,7 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
   enableLongRunning(res);
   try {
     const f = req.file;
-    const { projectId: pidStr, model, prompt, duration, aspect, sourceImageUrl } = req.body;
+    const { projectId: pidStr, model, prompt, duration, aspect, sourceImageUrl, cameraPreset } = req.body;
     const projectId = parseInt(pidStr || "0", 10);
     if (!projectId || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
 
@@ -340,6 +361,7 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
       duration: parseInt(duration || "5"),
       aspect: aspect || "9:16",
       replicateToken: (project as any).replicateApiKey || undefined,
+      cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
     });
 
     const vaultId = await saveToVaultSmart({
@@ -538,6 +560,7 @@ router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
     const {
       projectId, videoVaultIds, voiceVaultId, musicVaultId,
       width, height, fps, crossfadeSec, voiceVolume, musicVolume,
+      transitionPreset,
     } = req.body as {
       projectId: number;
       videoVaultIds: number[];
@@ -549,6 +572,7 @@ router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
       crossfadeSec?: number;
       voiceVolume?: number;
       musicVolume?: number;
+      transitionPreset?: string;
     };
     if (!projectId || !Array.isArray(videoVaultIds) || videoVaultIds.length === 0) {
       res.status(400).json({ error: "projectId + videoVaultIds[] requeridos" });
@@ -603,6 +627,7 @@ router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
       height: height ? Number(height) : undefined,
       fps: fps ? Number(fps) : undefined,
       crossfadeSec: crossfadeSec ? Number(crossfadeSec) : undefined,
+      transitionPreset: typeof transitionPreset === "string" ? transitionPreset : undefined,
       voiceBuffer: voiceBuf,
       musicBuffer: musicBuf,
       voiceVolume: voiceVolume ? parseFloat(String(voiceVolume)) : undefined,
@@ -682,5 +707,262 @@ router.post("/fs-pro/download-all", requireAdmin, async (req, res) => {
     res.status(500).json({ error: err?.message || "Error preparando ZIP" });
   }
 });
+
+// ─── LIP-SYNC (video ↔ audio) ─────────────────────────────────────────────
+// POST /fs-pro/lip-sync
+// Body: { projectId, videoVaultId, audioVaultId }
+// Reads both buffers from vault, runs Replicate lip-sync, saves result.
+router.post("/fs-pro/lip-sync", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId, videoVaultId, audioVaultId } = req.body as {
+      projectId: number; videoVaultId: number; audioVaultId: number;
+    };
+    if (!projectId || !videoVaultId || !audioVaultId) {
+      res.status(400).json({ error: "projectId, videoVaultId, audioVaultId requeridos" });
+      return;
+    }
+    const VIDEO_CREDITS = 4;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const rows = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), inArray(projectFilesTable.id, [videoVaultId, audioVaultId])),
+    );
+    const map = new Map(rows.map(r => [r.id, r]));
+    const videoBuf = await readVaultContent(map.get(videoVaultId));
+    const audioBuf = await readVaultContent(map.get(audioVaultId));
+    if (!videoBuf) { res.status(404).json({ error: "Video vault no se pudo leer" }); return; }
+    if (!audioBuf) { res.status(404).json({ error: "Audio vault no se pudo leer" }); return; }
+
+    const out = await lipSyncVideoToAudio(videoBuf, audioBuf, {
+      replicateToken: (project as any).replicateApiKey || undefined,
+    });
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-lipsync", category: "fusion-studio-pro",
+      title: `FS Pro Lip-sync: ${videoVaultId} ↔ ${audioVaultId}`,
+      mimeType: "video/mp4", generatedBy: "fs-pro:replicate-lipsync",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+    res.json({ success: true, vaultId, sizeBytes: out.length });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro lip-sync failed");
+    res.status(500).json({ error: err?.message || "Error en lip-sync" });
+  }
+});
+
+// ─── TRANSCRIBE AUDIO → SRT ───────────────────────────────────────────────
+// POST /fs-pro/transcribe
+// Body: { projectId, audioVaultId, language? }
+router.post("/fs-pro/transcribe", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId, audioVaultId, language } = req.body as {
+      projectId: number; audioVaultId: number; language?: string;
+    };
+    if (!projectId || !audioVaultId) {
+      res.status(400).json({ error: "projectId, audioVaultId requeridos" });
+      return;
+    }
+    const limit = await checkProductionLimit(projectId, "image", 1);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const [row] = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, audioVaultId)),
+    );
+    const audioBuf = await readVaultContent(row);
+    if (!audioBuf) { res.status(404).json({ error: "Audio vault no se pudo leer" }); return; }
+
+    const { srt, segments, language: detected } = await transcribeAudioToSrt(audioBuf, {
+      language: language || "auto",
+      replicateToken: (project as any).replicateApiKey || undefined,
+      audioMime: row?.mimeType || "audio/mpeg",
+    });
+
+    // Persist SRT itself to vault as text/plain so it can be reused
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-srt", category: "fusion-studio-pro",
+      title: `FS Pro SRT: audio ${audioVaultId} (${detected || "auto"})`,
+      mimeType: "text/plain", generatedBy: "fs-pro:whisper",
+      buffer: Buffer.from(srt, "utf-8"),
+    });
+    await recordUsage(projectId, "image", 1);
+    res.json({ success: true, vaultId, srt, segments, language: detected });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro transcribe failed");
+    res.status(500).json({ error: err?.message || "Error transcribiendo" });
+  }
+});
+
+// ─── BURN SUBTITLES INTO VIDEO ────────────────────────────────────────────
+// POST /fs-pro/burn-subs
+// Body: { projectId, videoVaultId, srt?, srtVaultId?, language?, style? }
+// Provide either SRT inline OR an existing SRT vault id, OR omit both to
+// auto-transcribe the video's audio with Whisper first.
+router.post("/fs-pro/burn-subs", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId, videoVaultId, srt, srtVaultId, language, style } = req.body as {
+      projectId: number; videoVaultId: number; srt?: string; srtVaultId?: number;
+      language?: string;
+      style?: {
+        fontName?: string; fontSizePx?: number; primaryColorHex?: string;
+        outlineColorHex?: string; outlinePx?: number; alignment?: number; marginVPx?: number;
+      };
+    };
+    if (!projectId || !videoVaultId) {
+      res.status(400).json({ error: "projectId, videoVaultId requeridos" });
+      return;
+    }
+    const VIDEO_CREDITS = 2;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const ids = [videoVaultId, ...(srtVaultId ? [srtVaultId] : [])];
+    const rows = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.projectId, projectId), inArray(projectFilesTable.id, ids)),
+    );
+    const map = new Map(rows.map(r => [r.id, r]));
+    const videoBuf = await readVaultContent(map.get(videoVaultId));
+    if (!videoBuf) { res.status(404).json({ error: "Video vault no se pudo leer" }); return; }
+
+    let srtText = (srt || "").trim();
+    if (!srtText && srtVaultId) {
+      const srtBuf = await readVaultContent(map.get(srtVaultId));
+      if (!srtBuf) { res.status(404).json({ error: "SRT vault no se pudo leer" }); return; }
+      srtText = srtBuf.toString("utf-8").trim();
+    }
+    if (!srtText) {
+      // Auto-transcribe the video's own audio
+      const { extractAudioMp3 } = await import("../lib/fusion-studio-pro.js");
+      const audioBuf = await extractAudioMp3(videoBuf);
+      const tx = await transcribeAudioToSrt(audioBuf, {
+        language: language || "auto",
+        replicateToken: (project as any).replicateApiKey || undefined,
+        audioMime: "audio/mpeg",
+      });
+      srtText = tx.srt;
+    }
+    if (!srtText.trim()) {
+      res.status(422).json({ error: "No se pudo obtener SRT (audio sin habla detectable)" });
+      return;
+    }
+
+    const out = await burnSubtitlesIntoVideo(videoBuf, srtText, (style || {}) as any);
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-subbed", category: "fusion-studio-pro",
+      title: `FS Pro Subs: video ${videoVaultId}`,
+      mimeType: "video/mp4", generatedBy: "fs-pro:ffmpeg-subs",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+    res.json({ success: true, vaultId, sizeBytes: out.length });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro burn-subs failed");
+    res.status(500).json({ error: err?.message || "Error quemando subtítulos" });
+  }
+});
+
+// ─── MOTION TRANSFER (anima imagen con un video referencia) ───────────────
+// POST /fs-pro/motion-transfer
+// Body: { projectId, refVideoVaultId, imageVaultId } OR multipart with files
+router.post(
+  "/fs-pro/motion-transfer",
+  requireAdmin,
+  upload.fields([{ name: "image", maxCount: 1 }, { name: "refVideo", maxCount: 1 }]),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const imgFile = files?.["image"]?.[0];
+      const refFile = files?.["refVideo"]?.[0];
+      const { projectId: pidStr, refVideoVaultId, imageVaultId } = req.body;
+      const projectId = parseInt(pidStr || "0", 10);
+      if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+      const VIDEO_CREDITS = 6;
+      const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+      // Resolve image
+      let imgBuf: Buffer | undefined;
+      let imgMime = "image/png";
+      if (imgFile) { imgBuf = imgFile.buffer; imgMime = imgFile.mimetype; }
+      else if (imageVaultId) {
+        const [row] = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, parseInt(imageVaultId, 10))),
+        );
+        imgBuf = await readVaultContent(row);
+        if (row?.mimeType) imgMime = row.mimeType;
+      }
+      if (!imgBuf) { res.status(400).json({ error: "Imagen requerida (file o imageVaultId)" }); return; }
+
+      // Resolve ref video
+      let refBuf: Buffer | undefined;
+      if (refFile) { refBuf = refFile.buffer; }
+      else if (refVideoVaultId) {
+        const [row] = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, parseInt(refVideoVaultId, 10))),
+        );
+        refBuf = await readVaultContent(row);
+      }
+      if (!refBuf) { res.status(400).json({ error: "Video referencia requerido (file o refVideoVaultId)" }); return; }
+
+      const out = await transferMotionToImage(imgBuf, refBuf, {
+        replicateToken: (project as any).replicateApiKey || undefined,
+        imageMime: imgMime,
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-motion", category: "fusion-studio-pro",
+        title: `FS Pro Motion Transfer`,
+        mimeType: "video/mp4", generatedBy: "fs-pro:replicate-champ",
+        buffer: out,
+      });
+      await recordUsage(projectId, "image", VIDEO_CREDITS);
+      res.json({ success: true, vaultId, sizeBytes: out.length });
+    } catch (err: any) {
+      logger.error({ err }, "fs-pro motion-transfer failed");
+      res.status(500).json({ error: err?.message || "Error en motion transfer" });
+    }
+  },
+);
+
+// Shared helper: read vault content from URL → objectStorage → base64 content
+async function readVaultContent(file: any): Promise<Buffer | undefined> {
+  if (!file) return undefined;
+  if (file.originalUrl?.startsWith("http")) {
+    try { return await fetchToBuffer(file.originalUrl); } catch { /* fallthrough */ }
+  }
+  if (file.objectPath) {
+    try {
+      const svc = getStorage();
+      const gcsFile = await svc.getObjectEntityFile(file.objectPath);
+      const resp = await svc.downloadObject(gcsFile);
+      return Buffer.from(await resp.arrayBuffer());
+    } catch (err) {
+      logger.warn({ err, fileId: file.id }, "fs-pro readVaultContent: objectStorage read failed");
+    }
+  }
+  if (file.content) {
+    try { return Buffer.from(file.content, "base64"); } catch { /* */ }
+  }
+  return undefined;
+}
 
 export default router;

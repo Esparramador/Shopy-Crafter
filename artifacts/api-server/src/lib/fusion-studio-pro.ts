@@ -479,11 +479,14 @@ export async function generateVideoFromImage(
   model: VideoModel,
   imageBuffer: Buffer, imageMime: string,
   prompt: string,
-  opts: { duration?: number; aspect?: string; replicateToken?: string },
+  opts: { duration?: number; aspect?: string; replicateToken?: string; cameraPreset?: string },
 ): Promise<Buffer> {
   const cfg = VIDEO_MODELS[model];
   if (!cfg) throw new Error(`Modelo de video desconocido: ${model}`);
   const duration = Math.min(Math.max(opts.duration || 5, 3), cfg.maxDuration);
+  // Apply camera preset prompt prefix if requested (Pollo-style cinematic
+  // grammar). Preset is a no-op when unknown/empty.
+  prompt = applyCameraPreset(prompt, opts.cameraPreset);
 
   // ── Google Veo (Gemini) ────────────────────────────────────────────────
   if (cfg.provider === "gemini") {
@@ -685,6 +688,13 @@ export interface ConcatOptions {
   /** Optional crossfade in seconds between clips (0 = hard cut) */
   crossfadeSec?: number;
   /**
+   * Optional thematic transition preset key (see TRANSITION_PRESETS).
+   * Overrides the xfade type and, if `crossfadeSec` is not provided, also the
+   * default duration. Backward-compatible: old callers who only pass
+   * `crossfadeSec` keep the legacy "fade" transition.
+   */
+  transitionPreset?: string;
+  /**
    * Optional explicit clip durations in seconds. Required for accurate xfade
    * offsets when `crossfadeSec` > 0. If omitted while crossfade is enabled,
    * `concatVideos` probes each clip with ffprobe to detect duration.
@@ -753,7 +763,15 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
   const w = opts.width ?? 1080;
   const h = opts.height ?? 1920;
   const fps = opts.fps ?? 30;
-  const crossfade = Math.max(0, opts.crossfadeSec ?? 0);
+  // Resolve transition preset (if any) → xfade type + default duration.
+  const presetCfg = opts.transitionPreset ? TRANSITION_PRESETS[opts.transitionPreset] : null;
+  const xfadeType = presetCfg?.xfade || "fade";
+  const crossfade = Math.max(
+    0,
+    opts.crossfadeSec ?? presetCfg?.defaultDurationSec ?? 0,
+  );
+  // hard_cut preset forces no crossfade regardless of duration.
+  const useCrossfade = !!xfadeType && crossfade > 0;
   try {
     // Write each clip to disk
     const inputPaths: string[] = [];
@@ -774,7 +792,7 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
     // xfade offsets. Use explicit durations if provided, otherwise probe each
     // clip with ffprobe.
     let durations: number[] | null = null;
-    if (crossfade > 0 && inputPaths.length > 1) {
+    if (useCrossfade && inputPaths.length > 1) {
       if (opts.clipDurationsSec && opts.clipDurationsSec.length === inputPaths.length) {
         durations = opts.clipDurationsSec.map(d => Math.max(0.5, Number(d) || 5));
       } else {
@@ -793,17 +811,18 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
         filters.push(`[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=${fps}[v${i}]`);
       }
 
-      if (crossfade > 0 && N > 1 && durations) {
+      if (useCrossfade && N > 1 && durations) {
         // Chain xfade with REAL clip durations. The offset of xfade on the
         // i-th transition is the cumulative duration of clips 0..i-1 minus
         // (i * crossfade) — i.e. each transition removes `crossfade` seconds
-        // of overlap from the running timeline.
+        // of overlap from the running timeline. The transition VISUAL is
+        // selected by `xfadeType` (legacy default = "fade").
         let prev = "v0";
         let runningEnd = durations[0];
         for (let i = 1; i < N; i++) {
           const out = i === N - 1 ? "vout" : `xf${i}`;
           const offset = Math.max(0, runningEnd - crossfade);
-          filters.push(`[${prev}][v${i}]xfade=transition=fade:duration=${crossfade}:offset=${offset.toFixed(3)}[${out}]`);
+          filters.push(`[${prev}][v${i}]xfade=transition=${xfadeType}:duration=${crossfade}:offset=${offset.toFixed(3)}[${out}]`);
           prev = out;
           runningEnd = offset + durations[i]; // new timeline length after this xfade
         }
@@ -883,4 +902,415 @@ export async function packAssetsAsZip(
     for (const f of files) archive.append(f.buffer, { name: f.name });
     archive.finalize();
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 13: CAMERA & TRANSITION PRESETS (Pollo-style cinematic grammar)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Camera-control presets injected as a prompt prefix for video generation. */
+export const CAMERA_PRESETS: Record<string, { label: string; promptPrefix: string }> = {
+  static:        { label: "Static / Locked-off",   promptPrefix: "Static locked-off camera, no movement, tripod-mounted." },
+  push_in:       { label: "Push in",               promptPrefix: "Slow steady push-in camera move, subject grows in frame." },
+  pull_out:      { label: "Pull out",              promptPrefix: "Slow steady pull-out, revealing more of the scene." },
+  dolly_in:      { label: "Dolly in",              promptPrefix: "Smooth dolly-in on rails, parallax background, cinematic." },
+  dolly_out:     { label: "Dolly out",             promptPrefix: "Smooth dolly-out on rails, gradual reveal of the environment." },
+  orbit_left:    { label: "Orbit left",            promptPrefix: "Camera orbits 180° around the subject from right to left, smooth arc." },
+  orbit_right:   { label: "Orbit right",           promptPrefix: "Camera orbits 180° around the subject from left to right, smooth arc." },
+  pan_left:      { label: "Pan left",              promptPrefix: "Slow horizontal pan from right to left, locked elevation." },
+  pan_right:     { label: "Pan right",             promptPrefix: "Slow horizontal pan from left to right, locked elevation." },
+  tilt_up:       { label: "Tilt up",               promptPrefix: "Vertical tilt-up reveal, base to top, gradual disclosure." },
+  tilt_down:     { label: "Tilt down",             promptPrefix: "Vertical tilt-down reveal, top to base." },
+  zoom_in:       { label: "Zoom in",               promptPrefix: "Slow optical zoom-in, focal length lengthens, depth compresses." },
+  crash_zoom:    { label: "Crash zoom",            promptPrefix: "Aggressive snap-zoom into the subject, energetic punch-in, hold on subject." },
+  crane_up:      { label: "Crane up",              promptPrefix: "Crane shot lifting upward and forward, vertical rise with subtle forward push." },
+  crane_down:    { label: "Crane down",            promptPrefix: "Crane shot descending from above to subject's eye-line." },
+  handheld:      { label: "Handheld",              promptPrefix: "Handheld documentary-style camera, subtle organic shake, energetic immediacy." },
+  parallax:      { label: "Parallax",              promptPrefix: "Side-tracking parallax move, foreground/background depth separation." },
+  fpv_drone:     { label: "FPV drone",             promptPrefix: "First-person-view drone shot, sweeping motion through the space, fluid trajectory." },
+  whip_pan:      { label: "Whip pan",              promptPrefix: "Fast whip-pan transition, motion blur peak, lands on subject." },
+  bullet_time:   { label: "Bullet time",           promptPrefix: "Time slows, camera orbits while subject is frozen mid-action, Matrix-style." },
+};
+
+/** Apply a camera preset prompt prefix; safe no-op when preset is unknown/empty. */
+export function applyCameraPreset(prompt: string, preset?: string): string {
+  if (!preset) return prompt;
+  const p = CAMERA_PRESETS[preset];
+  if (!p) return prompt;
+  // Avoid double-prefix if user already wrote the preset description.
+  const head = p.promptPrefix.split(",")[0].toLowerCase();
+  if (prompt.toLowerCase().includes(head)) return prompt;
+  return `${p.promptPrefix} ${prompt}`.trim();
+}
+
+/**
+ * Transition presets map to FFmpeg `xfade` transition names plus optional
+ * post-transition color grading hints (we keep this minimal for stability).
+ * `crossfadeSec` from ConcatOptions still controls duration; the preset only
+ * picks the visual style.
+ */
+export const TRANSITION_PRESETS: Record<string, { label: string; xfade: string; defaultDurationSec: number }> = {
+  hard_cut:        { label: "Hard cut",                xfade: "",            defaultDurationSec: 0   },
+  cross_dissolve:  { label: "Cross dissolve",          xfade: "fade",        defaultDurationSec: 0.4 },
+  fade_to_black:   { label: "Fade to black",           xfade: "fadeblack",   defaultDurationSec: 0.6 },
+  white_flash:     { label: "White flash",             xfade: "fadewhite",   defaultDurationSec: 0.25 },
+  dissolve_grain:  { label: "Dissolve",                xfade: "dissolve",    defaultDurationSec: 0.5 },
+  hand_swipe_l:    { label: "Hand swipe left",         xfade: "wipeleft",    defaultDurationSec: 0.4 },
+  hand_swipe_r:    { label: "Hand swipe right",        xfade: "wiperight",   defaultDurationSec: 0.4 },
+  slide_up:        { label: "Slide up",                xfade: "slideup",     defaultDurationSec: 0.4 },
+  slide_down:      { label: "Slide down",              xfade: "slidedown",   defaultDurationSec: 0.4 },
+  zoom_punch:      { label: "Zoom punch",              xfade: "zoomin",      defaultDurationSec: 0.35 },
+  iris_open:       { label: "Iris open",               xfade: "circleopen",  defaultDurationSec: 0.5 },
+  iris_close:      { label: "Iris close",              xfade: "circleclose", defaultDurationSec: 0.5 },
+  smoke_blur:      { label: "Smoke blur",              xfade: "hblur",       defaultDurationSec: 0.5 },
+  glitch_pixel:    { label: "Glitch pixelize",         xfade: "pixelize",    defaultDurationSec: 0.3 },
+  splash_circle:   { label: "Splash",                  xfade: "circlecrop",  defaultDurationSec: 0.45 },
+  diagonal_tl:     { label: "Diagonal top-left",       xfade: "diagtl",      defaultDurationSec: 0.4 },
+  cover_left:      { label: "Cover left",              xfade: "coverleft",   defaultDurationSec: 0.4 },
+  reveal_right:    { label: "Reveal right",            xfade: "revealright", defaultDurationSec: 0.4 },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 14: REPLICATE LATEST-VERSION HELPER (auto-resolves model version)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Run a Replicate model by `owner/name` (no hash needed). Auto-resolves the
+ * latest published version. Returns the first output URL fetched as a Buffer.
+ * Throws a clear error if the model doesn't exist or the user must update env.
+ */
+async function replicateRunLatestBuffer(
+  ownerName: string,
+  input: Record<string, unknown>,
+  token: string,
+  timeoutMs = 5 * 60_000,
+): Promise<Buffer> {
+  if (!token) throw new Error("REPLICATE_API_TOKEN no configurado");
+  const Replicate = (await import("replicate")).default;
+  const rep = new Replicate({ auth: token });
+  const [owner, name] = ownerName.split("/");
+  if (!owner || !name) throw new Error(`Modelo Replicate inválido: ${ownerName}`);
+  let model: any;
+  try {
+    model = await rep.models.get(owner, name);
+  } catch (err: any) {
+    throw new Error(`Modelo Replicate ${ownerName} no encontrado: ${err?.message ?? err}`);
+  }
+  const versionId = model?.latest_version?.id;
+  if (!versionId) throw new Error(`Modelo ${ownerName} sin latest_version (cuenta sin acceso?)`);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let prediction: any;
+  try {
+    prediction = await rep.predictions.create({ version: versionId, input });
+    while (prediction.status !== "succeeded" && prediction.status !== "failed" && prediction.status !== "canceled") {
+      if (ctrl.signal.aborted) throw new Error("Replicate timeout");
+      await new Promise((r) => setTimeout(r, 3000));
+      prediction = await rep.predictions.get(prediction.id);
+    }
+  } finally { clearTimeout(t); }
+  if (prediction.status !== "succeeded") {
+    throw new Error(`Replicate ${ownerName} ${prediction.status}: ${String(prediction.error ?? "").slice(0, 200)}`);
+  }
+  const out = prediction.output;
+  let url: string | null = null;
+  if (typeof out === "string" && out.startsWith("http")) url = out;
+  else if (Array.isArray(out) && typeof out[0] === "string") url = out[0];
+  else if (out && typeof out.url === "string") url = out.url;
+  if (!url) throw new Error(`Replicate ${ownerName} salida no reconocida`);
+  return await fetchToBuffer(url);
+}
+
+/** Run a Replicate model by latest version and return raw JSON output (no fetch). */
+async function replicateRunLatestJson(
+  ownerName: string,
+  input: Record<string, unknown>,
+  token: string,
+  timeoutMs = 5 * 60_000,
+): Promise<unknown> {
+  if (!token) throw new Error("REPLICATE_API_TOKEN no configurado");
+  const Replicate = (await import("replicate")).default;
+  const rep = new Replicate({ auth: token });
+  const [owner, name] = ownerName.split("/");
+  const model = await rep.models.get(owner, name);
+  const versionId = model?.latest_version?.id;
+  if (!versionId) throw new Error(`Modelo ${ownerName} sin latest_version`);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let prediction: any;
+  try {
+    prediction = await rep.predictions.create({ version: versionId, input });
+    while (prediction.status !== "succeeded" && prediction.status !== "failed" && prediction.status !== "canceled") {
+      if (ctrl.signal.aborted) throw new Error("Replicate timeout");
+      await new Promise((r) => setTimeout(r, 3000));
+      prediction = await rep.predictions.get(prediction.id);
+    }
+  } finally { clearTimeout(t); }
+  if (prediction.status !== "succeeded") {
+    throw new Error(`Replicate ${ownerName} ${prediction.status}: ${String(prediction.error ?? "").slice(0, 200)}`);
+  }
+  return prediction.output;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 15: LIP-SYNC (video + audio → video with synced lips)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Apply lip-sync to a video using a separate audio track. Default model is
+ * `cudanexus/lipsync-v2` (good quality, fast). Override with env
+ * REPLICATE_LIPSYNC_MODEL or the `model` opt to swap in `lucataco/wav2lip`,
+ * `bytedance/sync-2.0`, or any compatible video+audio→video Replicate model.
+ *
+ * Both buffers are uploaded as data URIs. The model response URL is fetched
+ * back and returned as a Buffer (MP4).
+ */
+export async function lipSyncVideoToAudio(
+  videoBuffer: Buffer,
+  audioBuffer: Buffer,
+  opts: { model?: string; replicateToken?: string; videoMime?: string; audioMime?: string } = {},
+): Promise<Buffer> {
+  const token = getReplicateToken(opts.replicateToken);
+  const modelName = opts.model
+    ?? process.env.REPLICATE_LIPSYNC_MODEL
+    ?? "cudanexus/lipsync-v2";
+  const videoMime = opts.videoMime ?? "video/mp4";
+  const audioMime = opts.audioMime ?? "audio/mpeg";
+  const input: Record<string, unknown> = {
+    video: bufferToDataUri(videoBuffer, videoMime),
+    audio: bufferToDataUri(audioBuffer, audioMime),
+  };
+  return replicateRunLatestBuffer(modelName, input, token, 8 * 60_000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 16: ASR (audio → SRT subtitles via Replicate Whisper)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface WhisperSegment { start: number; end: number; text: string }
+
+function fmtSrtTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.round((sec - Math.floor(sec)) * 1000);
+  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
+}
+
+function segmentsToSrt(segments: WhisperSegment[]): string {
+  return segments
+    .filter((s) => s.text?.trim())
+    .map((s, i) => `${i + 1}\n${fmtSrtTime(s.start)} --> ${fmtSrtTime(s.end)}\n${s.text.trim()}\n`)
+    .join("\n");
+}
+
+/**
+ * Transcribe an audio buffer to SRT subtitles using Replicate Whisper
+ * (default `openai/whisper`). Returns the SRT string ready to burn into a
+ * video. `lang` accepts ISO-639-1 codes ("es", "en"...) or null for auto.
+ */
+export async function transcribeAudioToSrt(
+  audioBuffer: Buffer,
+  opts: { language?: string | null; model?: string; replicateToken?: string; audioMime?: string } = {},
+): Promise<{ srt: string; segments: WhisperSegment[]; language?: string }> {
+  const token = getReplicateToken(opts.replicateToken);
+  const modelName = opts.model
+    ?? process.env.REPLICATE_WHISPER_MODEL
+    ?? "openai/whisper";
+  const audioMime = opts.audioMime ?? "audio/mpeg";
+  const input: Record<string, unknown> = {
+    audio: bufferToDataUri(audioBuffer, audioMime),
+  };
+  if (opts.language && opts.language !== "auto") input.language = opts.language;
+  const out = await replicateRunLatestJson(modelName, input, token, 6 * 60_000) as any;
+  // Whisper variants return either {transcription, segments[]} or {text, chunks[]}
+  let segments: WhisperSegment[] = [];
+  if (Array.isArray(out?.segments)) {
+    segments = out.segments
+      .map((s: any) => ({ start: Number(s.start ?? 0), end: Number(s.end ?? 0), text: String(s.text ?? "") }))
+      .filter((s: WhisperSegment) => s.end > s.start);
+  } else if (Array.isArray(out?.chunks)) {
+    segments = out.chunks
+      .map((c: any) => ({
+        start: Number(c.timestamp?.[0] ?? c.start ?? 0),
+        end: Number(c.timestamp?.[1] ?? c.end ?? 0),
+        text: String(c.text ?? ""),
+      }))
+      .filter((s: WhisperSegment) => s.end > s.start);
+  } else if (typeof out?.transcription === "string") {
+    // Single block fallback — assume 30s window
+    segments = [{ start: 0, end: 30, text: out.transcription }];
+  }
+  return { srt: segmentsToSrt(segments), segments };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 17: BURN SUBTITLES INTO VIDEO (FFmpeg subtitles filter)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface BurnSubsStyle {
+  fontName?: string;       // default Arial
+  fontSizePx?: number;     // default 28
+  primaryColorHex?: string; // hex like "FFFFFF" (no #)
+  outlineColorHex?: string; // hex like "000000"
+  outlinePx?: number;       // default 2
+  alignment?: 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9 | 10 | 11; // ASS alignment numpad style; 2 = bottom-center
+  marginVPx?: number;       // bottom margin
+}
+
+/**
+ * Burn an SRT subtitle string into a video via FFmpeg `subtitles` filter.
+ * Re-encodes the video. Style is applied through `force_style`.
+ */
+export async function burnSubtitlesIntoVideo(
+  videoBuffer: Buffer,
+  srt: string,
+  style: BurnSubsStyle = {},
+): Promise<Buffer> {
+  if (!srt?.trim()) throw new Error("burnSubtitlesIntoVideo: SRT vacío");
+  const tmp = await makeTmpDir("subs");
+  const inPath = path.join(tmp, "in.mp4");
+  const srtPath = path.join(tmp, "subs.srt");
+  const outPath = path.join(tmp, "out.mp4");
+  await fs.writeFile(inPath, videoBuffer);
+  await fs.writeFile(srtPath, srt, "utf8");
+  const ffmpeg: any = await loadFfmpeg();
+
+  const fontName = style.fontName ?? "Arial";
+  const fontSize = style.fontSizePx ?? 28;
+  const primary = (style.primaryColorHex ?? "FFFFFF").replace(/^#/, "");
+  const outline = (style.outlineColorHex ?? "000000").replace(/^#/, "");
+  const outlinePx = style.outlinePx ?? 2;
+  const alignment = style.alignment ?? 2;
+  const marginV = style.marginVPx ?? 60;
+  // ASS color format: &HAABBGGRR, no alpha → &H00BBGGRR
+  const toAssColor = (hex6: string): string => {
+    const r = hex6.slice(0, 2), g = hex6.slice(2, 4), b = hex6.slice(4, 6);
+    return `&H00${b}${g}${r}`;
+  };
+  const styleStr = [
+    `FontName=${fontName}`,
+    `FontSize=${fontSize}`,
+    `PrimaryColour=${toAssColor(primary)}`,
+    `OutlineColour=${toAssColor(outline)}`,
+    `BorderStyle=1`,
+    `Outline=${outlinePx}`,
+    `Shadow=0`,
+    `Alignment=${alignment}`,
+    `MarginV=${marginV}`,
+  ].join(",");
+  // The subtitles filter needs a filesystem-safe path; escape colons.
+  const safeSrt = srtPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+
+  return await new Promise<Buffer>((resolve, reject) => {
+    ffmpeg(inPath)
+      .videoFilter(`subtitles='${safeSrt}':force_style='${styleStr}'`)
+      .videoCodec("libx264")
+      .audioCodec("copy")
+      .outputOptions(["-pix_fmt yuv420p", "-movflags +faststart"])
+      .on("end", async () => {
+        try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        finally { fs.rm(tmp, { recursive: true, force: true }).catch(() => {}); }
+      })
+      .on("error", (err: Error) => {
+        fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+        reject(new Error(`FFmpeg burn-subs error: ${err.message}`));
+      })
+      .save(outPath);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 18: MOTION TRANSFER (driving video → animate static image)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Animate a static image with the motion of a driving reference video.
+ * Default model is `arielreplicate/champ` — override via REPLICATE_MOTION_MODEL
+ * or `opts.model` to use `magic-research/magic-animate`, `lucataco/animate-anything`,
+ * or any compatible image+driving-video→video Replicate model.
+ */
+export async function transferMotionToImage(
+  imageBuffer: Buffer,
+  drivingVideoBuffer: Buffer,
+  opts: { model?: string; replicateToken?: string; imageMime?: string; videoMime?: string } = {},
+): Promise<Buffer> {
+  const token = getReplicateToken(opts.replicateToken);
+  const modelName = opts.model
+    ?? process.env.REPLICATE_MOTION_MODEL
+    ?? "arielreplicate/champ";
+  const imageMime = opts.imageMime ?? "image/png";
+  const videoMime = opts.videoMime ?? "video/mp4";
+  const input: Record<string, unknown> = {
+    image: bufferToDataUri(imageBuffer, imageMime),
+    driving_video: bufferToDataUri(drivingVideoBuffer, videoMime),
+  };
+  return replicateRunLatestBuffer(modelName, input, token, 10 * 60_000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 19: VIDEO FRAME EXTRACTION (for analysis / clone-viral pipeline)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Extract N evenly-spaced JPEG frames from a video buffer. */
+export async function extractVideoFrames(
+  videoBuffer: Buffer,
+  frameCount = 8,
+  sizePx = 512,
+): Promise<{ frames: Buffer[]; durationSec: number }> {
+  const tmp = await makeTmpDir("frames");
+  const inPath = path.join(tmp, "in.mp4");
+  await fs.writeFile(inPath, videoBuffer);
+  const ffmpeg: any = await loadFfmpeg();
+  const dur = await probeDurationSec(inPath).catch(() => 0);
+  const N = Math.max(1, Math.min(frameCount, 32));
+  const step = dur > 0 ? dur / (N + 1) : 1;
+
+  const frames: Buffer[] = [];
+  try {
+    for (let i = 0; i < N; i++) {
+      const t = dur > 0 ? step * (i + 1) : i;
+      const outPath = path.join(tmp, `f_${i}.jpg`);
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(inPath)
+          .seekInput(t)
+          .frames(1)
+          .size(`${sizePx}x?`)
+          .outputOptions(["-q:v 4"])
+          .on("end", () => resolve())
+          .on("error", (e: Error) => reject(e))
+          .save(outPath);
+      });
+      frames.push(await fs.readFile(outPath));
+    }
+    return { frames, durationSec: dur };
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/** Extract the audio track of a video as MP3 buffer (for transcription). */
+export async function extractAudioMp3(videoBuffer: Buffer): Promise<Buffer> {
+  const tmp = await makeTmpDir("audio");
+  const inPath = path.join(tmp, "in.mp4");
+  const outPath = path.join(tmp, "out.mp3");
+  await fs.writeFile(inPath, videoBuffer);
+  const ffmpeg: any = await loadFfmpeg();
+  try {
+    return await new Promise<Buffer>((resolve, reject) => {
+      ffmpeg(inPath)
+        .noVideo()
+        .audioCodec("libmp3lame")
+        .audioBitrate("128k")
+        .on("end", async () => {
+          try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        })
+        .on("error", (e: Error) => reject(new Error(`FFmpeg audio extract: ${e.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
 }

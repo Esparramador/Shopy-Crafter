@@ -4,7 +4,7 @@ import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2,
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "audio" | "compose" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "audio" | "compose" | "protools" | "downloads";
 
 interface Capabilities {
   imageGeneration: Array<{ key: string; label: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }>;
@@ -15,6 +15,10 @@ interface Capabilities {
   audio: Array<{ key: string; label: string; description: string }>;
   composition: Array<{ key: string; label: string; description: string }>;
   voiceModels: Array<{ key: string; label: string; description: string }>;
+  cameraPresets?: Array<{ key: string; label: string; description: string }>;
+  transitionPresets?: Array<{ key: string; label: string; xfade: string; defaultDurationSec: number }>;
+  pollopaParity?: Array<{ key: string; label: string; description: string }>;
+  adTemplates?: Array<{ key: string; label: string; description: string; cameraPreset: string; transitionPreset: string; defaultAspect: string; defaultDurationSec: number }>;
 }
 
 interface VaultItem {
@@ -33,6 +37,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling, Seedance, Hailuo" },
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
+  { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
 
@@ -117,6 +122,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "video"      && <VideoTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "protools"   && <ProToolsTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "downloads"  && <DownloadsTab projectId={projectId} sessionItems={sessionItems} onError={(m) => showToast(m, false)} />}
       </div>
     </div>
@@ -403,6 +409,7 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
   const [aspect, setAspect] = useState("9:16");
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [cameraPreset, setCameraPreset] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
@@ -414,6 +421,7 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
       fd.append("projectId", String(projectId));
       fd.append("model", model); fd.append("prompt", prompt);
       fd.append("duration", String(duration)); fd.append("aspect", aspect);
+      if (cameraPreset) fd.append("cameraPreset", cameraPreset);
       if (file) fd.append("image", file);
       if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
       const res = await fetch(`${API_BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
@@ -460,6 +468,21 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
           <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
           <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
         </Section>
+        {caps?.cameraPresets && caps.cameraPresets.length > 0 && (
+          <Section title="Movimiento de cámara (preset)">
+            <select value={cameraPreset} onChange={e => setCameraPreset(e.target.value)} style={inputStyle}>
+              <option value="">Sin preset (libre)</option>
+              {caps.cameraPresets.map(p => (
+                <option key={p.key} value={p.key}>{p.label}</option>
+              ))}
+            </select>
+            {cameraPreset && (
+              <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0" }}>
+                {caps.cameraPresets.find(p => p.key === cameraPreset)?.description}
+              </p>
+            )}
+          </Section>
+        )}
         <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Generando video..." : "Generar video (1-3 min)"}
         </button>
@@ -788,6 +811,161 @@ function DownloadsTab({ projectId, sessionItems, onError }: { projectId: number;
             </div>
           </label>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: PRO TOOLS (lip-sync · auto-subs · motion-transfer) ────────────
+function ProToolsTab({ projectId, sessionItems, onSuccess, onError }: { projectId: number; sessionItems: VaultItem[]; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+  const [mode, setMode] = useState<"lipsync" | "subs" | "motion">("lipsync");
+  const [busy, setBusy] = useState(false);
+
+  // Lip-sync state
+  const [lsVideo, setLsVideo] = useState<number | "">("");
+  const [lsAudio, setLsAudio] = useState<number | "">("");
+
+  // Subs state
+  const [subVideo, setSubVideo] = useState<number | "">("");
+  const [subLang, setSubLang] = useState<string>("auto");
+  const [subFontSize, setSubFontSize] = useState<number>(32);
+
+  // Motion transfer state
+  const [mtImage, setMtImage] = useState<File | null>(null);
+  const [mtRef, setMtRef] = useState<File | null>(null);
+
+  const videoVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("video"));
+  const audioVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("audio"));
+
+  const runLipSync = async () => {
+    if (!lsVideo || !lsAudio) { onError("Selecciona video + audio"); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/lip-sync`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, videoVaultId: lsVideo, audioVaultId: lsAudio }),
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `HTTP ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Lip-sync ${lsVideo}`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  const runBurnSubs = async () => {
+    if (!subVideo) { onError("Selecciona un video"); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/burn-subs`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId, videoVaultId: subVideo,
+          language: subLang === "auto" ? undefined : subLang,
+          style: { fontSizePx: subFontSize, alignment: 2, marginVPx: 80, primaryColorHex: "FFFFFF", outlineColorHex: "000000", outlinePx: 3 },
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `HTTP ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Subs ${subVideo}`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  const runMotion = async () => {
+    if (!mtImage || !mtRef) { onError("Sube imagen + video referencia"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("image", mtImage);
+      fd.append("refVideo", mtRef);
+      const res = await fetch(`${API_BASE}/api/fs-pro/motion-transfer`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `HTTP ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: "Motion transfer", mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 16 }}>
+      <div>
+        {[
+          { k: "lipsync", l: "Lip-sync" },
+          { k: "subs",    l: "Subtítulos auto" },
+          { k: "motion",  l: "Motion transfer" },
+        ].map(o => (
+          <button key={o.k} onClick={() => setMode(o.k as any)} style={{ ...cardButton(mode === o.k), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
+            {o.l}
+          </button>
+        ))}
+        <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 12, lineHeight: 1.5 }}>
+          Estas operaciones consumen créditos de video. Lip-sync ≈ 4, Subs ≈ 2, Motion ≈ 6.
+        </p>
+      </div>
+      <div>
+        {mode === "lipsync" && (
+          <>
+            <Section title="Video (de la sesión)">
+              <select value={lsVideo} onChange={e => setLsVideo(e.target.value ? parseInt(e.target.value) : "")} style={inputStyle}>
+                <option value="">— Elige un video —</option>
+                {videoVaultItems.map(v => (<option key={v.vaultId} value={v.vaultId}>#{v.vaultId} · {v.label}</option>))}
+              </select>
+            </Section>
+            <Section title="Audio (de la sesión)">
+              <select value={lsAudio} onChange={e => setLsAudio(e.target.value ? parseInt(e.target.value) : "")} style={inputStyle}>
+                <option value="">— Elige un audio —</option>
+                {audioVaultItems.map(v => (<option key={v.vaultId} value={v.vaultId}>#{v.vaultId} · {v.label}</option>))}
+              </select>
+            </Section>
+            <button onClick={runLipSync} disabled={busy} className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Mic size={16} />} {busy ? "Sincronizando..." : "Sincronizar labios"}
+            </button>
+          </>
+        )}
+        {mode === "subs" && (
+          <>
+            <Section title="Video (de la sesión)">
+              <select value={subVideo} onChange={e => setSubVideo(e.target.value ? parseInt(e.target.value) : "")} style={inputStyle}>
+                <option value="">— Elige un video —</option>
+                {videoVaultItems.map(v => (<option key={v.vaultId} value={v.vaultId}>#{v.vaultId} · {v.label}</option>))}
+              </select>
+            </Section>
+            <Section title="Idioma">
+              <select value={subLang} onChange={e => setSubLang(e.target.value)} style={inputStyle}>
+                <option value="auto">Auto-detectar</option>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="pt">Português</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+              </select>
+            </Section>
+            <Section title="Tamaño de fuente (px)">
+              <input type="range" min={18} max={48} value={subFontSize} onChange={e => setSubFontSize(parseInt(e.target.value))} style={{ width: "100%" }} />
+              <p style={{ fontSize: 11, color: "var(--t3)" }}>{subFontSize}px</p>
+            </Section>
+            <button onClick={runBurnSubs} disabled={busy} className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />} {busy ? "Transcribiendo y quemando..." : "Quemar subtítulos"}
+            </button>
+          </>
+        )}
+        {mode === "motion" && (
+          <>
+            <Section title="Imagen origen (sujeto)">
+              <input type="file" accept="image/*" onChange={e => setMtImage(e.target.files?.[0] || null)} />
+            </Section>
+            <Section title="Video referencia (movimiento)">
+              <input type="file" accept="video/*" onChange={e => setMtRef(e.target.files?.[0] || null)} />
+              <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0" }}>
+                El movimiento del video se transfiere al sujeto de la imagen.
+              </p>
+            </Section>
+            <button onClick={runMotion} disabled={busy || !mtImage || !mtRef} className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Transfiriendo movimiento..." : "Generar (2-4 min)"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

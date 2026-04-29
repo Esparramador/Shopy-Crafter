@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRoute } from "wouter";
-import { Sparkles, Film, Download, AlertCircle, CheckCircle2, Loader2, Zap, Target, Users, TrendingUp, Globe } from "lucide-react";
+import { Sparkles, Film, Download, AlertCircle, CheckCircle2, Loader2, Zap, Target, Users, TrendingUp, Globe, Wand2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -84,6 +84,15 @@ export default function AdStudio() {
   const [providers, setProviders] = useState<VideoProvider[]>([]);
   const [voices, setVoices] = useState<ElevenVoice[]>([]);
   const [creditCostPerAd, setCreditCostPerAd] = useState(6);
+  const [templates, setTemplates] = useState<Array<{ key: string; label: string; description: string; defaultAspect?: string; defaultDurationSec?: number }>>([]);
+  const [templateKey, setTemplateKey] = useState<string>("");
+  const [burnSubs, setBurnSubs] = useState<boolean>(false);
+  const [subsLanguage, setSubsLanguage] = useState<string>("auto");
+  const [showClone, setShowClone] = useState<boolean>(false);
+  const [cloneUrl, setCloneUrl] = useState<string>("");
+  const [cloneFile, setCloneFile] = useState<File | null>(null);
+  const [cloneAnalyzing, setCloneAnalyzing] = useState(false);
+  const [cloneBrief, setCloneBrief] = useState<any>(null);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -97,7 +106,9 @@ export default function AdStudio() {
     Promise.all([
       fetch(`${API_BASE}/api/ad-studio/providers`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`${API_BASE}/api/ad-studio/voices`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
-    ]).then(([provData, voiceData]) => {
+      fetch(`${API_BASE}/api/ad-studio/templates`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
+    ]).then(([provData, voiceData, tplData]) => {
+      if (tplData?.templates) setTemplates(tplData.templates);
       if (provData?.videoProviders) {
         setProviders(provData.videoProviders);
         setCreditCostPerAd(provData.creditCostPerAd || 6);
@@ -131,6 +142,9 @@ export default function AdStudio() {
       objective, aspect, videoProvider, videoDurationSec, variantsCount,
       voiceId: voiceId || undefined, voiceStability, voiceStyle, addMusic,
       sourceImageUrl: sourceImageUrl || undefined,
+      template: templateKey || undefined,
+      burnSubs: burnSubs || undefined,
+      subsLanguage: burnSubs && subsLanguage !== "auto" ? subsLanguage : undefined,
     };
 
     const ctrl = new AbortController();
@@ -212,6 +226,74 @@ export default function AdStudio() {
         </p>
       </div>
 
+      {/* CLONE VIRAL PANEL */}
+      <div style={{ marginBottom: 16, padding: 14, borderRadius: 12, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)" }}>
+        <button onClick={() => setShowClone(s => !s)}
+          style={{ background: "transparent", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: 0 }}>
+          <Film size={14} /> Clonar formato viral desde URL/video {showClone ? "▾" : "▸"}
+        </button>
+        {showClone && (
+          <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <Field label="URL del video viral (TikTok / Instagram / YouTube)">
+                <input value={cloneUrl} onChange={e => setCloneUrl(e.target.value)} placeholder="https://www.tiktok.com/@..." style={inputStyle} />
+              </Field>
+              <Field label="O sube un archivo de video">
+                <input type="file" accept="video/*" onChange={e => setCloneFile(e.target.files?.[0] || null)} />
+              </Field>
+              <button
+                onClick={async () => {
+                  if (!cloneUrl && !cloneFile) { setGlobalError("Pega URL o sube video"); return; }
+                  setCloneAnalyzing(true); setGlobalError(""); setCloneBrief(null);
+                  try {
+                    let res: Response;
+                    if (cloneFile) {
+                      const fd = new FormData();
+                      fd.append("projectId", String(projectId));
+                      fd.append("video", cloneFile);
+                      fd.append("dryRun", "1");
+                      res = await fetch(`${API_BASE}/api/ad-studio/clone-viral`, { method: "POST", credentials: "include", body: fd });
+                    } else {
+                      res = await fetch(`${API_BASE}/api/ad-studio/clone-viral`, {
+                        method: "POST", credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ projectId, videoUrl: cloneUrl, dryRun: true }),
+                      });
+                    }
+                    const d = await res.json();
+                    if (!res.ok) { setGlobalError(d.error || `HTTP ${res.status}`); return; }
+                    const brief = d.brief || d;
+                    setCloneBrief(brief);
+                    if (brief?.template) setTemplateKey(brief.template);
+                    if (brief?.aspect) setAspect(brief.aspect as Aspect);
+                    if (brief?.durationSec) setVideoDurationSec(Math.min(Math.max(Number(brief.durationSec), 3), 10));
+                    if (brief?.hook) setCustomPrompt(String(brief.hook));
+                  } catch (e: any) { setGlobalError(e?.message || "Error analizando"); } finally { setCloneAnalyzing(false); }
+                }}
+                disabled={cloneAnalyzing || (!cloneUrl && !cloneFile)}
+                className="btn btn-gold" style={{ width: "100%", padding: "10px 14px", justifyContent: "center" }}>
+                {cloneAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                {cloneAnalyzing ? "Analizando viral..." : "Analizar y aplicar brief"}
+              </button>
+              <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 8 }}>
+                Auto-detecta formato, hook, plantilla recomendada y duración. Después rellena Producto y genera.
+              </p>
+            </div>
+            <div>
+              {cloneBrief ? (
+                <div style={{ padding: 12, background: "var(--ink, #0d0d14)", borderRadius: 8, border: "1px solid var(--bdr)", maxHeight: 260, overflowY: "auto", fontSize: 11, fontFamily: "monospace", color: "var(--t2)", whiteSpace: "pre-wrap" }}>
+                  {JSON.stringify(cloneBrief, null, 2)}
+                </div>
+              ) : (
+                <div style={{ padding: 12, background: "var(--ink, #0d0d14)", borderRadius: 8, border: "1px dashed var(--bdr)", color: "var(--t3)", fontSize: 11, textAlign: "center", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  El brief extraído aparecerá aquí
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* STEPS INDICATOR */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24, padding: 4, background: "var(--ink2, #14141d)", borderRadius: 12, border: "1px solid var(--bdr, #22222e)" }}>
         {[
@@ -281,6 +363,30 @@ export default function AdStudio() {
       {/* STEP 2 — Style (objective, aspect, provider, duration, variants) */}
       {step === 2 && (
         <div>
+          {templates.length > 0 && (
+            <Section title="Plantilla de género (opcional)">
+              <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10 }}>
+                Las plantillas curadas combinan tono de copy + estilo visual + voz + música óptimos para cada formato.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
+                <button onClick={() => setTemplateKey("")} style={cardButton(templateKey === "")}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Sin plantilla</div>
+                  <div style={{ fontSize: 10, color: "var(--t3)" }}>Generación libre</div>
+                </button>
+                {templates.map(t => (
+                  <button key={t.key} onClick={() => {
+                    setTemplateKey(t.key);
+                    if (t.defaultAspect) setAspect(t.defaultAspect as Aspect);
+                    if (t.defaultDurationSec) setVideoDurationSec(t.defaultDurationSec);
+                  }} style={cardButton(templateKey === t.key)}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{t.label}</div>
+                    <div style={{ fontSize: 10, color: "var(--t3)" }}>{t.description}</div>
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
+
           <Section title="Objetivo de campaña">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
               {Object.entries(OBJECTIVE_META).map(([k, m]) => (
