@@ -826,6 +826,38 @@ const ALLOWED_RATIOS: RunwayRatio[] = [
   "1280:768", "768:1280", "1104:832", "832:1104", "960:960", "1584:672",
 ];
 
+// Catálogo público de modelos de vídeo expuesto al frontend.
+// Mantener alineado con `RunwayModel` en lib/runway.ts.
+router.get("/fusion-studio/video-models", (_req: Request, res: Response): void => {
+  res.json({
+    models: [
+      {
+        key: "gen3a_turbo",
+        label: "Runway Gen-3 Turbo",
+        description: "Image-to-video rápido y económico (5–10s, óptimo para Reels).",
+        costPerSec: 0.05,
+        provider: "runway",
+        badge: "RÁPIDO",
+      },
+      {
+        key: "gen4_turbo",
+        label: "Runway Gen-4 Turbo",
+        description: "Modelo más reciente, mayor coherencia y físicas más realistas.",
+        costPerSec: 0.05,
+        provider: "runway",
+        badge: "PREMIUM",
+      },
+    ],
+    ratios: [
+      { key: "9:16", label: "9:16 vertical (Reels/TikTok)", runway: "768:1280" },
+      { key: "16:9", label: "16:9 horizontal (YouTube)", runway: "1280:768" },
+      { key: "1:1", label: "1:1 cuadrado (feed)", runway: "960:960" },
+      { key: "4:3", label: "4:3 retrato", runway: "832:1104" },
+    ],
+    durations: [5, 10],
+  });
+});
+
 router.post("/fusion-studio/generate-video", async (req: Request, res: Response): Promise<void> => {
   enableLongRunning(res);
   try {

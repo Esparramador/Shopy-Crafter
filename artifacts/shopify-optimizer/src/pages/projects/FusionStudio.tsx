@@ -182,8 +182,14 @@ export default function FusionStudio() {
   }, [projectId, productFiles, generatedPhotos]);
 
   // ─── Generate advertising video (uses /api/fusion-studio/generate-video) ─
-  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string }>>([]);
-  const [videoModel, setVideoModel] = useState<string>("seedance-fast");
+  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string; provider?: string }>>([]);
+  const [videoRatios, setVideoRatios] = useState<Array<{ key: string; label: string; runway: string }>>([
+    { key: "9:16", label: "9:16 vertical (Reels/TikTok)", runway: "768:1280" },
+    { key: "16:9", label: "16:9 horizontal (YouTube)", runway: "1280:768" },
+    { key: "1:1", label: "1:1 cuadrado (feed)", runway: "960:960" },
+  ]);
+  const [videoDurations, setVideoDurations] = useState<number[]>([5, 10]);
+  const [videoModel, setVideoModel] = useState<string>("gen3a_turbo");
   const [videoDuration, setVideoDuration] = useState<number>(5);
   const [videoAspectRatio, setVideoAspectRatio] = useState<string>("9:16");
   const [videoPrompt, setVideoPrompt] = useState<string>("");
@@ -196,48 +202,55 @@ export default function FusionStudio() {
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.models) setVideoModels(d.models);
+        if (d?.ratios) setVideoRatios(d.ratios);
+        if (d?.durations) setVideoDurations(d.durations);
       })
       .catch(() => {});
   }, []);
 
   const generateVideo = useCallback(async () => {
     if (!projectId) { setVideoResult({ error: "projectId requerido" }); return; }
-    // Source image: from gallery if user clicked one, else first uploaded product file
-    if (!videoSourceUrl && productFiles.length === 0) {
-      setVideoResult({ error: "Necesitas una imagen origen: sube producto o genera la galería primero." });
+    // Backend Runway requiere URL HTTPS pública (no acepta upload directo).
+    // El usuario debe seleccionar una imagen YA generada de la galería.
+    if (!videoSourceUrl) {
+      setVideoResult({ error: "Selecciona una imagen origen de la galería generada (Runway necesita una URL pública)." });
       return;
     }
     setVideoGenerating(true);
     setVideoResult(null);
     try {
-      const fd = new FormData();
-      fd.append("projectId", String(projectId));
-      fd.append("model", videoModel);
-      fd.append("duration", String(videoDuration));
-      fd.append("aspectRatio", videoAspectRatio);
-      fd.append("prompt", videoPrompt || `Cinematic product video, ${productAnalysis?.product?.category || "premium product"}, soft studio lighting, slow camera movement, professional advertising style`);
-      if (videoSourceUrl) {
-        fd.append("sourceImageUrl", videoSourceUrl);
-      } else if (productFiles[0]) {
-        fd.append("images", productFiles[0]);
-      }
+      // Mapear aspect ratio (UI) → ratio Runway (backend)
+      const ratioMap = new Map(videoRatios.map(r => [r.key, r.runway]));
+      const runwayRatio = ratioMap.get(videoAspectRatio) || "768:1280";
+      const promptText = (videoPrompt && videoPrompt.trim().length >= 3)
+        ? videoPrompt.trim()
+        : `Cinematic product video, ${productAnalysis?.product?.category || "premium product"}, soft studio lighting, slow camera movement, professional advertising style`;
+
       const res = await fetch(`${API_BASE}/api/fusion-studio/generate-video`, {
         method: "POST",
         credentials: "include",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: Number(projectId),
+          imageUrl: videoSourceUrl,
+          promptText,
+          model: videoModel,
+          duration: videoDuration,
+          ratio: runwayRatio,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setVideoResult({ error: data.error || `Error ${res.status}` });
         return;
       }
-      setVideoResult({ url: data.videoUrl, model: data.model, duration: data.duration });
+      setVideoResult({ url: data.videoUrl, model: data.model, duration: data.durationSec ?? data.duration });
     } catch (e: any) {
       setVideoResult({ error: e?.message || "Error de red al generar video" });
     } finally {
       setVideoGenerating(false);
     }
-  }, [projectId, productFiles, videoModel, videoDuration, videoAspectRatio, videoPrompt, videoSourceUrl, productAnalysis]);
+  }, [projectId, videoModel, videoDuration, videoAspectRatio, videoPrompt, videoSourceUrl, productAnalysis, videoRatios]);
 
   const fetchBrandDNA = useCallback(async () => {
     if (!brandUrl && !instagram && !companyName) return;
@@ -1063,7 +1076,7 @@ export default function FusionStudio() {
                           🎬 Generar video publicitario IA
                         </h3>
                         <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>
-                          Image-to-video con Kling, Seedance, Hailuo, Wan. Para Reels, TikTok, anuncios. Cuesta 4 créditos por video.
+                          Image-to-video con Runway Gen-3/Gen-4 Turbo. Para Reels, TikTok, anuncios. Cuesta 6 créditos (5s) o 12 créditos (10s).
                         </p>
                       </div>
                     </div>
@@ -1096,7 +1109,7 @@ export default function FusionStudio() {
                       <div>
                         <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Duración</label>
                         <div style={{ display: "flex", gap: 4 }}>
-                          {[3, 5, 6, 8, 10].map(d => (
+                          {videoDurations.map(d => (
                             <button key={d} onClick={() => setVideoDuration(d)}
                               style={{ flex: 1, padding: "8px 4px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", background: videoDuration === d ? "#6366f1" : "#0a0a14", color: videoDuration === d ? "#fff" : "#888", border: `1px solid ${videoDuration === d ? "#6366f1" : "#22222e"}` }}>
                               {d}s
@@ -1107,10 +1120,10 @@ export default function FusionStudio() {
                       <div>
                         <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Aspecto</label>
                         <div style={{ display: "flex", gap: 4 }}>
-                          {["9:16", "1:1", "16:9", "4:3"].map(r => (
-                            <button key={r} onClick={() => setVideoAspectRatio(r)}
-                              style={{ flex: 1, padding: "8px 4px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", background: videoAspectRatio === r ? "#6366f1" : "#0a0a14", color: videoAspectRatio === r ? "#fff" : "#888", border: `1px solid ${videoAspectRatio === r ? "#6366f1" : "#22222e"}` }}>
-                              {r}
+                          {videoRatios.map(r => (
+                            <button key={r.key} onClick={() => setVideoAspectRatio(r.key)} title={r.label}
+                              style={{ flex: 1, padding: "8px 4px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", background: videoAspectRatio === r.key ? "#6366f1" : "#0a0a14", color: videoAspectRatio === r.key ? "#fff" : "#888", border: `1px solid ${videoAspectRatio === r.key ? "#6366f1" : "#22222e"}` }}>
+                              {r.key}
                             </button>
                           ))}
                         </div>
@@ -1144,12 +1157,12 @@ export default function FusionStudio() {
                     </div>
 
                     {/* GENERATE BUTTON */}
-                    <button onClick={generateVideo} disabled={videoGenerating || (!videoSourceUrl && productFiles.length === 0)}
+                    <button onClick={generateVideo} disabled={videoGenerating || !videoSourceUrl} data-testid="button-generate-video"
                       style={{
                         width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: videoGenerating ? "not-allowed" : "pointer",
                         background: videoGenerating ? "#1f1f3a" : "linear-gradient(135deg, #6366f1, #a855f7)",
                         color: "#fff", border: "none",
-                        opacity: (!videoSourceUrl && productFiles.length === 0) ? 0.5 : 1,
+                        opacity: !videoSourceUrl ? 0.5 : 1,
                       }}>
                       {videoGenerating ? "🎥 Generando video... esto tarda 1-3 minutos" : `🎬 Generar video con ${videoModels.find(m => m.key === videoModel)?.label || videoModel}`}
                     </button>
