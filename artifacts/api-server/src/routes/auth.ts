@@ -63,33 +63,51 @@ router.post("/login", async (req, res): Promise<void> => {
       return;
     }
     const ip = req.ip ?? "unknown";
-    const rateLimitKey = `login:${ip}`;
-  
-    const limits = await getRateLimit(rateLimitKey);
-    if (limits.count >= RATE_LIMIT_MAX && limits.blockedUntil && limits.blockedUntil > new Date()) {
-      const mins = Math.ceil((limits.blockedUntil.getTime() - Date.now()) / 60000);
+    const normalizedEmail = email.toLowerCase().trim();
+    // FIX D-15: rate limit dual IP + email para evitar bypass con IPs rotantes
+    const rateLimitKeyIp = `login_ip:${ip}`;
+    const rateLimitKeyEmail = `login_email:${normalizedEmail}`;
+
+    const [limitsIp, limitsEmail] = await Promise.all([
+      getRateLimit(rateLimitKeyIp),
+      getRateLimit(rateLimitKeyEmail),
+    ]);
+    const ipBlocked = limitsIp.count >= RATE_LIMIT_MAX && limitsIp.blockedUntil && limitsIp.blockedUntil > new Date();
+    const emailBlocked = limitsEmail.count >= RATE_LIMIT_MAX && limitsEmail.blockedUntil && limitsEmail.blockedUntil > new Date();
+    if (ipBlocked || emailBlocked) {
+      const blockedUntil = ipBlocked ? limitsIp.blockedUntil! : limitsEmail.blockedUntil!;
+      const mins = Math.ceil((blockedUntil.getTime() - Date.now()) / 60000);
       res.status(429).json({ error: `Demasiados intentos. Espera ${mins} minuto(s).` });
       return;
     }
   
     await new Promise((r) => setTimeout(r, 200));
   
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase().trim()));
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
   
     if (!user || !user.isActive) {
-      await incrementRateLimit(rateLimitKey);
+      await Promise.all([
+        incrementRateLimit(rateLimitKeyIp),
+        incrementRateLimit(rateLimitKeyEmail),
+      ]);
       res.status(401).json({ error: "Credenciales incorrectas" });
       return;
     }
   
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      await incrementRateLimit(rateLimitKey);
+      await Promise.all([
+        incrementRateLimit(rateLimitKeyIp),
+        incrementRateLimit(rateLimitKeyEmail),
+      ]);
       res.status(401).json({ error: "Credenciales incorrectas" });
       return;
     }
   
-    await clearRateLimit(rateLimitKey);
+    await Promise.all([
+      clearRateLimit(rateLimitKeyIp),
+      clearRateLimit(rateLimitKeyEmail),
+    ]);
   
     req.session.userId = user.id;
     req.session.role = user.role;

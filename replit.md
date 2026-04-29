@@ -2,6 +2,15 @@
 
 ## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
 
+**Bloque D + E final (29 abr)** — fixes restantes auditoría aplicados:
+- `auth.ts` (D-15): rate limit de login DUAL — ahora limita por IP **y** por email (`login_ip:` + `login_email:`), evitando bypass con IPs rotantes contra una misma cuenta.
+- `admin.ts` (D-10): `/projects/:id/invite` valida email con regex y nombre ≥ 2 chars antes de tocar BD/Klaviyo.
+- `admin.ts` (D-11): `/users/:id/reset-password` valida que `password` sea string ≥ 8 chars antes de `bcrypt.hash` (que crashea con `undefined`).
+- `inventory.ts` (D-08): bloque Puppeteer hardcoded reemplazado por `generatePdfFromHtml` del helper centralizado (timeout 60s, bloqueo recursos externos, sin `chromiumPath` literal).
+- `vault.ts` (D-09): export DOCX ya no envía HTML con MIME `wordprocessingml.document` (Word lo rechazaba como "archivo dañado") — ahora sirve `.html` honesto hasta que se integre librería `docx` real.
+- `exports.ts` (E-07): eliminados `@import url('https://fonts.googleapis.com/...')` en bloques HTML que van a Puppeteer (causaban cuelgues esperando red externa); fallback a system font stack.
+- `exports.ts` (E-11): `autoSaveReport()` ahora limita contenido a 5MB y deduplica por (projectId, category, día) para evitar inserts masivos en hot path.
+
 **Hardening de seguridad Tier-1 + Bloque A (shopybrain CRIT/HIGH)**:
 - **Frontend** (`shopify-optimizer`): añadido `credentials:'include'` a 7 fetch() de cross-origin (Pricing, CMSEditor, ForgotPassword, ResetPassword, Landing, CmsContext) para evitar pérdida de sesión.
 - **XSS**: `Redesign.tsx` (HTML rich) e `Images.tsx` (SVG) ahora sanitizan con DOMPurify allowlist en lugar de regex casero. Instalado `dompurify` + `@types/dompurify`.

@@ -749,40 +749,29 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
       }
   
       if (format === "docx") {
+        // FIX D-09: NO enviar HTML con MIME de Word — Word lo rechaza como "archivo dañado".
+        // Mientras no se integre librería real (docx package), servimos como HTML honesto.
         try {
           const cleanHtml = htmlContent
-            .replace(/<style[\s\S]*?<\/style>/gi, "")
             .replace(/<script[\s\S]*?<\/script>/gi, "");
-  
-          const docxHtml = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office"
-                  xmlns:w="urn:schemas-microsoft-com:office:word"
-                  xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-              <meta charset="utf-8">
-              <style>
-                body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #222; line-height: 1.6; max-width: 100%; }
-                h1 { font-size: 22pt; color: #1a1a2e; border-bottom: 2px solid #c9a96e; padding-bottom: 8px; }
-                h2 { font-size: 16pt; color: #2d2d44; margin-top: 20px; }
-                h3 { font-size: 13pt; color: #444; }
-                table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-                td, th { border: 1px solid #ccc; padding: 6px 10px; font-size: 10pt; }
-                th { background: #f0ebe0; font-weight: bold; }
-                img { max-width: 400px; }
-                .grade-badge, .score-circle { font-weight: bold; }
-              </style>
-            </head>
-            <body>${cleanHtml}</body>
-            </html>`;
-  
-          const docxBuffer = Buffer.from(docxHtml, "utf-8");
-          res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-          res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.doc"`);
-          res.setHeader("Content-Length", String(docxBuffer.length));
-          res.send(docxBuffer);
+          const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #222; line-height: 1.6; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 22pt; color: #1a1a2e; border-bottom: 2px solid #c9a96e; padding-bottom: 8px; }
+  h2 { font-size: 16pt; color: #2d2d44; margin-top: 20px; }
+  h3 { font-size: 13pt; color: #444; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  td, th { border: 1px solid #ccc; padding: 6px 10px; font-size: 10pt; }
+  th { background: #f0ebe0; font-weight: bold; }
+  img { max-width: 400px; }
+</style>
+</head><body>${cleanHtml}</body></html>`;
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.html"`);
+          res.send(wrappedHtml);
         } catch (e: any) {
-          logger.error({ err: e }, "Error generating DOCX");
-          res.status(500).json({ error: `Error generando Word: ${e.message}` });
+          logger.error({ err: e }, "Error generating DOCX-as-HTML fallback");
+          res.status(500).json({ error: `Error generando documento: ${e.message}` });
         }
         return;
       }

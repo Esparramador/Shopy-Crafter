@@ -880,6 +880,28 @@ function buildCogsEstimationHtml(est: CogsEstimation, brandColors: { accent: str
 
 async function autoSaveReport(projectId: number, title: string, htmlContent: string, category: string): Promise<number | null> {
   try {
+    // FIX E-11: límite de tamaño + dedup diaria (evita 300KB×N inserts en path caliente)
+    const MAX_AUTO_SAVE_BYTES = 5 * 1024 * 1024; // 5MB
+    const sizeBytes = Buffer.byteLength(htmlContent, "utf8");
+    if (sizeBytes > MAX_AUTO_SAVE_BYTES) {
+      logger.warn({ projectId, title, sizeBytes }, "autoSaveReport: contenido excede 5MB, se omite");
+      return null;
+    }
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const existing = await db.select({ id: projectFilesTable.id })
+      .from(projectFilesTable)
+      .where(and(
+        eq(projectFilesTable.projectId, projectId),
+        eq(projectFilesTable.category, category),
+        sql`${projectFilesTable.createdAt} >= ${startOfDay.toISOString()}`,
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      logger.debug({ projectId, category, existingId: existing[0].id }, "autoSaveReport: ya guardado hoy, dedup");
+      return existing[0].id;
+    }
+
     const date = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
     const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
     const htmlBuffer = Buffer.from(htmlContent, "utf-8");
@@ -1982,9 +2004,10 @@ function buildCustomReportShell(tpl: CustomReportTemplate) {
 <head>
 <meta charset="UTF-8">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(hf)}:wght@400;600;700&family=${encodeURIComponent(bf)}:wght@300;400;500;600&display=swap');
+  /* FIX E-07: Google Fonts removido — Puppeteer cuelga esperando red externa.
+     System fonts garantizan render < 2s en PDF y ZIP. */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: '${bf}', sans-serif; background: ${bg}; color: ${tc}; }
+  body { font-family: '${bf}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: ${bg}; color: ${tc}; }
   .cover { background: ${sc}; padding: 80px 48px; text-align: ${cs === "left-aligned" ? "left" : "center"}; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
   .cover-logo { max-width: 120px; max-height: 120px; border-radius: 16px; margin-bottom: 24px; ${cs === "centered" ? "margin-left:auto;margin-right:auto;" : ""} }
   .cover-title { font-family: '${hf}', serif; font-size: 32px; font-weight: ${hw}; color: ${pc}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; }
@@ -5023,9 +5046,9 @@ router.get("/exports/report-png/:projectId/:area", async (req, res): Promise<voi
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* FIX E-07: removido @import Google Fonts — usa system stack en Puppeteer. */
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:#08080e; color:#f0f0f5; width:1200px; }
+body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#08080e; color:#f0f0f5; width:1200px; }
 .preview { padding:48px; }
 .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; padding-bottom:16px; border-bottom:1px solid #1a1a28; }
 .logo { font-size:20px; font-weight:800; color:#c8a84b; }

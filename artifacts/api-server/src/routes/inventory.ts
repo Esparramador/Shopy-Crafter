@@ -8,6 +8,7 @@ import { shopifyRequest } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 
 const router = Router();
 
@@ -919,32 +920,13 @@ router.get("/inventory/sales-report", async (req, res): Promise<void> => {
     const safeTitle = `Informe_Ventas_Stock_${(storeName).replace(/[^a-zA-Z0-9]/g, "_")}`;
   
     if (format === "pdf") {
+      // FIX D-08: usar helper centralizado (timeout 60s, bloqueo recursos externos, no chromium hardcoded)
       try {
-        const puppeteer = await import("puppeteer-core");
-        const chromiumPath = "/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium";
-        const browser = await puppeteer.default.launch({
-          executablePath: chromiumPath, headless: true,
-          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-        });
-        const page = await browser.newPage();
-        await page.setRequestInterception(true);
-        page.on("request", (r: any) => {
-          const t = r.resourceType();
-          if (t === "script" || t === "xhr" || t === "fetch" || t === "websocket") r.abort(); else r.continue();
-        });
-        await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 30000 });
-        await new Promise(r => setTimeout(r, 1000));
-        const pdfBuffer = await page.pdf({
-          format: "A4", printBackground: true,
-          margin: { top: "15mm", bottom: "15mm", left: "10mm", right: "10mm" },
-        });
-        await browser.close();
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.pdf"`);
-        res.setHeader("Content-Length", String(pdfBuffer.length));
-        res.send(Buffer.from(pdfBuffer));
+        await generatePdfFromHtml(htmlContent, safeTitle, res);
       } catch (e: any) {
-        res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+        if (!res.headersSent) {
+          res.status(500).json({ error: `Error generando PDF: ${e.message}` });
+        }
       }
       return;
     }
