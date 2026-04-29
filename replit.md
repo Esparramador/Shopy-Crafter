@@ -3,6 +3,7 @@
 ## Recent Changes (Apr 2026 — Auditoría Claude Opus 4.7)
 
 **Fase 7 — CRIT-6 + sesión final (29 abr)** — cierre de los hallazgos pendientes del audit con guard centralizado:
+- **ErrorBoundary → /error-report**: `componentDidCatch` ahora hace `fetch(POST /api/error-report)` con keepalive, fire-and-forget — conecta el endpoint backend al frontend (M4 audit fix).
 - **CRIT-6 (`shopybrain.ts` línea 1761)**: añadido guard centralizado `requireConfirmation(params, action, {...})` antes del `switch (action)` — cubre los 24 cases catastróficos del `DESTRUCTIVE_ACTIONS` set (delete_*, bulk_*, optimize_all_products, deactivate_user, reset_*, edit_theme_*, sync_store_theme, setup_full_store, fix_code, modify_ui) en una sola edición sin tocar cada case individual. Si la action está en el set y `params.confirmed !== true`, devuelve JSON `{requiresConfirmation:true, action, preview, message}` y no ejecuta nada.
 - **OmniChatbot global handler**: `formatActionResult()` ahora detecta `result.requiresConfirmation === true` AL INICIO y devuelve `result.message` directamente para cualquier action — antes solo `delete_product` lo manejaba, otras destructivas mostraban `✅` falsamente.
 - **`/error-report` IP detection**: cambia `req.headers["x-forwarded-for"]` (spoofable) por `req.ip` (respeta `app.set("trust proxy", 1)` ya configurado en `app.ts`).

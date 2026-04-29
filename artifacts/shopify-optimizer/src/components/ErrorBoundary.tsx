@@ -22,6 +22,33 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary]", error, errorInfo);
+
+    // M4 audit fix: report to backend /error-report (rate-limited 30/min/IP).
+    // Fire-and-forget; do not block render or escalate failures.
+    try {
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+      const url = `${apiBase}/api/error-report`;
+      const payload = {
+        reportId: `eb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        context: "ErrorBoundary",
+        name: error.name || "Error",
+        message: error.message || "Unknown error",
+        stack: error.stack || "",
+        componentStack: errorInfo?.componentStack || "",
+        url: typeof window !== "undefined" ? window.location.href : "",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        timestamp: new Date().toISOString(),
+      };
+      void fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => { /* silent — never crash on report failure */ });
+    } catch {
+      /* silent */
+    }
   }
 
   componentDidUpdate(prevProps: Props) {
