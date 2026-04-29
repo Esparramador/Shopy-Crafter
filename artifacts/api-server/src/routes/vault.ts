@@ -13,8 +13,8 @@ import sharp from "sharp";
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
 
-function metadataToReportHtml(file: { title: string; metadata: string | null; fileType: string; description?: string | null; category?: string | null; productTitle?: string | null; generatedBy?: string | null; createdAt?: Date | string | null }): string {
-  return buildBrandedHtmlFromMetadata({
+async function metadataToReportHtml(file: { title: string; metadata: string | null; fileType: string; description?: string | null; category?: string | null; productTitle?: string | null; generatedBy?: string | null; createdAt?: Date | string | null }): Promise<string> {
+  return await buildBrandedHtmlFromMetadata({
     title: file.title,
     fileType: file.fileType ?? "report",
     category: file.category ?? null,
@@ -321,7 +321,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
     if (isJson) {
       try {
         const parsed = JSON.parse(file.content);
-        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+        const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
         const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
         res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -337,7 +337,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
 
   if (file.metadata) {
     try {
-      const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+      const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
       const htmlFilename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.html`;
       res.setHeader("Content-Disposition", `attachment; filename="${htmlFilename}"`);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -386,7 +386,7 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
     if (isJson) {
       try {
         const parsed = JSON.parse(file.content);
-        const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+        const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
         res.send(htmlReport);
         return;
       } catch {}
@@ -397,7 +397,7 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
 
   if (file.metadata) {
     try {
-      const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+      const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
       res.send(htmlReport);
       return;
     } catch {}
@@ -455,7 +455,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         if (isJsonContent) {
           try {
             const parsed = JSON.parse(file.content);
-            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+            const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
             archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
           } catch {
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -465,7 +465,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         }
         added++;
       } else if (file.metadata) {
-        const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+        const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
@@ -554,7 +554,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         if (isJsonContent) {
           try {
             const parsed = JSON.parse(file.content);
-            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+            const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
             archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
           } catch {
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -564,7 +564,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         }
         added++;
       } else if (file.metadata) {
-        const htmlReport = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+        const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
@@ -696,12 +696,12 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
       } else if (!htmlContent && file.content) {
         try {
           const parsed = JSON.parse(file.content);
-          htmlContent = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          htmlContent = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
         } catch {}
       }
       if (!htmlContent && file.metadata) {
         try {
-          htmlContent = buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+          htmlContent = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         } catch {}
       }
   
@@ -969,16 +969,63 @@ const B = {
   blue: "#3b82f6", blueBg: "rgba(59,130,246,.08)",
 };
 
-function buildBrandedHtmlFromMetadata(file: {
+async function fetchImageAsDataUrl(url: string | null | undefined): Promise<string | null> {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const ct = r.headers.get("content-type") || "image/jpeg";
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 8 * 1024 * 1024) return null;
+    return `data:${ct};base64,${buf.toString("base64")}`;
+  } catch { return null; }
+}
+
+async function buildBrandedHtmlFromMetadata(file: {
   title: string; fileType: string | null; category: string | null;
   productTitle: string | null; generatedBy: string | null;
   createdAt: Date | string | null; metadata: unknown;
-}, coverTemplate: CoverTemplate = "prestige"): string {
+  objectPath?: string | null; originalUrl?: string | null;
+}, coverTemplate: CoverTemplate = "prestige"): Promise<string> {
   const date = new Date(file.createdAt ?? Date.now()).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
   const time = new Date(file.createdAt ?? Date.now()).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const year = new Date().getFullYear();
   let meta: Record<string, unknown> = {};
   try { meta = typeof file.metadata === "string" ? JSON.parse(file.metadata) : (file.metadata ?? {}) as Record<string, unknown>; } catch { meta = {}; }
+
+  let imageBlockHtml = "";
+  if (file.fileType === "image") {
+    let imgDataUrl: string | null = null;
+    if (file.objectPath) {
+      try {
+        const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
+        const [buf] = await gcsFile.download();
+        if (buf.length <= 8 * 1024 * 1024) {
+          const [meta] = await gcsFile.getMetadata();
+          const ct = (meta.contentType as string) || "image/jpeg";
+          imgDataUrl = `data:${ct};base64,${buf.toString("base64")}`;
+        }
+      } catch { /* fallback below */ }
+    }
+    if (!imgDataUrl) imgDataUrl = await fetchImageAsDataUrl(file.originalUrl);
+    if (!imgDataUrl) {
+      const fromMeta = (meta as any)?.imageUrl ?? (meta as any)?.image_url ?? null;
+      imgDataUrl = await fetchImageAsDataUrl(fromMeta);
+    }
+    if (imgDataUrl) {
+      imageBlockHtml = `
+      <div style="margin:0 0 24px;padding:18px;background:${B.surface};border:1px solid ${B.border};border-radius:14px;text-align:center;">
+        <img src="${imgDataUrl}" alt="${sanitizeHtml(file.title)}"
+          style="max-width:100%;max-height:720px;height:auto;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.35);display:inline-block;" />
+        <div style="margin-top:14px;font-size:11px;color:${B.muted};letter-spacing:1px;text-transform:uppercase;">Resultado generado &middot; ${sanitizeHtml(file.category || "imagen")}</div>
+      </div>`;
+    } else {
+      imageBlockHtml = `
+      <div style="margin:0 0 24px;padding:32px;background:${B.surface};border:1px dashed ${B.border};border-radius:14px;text-align:center;color:${B.muted};font-size:13px;">
+        ⚠ La imagen no pudo embeberse (URL caducada o inaccesible). Detalles t&eacute;cnicos abajo.
+      </div>`;
+    }
+  }
 
   function renderValue(val: unknown, depth = 0): string {
     if (val === null || val === undefined) return `<span style="color:${B.muted};">—</span>`;
@@ -1100,6 +1147,7 @@ ${buildCoverPage({ reportTitle: sanitizeHtml(file.title), reportSubtitle: saniti
     </div>
   </div>
   <div class="body-content">
+    ${imageBlockHtml}
     <div class="data-section">
       ${bodyHtml}
     </div>
@@ -1341,7 +1389,7 @@ router.get("/vault/global/:fileId/download", requireAuth, async (req, res): Prom
       if (isJson) {
         try {
           const parsed = JSON.parse(file.content);
-          const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
           res.send(htmlReport);
           return;
         } catch {}
@@ -1351,7 +1399,7 @@ router.get("/vault/global/:fileId/download", requireAuth, async (req, res): Prom
     }
   
     if (file.metadata) {
-      const reportHtml = metadataToReportHtml(file);
+      const reportHtml = await metadataToReportHtml(file);
       res.send(reportHtml);
       return;
     }
@@ -1394,7 +1442,7 @@ router.get("/vault/global/:fileId/preview", requireAuth, async (req, res): Promi
       if (isJson) {
         try {
           const parsed = JSON.parse(file.content);
-          const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
           res.send(htmlReport);
           return;
         } catch {}
@@ -1404,7 +1452,7 @@ router.get("/vault/global/:fileId/preview", requireAuth, async (req, res): Promi
     }
 
     if (file.metadata) {
-      const reportHtml = metadataToReportHtml(file);
+      const reportHtml = await metadataToReportHtml(file);
       res.send(reportHtml);
       return;
     }
@@ -1461,7 +1509,7 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
         if (isJsonContent) {
           try {
             const parsed = JSON.parse(file.content);
-            const htmlReport = buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, "prestige");
+            const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, "prestige");
             archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
           } catch {
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -1470,7 +1518,7 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
           archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
         }
       } else if (file.metadata) {
-        const html = metadataToReportHtml(file);
+        const html = await metadataToReportHtml(file);
         archive.append(html, { name: `${folder}/${safeTitle}_${file.id}.html` });
       }
     }

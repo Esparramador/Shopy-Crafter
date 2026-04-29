@@ -4,13 +4,12 @@ import {
   serial,
   timestamp,
   boolean,
-  integer,
   varchar,
 } from "drizzle-orm/pg-core";
 
 export const reportTemplatesTable = pgTable("report_templates", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id"),
+  userId: text("user_id"),
   name: varchar("name", { length: 200 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull(),
 
