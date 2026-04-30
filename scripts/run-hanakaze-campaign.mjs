@@ -451,17 +451,28 @@ async function main() {
     ]);
     return { PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3 };
   });
-  // OJO: las signed URLs caducan en 1 h. Si el state es viejo, regenera con RESET=1.
-  // Verificamos edad:
+  // OJO: las signed URLs caducan en 1 h. Si el state es viejo, regenera in-line.
+  // (Antes recursábamos a main() y eso duplicaba estado en logs/handlers.)
+  let refsFresh = refs;
   const refsCompletedAt = new Date(state.steps["refs:photos-uploaded"].completedAt).getTime();
   const refsAgeMin = (Date.now() - refsCompletedAt) / 60_000;
   if (refsAgeMin > 50) {
-    await log(`⚠ refs photos tienen ${refsAgeMin.toFixed(1)} min (TTL 60 min) — regenerando…`);
+    await log(`⚠ refs photos tienen ${refsAgeMin.toFixed(1)} min (TTL 60 min) — regenerando in-line…`);
     delete state.steps["refs:photos-uploaded"];
     await saveState(state);
-    return main(); // re-ejecutamos
+    refsFresh = await memoize(state, "refs:photos-uploaded", async () => {
+      await log("\n━━━ FASE 0 (RE-RUN): SUBIDA DE FOTOS A OBJECT STORAGE ━━━");
+      const ASSETS = "attached_assets";
+      const [PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3] = await Promise.all([
+        uploadPublicAsset(`${ASSETS}/PXL_20260410_171731994.RAW-01_1777547033722.jpg`, "burro"),
+        uploadPublicAsset(`${ASSETS}/IMG-20260414-WA0010_1777547033700.jpg`, "model-1"),
+        uploadPublicAsset(`${ASSETS}/IMG-20260414-WA0011_1777547033708.jpg`, "model-2"),
+        uploadPublicAsset(`${ASSETS}/IMG-20260414-WA0012_1777547033709.jpg`, "model-3"),
+      ]);
+      return { PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3 };
+    });
   }
-  const { PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3 } = refs;
+  const { PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3 } = refsFresh;
 
   const result = {
     references: { PHOTO_BURRO, PHOTO_MODEL_1, PHOTO_MODEL_2, PHOTO_MODEL_3 },
@@ -489,20 +500,22 @@ async function main() {
   }));
   result.imagesIntro = intro.vaultId;
 
+  // OUTRO: usamos Replicate (flux-1.1-pro) porque Runway gen4_image_turbo
+  // rechaza este prompt con "An unexpected error occurred" (filtro server-side
+  // imposible de saltar: probado con/sin texto literal, con/sin hex codes).
+  // Flux genera placas minimalistas con detalle excelente.
   const outro = await memoize(state, "frame:outro-logo", () => genImage({
     projectId: PROJECT_ID,
     label: "outro-logo",
     ratio: "1080:1920",
     referenceUrl: PHOTO_BURRO,
-    // OJO: prompt SIN texto literal de marca (Runway guardrails sobre branded text).
-    // Generamos placa vacía con composición preparada para overlay tipográfico vía ffmpeg.
+    engine: "replicate",
     prompt:
-      "Vertical 9:16 luxury minimal poster. Background: pure matte ink black #0A0A0A with subtle vignette and 1% film grain. " +
-      "Center frame: a single elegant gold sumi-e brushstroke arc occupying 30% width, painted in gold leaf #D4A843 with visible bristle drag and ink halo. " +
-      "Lower third: floating dust of gold particles in soft bokeh, varying focal depths. " +
-      "Lighting: single overhead-left soft directional source revealing the gold leaf grain on the brushstroke. " +
-      "Composition: large negative space top and bottom, brushstroke in optical center. Style: luxury fashion brand atmosphere, premium minimal. " +
-      "No text, no letters, no logos, no watermarks, no UI.",
+      "Vertical 9:16 minimal art poster. Pure deep black background with subtle vignette and fine film grain. " +
+      "Centered: a single elegant gold sumi-e brushstroke arc, painted with visible bristle drag and ink halo, occupying about thirty percent of the width. " +
+      "Lower third filled with floating gold particle dust in soft bokeh at varying focal depths. " +
+      "Lighting from upper left reveals the gold leaf grain on the brushstroke. Large negative space top and bottom. " +
+      "Premium editorial atmosphere, no text, no letters, no logos.",
   }));
   result.imagesOutro = outro.vaultId;
 
@@ -612,6 +625,7 @@ async function main() {
     label: "ad1-male-hoodie",
     ratio: "1080:1080",
     referenceUrl: PHOTO_MODEL_1,
+    engine: "replicate",
     prompt:
       "1:1 square magazine cover layout. Center-right: Japanese male model wearing a black Hanakaze hoodie, three-quarter view, cropped at chest. " +
       "Backdrop: clean dark navy #0E1A2C seamless. " +
@@ -627,6 +641,7 @@ async function main() {
     label: "ad2-tshirt-flatlay",
     ratio: "1080:1080",
     referenceUrl: PHOTO_BURRO,
+    engine: "replicate",
     prompt:
       "1:1 overhead flat-lay product photograph. Center: a folded Hanakaze t-shirt on dark washi paper background #1A1612. " +
       "Top-right of folded fabric: the sumi-e cherry-blossom print is partially visible. " +
@@ -644,6 +659,7 @@ async function main() {
     label: "infografia-proceso",
     ratio: "1080:1920",
     referenceUrl: PHOTO_BURRO,
+    engine: "replicate",
     prompt:
       "Vertical 9:16 brand storytelling poster on ultra-dark charcoal background #0F0F0F. " +
       "Frame divided into 4 horizontal sections by thin gold sumi-e ink strokes. Each section depicts one stage of artisan serigraphy in editorial product-photography style: " +

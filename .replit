@@ -17,6 +17,26 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "hanakaze-runner"
+
+[[workflows.workflow]]
+name = "hanakaze-runner"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "HANAKAZE_PROJECT_ID=7 node scripts/run-hanakaze-campaign.mjs"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true

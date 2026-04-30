@@ -63,12 +63,20 @@ async function replicateRunBuffer(
   const rep = new Replicate({ auth: token });
   const output = await rep.run(modelId as `${string}/${string}`, { input });
   const raw = Array.isArray(output) ? output[0] : output;
-  let url: string;
+  // Replicate SDK puede devolver: string, URL instance, o FileOutput con .url() (que devuelve URL u object)
+  let url: any;
   if (typeof raw === "string") url = raw;
   else if (raw && typeof (raw as any).url === "function") url = (raw as any).url();
   else if (raw && typeof (raw as any).url === "string") url = (raw as any).url;
+  else if (raw && (raw as any).url instanceof URL) url = (raw as any).url;
   else throw new Error(`Replicate invalid output: ${String(raw).slice(0, 200)}`);
-  if (!url?.startsWith("http")) throw new Error(`Replicate invalid URL: ${url?.slice(0, 200)}`);
+  // Normaliza URL/objeto a string
+  if (url instanceof URL) url = url.href;
+  else if (url && typeof url !== "string" && typeof (url as any).href === "string") url = (url as any).href;
+  else if (url && typeof url !== "string") url = String(url);
+  if (typeof url !== "string" || !url.startsWith("http")) {
+    throw new Error(`Replicate invalid URL: ${typeof url === "string" ? url.slice(0, 200) : JSON.stringify(url).slice(0, 200)}`);
+  }
   return await fetchToBuffer(url);
 }
 
