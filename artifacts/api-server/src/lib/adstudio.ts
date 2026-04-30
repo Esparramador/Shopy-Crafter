@@ -137,8 +137,8 @@ async function makeTmpDir(prefix = "adstudio"): Promise<string> {
 
 async function fetchToBuffer(url: string, timeoutMs = 120_000, opts: { ssrfGuard?: boolean } = {}): Promise<Buffer> {
   if (opts.ssrfGuard) {
-    const { validateImageUrl } = await import("./runway.js");
-    validateImageUrl(url); // throws if internal/private/localhost
+    const { validateImageUrlAsync } = await import("./runway.js");
+    await validateImageUrlAsync(url); // throws on private IP literal AND on DNS rebind
   }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);

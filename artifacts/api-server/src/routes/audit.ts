@@ -7,6 +7,7 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { UniversalAuditConnector } from "../lib/connectors/universal.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { requireProjectAccess } from "../lib/access.js";
 
 const router = Router();
 
@@ -43,11 +44,11 @@ interface AuditAiAnalysis {
   summary: string;
 }
 
-router.post("/projects/:projectId/audit/run", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/audit/run", requireProjectAccess, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   
     if (!project) {
@@ -232,9 +233,9 @@ router.post("/projects/:projectId/audit/run", async (req, res): Promise<void> =>
   }
 });
 
-router.get("/projects/:projectId/audit/results", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/audit/results", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
   
     const [latest] = await db.select()
       .from(auditResultsTable)
@@ -254,9 +255,9 @@ router.get("/projects/:projectId/audit/results", async (req, res): Promise<void>
   }
 });
 
-router.get("/projects/:projectId/audit/history", async (req, res): Promise<void> => {
+router.get("/projects/:projectId/audit/history", requireProjectAccess, async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
   
     const history = await db.select({
       id: auditResultsTable.id,

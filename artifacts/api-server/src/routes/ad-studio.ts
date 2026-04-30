@@ -130,12 +130,29 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
 
+    let clientGone = false;
+    req.on("close", () => { clientGone = true; });
+
     const emit = (event: string, data: any) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      if (clientGone || res.writableEnded || res.destroyed) return;
+      try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch {}
     };
+
+    // heartbeat every 25s to prevent proxies from killing the connection
+    const heartbeat = setInterval(() => {
+      if (clientGone || res.writableEnded) { clearInterval(heartbeat); return; }
+      try { res.write(`: ping\n\n`); } catch {}
+    }, 25_000);
 
     try {
       const { variants, errors } = await runAdCampaign(input, replicateToken, (ev) => emit("progress", ev));
+
+      if (clientGone) {
+        // Client disconnected while provider work was in flight. We still
+        // persist results and record usage so the user is not charged twice
+        // and assets remain in the vault for them to find later.
+        logger.warn({ projectId }, "ad-studio: client disconnected — persisting results anyway");
+      }
 
       // Persist assets to vault and build response
       const savedVariants = await Promise.all(variants.map(async (v, idx) => {
@@ -200,10 +217,12 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
         errors,
         creditsUsed: totalCredits,
       });
-      res.end();
+      clearInterval(heartbeat);
+      if (!res.writableEnded) res.end();
     } catch (err: any) {
+      clearInterval(heartbeat);
       emit("error", { error: err?.message || "Campaign failed" });
-      res.end();
+      if (!res.writableEnded) res.end();
     }
     return;
   }

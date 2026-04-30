@@ -30,13 +30,12 @@ export async function makeTmpDir(prefix = "fs-pro"): Promise<string> {
   return dir;
 }
 
-import { validateImageUrl } from "./runway.js";
+import { validateImageUrlAsync } from "./runway.js";
 
 export async function fetchToBuffer(url: string, timeoutMs = 180_000): Promise<Buffer> {
-  // SECURITY (HIGH): SSRF guard — reject URLs pointing to internal/private hosts.
-  // Replicate-returned URLs are public HTTPS so they always pass; user-supplied
-  // referenceImageUrl / sourceImageUrl are validated here.
-  validateImageUrl(url);
+  // SECURITY (HIGH): SSRF guard with DNS resolution — rejects URLs pointing to
+  // internal/private hosts AND blocks DNS-rebinding (attacker domain → private IP).
+  await validateImageUrlAsync(url);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {

@@ -46,6 +46,34 @@ function getApiKey(): string {
   return key.trim();
 }
 
+function isPrivateOrReservedIp(ip: string): boolean {
+  const host = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    host === "localhost" ||
+    host === "0.0.0.0" ||
+    host.endsWith(".internal") ||
+    host.endsWith(".local") ||
+    host.endsWith(".localhost") ||
+    // IPv4 loopback / private / link-local / carrier-grade NAT / multicast / reserved
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    /^127\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
+    /^22[4-9]\./.test(host) || /^23\d\./.test(host) || /^24\d\./.test(host) || /^25[0-5]\./.test(host) ||
+    // IPv6 loopback / unique-local / link-local
+    host === "::1" ||
+    host === "::" ||
+    /^fc[0-9a-f]{2}:/.test(host) ||
+    /^fd[0-9a-f]{2}:/.test(host) ||
+    /^fe[89ab][0-9a-f]:/.test(host) ||
+    // IPv4-mapped IPv6 a privadas
+    /^::ffff:(10|127|169\.254|192\.168)\./.test(host) ||
+    /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
+}
+
 export function validateImageUrl(url: string): void {
   if (!url || typeof url !== "string") {
     throw new Error("promptImage requerido");
@@ -64,28 +92,42 @@ export function validateImageUrl(url: string): void {
   if (
     host === "localhost" ||
     host === "127.0.0.1" ||
-    host === "0.0.0.0" ||
-    host.endsWith(".internal") ||
-    host.endsWith(".local") ||
-    host.endsWith(".localhost") ||
-    // IPv4 privadas + loopback + link-local + carrier-grade NAT
-    /^10\./.test(host) ||
-    /^192\.168\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    /^127\./.test(host) ||
-    /^169\.254\./.test(host) ||
-    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
-    // IPv6 loopback / unique-local / link-local
-    host === "::1" ||
-    host === "::" ||
-    /^fc[0-9a-f]{2}:/.test(host) ||
-    /^fd[0-9a-f]{2}:/.test(host) ||
-    /^fe[89ab][0-9a-f]:/.test(host) ||
-    // IPv4-mapped IPv6 a privadas
-    /^::ffff:(10|127|169\.254|192\.168)\./.test(host) ||
-    /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(host)
+    isPrivateOrReservedIp(host) ||
+    host === "metadata.google.internal" ||
+    host === "169.254.169.254"
   ) {
     throw new Error("promptImage no puede apuntar a hosts internos/privados");
+  }
+}
+
+/**
+ * Stronger SSRF protection: validates the URL literal AND resolves the
+ * hostname via DNS to ensure no record points to a private/reserved IP.
+ * This blocks DNS-rebinding attacks (attacker-controlled domain that
+ * resolves to 169.254.169.254 etc.).
+ *
+ * Use before any user-supplied URL fetch.
+ */
+export async function validateImageUrlAsync(url: string): Promise<void> {
+  validateImageUrl(url); // sync literal checks first
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  // If literal IP, sync check already covered it
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return;
+  let records: Array<{ address: string; family: number }>;
+  try {
+    const dns = await import("node:dns/promises");
+    records = await dns.lookup(host, { all: true, verbatim: true });
+  } catch {
+    throw new Error("No se pudo resolver el host de la URL");
+  }
+  if (!records || records.length === 0) {
+    throw new Error("Host no resolvible");
+  }
+  for (const r of records) {
+    if (isPrivateOrReservedIp(r.address)) {
+      throw new Error(`URL resuelve a IP no permitida (${r.address})`);
+    }
   }
 }
 
