@@ -480,8 +480,8 @@ export type VideoModel =
   | "wan-2.5-fast";
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
-  "runway-gen4-turbo":  { provider: "runway",                                              description: "Runway Gen-4 — top quality, control fino, 5/10s",        costPerSec: 0.10, quality: 10, maxDuration: 10 },
-  "runway-gen3-alpha":  { provider: "runway",                                              description: "Runway Gen-3 Alpha — buena calidad, mejor precio",       costPerSec: 0.08, quality: 8,  maxDuration: 10 },
+  "runway-gen4-turbo":  { provider: "runway",                                              description: "Runway Gen-4 — top quality, control fino, 5/10s",        costPerSec: 0.05, quality: 10, maxDuration: 10 },
+  "runway-gen3-alpha":  { provider: "runway",                                              description: "Runway Gen-3 Alpha — buena calidad, mejor precio",       costPerSec: 0.05, quality: 8,  maxDuration: 10 },
   "veo-3-fast":         { provider: "gemini",  modelId: "veo-3.0-fast-generate-preview",  description: "Google Veo 3 Fast — rápido + audio nativo (8s, 16:9)",  costPerSec: 0.40, quality: 9,  maxDuration: 8  },
   "veo-3":              { provider: "gemini",  modelId: "veo-3.0-generate-preview",       description: "Google Veo 3 — máxima calidad + audio nativo (8s, 16:9)",costPerSec: 0.75, quality: 10, maxDuration: 8  },
   "veo-2":              { provider: "gemini",  modelId: "veo-2.0-generate-001",           description: "Google Veo 2 — soporta 9:16 y 16:9, hasta 8s (sin audio)",costPerSec: 0.35, quality: 8,  maxDuration: 8  },

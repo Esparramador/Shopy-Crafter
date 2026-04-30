@@ -931,6 +931,12 @@ export const DEFAULT_CMS_CONTENT = {
         { label: "Afiliados", href: "#affiliates" },
         { label: "Contacto", href: "#fp-contact" },
       ] },
+      { title: "Recursos", links: [
+        { label: "Blog", href: "" },
+        { label: "Changelog", href: "" },
+        { label: "Documentación", href: "" },
+        { label: "API Reference", href: "" },
+      ] },
       { title: "Legal", links: [
         { label: "Privacidad", href: "#legal:privacy" },
         { label: "Términos", href: "#legal:terms" },

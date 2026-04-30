@@ -809,7 +809,6 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   );
 }
 
-// ─── TAB: AUDIO ──────────────────────────────────────────────────────────
 function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onInfo: (m: string) => void }) {
   const [mode, setMode] = useState<"tts" | "clone" | "sfx" | "music">("tts");
   const [voices, setVoices] = useState<any[]>([]);

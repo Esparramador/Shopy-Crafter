@@ -9,7 +9,7 @@ import { getReportShell, type ReportTemplate } from "./exports.js";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { checkProductionLimit } from "../lib/plan-limits.js";
+import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -1048,6 +1048,16 @@ Devuelve la nueva versión completa con el cambio aplicado en JSON válido segú
         confidence: audit.warnings.length === 0 ? 0.85 : 0.6,
         tags: ["web-lab", "iteration", brand || ""].filter(Boolean),
       });
+
+      // BUG FIX (auditoría): consumimos el crédito SOLO si la iteración terminó OK
+      // (audit pasó, vault guardado). Antes el endpoint validaba límite con
+      // checkProductionLimit pero nunca llamaba a recordUsage → cliente con
+      // saldo iteraba gratis. Tipo "image" para alinear con la validación previa.
+      try {
+        await recordUsage(pid, "image", 1);
+      } catch (usageErr) {
+        logger.warn({ err: usageErr, pid }, "Web Lab iterate — recordUsage failed (no bloquea respuesta)");
+      }
     }
 
     res.end(JSON.stringify({

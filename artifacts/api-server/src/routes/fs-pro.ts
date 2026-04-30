@@ -34,6 +34,7 @@ import {
   AVATAR_LIBRARY, listAvatarsByNiche, findAvatar,
   generateTalkingAvatar, generateProductAvatar, generateMimicMotion,
 } from "../lib/avatar-studio.js";
+import { planCampaign, type CampaignBudget, type ShotRequest } from "../lib/campaign-planner.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
@@ -838,6 +839,22 @@ router.post("/fs-pro/save-to-vault", requireAdmin, upload.single("file"), async 
   } catch (err: any) {
     logger.error({ err }, "fs-pro save-to-vault failed");
     res.status(500).json({ error: err?.message || "Error guardando en vault" });
+  }
+});
+
+// ─── COST ESTIMATE / CAMPAIGN PLANNER ─────────────────────────────────────
+// Calcula coste y shotlist optimizado SIN ejecutar nada. Pensado para que el
+// frontend muestre presupuesto antes de quemar créditos.
+router.post("/fs-pro/cost-estimate", requireAdmin, async (req, res) => {
+  try {
+    const { budget, shots } = req.body as { budget: CampaignBudget; shots: ShotRequest[] };
+    if (!budget || !Array.isArray(shots) || shots.length === 0) {
+      res.status(400).json({ error: "budget + shots[] requeridos" }); return;
+    }
+    const estimate = planCampaign(budget, shots);
+    res.json({ success: true, estimate });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en cost-estimate" });
   }
 });
 

@@ -103,6 +103,40 @@ function healFooterColumns(merged: Record<string, unknown>, defaults: Record<str
         };
       }
     }
+
+    // ── HEAL adicional: añadir columnas que existen en defaults pero NO en stored.
+    // Esto cubre el caso "el cliente ya migró su footer pero nosotros añadimos
+    // una nueva columna como 'Recursos' después" — sin pisar personalizaciones.
+    // Sólo añade las columnas faltantes por title (case-insensitive); el resto
+    // se conserva tal cual.
+    const defaultsFooter = defaults.footer as { columns?: Array<{ title?: string; links?: unknown }> } | undefined;
+    if (defaultsFooter?.columns && Array.isArray(defaultsFooter.columns)) {
+      const storedTitles = new Set(footer.columns.map(c => (c.title || "").trim().toLowerCase()));
+      const missing = defaultsFooter.columns.filter(c => {
+        const t = (c.title || "").trim().toLowerCase();
+        return t && !storedTitles.has(t);
+      });
+      if (missing.length > 0) {
+        // Insertamos las nuevas en la misma posición relativa que tienen en defaults.
+        const newColumns: typeof footer.columns = [];
+        const storedByTitle = new Map(footer.columns.map(c => [(c.title || "").trim().toLowerCase(), c]));
+        for (const defCol of defaultsFooter.columns) {
+          const t = (defCol.title || "").trim().toLowerCase();
+          const existing = storedByTitle.get(t);
+          if (existing) newColumns.push(existing);
+          else newColumns.push(defCol as { title?: string; links?: Array<{ label?: string; href?: string }> });
+        }
+        // Conservamos también cualquier columna 100% custom que el cliente
+        // haya añadido (no viene del default) al final.
+        const defaultTitlesLower = new Set(defaultsFooter.columns.map(c => (c.title || "").trim().toLowerCase()));
+        for (const col of footer.columns) {
+          const t = (col.title || "").trim().toLowerCase();
+          if (t && !defaultTitlesLower.has(t)) newColumns.push(col);
+        }
+        return { ...merged, footer: { ...footer, columns: newColumns } };
+      }
+    }
+
     return merged;
   } catch {
     return merged;

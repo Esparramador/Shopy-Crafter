@@ -1424,7 +1424,7 @@ export default function Landing() {
                   </a>
                   <p className="l-footer-desc" {...cmsProps("footer.tagline")}>{content.footer.tagline}</p>
                 </div>
-                {content.footer.columns.slice(0, 3).map((col, i) => (
+                {content.footer.columns.slice(0, 4).map((col, i) => (
                   <div key={i} className="fp-footer-col">
                     <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
                     <ul className="l-footer-links">
