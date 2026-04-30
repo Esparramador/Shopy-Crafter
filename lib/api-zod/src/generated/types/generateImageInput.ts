@@ -13,4 +13,9 @@ export interface GenerateImageInput {
   customPrompt?: string | null;
   /** @nullable */
   styleOverrides?: GenerateImageInputStyleOverrides;
+  /**
+   * Override del motor de generación (ej: 'black-forest-labs/flux-1.1-pro'). Si null, usa el mapeo por imageType.
+   * @nullable
+   */
+  engine?: string | null;
 }

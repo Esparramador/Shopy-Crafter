@@ -340,6 +340,19 @@ paths:
                 $ref: "#/components/schemas/BulkJobResponse"
 
   # ─── IMAGES ──────────────────────────────────────────────────
+  /images/engines:
+    get:
+      operationId: listImageEngines
+      tags: [images]
+      summary: Lista los motores de generación de imagen disponibles
+      responses:
+        "200":
+          description: Lista de motores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListImageEnginesResult"
+
   /projects/{projectId}/products/{productId}/images/generate:
     post:
       operationId: generateImage
@@ -1459,8 +1472,44 @@ components:
           type: ["string", "null"]
         styleOverrides:
           type: ["object", "null"]
+        engine:
+          type: ["string", "null"]
+          description: "Override del motor de generación (ej: 'black-forest-labs/flux-1.1-pro'). Si null, usa el mapeo por imageType."
       required:
         - imageType
+
+    ImageEngine:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        model:
+          type: string
+        cost:
+          type: number
+        description:
+          type: string
+        recommendedFor:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - label
+        - model
+        - cost
+
+    ListImageEnginesResult:
+      type: object
+      properties:
+        engines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageEngine"
+      required:
+        - engines
 
     GenerationJob:
       type: object

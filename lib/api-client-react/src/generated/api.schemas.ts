@@ -291,6 +291,24 @@ export interface GenerateImageInput {
   customPrompt?: string | null;
   /** @nullable */
   styleOverrides?: GenerateImageInputStyleOverrides;
+  /**
+   * Override del motor de generación (ej: 'black-forest-labs/flux-1.1-pro'). Si null, usa el mapeo por imageType.
+   * @nullable
+   */
+  engine?: string | null;
+}
+
+export interface ImageEngine {
+  id: string;
+  label: string;
+  model: string;
+  cost: number;
+  description?: string;
+  recommendedFor?: string[];
+}
+
+export interface ListImageEnginesResult {
+  engines: ImageEngine[];
 }
 
 export interface InfographicResult {

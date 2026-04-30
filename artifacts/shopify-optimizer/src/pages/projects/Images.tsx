@@ -8,6 +8,7 @@ import {
   useBulkGenerateImages,
   useBuildImagePrompt,
   useGetGenerationJob,
+  useListImageEngines,
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
@@ -252,6 +253,11 @@ export default function ImagesPage() {
     productId: string;
     imageType: string;
   } | null>(null);
+  // Motor IA seleccionado por (productId+tipo). Vacío = motor por defecto del backend.
+  const [selectedEngines, setSelectedEngines] = useState<Record<string, string>>({});
+  const { data: enginesData } = useListImageEngines();
+  const engines = (enginesData as { engines?: Array<{ id: string; label: string; model: string; cost: number; description?: string }> } | undefined)?.engines ?? [];
+
   const [bulkJobId, setBulkJobId] = useState<string | null>(() => {
     try {
       const saved = localStorage.getItem(`img-bulk-${projectId}`);
@@ -309,7 +315,7 @@ export default function ImagesPage() {
   const hasImage = (productId: string, type: string) => !!completedImages[jobKey(productId, type)];
   const hasSvg = (productId: string, type: string) => !!completedSvgs[jobKey(productId, type)];
 
-  const handleGenerate = (productId: string, imageType: string) => {
+  const handleGenerate = (productId: string, imageType: string, engine?: string) => {
     const key = jobKey(productId, imageType);
 
     if (imageType === "infografia") {
@@ -318,21 +324,21 @@ export default function ImagesPage() {
         { projectId, productId },
         {
           onSuccess: (res) => {
-            const svgContent = (res as { svg?: string }).svg ?? "";
+            // El backend devuelve { svgContent, pngBase64, uploaded } según el spec OpenAPI.
+            const svgContent = (res as { svgContent?: string }).svgContent ?? "";
+            if (!svgContent || !svgContent.includes("<svg")) {
+              setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+              toast({ title: "El motor no devolvió un SVG válido", description: "Vuelve a intentarlo en unos segundos.", variant: "destructive" });
+              return;
+            }
             setCompletedSvgs((prev) => ({ ...prev, [key]: svgContent }));
-            setJobs((prev) => {
-              const next = { ...prev };
-              delete next[key];
-              return next;
-            });
-            toast({ title: "Infografía SVG generada" });
+            setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+            toast({ title: "Infografía SVG generada", description: "Guardada en el repositorio del proyecto." });
           },
-          onError: () => {
-            setJobs((prev) => {
-              const next = { ...prev };
-              delete next[key];
-              return next;
-            });
+          onError: (err) => {
+            setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+            const msg = (err as { message?: string })?.message || "Error al generar la infografía";
+            toast({ title: "Error generando SVG", description: msg, variant: "destructive" });
           },
         }
       );
@@ -340,7 +346,7 @@ export default function ImagesPage() {
     }
 
     generateImage.mutate(
-      { projectId, productId, data: { imageType } },
+      { projectId, productId, data: { imageType, engine: engine ?? null } },
       {
         onSuccess: (res) => {
           const jobId = (res as { jobId?: string }).jobId;
@@ -348,8 +354,9 @@ export default function ImagesPage() {
             setJobs((prev) => ({ ...prev, [key]: { jobId, type: imageType } }));
           }
         },
-        onError: () => {
-          toast({ title: "Error al iniciar generación", variant: "destructive" });
+        onError: (err) => {
+          const msg = (err as { message?: string })?.message || "Error al iniciar generación";
+          toast({ title: msg, variant: "destructive" });
         },
       }
     );
@@ -604,11 +611,34 @@ export default function ImagesPage() {
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                         {!done && !svgDone ? (
                           <>
+                            {/* Selector de motor IA — sólo para tipos que NO son SVG */}
+                            {type.id !== "infografia" && engines.length > 0 && (
+                              <select
+                                aria-label={`Motor IA para ${type.label}`}
+                                value={selectedEngines[key] ?? ""}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) =>
+                                  setSelectedEngines((prev) => ({ ...prev, [key]: e.target.value }))
+                                }
+                                className="w-full text-[11px] bg-black/80 text-foreground border border-white/20 rounded-md px-1.5 py-1 focus:outline-none focus:border-primary"
+                              >
+                                <option value="">⚡ Motor automático ({type.model})</option>
+                                {engines.map((eng) => (
+                                  <option key={eng.id} value={eng.model}>
+                                    {eng.label} (~${eng.cost.toFixed(3)})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                             <button
-                              onClick={() => handleGenerate(product.id, type.id)}
+                              onClick={() => handleGenerate(product.id, type.id, selectedEngines[key] || undefined)}
                               className="w-full text-xs bg-primary text-white px-2 py-1.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                             >
-                              {type.id === "infografia" ? "Generar SVG" : "Generar (~$0.04)"}
+                              {type.id === "infografia"
+                                ? "Generar SVG"
+                                : selectedEngines[key]
+                                ? `Generar con ${engines.find((e) => e.model === selectedEngines[key])?.label ?? "motor"}`
+                                : "Generar (~$0.04)"}
                             </button>
                             <button
                               onClick={() => setPreviewModal({ productId: product.id, imageType: type.id })}

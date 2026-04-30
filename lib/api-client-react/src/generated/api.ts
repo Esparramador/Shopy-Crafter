@@ -49,6 +49,7 @@ import type {
   KeywordInput,
   KeywordStrategy,
   ListAbTestsParams,
+  ListImageEnginesResult,
   PageSpeedInput,
   PageSpeedResult,
   PricingRecommendation,
@@ -1572,6 +1573,81 @@ export const useBulkRedesign = <
 > => {
   return useMutation(getBulkRedesignMutationOptions(options));
 };
+
+/**
+ * @summary Lista los motores de generación de imagen disponibles
+ */
+export const getListImageEnginesUrl = () => {
+  return `/api/images/engines`;
+};
+
+export const listImageEngines = async (
+  options?: RequestInit,
+): Promise<ListImageEnginesResult> => {
+  return customFetch<ListImageEnginesResult>(getListImageEnginesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListImageEnginesQueryKey = () => {
+  return [`/api/images/engines`] as const;
+};
+
+export const getListImageEnginesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listImageEngines>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listImageEngines>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListImageEnginesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listImageEngines>>
+  > = ({ signal }) => listImageEngines({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listImageEngines>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListImageEnginesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listImageEngines>>
+>;
+export type ListImageEnginesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Lista los motores de generación de imagen disponibles
+ */
+
+export function useListImageEngines<
+  TData = Awaited<ReturnType<typeof listImageEngines>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listImageEngines>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListImageEnginesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Generate a single product image with Replicate

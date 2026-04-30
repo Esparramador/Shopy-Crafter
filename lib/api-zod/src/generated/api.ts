@@ -447,6 +447,22 @@ export const BulkRedesignResponse = zod.object({
 });
 
 /**
+ * @summary Lista los motores de generación de imagen disponibles
+ */
+export const ListImageEnginesResponse = zod.object({
+  engines: zod.array(
+    zod.object({
+      id: zod.string(),
+      label: zod.string(),
+      model: zod.string(),
+      cost: zod.number(),
+      description: zod.string().optional(),
+      recommendedFor: zod.array(zod.string()).optional(),
+    }),
+  ),
+});
+
+/**
  * @summary Generate a single product image with Replicate
  */
 export const GenerateImageParams = zod.object({
@@ -458,6 +474,12 @@ export const GenerateImageBody = zod.object({
   imageType: zod.string(),
   customPrompt: zod.string().nullish(),
   styleOverrides: zod.object({}).passthrough().nullish(),
+  engine: zod
+    .string()
+    .nullish()
+    .describe(
+      "Override del motor de generación (ej: 'black-forest-labs\/flux-1.1-pro'). Si null, usa el mapeo por imageType.",
+    ),
 });
 
 export const GenerateImageResponse = zod.object({

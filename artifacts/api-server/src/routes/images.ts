@@ -8,6 +8,7 @@ import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -29,9 +30,40 @@ export const MODEL_MAP: Record<string, string> = {
 export const COST_MAP: Record<string, number> = {
   "black-forest-labs/flux-1.1-pro": 0.04,
   "black-forest-labs/flux-dev": 0.025,
+  "black-forest-labs/flux-schnell": 0.003,
   "recraft-ai/recraft-v3": 0.022,
+  "ideogram-ai/ideogram-v2": 0.08,
+  "stability-ai/stable-diffusion-3.5-large": 0.065,
+  "google/imagen-3": 0.05,
   svg_only: 0,
 };
+
+// Catálogo público de motores expuestos en la UI. Usado por GET /images/engines
+// y por el endpoint /generate para validar el override `engine` del usuario.
+export const IMAGE_ENGINES: Array<{
+  id: string;
+  label: string;
+  model: string;
+  cost: number;
+  description: string;
+  recommendedFor: string[];
+}> = [
+  { id: "flux-1-1-pro", label: "Flux 1.1 Pro", model: "black-forest-labs/flux-1.1-pro", cost: 0.04, description: "Calidad fotográfica premium. El mejor para hero y lifestyle.", recommendedFor: ["hero", "lifestyle", "bundle", "process"] },
+  { id: "flux-dev",     label: "Flux Dev",     model: "black-forest-labs/flux-dev",      cost: 0.025, description: "Más rápido y barato. Bueno para detalles y variantes.", recommendedFor: ["detail", "scale", "variant"] },
+  { id: "flux-schnell", label: "Flux Schnell (rápido)", model: "black-forest-labs/flux-schnell", cost: 0.003, description: "Ultra rápido y económico. Borradores y volumen.", recommendedFor: ["bulk", "draft"] },
+  { id: "recraft-v3",   label: "Recraft v3",   model: "recraft-ai/recraft-v3",           cost: 0.022, description: "Especialista en packaging, ilustración y UGC.", recommendedFor: ["packaging", "ugc"] },
+  { id: "ideogram-v2",  label: "Ideogram v2",  model: "ideogram-ai/ideogram-v2",         cost: 0.08,  description: "El mejor para imágenes con texto legible (carteles, badges).", recommendedFor: ["poster", "text"] },
+  { id: "sd35-large",   label: "Stable Diffusion 3.5 Large", model: "stability-ai/stable-diffusion-3.5-large", cost: 0.065, description: "Calidad alta, estilo flexible. Buen comodín.", recommendedFor: ["lifestyle", "creative"] },
+  { id: "imagen-3",     label: "Google Imagen 3", model: "google/imagen-3",              cost: 0.05,  description: "Realismo de Google. Bueno para fotorealismo limpio.", recommendedFor: ["hero", "lifestyle"] },
+];
+
+// Whitelist rápido para validar el override `engine` enviado por el cliente.
+const ENGINE_MODEL_WHITELIST = new Set(IMAGE_ENGINES.map(e => e.model));
+
+// Endpoint público para que el frontend muestre la lista de motores en un selector.
+router.get("/images/engines", (_req, res) => {
+  res.json({ engines: IMAGE_ENGINES });
+});
 
 export const NEGATIVE_PROMPT =
   "blurry, low quality, pixelated, watermark, text overlay, logo, cartoon, illustration, distorted, ugly, bad lighting, amateur, overexposed, underexposed, duplicate, extra limbs, wrong product, unrelated object, flowers on non-flower product, animals on non-animal product, food on non-food product, random decorations unrelated to subject";
@@ -208,22 +240,38 @@ export async function runImageGeneration(params: {
     const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
     const replicate = new Replicate({ auth: replicateToken });
 
+    // Cada modelo de Replicate acepta un esquema de input diferente.
+    // Construimos el input correcto para cada uno; si no reconocemos el modelo
+    // caemos a un esquema Flux-style razonable (válido para Flux Dev/Schnell).
+    const buildInput = (m: string): Record<string, unknown> => {
+      if (m.includes("flux-1.1-pro")) {
+        return { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 };
+      }
+      if (m.includes("flux-schnell")) {
+        return { prompt: finalPrompt, num_outputs: 1, aspect_ratio: "1:1", output_format: "png", output_quality: 100, num_inference_steps: 4 };
+      }
+      if (m.includes("flux-dev")) {
+        return { prompt: finalPrompt, num_outputs: 1, aspect_ratio: "1:1", output_format: "png", output_quality: 100, num_inference_steps: 28, guidance: 3.5 };
+      }
+      if (m.includes("recraft")) {
+        return { prompt: finalPrompt, size: "1024x1024", style: "realistic_image" };
+      }
+      if (m.includes("ideogram")) {
+        return { prompt: finalPrompt, aspect_ratio: "1:1", magic_prompt_option: "Auto", style_type: "Realistic" };
+      }
+      if (m.includes("imagen-3")) {
+        return { prompt: finalPrompt, aspect_ratio: "1:1", safety_filter_level: "block_only_high" };
+      }
+      if (m.includes("stable-diffusion-3.5") || m.includes("sd3")) {
+        return { prompt: finalPrompt, aspect_ratio: "1:1", output_format: "png", output_quality: 100, prompt_strength: 0.85, cfg: 4.5, steps: 35 };
+      }
+      // Fallback Flux-style
+      return { prompt: finalPrompt, num_outputs: 1, aspect_ratio: "1:1", output_format: "png" };
+    };
+
     const runWithRetry = async (attempt = 1): Promise<unknown> => {
       try {
-        let runPromise: Promise<unknown>;
-        if (model.includes("flux-1.1-pro")) {
-          runPromise = replicate.run(model as `${string}/${string}`, {
-            input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_outputs: 1, output_format: "png", output_quality: 100 },
-          });
-        } else if (model.includes("recraft")) {
-          runPromise = replicate.run(model as `${string}/${string}`, {
-            input: { prompt: finalPrompt, size: "1024x1024", style: "realistic_image" },
-          });
-        } else {
-          runPromise = replicate.run(model as `${string}/${string}`, {
-            input: { prompt: finalPrompt, negative_prompt: NEGATIVE_PROMPT, width: 1440, height: 1440, num_inference_steps: 35, guidance_scale: 3.5, output_format: "png" },
-          });
-        }
+        const runPromise = replicate.run(model as `${string}/${string}`, { input: buildInput(model) });
         return await withTimeout(runPromise, REPLICATE_TIMEOUT_MS, `Replicate ${model}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -416,7 +464,7 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
   try {
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
-    const { imageType: rawImageType, imageTypes, customPrompt } = req.body as { imageType?: string; imageTypes?: string[]; customPrompt?: string };
+    const { imageType: rawImageType, imageTypes, customPrompt, engine: requestedEngine } = req.body as { imageType?: string; imageTypes?: string[]; customPrompt?: string; engine?: string | null };
     const imageType = rawImageType || (Array.isArray(imageTypes) ? imageTypes[0] : null) || "hero";
   
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -436,7 +484,19 @@ router.post("/projects/:projectId/products/:productId/images/generate", async (r
       return;
     }
   
-    const model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
+    // Si el usuario eligió un motor explícitamente, lo usamos (validando contra
+    // la whitelist). En caso contrario, caemos al mapeo por imageType.
+    let model: string;
+    if (requestedEngine && typeof requestedEngine === "string" && requestedEngine.trim()) {
+      const candidate = requestedEngine.trim();
+      if (!ENGINE_MODEL_WHITELIST.has(candidate)) {
+        res.status(400).json({ error: `Motor no soportado: ${candidate}. Usa GET /api/images/engines para ver la lista.` });
+        return;
+      }
+      model = candidate;
+    } else {
+      model = MODEL_MAP[imageType] ?? MODEL_MAP.hero;
+    }
     const estimatedCost = COST_MAP[model] ?? 0.04;
   
     const finalPrompt = customPrompt ?? await buildImagePrompt(
@@ -632,21 +692,60 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
   
   Devuelve SOLO el SVG completo, sin markdown, sin explicaciones. Empieza con <svg y termina con </svg>.`;
   
-    const svgContent = await askClaudeWithBrain(projectId, [{ role: "user", content: prompt }], undefined, "general", project.storeNiche ?? undefined, 4000);
-    const cleanSvg = svgContent.includes("<svg") ? svgContent.substring(svgContent.indexOf("<svg")) : svgContent;
-  
+    const svgContentRaw = await askClaudeWithBrain(projectId, [{ role: "user", content: prompt }], undefined, "general", project.storeNiche ?? undefined, 4000);
+    // Claude a veces envuelve el SVG en ```xml … ```; lo extraemos.
+    let cleanSvg = svgContentRaw || "";
+    const startIdx = cleanSvg.indexOf("<svg");
+    const endIdx = cleanSvg.lastIndexOf("</svg>");
+    if (startIdx >= 0 && endIdx > startIdx) {
+      cleanSvg = cleanSvg.substring(startIdx, endIdx + "</svg>".length);
+    }
+
+    if (!cleanSvg || !cleanSvg.includes("<svg") || !cleanSvg.includes("</svg>")) {
+      logger.warn({ projectId, productId: shopifyProductId, preview: svgContentRaw?.slice(0, 200) }, "SVG inválido devuelto por el motor");
+      res.status(422).json({ error: "El motor no devolvió un SVG válido. Inténtalo de nuevo." });
+      return;
+    }
+
+    // Persistimos SIEMPRE en el vault para que el usuario no pierda la creación.
+    let vaultId: number | null = null;
+    try {
+      vaultId = await saveToVault({
+        projectId,
+        fileType: "svg-infographic",
+        category: "image",
+        title: `Infografía SVG — ${product.title}`,
+        description: `Generada con Claude para ${project.name}.`,
+        mimeType: "image/svg+xml",
+        productId: product.shopifyProductId,
+        productTitle: product.title,
+        generatedBy: "claude-svg",
+        content: cleanSvg,
+        metadata: {
+          niche: project.storeNiche,
+          generatedAt: new Date().toISOString(),
+          tags: ["infographic", "svg", "claude"],
+        },
+      });
+    } catch (e) {
+      logger.warn({ err: e, projectId }, "No se pudo guardar la infografía SVG en el vault (no fatal)");
+    }
+
     learnFromOperation({
       operationType: "svg_generation",
-      title: `SVG generado: ${req.body.type || "logo"} para ${project.name}`,
-      content: `Tipo: ${req.body.type}, Estilo: ${req.body.style || "brand"}, Nicho: ${project.storeNiche}`,
+      title: `SVG generado: infografía para ${project.name}`,
+      content: `Producto: ${product.title}. Nicho: ${project.storeNiche ?? "(n/d)"}. VaultId: ${vaultId ?? "(no)"}.`,
       confidence: 0.7,
-      tags: ["svg", "brand_asset", "design"],
+      tags: ["svg", "brand_asset", "design", "infographic"],
     });
-  
-    res.json({ svgContent: cleanSvg, pngBase64: null, uploaded: false });
+
+    res.json({ svgContent: cleanSvg, pngBase64: null, uploaded: vaultId !== null });
   } catch (err: any) {
+    logger.error({ err, projectId: req.params.projectId }, "generate-infographic failed");
     const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) {
+      res.status(500).json({ error: msg });
+    }
   }
 });
 
