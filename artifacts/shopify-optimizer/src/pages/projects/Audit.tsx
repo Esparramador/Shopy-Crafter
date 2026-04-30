@@ -10,7 +10,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff }from "lucide-react";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
 
@@ -751,6 +751,8 @@ export default function AuditPage() {
 
   const [filterGrade, setFilterGrade] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const PAGE_SIZE = 50;
   const [activeTab, setActiveTab] = useState<"products" | "opportunities">("products");
   const [scanStatus, setScanStatus] = useState<"idle" | "syncing" | "auditing">("idle");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -763,7 +765,17 @@ export default function AuditPage() {
   const [optimizeMsg, setOptimizeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const { data, isLoading, refetch } = useGetProjectProducts(projectId, { grade: filterGrade || undefined });
+  const { data, isLoading, refetch } = useGetProjectProducts(projectId, {
+    page: currentPage,
+    limit: PAGE_SIZE,
+    grade: filterGrade || undefined,
+  });
+
+  // Reset page to 1 when filters change so user always sees first results.
+  useEffect(() => { setCurrentPage(1); }, [filterGrade, filterStatus]);
+
+  const totalProducts = data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
   const _syncProducts = useSyncProducts();
   const getCatalogOpps = useGetCatalogOpportunities();
   const oppsData = getCatalogOpps.data ?? [];
@@ -1388,6 +1400,38 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               </div>
             )}
           </div>
+
+          {/* Pagination bar — 50 products per page with prev/next arrows */}
+          {totalProducts > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-3 px-2 py-4 border-t border-white/5">
+              <div className="text-sm text-muted-foreground">
+                Mostrando <strong className="text-foreground">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalProducts)}</strong> de <strong className="text-foreground">{totalProducts}</strong> productos
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1 || isLoading}
+                  className="flex items-center gap-1 px-3 py-2 bg-card border border-white/10 rounded-lg text-sm text-foreground hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Página anterior"
+                >
+                  <span aria-hidden="true">←</span>
+                  <span className="hidden sm:inline">Anterior</span>
+                </button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Página <strong className="text-foreground">{currentPage}</strong> de <strong className="text-foreground">{totalPages}</strong>
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages || isLoading}
+                  className="flex items-center gap-1 px-3 py-2 bg-primary/15 border border-primary/30 rounded-lg text-sm text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                  aria-label="Página siguiente"
+                >
+                  <span className="hidden sm:inline">Siguiente</span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 

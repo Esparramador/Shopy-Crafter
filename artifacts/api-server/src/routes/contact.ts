@@ -599,6 +599,43 @@ function buildReportHtml(
 
   const ps = research.productSample;
   const productImageUrl = lead.productImageUrl || "";
+
+  // FIX: el LLM puede devolver objetos/arrays donde esperamos string;
+  // esto causaba `[object Object]` literal en el HTML del producto.
+  function normalizeToText(v: unknown): string {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (Array.isArray(v)) {
+      return v.map(item => normalizeToText(item)).filter(Boolean).join(", ");
+    }
+    if (typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      // Forma común del LLM: { keyword: "...", searchVolume: "..." } o { type: "...", value: "..." } etc.
+      const candidates = [
+        "keyword", "label", "name", "title", "text", "value",
+        "description", "strategy", "note", "improvement", "question",
+        "tag", "term",
+      ];
+      for (const k of candidates) {
+        const val = o[k];
+        if (typeof val === "string" && val.trim()) return val;
+      }
+      // Fallback: serializar como "k: v · k: v"
+      const parts: string[] = [];
+      for (const [k, val] of Object.entries(o)) {
+        if (val === null || val === undefined) continue;
+        if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+          parts.push(`${k}: ${String(val)}`);
+        }
+      }
+      return parts.slice(0, 3).join(" · ");
+    }
+    return "";
+  }
+
+  // Aplica esc() después de normalizar para HTML-escape seguro.
+  const escN = (v: unknown) => esc(normalizeToText(v));
   const productSampleHtml = ps ? `
     <div class="section" style="page-break-before:always;">
       <div class="section-title">Producto Optimizado por Shopy Crafter — Score SEO 100/100</div>
@@ -607,28 +644,35 @@ function buildReportHtml(
 
           ${productImageUrl ? `
           <div style="position:relative;background:#0a0a0a;text-align:center;padding:32px 20px;">
-            <img src="${safeUrl(productImageUrl)}" alt="${esc(ps.altText || ps.title)}" style="max-width:100%;max-height:420px;border-radius:12px;object-fit:contain;display:inline-block;box-shadow:0 8px 32px rgba(0,0,0,.5);" onerror="this.parentElement.style.display='none'" />
+            <img src="${safeUrl(productImageUrl)}" alt="${escN(ps.altText || ps.title)}" style="max-width:100%;max-height:420px;border-radius:12px;object-fit:contain;display:inline-block;box-shadow:0 8px 32px rgba(0,0,0,.5);" onerror="this.parentElement.style.display='none'" />
             <div style="position:absolute;top:16px;right:16px;background:rgba(52,211,153,.15);color:#34d399;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;border:1px solid rgba(52,211,153,.3);">SEO 100/100</div>
           </div>` : `
-          <div style="background:linear-gradient(135deg,rgba(196,149,106,.08),rgba(52,211,153,.05));padding:40px 20px;text-align:center;">
-            <div style="font-size:48px;margin-bottom:8px;">🛍️</div>
-            <div style="font-size:11px;color:rgba(196,149,106,.6);letter-spacing:2px;text-transform:uppercase;">Producto Optimizado</div>
+          <div style="position:relative;background:linear-gradient(135deg,#1a1410 0%,#211a14 50%,#1a1410 100%);padding:64px 28px 56px;text-align:center;border-bottom:1px solid rgba(196,149,106,.18);">
+            <div style="position:absolute;top:16px;right:16px;background:rgba(52,211,153,.15);color:#34d399;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;border:1px solid rgba(52,211,153,.3);">SCORE 100/100</div>
+            <div style="display:inline-block;width:96px;height:96px;border-radius:50%;border:2px solid rgba(196,149,106,.35);background:rgba(196,149,106,.06);display:flex;align-items:center;justify-content:center;font-size:42px;margin-bottom:20px;line-height:96px;">🛍️</div>
+            <div style="font-size:11px;color:rgba(196,149,106,.6);letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:10px;">Producto AI-Optimizado</div>
+            <div style="font-size:22px;font-weight:700;color:rgba(255,255,255,.95);line-height:1.3;max-width:560px;margin:0 auto;">${escN(ps.title)}</div>
+            ${ps.productType || ps.vendor ? `<div style="margin-top:14px;font-size:12px;color:rgba(255,255,255,.55);">${ps.productType ? escN(ps.productType) : ""}${ps.productType && (ps.vendor || lead.name) ? " · " : ""}${escN(ps.vendor || lead.name)}</div>` : ""}
           </div>`}
 
           <div style="padding:28px;">
+            ${productImageUrl ? `
             <div style="margin-bottom:24px;">
               <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Titulo Shopify</div>
-              <div style="font-size:20px;font-weight:700;color:rgba(255,255,255,.95);line-height:1.3;">${esc(ps.title)}</div>
+              <div style="font-size:20px;font-weight:700;color:rgba(255,255,255,.95);line-height:1.3;">${escN(ps.title)}</div>
               <div style="margin-top:8px;">
-                <span style="display:inline-block;background:rgba(196,149,106,.1);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;">/${esc(ps.handle || "producto-optimizado")}</span>
-                <span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${esc(ps.productType)}</span>
-                <span style="display:inline-block;background:rgba(196,149,106,.08);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${esc(ps.vendor || lead.name)}</span>
+                <span style="display:inline-block;background:rgba(196,149,106,.1);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;">/${escN(ps.handle || "producto-optimizado")}</span>
+                <span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${escN(ps.productType)}</span>
+                <span style="display:inline-block;background:rgba(196,149,106,.08);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;margin-left:8px;">${escN(ps.vendor || lead.name)}</span>
               </div>
-            </div>
+            </div>` : `
+            <div style="margin-bottom:24px;">
+              <span style="display:inline-block;background:rgba(196,149,106,.1);color:#c4956a;padding:4px 12px;border-radius:4px;font-size:12px;font-family:monospace;">/${escN(ps.handle || "producto-optimizado")}</span>
+            </div>`}
 
             <div class="ai-field" style="margin-bottom:20px;">
               <div class="ai-field-label">Descripcion de Venta</div>
-              <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${esc(ps.description)}</div>
+              <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${escN(ps.description)}</div>
             </div>
 
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
@@ -636,15 +680,15 @@ function buildReportHtml(
                 <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
                   <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
                     <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Title</div>
-                    <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:600;">${esc(ps.seoTitle)}</div>
-                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoTitle || "").length}/60 chars</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:600;">${escN(ps.seoTitle)}</div>
+                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${normalizeToText(ps.seoTitle).length}/60 chars</div>
                   </div>
                 </td>
                 <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
                   <div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:16px;">
                     <div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Meta Description</div>
-                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.seoDescription)}</div>
-                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${(ps.seoDescription || "").length}/155 chars</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${escN(ps.seoDescription)}</div>
+                    <div style="font-size:10px;color:rgba(52,211,153,.5);margin-top:4px;">${normalizeToText(ps.seoDescription).length}/155 chars</div>
                   </div>
                 </td>
               </tr>
@@ -656,11 +700,11 @@ function buildReportHtml(
                 <tr>
                   <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
                     <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Title</div>
-                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogTitle || ps.seoTitle || "")}</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${escN(ps.ogTitle || ps.seoTitle || "")}</div>
                   </td>
                   <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
                     <div style="font-size:10px;color:rgba(107,168,240,.6);margin-bottom:4px;">OG Description</div>
-                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${esc(ps.ogDescription || ps.seoDescription || "")}</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.85);">${escN(ps.ogDescription || ps.seoDescription || "")}</div>
                   </td>
                 </tr>
               </table>
@@ -669,26 +713,27 @@ function buildReportHtml(
             ${ps.altText ? `
             <div class="ai-field" style="margin-bottom:16px;">
               <div class="ai-field-label">Alt Text Imagen Principal</div>
-              <div class="ai-field-value" style="color:#34d399;font-size:13px;">${esc(ps.altText)}</div>
+              <div class="ai-field-value" style="color:#34d399;font-size:13px;">${escN(ps.altText)}</div>
             </div>` : ""}
 
             ${ps.variants && ps.variants.length > 0 ? `
             <div style="background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:10px;padding:16px;margin-bottom:20px;">
               <div style="font-size:10px;font-weight:700;color:#c4956a;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Variantes Shopify</div>
               ${ps.variants.map(v =>
-                `<div style="margin-bottom:8px;"><span style="font-weight:600;color:rgba(255,255,255,.8);font-size:13px;">${esc(v.option)}:</span> <span style="color:rgba(255,255,255,.6);font-size:13px;">${v.values.map(val => esc(val)).join(" · ")}</span></div>`
+                `<div style="margin-bottom:8px;"><span style="font-weight:600;color:rgba(255,255,255,.8);font-size:13px;">${escN(v?.option)}:</span> <span style="color:rgba(255,255,255,.6);font-size:13px;">${(Array.isArray(v?.values) ? v.values : []).map(val => escN(val)).filter(Boolean).join(" · ")}</span></div>`
               ).join("")}
             </div>` : ""}
 
+            ${(ps.tags && (ps.tags as unknown[]).length > 0) ? `
             <div style="margin-bottom:20px;">
               <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Tags SEO</div>
-              <div>${(ps.tags || []).map(t => `<span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(107,168,240,.15);">${esc(t)}</span>`).join("")}</div>
-            </div>
+              <div>${(ps.tags as unknown[]).map(t => normalizeToText(t)).filter(Boolean).map(t => `<span style="display:inline-block;background:rgba(107,168,240,.08);color:#6ba8f0;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(107,168,240,.15);">${esc(t)}</span>`).join("")}</div>
+            </div>` : ""}
 
-            ${ps.seoKeywords && ps.seoKeywords.length > 0 ? `
+            ${(ps.seoKeywords && (ps.seoKeywords as unknown[]).length > 0) ? `
             <div style="margin-bottom:20px;">
               <div style="font-size:10px;font-weight:700;color:rgba(52,211,153,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Keywords Target</div>
-              <div>${ps.seoKeywords.map(k => `<span style="display:inline-block;background:rgba(52,211,153,.06);color:#34d399;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(52,211,153,.12);">${esc(k)}</span>`).join("")}</div>
+              <div>${(ps.seoKeywords as unknown[]).map(k => normalizeToText(k)).filter(Boolean).map(k => `<span style="display:inline-block;background:rgba(52,211,153,.06);color:#34d399;padding:3px 10px;border-radius:12px;font-size:11px;margin:2px 4px 2px 0;border:1px solid rgba(52,211,153,.12);">${esc(k)}</span>`).join("")}</div>
             </div>` : ""}
 
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
@@ -696,13 +741,13 @@ function buildReportHtml(
                 <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
                   <div class="ai-field">
                     <div class="ai-field-label">Estrategia de Precio</div>
-                    <div class="ai-field-value" style="font-size:13px;">${esc(ps.priceStrategy)}</div>
+                    <div class="ai-field-value" style="font-size:13px;">${escN(ps.priceStrategy)}</div>
                   </div>
                 </td>
                 <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
                   <div class="ai-field">
                     <div class="ai-field-label">Mejoras con Impacto</div>
-                    <div class="ai-field-value" style="font-size:13px;">${esc(ps.improvementNotes)}</div>
+                    <div class="ai-field-value" style="font-size:13px;">${escN(ps.improvementNotes)}</div>
                   </div>
                 </td>
               </tr>
@@ -713,8 +758,8 @@ function buildReportHtml(
               <div style="font-size:10px;font-weight:700;color:rgba(196,149,106,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">FAQ — Preguntas Frecuentes</div>
               ${ps.faqItems.map(faq => `
                 <div style="margin-bottom:10px;padding:12px 16px;background:rgba(196,149,106,.03);border-radius:8px;border-left:3px solid rgba(196,149,106,.25);">
-                  <div style="font-weight:600;color:rgba(255,255,255,.9);font-size:13px;margin-bottom:4px;">${esc(faq.question)}</div>
-                  <div style="color:rgba(255,255,255,.65);font-size:12px;">${esc(faq.answer)}</div>
+                  <div style="font-weight:600;color:rgba(255,255,255,.9);font-size:13px;margin-bottom:4px;">${escN(faq?.question)}</div>
+                  <div style="color:rgba(255,255,255,.65);font-size:12px;">${escN(faq?.answer)}</div>
                 </div>
               `).join("")}
             </div>` : ""}

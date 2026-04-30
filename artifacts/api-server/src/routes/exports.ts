@@ -1577,44 +1577,6 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 <body>
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyE, date: safeDate, template: "elegance" })}
 <div class="page">
-  <div class="cover-portfolio">
-    <div class="cover-inner">
-      <div class="cover-diamond-top"></div>
-
-      <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
-
-      <div class="cover-logo-container">
-        <div class="cover-logo-circle">
-          <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="96" height="96" style="width:96px;height:96px;border-radius:16px;" />
-        </div>
-      </div>
-
-      <div class="cover-doc-type">Informe de Consultoría Digital</div>
-      <div class="cover-main-title">${safeTitle}</div>
-      <div class="cover-main-subtitle">${safeSub}</div>
-
-      ${safeCompany ? `<div class="cover-client-box">
-        <div class="cover-client-label">Preparado para</div>
-        <div class="cover-client-name">${safeCompany}</div>
-      </div>` : ""}
-
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:16px auto 0;text-align:center;">
-        <tr>
-          <td style="padding:0 20px;"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></td>
-          <td style="padding:0 20px;"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></td>
-          ${coverDomain ? `<td style="padding:0 20px;"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></td>` : ""}
-          <td style="padding:0 20px;"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></td>
-        </tr>
-      </table>
-    </div>
-
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
-      <tr>
-        <td style="text-align:left;"><span class="cover-footer-text">shopycrafter.com</span></td>
-        <td style="text-align:right;"><span class="cover-footer-text">Confidencial</span></td>
-      </tr>
-    </table>
-  </div>
   ${buildTableOfContents(body, "elegance")}
   <div class="body-content">
     ${body}
@@ -1921,44 +1883,6 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 <body>
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompanyP, date: safeDate, template: "prestige" })}
 <div class="page">
-  <div class="cover-portfolio">
-    <div class="cover-inner">
-      <div class="cover-diamond-top"></div>
-
-      <div class="cover-agency-name">S H O P Y &nbsp; C R A F T E R</div>
-
-      <div class="cover-logo-container">
-        <div class="cover-logo-circle">
-          <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" width="96" height="96" style="width:96px;height:96px;border-radius:50%;" />
-        </div>
-      </div>
-
-      <div class="cover-doc-type">Informe de Consultoría Digital</div>
-      <div class="cover-main-title">${safeTitle}</div>
-      <div class="cover-main-subtitle">${safeSub}</div>
-
-      ${safeCompany ? `<div class="cover-client-box">
-        <div class="cover-client-label">Preparado para</div>
-        <div class="cover-client-name">${safeCompany}</div>
-      </div>` : ""}
-
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:16px auto 0;text-align:center;">
-        <tr>
-          <td style="padding:0 20px;"><div class="cover-meta-label">Fecha</div><div class="cover-meta-value">${safeDate}</div></td>
-          <td style="padding:0 20px;"><div class="cover-meta-label">Sector</div><div class="cover-meta-value">${coverSector}</div></td>
-          ${coverDomain ? `<td style="padding:0 20px;"><div class="cover-meta-label">Dominio</div><div class="cover-meta-value">${coverDomain}</div></td>` : ""}
-          <td style="padding:0 20px;"><div class="cover-meta-label">Referencia</div><div class="cover-meta-value">${refCode}</div></td>
-        </tr>
-      </table>
-    </div>
-
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
-      <tr>
-        <td style="text-align:left;"><span class="cover-footer-text">shopycrafter.com</span></td>
-        <td style="text-align:right;"><span class="cover-footer-text">Confidencial</span></td>
-      </tr>
-    </table>
-  </div>
   ${buildTableOfContents(body, "prestige")}
   <div class="body-content">
     ${body}

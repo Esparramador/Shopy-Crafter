@@ -29,65 +29,53 @@ export function buildCoverPage(opts: CoverPageOptions): string {
   return buildPrestigeCover(companyName);
 }
 
-function buildClassicCover(companyName: string): string {
+// Universal cover (style "foto 1"): SC golden medal logo 160px centered + client name bottom-right.
+// Same layout for all 3 templates, only background tone changes (kept for legacy compat).
+function buildUniversalCover(
+  companyName: string,
+  background: string,
+  logoB64: string,
+  accent: string,
+): string {
   return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#08080e;page-break-after:always;">
-  <tr><td style="padding:80px 40px 20px;text-align:center;">
-    <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" width="120" height="120" style="width:120px;height:120px;border-radius:24px;border:2px solid rgba(200,168,75,.25);display:block;margin:0 auto 24px;" />
-    <p style="font-size:28px;font-weight:700;color:rgba(200,168,75,.85);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
-  </td></tr>
-  <tr><td style="padding:20px 40px 60px;text-align:right;">
-    <p style="font-size:14px;color:rgba(200,168,75,.45);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
-  </td></tr>
-</table>`;
-}
-
-function buildEleganceCover(companyName: string): string {
-  return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0b1628;page-break-after:always;">
-  <tr><td style="padding:80px 40px 20px;text-align:center;">
-    <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="Shopy Crafter" width="120" height="120" style="width:120px;height:120px;border-radius:24px;border:2px solid rgba(192,200,216,.2);display:block;margin:0 auto 24px;" />
-    <p style="font-size:28px;font-weight:700;color:rgba(192,200,216,.8);letter-spacing:4px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
-  </td></tr>
-  <tr><td style="padding:20px 40px 60px;text-align:right;">
-    <p style="font-size:14px;color:rgba(192,200,216,.4);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:500;">${companyName}</p>
-  </td></tr>
-</table>`;
-}
-
-function buildPrestigeCover(companyName: string): string {
-  return `
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(180deg,#1a1410 0%,#120e0a 60%,#0d0a07 100%);page-break-after:always;height:100vh;min-height:700px;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${background};page-break-after:always;height:100vh;min-height:700px;">
   <tr><td style="padding:0 40px;text-align:center;vertical-align:middle;height:100vh;min-height:700px;">
     <div style="max-width:560px;margin:0 auto;">
 
-      <div style="width:12px;height:12px;background:rgba(196,149,106,.6);transform:rotate(45deg);margin:0 auto 40px;"></div>
-
-      <p style="font-size:11px;font-weight:600;color:rgba(196,149,106,.5);letter-spacing:6px;text-transform:uppercase;margin:0 0 40px;font-family:'Helvetica Neue',Arial,sans-serif;">S H O P Y &nbsp;&nbsp; C R A F T E R</p>
-
-      <div style="width:110px;height:110px;border-radius:50%;overflow:hidden;margin:0 auto 44px;border:2px solid rgba(196,149,106,.3);box-shadow:0 8px 40px rgba(0,0,0,.4);">
-        <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" width="110" height="110" style="width:110px;height:110px;border-radius:50%;display:block;" />
+      <div style="position:relative;width:200px;height:200px;margin:0 auto 36px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${accent}33 0%,transparent 70%);"></div>
+        <div style="position:absolute;inset:20px;border-radius:50%;overflow:hidden;border:3px solid ${accent}66;box-shadow:0 12px 48px rgba(0,0,0,.55),inset 0 0 24px rgba(0,0,0,.3);">
+          <img src="data:image/png;base64,${logoB64}" alt="SC" width="160" height="160" style="width:160px;height:160px;border-radius:50%;display:block;" />
+        </div>
       </div>
 
-      <div style="width:60px;height:1px;background:linear-gradient(90deg,transparent,rgba(196,149,106,.4),transparent);margin:0 auto 32px;"></div>
-
-      <p style="font-size:13px;font-weight:600;color:rgba(196,149,106,.4);letter-spacing:4px;text-transform:uppercase;margin:0 0 20px;font-family:'Helvetica Neue',Arial,sans-serif;">Informe de Consultoría Digital</p>
-
-      <div style="width:100px;height:1px;background:linear-gradient(90deg,transparent,rgba(196,149,106,.25),transparent);margin:0 auto 44px;"></div>
-
-      <div style="background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:16px;padding:28px 40px;margin:0 auto;display:inline-block;">
-        <p style="font-size:10px;color:rgba(196,149,106,.4);letter-spacing:3px;text-transform:uppercase;margin:0 0 10px;font-family:'Helvetica Neue',Arial,sans-serif;">Preparado para</p>
-        <p style="font-family:'Cormorant Garamond','Georgia',serif;font-size:28px;font-weight:700;color:rgba(196,149,106,.85);font-style:italic;margin:0;letter-spacing:0.5px;">${companyName}</p>
-      </div>
-
-      <div style="margin-top:48px;">
-        <div style="width:100px;height:1px;background:linear-gradient(90deg,transparent,rgba(196,149,106,.15),transparent);margin:0 auto 20px;"></div>
-        <p style="font-size:9px;color:rgba(196,149,106,.25);letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">shopycrafter.com &nbsp;&middot;&nbsp; Confidencial</p>
-      </div>
+      <p style="font-size:13px;font-weight:700;color:${accent};letter-spacing:6px;text-transform:uppercase;margin:0 0 8px;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
+      <div style="width:60px;height:1px;background:${accent}55;margin:0 auto;"></div>
 
     </div>
   </td></tr>
+  <tr><td style="padding:20px 56px 56px;text-align:right;vertical-align:bottom;">
+    <p style="font-size:10px;color:${accent}aa;letter-spacing:3px;text-transform:uppercase;margin:0 0 6px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Preparado para</p>
+    <p style="font-family:'Cormorant Garamond','Georgia',serif;font-size:24px;font-weight:700;color:${accent};font-style:italic;margin:0;letter-spacing:0.5px;">${companyName}</p>
+  </td></tr>
 </table>`;
+}
+
+function buildClassicCover(companyName: string): string {
+  return buildUniversalCover(companyName, "#08080e", LOGO_CORPORATE_B64, "rgba(200,168,75,.85)");
+}
+
+function buildEleganceCover(companyName: string): string {
+  return buildUniversalCover(companyName, "#0b1628", LOGO_CORPORATE_B64, "rgba(192,200,216,.85)");
+}
+
+function buildPrestigeCover(companyName: string): string {
+  return buildUniversalCover(
+    companyName,
+    "linear-gradient(180deg,#1a1410 0%,#120e0a 60%,#0d0a07 100%)",
+    LOGO_PRESTIGE_B64,
+    "rgba(196,149,106,.85)",
+  );
 }
 
 export function buildTableOfContents(body: string, template: CoverTemplate = "prestige"): string {
