@@ -8,7 +8,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { saveToVault } from "../lib/vault.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { learnFromOperation } from "../lib/claude.js";
-import { ObjectStorageService } from "../lib/objectStorage.js";
+import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib/objectStorage.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
 import {
@@ -845,6 +845,56 @@ router.post("/fs-pro/save-to-vault", requireAdmin, upload.single("file"), async 
 // ─── COST ESTIMATE / CAMPAIGN PLANNER ─────────────────────────────────────
 // Calcula coste y shotlist optimizado SIN ejecutar nada. Pensado para que el
 // frontend muestre presupuesto antes de quemar créditos.
+// ─── UPLOAD PUBLIC ASSET (URL HTTPS firmada para usar como referenceImage) ──
+// POST /fs-pro/upload-public-asset
+// FormData: file (multipart) — sube el archivo al bucket público de Object Storage
+// y devuelve { signedUrl, objectName, ttlSec }. La URL es HTTPS, válida 1h, y
+// la aceptan motores como Runway que exigen URLs públicas (no dataURI grandes).
+router.post("/fs-pro/upload-public-asset", requireAdmin, upload.single("file"), async (req, res): Promise<void> => {
+  try {
+    const f = req.file;
+    if (!f) { res.status(400).json({ error: "Falta file (multipart)" }); return; }
+
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) { res.status(500).json({ error: "DEFAULT_OBJECT_STORAGE_BUCKET_ID no configurado" }); return; }
+
+    // Auto-resize si es imagen y excede 2048px (Runway/Replicate exigen ≤8000, pero
+    // 2048 es óptimo para referencias: rápido y sin pérdida visual perceptible).
+    let buffer = f.buffer;
+    let mimeType = f.mimetype || "application/octet-stream";
+    let ext = (f.originalname?.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    if (mimeType.startsWith("image/")) {
+      try {
+        const sharp = (await import("sharp")).default;
+        const meta = await sharp(buffer).metadata();
+        if ((meta.width || 0) > 2048 || (meta.height || 0) > 2048) {
+          buffer = await sharp(buffer).rotate().resize({ width: 2048, height: 2048, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+          mimeType = "image/jpeg";
+          ext = "jpg";
+          logger.info({ originalSize: f.size, newSize: buffer.length, w: meta.width, h: meta.height }, "upload-public-asset: auto-resized");
+        }
+      } catch (e: any) {
+        logger.warn({ err: e?.message }, "upload-public-asset: resize skipped");
+      }
+    }
+
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    const objectName = `public/runway-refs/${safeName}`;
+
+    const file = objectStorageClient.bucket(bucketId).file(objectName);
+    await file.save(buffer, { contentType: mimeType, resumable: false });
+
+    const ttlSec = 3600;
+    const signedUrl = await signObjectURL({ bucketName: bucketId, objectName, method: "GET", ttlSec });
+
+    res.json({ signedUrl, objectName, ttlSec, sizeBytes: f.size, mimeType: f.mimetype });
+  } catch (err: any) {
+    logger.error({ err: err?.message || err }, "upload-public-asset failed");
+    res.status(500).json({ error: err?.message || "upload failed" });
+  }
+});
+
 // ─── RUNWAY DIRECT IMAGE GENERATION (sin pasar por Replicate) ──────────────
 // POST /fs-pro/runway-image
 // Body: { projectId, prompt, ratio?, model?, referenceImageUrl?, seed? }
