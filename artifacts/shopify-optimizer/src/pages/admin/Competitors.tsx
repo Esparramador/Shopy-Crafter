@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Scan, Trash2, AlertTriangle, X, Download } from "lucide-react";
+import { Plus, Scan, Trash2, AlertTriangle, X, Download, BarChart3, Loader2 } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import SaveToVaultButton from "@/components/SaveToVaultButton";
 
@@ -12,6 +12,7 @@ export default function Competitors() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState<string | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newComp, setNewComp] = useState({ name: "", url: "", type: "direct" });
 
@@ -139,6 +140,38 @@ ${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
     URL.revokeObjectURL(url);
   };
 
+  const generateComparativeReport = async () => {
+    if (!selectedProject) return;
+    if (competitors.length === 0) {
+      alert("Añade al menos un competidor antes de generar el informe.");
+      return;
+    }
+    setGeneratingReport(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/competitors/comparative-report`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: Number(selectedProject) }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${r.status}`);
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Comparativa_Competidores_${new Date().toISOString().split("T")[0]}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`No se pudo generar el informe comparativo: ${err.message}`);
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
   return (
@@ -163,6 +196,16 @@ ${alerts.length > 0 ? `<tr><td style="padding:0 48px 28px;">
           />
           <button className="btn-secondary" onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Download size={14} /> Exportar
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={generateComparativeReport}
+            disabled={generatingReport || competitors.length === 0}
+            title={competitors.length === 0 ? "Añade competidores primero" : "Genera informe IA con Google Search"}
+            style={{ display: "flex", alignItems: "center", gap: 6, opacity: competitors.length === 0 ? 0.5 : 1 }}
+          >
+            {generatingReport ? <Loader2 size={14} className="animate-spin" /> : <BarChart3 size={14} />}
+            {generatingReport ? "Analizando con IA…" : "Informe Comparativo IA"}
           </button>
           <button className="btn-primary" onClick={() => setShowAdd(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Plus size={14} /> Añadir Competidor

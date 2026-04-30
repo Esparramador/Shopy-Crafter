@@ -65,6 +65,7 @@ const SEOPage = lazy(() => import("@/pages/projects/SEO"));
 const SettingsPage = lazy(() => import("@/pages/projects/Settings"));
 const ExportCenter = lazy(() => import("@/pages/projects/ExportCenter"));
 const UniversalGenerator = lazy(() => import("@/pages/projects/UniversalGenerator"));
+const Suppliers = lazy(() => import("@/pages/projects/Suppliers"));
 const WebLab = lazy(() => import("@/pages/projects/WebLab"));
 const WebLabStandalone = lazy(() => import("@/pages/projects/WebLab").then(m => ({ default: m.WebLabStandalone })));
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
@@ -410,6 +411,10 @@ function Router() {
 
         <Route path="/projects/:id/generator">
           <RequireAdmin><AdminWrapper><AppLayout><S><UniversalGenerator /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+
+        <Route path="/projects/:id/suppliers">
+          <RequireAdmin><AdminWrapper><AppLayout><S><Suppliers /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/web-lab">

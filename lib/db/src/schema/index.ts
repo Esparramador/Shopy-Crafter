@@ -13,6 +13,7 @@ export * from "./intelligence";
 export * from "./inventory";
 export * from "./onboarding";
 export * from "./competitors";
+export * from "./suppliers";
 export * from "./billing";
 export * from "./shopybrain";
 export * from "./project_files";

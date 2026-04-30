@@ -1,0 +1,42 @@
+import { pgTable, text, real, integer, timestamp } from "drizzle-orm/pg-core";
+
+export const suppliersResearchTable = pgTable("suppliers_research", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  niche: text("niche"),
+  query: text("query"),
+  status: text("status").default("completed"),
+  totalFound: integer("total_found").default(0),
+  sources: text("sources"),
+  rawResponse: text("raw_response"),
+  costEur: real("cost_eur"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const supplierEntriesTable = pgTable("supplier_entries", {
+  id: text("id").primaryKey(),
+  researchId: text("research_id").notNull(),
+  projectId: text("project_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category"),
+  country: text("country"),
+  region: text("region"),
+  website: text("website"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  productsOffered: text("products_offered"),
+  priceRangeMin: real("price_range_min"),
+  priceRangeMax: real("price_range_max"),
+  currency: text("currency").default("EUR"),
+  moq: text("moq"),
+  leadDays: text("lead_days"),
+  paymentTerms: text("payment_terms"),
+  shipsInternationally: integer("ships_internationally").default(0),
+  certifications: text("certifications"),
+  score: integer("score"),
+  source: text("source"),
+  sourceUrl: text("source_url"),
+  notes: text("notes"),
+  starred: integer("starred").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});

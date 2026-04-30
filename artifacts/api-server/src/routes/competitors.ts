@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable, productsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
 import net from "net";
 import { enableLongRunning } from "../lib/long-running.js";
+import { getReportShell } from "./exports.js";
 
 const router = Router();
 
@@ -350,6 +351,203 @@ router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
       totalFound: discovered.length,
       alreadyRegistered: existingCompetitors.length,
     });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── POST /competitors/comparative-report ─────────────────────────────────────
+// Genera informe HTML profesional comparando NUESTRA tienda contra los
+// competidores registrados, en precio / producto / calidad / imagen / social.
+router.post("/competitors/comparative-report", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const session = req.session as { userId?: string; role?: string; clientId?: string | number | null } | undefined;
+    if (!session?.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { projectId } = req.body ?? {};
+    if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+    const projectIdNum = Number(projectId);
+    if (!Number.isFinite(projectIdNum)) { res.status(400).json({ error: "projectId inválido" }); return; }
+
+    // access check
+    if (session.role !== "admin") {
+      const [proj] = await db.select({ clientId: projectsTable.clientId }).from(projectsTable).where(eq(projectsTable.id, projectIdNum)).limit(1);
+      if (!proj || String(proj.clientId) !== String(session.clientId)) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectIdNum)).limit(1);
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+
+    const competitors = await db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(projectIdNum)));
+    if (competitors.length === 0) { res.status(400).json({ error: "Añade al menos un competidor antes de generar el informe" }); return; }
+
+    // last snapshot per competitor
+    const compIds = competitors.map(c => c.id);
+    const allSnaps = await db.select().from(competitorSnapshotsTable)
+      .where(inArray(competitorSnapshotsTable.competitorId, compIds))
+      .orderBy(desc(competitorSnapshotsTable.scannedAt));
+    const lastSnap: Record<string, typeof allSnaps[number]> = {};
+    for (const s of allSnaps) { if (!lastSnap[s.competitorId]) lastSnap[s.competitorId] = s; }
+
+    const ourProducts = await db.select().from(productsTable).where(eq(productsTable.projectId, projectIdNum)).limit(50);
+    const ourPrices = ourProducts.map(p => Number((p as any).price)).filter(n => Number.isFinite(n) && n > 0);
+    const ourMin = ourPrices.length ? Math.min(...ourPrices) : null;
+    const ourMax = ourPrices.length ? Math.max(...ourPrices) : null;
+    const ourMedian = ourPrices.length ? ourPrices.sort((a, b) => a - b)[Math.floor(ourPrices.length / 2)] : null;
+
+    const storeName = (project as any).storeName || (project as any).name || "Tienda";
+    const niche = (project as any).storeNiche || "—";
+    const storeUrl = (project as any).shopifyDomain || (project as any).storeUrl || "";
+
+    const competitorBrief = competitors.map(c => {
+      const snap = lastSnap[c.id];
+      return `- ${c.name} (${c.url}) [${c.type}]${snap ? ` — precios ${snap.priceMin ?? "?"}–${snap.priceMax ?? "?"}€ (mediana ${snap.priceMedian ?? "?"}), ${snap.productsFound ?? "?"} productos` : " — sin escanear"}`;
+    }).join("\n");
+
+    const aiPrompt = `Eres un consultor senior de competitive intelligence para eCommerce. Genera una comparativa REAL y útil entre la tienda del cliente y sus competidores. Usa Google Search para verificar datos actuales.
+
+NUESTRA TIENDA:
+- Nombre: ${storeName}
+- Sector / nicho: ${niche}
+- URL: ${storeUrl}
+- Productos analizados: ${ourProducts.length}
+- Rango de precios propios: ${ourMin ?? "?"}€ – ${ourMax ?? "?"}€ (mediana ${ourMedian ?? "?"}€)
+
+COMPETIDORES REGISTRADOS:
+${competitorBrief}
+
+PARA CADA COMPETIDOR, investiga en Google y devuelve un análisis detallado en estos ejes:
+1. PRECIO: rango y posicionamiento (premium/medio/low cost) frente a nosotros
+2. PRODUCTO/SURTIDO: amplitud, profundidad, especialización
+3. CALIDAD/IMAGEN: percepción de marca, fotografía, packaging
+4. PRESENCIA WEB/SEO: dominio, autoridad percibida
+5. PRESENCIA SOCIAL: Instagram/Facebook/TikTok (URLs reales si existen, número aprox. seguidores)
+6. PUNTOS FUERTES y DÉBILES vs nuestra tienda
+7. RECOMENDACIÓN ACCIONABLE (qué copiar, qué evitar, dónde diferenciarse)
+
+DEVUELVE SOLO un JSON válido:
+{
+  "executiveSummary": "2-3 frases con la conclusión global",
+  "ourStrengths": ["..."],
+  "ourWeaknesses": ["..."],
+  "marketPositioning": "1 frase sobre dónde estamos en el mercado",
+  "competitors": [
+    {
+      "name": "...",
+      "priceLevel": "premium|medio|low-cost",
+      "priceRange": "X-Y €",
+      "productAnalysis": "...",
+      "qualityImage": "...",
+      "webSeo": "...",
+      "social": { "instagram": "@... | url | seguidores aprox", "facebook": "...", "tiktok": "..." },
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "actionable": "..."
+    }
+  ],
+  "recommendations": ["...", "..."]
+}`;
+
+    const t0 = Date.now();
+    const { text: aiText, sources } = await askGeminiWithSearch(
+      aiPrompt,
+      "Eres un investigador competitivo. Verifica todo con Google. Responde SIEMPRE con JSON estricto, sin texto fuera del JSON. Si un dato no existe, omite el campo.",
+    );
+    const elapsedMs = Date.now() - t0;
+
+    // safe JSON parse
+    let parsed: any = null;
+    try {
+      const fence = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const candidate = fence ? fence[1].trim() : aiText.trim();
+      try { parsed = JSON.parse(candidate); } catch {
+        const obj = candidate.match(/\{[\s\S]*\}/);
+        if (obj) parsed = JSON.parse(obj[0]);
+      }
+    } catch { /* parsed stays null */ }
+
+    if (!parsed || !Array.isArray(parsed.competitors)) {
+      res.status(502).json({ error: "Gemini no devolvió un JSON comparativo válido", rawPreview: aiText.slice(0, 400) });
+      return;
+    }
+
+    const esc = (s: unknown): string => String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+    const today = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" });
+
+    const summaryHtml = `
+      <h2>Resumen ejecutivo</h2>
+      <p>${esc(parsed.executiveSummary || "—")}</p>
+      ${parsed.marketPositioning ? `<p><strong>Posicionamiento:</strong> ${esc(parsed.marketPositioning)}</p>` : ""}
+
+      <h2>Nuestra tienda — Fortalezas y debilidades</h2>
+      <table>
+        <thead><tr><th>✅ Fortalezas</th><th>⚠️ Debilidades</th></tr></thead>
+        <tbody><tr>
+          <td><ul>${(parsed.ourStrengths || []).map((s: string) => `<li>${esc(s)}</li>`).join("")}</ul></td>
+          <td><ul>${(parsed.ourWeaknesses || []).map((s: string) => `<li>${esc(s)}</li>`).join("")}</ul></td>
+        </tr></tbody>
+      </table>`;
+
+    const compHtml = (parsed.competitors as any[]).map(c => {
+      const social = c.social || {};
+      return `
+      <h2>${esc(c.name)}</h2>
+      <table>
+        <tbody>
+          <tr><th style="width:25%">Nivel de precio</th><td>${esc(c.priceLevel || "—")} (${esc(c.priceRange || "—")})</td></tr>
+          <tr><th>Producto / Surtido</th><td>${esc(c.productAnalysis)}</td></tr>
+          <tr><th>Calidad / Imagen</th><td>${esc(c.qualityImage)}</td></tr>
+          <tr><th>Web / SEO</th><td>${esc(c.webSeo)}</td></tr>
+          <tr><th>Presencia social</th><td>${["instagram", "facebook", "tiktok"].map(k => social[k] ? `<strong>${k}:</strong> ${esc(social[k])}` : "").filter(Boolean).join("<br/>") || "—"}</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>✅ Sus fortalezas</th><th>⚠️ Sus debilidades</th></tr></thead>
+        <tbody><tr>
+          <td><ul>${(c.strengths || []).map((s: string) => `<li>${esc(s)}</li>`).join("")}</ul></td>
+          <td><ul>${(c.weaknesses || []).map((s: string) => `<li>${esc(s)}</li>`).join("")}</ul></td>
+        </tr></tbody>
+      </table>
+      ${c.actionable ? `<p><strong>🎯 Acción recomendada:</strong> ${esc(c.actionable)}</p>` : ""}`;
+    }).join("");
+
+    const recsHtml = `<h2>Recomendaciones globales</h2>
+      <ul>${(parsed.recommendations || []).map((r: string) => `<li>${esc(r)}</li>`).join("")}</ul>
+      <p style="font-size:11px;color:#94a3b8;margin-top:18px">Análisis basado en investigación con Google Search en tiempo real (${sources.length} fuentes verificadas, ${Math.round(elapsedMs / 1000)}s).</p>`;
+
+    const body = summaryHtml + compHtml + recsHtml;
+    const shell = getReportShell("prestige");
+    const html = shell(
+      "Análisis Competitivo",
+      `${storeName} vs ${competitors.length} competidores`,
+      body,
+      today,
+      storeName,
+    );
+
+    saveToVault({
+      projectId: projectIdNum,
+      fileType: "report",
+      category: "competitor_analysis",
+      title: `Análisis competitivo: ${storeName}`,
+      description: `Comparativa con ${competitors.length} competidores (${sources.length} fuentes Google)`,
+      mimeType: "text/html",
+      fileSizeBytes: Buffer.from(html).length,
+      generatedBy: "competitive_report",
+      content: html,
+      metadata: { competitors: competitors.length, sources: sources.length, elapsedMs },
+    }).catch(() => {});
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="competidores-${projectIdNum}-${Date.now()}.html"`);
+    res.send(html);
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
