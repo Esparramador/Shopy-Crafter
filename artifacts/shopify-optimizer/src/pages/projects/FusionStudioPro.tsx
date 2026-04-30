@@ -623,7 +623,13 @@ function EnhanceTab({ projectId, onSuccess, onError }: { projectId: number; onSu
 }
 
 // ─── TAB: VIDEO ──────────────────────────────────────────────────────────
+// Modelos que NO soportan text-to-video puro → exigen imagen origen.
+const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen3-alpha", "wan-2.5-fast"]);
+
+type VideoMode = "t2v" | "i2v" | "v2v";
+
 function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
+  const [mode, setMode] = useState<VideoMode>("i2v");
   const [model, setModel] = useState("seedance-fast");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(5);
@@ -642,9 +648,15 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
     [providerDown, caps, model, health],
   );
 
+  // Si el modelo seleccionado no soporta T2V, fuerza I2V automáticamente.
+  useEffect(() => {
+    if (mode === "t2v" && I2V_ONLY_MODELS.has(model)) setMode("i2v");
+  }, [model, mode]);
+
   const run = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
-    if (!file && !sourceUrl) { onError("Imagen origen requerida"); return; }
+    if (mode === "i2v" && !file && !sourceUrl) { onError("Imagen origen requerida en modo Imagen → Vídeo"); return; }
+    if (mode === "v2v") { onError("Vídeo → Vídeo aún no disponible. Usa ProTools → Motion transfer como alternativa."); return; }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -652,8 +664,11 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
       fd.append("model", model); fd.append("prompt", prompt);
       fd.append("duration", String(duration)); fd.append("aspect", aspect);
       if (cameraPreset) fd.append("cameraPreset", cameraPreset);
-      if (file) fd.append("image", file);
-      if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
+      // En T2V puro NO se envía imagen aunque haya quedado seleccionada.
+      if (mode === "i2v") {
+        if (file) fd.append("image", file);
+        if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
+      }
       const res = await fetch(`${API_BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
       const d = await res.json();
       if (!res.ok) {
@@ -670,9 +685,42 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
     } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
   };
 
+  const modelSupportsT2V = !I2V_ONLY_MODELS.has(model);
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
+        <Section title="Modo de generación">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+            <button
+              onClick={() => setMode("t2v")}
+              disabled={!modelSupportsT2V}
+              title={!modelSupportsT2V ? `${model} sólo soporta Imagen → Vídeo` : "Texto → Vídeo (sin imagen origen)"}
+              style={{ ...cardButton(mode === "t2v"), opacity: modelSupportsT2V ? 1 : 0.4, cursor: modelSupportsT2V ? "pointer" : "not-allowed", padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>Texto → Vídeo</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Sólo prompt</div>
+            </button>
+            <button
+              onClick={() => setMode("i2v")}
+              style={{ ...cardButton(mode === "i2v"), padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>Imagen → Vídeo</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Animar foto</div>
+            </button>
+            <button
+              onClick={() => setMode("v2v")}
+              disabled
+              title="Próximamente — usa ProTools → Motion transfer"
+              style={{ ...cardButton(false), opacity: 0.45, cursor: "not-allowed", padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>Vídeo → Vídeo</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Próximamente</div>
+            </button>
+          </div>
+          {mode === "t2v" && (
+            <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
+              Modo Texto → Vídeo: el modelo genera el clip a partir del prompt sin imagen origen. Disponible en Veo, Kling, Seedance y Hailuo.
+            </p>
+          )}
+        </Section>
         <Section title="Modelo">
           {providerDown && (
             <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
@@ -711,11 +759,20 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
             </div>
           </div>
         </Section>
-        <Section title="Imagen origen">
-          <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-          <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
-          <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
-        </Section>
+        {mode === "i2v" && (
+          <Section title="Imagen origen (requerida)">
+            <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+            <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
+            <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
+          </Section>
+        )}
+        {mode === "t2v" && (
+          <Section title="Imagen origen">
+            <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.4, margin: 0 }}>
+              No se usa imagen en modo Texto → Vídeo. Cambia a "Imagen → Vídeo" si quieres animar una foto concreta.
+            </p>
+          </Section>
+        )}
         {caps?.cameraPresets && caps.cameraPresets.length > 0 && (
           <Section title="Movimiento de cámara (preset)">
             <select value={cameraPreset} onChange={e => setCameraPreset(e.target.value)} style={inputStyle}>
@@ -1288,23 +1345,58 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
         )}
         {mode === "concat" && (
           <>
-            <Section title="Videos a concatenar (en orden)">
+            <Section title="Disponibles">
               {videoVaultItems.length === 0 ? (
                 <p style={{ fontSize: 11, color: "var(--t3)" }}>Genera primero al menos 2 videos.</p>
               ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {videoVaultItems.filter(v => !concatIds.includes(v.vaultId)).map(v => (
+                    <button
+                      key={v.vaultId}
+                      onClick={() => setConcatIds(prev => [...prev, v.vaultId])}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 6, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer", textAlign: "left", color: "var(--t2)", fontSize: 12 }}>
+                      <span style={{ flex: 1 }}>#{v.vaultId} · {v.label}</span>
+                      <span style={{ fontSize: 10, color: "var(--gold)" }}>+ añadir</span>
+                    </button>
+                  ))}
+                  {videoVaultItems.length > 0 && videoVaultItems.every(v => concatIds.includes(v.vaultId)) && (
+                    <p style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic" }}>Todos los videos ya están en el timeline.</p>
+                  )}
+                </div>
+              )}
+            </Section>
+            <Section title={`Timeline (${concatIds.length} clips · arrastra el orden con ↑↓)`}>
+              {concatIds.length === 0 ? (
+                <p style={{ fontSize: 11, color: "var(--t3)" }}>Añade clips desde la lista superior para construir tu secuencia.</p>
+              ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {videoVaultItems.map(v => {
-                    const idx = concatIds.indexOf(v.vaultId);
+                  {concatIds.map((vaultId, idx) => {
+                    const v = videoVaultItems.find(x => x.vaultId === vaultId);
+                    const moveUp = () => setConcatIds(prev => {
+                      if (idx === 0) return prev;
+                      const next = [...prev]; [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; return next;
+                    });
+                    const moveDown = () => setConcatIds(prev => {
+                      if (idx === prev.length - 1) return prev;
+                      const next = [...prev]; [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]; return next;
+                    });
+                    const remove = () => setConcatIds(prev => prev.filter(i => i !== vaultId));
                     return (
-                      <label key={v.vaultId} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 6, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer" }}>
-                        <input type="checkbox" checked={idx >= 0} onChange={() => {
-                          setConcatIds(prev => idx >= 0 ? prev.filter(i => i !== v.vaultId) : [...prev, v.vaultId]);
-                        }} />
-                        <span style={{ fontSize: 12, flex: 1 }}>#{v.vaultId} · {v.label}</span>
-                        {idx >= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", minWidth: 18 }}>#{idx + 1}</span>}
-                      </label>
+                      <div key={vaultId} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 8, background: "linear-gradient(90deg, rgba(200,168,75,0.10), rgba(200,168,75,0.02))", border: "1px solid rgba(200,168,75,0.35)" }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "var(--gold)", minWidth: 28, textAlign: "center", padding: "4px 6px", borderRadius: 4, background: "rgba(0,0,0,0.3)" }}>#{idx + 1}</span>
+                        <span style={{ fontSize: 12, flex: 1, color: "var(--t1)" }}>#{vaultId} · {v?.label ?? "(?)"}</span>
+                        <button onClick={moveUp} disabled={idx === 0} title="Subir" style={{ ...pillButton(false), opacity: idx === 0 ? 0.3 : 1, cursor: idx === 0 ? "not-allowed" : "pointer", padding: "4px 8px" }}>↑</button>
+                        <button onClick={moveDown} disabled={idx === concatIds.length - 1} title="Bajar" style={{ ...pillButton(false), opacity: idx === concatIds.length - 1 ? 0.3 : 1, cursor: idx === concatIds.length - 1 ? "not-allowed" : "pointer", padding: "4px 8px" }}>↓</button>
+                        <button onClick={remove} title="Quitar" style={{ ...pillButton(false), padding: "4px 8px", color: "#ef4444", borderColor: "rgba(239,68,68,0.35)" }}>×</button>
+                      </div>
                     );
                   })}
+                  {concatIds.length >= 2 && (
+                    <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0", lineHeight: 1.4 }}>
+                      Resultado: secuencia de {concatIds.length} clips
+                      {transitionPreset ? ` con transición "${caps?.transitionPresets?.find(t => t.key === transitionPreset)?.label || transitionPreset}" (${transitionDuration.toFixed(1)}s)` : " unidos por corte directo"}.
+                    </p>
+                  )}
                 </div>
               )}
             </Section>
@@ -1435,7 +1527,8 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
   const [customBrief, setCustomBrief] = useState("");
   const [productFile, setProductFile] = useState<File | null>(null);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
-  const [narrationVoiceId, setNarrationVoiceId] = useState("21m00Tcm4TlvDq8ikWAM");
+  // Vacío → backend usa voz por defecto auto-detectada (multilingüe ES).
+  const [narrationVoiceId, setNarrationVoiceId] = useState("");
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicPrompt, setMusicPrompt] = useState("");
   const [busy, setBusy] = useState(false);

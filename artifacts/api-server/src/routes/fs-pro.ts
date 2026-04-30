@@ -9,6 +9,7 @@ import { saveToVault } from "../lib/vault.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
+import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
 import {
   IMAGE_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
@@ -43,6 +44,16 @@ let _storage: ObjectStorageService | null = null;
 function getStorage(): ObjectStorageService {
   if (!_storage) _storage = new ObjectStorageService();
   return _storage;
+}
+
+// Lee y desencripta el token de Replicate del proyecto (campo cifrado en DB).
+// El bug histórico: el código leía `replicateApiKey` que NO EXISTE en el schema
+// (la columna real es `replicate_api_token` → `replicateApiToken`). Por eso
+// siempre caía al env REPLICATE_API_TOKEN, ignorando el token por proyecto.
+function getProjectReplicateToken(project: any): string | undefined {
+  const enc = project?.replicateApiToken;
+  if (!enc) return undefined;
+  try { return safeDecrypt(enc) || enc; } catch { return enc; }
 }
 
 // Smart vault save: uploads large files to Object Storage instead of inline base64.
@@ -294,7 +305,7 @@ router.post("/fs-pro/generate-image", requireAdmin, async (req: Request, res: Re
 
     const { buffer, mimeType } = await generateImage(model, prompt, {
       aspectRatio, seed, negativePrompt, referenceImage, referenceMime,
-      replicateToken: (project as any).replicateApiKey || undefined,
+      replicateToken: getProjectReplicateToken(project),
     });
 
     const vaultId = await saveToVaultSmart({
@@ -338,7 +349,7 @@ router.post("/fs-pro/edit-image", requireAdmin, upload.single("image"), async (r
     else { res.status(400).json({ error: "Imagen requerida (file o sourceImageUrl)" }); return; }
 
     const { buffer, mimeType } = await editImage(model as ImageEditModel, imgBuf, imgMime, prompt, {
-      aspectRatio, replicateToken: (project as any).replicateApiKey || undefined,
+      aspectRatio, replicateToken: getProjectReplicateToken(project),
     });
 
     const vaultId = await saveToVaultSmart({
@@ -374,7 +385,7 @@ router.post("/fs-pro/remove-bg", requireAdmin, upload.single("image"), async (re
     else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
     else { res.status(400).json({ error: "Imagen requerida" }); return; }
 
-    const out = await removeBackground(buf, mime, (project as any).replicateApiKey || undefined);
+    const out = await removeBackground(buf, mime, getProjectReplicateToken(project));
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-bg-removed", category: "fusion-studio-pro",
       title: `FS Pro: BG removido`, mimeType: "image/png", generatedBy: "fs-pro:bria-rmbg",
@@ -404,7 +415,7 @@ router.post("/fs-pro/replace-bg", requireAdmin, upload.single("image"), async (r
     else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
     else { res.status(400).json({ error: "Imagen requerida" }); return; }
 
-    const out = await replaceBackground(buf, mime, scenePrompt, (project as any).replicateApiKey || undefined);
+    const out = await replaceBackground(buf, mime, scenePrompt, getProjectReplicateToken(project));
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-bg-replaced", category: "fusion-studio-pro",
       title: `FS Pro: BG reemplazado - ${scenePrompt.slice(0, 50)}`,
@@ -438,9 +449,9 @@ router.post("/fs-pro/upscale", requireAdmin, upload.single("image"), async (req,
 
     const sc = parseInt(scale || "2") as 2 | 4;
     let out: Buffer;
-    if (mode === "clarity") out = await clarityUpscale(buf, mime, prompt || "high detail photograph", sc, (project as any).replicateApiKey || undefined);
-    else if (mode === "faces") out = await enhanceFaces(buf, mime, (project as any).replicateApiKey || undefined);
-    else out = await upscaleImage(buf, mime, sc, (project as any).replicateApiKey || undefined);
+    if (mode === "clarity") out = await clarityUpscale(buf, mime, prompt || "high detail photograph", sc, getProjectReplicateToken(project));
+    else if (mode === "faces") out = await enhanceFaces(buf, mime, getProjectReplicateToken(project));
+    else out = await upscaleImage(buf, mime, sc, getProjectReplicateToken(project));
 
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-upscaled", category: "fusion-studio-pro",
@@ -471,15 +482,16 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    let buf: Buffer; let mime: string;
+    // Imagen origen opcional → text-to-video puro permitido si el modelo lo soporta
+    let buf: Buffer | null = null;
+    let mime = "image/png";
     if (f) { buf = f.buffer; mime = f.mimetype; }
     else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
-    else { res.status(400).json({ error: "Imagen origen requerida" }); return; }
 
     const out = await generateVideoFromImage(model as VideoModel, buf, mime, prompt, {
       duration: parseInt(duration || "5"),
       aspect: aspect || "9:16",
-      replicateToken: (project as any).replicateApiKey || undefined,
+      replicateToken: getProjectReplicateToken(project),
       cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
     });
 
@@ -583,7 +595,7 @@ router.post("/fs-pro/music", requireAdmin, async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const buf = await generateMusic(prompt, parseInt(duration || "30"), (project as any).replicateApiKey || undefined);
+    const buf = await generateMusic(prompt, parseInt(duration || "30"), getProjectReplicateToken(project));
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-music", category: "fusion-studio-pro",
       title: `FS Pro Music: ${prompt.slice(0, 60)}`,
@@ -900,7 +912,7 @@ router.post("/fs-pro/lip-sync", requireAdmin, async (req, res) => {
     if (!audioBuf) { res.status(404).json({ error: "Audio vault no se pudo leer" }); return; }
 
     const out = await lipSyncVideoToAudio(videoBuf, audioBuf, {
-      replicateToken: (project as any).replicateApiKey || undefined,
+      replicateToken: getProjectReplicateToken(project),
     });
 
     const vaultId = await saveToVaultSmart({
@@ -944,7 +956,7 @@ router.post("/fs-pro/transcribe", requireAdmin, async (req, res) => {
 
     const { srt, segments, language: detected } = await transcribeAudioToSrt(audioBuf, {
       language: language || "auto",
-      replicateToken: (project as any).replicateApiKey || undefined,
+      replicateToken: getProjectReplicateToken(project),
       audioMime: row?.mimeType || "audio/mpeg",
     });
 
@@ -1010,7 +1022,7 @@ router.post("/fs-pro/burn-subs", requireAdmin, async (req, res) => {
       const audioBuf = await extractAudioMp3(videoBuf);
       const tx = await transcribeAudioToSrt(audioBuf, {
         language: language || "auto",
-        replicateToken: (project as any).replicateApiKey || undefined,
+        replicateToken: getProjectReplicateToken(project),
         audioMime: "audio/mpeg",
       });
       srtText = tx.srt;
@@ -1085,7 +1097,7 @@ router.post(
       if (!refBuf) { res.status(400).json({ error: "Video referencia requerido (file o refVideoVaultId)" }); return; }
 
       const out = await transferMotionToImage(imgBuf, refBuf, {
-        replicateToken: (project as any).replicateApiKey || undefined,
+        replicateToken: getProjectReplicateToken(project),
         imageMime: imgMime,
       });
 

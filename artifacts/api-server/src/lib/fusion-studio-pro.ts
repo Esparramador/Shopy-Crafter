@@ -493,15 +493,39 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",    description: "Wan 2.5 — open-source, el más barato del mercado",      costPerSec: 0.018, quality: 6, maxDuration: 5  },
 };
 
+// Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
+// Runway sólo expone /image_to_video en este pipeline → I2V obligatorio.
+const T2V_SUPPORTED: Record<VideoModel, boolean> = {
+  "runway-gen4-turbo": false,
+  "runway-gen3-alpha": false,
+  "veo-3-fast": true,
+  "veo-3":      true,
+  "veo-2":      true,
+  "kling-master": true,
+  "kling-2.1":   true,
+  "seedance-pro":  true,
+  "seedance-fast": true,
+  "hailuo-02":    true,
+  "wan-2.5-fast": false,
+};
+
+export function modelSupportsTextToVideo(model: VideoModel): boolean {
+  return !!T2V_SUPPORTED[model];
+}
+
 export async function generateVideoFromImage(
   model: VideoModel,
-  imageBuffer: Buffer, imageMime: string,
+  imageBuffer: Buffer | null, imageMime: string,
   prompt: string,
   opts: { duration?: number; aspect?: string; replicateToken?: string; cameraPreset?: string },
 ): Promise<Buffer> {
   const cfg = VIDEO_MODELS[model];
   if (!cfg) throw new Error(`Modelo de video desconocido: ${model}`);
   const duration = Math.min(Math.max(opts.duration || 5, 3), cfg.maxDuration);
+  // Si no hay imagen, exige que el modelo soporte text-to-video puro.
+  if (!imageBuffer && !T2V_SUPPORTED[model]) {
+    throw new Error(`Modelo "${model}" requiere imagen origen (no soporta text-to-video puro)`);
+  }
   // Apply camera preset prompt prefix if requested (Pollo-style cinematic
   // grammar). Preset is a no-op when unknown/empty.
   prompt = applyCameraPreset(prompt, opts.cameraPreset);
@@ -520,12 +544,15 @@ export async function generateVideoFromImage(
     const config: any = { aspectRatio, numberOfVideos: 1, personGeneration: "allow_all" };
     if (!isVeo3) config.durationSeconds = veoDur;
 
-    let operation: any = await ai.models.generateVideos({
+    const veoArgs: any = {
       model: veoModel,
       prompt: prompt.slice(0, 1500),
-      image: { imageBytes: imageBuffer.toString("base64"), mimeType: imageMime },
       config,
-    });
+    };
+    if (imageBuffer) {
+      veoArgs.image = { imageBytes: imageBuffer.toString("base64"), mimeType: imageMime };
+    }
+    let operation: any = await ai.models.generateVideos(veoArgs);
 
     const deadline = Date.now() + 6 * 60_000;
     while (!operation.done && Date.now() < deadline) {
@@ -545,6 +572,7 @@ export async function generateVideoFromImage(
   }
 
   if (cfg.provider === "runway") {
+    if (!imageBuffer) throw new Error("Runway requiere imagen origen (image_to_video)");
     const apiKey = getRunwayKey();
     const dataUri = bufferToDataUri(imageBuffer, imageMime);
     // Runway API ratios: gen3a accepts "1280:768" / "768:1280"; gen4 turbo
@@ -594,15 +622,32 @@ export async function generateVideoFromImage(
     throw new Error("Runway timed out");
   }
 
-  // Replicate
+  // Replicate (T2V o I2V según haya imagen)
   if (!cfg.modelId) throw new Error(`Modelo ${model} sin modelId`);
   const token = getReplicateToken(opts.replicateToken);
-  const dataUri = bufferToDataUri(imageBuffer, imageMime);
+  const dataUri = imageBuffer ? bufferToDataUri(imageBuffer, imageMime) : null;
+  const aspect = opts.aspect || "9:16";
   let input: any;
-  if (cfg.modelId.startsWith("bytedance/")) input = { prompt, image: dataUri, duration, resolution: "1080p" };
-  else if (cfg.modelId.startsWith("kwaivgi/")) input = { prompt, start_image: dataUri, duration, aspect_ratio: opts.aspect || "9:16" };
-  else if (cfg.modelId.startsWith("minimax/")) input = { prompt, first_frame_image: dataUri, duration };
-  else input = { prompt, image: dataUri, duration };
+  if (cfg.modelId.startsWith("bytedance/")) {
+    // Seedance: image opcional, T2V puro soportado
+    input = { prompt, duration, resolution: "1080p", aspect_ratio: aspect };
+    if (dataUri) input.image = dataUri;
+  } else if (cfg.modelId.startsWith("kwaivgi/")) {
+    // Kling: start_image opcional, T2V puro soportado en v2.1
+    input = { prompt, duration, aspect_ratio: aspect };
+    if (dataUri) input.start_image = dataUri;
+  } else if (cfg.modelId.startsWith("minimax/")) {
+    // Hailuo: first_frame_image opcional
+    input = { prompt, duration };
+    if (dataUri) input.first_frame_image = dataUri;
+  } else if (cfg.modelId.startsWith("wan-video/")) {
+    // Wan-2.5 i2v: requiere image
+    if (!dataUri) throw new Error(`${model} requiere imagen origen`);
+    input = { prompt, image: dataUri, duration };
+  } else {
+    input = { prompt, duration };
+    if (dataUri) input.image = dataUri;
+  }
 
   return await replicateRunBuffer(cfg.modelId, input, token);
 }

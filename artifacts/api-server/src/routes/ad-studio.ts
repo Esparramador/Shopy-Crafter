@@ -11,6 +11,7 @@ import { runAdCampaign, AD_CREDIT_COST, type AdCampaignInput } from "../lib/adst
 import { listTemplates, AD_TEMPLATES, type AdTemplateKey } from "../lib/ad-templates.js";
 import { analyzeViralVideo, briefToCampaignInput } from "../lib/viral-clone.js";
 import { fetchToBuffer } from "../lib/fusion-studio-pro.js";
+import { safeDecrypt } from "../lib/crypto.js";
 import multer from "multer";
 import fs from "node:fs/promises";
 
@@ -114,7 +115,11 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
     subsLanguage: body.subsLanguage,
   };
 
-  const replicateToken = (project as any).replicateApiKey || process.env.REPLICATE_API_TOKEN || undefined;
+  const replicateToken = (() => {
+    const enc = (project as any)?.replicateApiToken;
+    if (!enc) return process.env.REPLICATE_API_TOKEN || undefined;
+    try { return safeDecrypt(enc) || enc; } catch { return enc; }
+  })();
   if (input.videoProvider.startsWith("replicate-") && !replicateToken) {
     res.status(400).json({ error: "REPLICATE_API_TOKEN requerido para proveedor Replicate" });
     return;
@@ -342,7 +347,11 @@ router.post(
         return;
       }
 
-      const replicateToken = (project as any).replicateApiKey || process.env.REPLICATE_API_TOKEN || undefined;
+      const replicateToken = (() => {
+        const enc = (project as any)?.replicateApiToken;
+        if (!enc) return process.env.REPLICATE_API_TOKEN || undefined;
+        try { return safeDecrypt(enc) || enc; } catch { return enc; }
+      })();
 
       // STEP 1: analyze (always run, cheap-ish)
       const brief = await analyzeViralVideo(viralBuf, {
