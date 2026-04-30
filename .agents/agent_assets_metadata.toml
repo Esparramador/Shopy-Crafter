@@ -479,3 +479,9 @@ id = "QAF80ViKfjR7bqqJ22HOq"
 uri = "file://exports/hanakaze-deconstruccion-sudadera-royal.mp4"
 type = "video"
 title = "Vídeo Deconstrucción — Sudadera Royal Blue Kanji (estilo Seedance 2.0, 8s vertical 1080p)"
+
+[[outputs]]
+id = "c0xXfW2QNXOgMaq_2c2GW"
+uri = "file://exports/hanakaze-deconstruccion-extendida-24s.mp4"
+type = "video"
+title = "Vídeo Deconstrucción Extendido — Sudadera Royal Blue (front kanji + back mariposa + hero, 23s)"
