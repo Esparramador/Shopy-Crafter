@@ -985,15 +985,38 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function getExtension(mimeType: string): string {
   const map: Record<string, string> = {
-    "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png",
-    "image/gif": "gif", "application/json": "json", "text/html": "html",
-    "text/plain": "txt", "application/pdf": "pdf",
+    // imágenes
+    "image/webp": "webp", "image/jpeg": "jpg", "image/jpg": "jpg",
+    "image/png": "png", "image/gif": "gif",
+    "image/tiff": "tiff", "image/avif": "avif", "image/svg+xml": "svg",
+    // vídeo (CRÍTICO para entregables al cliente)
+    "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
+    "video/x-matroska": "mkv", "video/mpeg": "mpeg", "video/x-msvideo": "avi",
+    // audio
+    "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav",
+    "audio/wave": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
+    "audio/webm": "weba", "audio/aac": "aac", "audio/flac": "flac",
+    "audio/mp4": "m4a", "audio/x-m4a": "m4a",
+    // texto / data
+    "application/json": "json", "text/html": "html", "text/plain": "txt",
+    "text/csv": "csv", "text/markdown": "md",
+    "application/pdf": "pdf",
     "application/octet-stream": "bin",
-    "image/tiff": "tiff", "image/avif": "avif",
+    "application/zip": "zip",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-    "text/csv": "csv",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
   };
-  return map[mimeType] ?? "bin";
+  // 1) match exacto
+  if (map[mimeType]) return map[mimeType];
+  // 2) match sin parámetros (ej. "video/mp4; codecs=avc1")
+  const base = mimeType.split(";")[0].trim().toLowerCase();
+  if (map[base]) return map[base];
+  // 3) fallback inteligente por familia
+  if (base.startsWith("video/")) return base.split("/")[1] || "mp4";
+  if (base.startsWith("audio/")) return base.split("/")[1] || "mp3";
+  if (base.startsWith("image/")) return base.split("/")[1] || "png";
+  return "bin";
 }
 
 const B = {
