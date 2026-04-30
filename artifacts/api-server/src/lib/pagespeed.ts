@@ -181,14 +181,48 @@ export async function runPageSpeedAudit(
   };
 }
 
+// Wrapper que registra cada llamada a PageSpeed (free tier => costUsd = 0).
+async function trackedRunPageSpeedAudit(url: string, strategy: "mobile" | "desktop"): Promise<PageSpeedResult> {
+  const start = Date.now();
+  try {
+    const result = await runPageSpeedAudit(url, strategy);
+    try {
+      const { recordApiUsage } = await import("./api-usage.js");
+      void recordApiUsage({
+        provider: "pagespeed",
+        operation: `audit-${strategy}`,
+        inputUnits: 1,
+        unitsLabel: "calls",
+        costUsd: 0,
+        metadata: { url, durationMs: Date.now() - start },
+      });
+    } catch { /* nunca bloquea */ }
+    return result;
+  } catch (err) {
+    try {
+      const { recordApiUsage } = await import("./api-usage.js");
+      void recordApiUsage({
+        provider: "pagespeed",
+        operation: `audit-${strategy}`,
+        inputUnits: 1,
+        unitsLabel: "calls",
+        costUsd: 0,
+        success: false,
+        errorMessage: String(err).slice(0, 200),
+      });
+    } catch { /* nunca bloquea */ }
+    throw err;
+  }
+}
+
 export async function runDualPageSpeed(url: string): Promise<{
   mobile: PageSpeedResult | null;
   desktop: PageSpeedResult | null;
   summary: string;
 }> {
   const [mobileSettled, desktopSettled] = await Promise.allSettled([
-    runPageSpeedAudit(url, "mobile"),
-    runPageSpeedAudit(url, "desktop"),
+    trackedRunPageSpeedAudit(url, "mobile"),
+    trackedRunPageSpeedAudit(url, "desktop"),
   ]);
 
   const mobile = mobileSettled.status === "fulfilled" ? mobileSettled.value : null;

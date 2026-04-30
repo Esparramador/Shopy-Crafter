@@ -4,6 +4,8 @@ import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable
 import { eq, and } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { enableLongRunning } from "../lib/long-running.js";
+import { safeDecrypt } from "../lib/crypto.js";
+import { requireProjectAccess } from "../lib/access.js";
 
 const router = Router();
 
@@ -328,11 +330,11 @@ router.get("/projects/:projectId/ab-tests/:testId", async (req, res): Promise<vo
   }
 });
 
-router.post("/projects/:projectId/ab-tests/:testId/declare-winner", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/ab-tests/:testId/declare-winner", requireProjectAccess, async (req, res): Promise<void> => {
   try {
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const testId = parseInt(Array.isArray(req.params.testId) ? req.params.testId[0] : req.params.testId, 10);
-    const { winner } = req.body as { winner: string; applyToShopify: boolean };
+    const { winner, applyToShopify } = req.body as { winner: string; applyToShopify?: boolean };
   
     const [test] = await db
       .select()
@@ -349,6 +351,50 @@ router.post("/projects/:projectId/ab-tests/:testId/declare-winner", async (req, 
       .set({ winner, status: "completed", endDate: new Date() })
       .where(eq(abTestsTable.id, testId))
       .returning();
+
+    // Apply winner real a Shopify: añade la imagen ganadora al producto
+    // como imagen principal. Sólo si applyToShopify=true y hay creds.
+    let appliedToShopify: { ok: boolean; message: string; imageId?: number | null } = { ok: false, message: "Sin aplicar (applyToShopify=false)" };
+    if (applyToShopify) {
+      try {
+        const winnerUrl = winner === "B" ? test.variantBUrl : test.variantAUrl;
+        if (!winnerUrl) {
+          appliedToShopify = { ok: false, message: "La variante ganadora no tiene URL de imagen." };
+        } else {
+          const [proj] = await db
+            .select({ accessToken: projectsTable.accessToken, shopDomain: projectsTable.shopDomain })
+            .from(projectsTable)
+            .where(eq(projectsTable.id, projectId));
+          let adminToken = proj?.accessToken ? (safeDecrypt(proj.accessToken) || proj.accessToken) : (process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ?? "");
+          let shopDomain = proj?.shopDomain || (process.env.SHOP_DOMAIN ?? "");
+          if (!adminToken || !shopDomain) {
+            appliedToShopify = { ok: false, message: "Faltan credenciales Shopify del proyecto." };
+          } else if (!test.shopifyProductId) {
+            appliedToShopify = { ok: false, message: "El test no tiene producto Shopify asociado." };
+          } else {
+            const adminDomain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+            const apiBase = `https://${adminDomain}/admin/api/2024-10`;
+            const headers = { "Content-Type": "application/json", "X-Shopify-Access-Token": adminToken };
+            // Extrae numeric id del GID si llega como gid://shopify/Product/123456
+            const numericProductId = String(test.shopifyProductId).replace(/^.*\//, "");
+            const r = await fetch(`${apiBase}/products/${numericProductId}/images.json`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ image: { src: winnerUrl, alt: `A/B Winner ${winner} · ${test.imageType ?? "image"}`, position: 1 } }),
+            });
+            if (r.ok) {
+              const j: any = await r.json().catch(() => ({}));
+              appliedToShopify = { ok: true, message: `Imagen ganadora ${winner} aplicada como imagen principal en Shopify.`, imageId: j?.image?.id ?? null };
+            } else {
+              const errText = await r.text().catch(() => "");
+              appliedToShopify = { ok: false, message: `Shopify rechazó la actualización (${r.status}): ${errText.slice(0, 160)}` };
+            }
+          }
+        }
+      } catch (applyErr: any) {
+        appliedToShopify = { ok: false, message: `Error aplicando a Shopify: ${applyErr?.message ?? String(applyErr)}` };
+      }
+    }
   
     // ShopyBrain aprende del ganador del A/B test (fire-and-forget)
     const [abProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
@@ -382,6 +428,7 @@ router.post("/projects/:projectId/ab-tests/:testId/declare-winner", async (req, 
       targetMetric: updated.targetMetric,
       startDate: updated.startDate.toISOString(),
       endDate: updated.endDate?.toISOString() ?? null,
+      appliedToShopify,
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

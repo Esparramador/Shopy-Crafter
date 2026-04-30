@@ -122,6 +122,19 @@ export async function synthesizeSpeech(req: SynthesizeRequest): Promise<Synthesi
 
   logger.info({ voiceId, modelId, audioBytes: audio.length }, "ElevenLabs: audio generado");
 
+  try {
+    const { recordApiUsage, calcElevenLabsCost } = await import("./api-usage.js");
+    void recordApiUsage({
+      provider: "elevenlabs",
+      operation: "tts",
+      model: modelId,
+      inputUnits: text.length,
+      unitsLabel: "chars",
+      costUsd: calcElevenLabsCost(text.length),
+      metadata: { voiceId, audioBytes: audio.length },
+    });
+  } catch { /* nunca bloquea */ }
+
   return {
     audio,
     contentType: contentTypeForFormat(outputFormat),

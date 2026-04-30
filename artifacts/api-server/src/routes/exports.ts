@@ -16,6 +16,7 @@ import { visualDnaTable } from "@workspace/db/schema";
 import archiver from "archiver";
 import ExcelJS from "exceljs";
 import { sanitizeHtml } from "../lib/html-escape.js";
+import { buildBackCover } from "../lib/report-cover.js";
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
@@ -1255,6 +1256,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <p style="font-size:11px;color:${BRAND.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
     </td></tr>
   </table>
+  ${buildBackCover("classic")}
 </div>
 </body>
 </html>`;
@@ -1588,6 +1590,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <p style="font-size:11px;color:${ELEGANCE.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
     </td></tr>
   </table>
+  ${buildBackCover("elegance")}
 </div>
 </body>
 </html>`;
@@ -1894,6 +1897,7 @@ ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName:
       <p style="font-size:11px;color:${PRESTIGE.muted};margin:6px 0 0;">shopycrafter.com &mdash; Shopy Crafter eCommerce &middot; ${safeDate} &middot; Confidencial</p>
     </td></tr>
   </table>
+  ${buildBackCover("prestige")}
 </div>
 </body>
 </html>`;

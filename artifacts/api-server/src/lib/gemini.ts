@@ -112,6 +112,22 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
     logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
   }
 
+  try {
+    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+    const usage = (response as any).usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = Number(usage.candidatesTokenCount) || 0;
+    void recordApiUsage({
+      provider: "gemini",
+      operation: "askGemini",
+      model,
+      inputUnits: inTok,
+      outputUnits: outTok,
+      unitsLabel: "tokens",
+      costUsd: calcGeminiCost(model, inTok, outTok),
+    });
+  } catch { /* nunca bloquea */ }
+
   return response.text ?? "";
 }
 
@@ -139,6 +155,22 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
   if ((jsonCandidate as any)?.finishReason === "MAX_TOKENS") {
     logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
   }
+
+  try {
+    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+    const usage = (response as any).usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = Number(usage.candidatesTokenCount) || 0;
+    void recordApiUsage({
+      provider: "gemini",
+      operation: "askGeminiJson",
+      model,
+      inputUnits: inTok,
+      outputUnits: outTok,
+      unitsLabel: "tokens",
+      costUsd: calcGeminiCost(model, inTok, outTok),
+    });
+  } catch { /* nunca bloquea */ }
 
   const text = response.text ?? "{}";
   try {
@@ -353,6 +385,23 @@ export async function askGeminiWithSearch(
 
   const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
 
+  try {
+    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+    const usage = (response as any).usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = Number(usage.candidatesTokenCount) || 0;
+    void recordApiUsage({
+      provider: "gemini",
+      operation: "askGeminiWithSearch",
+      model: GEMINI_MODEL,
+      inputUnits: inTok,
+      outputUnits: outTok,
+      unitsLabel: "tokens",
+      costUsd: calcGeminiCost(GEMINI_MODEL, inTok, outTok),
+      metadata: { sources: sources.length, queries: (searchQueries ?? []).length },
+    });
+  } catch { /* nunca bloquea */ }
+
   return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
 }
 
@@ -393,6 +442,23 @@ export async function askGeminiWithUrls(
   const groundingMeta   = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
   const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
   const sources         = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+  try {
+    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+    const usage = (response as any).usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = Number(usage.candidatesTokenCount) || 0;
+    void recordApiUsage({
+      provider: "gemini",
+      operation: "askGeminiWithUrls",
+      model: GEMINI_MODEL,
+      inputUnits: inTok,
+      outputUnits: outTok,
+      unitsLabel: "tokens",
+      costUsd: calcGeminiCost(GEMINI_MODEL, inTok, outTok),
+      metadata: { urls: urls.length, sources: sources.length },
+    });
+  } catch { /* nunca bloquea */ }
 
   return { text: response.text ?? "", sources };
 }

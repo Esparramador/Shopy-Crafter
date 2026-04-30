@@ -320,12 +320,40 @@ export async function runImageGeneration(params: {
       }
     }
 
+    try {
+      const { recordApiUsage } = await import("../lib/api-usage.js");
+      void recordApiUsage({
+        provider: "replicate",
+        operation: `image-${imageType}`,
+        model,
+        projectId,
+        inputUnits: 1,
+        unitsLabel: "images",
+        costUsd: estimatedCost,
+        metadata: { jobId: job.id, productId: shopifyProductId, productTitle: product.title },
+      });
+    } catch { /* nunca bloquea */ }
+
     return { success: true, imageUrl };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error desconocido";
     await db.update(generationJobsTable)
       .set({ status: "failed", errorMessage: msg })
       .where(eq(generationJobsTable.id, job.id));
+    try {
+      const { recordApiUsage } = await import("../lib/api-usage.js");
+      void recordApiUsage({
+        provider: "replicate",
+        operation: `image-${imageType}`,
+        model,
+        projectId,
+        inputUnits: 1,
+        unitsLabel: "images",
+        costUsd: 0,
+        success: false,
+        errorMessage: msg,
+      });
+    } catch { /* nunca bloquea */ }
     return { success: false, error: msg };
   }
 }

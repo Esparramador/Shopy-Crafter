@@ -75,6 +75,40 @@ export default function MyPricing() {
   const [loadingShopify, setLoadingShopify] = useState(false);
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>({});
+  // FIX: nuevos estados para mostrar COSTES REALES tracked desde api_usage_log.
+  // Antes la "Estructura de costes" mostraba 0€ porque sólo había unit costs hardcodeados.
+  const [apiUsage, setApiUsage] = useState<{
+    thisMonth: { totalEur: number; totalCalls: number; byProvider: Array<{ provider: string; calls: number; costEur: number; inputUnits: number; outputUnits: number }> };
+    last30Days: { totalEur: number; totalCalls: number; byProvider: Array<{ provider: string; calls: number; costEur: number }> };
+    allTime: { totalEur: number; totalCalls: number; byProvider: Array<{ provider: string; calls: number; costEur: number }> };
+    recent?: Array<{ id: string; provider: string; operation: string; model: string | null; costEur: number; createdAt: string; success: number }>;
+  } | null>(null);
+  const [loadingApiUsage, setLoadingApiUsage] = useState(false);
+
+  const [apiUsageError, setApiUsageError] = useState<string | null>(null);
+  const loadApiUsage = async () => {
+    setLoadingApiUsage(true);
+    setApiUsageError(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/agency/api-usage-summary`, { credentials: "include" });
+      if (!r.ok) {
+        setApiUsage(null);
+        setApiUsageError(`No se pudo cargar (HTTP ${r.status}). Asegúrate de tener sesión admin activa.`);
+      } else {
+        const data = await r.json();
+        if (data && typeof data === "object" && "thisMonth" in data) {
+          setApiUsage(data);
+        } else {
+          setApiUsage(null);
+          setApiUsageError("Respuesta inesperada del servidor.");
+        }
+      }
+    } catch (err: any) {
+      setApiUsage(null);
+      setApiUsageError(`Error de red: ${err?.message ?? String(err)}`);
+    }
+    setLoadingApiUsage(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -88,6 +122,7 @@ export default function MyPricing() {
     setProjects(projectList);
     if (projectList.length > 0 && !selectedProjectId) setSelectedProjectId(projectList[0].id);
     setLoading(false);
+    void loadApiUsage();
   };
 
   useEffect(() => { load(); }, []);
@@ -137,6 +172,19 @@ export default function MyPricing() {
   };
 
   const pushToShopify = async () => {
+    // FIX: confirmación explícita antes de crear/actualizar productos en Shopify.
+    // El usuario reportó que se le crearon 11 productos sin previo aviso.
+    const totalServices = services.length;
+    const target = selectedProjectId
+      ? `la tienda del proyecto seleccionado (#${selectedProjectId})`
+      : "tu tienda principal (SHOP_DOMAIN configurado)";
+    const ok = window.confirm(
+      `⚠️  CONFIRMACIÓN REQUERIDA\n\n` +
+      `Vas a sincronizar ${totalServices} servicio(s) con ${target}.\n\n` +
+      `Esto CREARÁ o ACTUALIZARÁ productos REALES en Shopify (no es una simulación).\n\n` +
+      `¿Continuar?`
+    );
+    if (!ok) return;
     setPushing(true);
     setPushResult(null);
     try {
@@ -496,6 +544,117 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
               {savingCosts ? "Guardando..." : <><Save size={14} /> Guardar cambios</>}
             </button>
           )}
+
+          {/* ─── Costes REALES por API (tracked desde api_usage_log) ─────────── */}
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid var(--ink3)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>💸 Coste REAL acumulado por API</h3>
+                <p style={{ fontSize: 11, color: "var(--t3)", margin: "3px 0 0" }}>
+                  Cada llamada a Replicate / Claude / Gemini / Runway / ElevenLabs / PageSpeed se registra automáticamente.
+                  Estos valores reemplazan a las estimaciones manuales de arriba.
+                </p>
+              </div>
+              <button onClick={loadApiUsage} disabled={loadingApiUsage} className="btn-secondary" style={{ fontSize: 11 }}>
+                {loadingApiUsage ? "..." : "↻ Actualizar"}
+              </button>
+            </div>
+
+            {apiUsage ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 18 }}>
+                  <div style={{ padding: 14, background: "var(--ink3)", borderRadius: 10, border: "1px solid var(--ink4)" }}>
+                    <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Este mes</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--gold)" }}>{(apiUsage.thisMonth?.totalEur ?? 0).toFixed(4)} €</div>
+                    <div style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>{apiUsage.thisMonth?.totalCalls ?? 0} llamadas</div>
+                  </div>
+                  <div style={{ padding: 14, background: "var(--ink3)", borderRadius: 10, border: "1px solid var(--ink4)" }}>
+                    <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Últimos 30 días</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--t)" }}>{(apiUsage.last30Days?.totalEur ?? 0).toFixed(4)} €</div>
+                    <div style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>{apiUsage.last30Days?.totalCalls ?? 0} llamadas</div>
+                  </div>
+                  <div style={{ padding: 14, background: "var(--ink3)", borderRadius: 10, border: "1px solid var(--ink4)" }}>
+                    <div style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Histórico total</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--t)" }}>{(apiUsage.allTime?.totalEur ?? 0).toFixed(4)} €</div>
+                    <div style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>{apiUsage.allTime?.totalCalls ?? 0} llamadas</div>
+                  </div>
+                </div>
+
+                {(apiUsage.thisMonth?.byProvider?.length ?? 0) > 0 ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: "var(--ink3)" }}>
+                          <th style={{ textAlign: "left", padding: "10px 12px", color: "var(--t3)", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Proveedor</th>
+                          <th style={{ textAlign: "right", padding: "10px 12px", color: "var(--t3)", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Llamadas (mes)</th>
+                          <th style={{ textAlign: "right", padding: "10px 12px", color: "var(--t3)", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Coste mes</th>
+                          <th style={{ textAlign: "right", padding: "10px 12px", color: "var(--t3)", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Coste 30d</th>
+                          <th style={{ textAlign: "right", padding: "10px 12px", color: "var(--t3)", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Coste total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {apiUsage.thisMonth.byProvider.map(row => {
+                          const r30 = apiUsage.last30Days?.byProvider?.find(x => x.provider === row.provider);
+                          const rAll = apiUsage.allTime?.byProvider?.find(x => x.provider === row.provider);
+                          return (
+                            <tr key={row.provider} style={{ borderBottom: "1px solid var(--ink3)" }}>
+                              <td style={{ padding: "10px 12px", fontWeight: 700, textTransform: "capitalize" }}>{row.provider}</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--t2)" }}>{row.calls}</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "var(--gold)" }}>{Number(row.costEur || 0).toFixed(4)} €</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--t2)" }}>{Number(r30?.costEur || 0).toFixed(4)} €</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--t2)" }}>{Number(rAll?.costEur || 0).toFixed(4)} €</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: "var(--t3)", padding: "20px 0", textAlign: "center" }}>
+                    Aún no hay llamadas registradas este mes. Usa cualquier función IA (generar imagen, audit SEO, etc.) y el coste real aparecerá aquí.
+                  </p>
+                )}
+
+                {(apiUsage.recent?.length ?? 0) > 0 && (
+                  <details style={{ marginTop: 16 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--t3)", padding: "6px 0" }}>
+                      Ver últimas {apiUsage.recent?.length} llamadas registradas
+                    </summary>
+                    <div style={{ overflowX: "auto", marginTop: 8 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                        <thead>
+                          <tr style={{ background: "var(--ink3)" }}>
+                            <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--t3)" }}>Cuándo</th>
+                            <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--t3)" }}>Proveedor</th>
+                            <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--t3)" }}>Operación</th>
+                            <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--t3)" }}>Modelo</th>
+                            <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--t3)" }}>Coste</th>
+                            <th style={{ textAlign: "center", padding: "6px 8px", color: "var(--t3)" }}>OK</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {apiUsage.recent!.map(r => (
+                            <tr key={r.id} style={{ borderBottom: "1px solid var(--ink3)" }}>
+                              <td style={{ padding: "6px 8px", color: "var(--t3)", whiteSpace: "nowrap" }}>{new Date(r.createdAt).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</td>
+                              <td style={{ padding: "6px 8px", color: "var(--t2)", textTransform: "capitalize" }}>{r.provider}</td>
+                              <td style={{ padding: "6px 8px", color: "var(--t2)" }}>{r.operation}</td>
+                              <td style={{ padding: "6px 8px", color: "var(--t3)", fontSize: 10 }}>{r.model || "—"}</td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--gold)" }}>{Number(r.costEur || 0).toFixed(5)} €</td>
+                              <td style={{ padding: "6px 8px", textAlign: "center" }}>{r.success ? "✓" : "✗"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: 12, color: apiUsageError ? "var(--crim)" : "var(--t3)", padding: 14 }}>
+                {loadingApiUsage ? "Cargando…" : (apiUsageError ?? "Sin datos de uso aún.")}
+              </p>
+            )}
+          </div>
         </div>
       ) : tab === "budget" ? (
         <div>

@@ -78,6 +78,72 @@ function buildPrestigeCover(companyName: string): string {
   );
 }
 
+// ── Contraportada universal ─────────────────────────────────────────────────
+// Cierre de informe brandeado SC: medalla dorada + tagline + datos de contacto.
+// Se inserta al final del body antes de </body> en cada plantilla.
+function buildUniversalBackCover(
+  background: string,
+  logoB64: string,
+  accent: string,
+  textColor: string,
+): string {
+  const date = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" });
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${background};page-break-before:always;height:100vh;min-height:700px;">
+  <tr><td style="padding:60px 56px 24px;text-align:center;vertical-align:middle;">
+    <div style="max-width:520px;margin:0 auto;">
+
+      <div style="position:relative;width:140px;height:140px;margin:0 auto 32px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${accent}33 0%,transparent 70%);"></div>
+        <div style="position:absolute;inset:14px;border-radius:50%;overflow:hidden;border:2px solid ${accent}66;box-shadow:0 8px 32px rgba(0,0,0,.45),inset 0 0 16px rgba(0,0,0,.3);">
+          <img src="data:image/png;base64,${logoB64}" alt="SC" width="112" height="112" style="width:112px;height:112px;border-radius:50%;display:block;" />
+        </div>
+      </div>
+
+      <p style="font-family:'Cormorant Garamond','Georgia',serif;font-size:22px;font-style:italic;color:${textColor};margin:0 0 12px;letter-spacing:0.4px;line-height:1.4;">
+        Estrategia, datos e inteligencia artificial<br/>al servicio de tu tienda.
+      </p>
+      <div style="width:60px;height:1px;background:${accent}55;margin:18px auto 24px;"></div>
+      <p style="font-size:11px;font-weight:700;color:${accent};letter-spacing:5px;text-transform:uppercase;margin:0 0 6px;font-family:'Helvetica Neue',Arial,sans-serif;">Shopy Crafter</p>
+      <p style="font-size:12px;color:${textColor}aa;letter-spacing:0.4px;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">
+        Plataforma profesional de optimización Shopify
+      </p>
+
+    </div>
+  </td></tr>
+  <tr><td style="padding:24px 56px 56px;vertical-align:bottom;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="vertical-align:bottom;">
+          <p style="font-size:9px;color:${textColor}66;letter-spacing:2.5px;text-transform:uppercase;margin:0 0 4px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Confidencial</p>
+          <p style="font-size:11px;color:${textColor}88;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">Documento de uso interno · ${date}</p>
+        </td>
+        <td style="vertical-align:bottom;text-align:right;">
+          <p style="font-size:9px;color:${accent}aa;letter-spacing:2.5px;text-transform:uppercase;margin:0 0 4px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Contacto</p>
+          <p style="font-size:11px;color:${textColor};margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">shopycrafter.com</p>
+          <p style="font-size:10px;color:${textColor}88;margin:2px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;">© ${new Date().getFullYear()} Shopy Crafter</p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>`;
+}
+
+export function buildBackCover(template: CoverTemplate = "prestige"): string {
+  if (template === "classic") {
+    return buildUniversalBackCover("#08080e", LOGO_CORPORATE_B64, "rgba(200,168,75,.85)", "#f0f0f5");
+  }
+  if (template === "elegance") {
+    return buildUniversalBackCover("#0b1628", LOGO_CORPORATE_B64, "rgba(192,200,216,.85)", "#e8ecf2");
+  }
+  return buildUniversalBackCover(
+    "linear-gradient(180deg,#1a1410 0%,#120e0a 60%,#0d0a07 100%)",
+    LOGO_PRESTIGE_B64,
+    "rgba(196,149,106,.85)",
+    "#f0ebe4",
+  );
+}
+
 export function buildTableOfContents(body: string, template: CoverTemplate = "prestige"): string {
   // FIX: regex más permisiva (acepta div o h1-h6 con class section-title)
   const sectionRegex = /<(?:div|h[1-6])\s+[^>]*class=['"][^'"]*section-title[^'"]*['"][^>]*>([\s\S]*?)<\/(?:div|h[1-6])>/g;

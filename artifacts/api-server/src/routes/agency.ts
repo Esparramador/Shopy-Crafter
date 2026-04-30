@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db, agencyCostStructureTable, serviceCatalogTable, pricingDecisionsTable, projectsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { apiUsageLogTable } from "@workspace/db/schema";
+import { eq, desc, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { askClaudeJsonWithBrain, askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
@@ -634,6 +635,93 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
         ? `✅ ${created} productos creados en Shopify${collectionStatus === "assigned" ? " y añadidos a la colección shopify-automatization" : ""}${failed > 0 ? ` · ${failed} fallaron` : ""}`
         : "No se pudo crear ningún producto",
       storeUrl: `https://${adminDomain}/collections/shopify-automatization`,
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── API Usage Summary — costes reales por proveedor ────────────────────────
+// Devuelve totales de api_usage_log agrupados por proveedor: mes actual,
+// últimos 30 días y total histórico. Evita el problema de "estructura de
+// costes muestra 0€" mostrando lo que realmente se ha gastado.
+router.get("/agency/api-usage-summary", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const projectIdRaw = req.query.projectId;
+    let projectId: number | null = null;
+    if (projectIdRaw !== undefined && projectIdRaw !== null && projectIdRaw !== "") {
+      const parsed = parseInt(String(projectIdRaw), 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        res.status(400).json({ error: "projectId inválido" });
+        return;
+      }
+      projectId = parsed;
+    }
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const thirty = new Date();
+    thirty.setDate(thirty.getDate() - 30);
+
+    const baseFilter = projectId
+      ? sql`${apiUsageLogTable.projectId} = ${projectId}`
+      : sql`1=1`;
+
+    const aggregateBy = async (since: Date | null) => {
+      const whereSince = since
+        ? sql`${apiUsageLogTable.createdAt} >= ${since.toISOString()} AND ${baseFilter}`
+        : baseFilter;
+      const rows = await db
+        .select({
+          provider: apiUsageLogTable.provider,
+          calls: sql<number>`count(*)::int`,
+          costEur: sql<number>`coalesce(sum(${apiUsageLogTable.costEur}), 0)::float`,
+          inputUnits: sql<number>`coalesce(sum(${apiUsageLogTable.inputUnits}), 0)::float`,
+          outputUnits: sql<number>`coalesce(sum(${apiUsageLogTable.outputUnits}), 0)::float`,
+        })
+        .from(apiUsageLogTable)
+        .where(whereSince)
+        .groupBy(apiUsageLogTable.provider);
+      return rows;
+    };
+
+    const [thisMonth, last30, allTime] = await Promise.all([
+      aggregateBy(monthStart),
+      aggregateBy(thirty),
+      aggregateBy(null),
+    ]);
+
+    const sumEur = (rows: any[]) => rows.reduce((s, r) => s + Number(r.costEur || 0), 0);
+    const sumCalls = (rows: any[]) => rows.reduce((s, r) => s + Number(r.calls || 0), 0);
+
+    const recent = await db
+      .select()
+      .from(apiUsageLogTable)
+      .where(baseFilter)
+      .orderBy(desc(apiUsageLogTable.createdAt))
+      .limit(20);
+
+    res.json({
+      thisMonth: {
+        totalEur: parseFloat(sumEur(thisMonth).toFixed(4)),
+        totalCalls: sumCalls(thisMonth),
+        byProvider: thisMonth,
+      },
+      last30Days: {
+        totalEur: parseFloat(sumEur(last30).toFixed(4)),
+        totalCalls: sumCalls(last30),
+        byProvider: last30,
+      },
+      allTime: {
+        totalEur: parseFloat(sumEur(allTime).toFixed(4)),
+        totalCalls: sumCalls(allTime),
+        byProvider: allTime,
+      },
+      recent,
+      projectId,
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

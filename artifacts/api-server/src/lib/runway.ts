@@ -172,6 +172,17 @@ export async function generateVideoFromImage(
       }
       const cost = duration * (COST_PER_SECOND[model] ?? 0.05);
       logger.info({ taskId, videoUrl: videoUrl.slice(0, 80), cost }, "Runway: video listo");
+      try {
+        const { recordApiUsage } = await import("./api-usage.js");
+        void recordApiUsage({
+          provider: "runway",
+          operation: "generateVideo",
+          model,
+          inputUnits: duration,
+          unitsLabel: "seconds",
+          costUsd: cost,
+        });
+      } catch { /* nunca bloquea */ }
       return { taskId, videoUrl, durationSec: duration, model, cost };
     }
 

@@ -178,6 +178,24 @@ export async function askClaude(
       logger.warn({ maxTokens, model: CLAUDE_MODEL, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
     }
 
+    // Track real cost (fire-and-forget, never blocks response)
+    try {
+      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
+      const inTok = response.usage?.input_tokens ?? 0;
+      const outTok = response.usage?.output_tokens ?? 0;
+      const costUsd = calcClaudeCost(CLAUDE_MODEL, inTok, outTok);
+      void recordApiUsage({
+        provider: "claude",
+        operation: "askClaude",
+        model: CLAUDE_MODEL,
+        projectId: projectId || null,
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd,
+      });
+    } catch { /* nunca bloquea */ }
+
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
     return content.text;
