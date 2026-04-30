@@ -22,7 +22,7 @@ import { randomUUID } from "crypto";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
-import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "../lib/report-logos.js";
+// LOGO_CORPORATE_B64 / LOGO_PRESTIGE_B64 ahora solo se usan dentro de buildCoverPage en lib/report-cover.ts
 import { buildCoverPage, buildTableOfContents } from "../lib/report-cover.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
@@ -1216,35 +1216,6 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 <body>
 ${buildCoverPage({ reportTitle: safeTitle, reportSubtitle: safeSub, companyName: coverCompany, date: safeDate, template: "classic" })}
 <div class="page">
-  <div class="cover">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
-      <tr>
-        <td style="vertical-align:middle;">
-          <table cellpadding="0" cellspacing="0" border="0"><tr>
-            <td style="vertical-align:middle;padding-right:12px;"><div class="cover-logo-icon"><img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="44" height="44" style="width:44px;height:44px;border-radius:10px;" /></div></td>
-            <td style="vertical-align:middle;"><span class="cover-logo-text">Shopy Crafter</span></td>
-          </tr></table>
-        </td>
-        <td style="vertical-align:top;text-align:right;">
-          <div class="cover-badge">
-            <div class="cover-badge-label">Fecha del informe</div>
-            <div class="cover-badge-value">${safeDate}</div>
-          </div>
-        </td>
-      </tr>
-    </table>
-    <div class="cover-title">
-      <h1>${safeTitle}</h1>
-      <p class="subtitle">${safeSub}</p>
-    </div>
-    <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
-      <tr>
-        <td style="padding-right:24px;font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Generado por IA</td>
-        <td style="padding-right:24px;font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Datos reales</td>
-        <td style="font-size:12px;color:${BRAND.muted};vertical-align:middle;"><span class="cover-meta-dot" style="margin-right:6px;"></span>Confidencial</td>
-      </tr>
-    </table>
-  </div>
   ${buildTableOfContents(body, "classic")}
   <div class="body-content">
     ${body}
@@ -1949,12 +1920,14 @@ function buildCustomReportShell(tpl: CustomReportTemplate) {
      System fonts garantizan render < 2s en PDF y ZIP. */
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: '${bf}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: ${bg}; color: ${tc}; }
-  .cover { background: ${sc}; padding: 80px 48px; text-align: ${cs === "left-aligned" ? "left" : "center"}; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
-  .cover-logo { max-width: 120px; max-height: 120px; border-radius: 16px; margin-bottom: 24px; ${cs === "centered" ? "margin-left:auto;margin-right:auto;" : ""} }
-  .cover-title { font-family: '${hf}', serif; font-size: 32px; font-weight: ${hw}; color: ${pc}; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; }
-  .cover-subtitle { font-size: 16px; color: ${tc}80; margin-bottom: 24px; }
-  .cover-company { font-size: 14px; color: ${pc}60; letter-spacing: 2px; text-transform: uppercase; }
-  .cover-date { font-size: 12px; color: ${tc}40; margin-top: 16px; }
+  /* Cover variants: centered (logo grande arriba, todo centrado), left-aligned (texto izquierda, logo arriba), minimal (sin logo grande, líneas finas tipográficas) */
+  .cover { background: ${sc}; padding: ${cs === "minimal" ? "100px 60px" : "80px 48px"}; text-align: ${cs === "left-aligned" ? "left" : "center"}; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; ${cs === "minimal" ? `border-left: 4px solid ${pc};` : ""} }
+  .cover-logo { ${cs === "minimal" ? "max-width: 56px; max-height: 56px; opacity: 0.85;" : "max-width: 120px; max-height: 120px;"} border-radius: ${cs === "minimal" ? "8px" : "16px"}; margin-bottom: ${cs === "minimal" ? "40px" : "24px"}; ${cs === "centered" ? "margin-left:auto;margin-right:auto;" : ""} }
+  .cover-rule { display: ${cs === "minimal" ? "block" : "none"}; width: 48px; height: 2px; background: ${pc}; margin: ${cs === "centered" || cs === "minimal" ? "0 auto 24px" : "0 0 24px 0"}; border-radius: 1px; }
+  .cover-title { font-family: '${hf}', serif; font-size: ${cs === "minimal" ? "44px" : "32px"}; font-weight: ${hw}; color: ${pc}; letter-spacing: ${cs === "minimal" ? "-0.5px" : "3px"}; text-transform: ${cs === "minimal" ? "none" : "uppercase"}; margin-bottom: 12px; line-height: 1.15; }
+  .cover-subtitle { font-size: 16px; color: ${tc}80; margin-bottom: 24px; line-height: 1.5; }
+  .cover-company { font-size: 14px; color: ${pc}; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; ${cs === "minimal" ? `padding-top: 12px; border-top: 1px solid ${bc};` : ""} }
+  .cover-date { font-size: 12px; color: ${tc}50; margin-top: ${cs === "minimal" ? "32px" : "16px"}; letter-spacing: ${cs === "minimal" ? "1.5px" : "0"}; text-transform: ${cs === "minimal" ? "uppercase" : "none"}; }
   .report-body { padding: 48px; max-width: 900px; margin: 0 auto; }
   .section { margin-bottom: 32px; }
   .section-title { font-family: '${hf}', serif; font-size: 20px; font-weight: ${hw}; color: ${pc}; margin-bottom: 16px; ${ss === "accent-bar" ? `border-left: 4px solid ${pc}; padding-left: 16px;` : ""} }
@@ -1980,10 +1953,11 @@ function buildCustomReportShell(tpl: CustomReportTemplate) {
 <body>
   <div class="cover">
     ${tpl.logoBase64 && String(tpl.logoBase64).startsWith("data:image/") ? `<img class="cover-logo" src="${tpl.logoBase64}" alt="Logo" />` : ""}
+    <div class="cover-rule"></div>
     <div class="cover-title">${title}</div>
     <div class="cover-subtitle">${subtitle}</div>
     ${targetCompany ? `<div class="cover-company">${targetCompany}</div>` : ""}
-    ${tpl.tagline ? `<div style="font-size:13px;color:${tc}50;margin-top:8px;">${esc(tpl.tagline)}</div>` : ""}
+    ${tpl.tagline ? `<div style="font-size:13px;color:${tc}60;margin-top:10px;font-style:italic;">${esc(tpl.tagline)}</div>` : ""}
     <div class="cover-date">${date}</div>
   </div>
   <div class="report-body">
