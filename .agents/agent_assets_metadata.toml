@@ -132,6 +132,30 @@ uri = "file://attached_assets/generated_images/comic_crafter_ad_feed_1x1.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "fep6cW0dDEUBFrbRDi0GE"
+uri = "file://exports/hanakaze-perchero-1-catalogo-rooftop.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "GHhUABo31A2ZVs2Hi3RnD"
+uri = "file://exports/hanakaze-perchero-2-detalle-azules.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "GnMUaAhpAW-NG4_UHpr4B"
+uri = "file://exports/hanakaze-perchero-3-coleccion-rooftop.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "9m1WHcPFUp4glwytV7smP"
+uri = "file://exports/hanakaze-perchero-4-lookbook-frontal.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "9EyhiMCidMT9gdjJwunVq"
 uri = "file://all-css-for-claude.txt"
@@ -377,3 +401,27 @@ id = "S-A3kJGtzefqQ_POIdBR4"
 uri = "file://exports/hanakaze-super-anuncio-v2.mp4"
 type = "video"
 title = "Hanakaze Serigraphy — Super Anuncio v2 (71s, fiel a la colección real)"
+
+[[outputs]]
+id = "3fnDJtTCyPeArb2kbpFGF"
+uri = "file://exports/hanakaze-perchero-1-catalogo-rooftop.png"
+type = "image"
+title = "Hanakaze Perchero 1 — Catálogo rooftop completo"
+
+[[outputs]]
+id = "drZjiF6lJCsl6dWiVE6qL"
+uri = "file://exports/hanakaze-perchero-3-coleccion-rooftop.png"
+type = "image"
+title = "Hanakaze Perchero 3 — Colección rooftop al sol"
+
+[[outputs]]
+id = "NoqCzrvyV6a8IJM-fpDA4"
+uri = "file://exports/hanakaze-perchero-4-lookbook-frontal.png"
+type = "image"
+title = "Hanakaze Perchero 4 — Lookbook frontal minimalista"
+
+[[outputs]]
+id = "50mjBpTxNHq29RM1dT5T5"
+uri = "file://exports/hanakaze-perchero-2-detalle-azules.png"
+type = "image"
+title = "Hanakaze Perchero 2 — Detalle dúo azules"
