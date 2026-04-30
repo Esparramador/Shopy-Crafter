@@ -1167,21 +1167,57 @@ function DownloadsTab({ projectId, sessionItems, onError }: { projectId: number;
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-        {sessionItems.map((it, i) => (
-          <label key={i} style={{ position: "relative", borderRadius: 10, overflow: "hidden", background: "var(--ink2)", border: `1px solid ${selected.has(it.vaultId) ? "var(--gold)" : "var(--bdr)"}`, aspectRatio: "1 / 1", cursor: "pointer" }}>
-            <input type="checkbox" checked={selected.has(it.vaultId)} onChange={() => toggle(it.vaultId)} style={{ position: "absolute", top: 8, left: 8, zIndex: 2 }} />
-            {it.mimeType?.startsWith("image") && it.dataUrl ? (
-              <img src={it.dataUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={it.label} />
-            ) : it.mimeType?.startsWith("video") ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", background: "linear-gradient(135deg, #2a1f3d, #14141d)" }}><Video size={36} style={{ color: "var(--gold)" }} /></div>
-            ) : it.mimeType?.startsWith("audio") ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", background: "linear-gradient(135deg, #1f2a3d, #14141d)" }}><Volume2 size={36} style={{ color: "#a5b4fc" }} /></div>
-            ) : null}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "6px 8px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 10 }}>
-              {it.label}
+        {sessionItems.map((it, i) => {
+          // El backend sirve el binario en este endpoint con cookie de sesión.
+          const previewSrc = `${API_BASE}/api/projects/${projectId}/vault/${it.vaultId}/preview`;
+          const downloadSrc = `${API_BASE}/api/projects/${projectId}/vault/${it.vaultId}/download`;
+          const isVideo = it.mimeType?.startsWith("video");
+          const isAudio = it.mimeType?.startsWith("audio");
+          const isImage = it.mimeType?.startsWith("image");
+          return (
+            <div key={i} style={{ position: "relative", borderRadius: 10, overflow: "hidden", background: "var(--ink2)", border: `1px solid ${selected.has(it.vaultId) ? "var(--gold)" : "var(--bdr)"}`, aspectRatio: "1 / 1" }}>
+              <input
+                type="checkbox"
+                checked={selected.has(it.vaultId)}
+                onChange={() => toggle(it.vaultId)}
+                style={{ position: "absolute", top: 8, left: 8, zIndex: 3, accentColor: "var(--gold)", width: 18, height: 18 }}
+                title="Seleccionar para descarga ZIP"
+              />
+              <a
+                href={previewSrc}
+                target="_blank"
+                rel="noreferrer"
+                title={`#${it.vaultId} · abrir a tamaño real`}
+                style={{ position: "absolute", top: 6, right: 6, zIndex: 3, padding: "2px 6px", borderRadius: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 9, fontWeight: 700, textDecoration: "none" }}>
+                #{it.vaultId} ↗
+              </a>
+              {isImage ? (
+                <img src={it.dataUrl || previewSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt={it.label} />
+              ) : isVideo ? (
+                <video
+                  src={previewSrc}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "cover", background: "#0b0b14" }}
+                  onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = "none"; }}
+                />
+              ) : isAudio ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", background: "linear-gradient(135deg, #1f2a3d, #14141d)", padding: 12 }}>
+                  <Volume2 size={28} style={{ color: "#a5b4fc", marginBottom: 8 }} />
+                  <audio src={previewSrc} controls style={{ width: "100%", maxWidth: 160 }} />
+                </div>
+              ) : (
+                <a href={downloadSrc} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", color: "var(--t2)", fontSize: 11, textDecoration: "underline" }}>
+                  Descargar
+                </a>
+              )}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "6px 8px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 10, pointerEvents: "none" }}>
+                {it.label}
+              </div>
             </div>
-          </label>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

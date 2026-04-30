@@ -69,10 +69,19 @@ async function saveToVaultSmart(params: {
   generatedBy: string;
   buffer: Buffer;
 }): Promise<number> {
-  const RAW_THRESHOLD = 2 * 1024 * 1024; // 2MB raw
+  const RAW_THRESHOLD = 2 * 1024 * 1024; // 2MB raw → preferimos Object Storage
+  // saveToVault corta a metadata-only si content > 50MB (vídeo) o > 10MB (resto).
+  // Si Object Storage cae y caemos a base64, estos tamaños provocarían pérdida
+  // SILENCIOSA del binario. Calculamos el tope real para fallback seguro.
+  const isVideo = params.mimeType.startsWith("video/");
+  const FALLBACK_MAX = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+
+  if (params.buffer.length === 0) {
+    throw new Error(`saveToVaultSmart: buffer vacío (${params.fileType})`);
+  }
 
   if (params.buffer.length > RAW_THRESHOLD) {
-    // Upload to Object Storage
+    // Subida a Object Storage (preferida para todo lo que pese >2MB).
     const safeTitle = params.title.replace(/[^a-z0-9-_]/gi, "_").slice(0, 50);
     const ext = params.mimeType.split("/")[1] || "bin";
     const objectPath = `projects/${params.projectId}/${params.fileType}/${safeTitle}_${Date.now()}.${ext}`;
@@ -90,10 +99,18 @@ async function saveToVaultSmart(params: {
         fileSizeBytes: params.buffer.length,
       });
       if (vaultId === null) throw new Error("saveToVault returned null after objectStorage upload");
+      logger.info({ vaultId, fileType: params.fileType, sizeMB: (params.buffer.length / 1024 / 1024).toFixed(2), storage: "objectStorage" }, "fs-pro: asset guardado");
       return vaultId;
     } catch (err) {
-      logger.warn({ err, fileType: params.fileType }, "fs-pro: object storage upload failed, falling back to base64 content");
-      // Fall through to content base64
+      // Si el archivo es demasiado grande para caber en `content` después del
+      // fallo de Object Storage, fallamos rápido en vez de devolver un vaultId
+      // que el endpoint de preview no podrá servir (vault.ts truncaría a meta).
+      if (params.buffer.length > FALLBACK_MAX) {
+        logger.error({ err, fileType: params.fileType, sizeMB: (params.buffer.length / 1024 / 1024).toFixed(2) }, "fs-pro: Object Storage falló y el archivo es demasiado grande para fallback base64");
+        throw new Error(`No se pudo guardar el archivo (${(params.buffer.length / 1024 / 1024).toFixed(1)}MB): Object Storage no disponible y excede el límite de DB`);
+      }
+      logger.warn({ err, fileType: params.fileType, sizeMB: (params.buffer.length / 1024 / 1024).toFixed(2) }, "fs-pro: Object Storage upload failed, fallback a base64 en DB");
+      // Fall through to content base64 (sólo si cabe en el límite real)
     }
   }
   const vaultId = await saveToVault({
@@ -107,6 +124,7 @@ async function saveToVaultSmart(params: {
     fileSizeBytes: params.buffer.length,
   });
   if (vaultId === null) throw new Error("saveToVault returned null (DB insert failed)");
+  logger.info({ vaultId, fileType: params.fileType, sizeMB: (params.buffer.length / 1024 / 1024).toFixed(2), storage: "db-base64" }, "fs-pro: asset guardado");
   return vaultId;
 }
 
