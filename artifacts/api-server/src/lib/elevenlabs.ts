@@ -41,7 +41,68 @@ export interface SynthesizeResult {
   characters: number;
 }
 
-const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+// Voz por defecto. Se sobreescribe con `ELEVENLABS_DEFAULT_VOICE_ID` si está
+// definido en el entorno. Si no, usamos "Charlie" (IKne3meq5aSn9XLyUdCD), una
+// voz multilingüe pública de ElevenLabs que suena natural en español
+// castellano (mucho mejor que la antigua Rachel "21m00Tcm4TlvDq8ikWAM" inglesa).
+// La detección dinámica intenta encontrar una voz con label "spanish"/"es"
+// en el workspace del usuario y la cachea como fallback automático.
+const FALLBACK_VOICE_ID = "IKne3meq5aSn9XLyUdCD";
+const DEFAULT_VOICE_ID = (process.env.ELEVENLABS_DEFAULT_VOICE_ID || "").trim() || FALLBACK_VOICE_ID;
+
+// Caché de la voz "auto" detectada por workspace. Cacheamos:
+//  - el resultado (1h) para no consultar en cada TTS,
+//  - la PROMESA en curso para que peticiones concurrentes iniciales no
+//    disparen N llamadas a /voices a la vez (thundering herd).
+// Si la auto-detección tarda > AUTO_VOICE_RESOLVE_TIMEOUT_MS, devolvemos el
+// fallback estático y dejamos que la búsqueda termine en background y
+// rellene la caché para próximas peticiones — NUNCA bloqueamos al usuario
+// más de unos pocos segundos esperando ElevenLabs /voices.
+let _autoVoiceCache: { voiceId: string; cachedAt: number } | null = null;
+let _autoVoiceInflight: Promise<string> | null = null;
+const AUTO_VOICE_TTL_MS = 60 * 60 * 1000;
+const AUTO_VOICE_RESOLVE_TIMEOUT_MS = 2_500;
+
+async function detectSpanishVoice(): Promise<string> {
+  try {
+    const voices = await listVoices();
+    const spanishVoice =
+      voices.find(v => Object.values(v.labels || {}).some(l => /spanish|español|castellano|\bes\b/i.test(String(l)))) ||
+      voices.find(v => /spanish|español|castellano/i.test(v.name)) ||
+      voices.find(v => Object.values(v.labels || {}).some(l => /multilingual|multilingüe|multilingue/i.test(String(l))));
+    const chosen = spanishVoice?.voice_id ?? DEFAULT_VOICE_ID;
+    _autoVoiceCache = { voiceId: chosen, cachedAt: Date.now() };
+    if (spanishVoice?.voice_id) {
+      logger.info({ voiceId: spanishVoice.voice_id, name: spanishVoice.name }, "ElevenLabs: voz por defecto auto-detectada");
+    }
+    return chosen;
+  } catch (e) {
+    logger.warn({ err: (e as Error).message }, "ElevenLabs: no se pudo auto-detectar voz por defecto, usando fallback");
+    _autoVoiceCache = { voiceId: DEFAULT_VOICE_ID, cachedAt: Date.now() };
+    return DEFAULT_VOICE_ID;
+  } finally {
+    _autoVoiceInflight = null;
+  }
+}
+
+async function resolveDefaultVoiceId(): Promise<string> {
+  // 1. Override explícito por env → siempre gana, sin red.
+  if (process.env.ELEVENLABS_DEFAULT_VOICE_ID && process.env.ELEVENLABS_DEFAULT_VOICE_ID.trim()) {
+    return process.env.ELEVENLABS_DEFAULT_VOICE_ID.trim();
+  }
+  // 2. Caché vigente.
+  if (_autoVoiceCache && Date.now() - _autoVoiceCache.cachedAt < AUTO_VOICE_TTL_MS) {
+    return _autoVoiceCache.voiceId;
+  }
+  // 3. Reutilizar promesa si ya hay una búsqueda en vuelo (evita thundering herd).
+  const inflight = _autoVoiceInflight ?? (_autoVoiceInflight = detectSpanishVoice());
+  // 4. No esperar más de AUTO_VOICE_RESOLVE_TIMEOUT_MS — si tarda, devolvemos
+  //    el fallback estático y la búsqueda sigue en background poblando caché.
+  return await Promise.race([
+    inflight,
+    new Promise<string>(resolve => setTimeout(() => resolve(DEFAULT_VOICE_ID), AUTO_VOICE_RESOLVE_TIMEOUT_MS)),
+  ]);
+}
 
 function getApiKey(): string {
   const key = process.env.ELEVENLABS_API_KEY;
@@ -77,15 +138,19 @@ export async function synthesizeSpeech(req: SynthesizeRequest): Promise<Synthesi
     throw new Error(`text excede ${MAX_TEXT_LENGTH} caracteres`);
   }
 
-  const voiceId = (req.voiceId ?? DEFAULT_VOICE_ID).trim();
+  const voiceId = ((req.voiceId ?? "").trim() || (await resolveDefaultVoiceId())).trim();
   validateVoiceId(voiceId);
   const modelId: ElevenModel = req.modelId ?? "eleven_multilingual_v2";
   const outputFormat: ElevenOutputFormat = req.outputFormat ?? "mp3_44100_128";
 
+  // Defaults ajustados para sonar natural en español:
+  // - stability 0.40 → variación humana sin descontrolarse
+  // - similarity_boost 0.85 → cercano al timbre de la voz original
+  // - style 0.40 → expresividad real (antes 0.0 = monótono robótico)
   const voice_settings = {
-    stability: clamp01(req.voiceSettings?.stability, 0.45),
-    similarity_boost: clamp01(req.voiceSettings?.similarity_boost, 0.75),
-    style: clamp01(req.voiceSettings?.style, 0.0),
+    stability: clamp01(req.voiceSettings?.stability, 0.40),
+    similarity_boost: clamp01(req.voiceSettings?.similarity_boost, 0.85),
+    style: clamp01(req.voiceSettings?.style, 0.40),
     use_speaker_boost: req.voiceSettings?.use_speaker_boost ?? true,
   };
 

@@ -157,7 +157,11 @@ function WebLabInner({ projectId }: { projectId: number }) {
       }
 
       setResult(data);
-      setTab("summary");
+      // BUG FIX: tras generar, abrir directamente el tab "preview" para que
+      // el usuario vea el iframe + textarea de iteración SIN tener que pulsar
+      // ningún tab manualmente. Antes saltaba a "summary" y muchos usuarios
+      // no encontraban el preview ni el flujo de cambios.
+      setTab("preview");
       setPhase(4);
       loadHistory();
     } catch (err: any) {
