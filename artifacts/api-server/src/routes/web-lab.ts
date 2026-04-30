@@ -376,11 +376,19 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
     }
 
     // ── T004: Auditoría de calidad / uniqueness ──
-    // No bloqueamos al usuario (la respuesta sigue siendo entregable) pero
-    // logueamos cualquier señal de placeholder/genérico para auditar.
+    // Severos (CSS < 200 líneas, placeholder/lorem detectados) → rechazamos.
+    // Resto → loguear y seguir.
     const audit = auditWebLabAnalysis(analysis, searchName);
     if (audit.warnings.length > 0) {
-      logger.warn({ url, brand: searchName, warnings: audit.warnings, cssLines: audit.cssLines }, "⚠ Web Lab — análisis con avisos de calidad");
+      logger.warn({ url, brand: searchName, warnings: audit.warnings, severe: audit.severeWarnings, cssLines: audit.cssLines }, "⚠ Web Lab — análisis con avisos de calidad");
+    }
+    if (audit.severeWarnings.length > 0) {
+      logger.error({ url, brand: searchName, severe: audit.severeWarnings, cssLines: audit.cssLines }, "✗ Web Lab — análisis rechazado por calidad insuficiente");
+      res.end(JSON.stringify({
+        error: "El diseño generado no cumple los mínimos de calidad. Por favor reintenta o concreta más la marca/URL.",
+        details: audit.severeWarnings,
+      }));
+      return;
     }
     if (pid > 0) {
       learnFromOperation({
@@ -771,13 +779,15 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
 // Detecta señales de respuesta genérica o con placeholders.
 // No bloquea al usuario; sólo emite avisos para auditar.
 // ─────────────────────────────────────────────────────────────
-function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warnings: string[]; cssLines: number } {
+function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warnings: string[]; severeWarnings: string[]; cssLines: number } {
   const warnings: string[] = [];
+  const severeWarnings: string[] = [];
   const css = (analysis.improvedCss || "").toString();
   const cssLines = css.split("\n").length;
 
+  // ── SEVERO: CSS demasiado corto (no entrega valor real al cliente) ──
   if (cssLines < 200) {
-    warnings.push(`CSS demasiado corto (${cssLines} líneas; mínimo 200)`);
+    severeWarnings.push(`CSS demasiado corto (${cssLines} líneas; mínimo 200)`);
   }
 
   const FORBIDDEN_TOKENS = [
@@ -789,18 +799,19 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
   ];
   const cssLower = css.toLowerCase();
   const fragmentsBlob = (analysis.improvedHtmlFragments || []).map(f => `${f.improved}`).join("\n").toLowerCase();
+  // ── SEVERO: cualquier token de placeholder rompe la entrega ──
   for (const tok of FORBIDDEN_TOKENS) {
-    if (cssLower.includes(tok)) warnings.push(`CSS contiene token prohibido: "${tok}"`);
-    if (fragmentsBlob.includes(tok)) warnings.push(`HTML contiene token prohibido: "${tok}"`);
+    if (cssLower.includes(tok)) severeWarnings.push(`CSS contiene token prohibido: "${tok}"`);
+    if (fragmentsBlob.includes(tok)) severeWarnings.push(`HTML contiene token prohibido: "${tok}"`);
   }
 
-  // Selectores genéricos que delatan respuesta plantilla
+  // INFO: Selectores genéricos que delatan respuesta plantilla — loguear, no rechazar
   const GENERIC_SELECTORS = [/\.class1\b/, /\.div1\b/, /\.section1\b/, /\.untitled\b/, /\.foo\b/, /\.bar\b/];
   for (const re of GENERIC_SELECTORS) {
     if (re.test(css)) warnings.push(`CSS usa selector genérico: ${re.source}`);
   }
 
-  // Fragmentos donde improved === original = respuesta vacía
+  // INFO: Fragmentos donde improved === original — el modelo no mejoró
   const lazyFragments = (analysis.improvedHtmlFragments || []).filter(f =>
     f.improved && f.original && f.improved.trim() === f.original.trim()
   );
@@ -808,7 +819,7 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
     warnings.push(`${lazyFragments.length} fragmento(s) HTML idénticos al original`);
   }
 
-  // Ausencia total de variables CSS de marca
+  // INFO: Ausencia total de variables CSS de marca
   if (!/--brand-/i.test(css) && !/--color-/i.test(css)) {
     warnings.push("CSS no define variables de marca (--brand-* / --color-*)");
   }
@@ -822,7 +833,8 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
     }
   }
 
-  return { warnings, cssLines };
+  // Los warnings retornados incluyen también los severos (compatibilidad con código previo)
+  return { warnings: [...severeWarnings, ...warnings], severeWarnings, cssLines };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -933,13 +945,21 @@ Devuelve la nueva versión completa con el cambio aplicado en JSON válido segú
       result.improvedHtmlFragments = previousFragments || [];
     }
 
-    // Audit calidad de la iteración
+    // Audit calidad de la iteración (mismo criterio severo que en /analyze)
     const audit = auditWebLabAnalysis(
       { ...({} as WebLabAnalysis), improvedCss: result.improvedCss, improvedHtmlFragments: result.improvedHtmlFragments } as WebLabAnalysis,
       brand,
     );
     if (audit.warnings.length > 0) {
-      logger.warn({ url, brand, warnings: audit.warnings, cssLines: audit.cssLines }, "⚠ Web Lab iterate — avisos de calidad");
+      logger.warn({ url, brand, warnings: audit.warnings, severe: audit.severeWarnings, cssLines: audit.cssLines }, "⚠ Web Lab iterate — avisos de calidad");
+    }
+    if (audit.severeWarnings.length > 0) {
+      logger.error({ url, brand, severe: audit.severeWarnings, cssLines: audit.cssLines }, "✗ Web Lab iterate — iteración rechazada por calidad insuficiente");
+      res.end(JSON.stringify({
+        error: "La iteración no cumple los mínimos de calidad. Concreta más el cambio o vuelve a intentarlo.",
+        details: audit.severeWarnings,
+      }));
+      return;
     }
 
     // Guarda nueva versión en el vault si hay proyecto

@@ -58,7 +58,13 @@ router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/client", clientRouter);
 router.use("/cms", (req, res, next) => {
+  // Endpoints públicos del CMS (no requieren admin):
+  //   GET /content                → contenido global del sitio
+  //   GET /pages                  → listado de páginas publicadas (para nav)
+  //   GET /pages/:slug            → renderiza una página publicada
   if (req.method === "GET" && req.path === "/content") return next();
+  if (req.method === "GET" && req.path === "/pages") return next();
+  if (req.method === "GET" && /^\/pages\/[a-z0-9-]+$/i.test(req.path)) return next();
   return requireAdmin(req, res, next);
 }, cmsRouter);
 router.use(storeRouter);

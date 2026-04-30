@@ -30,6 +30,8 @@ import type {
   BulkJobResponse,
   BulkRedesignInput,
   CatalogOpportunity,
+  CmsPage,
+  CmsPageInput,
   CogsData,
   CompetitorAnalysisInput,
   CompetitorAnalysisResult,
@@ -49,6 +51,7 @@ import type {
   KeywordInput,
   KeywordStrategy,
   ListAbTestsParams,
+  ListCmsPagesResult,
   ListImageEnginesResult,
   PageSpeedInput,
   PageSpeedResult,
@@ -63,6 +66,7 @@ import type {
   SaveCogsInput,
   SeoActionInput,
   SeoAuditResult,
+  SimpleSuccess,
   SitemapResult,
   SuccessResponse,
   SyncResult,
@@ -1572,6 +1576,425 @@ export const useBulkRedesign = <
   TContext
 > => {
   return useMutation(getBulkRedesignMutationOptions(options));
+};
+
+/**
+ * @summary Lista páginas (publicadas para público; todas para admin)
+ */
+export const getListCmsPagesUrl = () => {
+  return `/api/cms/pages`;
+};
+
+export const listCmsPages = async (
+  options?: RequestInit,
+): Promise<ListCmsPagesResult> => {
+  return customFetch<ListCmsPagesResult>(getListCmsPagesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCmsPagesQueryKey = () => {
+  return [`/api/cms/pages`] as const;
+};
+
+export const getListCmsPagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCmsPages>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCmsPages>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCmsPagesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCmsPages>>> = ({
+    signal,
+  }) => listCmsPages({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCmsPages>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCmsPagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCmsPages>>
+>;
+export type ListCmsPagesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Lista páginas (publicadas para público; todas para admin)
+ */
+
+export function useListCmsPages<
+  TData = Awaited<ReturnType<typeof listCmsPages>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCmsPages>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCmsPagesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Crea una nueva página externa (admin)
+ */
+export const getCreateCmsPageUrl = () => {
+  return `/api/cms/pages`;
+};
+
+export const createCmsPage = async (
+  cmsPageInput: CmsPageInput,
+  options?: RequestInit,
+): Promise<CmsPage> => {
+  return customFetch<CmsPage>(getCreateCmsPageUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cmsPageInput),
+  });
+};
+
+export const getCreateCmsPageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCmsPage>>,
+    TError,
+    { data: BodyType<CmsPageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCmsPage>>,
+  TError,
+  { data: BodyType<CmsPageInput> },
+  TContext
+> => {
+  const mutationKey = ["createCmsPage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCmsPage>>,
+    { data: BodyType<CmsPageInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCmsPage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCmsPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCmsPage>>
+>;
+export type CreateCmsPageMutationBody = BodyType<CmsPageInput>;
+export type CreateCmsPageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Crea una nueva página externa (admin)
+ */
+export const useCreateCmsPage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCmsPage>>,
+    TError,
+    { data: BodyType<CmsPageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCmsPage>>,
+  TError,
+  { data: BodyType<CmsPageInput> },
+  TContext
+> => {
+  return useMutation(getCreateCmsPageMutationOptions(options));
+};
+
+/**
+ * @summary Obtiene una página por slug
+ */
+export const getGetCmsPageUrl = (slug: string) => {
+  return `/api/cms/pages/${slug}`;
+};
+
+export const getCmsPage = async (
+  slug: string,
+  options?: RequestInit,
+): Promise<CmsPage> => {
+  return customFetch<CmsPage>(getGetCmsPageUrl(slug), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCmsPageQueryKey = (slug: string) => {
+  return [`/api/cms/pages/${slug}`] as const;
+};
+
+export const getGetCmsPageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCmsPage>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCmsPage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCmsPageQueryKey(slug);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCmsPage>>> = ({
+    signal,
+  }) => getCmsPage(slug, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!slug,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCmsPage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCmsPageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCmsPage>>
+>;
+export type GetCmsPageQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Obtiene una página por slug
+ */
+
+export function useGetCmsPage<
+  TData = Awaited<ReturnType<typeof getCmsPage>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCmsPage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCmsPageQueryOptions(slug, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Actualiza una página (admin)
+ */
+export const getUpdateCmsPageUrl = (id: number) => {
+  return `/api/cms/pages/${id}/admin`;
+};
+
+export const updateCmsPage = async (
+  id: number,
+  cmsPageInput: CmsPageInput,
+  options?: RequestInit,
+): Promise<CmsPage> => {
+  return customFetch<CmsPage>(getUpdateCmsPageUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cmsPageInput),
+  });
+};
+
+export const getUpdateCmsPageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCmsPage>>,
+    TError,
+    { id: number; data: BodyType<CmsPageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCmsPage>>,
+  TError,
+  { id: number; data: BodyType<CmsPageInput> },
+  TContext
+> => {
+  const mutationKey = ["updateCmsPage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCmsPage>>,
+    { id: number; data: BodyType<CmsPageInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCmsPage(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCmsPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCmsPage>>
+>;
+export type UpdateCmsPageMutationBody = BodyType<CmsPageInput>;
+export type UpdateCmsPageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Actualiza una página (admin)
+ */
+export const useUpdateCmsPage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCmsPage>>,
+    TError,
+    { id: number; data: BodyType<CmsPageInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCmsPage>>,
+  TError,
+  { id: number; data: BodyType<CmsPageInput> },
+  TContext
+> => {
+  return useMutation(getUpdateCmsPageMutationOptions(options));
+};
+
+/**
+ * @summary Elimina una página (admin)
+ */
+export const getDeleteCmsPageUrl = (id: number) => {
+  return `/api/cms/pages/${id}/admin`;
+};
+
+export const deleteCmsPage = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SimpleSuccess> => {
+  return customFetch<SimpleSuccess>(getDeleteCmsPageUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCmsPageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCmsPage>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCmsPage>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCmsPage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCmsPage>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCmsPage(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCmsPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCmsPage>>
+>;
+
+export type DeleteCmsPageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Elimina una página (admin)
+ */
+export const useDeleteCmsPage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCmsPage>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCmsPage>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCmsPageMutationOptions(options));
 };
 
 /**

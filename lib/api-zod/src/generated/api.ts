@@ -447,6 +447,171 @@ export const BulkRedesignResponse = zod.object({
 });
 
 /**
+ * @summary Lista páginas (publicadas para público; todas para admin)
+ */
+export const ListCmsPagesResponse = zod.object({
+  pages: zod.array(
+    zod.object({
+      id: zod.number(),
+      slug: zod.string(),
+      title: zod.string(),
+      metaTitle: zod.string().nullish(),
+      metaDescription: zod.string().nullish(),
+      ogImage: zod.string().nullish(),
+      status: zod.string(),
+      blocks: zod.array(
+        zod.object({
+          id: zod.string(),
+          type: zod
+            .string()
+            .describe(
+              "hero | text | image | video | cards | cta | html | spacer | embed",
+            ),
+          data: zod.record(zod.string(), zod.unknown()),
+        }),
+      ),
+      showHeader: zod.boolean().optional(),
+      showFooter: zod.boolean().optional(),
+      themeOverrides: zod.record(zod.string(), zod.unknown()).nullish(),
+      navOrder: zod.number().optional(),
+      updatedAt: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Crea una nueva página externa (admin)
+ */
+export const CreateCmsPageBody = zod.object({
+  slug: zod.string().nullish(),
+  title: zod.string().nullish(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  status: zod.string().nullish(),
+  blocks: zod
+    .array(
+      zod.object({
+        id: zod.string(),
+        type: zod
+          .string()
+          .describe(
+            "hero | text | image | video | cards | cta | html | spacer | embed",
+          ),
+        data: zod.record(zod.string(), zod.unknown()),
+      }),
+    )
+    .nullish(),
+  showHeader: zod.boolean().nullish(),
+  showFooter: zod.boolean().nullish(),
+  themeOverrides: zod.record(zod.string(), zod.unknown()).nullish(),
+  navOrder: zod.number().nullish(),
+});
+
+/**
+ * @summary Obtiene una página por slug
+ */
+export const GetCmsPageParams = zod.object({
+  slug: zod.coerce.string(),
+});
+
+export const GetCmsPageResponse = zod.object({
+  id: zod.number(),
+  slug: zod.string(),
+  title: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  status: zod.string(),
+  blocks: zod.array(
+    zod.object({
+      id: zod.string(),
+      type: zod
+        .string()
+        .describe(
+          "hero | text | image | video | cards | cta | html | spacer | embed",
+        ),
+      data: zod.record(zod.string(), zod.unknown()),
+    }),
+  ),
+  showHeader: zod.boolean().optional(),
+  showFooter: zod.boolean().optional(),
+  themeOverrides: zod.record(zod.string(), zod.unknown()).nullish(),
+  navOrder: zod.number().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Actualiza una página (admin)
+ */
+export const UpdateCmsPageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCmsPageBody = zod.object({
+  slug: zod.string().nullish(),
+  title: zod.string().nullish(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  status: zod.string().nullish(),
+  blocks: zod
+    .array(
+      zod.object({
+        id: zod.string(),
+        type: zod
+          .string()
+          .describe(
+            "hero | text | image | video | cards | cta | html | spacer | embed",
+          ),
+        data: zod.record(zod.string(), zod.unknown()),
+      }),
+    )
+    .nullish(),
+  showHeader: zod.boolean().nullish(),
+  showFooter: zod.boolean().nullish(),
+  themeOverrides: zod.record(zod.string(), zod.unknown()).nullish(),
+  navOrder: zod.number().nullish(),
+});
+
+export const UpdateCmsPageResponse = zod.object({
+  id: zod.number(),
+  slug: zod.string(),
+  title: zod.string(),
+  metaTitle: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  ogImage: zod.string().nullish(),
+  status: zod.string(),
+  blocks: zod.array(
+    zod.object({
+      id: zod.string(),
+      type: zod
+        .string()
+        .describe(
+          "hero | text | image | video | cards | cta | html | spacer | embed",
+        ),
+      data: zod.record(zod.string(), zod.unknown()),
+    }),
+  ),
+  showHeader: zod.boolean().optional(),
+  showFooter: zod.boolean().optional(),
+  themeOverrides: zod.record(zod.string(), zod.unknown()).nullish(),
+  navOrder: zod.number().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Elimina una página (admin)
+ */
+export const DeleteCmsPageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteCmsPageResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * @summary Lista los motores de generación de imagen disponibles
  */
 export const ListImageEnginesResponse = zod.object({

@@ -339,6 +339,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkJobResponse"
 
+  # ─── CMS PÁGINAS EXTERNAS ────────────────────────────────────
+  /cms/pages:
+    get:
+      operationId: listCmsPages
+      tags: [cms]
+      summary: Lista páginas (publicadas para público; todas para admin)
+      responses:
+        "200":
+          description: Lista de páginas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCmsPagesResult"
+    post:
+      operationId: createCmsPage
+      tags: [cms]
+      summary: Crea una nueva página externa (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsPageInput"
+      responses:
+        "201":
+          description: Página creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CmsPage"
+
+  /cms/pages/{slug}:
+    get:
+      operationId: getCmsPage
+      tags: [cms]
+      summary: Obtiene una página por slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Página
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CmsPage"
+
+  /cms/pages/{id}/admin:
+    patch:
+      operationId: updateCmsPage
+      tags: [cms]
+      summary: Actualiza una página (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsPageInput"
+      responses:
+        "200":
+          description: Página actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CmsPage"
+    delete:
+      operationId: deleteCmsPage
+      tags: [cms]
+      summary: Elimina una página (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleSuccess"
+
   # ─── IMAGES ──────────────────────────────────────────────────
   /images/engines:
     get:
@@ -1500,6 +1589,65 @@ components:
         - label
         - model
         - cost
+
+    CmsPageBlock:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, description: "hero | text | image | video | cards | cta | html | spacer | embed" }
+        data: { type: object, additionalProperties: true }
+      required: [id, type, data]
+
+    CmsPage:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        metaTitle: { type: ["string", "null"] }
+        metaDescription: { type: ["string", "null"] }
+        ogImage: { type: ["string", "null"] }
+        status: { type: string }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/CmsPageBlock" }
+        showHeader: { type: boolean }
+        showFooter: { type: boolean }
+        themeOverrides: { type: ["object", "null"], additionalProperties: true }
+        navOrder: { type: integer }
+        updatedAt: { type: string }
+      required: [id, slug, title, status, blocks]
+
+    CmsPageInput:
+      type: object
+      properties:
+        slug: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        metaTitle: { type: ["string", "null"] }
+        metaDescription: { type: ["string", "null"] }
+        ogImage: { type: ["string", "null"] }
+        status: { type: ["string", "null"] }
+        blocks:
+          type: ["array", "null"]
+          items: { $ref: "#/components/schemas/CmsPageBlock" }
+        showHeader: { type: ["boolean", "null"] }
+        showFooter: { type: ["boolean", "null"] }
+        themeOverrides: { type: ["object", "null"], additionalProperties: true }
+        navOrder: { type: ["integer", "null"] }
+
+    ListCmsPagesResult:
+      type: object
+      properties:
+        pages:
+          type: array
+          items: { $ref: "#/components/schemas/CmsPage" }
+      required: [pages]
+
+    SimpleSuccess:
+      type: object
+      properties:
+        success: { type: boolean }
+      required: [success]
 
     ListImageEnginesResult:
       type: object

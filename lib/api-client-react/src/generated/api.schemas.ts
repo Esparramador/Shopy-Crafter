@@ -307,6 +307,78 @@ export interface ImageEngine {
   recommendedFor?: string[];
 }
 
+export type CmsPageBlockData = { [key: string]: unknown };
+
+export interface CmsPageBlock {
+  id: string;
+  /** hero | text | image | video | cards | cta | html | spacer | embed */
+  type: string;
+  data: CmsPageBlockData;
+}
+
+/**
+ * @nullable
+ */
+export type CmsPageThemeOverrides = { [key: string]: unknown } | null;
+
+export interface CmsPage {
+  id: number;
+  slug: string;
+  title: string;
+  /** @nullable */
+  metaTitle?: string | null;
+  /** @nullable */
+  metaDescription?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  status: string;
+  blocks: CmsPageBlock[];
+  showHeader?: boolean;
+  showFooter?: boolean;
+  /** @nullable */
+  themeOverrides?: CmsPageThemeOverrides;
+  navOrder?: number;
+  updatedAt?: string;
+}
+
+/**
+ * @nullable
+ */
+export type CmsPageInputThemeOverrides = { [key: string]: unknown } | null;
+
+export interface CmsPageInput {
+  /** @nullable */
+  slug?: string | null;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  metaTitle?: string | null;
+  /** @nullable */
+  metaDescription?: string | null;
+  /** @nullable */
+  ogImage?: string | null;
+  /** @nullable */
+  status?: string | null;
+  /** @nullable */
+  blocks?: CmsPageBlock[] | null;
+  /** @nullable */
+  showHeader?: boolean | null;
+  /** @nullable */
+  showFooter?: boolean | null;
+  /** @nullable */
+  themeOverrides?: CmsPageInputThemeOverrides;
+  /** @nullable */
+  navOrder?: number | null;
+}
+
+export interface ListCmsPagesResult {
+  pages: CmsPage[];
+}
+
+export interface SimpleSuccess {
+  success: boolean;
+}
+
 export interface ListImageEnginesResult {
   engines: ImageEngine[];
 }

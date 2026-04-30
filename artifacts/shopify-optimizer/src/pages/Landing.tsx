@@ -153,6 +153,20 @@ export default function Landing() {
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
   const [legalModal, setLegalModal] = useState<null | "privacy" | "terms" | "cookies" | "gdpr">(null);
+  const [comingSoon, setComingSoon] = useState<string | null>(null);
+
+  // Escape + body-scroll lock para el modal "Próximamente" (mismo patrón que LegalModal)
+  useEffect(() => {
+    if (!comingSoon) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setComingSoon(null); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [comingSoon]);
 
   const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
   const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
@@ -1415,33 +1429,52 @@ export default function Landing() {
                     <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
                     <ul className="l-footer-links">
                       {col.links.slice(0, 4).map((l, li) => {
-                        const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-                          const href = l.href || "#";
-                          // Legal modal: hrefs like "#legal:privacy"
-                          if (href.startsWith("#legal:")) {
-                            e.preventDefault();
-                            const key = href.split(":")[1] as "privacy" | "terms" | "cookies" | "gdpr";
-                            if (["privacy", "terms", "cookies", "gdpr"].includes(key)) setLegalModal(key);
-                            return;
-                          }
-                          // Section navigation
-                          if (href.startsWith("#")) {
-                            const id = href.slice(1);
-                            const fpIdx = FP_SECTION_IDS.indexOf(id);
-                            if (fpIdx >= 0) {
-                              e.preventDefault();
-                              goToSection(fpIdx);
-                              return;
-                            }
-                            // Extra section (about-us, case-studies, affiliates)
-                            const target = document.getElementById(id);
-                            if (target) {
-                              e.preventDefault();
-                              target.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                          }
+                        const href = (l.href || "#").trim();
+                        // Href vacío o "#" → modal "Próximamente" (defensivo si admin
+                        // añade un link sin destino aún, p.ej. Blog/Changelog/Doc/API)
+                        if (href === "" || href === "#") {
+                          return (
+                            <li key={li}>
+                              <a href="#" onClick={(e) => { e.preventDefault(); setComingSoon(l.label || "Esta sección"); }}>
+                                {l.label}
+                              </a>
+                            </li>
+                          );
+                        }
+                        // Modales legales: "#legal:privacy" | "#legal:terms" | "#legal:cookies" | "#legal:gdpr"
+                        if (href.startsWith("#legal:")) {
+                          const key = href.split(":")[1] as "privacy" | "terms" | "cookies" | "gdpr";
+                          return (
+                            <li key={li}>
+                              <a href={href} onClick={(e) => {
+                                e.preventDefault();
+                                if (["privacy","terms","cookies","gdpr"].includes(key)) setLegalModal(key);
+                              }}>{l.label}</a>
+                            </li>
+                          );
+                        }
+                        // Página externa /p/slug o ruta interna SPA → wouter Link
+                        if (href.startsWith("/") && !href.startsWith("//")) {
+                          return <li key={li}><Link href={href}>{l.label}</Link></li>;
+                        }
+                        // Email / Teléfono → no nueva pestaña
+                        if (href.startsWith("mailto:") || href.startsWith("tel:")) {
+                          return <li key={li}><a href={href}>{l.label}</a></li>;
+                        }
+                        // URL externa → nueva pestaña con seguridad
+                        if (href.startsWith("http://") || href.startsWith("https://")) {
+                          return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer">{l.label}</a></li>;
+                        }
+                        // Anchor: secciones fullpage o ids dentro del DOM
+                        const onAnchor = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                          if (!href.startsWith("#")) return;
+                          const id = href.slice(1);
+                          const fpIdx = FP_SECTION_IDS.indexOf(id);
+                          if (fpIdx >= 0) { e.preventDefault(); goToSection(fpIdx); return; }
+                          const target = document.getElementById(id);
+                          if (target) { e.preventDefault(); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
                         };
-                        return <li key={li}><a href={l.href} onClick={handleClick}>{l.label}</a></li>;
+                        return <li key={li}><a href={href} onClick={onAnchor}>{l.label}</a></li>;
                       })}
                     </ul>
                   </div>
@@ -1539,6 +1572,27 @@ export default function Landing() {
       {/* ── LEGAL MODAL (privacidad / términos / cookies / RGPD) ── */}
       {legalModal && (
         <LegalModal kind={legalModal} onClose={() => setLegalModal(null)} siteName={content.site.name} />
+      )}
+      {comingSoon && (
+        <div
+          role="dialog" aria-modal="true"
+          onClick={() => setComingSoon(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0c0c0e", border: "1px solid #2a2a30", borderRadius: 16, maxWidth: 460, padding: 32, textAlign: "center", color: "#eee" }}>
+            <div style={{ fontSize: 42, marginBottom: 12 }}>🚧</div>
+            <h3 style={{ fontSize: "1.4rem", margin: "0 0 10px", color: "#e6c668" }}>{comingSoon}</h3>
+            <p style={{ fontSize: "0.95rem", opacity: 0.85, margin: "0 0 20px", lineHeight: 1.5 }}>
+              Estamos preparando esta sección. Vuelve pronto o contáctanos por email si necesitas información ahora.
+            </p>
+            <button
+              onClick={() => setComingSoon(null)}
+              style={{ padding: "10px 22px", borderRadius: 10, background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000", border: "none", cursor: "pointer", fontWeight: 700 }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

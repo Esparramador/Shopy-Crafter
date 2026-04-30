@@ -9,6 +9,7 @@ export * from "./seo_data";
 export * from "./bulk_jobs";
 export * from "./users";
 export * from "./cms";
+export * from "./cms_pages";
 export * from "./intelligence";
 export * from "./inventory";
 export * from "./onboarding";

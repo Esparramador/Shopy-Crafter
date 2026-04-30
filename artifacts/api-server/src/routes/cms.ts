@@ -5,8 +5,8 @@ import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@workspace/db";
-import { cmsContent, cmsVersions } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { cmsContent, cmsVersions, cmsPages } from "@workspace/db/schema";
+import { eq, desc, and } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { cached, invalidateCache } from "../lib/cache.js";
@@ -314,6 +314,160 @@ router.post("/ai/improve", async (req: Request, res: Response) => {
     res.json({ improved: improved.trim() });
   } catch (e) {
     res.status(500).json({ error: "AI improvement failed" });
+  }
+});
+
+// ─── PÁGINAS EXTERNAS ────────────────────────────────────────────────────────
+//
+// Sistema de páginas independientes (descongesta la landing).
+// Cada página vive en /p/:slug y se compone de bloques.
+// GET /pages y GET /pages/:slug son PÚBLICOS (filtran por status=published).
+// El resto requiere admin.
+
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+
+type Block = { id: string; type: string; data: Record<string, unknown> };
+
+function sanitizeBlocks(input: unknown): Block[] {
+  if (!Array.isArray(input)) return [];
+  const allowed = new Set(["hero", "text", "image", "video", "cards", "cta", "html", "spacer", "embed"]);
+  return input
+    .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
+    .map((b, i) => ({
+      id: typeof b.id === "string" ? b.id : `b${i}_${Date.now()}`,
+      type: typeof b.type === "string" && allowed.has(b.type) ? b.type : "text",
+      data: (b.data && typeof b.data === "object") ? (b.data as Record<string, unknown>) : {},
+    }));
+}
+
+function isAdminRequest(req: Request): boolean {
+  return !!(req.session?.userId && (req.session as { role?: string }).role === "admin");
+}
+
+// Lista pública de páginas publicadas (para construir nav). Admin ve todas.
+router.get("/pages", async (req: Request, res: Response) => {
+  try {
+    const adminMode = isAdminRequest(req);
+    const rows = adminMode
+      ? await db.select().from(cmsPages).orderBy(desc(cmsPages.updatedAt))
+      : await db.select({
+          id: cmsPages.id,
+          slug: cmsPages.slug,
+          title: cmsPages.title,
+          metaDescription: cmsPages.metaDescription,
+          status: cmsPages.status,
+          navOrder: cmsPages.navOrder,
+          updatedAt: cmsPages.updatedAt,
+        }).from(cmsPages).where(eq(cmsPages.status, "published")).orderBy(cmsPages.navOrder);
+    res.json({ pages: rows });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to load pages" });
+  }
+});
+
+router.get("/pages/:slug", async (req: Request, res: Response) => {
+  try {
+    const slug = String(req.params.slug).toLowerCase();
+    if (!SLUG_RE.test(slug)) { res.status(400).json({ error: "Slug inválido" }); return; }
+    const [page] = await db.select().from(cmsPages).where(eq(cmsPages.slug, slug));
+    if (!page) { res.status(404).json({ error: "Página no encontrada" }); return; }
+    // Solo admin puede ver borradores
+    if (page.status !== "published" && !isAdminRequest(req)) {
+      res.status(404).json({ error: "Página no encontrada" });
+      return;
+    }
+    res.json(page);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to load page" });
+  }
+});
+
+router.post("/pages", async (req: Request, res: Response) => {
+  try {
+    const body = req.body as Partial<{ slug: string; title: string; status: string; metaTitle: string; metaDescription: string; ogImage: string; blocks: unknown; showHeader: boolean; showFooter: boolean; themeOverrides: unknown; navOrder: number }>;
+    const slug = String(body.slug || "").trim().toLowerCase();
+    const title = String(body.title || "").trim();
+    if (!SLUG_RE.test(slug)) { res.status(400).json({ error: "Slug inválido (sólo a-z, 0-9, -)" }); return; }
+    if (!title) { res.status(400).json({ error: "Falta título" }); return; }
+    // Comprobar duplicado
+    const existing = await db.select().from(cmsPages).where(eq(cmsPages.slug, slug));
+    if (existing.length > 0) { res.status(409).json({ error: "Ya existe una página con ese slug" }); return; }
+    const blocks = sanitizeBlocks(body.blocks);
+    const userId = req.session?.userId?.toString() || "admin";
+    const [created] = await db.insert(cmsPages).values({
+      slug,
+      title,
+      status: body.status === "published" ? "published" : "draft",
+      metaTitle: body.metaTitle || null,
+      metaDescription: body.metaDescription || null,
+      ogImage: body.ogImage || null,
+      blocks,
+      showHeader: body.showHeader !== false,
+      showFooter: body.showFooter !== false,
+      themeOverrides: (body.themeOverrides && typeof body.themeOverrides === "object") ? body.themeOverrides as Record<string, unknown> : null,
+      navOrder: typeof body.navOrder === "number" ? body.navOrder : 0,
+      createdBy: userId,
+      updatedBy: userId,
+    }).returning();
+    invalidateCache("cms-pages");
+    broadcast("page_created", { id: created.id, slug: created.slug });
+    res.status(201).json(created);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to create page" });
+  }
+});
+
+router.patch("/pages/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!Number.isFinite(id)) { res.status(400).json({ error: "id inválido" }); return; }
+    const [existing] = await db.select().from(cmsPages).where(eq(cmsPages.id, id));
+    if (!existing) { res.status(404).json({ error: "Página no encontrada" }); return; }
+    const body = req.body as Partial<{ slug: string; title: string; status: string; metaTitle: string; metaDescription: string; ogImage: string; blocks: unknown; showHeader: boolean; showFooter: boolean; themeOverrides: unknown; navOrder: number }>;
+    const updates: Record<string, unknown> = {
+      updatedAt: new Date(),
+      updatedBy: req.session?.userId?.toString() || "admin",
+    };
+    if (typeof body.title === "string") updates.title = body.title.trim();
+    if (typeof body.status === "string") updates.status = body.status === "published" ? "published" : "draft";
+    if ("metaTitle" in body) updates.metaTitle = body.metaTitle || null;
+    if ("metaDescription" in body) updates.metaDescription = body.metaDescription || null;
+    if ("ogImage" in body) updates.ogImage = body.ogImage || null;
+    if ("blocks" in body) updates.blocks = sanitizeBlocks(body.blocks);
+    if (typeof body.showHeader === "boolean") updates.showHeader = body.showHeader;
+    if (typeof body.showFooter === "boolean") updates.showFooter = body.showFooter;
+    if ("themeOverrides" in body) updates.themeOverrides = (body.themeOverrides && typeof body.themeOverrides === "object") ? body.themeOverrides : null;
+    if (typeof body.navOrder === "number") updates.navOrder = body.navOrder;
+    if (typeof body.slug === "string") {
+      const newSlug = body.slug.trim().toLowerCase();
+      if (!SLUG_RE.test(newSlug)) { res.status(400).json({ error: "Slug inválido" }); return; }
+      if (newSlug !== existing.slug) {
+        const dup = await db.select().from(cmsPages).where(and(eq(cmsPages.slug, newSlug)));
+        if (dup.length > 0) { res.status(409).json({ error: "Ya existe una página con ese slug" }); return; }
+        updates.slug = newSlug;
+      }
+    }
+    const [updated] = await db.update(cmsPages).set(updates).where(eq(cmsPages.id, id)).returning();
+    invalidateCache("cms-pages");
+    broadcast("page_updated", { id: updated.id, slug: updated.slug });
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to update page" });
+  }
+});
+
+router.delete("/pages/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!Number.isFinite(id)) { res.status(400).json({ error: "id inválido" }); return; }
+    const [existing] = await db.select().from(cmsPages).where(eq(cmsPages.id, id));
+    if (!existing) { res.status(404).json({ error: "Página no encontrada" }); return; }
+    await db.delete(cmsPages).where(eq(cmsPages.id, id));
+    invalidateCache("cms-pages");
+    broadcast("page_deleted", { id, slug: existing.slug });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to delete page" });
   }
 });
 
