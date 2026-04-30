@@ -108,6 +108,10 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [previewMode, setPreviewMode] = useState<"original" | "improved">("improved");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [changeRequest, setChangeRequest] = useState("");
+  const [iterating, setIterating] = useState(false);
+  const [iterError, setIterError] = useState("");
 
   const loadHistory = useCallback(async () => {
     if (!projectId) return;
@@ -182,6 +186,135 @@ function WebLabInner({ projectId }: { projectId: number }) {
 
   const downloadFromVault = (path: string) => {
     window.open(`${API_BASE}/api/${path}`, "_blank");
+  };
+
+  /**
+   * Build a self-contained HTML document for the iframe preview.
+   * - Adds <meta charset> + viewport so it renders correctly at any size.
+   * - Adds <base target="_blank"> so external links open in a new tab
+   *   (so the user doesn't navigate away from the preview).
+   * - Injects a normalize/reset so the preview LOOKS like a real site,
+   *   not unstyled HTML.
+   * - Injects a tiny script that intercepts in-page anchor clicks
+   *   ("#section") and smooth-scrolls inside the iframe — making the
+   *   preview behave like a real navigable web page.
+   *
+   * SECURITY: el iframe se monta SIN `allow-same-origin` (ver más abajo),
+   * por lo que cualquier script presente en el HTML/CSS generado por
+   * Claude o extraído del sitio externo se ejecuta en un origen opaco
+   * y NO puede leer cookies/localStorage/fetch /api/* de Shopy Crafter.
+   * Aun así, añadimos un meta CSP conservador para limitar destinos de
+   * red dentro del propio iframe.
+   */
+  const buildPreviewSrcDoc = (mode: "original" | "improved"): string => {
+    if (!a) return "";
+    const fragments = a.improvedHtmlFragments || [];
+    const body = mode === "improved"
+      ? fragments.map(f => f.improved).join("\n")
+      : fragments.map(f => f.original).join("\n");
+    const css = mode === "improved" ? (a.improvedCss || "") : "";
+
+    const normalize = `
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; color: #1a1a1a; background: #fff; }
+      img, video { max-width: 100%; height: auto; display: block; }
+      a { color: inherit; }
+      h1, h2, h3, h4, h5, h6 { margin: 0.5em 0; line-height: 1.2; }
+      p { margin: 0.5em 0; }
+      button, input, select, textarea { font: inherit; }
+    `;
+
+    const navScript = `
+      (function() {
+        document.addEventListener('click', function(e) {
+          var a = e.target.closest && e.target.closest('a');
+          if (!a) return;
+          var href = a.getAttribute('href') || '';
+          // Internal anchor: smooth-scroll inside the preview iframe.
+          if (href.startsWith('#') && href.length > 1) {
+            e.preventDefault();
+            var target = document.getElementById(href.slice(1)) ||
+                         document.querySelector('[name="' + href.slice(1) + '"]');
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
+          // Empty href or just '#': prevent navigation.
+          if (href === '' || href === '#') { e.preventDefault(); return; }
+          // Anything else (full URLs) opens in a new tab via <base target="_blank">.
+        }, true);
+      })();
+    `;
+
+    // CSP defensivo dentro del iframe — bloquea cualquier intento del HTML
+    // generado por Claude/sitio externo de hacer fetch a /api/* o exfiltrar
+    // datos. Sólo permitimos imágenes y fuentes (data:, https:) y CSS inline.
+    // 'unsafe-inline' es necesario porque inyectamos <style> y nuestro
+    // navScript de scroll interno.
+    const csp = "default-src 'none'; img-src data: https: http:; font-src data: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';";
+
+    return `<!DOCTYPE html><html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<base target="_blank">
+<title>Preview</title>
+<style>${normalize}</style>
+${css ? `<style>${css}</style>` : ""}
+</head><body>
+${body || '<div style="padding:40px;text-align:center;color:#888;font-family:sans-serif">No hay contenido para mostrar.</div>'}
+<script>${navScript}<\/script>
+</body></html>`;
+  };
+
+  const openPreviewFullscreen = () => {
+    if (!a) return;
+    const html = buildPreviewSrcDoc(previewMode);
+    // SECURITY: usamos data: URL en vez de blob: porque blob: es same-origin
+    // con la app Shopy Crafter, y eso permitiría a scripts del HTML generado
+    // por Claude leer cookies/localStorage/hacer fetch a /api/*. data: URL
+    // crea un origen opaco aislado.
+    const dataUrl = "data:text/html;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(html)));
+    window.open(dataUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const iterate = async () => {
+    if (!a || !result || !changeRequest.trim()) return;
+    setIterating(true);
+    setIterError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/iterate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          projectId,
+          url: result.url,
+          previousCss: a.improvedCss,
+          previousFragments: a.improvedHtmlFragments,
+          changeRequest: changeRequest.trim(),
+          brandName: brandName.trim() || undefined,
+        }),
+      });
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text.trim()); } catch { throw new Error(`Error ${res.status}: respuesta inválida`); }
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setResult(prev => prev ? {
+        ...prev,
+        analysis: {
+          ...prev.analysis,
+          improvedCss: data.improvedCss || prev.analysis.improvedCss,
+          improvedHtmlFragments: data.improvedHtmlFragments || prev.analysis.improvedHtmlFragments,
+          summary: data.summary || prev.analysis.summary,
+        },
+      } : prev);
+      setChangeRequest("");
+    } catch (e: any) {
+      setIterError(e?.message || "Error aplicando los cambios");
+    } finally {
+      setIterating(false);
+    }
   };
 
   const a = result?.analysis;
@@ -676,9 +809,25 @@ function WebLabInner({ projectId }: { projectId: number }) {
 
             {tab === "preview" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700 }}>👁️ Preview Visual</h3>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    {/* Device selector */}
+                    <div style={{ display: "flex", gap: 4, padding: 3, background: "#1a1a1a", borderRadius: 8 }}>
+                      {(["desktop", "tablet", "mobile"] as const).map(d => (
+                        <button
+                          key={d}
+                          onClick={() => setPreviewDevice(d)}
+                          title={d}
+                          style={{
+                            padding: "5px 10px", borderRadius: 6, border: "none",
+                            background: previewDevice === d ? "#d4a843" : "transparent",
+                            color: previewDevice === d ? "#000" : "#888",
+                            fontSize: 11, fontWeight: 700, cursor: "pointer", textTransform: "capitalize",
+                          }}
+                        >{d === "desktop" ? "🖥️" : d === "tablet" ? "📱" : "📱"} {d}</button>
+                      ))}
+                    </div>
                     <span style={{ fontSize: 13, color: previewMode === "original" ? "#ef4444" : "#888" }}>Original</span>
                     <button
                       onClick={() => setPreviewMode(previewMode === "original" ? "improved" : "original")}
@@ -696,23 +845,67 @@ function WebLabInner({ projectId }: { projectId: number }) {
                       }} />
                     </button>
                     <span style={{ fontSize: 13, color: previewMode === "improved" ? "#22c55e" : "#888" }}>Mejorado</span>
+                    <button
+                      onClick={openPreviewFullscreen}
+                      style={{ padding: "6px 12px", background: "#1a1a2e", border: "1px solid #333", borderRadius: 8, color: "#ccc", cursor: "pointer", fontSize: 12 }}
+                    >🔗 Abrir en pestaña</button>
                   </div>
                 </div>
-                <iframe
-                  sandbox="allow-same-origin"
-                  style={{
-                    width: "100%",
-                    height: 600,
-                    border: `2px solid ${previewMode === "improved" ? "#22c55e33" : "#ef444433"}`,
-                    borderRadius: 12,
-                    background: "#fff",
-                  }}
-                  srcDoc={
-                    previewMode === "improved"
-                      ? `<!DOCTYPE html><html><head><style>${a.improvedCss || ""}</style></head><body>${(a.improvedHtmlFragments || []).map(f => f.improved).join("\n")}</body></html>`
-                      : `<!DOCTYPE html><html><head></head><body>${(a.improvedHtmlFragments || []).map(f => f.original).join("\n")}</body></html>`
-                  }
-                />
+                {/* Device-sized preview frame */}
+                <div style={{ display: "flex", justifyContent: "center", padding: 16, background: "#0a0a0a", borderRadius: 12 }}>
+                  <iframe
+                    sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                    title="Preview de la página mejorada"
+                    style={{
+                      width: previewDevice === "desktop" ? "100%" : previewDevice === "tablet" ? 768 : 390,
+                      maxWidth: "100%",
+                      height: 720,
+                      border: `2px solid ${previewMode === "improved" ? "#22c55e33" : "#ef444433"}`,
+                      borderRadius: 12,
+                      background: "#fff",
+                      transition: "width 0.25s ease",
+                    }}
+                    srcDoc={buildPreviewSrcDoc(previewMode)}
+                  />
+                </div>
+
+                {/* ── Iteración: sugerir cambios sobre lo ya generado ── */}
+                <div style={{ marginTop: 24, padding: 18, background: "#0c0c0e", border: "1px solid #1f1f24", borderRadius: 12 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "#e6c668", marginBottom: 8 }}>💬 Sugerir cambios sobre el diseño actual</h4>
+                  <p style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.5 }}>
+                    Describe en lenguaje natural lo que quieres cambiar. La IA tomará el HTML/CSS actual como punto de partida y generará una nueva versión. Ejemplos: "haz el hero más oscuro y añade un degradado dorado", "cambia la tipografía a algo más editorial estilo Vogue", "el botón principal debe ser verde menta y más grande".
+                  </p>
+                  <textarea
+                    rows={3}
+                    value={changeRequest}
+                    onChange={(e) => setChangeRequest(e.target.value)}
+                    placeholder="Describe el cambio que quieres aplicar…"
+                    disabled={iterating}
+                    style={{
+                      width: "100%", padding: "10px 14px",
+                      background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
+                      color: "#eee", fontSize: 13, outline: "none", resize: "vertical",
+                      fontFamily: "inherit", boxSizing: "border-box",
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 12, flexWrap: "wrap" }}>
+                    <small style={{ color: "#666", fontSize: 11 }}>
+                      {iterError ? <span style={{ color: "#ef4444" }}>⚠ {iterError}</span> : "El cambio reemplaza la versión mejorada actual y conserva el original como referencia."}
+                    </small>
+                    <button
+                      onClick={iterate}
+                      disabled={iterating || !changeRequest.trim()}
+                      style={{
+                        padding: "9px 18px",
+                        background: iterating || !changeRequest.trim() ? "#2a2a30" : "linear-gradient(135deg, #d4a843, #b8860b)",
+                        border: "none", borderRadius: 10,
+                        color: iterating || !changeRequest.trim() ? "#666" : "#000",
+                        fontWeight: 700, fontSize: 13,
+                        cursor: iterating || !changeRequest.trim() ? "not-allowed" : "pointer",
+                      }}
+                    >{iterating ? "Aplicando…" : "✨ Aplicar cambio"}</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

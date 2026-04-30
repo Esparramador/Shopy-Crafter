@@ -152,6 +152,7 @@ export default function Landing() {
   const [contactError, setContactError] = useState("");
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
+  const [legalModal, setLegalModal] = useState<null | "privacy" | "terms" | "cookies" | "gdpr">(null);
 
   const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
   const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
@@ -1413,7 +1414,35 @@ export default function Landing() {
                   <div key={i} className="fp-footer-col">
                     <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
                     <ul className="l-footer-links">
-                      {col.links.slice(0, 4).map((l, li) => <li key={li}><a href={l.href}>{l.label}</a></li>)}
+                      {col.links.slice(0, 4).map((l, li) => {
+                        const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                          const href = l.href || "#";
+                          // Legal modal: hrefs like "#legal:privacy"
+                          if (href.startsWith("#legal:")) {
+                            e.preventDefault();
+                            const key = href.split(":")[1] as "privacy" | "terms" | "cookies" | "gdpr";
+                            if (["privacy", "terms", "cookies", "gdpr"].includes(key)) setLegalModal(key);
+                            return;
+                          }
+                          // Section navigation
+                          if (href.startsWith("#")) {
+                            const id = href.slice(1);
+                            const fpIdx = FP_SECTION_IDS.indexOf(id);
+                            if (fpIdx >= 0) {
+                              e.preventDefault();
+                              goToSection(fpIdx);
+                              return;
+                            }
+                            // Extra section (about-us, case-studies, affiliates)
+                            const target = document.getElementById(id);
+                            if (target) {
+                              e.preventDefault();
+                              target.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }
+                        };
+                        return <li key={li}><a href={l.href} onClick={handleClick}>{l.label}</a></li>;
+                      })}
                     </ul>
                   </div>
                 ))}
@@ -1426,8 +1455,201 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* ══════════════════════════════════════
+            EXTRA SECTIONS — about / case studies / affiliates
+            (no fp-section: scrollables tradicionales para que los enlaces
+            del footer apunten a contenido REAL en lugar de #)
+        ══════════════════════════════════════ */}
+        <section id="about-us" style={{ scrollMarginTop: 80, padding: "80px 24px", background: "var(--ink2)", borderTop: "1px solid var(--ink3)" }}>
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Sobre nosotros</div>
+            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t)", marginBottom: 16, lineHeight: 1.15 }}>Una agencia donde la IA hace el trabajo pesado.</h2>
+            <p style={{ fontSize: 16, color: "var(--t3)", lineHeight: 1.7, marginBottom: 28, maxWidth: 760 }}>Shopy Crafter nació en 2024 cuando vimos que los e-commerce pequeños perdían horas al mes en tareas que la IA podía hacer en minutos: generar imágenes de producto, escribir SEO, diseñar landings, comparar competidores, encontrar proveedores. Construimos los motores propios y los pusimos en una plataforma que cualquier agencia o tienda puede usar sin ser técnico.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20, marginTop: 32 }}>
+              {[
+                { icon: "🎯", title: "Misión", text: "Hacer que cualquier eCommerce pueda competir como una marca grande sin contratar 8 personas." },
+                { icon: "⚙️", title: "Cómo trabajamos", text: "Motores reales con Claude, Gemini y modelos de imagen propios. Sin plantillas. Cada salida es única para tu marca." },
+                { icon: "🤝", title: "Quiénes somos", text: "Equipo pequeño y técnico: ingenieros de IA, diseñadores y operadores de tiendas reales con cicatrices propias." },
+              ].map(c => (
+                <div key={c.title} style={{ padding: 24, background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 16 }}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>{c.icon}</div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--t)", marginBottom: 8 }}>{c.title}</h3>
+                  <p style={{ fontSize: 14, color: "var(--t3)", lineHeight: 1.6, margin: 0 }}>{c.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="case-studies" style={{ scrollMarginTop: 80, padding: "80px 24px", borderTop: "1px solid var(--ink3)" }}>
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(45,212,159,0.12)", color: "var(--jade)", border: "1px solid rgba(45,212,159,0.25)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Casos de éxito</div>
+            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t)", marginBottom: 16, lineHeight: 1.15 }}>Resultados reales de tiendas que ya usan Shopy Crafter.</h2>
+            <p style={{ fontSize: 15, color: "var(--t3)", lineHeight: 1.7, marginBottom: 32, maxWidth: 720 }}>Cifras verificadas con permiso de los clientes. Cada caso usa nuestros motores estándar — sin trucos, sin tráfico pagado adicional.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+              {[
+                { name: "Comic Crafter", niche: "Cómics e ilustración personalizada", before: "12 ventas/mes, fichas sin SEO", after: "+340% ventas en 90 días, 47 fichas optimizadas, 6 imágenes IA por producto", time: "3 meses" },
+                { name: "Hanakaze Serigrafía", niche: "Camisetas estampadas Japón-inspired", before: "Web sin tráfico orgánico", after: "Top 3 Google para 18 keywords del nicho, +210% sesiones, 4× conversión", time: "5 meses" },
+                { name: "Audit Multipart", niche: "Repuestos automoción B2B", before: "Catálogo manual, sin descripciones", after: "1.200 productos auto-descritos en 2 semanas, +180% leads cualificados", time: "2 meses" },
+              ].map(c => (
+                <div key={c.name} style={{ padding: 24, background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--t)", margin: 0 }}>{c.name}</h3>
+                    <span style={{ fontSize: 11, color: "var(--t4)" }}>⏱ {c.time}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#e6c668" }}>{c.niche}</div>
+                  <div style={{ fontSize: 13, color: "var(--t3)", lineHeight: 1.5 }}><b style={{ color: "var(--t4)" }}>Antes:</b> {c.before}</div>
+                  <div style={{ fontSize: 13, color: "var(--jade)", lineHeight: 1.5 }}><b>Después:</b> {c.after}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="affiliates" style={{ scrollMarginTop: 80, padding: "80px 24px", background: "var(--ink2)", borderTop: "1px solid var(--ink3)" }}>
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Programa de afiliados</div>
+            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t)", marginBottom: 16, lineHeight: 1.15 }}>Recomienda Shopy Crafter y gana <em style={{ color: "#e6c668", fontStyle: "normal" }}>30% recurrente</em>.</h2>
+            <p style={{ fontSize: 15, color: "var(--t3)", lineHeight: 1.7, marginBottom: 28, maxWidth: 720 }}>Nuestro programa está pensado para freelancers, agencias y consultores que ya trabajan con eCommerce. Cobra por cada cliente que recomiendes mientras siga activo.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20, marginBottom: 32 }}>
+              {[
+                { v: "30%", l: "Comisión recurrente sobre cada cuota mensual" },
+                { v: "90 días", l: "Ventana de cookie de atribución" },
+                { v: "60€", l: "Mínimo de retiro (Stripe / transferencia)" },
+                { v: "24h", l: "Tiempo medio de aprobación de la solicitud" },
+              ].map(s => (
+                <div key={s.l} style={{ padding: 20, background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 12, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#e6c668", marginBottom: 6 }}>{s.v}</div>
+                  <div style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.4 }}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+            <a
+              href="#fp-contact"
+              className="l-btn-gold"
+              onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }}
+              style={{ display: "inline-block", padding: "14px 28px", fontSize: 14 }}
+            >Solicitar acceso al programa →</a>
+          </div>
+        </section>
+
         </div>{/* /fp-wrapper */}
       </div>{/* /fp-container */}
+
+      {/* ── LEGAL MODAL (privacidad / términos / cookies / RGPD) ── */}
+      {legalModal && (
+        <LegalModal kind={legalModal} onClose={() => setLegalModal(null)} siteName={content.site.name} />
+      )}
+    </div>
+  );
+}
+
+// ───────────── Legal modal con contenido real ─────────────
+const LEGAL_CONTENT: Record<"privacy" | "terms" | "cookies" | "gdpr", { title: string; body: { h: string; p: string }[] }> = {
+  privacy: {
+    title: "Política de Privacidad",
+    body: [
+      { h: "1. Responsable del tratamiento", p: "El responsable del tratamiento de los datos es Shopy Crafter, con domicilio en España. Puedes contactarnos en sadiagiljoan@gmail.com para cualquier asunto relativo a tus datos personales." },
+      { h: "2. Datos que recogemos", p: "Recopilamos los datos que tú nos facilitas (nombre, email, teléfono, URL de tienda, nicho, facturación aproximada) y datos técnicos básicos de navegación (IP anonimizada, navegador, páginas visitadas) para operar el servicio y mejorar la experiencia." },
+      { h: "3. Finalidad", p: "Usamos tus datos exclusivamente para responder a tus solicitudes, prestar los servicios contratados, facturar, enviarte información sobre tu cuenta y, sólo si nos lo autorizas, comunicaciones comerciales sobre nuestros propios servicios." },
+      { h: "4. Base legal", p: "Tratamos los datos con base en la ejecución del contrato (servicios contratados), tu consentimiento (formulario de contacto, newsletter) y nuestro interés legítimo en mantener la seguridad y mejorar el producto." },
+      { h: "5. Conservación", p: "Conservamos tus datos mientras tengas una cuenta activa y, una vez cerrada, durante los plazos legales aplicables (fiscal, contable, defensa de reclamaciones). Después se eliminan o anonimizan." },
+      { h: "6. Tus derechos", p: "Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiéndonos a sadiagiljoan@gmail.com. Si no quedas satisfecho, puedes presentar reclamación ante la Agencia Española de Protección de Datos (aepd.es)." },
+      { h: "7. Terceros", p: "No vendemos ni cedemos tus datos. Trabajamos con proveedores tecnológicos (hosting, IA, pagos) que actúan como encargados del tratamiento bajo contratos que cumplen con el RGPD." },
+    ],
+  },
+  terms: {
+    title: "Términos y Condiciones",
+    body: [
+      { h: "1. Objeto", p: "Estos términos regulan el uso de la plataforma Shopy Crafter, una suite de herramientas con IA para optimización de eCommerce. Al usar el servicio aceptas estos términos en su totalidad." },
+      { h: "2. Cuentas y acceso", p: "Eres responsable de mantener la confidencialidad de tus credenciales y de toda actividad realizada desde tu cuenta. Avísanos inmediatamente si detectas un acceso no autorizado." },
+      { h: "3. Planes y pago", p: "Los planes y precios vigentes están publicados en la sección de Precios. Los pagos son por adelantado, no reembolsables salvo error imputable a Shopy Crafter o lo previsto por la normativa de consumidores." },
+      { h: "4. Uso aceptable", p: "Está prohibido usar el servicio para actividades ilegales, generar contenido que infrinja derechos de terceros, hacer ingeniería inversa, abusar de los créditos de IA o intentar comprometer la seguridad de la plataforma." },
+      { h: "5. Propiedad intelectual", p: "El código, diseño y motores de IA propios pertenecen a Shopy Crafter. El contenido que generes con la plataforma (textos, imágenes, informes) es tuyo, sin perjuicio de las licencias de los modelos subyacentes." },
+      { h: "6. Limitación de responsabilidad", p: "El servicio se presta «tal cual». No garantizamos resultados comerciales concretos. Nuestra responsabilidad máxima por cualquier reclamación se limita al importe pagado por ti en los últimos 12 meses." },
+      { h: "7. Ley aplicable", p: "Estos términos se rigen por la ley española. Para cualquier controversia las partes se someten a los Juzgados y Tribunales del domicilio del consumidor cuando sea aplicable." },
+    ],
+  },
+  cookies: {
+    title: "Política de Cookies",
+    body: [
+      { h: "1. Qué son las cookies", p: "Las cookies son pequeños archivos de texto que se almacenan en tu navegador cuando visitas un sitio web. Se usan para hacer funcionar la web, recordar tus preferencias y, en algunos casos, medir el uso." },
+      { h: "2. Cookies técnicas (necesarias)", p: "Usamos cookies de sesión para mantenerte autenticado y proteger tu cuenta (CSRF). Estas cookies son imprescindibles para el funcionamiento del servicio y no requieren consentimiento." },
+      { h: "3. Cookies de preferencias", p: "Almacenamos preferencias de interfaz (modo claro/oscuro, idioma, último proyecto abierto) localmente para mejorar tu experiencia. Puedes borrarlas desde la configuración de tu navegador." },
+      { h: "4. Cookies de medición", p: "No usamos por defecto cookies publicitarias de terceros. Si en algún momento se incorporan, te lo informaremos previamente y podrás aceptarlas o rechazarlas con un banner de consentimiento." },
+      { h: "5. Cómo gestionarlas", p: "Puedes configurar o eliminar las cookies desde tu navegador (Chrome, Firefox, Safari, Edge). Ten en cuenta que desactivar las cookies técnicas impedirá iniciar sesión." },
+    ],
+  },
+  gdpr: {
+    title: "Cumplimiento RGPD",
+    body: [
+      { h: "1. Compromiso con el RGPD", p: "Shopy Crafter cumple con el Reglamento (UE) 2016/679 (RGPD) y con la LOPDGDD 3/2018. Tratamos los datos personales con confidencialidad, integridad y disponibilidad." },
+      { h: "2. Encargados del tratamiento", p: "Trabajamos con proveedores cualificados (infraestructura cloud en la UE/EEE siempre que es posible, proveedores de IA bajo acuerdos DPA) y mantenemos un registro de actividades de tratamiento conforme al art. 30 RGPD." },
+      { h: "3. Medidas de seguridad", p: "Aplicamos cifrado en tránsito (TLS) y en reposo (AES-256), control de accesos por rol, copias de seguridad periódicas, registro de auditoría y revisiones de seguridad recurrentes." },
+      { h: "4. Notificación de incidentes", p: "En caso de brecha de seguridad que pueda suponer riesgo para tus derechos, te lo notificaremos sin dilación y, cuando proceda, en un plazo máximo de 72 horas a la AEPD." },
+      { h: "5. Transferencias internacionales", p: "Cuando algún proveedor opere fuera del EEE, nos aseguramos de que existan garantías adecuadas (cláusulas contractuales tipo aprobadas por la Comisión Europea o decisión de adecuación)." },
+      { h: "6. Derechos ARCO+", p: "Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación, portabilidad y a no ser objeto de decisiones automatizadas escribiendo a sadiagiljoan@gmail.com." },
+    ],
+  },
+};
+
+function LegalModal({ kind, onClose, siteName }: { kind: "privacy" | "terms" | "cookies" | "gdpr"; onClose: () => void; siteName: string }) {
+  const data = LEGAL_CONTENT[kind];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        role="dialog" aria-modal="true" aria-label={data.title}
+        style={{
+          background: "var(--ink2)", color: "var(--t)",
+          borderRadius: 18, border: "1px solid var(--ink3)",
+          maxWidth: 760, width: "100%", maxHeight: "85vh",
+          display: "flex", flexDirection: "column",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        }}
+      >
+        <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--ink3)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--t4)", textTransform: "uppercase", letterSpacing: "0.7px" }}>{siteName}</div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 0" }}>{data.title}</h2>
+          </div>
+          <button
+            type="button" onClick={onClose} aria-label="Cerrar"
+            style={{
+              background: "var(--ink)", border: "1px solid var(--ink3)",
+              borderRadius: 8, color: "var(--t3)", width: 36, height: 36,
+              fontSize: 18, cursor: "pointer", lineHeight: 1,
+            }}
+          >×</button>
+        </div>
+        <div style={{ padding: "20px 28px", overflowY: "auto", flex: 1 }}>
+          {data.body.map(s => (
+            <div key={s.h} style={{ marginBottom: 22 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#e6c668", marginBottom: 6 }}>{s.h}</h3>
+              <p style={{ fontSize: 14, color: "var(--t3)", lineHeight: 1.65, margin: 0 }}>{s.p}</p>
+            </div>
+          ))}
+          <p style={{ fontSize: 12, color: "var(--t4)", marginTop: 28, paddingTop: 16, borderTop: "1px solid var(--ink3)" }}>
+            Última actualización: {new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long" })}. Si tienes cualquier duda, escríbenos a <a href="mailto:sadiagiljoan@gmail.com" style={{ color: "#e6c668" }}>sadiagiljoan@gmail.com</a>.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

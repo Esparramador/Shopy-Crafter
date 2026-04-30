@@ -64,10 +64,68 @@ function deepMergeDefaults(defaults: Record<string, unknown>, stored: Record<str
   return result;
 }
 
+/**
+ * Auto-heal del footer: detecta la "forma legacy completa" (footer que aún
+ * tiene MAYORÍA de hrefs rotos típicos de los defaults antiguos) y la
+ * reemplaza por los defaults nuevos. Es CONSERVADOR: sólo dispara si la
+ * proporción de hrefs rotos es alta, para no destruir personalizaciones
+ * legítimas que casualmente usen alguno de esos hrefs.
+ *
+ * Idempotente: una vez sustituido, los hrefs nuevos no contienen los
+ * patrones legacy y el heal no vuelve a dispararse.
+ */
+function healFooterColumns(merged: Record<string, unknown>, defaults: Record<string, unknown>): Record<string, unknown> {
+  try {
+    const footer = merged.footer as { columns?: Array<{ title?: string; links?: Array<{ label?: string; href?: string }> }> } | undefined;
+    if (!footer?.columns || !Array.isArray(footer.columns)) return merged;
+
+    const allLinks = footer.columns.flatMap(col => col.links ?? []);
+    if (allLinks.length === 0) return merged;
+
+    // Los defaults antiguos rotos eran exactamente estos hrefs:
+    //   Producto: #features, #pricing, #, #, #
+    //   Empresa:  # # # # #
+    //   Legal:    # # # # #
+    // Sólo reemplazamos si MÁS DE LA MITAD de los links siguen siendo
+    // exactamente "#" o uno de los anclas legacy planos. Eso es muy
+    // improbable en una personalización del usuario.
+    const LEGACY_HREFS = new Set(["#", "#features", "#pricing"]);
+    const brokenCount = allLinks.filter(l => LEGACY_HREFS.has((l.href || "").trim())).length;
+    const ratio = brokenCount / allLinks.length;
+
+    // Umbral conservador: > 50% de hrefs son legacy → casi seguro defaults antiguos.
+    if (ratio > 0.5) {
+      const defaultsFooter = defaults.footer as { columns?: unknown };
+      if (defaultsFooter?.columns) {
+        return {
+          ...merged,
+          footer: { ...footer, columns: defaultsFooter.columns },
+        };
+      }
+    }
+    return merged;
+  } catch {
+    return merged;
+  }
+}
+
 async function getOrInitContent() {
   const rows = await db.select().from(cmsContent).limit(1);
   if (rows.length > 0) {
     const merged = deepMergeDefaults(DEFAULT_CMS_CONTENT as Record<string, unknown>, rows[0].content as Record<string, unknown>);
+    const healed = healFooterColumns(merged, DEFAULT_CMS_CONTENT as Record<string, unknown>);
+    // Si hubo healing, persistimos para que los próximos reads no necesiten heal otra vez.
+    if (healed !== merged) {
+      try {
+        const newVersion = rows[0].version + 1;
+        await db.update(cmsContent)
+          .set({ content: healed, version: newVersion, updatedAt: new Date() })
+          .where(eq(cmsContent.id, rows[0].id));
+        // Notifica a editores conectados por SSE para que recarguen.
+        try { invalidateCache("cms-"); broadcast("content_updated", { path: "footer.columns", value: (healed as any).footer?.columns, version: newVersion, source: "auto-heal" }); } catch {}
+      } catch {}
+      return { ...rows[0], content: healed };
+    }
     return { ...rows[0], content: merged };
   }
   const [row] = await db.insert(cmsContent).values({ content: DEFAULT_CMS_CONTENT, version: 1 }).returning();

@@ -160,6 +160,21 @@ REGLAS CRÍTICAS:
 - Los fragmentos HTML mejorados deben ser semánticos, accesibles y modernos
 - La paleta mejorada debe POTENCIAR la identidad de marca, no reemplazarla
 
+PROHIBIDO ABSOLUTAMENTE (rechazaremos la respuesta y la regeneraremos):
+- Texto "Lorem ipsum" o cualquier variante latina de relleno
+- Las palabras "placeholder", "[placeholder]", "TODO", "FIXME", "TBD", "Insert text here", "Add content here" en HTML o CSS
+- Clases CSS genéricas tipo .class1, .div1, .section1, .untitled, .foo, .bar
+- Selectores genéricos como .container-default, .generic-button, .default-card
+- Valores hardcodeados sin sentido (#000, #fff sólo, font-family: Arial sólo) — usa la paleta y tipografía REALES de la marca
+- HTML con texto en inglés genérico ("Welcome to our website", "Lorem ipsum dolor sit amet…") cuando la marca es de habla hispana
+- Repetir literalmente el HTML/CSS original sin cambios — el "improved" tiene que ser distinto y mejor
+- Generar una respuesta donde "improved" === "original" (haz un trabajo real, propón cambios concretos)
+
+REGLA DE UNICIDAD POR MARCA:
+- El nombre y los valores hex de --brand-primary, --brand-secondary, --brand-accent deben coincidir con la paleta REAL detectada para esta marca, no copiar valores de un análisis anterior
+- Las Google Fonts importadas deben razonarse a partir del estilo de la marca (sector, tono, estética del Instagram), no usar siempre Inter+Playfair
+- Los textos del HTML mejorado deben referirse a productos/servicios reales de la marca cuando se conozcan
+
 CATEGORÍAS DE SCORE (0-100):
 - design: Estética visual, espaciado, jerarquía, modernidad
 - ux: Navegación, CTAs, flujo de usuario, micro-interacciones
@@ -358,6 +373,23 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
     if (!analysis.issues) analysis.issues = [];
     if (!analysis.categories) {
       analysis.categories = { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 };
+    }
+
+    // ── T004: Auditoría de calidad / uniqueness ──
+    // No bloqueamos al usuario (la respuesta sigue siendo entregable) pero
+    // logueamos cualquier señal de placeholder/genérico para auditar.
+    const audit = auditWebLabAnalysis(analysis, searchName);
+    if (audit.warnings.length > 0) {
+      logger.warn({ url, brand: searchName, warnings: audit.warnings, cssLines: audit.cssLines }, "⚠ Web Lab — análisis con avisos de calidad");
+    }
+    if (pid > 0) {
+      learnFromOperation({
+        operationType: "web_lab_quality_audit",
+        title: `Auditoría calidad Lab Web — ${searchName}`,
+        content: `URL: ${url}. CSS: ${audit.cssLines} líneas. Fragments: ${analysis.improvedHtmlFragments?.length ?? 0}. Avisos: ${audit.warnings.join("; ") || "ninguno"}.`,
+        confidence: audit.warnings.length === 0 ? 0.9 : 0.5,
+        tags: ["web-lab", "quality-audit", searchName],
+      });
     }
     if (!analysis.overallScore) {
       const cats = analysis.categories;
@@ -731,6 +763,241 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
   } catch (err: any) {
     logger.error({ err }, "Web Lab download pack failed");
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// T004 — Auditoría de calidad / uniqueness post-generación
+// Detecta señales de respuesta genérica o con placeholders.
+// No bloquea al usuario; sólo emite avisos para auditar.
+// ─────────────────────────────────────────────────────────────
+function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warnings: string[]; cssLines: number } {
+  const warnings: string[] = [];
+  const css = (analysis.improvedCss || "").toString();
+  const cssLines = css.split("\n").length;
+
+  if (cssLines < 200) {
+    warnings.push(`CSS demasiado corto (${cssLines} líneas; mínimo 200)`);
+  }
+
+  const FORBIDDEN_TOKENS = [
+    "lorem ipsum", "lorem-ipsum",
+    "[placeholder]", "{placeholder}",
+    "todo:", "fixme", "tbd",
+    "insert text here", "add content here", "add text here",
+    "your text here", "your title here",
+  ];
+  const cssLower = css.toLowerCase();
+  const fragmentsBlob = (analysis.improvedHtmlFragments || []).map(f => `${f.improved}`).join("\n").toLowerCase();
+  for (const tok of FORBIDDEN_TOKENS) {
+    if (cssLower.includes(tok)) warnings.push(`CSS contiene token prohibido: "${tok}"`);
+    if (fragmentsBlob.includes(tok)) warnings.push(`HTML contiene token prohibido: "${tok}"`);
+  }
+
+  // Selectores genéricos que delatan respuesta plantilla
+  const GENERIC_SELECTORS = [/\.class1\b/, /\.div1\b/, /\.section1\b/, /\.untitled\b/, /\.foo\b/, /\.bar\b/];
+  for (const re of GENERIC_SELECTORS) {
+    if (re.test(css)) warnings.push(`CSS usa selector genérico: ${re.source}`);
+  }
+
+  // Fragmentos donde improved === original = respuesta vacía
+  const lazyFragments = (analysis.improvedHtmlFragments || []).filter(f =>
+    f.improved && f.original && f.improved.trim() === f.original.trim()
+  );
+  if (lazyFragments.length > 0) {
+    warnings.push(`${lazyFragments.length} fragmento(s) HTML idénticos al original`);
+  }
+
+  // Ausencia total de variables CSS de marca
+  if (!/--brand-/i.test(css) && !/--color-/i.test(css)) {
+    warnings.push("CSS no define variables de marca (--brand-* / --color-*)");
+  }
+
+  // Mención mínima de la marca en el CSS o fragments (señal débil de uniqueness)
+  if (brand && brand.length > 2) {
+    const brandSlug = brand.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    if (brandSlug.length > 2 && !cssLower.includes(brandSlug) && !fragmentsBlob.includes(brandSlug)) {
+      // Esto es sólo una señal; no siempre es problema (algunas marcas no aparecen como clase)
+      // pero ayuda a auditar.
+    }
+  }
+
+  return { warnings, cssLines };
+}
+
+// ─────────────────────────────────────────────────────────────
+// T003 — Iteración: refinar el diseño ya generado con un cambio
+// pedido en lenguaje natural. Toma el CSS y los fragments
+// "improved" como punto de partida y genera una nueva versión.
+// ─────────────────────────────────────────────────────────────
+const WEB_DESIGN_ITERATE_SYSTEM = `Eres un experto en diseño web. Recibes un CSS y unos fragmentos HTML que YA generaste anteriormente para una marca,
+junto con una petición concreta de cambio del cliente. Tu trabajo es producir una NUEVA versión del CSS y de los fragmentos
+aplicando ese cambio sin romper el resto.
+
+REGLAS:
+- Mantén las variables CSS de marca y la coherencia visual del diseño actual
+- Aplica el cambio pedido de forma visible y concreta
+- Devuelve el CSS COMPLETO (no parches), listo para reemplazar el anterior — mínimo 200 líneas
+- Devuelve los fragmentos HTML COMPLETOS, no diffs
+- Prohibido: lorem ipsum, placeholder, TODO, FIXME, clases genéricas .class1/.div1, repetir literalmente la versión anterior sin aplicar el cambio
+- Si el cambio pedido es ambiguo, interprétalo razonablemente y explica en "summary" qué decisiones tomaste
+- NO inventes secciones que no existían; si el cliente pide algo nuevo, añade un fragmento extra coherente
+
+Responde SIEMPRE en JSON válido con esta estructura exacta:
+{
+  "improvedCss": "/* CSS COMPLETO actualizado */",
+  "improvedHtmlFragments": [{ "section": "nombre", "original": "<código previo>", "improved": "<código nuevo>" }],
+  "summary": "Qué cambios aplicaste y por qué, en español"
+}`;
+
+router.post("/web-lab/iterate", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, url, previousCss, previousFragments, changeRequest, brandName } = req.body as {
+      projectId?: number;
+      url?: string;
+      previousCss?: string;
+      previousFragments?: Array<{ section: string; original: string; improved: string }>;
+      changeRequest?: string;
+      brandName?: string;
+    };
+
+    if (!changeRequest || !changeRequest.trim()) {
+      res.status(400).json({ error: "Falta el cambio a aplicar (changeRequest)" });
+      return;
+    }
+    if (changeRequest.length > 4_000) {
+      res.status(400).json({ error: "El cambio pedido es demasiado largo (máx 4000 caracteres)" });
+      return;
+    }
+    if (!previousCss || previousCss.length < 50) {
+      res.status(400).json({ error: "Falta el CSS previo (previousCss)" });
+      return;
+    }
+    if (previousCss.length > 200_000) {
+      res.status(400).json({ error: "El CSS previo es demasiado grande (máx 200KB)" });
+      return;
+    }
+    if (previousFragments && Array.isArray(previousFragments) && previousFragments.length > 50) {
+      res.status(400).json({ error: "Demasiados fragmentos previos (máx 50)" });
+      return;
+    }
+
+    const pid = projectId ?? 0;
+    const brand = (brandName || "").trim() || (url ? url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : "");
+
+    res.status(200);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    enableLongRunning(res);
+    if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
+      (res as unknown as { flushHeaders: () => void }).flushHeaders();
+    }
+
+    // Recortamos lo que enviamos al modelo para no explotar el contexto
+    const cssTrim = previousCss.length > 60_000
+      ? `${previousCss.slice(0, 40_000)}\n/* …CSS previo recortado… */\n${previousCss.slice(-15_000)}`
+      : previousCss;
+    const fragsTrim = (previousFragments || [])
+      .slice(0, 12)
+      .map(f => `=== ${f.section} ===\n--- ORIGINAL ---\n${(f.original || "").slice(0, 4_000)}\n--- IMPROVED PREVIO ---\n${(f.improved || "").slice(0, 4_000)}`)
+      .join("\n\n");
+
+    const userPrompt = `MARCA: ${brand || "(no especificada)"}
+URL DE REFERENCIA: ${url || "(n/a)"}
+
+CAMBIO QUE PIDE EL CLIENTE:
+"${changeRequest.trim()}"
+
+CSS PREVIO (versión que estamos iterando):
+${cssTrim}
+
+FRAGMENTOS HTML PREVIOS:
+${fragsTrim || "(sin fragmentos previos)"}
+
+Devuelve la nueva versión completa con el cambio aplicado en JSON válido según el contrato del system prompt.`;
+
+    type IterateResult = {
+      improvedCss: string;
+      improvedHtmlFragments: Array<{ section: string; original: string; improved: string }>;
+      summary: string;
+    };
+
+    const result = await askClaudeJsonWithBrain<IterateResult>(
+      pid, userPrompt, WEB_DESIGN_ITERATE_SYSTEM, "general", undefined, 12000, 240_000
+    );
+
+    if (!result.improvedCss || result.improvedCss.length < 100) {
+      res.end(JSON.stringify({ error: "La iteración no devolvió un CSS válido. Inténtalo con una petición más concreta." }));
+      return;
+    }
+    if (!Array.isArray(result.improvedHtmlFragments)) {
+      result.improvedHtmlFragments = previousFragments || [];
+    }
+
+    // Audit calidad de la iteración
+    const audit = auditWebLabAnalysis(
+      { ...({} as WebLabAnalysis), improvedCss: result.improvedCss, improvedHtmlFragments: result.improvedHtmlFragments } as WebLabAnalysis,
+      brand,
+    );
+    if (audit.warnings.length > 0) {
+      logger.warn({ url, brand, warnings: audit.warnings, cssLines: audit.cssLines }, "⚠ Web Lab iterate — avisos de calidad");
+    }
+
+    // Guarda nueva versión en el vault si hay proyecto
+    if (pid > 0) {
+      try {
+        await Promise.all([
+          saveToVault({
+            projectId: pid,
+            fileType: "web-lab-css",
+            category: "web-lab",
+            title: `CSS iterado — ${brand || url || "Lab Web"}`,
+            description: `Iteración: ${changeRequest.trim().slice(0, 140)}`,
+            originalUrl: url || "",
+            mimeType: "text/css",
+            generatedBy: "web-lab-iterate",
+            content: result.improvedCss,
+            metadata: { url, brand, changeRequest, iteratedAt: new Date().toISOString(), tags: ["web-lab", "iteration", brand].filter(Boolean) },
+          }),
+          saveToVault({
+            projectId: pid,
+            fileType: "web-lab-html",
+            category: "web-lab",
+            title: `HTML iterado — ${brand || url || "Lab Web"}`,
+            description: `Iteración: ${changeRequest.trim().slice(0, 140)}`,
+            originalUrl: url || "",
+            mimeType: "text/html",
+            generatedBy: "web-lab-iterate",
+            content: (result.improvedHtmlFragments || []).map(f => `<!-- ${f.section} -->\n${f.improved}`).join("\n\n"),
+            metadata: { url, brand, changeRequest, iteratedAt: new Date().toISOString(), tags: ["web-lab", "iteration", brand].filter(Boolean) },
+          }),
+        ]);
+      } catch (e) {
+        logger.warn({ err: e }, "Web Lab iterate — vault save failed");
+      }
+
+      learnFromOperation({
+        operationType: "web_lab_iteration",
+        title: `Iteración Lab Web — ${brand || url}`,
+        content: `Cambio pedido: "${changeRequest.trim()}". Resumen del modelo: ${result.summary}. Avisos: ${audit.warnings.join("; ") || "ninguno"}.`,
+        confidence: audit.warnings.length === 0 ? 0.85 : 0.6,
+        tags: ["web-lab", "iteration", brand || ""].filter(Boolean),
+      });
+    }
+
+    res.end(JSON.stringify({
+      success: true,
+      improvedCss: result.improvedCss,
+      improvedHtmlFragments: result.improvedHtmlFragments,
+      summary: result.summary || `Cambios aplicados: ${changeRequest.trim()}`,
+      audit: { cssLines: audit.cssLines, warnings: audit.warnings },
+    }));
+  } catch (err: any) {
+    logger.error({ err }, "Web Lab iterate failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Error en la iteración" });
+    } else {
+      try { res.end(JSON.stringify({ error: err.message || "Error en la iteración" })); } catch {}
+    }
   }
 });
 

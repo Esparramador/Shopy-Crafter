@@ -919,9 +919,24 @@ export const DEFAULT_CMS_CONTENT = {
   footer: {
     tagline: "Shopy Crafter — Shopy Crafter eCommerce. Powered by Claude AI + Gemini + Replicate.",
     columns: [
-      { title: "Producto", links: [{ label: "Motores IA", href: "#features" }, { label: "Precios", href: "#pricing" }, { label: "Changelog", href: "#" }, { label: "Documentación", href: "#" }, { label: "API Reference", href: "#" }] },
-      { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#" }, { label: "Blog", href: "#" }, { label: "Casos de éxito", href: "#" }, { label: "Afiliados", href: "#" }, { label: "Contacto", href: "#" }] },
-      { title: "Legal", links: [{ label: "Privacidad", href: "#" }, { label: "Términos", href: "#" }, { label: "Cookies", href: "#" }, { label: "RGPD", href: "#" }, { label: "Seguridad", href: "#" }] },
+      { title: "Producto", links: [
+        { label: "Motores IA", href: "#fp-engines" },
+        { label: "Precios", href: "#fp-pricing" },
+        { label: "Calculadora", href: "#fp-calculator" },
+        { label: "Resultados", href: "#fp-results" },
+      ] },
+      { title: "Empresa", links: [
+        { label: "Sobre nosotros", href: "#about-us" },
+        { label: "Casos de éxito", href: "#case-studies" },
+        { label: "Afiliados", href: "#affiliates" },
+        { label: "Contacto", href: "#fp-contact" },
+      ] },
+      { title: "Legal", links: [
+        { label: "Privacidad", href: "#legal:privacy" },
+        { label: "Términos", href: "#legal:terms" },
+        { label: "Cookies", href: "#legal:cookies" },
+        { label: "RGPD", href: "#legal:gdpr" },
+      ] },
     ],
     copyright: "© 2026 Shopy Crafter · Agency Platform. Todos los derechos reservados.",
     badges: ["RGPD", "AES-256", "SOC2"],
