@@ -485,3 +485,9 @@ id = "c0xXfW2QNXOgMaq_2c2GW"
 uri = "file://exports/hanakaze-deconstruccion-extendida-24s.mp4"
 type = "video"
 title = "Vídeo Deconstrucción Extendido — Sudadera Royal Blue (front kanji + back mariposa + hero, 23s)"
+
+[[outputs]]
+id = "VghOLYYUqB3j-e7VzeO1F"
+uri = "file://exports/hanakaze-deconstruccion-extendida-24s-light.mp4"
+type = "video"
+title = "Vídeo Deconstrucción Extendido — Sudadera Royal (front + back mariposa + hero, 23s, 28MB)"
