@@ -11,7 +11,7 @@ import { learnFromOperation } from "../lib/claude.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { checkTtsQuota } from "./voice.js";
 import {
-  IMAGE_MODELS, VIDEO_MODELS,
+  IMAGE_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
@@ -22,6 +22,8 @@ import {
   transferMotionToImage,
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
+import { getAllProvidersHealth, invalidateProviderHealthCache, type ProviderId } from "../lib/provider-health.js";
+import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../lib/prompt-templates.js";
 import { listTemplates } from "../lib/ad-templates.js";
 import {
   generateCinematicMultiShot,
@@ -106,11 +108,9 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
     videoGeneration: Object.entries(VIDEO_MODELS).map(([k, v]) => ({
       key: k, label: prettyLabel(k), ...v,
     })),
-    imageEdit: [
-      { key: "nano-banana", label: "Nano Banana (Gemini)", description: "Edición rápida con instrucciones de texto, mantiene la marca" },
-      { key: "flux-kontext-pro", label: "Flux Kontext Pro", description: "Edición consistente, mantiene personajes/estilo" },
-      { key: "gen4-image-edit", label: "Runway Gen-4 Image", description: "Image edit con referencias estilo Runway" },
-    ],
+    imageEdit: Object.entries(IMAGE_EDIT_MODELS).map(([k, v]) => ({
+      key: k, label: prettyLabel(k), ...v,
+    })),
     enhance: [
       { key: "real-esrgan", label: "Real-ESRGAN x2/x4", description: "Upscale general con preservación de detalle" },
       { key: "clarity-upscaler", label: "Clarity Upscaler", description: "Tipo Magnific, añade detalle creativo" },
@@ -181,6 +181,94 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
 function prettyLabel(key: string): string {
   return key.split("-").map(s => s[0].toUpperCase() + s.slice(1)).join(" ");
 }
+
+// ─── PROVIDER HEALTH (selector de API + fallback automático) ─────────────
+// GET /api/fs-pro/providers/health  → estado de Replicate / Runway / Gemini / ElevenLabs
+//   ?fresh=1 fuerza refresco (sin cache de 60s)
+router.get("/fs-pro/providers/health", requireAdmin, async (req, res) => {
+  try {
+    const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+    const data = await getAllProvidersHealth(fresh);
+    res.json({ providers: data, fetchedAt: Date.now() });
+  } catch (e: any) {
+    logger.error({ err: e?.message }, "[fs-pro] providers/health failed");
+    res.status(500).json({ error: e?.message || "health check failed" });
+  }
+});
+
+// POST /api/fs-pro/providers/refresh-cache  → invalida cache (tras 402/429)
+router.post("/fs-pro/providers/refresh-cache", requireAdmin, async (_req, res) => {
+  invalidateProviderHealthCache();
+  res.json({ ok: true });
+});
+
+// ─── PROMPT BUILDER (estilo pollo.ai) ─────────────────────────────────────
+// GET /api/fs-pro/prompt/catalog → presets disponibles (style, lens, lighting...)
+router.get("/fs-pro/prompt/catalog", requireAdmin, (_req, res) => {
+  res.json(getPromptCatalog());
+});
+
+// POST /api/fs-pro/prompt/build → combina presets en un prompt cinematográfico
+//   body: BuildPromptOptions  →  { prompt, negativePrompt, breakdown }
+router.post("/fs-pro/prompt/build", requireAdmin, (req, res) => {
+  try {
+    const body = req.body as Partial<BuildPromptOptions> & { picks?: Record<string, string>; brand?: string; apps?: string };
+    if (!body || typeof body.subject !== "string" || body.subject.trim().length < 3) {
+      res.status(400).json({ error: "subject (min 3 chars) requerido" });
+      return;
+    }
+    if (body.kind !== "image" && body.kind !== "video") {
+      res.status(400).json({ error: "kind debe ser 'image' o 'video'" });
+      return;
+    }
+    // Si llega `picks` anidado (forma frontend), aplanar al formato BuildPromptOptions
+    // y validar contra el catálogo (allowlist) para evitar valores arbitrarios.
+    const catalog = getPromptCatalog();
+    const validKeys = (cat: keyof typeof catalog) =>
+      new Set(catalog[cat].map((it: any) => it.key));
+    const pickAllowed = (cat: keyof typeof catalog, val: any): string | undefined =>
+      typeof val === "string" && val && validKeys(cat).has(val) ? val : undefined;
+
+    const picks = (body.picks && typeof body.picks === "object") ? body.picks : {};
+
+    // Normalizar transitions: añadirlo como brandKeyword adicional ya que BuildPromptOptions no lo soporta
+    const transitionVal = pickAllowed("transitions", picks.transitions);
+    const transitionLine = transitionVal
+      ? (catalog.transitions.find((t: any) => t.key === transitionVal)?.description || "")
+      : "";
+
+    // Brand string → brandKeywords array
+    let brandKw: string[] | undefined;
+    if (typeof body.brand === "string" && body.brand.trim()) {
+      brandKw = [body.brand.trim().slice(0, 80)];
+    } else if (Array.isArray(body.brandKeywords)) {
+      brandKw = body.brandKeywords.slice(0, 8).map(s => String(s).slice(0, 80));
+    }
+    if (transitionLine) {
+      brandKw = [...(brandKw || []), transitionLine.slice(0, 200)];
+    }
+
+    const safe: BuildPromptOptions = {
+      kind: body.kind,
+      subject: String(body.subject).trim().slice(0, 1500),
+      style:          (pickAllowed("style", picks.style) ?? body.style) as any,
+      lens:           (pickAllowed("lens", picks.lens) ?? body.lens) as any,
+      lighting:       (pickAllowed("lighting", picks.lighting) ?? body.lighting) as any,
+      palette:        (pickAllowed("palette", picks.palette) ?? body.palette) as any,
+      mood:           (pickAllowed("mood", picks.mood) ?? body.mood) as any,
+      composition:    (pickAllowed("composition", picks.composition) ?? body.composition) as any,
+      cameraMovement: body.kind === "video" ? (pickAllowed("cameraMovement", picks.cameraMovement) ?? body.cameraMovement) as any : undefined,
+      app:            (pickAllowed("apps", picks.apps ?? (body as any).app) ?? body.app) as any,
+      brandKeywords:  brandKw,
+      negativeHints:  Array.isArray(body.negativeHints) ? body.negativeHints.slice(0, 12).map(s => String(s).slice(0, 60)) : undefined,
+      language:       body.language === "en" ? "en" : "es",
+    };
+    const result = buildProPrompt(safe);
+    res.json({ ok: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt build failed" });
+  }
+});
 
 // ─── IMAGE GENERATION ─────────────────────────────────────────────────────
 router.post("/fs-pro/generate-image", requireAdmin, async (req: Request, res: Response) => {

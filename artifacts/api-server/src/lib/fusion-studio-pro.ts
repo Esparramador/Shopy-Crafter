@@ -104,15 +104,25 @@ export type ImageGenModel =
   | "nano-banana"               // Gemini 2.5 Flash Image
   | "flux-kontext-pro";         // Flux Kontext for character consistency
 
-export const IMAGE_MODELS: Record<ImageGenModel, { replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
-  "flux-1.1-pro-ultra": { replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
-  "flux-1.1-pro":       { replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
-  "flux-schnell":       { replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
-  "recraft-v3":         { replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
-  "ideogram-v3-turbo":  { replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
-  "imagen-4-ultra":     { replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra, premium", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
-  "nano-banana":        { description: "Gemini 2.5 Flash Image - rápido y consistente con marca", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "2K" },
-  "flux-kontext-pro":   { replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+// ImageProvider explícito para health-check / fallback automático en frontend.
+export type ImageProvider = "replicate" | "gemini" | "runway";
+
+export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
+  "flux-1.1-pro-ultra": { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
+  "flux-1.1-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
+  "flux-schnell":       { provider: "replicate", replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
+  "recraft-v3":         { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "ideogram-v3-turbo":  { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "imagen-4-ultra":     { provider: "replicate", replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra, premium", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "nano-banana":        { provider: "gemini",                                                          description: "Gemini 2.5 Flash Image - rápido y consistente con marca", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "2K" },
+  "flux-kontext-pro":   { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+};
+
+// Modelos de edición de imagen mapeados a provider para el health-check.
+export const IMAGE_EDIT_MODELS: Record<ImageEditModel, { provider: ImageProvider; description: string; costPerImage: number }> = {
+  "nano-banana":      { provider: "gemini",    description: "Edición rápida con instrucciones de texto, mantiene la marca",     costPerImage: 0.04 },
+  "flux-kontext-pro": { provider: "replicate", description: "Edición consistente, mantiene personajes/estilo",                  costPerImage: 0.05 },
+  "gen4-image-edit":  { provider: "runway",    description: "Image edit con referencias estilo Runway (gen4_image)",            costPerImage: 0.08 },
 };
 
 export async function generateImage(

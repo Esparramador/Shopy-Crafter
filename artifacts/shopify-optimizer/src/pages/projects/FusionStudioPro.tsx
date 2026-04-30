@@ -1,16 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRoute } from "wouter";
-import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare } from "lucide-react";
+import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "avatars" | "audio" | "compose" | "protools" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "downloads";
 
+type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs";
+type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
+interface ProviderHealth { provider: ProviderId; status: ProviderStatus; hasKey: boolean; detail?: string; checkedAt: number }
+type HealthMap = Record<ProviderId, ProviderHealth>;
+
+interface ModelWithProvider {
+  key: string; label: string; description: string;
+  provider?: ProviderId;
+  costPerImage?: number; aspectRatios?: string[]; maxResolution?: string;
+  costPerSec?: number; quality?: number; maxDuration?: number;
+}
 interface Capabilities {
-  imageGeneration: Array<{ key: string; label: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }>;
-  videoGeneration: Array<{ key: string; label: string; description: string; costPerSec: number; quality: number; maxDuration: number }>;
-  imageEdit: Array<{ key: string; label: string; description: string }>;
+  imageGeneration: ModelWithProvider[];
+  videoGeneration: ModelWithProvider[];
+  imageEdit: ModelWithProvider[];
   enhance: Array<{ key: string; label: string; description: string }>;
   background: Array<{ key: string; label: string; description: string }>;
   audio: Array<{ key: string; label: string; description: string }>;
@@ -20,6 +31,85 @@ interface Capabilities {
   transitionPresets?: Array<{ key: string; label: string; xfade: string; defaultDurationSec: number }>;
   pollopaParity?: Array<{ key: string; label: string; description: string }>;
   adTemplates?: Array<{ key: string; label: string; description: string; cameraPreset: string; transitionPreset: string; defaultAspect: string; defaultDurationSec: number }>;
+}
+
+// ── Hook & helpers para health de proveedores
+function useProviderHealth(): { health: HealthMap | null; loading: boolean; refresh: (force?: boolean) => Promise<void> } {
+  const [health, setHealth] = useState<HealthMap | null>(null);
+  const [loading, setLoading] = useState(false);
+  const refresh = useCallback(async (force = false) => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/providers/health${force ? "?fresh=1" : ""}`, { credentials: "include" });
+      if (r.ok) { const j = await r.json(); setHealth(j.providers); }
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { refresh(false); }, [refresh]);
+  return { health, loading, refresh };
+}
+
+const PROVIDER_LABEL: Record<ProviderId, string> = {
+  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs",
+};
+const STATUS_COLOR: Record<ProviderStatus, { bg: string; fg: string; border: string; emoji: string }> = {
+  ok:              { bg: "rgba(45,212,159,0.15)", fg: "#2dd49f", border: "rgba(45,212,159,0.4)", emoji: "🟢" },
+  rate_limited:    { bg: "rgba(251,191,36,0.15)", fg: "#fbbf24", border: "rgba(251,191,36,0.4)", emoji: "🟡" },
+  out_of_credits:  { bg: "rgba(239,68,68,0.15)",  fg: "#ef4444", border: "rgba(239,68,68,0.4)",  emoji: "🔴" },
+  missing_key:     { bg: "rgba(148,163,184,0.15)",fg: "#94a3b8", border: "rgba(148,163,184,0.4)",emoji: "⚪" },
+  down:            { bg: "rgba(239,68,68,0.15)",  fg: "#ef4444", border: "rgba(239,68,68,0.4)",  emoji: "🔴" },
+  unknown:         { bg: "rgba(148,163,184,0.10)",fg: "#94a3b8", border: "rgba(148,163,184,0.3)",emoji: "❔" },
+};
+function statusLabel(s: ProviderStatus): string {
+  return s === "ok" ? "operativo"
+    : s === "rate_limited" ? "rate limit"
+    : s === "out_of_credits" ? "sin saldo (402)"
+    : s === "missing_key" ? "sin API key"
+    : s === "down" ? "caído"
+    : "desconocido";
+}
+
+function ProviderBadge({ provider, health, compact = false }: { provider?: ProviderId; health: HealthMap | null; compact?: boolean }) {
+  if (!provider) return null;
+  const h = health?.[provider];
+  const status = h?.status || "unknown";
+  const c = STATUS_COLOR[status];
+  return (
+    <span title={h?.detail ? `${PROVIDER_LABEL[provider]} · ${statusLabel(status)} (${h.detail})` : `${PROVIDER_LABEL[provider]} · ${statusLabel(status)}`}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: compact ? "1px 6px" : "2px 8px",
+        borderRadius: 999, background: c.bg, color: c.fg, border: `1px solid ${c.border}`,
+        fontSize: compact ? 9 : 10, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase",
+      }}>
+      <span style={{ fontSize: compact ? 8 : 9 }}>{c.emoji}</span>{PROVIDER_LABEL[provider]}
+    </span>
+  );
+}
+
+// Devuelve modelo alternativo cuyo provider esté OK, mismo array de modelos.
+function suggestFallback(models: ModelWithProvider[], failedKey: string, health: HealthMap | null): ModelWithProvider | null {
+  if (!health) return null;
+  const failed = models.find(m => m.key === failedKey);
+  // Prefer modelos con provider distinto al que falló y status ok
+  const candidates = models.filter(m =>
+    m.key !== failedKey &&
+    m.provider &&
+    health[m.provider]?.status === "ok"
+  );
+  // Mayor prioridad: provider distinto al fallido
+  candidates.sort((a, b) => {
+    if (a.provider === failed?.provider) return 1;
+    if (b.provider === failed?.provider) return -1;
+    return 0;
+  });
+  return candidates[0] || null;
+}
+
+// Detecta error 402/credit en respuesta y mensaje
+function isCreditError(httpStatus: number | undefined, message: string | undefined): boolean {
+  if (httpStatus === 402) return true;
+  const m = (message || "").toLowerCase();
+  return /402|out of credits|insufficient|payment required|sin saldo|saldo insuficiente|billing/i.test(m);
 }
 
 interface VaultItem {
@@ -41,6 +131,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
+  { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts cinematográficos estilo pollo.ai con presets" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
 
@@ -60,6 +151,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [sessionItems, setSessionItems] = useState<VaultItem[]>([]);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const { health, loading: healthLoading, refresh: refreshHealth } = useProviderHealth();
 
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok });
@@ -95,6 +187,21 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         </div>
       )}
 
+      {/* HEALTH BAR — estado de los 4 motores en tiempo real */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 14px", marginBottom: 16, borderRadius: 10, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--t3, #6c6c7c)", textTransform: "uppercase", letterSpacing: 0.6, marginRight: 6 }}>
+          Motores IA
+        </span>
+        {(["replicate","runway","gemini","elevenlabs"] as ProviderId[]).map(p => (
+          <ProviderBadge key={p} provider={p} health={health} />
+        ))}
+        <button onClick={() => refreshHealth(true)} disabled={healthLoading}
+          title="Refrescar estado (sin cache)"
+          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 6, background: "transparent", color: "var(--t2, #aaa)", border: "1px solid var(--bdr, #22222e)", fontSize: 11, cursor: healthLoading ? "wait" : "pointer" }}>
+          <RefreshCw size={12} className={healthLoading ? "animate-spin" : ""} /> {healthLoading ? "Comprobando..." : "Refrescar"}
+        </button>
+      </div>
+
       {/* TABS */}
       <div style={{ display: "flex", gap: 4, marginBottom: 20, padding: 4, background: "var(--ink2, #14141d)", borderRadius: 12, border: "1px solid var(--bdr, #22222e)", overflowX: "auto" }}>
         {TABS.map(t => (
@@ -118,16 +225,17 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20, marginTop: 16 }}>
-        {tab === "generate"   && <GenerateTab caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen generada y guardada", true); }} onError={(m) => showToast(m, false)} />}
-        {tab === "edit"       && <EditTab     caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Edición guardada", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "generate"   && <GenerateTab caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen generada y guardada", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
+        {tab === "edit"       && <EditTab     caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Edición guardada", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "background" && <BackgroundTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "enhance"    && <EnhanceTab    projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen mejorada", true); }} onError={(m) => showToast(m, false)} />}
-        {tab === "video"      && <VideoTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "video"      && <VideoTab    caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "multishot"  && <MultiShotTab caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Multi-shot listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "avatars"    && <AvatarsTab   caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Avatar listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "promptlab"  && <PromptLabTab onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
         {tab === "downloads"  && <DownloadsTab projectId={projectId} sessionItems={sessionItems} onError={(m) => showToast(m, false)} />}
       </div>
     </div>
@@ -170,7 +278,7 @@ function SessionGallery({ items, projectId, onToast }: { items: VaultItem[]; pro
 }
 
 // ─── TAB: GENERATE IMAGE ─────────────────────────────────────────────────
-function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [model, setModel] = useState("flux-1.1-pro");
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -179,6 +287,13 @@ function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabiliti
   const [busy, setBusy] = useState(false);
 
   const modelCfg = caps?.imageGeneration.find(m => m.key === model);
+  const currentProvider = modelCfg?.provider;
+  const providerStatus = currentProvider ? health?.[currentProvider]?.status : undefined;
+  const providerDown = providerStatus === "out_of_credits" || providerStatus === "down" || providerStatus === "missing_key";
+  const fallback = useMemo(
+    () => providerDown && caps ? suggestFallback(caps.imageGeneration, model, health) : null,
+    [providerDown, caps, model, health],
+  );
 
   const generate = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
@@ -190,7 +305,16 @@ function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabiliti
         body: JSON.stringify({ projectId, model, prompt, aspectRatio, negativePrompt: negativePrompt || undefined, referenceImageUrl: referenceImageUrl || undefined }),
       });
       const d = await res.json();
-      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      if (!res.ok) {
+        if (isCreditError(res.status, d?.error)) {
+          onCreditError?.();
+          const alt = caps ? suggestFallback(caps.imageGeneration, model, health) : null;
+          if (alt) onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo. Cambia a "${alt.label}" (${PROVIDER_LABEL[alt.provider!]}) y reintenta.`);
+          else     onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo y no hay otro motor con créditos. Recarga alguna API.`);
+          return;
+        }
+        onError(d.error || `Error ${res.status}`); return;
+      }
       onSuccess({ vaultId: d.vaultId, type: "image", label: prompt.slice(0, 40), dataUrl: d.dataUrl, mimeType: "image/png" });
     } catch (e: any) {
       onError(e?.message || "Error de red");
@@ -201,10 +325,19 @@ function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabiliti
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
         <Section title="Modelo">
+          {providerDown && (
+            <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+              ⚠️ <strong>{PROVIDER_LABEL[currentProvider!]}</strong> está {statusLabel(providerStatus!)}.
+              {fallback && <> Sugerencia: cambia a <button onClick={() => setModel(fallback.key)} style={{ background: "transparent", border: "none", color: "#fbbf24", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 700 }}>{fallback.label}</button> ({PROVIDER_LABEL[fallback.provider!]}).</>}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 6 }}>
             {caps?.imageGeneration.map(m => (
               <button key={m.key} onClick={() => setModel(m.key)} style={cardButton(model === m.key)}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{m.label}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2, gap: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>{m.label}</span>
+                  <ProviderBadge provider={m.provider} health={health} compact />
+                </div>
                 <div style={{ fontSize: 9, color: "var(--t3)", lineHeight: 1.3 }}>{m.description}</div>
                 <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 4 }}>~€{m.costPerImage} · {m.maxResolution}</div>
               </button>
@@ -250,12 +383,21 @@ function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabiliti
 }
 
 // ─── TAB: EDIT IMAGE ─────────────────────────────────────────────────────
-function EditTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+function EditTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [model, setModel] = useState("nano-banana");
   const [prompt, setPrompt] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const modelCfg = caps?.imageEdit.find(m => m.key === model);
+  const currentProvider = modelCfg?.provider;
+  const providerStatus = currentProvider ? health?.[currentProvider]?.status : undefined;
+  const providerDown = providerStatus === "out_of_credits" || providerStatus === "down" || providerStatus === "missing_key";
+  const fallback = useMemo(
+    () => providerDown && caps ? suggestFallback(caps.imageEdit, model, health) : null,
+    [providerDown, caps, model, health],
+  );
 
   const edit = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
@@ -270,7 +412,16 @@ function EditTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities |
       if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
       const res = await fetch(`${API_BASE}/api/fs-pro/edit-image`, { method: "POST", credentials: "include", body: fd });
       const d = await res.json();
-      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      if (!res.ok) {
+        if (isCreditError(res.status, d?.error)) {
+          onCreditError?.();
+          const alt = caps ? suggestFallback(caps.imageEdit, model, health) : null;
+          if (alt) onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo. Cambia a "${alt.label}" (${PROVIDER_LABEL[alt.provider!]}) y reintenta.`);
+          else     onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo y no hay otro motor disponible.`);
+          return;
+        }
+        onError(d.error || `Error ${res.status}`); return;
+      }
       onSuccess({ vaultId: d.vaultId, type: "image-edit", label: prompt.slice(0, 40), dataUrl: d.dataUrl, mimeType: "image/png" });
     } catch (e: any) { onError(e?.message || "Error de red"); } finally { setBusy(false); }
   };
@@ -279,9 +430,18 @@ function EditTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities |
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
         <Section title="Modelo de edición">
+          {providerDown && (
+            <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+              ⚠️ <strong>{PROVIDER_LABEL[currentProvider!]}</strong> está {statusLabel(providerStatus!)}.
+              {fallback && <> Sugerencia: <button onClick={() => setModel(fallback.key)} style={{ background: "transparent", border: "none", color: "#fbbf24", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 700 }}>{fallback.label}</button> ({PROVIDER_LABEL[fallback.provider!]}).</>}
+            </div>
+          )}
           {caps?.imageEdit.map(m => (
             <button key={m.key} onClick={() => setModel(m.key)} style={{ ...cardButton(model === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
-              <strong style={{ fontSize: 12 }}>{m.label}</strong>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                <strong style={{ fontSize: 12 }}>{m.label}</strong>
+                <ProviderBadge provider={m.provider} health={health} compact />
+              </div>
               <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.description}</div>
             </button>
           ))}
@@ -463,7 +623,7 @@ function EnhanceTab({ projectId, onSuccess, onError }: { projectId: number; onSu
 }
 
 // ─── TAB: VIDEO ──────────────────────────────────────────────────────────
-function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [model, setModel] = useState("seedance-fast");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(5);
@@ -472,6 +632,15 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
   const [sourceUrl, setSourceUrl] = useState("");
   const [cameraPreset, setCameraPreset] = useState<string>("");
   const [busy, setBusy] = useState(false);
+
+  const modelCfg = caps?.videoGeneration.find(m => m.key === model);
+  const currentProvider = modelCfg?.provider;
+  const providerStatus = currentProvider ? health?.[currentProvider]?.status : undefined;
+  const providerDown = providerStatus === "out_of_credits" || providerStatus === "down" || providerStatus === "missing_key";
+  const fallback = useMemo(
+    () => providerDown && caps ? suggestFallback(caps.videoGeneration, model, health) : null,
+    [providerDown, caps, model, health],
+  );
 
   const run = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
@@ -487,7 +656,16 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
       if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
       const res = await fetch(`${API_BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
       const d = await res.json();
-      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      if (!res.ok) {
+        if (isCreditError(res.status, d?.error)) {
+          onCreditError?.();
+          const alt = caps ? suggestFallback(caps.videoGeneration, model, health) : null;
+          if (alt) onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo. Cambia a "${alt.label}" (${PROVIDER_LABEL[alt.provider!]}) y reintenta.`);
+          else     onError(`${PROVIDER_LABEL[currentProvider!]} sin saldo y no hay otro motor de vídeo con créditos.`);
+          return;
+        }
+        onError(d.error || `Error ${res.status}`); return;
+      }
       onSuccess({ vaultId: d.vaultId, type: "video", label: prompt.slice(0, 30), mimeType: "video/mp4" });
     } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
   };
@@ -496,11 +674,20 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
         <Section title="Modelo">
+          {providerDown && (
+            <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+              ⚠️ <strong>{PROVIDER_LABEL[currentProvider!]}</strong> está {statusLabel(providerStatus!)}.
+              {fallback && <> Sugerencia: <button onClick={() => setModel(fallback.key)} style={{ background: "transparent", border: "none", color: "#fbbf24", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 700 }}>{fallback.label}</button> ({PROVIDER_LABEL[fallback.provider!]}).</>}
+            </div>
+          )}
           {caps?.videoGeneration.map(m => (
             <button key={m.key} onClick={() => setModel(m.key)} style={{ ...cardButton(model === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
                 <strong style={{ fontSize: 12 }}>{m.label}</strong>
-                <span style={{ fontSize: 10, color: "var(--gold)" }}>~€{m.costPerSec}/s · Q{m.quality}/10</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <ProviderBadge provider={m.provider} health={health} compact />
+                  <span style={{ fontSize: 10, color: "var(--gold)" }}>~€{m.costPerSec}/s · Q{m.quality}/10</span>
+                </div>
               </div>
               <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.description}</div>
             </button>
@@ -1636,6 +1823,143 @@ function AvatarsTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── TAB: PROMPT LAB (PRO PRESETS) ───────────────────────────────────────
+type PromptCategory = "lens" | "lighting" | "palette" | "mood" | "composition" | "cameraMovement" | "style" | "apps" | "transitions";
+type PromptCatalog = Record<PromptCategory, Array<{ key: string; label: string; description?: string; value?: string }>>;
+
+function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onError: (m: string) => void }) {
+  const [catalog, setCatalog] = useState<PromptCatalog | null>(null);
+  const [kind, setKind] = useState<"image" | "video">("image");
+  const [subject, setSubject] = useState("");
+  const [brand, setBrand] = useState("");
+  const [picks, setPicks] = useState<Partial<Record<PromptCategory, string>>>({});
+  const [busy, setBusy] = useState(false);
+  const [output, setOutput] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/fs-pro/prompt/catalog`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { if (!cancelled && d?.catalog) setCatalog(d.catalog); })
+      .catch(() => onError("No se pudo cargar el catálogo de prompts"));
+    return () => { cancelled = true; };
+  }, []);
+
+  const build = async () => {
+    if (subject.trim().length < 3) { onError("Describe el sujeto (mínimo 3 caracteres)"); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/build`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, subject: subject.trim(), brand: brand.trim() || undefined, picks }),
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      setOutput(d.prompt || "");
+      onInfo("Prompt construido");
+    } catch (e: any) {
+      onError(e?.message || "Error de red");
+    } finally { setBusy(false); }
+  };
+
+  const copy = async () => {
+    if (!output) return;
+    try { await navigator.clipboard.writeText(output); onInfo("Prompt copiado al portapapeles"); }
+    catch { onError("No se pudo copiar"); }
+  };
+
+  const reset = () => { setPicks({}); setOutput(""); };
+
+  const CATEGORY_TITLES: Record<PromptCategory, string> = {
+    lens: "🔭 Óptica / Lente",
+    lighting: "💡 Iluminación",
+    palette: "🎨 Paleta",
+    mood: "🎭 Atmósfera",
+    composition: "📐 Composición",
+    cameraMovement: "🎥 Movimiento de cámara (vídeo)",
+    style: "🖌️ Estilo visual",
+    apps: "🧩 Aplicación",
+    transitions: "✂️ Transiciones (vídeo)",
+  };
+
+  const visibleCategories: PromptCategory[] = kind === "image"
+    ? ["lens","lighting","palette","mood","composition","style","apps"]
+    : ["lens","lighting","palette","mood","composition","cameraMovement","style","apps","transitions"];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div>
+        <Section title="Tipo">
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setKind("image")} style={pillButton(kind === "image")}>📸 Imagen</button>
+            <button onClick={() => setKind("video")} style={pillButton(kind === "video")}>🎬 Vídeo</button>
+          </div>
+        </Section>
+        <Section title="Sujeto principal">
+          <textarea
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            placeholder="reloj de oro sobre mármol negro / modelo joven con auriculares en azotea / botella de perfume premium en estudio…"
+            style={{ ...inputStyle, minHeight: 80 }}
+          />
+        </Section>
+        <Section title="Marca (opcional)">
+          <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej: Hanakaze, Nike, Apple…" style={inputStyle} />
+        </Section>
+        {!catalog && <p style={{ fontSize: 11, color: "var(--t3)" }}>Cargando catálogo de presets…</p>}
+        {catalog && visibleCategories.map(cat => {
+          const items = catalog[cat] || [];
+          if (items.length === 0) return null;
+          return (
+            <Section key={cat} title={CATEGORY_TITLES[cat]}>
+              <select
+                value={picks[cat] || ""}
+                onChange={e => setPicks(p => ({ ...p, [cat]: e.target.value || undefined }))}
+                style={inputStyle}
+              >
+                <option value="">— Sin elección —</option>
+                {items.map(it => (
+                  <option key={it.key} value={it.key}>
+                    {it.label}{it.description ? ` · ${it.description}` : ""}
+                  </option>
+                ))}
+              </select>
+            </Section>
+          );
+        })}
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={build} disabled={busy || subject.trim().length < 3} className="btn btn-gold" style={{ flex: 1, justifyContent: "center", padding: "12px 16px" }}>
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy ? "Construyendo…" : "Construir prompt PRO"}
+          </button>
+          <button onClick={reset} disabled={busy} className="btn" style={{ padding: "12px 16px" }}>
+            <RefreshCw size={14} /> Reset
+          </button>
+        </div>
+      </div>
+      <div>
+        <Section title="Prompt cinematográfico generado">
+          <textarea
+            value={output}
+            readOnly
+            placeholder="Tu prompt profesional aparecerá aquí. Cópialo y pégalo en la pestaña Generar / Editar / Vídeo."
+            style={{ ...inputStyle, minHeight: 320, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.5 }}
+          />
+        </Section>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={copy} disabled={!output} className="btn" style={{ flex: 1, justifyContent: "center", padding: "10px 14px" }}>
+            <Copy size={14} /> Copiar prompt
+          </button>
+        </div>
+        <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)", fontSize: 11, color: "var(--t3, #6c6c7c)", lineHeight: 1.5 }}>
+          <strong style={{ color: "var(--gold, #fbbf24)" }}>💡 Tip:</strong> combina <em>lente + iluminación + paleta + mood</em> para fotos editoriales.
+          Para vídeo, añade <em>movimiento de cámara + transición</em>. Sin elecciones devuelve un baseline cinematográfico.
+        </div>
+      </div>
     </div>
   );
 }
