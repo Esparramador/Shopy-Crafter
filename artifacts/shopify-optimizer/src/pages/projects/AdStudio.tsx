@@ -207,7 +207,7 @@ export default function AdStudio() {
     } finally {
       abortRef.current = null;
     }
-  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, canGenerate]);
+  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, canGenerate, templateKey, burnSubs, subsLanguage]);
 
   const cancel = () => {
     abortRef.current?.abort();
@@ -491,6 +491,30 @@ export default function AdStudio() {
                 <div style={{ fontSize: 11, color: "var(--t3)" }}>Se genera SFX automático según el tono de cada variante. +€0.02/ad.</div>
               </div>
             </label>
+          </Section>
+
+          <Section title="Subtítulos automáticos quemados">
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer" }}>
+              <input type="checkbox" checked={burnSubs} onChange={e => setBurnSubs(e.target.checked)} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)" }}>Transcribir voz y quemar subtítulos en el MP4 final</div>
+                <div style={{ fontSize: 11, color: "var(--t3)" }}>Whisper transcribe el voiceover y FFmpeg quema los subtítulos. Recomendado para TikTok/Reels.</div>
+              </div>
+            </label>
+            {burnSubs && (
+              <div style={{ marginTop: 10 }}>
+                <label style={{ fontSize: 11, color: "var(--t2)", marginBottom: 4, display: "block" }}>Idioma del audio (auto = detectar)</label>
+                <select value={subsLanguage} onChange={e => setSubsLanguage(e.target.value)} style={inputStyle}>
+                  <option value="auto">Auto-detectar</option>
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                  <option value="pt">Português</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="it">Italiano</option>
+                </select>
+              </div>
+            )}
           </Section>
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>

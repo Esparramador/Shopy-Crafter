@@ -122,7 +122,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "video"      && <VideoTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
-        {tab === "protools"   && <ProToolsTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "downloads"  && <DownloadsTab projectId={projectId} sessionItems={sessionItems} onError={(m) => showToast(m, false)} />}
       </div>
     </div>
@@ -816,9 +816,9 @@ function DownloadsTab({ projectId, sessionItems, onError }: { projectId: number;
   );
 }
 
-// ─── TAB: PRO TOOLS (lip-sync · auto-subs · motion-transfer) ────────────
-function ProToolsTab({ projectId, sessionItems, onSuccess, onError }: { projectId: number; sessionItems: VaultItem[]; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
-  const [mode, setMode] = useState<"lipsync" | "subs" | "motion">("lipsync");
+// ─── TAB: PRO TOOLS (lip-sync · auto-subs · motion-transfer · concat) ───
+function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { caps: Capabilities | null; projectId: number; sessionItems: VaultItem[]; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+  const [mode, setMode] = useState<"lipsync" | "subs" | "motion" | "concat">("lipsync");
   const [busy, setBusy] = useState(false);
 
   // Lip-sync state
@@ -833,6 +833,11 @@ function ProToolsTab({ projectId, sessionItems, onSuccess, onError }: { projectI
   // Motion transfer state
   const [mtImage, setMtImage] = useState<File | null>(null);
   const [mtRef, setMtRef] = useState<File | null>(null);
+
+  // Concat state
+  const [concatIds, setConcatIds] = useState<number[]>([]);
+  const [transitionPreset, setTransitionPreset] = useState<string>("");
+  const [transitionDuration, setTransitionDuration] = useState<number>(0.5);
 
   const videoVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("video"));
   const audioVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("audio"));
@@ -893,6 +898,7 @@ function ProToolsTab({ projectId, sessionItems, onSuccess, onError }: { projectI
           { k: "lipsync", l: "Lip-sync" },
           { k: "subs",    l: "Subtítulos auto" },
           { k: "motion",  l: "Motion transfer" },
+          { k: "concat",  l: "Concat + transitions" },
         ].map(o => (
           <button key={o.k} onClick={() => setMode(o.k as any)} style={{ ...cardButton(mode === o.k), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
             {o.l}
@@ -963,6 +969,69 @@ function ProToolsTab({ projectId, sessionItems, onSuccess, onError }: { projectI
             </Section>
             <button onClick={runMotion} disabled={busy || !mtImage || !mtRef} className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Transfiriendo movimiento..." : "Generar (2-4 min)"}
+            </button>
+          </>
+        )}
+        {mode === "concat" && (
+          <>
+            <Section title="Videos a concatenar (en orden)">
+              {videoVaultItems.length === 0 ? (
+                <p style={{ fontSize: 11, color: "var(--t3)" }}>Genera primero al menos 2 videos.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {videoVaultItems.map(v => {
+                    const idx = concatIds.indexOf(v.vaultId);
+                    return (
+                      <label key={v.vaultId} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 6, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer" }}>
+                        <input type="checkbox" checked={idx >= 0} onChange={() => {
+                          setConcatIds(prev => idx >= 0 ? prev.filter(i => i !== v.vaultId) : [...prev, v.vaultId]);
+                        }} />
+                        <span style={{ fontSize: 12, flex: 1 }}>#{v.vaultId} · {v.label}</span>
+                        {idx >= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", minWidth: 18 }}>#{idx + 1}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </Section>
+            {caps?.transitionPresets && caps.transitionPresets.length > 0 && (
+              <Section title="Transición temática">
+                <select value={transitionPreset} onChange={e => setTransitionPreset(e.target.value)} style={inputStyle}>
+                  <option value="">Sin transición (corte directo)</option>
+                  {caps.transitionPresets.map(t => (
+                    <option key={t.key} value={t.key}>{t.label} ({t.xfade})</option>
+                  ))}
+                </select>
+                {transitionPreset && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ fontSize: 11, color: "var(--t3)" }}>Duración transición: {transitionDuration.toFixed(2)}s</label>
+                    <input type="range" min={0.2} max={2.0} step={0.1} value={transitionDuration} onChange={e => setTransitionDuration(parseFloat(e.target.value))} style={{ width: "100%" }} />
+                  </div>
+                )}
+              </Section>
+            )}
+            <button
+              onClick={async () => {
+                if (concatIds.length < 2) { onError("Selecciona al menos 2 videos"); return; }
+                setBusy(true);
+                try {
+                  const res = await fetch(`${API_BASE}/api/fs-pro/concat`, {
+                    method: "POST", credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      projectId, videoVaultIds: concatIds,
+                      transitionPreset: transitionPreset || undefined,
+                      crossfadeSec: transitionPreset ? transitionDuration : undefined,
+                    }),
+                  });
+                  const d = await res.json();
+                  if (!res.ok) { onError(d.error || `HTTP ${res.status}`); return; }
+                  onSuccess({ vaultId: d.vaultId, type: "video", label: `Concat ${concatIds.length} clips`, mimeType: "video/mp4" });
+                } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+              }}
+              disabled={busy || concatIds.length < 2}
+              className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />} {busy ? "Concatenando..." : `Concatenar ${concatIds.length} videos`}
             </button>
           </>
         )}
