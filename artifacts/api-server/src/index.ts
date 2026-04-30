@@ -391,3 +391,37 @@ logger.info({
   headersTimeout: "11min",
   keepAliveTimeout: "65s",
 }, "⏱ Server timeout config applied");
+
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info({ signal }, "🛑 Graceful shutdown iniciado");
+
+  const forceExitTimer = setTimeout(() => {
+    logger.warn("⏱ Forzando salida tras 8s de espera");
+    process.exit(1);
+  }, 8000);
+  forceExitTimer.unref();
+
+  server.close((err) => {
+    if (err) {
+      logger.error({ err }, "Error cerrando server");
+      process.exit(1);
+    }
+    logger.info("✅ Server cerrado limpio");
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    server.closeIdleConnections?.();
+  }, 200).unref();
+
+  setTimeout(() => {
+    server.closeAllConnections?.();
+  }, 4000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
