@@ -5854,7 +5854,89 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           }
           break;
         }
-  
+
+        case "create_montage_video": {
+          // Crea un vídeo conjunto (montaje cinematográfico) concatenando varios
+          // clips ya existentes en el vault del proyecto, con voz y música opcionales
+          // y transiciones profesionales entre escenas. Reutiliza /fs-pro/concat.
+          const projectId = params?.projectId;
+          if (!projectId || isNaN(Number(projectId))) {
+            result = { error: true, message: "❌ Falta projectId válido" }; break;
+          }
+          // Validación: enteros positivos únicos, entre 2 y 12 clips
+          const rawIds = Array.isArray(params?.clipVaultIds) ? params!.clipVaultIds : [];
+          const clipVaultIds = Array.from(new Set(
+            rawIds.map((x: any) => Number(x)).filter((x: number) => Number.isInteger(x) && x > 0)
+          )) as number[];
+          if (clipVaultIds.length < 2 || clipVaultIds.length > 12) {
+            result = { error: true, message: "❌ Necesitas entre 2 y 12 clipVaultIds (enteros positivos únicos)" }; break;
+          }
+          const ALLOWED_TRANSITIONS = new Set([
+            "hard_cut","cross_dissolve","fade_to_black","white_flash","dissolve_grain",
+            "hand_swipe_l","hand_swipe_r","slide_up","slide_down","zoom_punch",
+            "iris_open","iris_close","smoke_blur","glitch_pixel","splash_circle",
+            "diagonal_tl","cover_left","reveal_right",
+          ]);
+          const transitionPreset = ALLOWED_TRANSITIONS.has(String(params?.transitionPreset))
+            ? String(params!.transitionPreset)
+            : "cross_dissolve";
+          const clamp01to2 = (v: any, def: number) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return def;
+            return Math.max(0, Math.min(2, n));
+          };
+          const voiceVolume = clamp01to2(params?.voiceVolume, 1.0);
+          const musicVolume = clamp01to2(params?.musicVolume, 0.18);
+          const toPosInt = (v: any) => {
+            const n = Number(v);
+            return Number.isInteger(n) && n > 0 ? n : undefined;
+          };
+          const voiceVaultId = toPosInt(params?.voiceVaultId);
+          const musicVaultId = toPosInt(params?.musicVaultId);
+          try {
+            const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+            if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+            // SECURITY: URL interna fija (NUNCA host del request → evita SSRF + cookie leak)
+            const internalPort = process.env.PORT || 8080;
+            const cookieHeader = (req.headers.cookie as string) || "";
+            const concatRes = await fetch(`http://localhost:${internalPort}/api/fs-pro/concat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Cookie: cookieHeader },
+              body: JSON.stringify({
+                projectId: Number(projectId),
+                videoVaultIds: clipVaultIds,
+                voiceVaultId, musicVaultId,
+                transitionPreset,
+                voiceVolume, musicVolume,
+                width: 1920, height: 1080, fps: 30,
+              }),
+              signal: AbortSignal.timeout(4 * 60 * 1000), // 4 min hard cap
+            });
+            const concatData = await concatRes.json() as { success?: boolean; vaultId?: number; sizeBytes?: number; clipsCount?: number; error?: string };
+            if (!concatRes.ok || !concatData.success || !concatData.vaultId) {
+              result = { error: true, message: `❌ Error montando vídeo: ${concatData.error || `HTTP ${concatRes.status}`}` };
+              break;
+            }
+            const sizeMB = ((concatData.sizeBytes || 0) / 1024 / 1024).toFixed(2);
+            result = {
+              vaultId: concatData.vaultId,
+              clipsCount: concatData.clipsCount,
+              sizeBytes: concatData.sizeBytes,
+              message: `🎬✅ **Vídeo montaje creado**\n\n` +
+                `📦 Vault ID: **${concatData.vaultId}**\n` +
+                `🎞️ Clips concatenados: ${concatData.clipsCount}\n` +
+                `🎚️ Transición: ${transitionPreset}\n` +
+                `🎙️ Voz: ${voiceVaultId ? `vault ${voiceVaultId}` : "sin voz"}\n` +
+                `🎵 Música: ${musicVaultId ? `vault ${musicVaultId} (volumen ${musicVolume})` : "sin música"}\n` +
+                `💾 Tamaño: ${sizeMB} MB\n\n` +
+                `🔗 Disponible en el vault del proyecto, sección Fusion Studio Pro.`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error creando montaje: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
         case "run_leveled_report": {
           const projectId = params?.projectId;
           const reportType = params?.type;

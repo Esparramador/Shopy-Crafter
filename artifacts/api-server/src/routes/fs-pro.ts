@@ -681,6 +681,48 @@ router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── UPLOAD ARBITRARY CLIP/AUDIO/IMAGE TO VAULT ───────────────────────────
+// Permite a otros agentes (chatbot, scripts batch, ffmpeg local) guardar un
+// archivo binario directamente en el vault del proyecto. Usado por el pipeline
+// de montaje cuando los clips intro/outro se generan offline.
+router.post("/fs-pro/save-to-vault", requireAdmin, upload.single("file"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    if (!f) { res.status(400).json({ error: "Falta archivo (campo 'file')" }); return; }
+    const projectId = parseInt(String(req.body.projectId || "0"), 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    const title = String(req.body.title || `FS Pro Upload ${Date.now()}`).slice(0, 200);
+    // SECURITY: Allowlist de fileType / mimeType para evitar registrar contenido inesperado
+    const ALLOWED_FILETYPES = new Set([
+      "fs-pro-upload", "fs-pro-intro", "fs-pro-outro", "fs-pro-clip",
+      "fs-pro-video", "fs-pro-image", "fs-pro-audio", "fs-pro-tts", "fs-pro-sfx", "fs-pro-music",
+    ]);
+    const requestedFileType = String(req.body.fileType || "fs-pro-upload").slice(0, 64);
+    const fileType = ALLOWED_FILETYPES.has(requestedFileType) ? requestedFileType : "fs-pro-upload";
+    const category = "fusion-studio-pro";
+    const generatedBy = String(req.body.generatedBy || "fs-pro:upload").slice(0, 64);
+    const ALLOWED_MIME_PREFIX = ["video/", "audio/", "image/"];
+    const mimeRaw = String(req.body.mimeType || f.mimetype || "application/octet-stream");
+    if (!ALLOWED_MIME_PREFIX.some(p => mimeRaw.startsWith(p))) {
+      res.status(415).json({ error: `mimeType no permitido (${mimeRaw}). Solo video/audio/image.` });
+      return;
+    }
+    const mimeType = mimeRaw;
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType, category, title, mimeType, generatedBy, buffer: f.buffer,
+    });
+    res.json({ success: true, vaultId, sizeBytes: f.buffer.length, mimeType });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro save-to-vault failed");
+    res.status(500).json({ error: err?.message || "Error guardando en vault" });
+  }
+});
+
 // ─── DOWNLOAD ALL ASSETS AS ZIP ───────────────────────────────────────────
 router.post("/fs-pro/download-all", requireAdmin, async (req, res) => {
   enableLongRunning(res);

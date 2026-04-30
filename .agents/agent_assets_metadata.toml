@@ -365,3 +365,9 @@ id = "mtVaFoAb4ma_UHOBN4fS6"
 uri = "file://attached_assets/ads/ad2_camisetas_negras_templo.png"
 type = "image"
 title = "Anuncio 2 — Camisetas negras koi/Fuji · Templo blue hour"
+
+[[outputs]]
+id = "aUUQMdGIhdLlHC-qAZFvG"
+uri = "file://attached_assets/hanakaze_serigraphy_montaje_25s.mp4"
+type = "video"
+title = "Hanakaze Serigraphy — montaje cinematográfico (17.7s · 1080p)"
