@@ -371,3 +371,9 @@ id = "aUUQMdGIhdLlHC-qAZFvG"
 uri = "file://attached_assets/hanakaze_serigraphy_montaje_25s.mp4"
 type = "video"
 title = "Hanakaze Serigraphy — montaje cinematográfico (17.7s · 1080p)"
+
+[[outputs]]
+id = "S-A3kJGtzefqQ_POIdBR4"
+uri = "file://exports/hanakaze-super-anuncio-v2.mp4"
+type = "video"
+title = "Hanakaze Serigraphy — Super Anuncio v2 (71s, fiel a la colección real)"

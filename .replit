@@ -30,12 +30,12 @@ args = "hanakaze-runner"
 name = "hanakaze-runner"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "HANAKAZE_PROJECT_ID=7 node scripts/run-hanakaze-campaign.mjs"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "HANAKAZE_PROJECT_ID=7 node scripts/run-hanakaze-v2-super.mjs"
 
 [agent]
 stack = "PNPM_WORKSPACE"
