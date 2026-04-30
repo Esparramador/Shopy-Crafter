@@ -353,3 +353,15 @@ id = "8-0FdPnGajp22rCiEUf20"
 uri = "file://attached_assets/generated_videos/comic_crafter_ad_cinematic_showcase.mp4"
 type = "video"
 title = "Video Anuncio Comic Crafter — Cinematic Showcase 9:16 (6s, 720x1280, H.264 + AAC)"
+
+[[outputs]]
+id = "3vihcVzAaW7dq9BhUHyvV"
+uri = "file://attached_assets/ads/ad1_camiseta_blanca_tokio.png"
+type = "image"
+title = "Anuncio 1 — Camiseta blanca koi · Shibuya golden hour"
+
+[[outputs]]
+id = "mtVaFoAb4ma_UHOBN4fS6"
+uri = "file://attached_assets/ads/ad2_camisetas_negras_templo.png"
+type = "image"
+title = "Anuncio 2 — Camisetas negras koi/Fuji · Templo blue hour"

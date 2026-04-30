@@ -209,18 +209,27 @@ export async function editImage(
   }
 
   if (model === "gen4-image-edit") {
-    // Runway Gen-4 Image via Replicate. NOTE: takes 1-3 reference images
-    // (in our case, the user's input image as the only ref) + text prompt
-    // describing the edit. This produces a NEW image preserving identity/style.
-    // Per Replicate docs, the input shape on r8.im/runwayml/gen4-image accepts
-    // `prompt` and `reference_images` array.
-    const token = getReplicateToken(opts.replicateToken);
-    const buf = await replicateRunBuffer("runwayml/gen4-image", {
-      prompt: editPrompt,
-      reference_images: [bufferToDataUri(imageBuffer, imageMime)],
-      aspect_ratio: opts.aspectRatio || "1:1",
-    }, token);
-    return { buffer: buf, mimeType: "image/png" };
+    // Runway Gen-4 Image via API NATIVA de Runway (NO Replicate). Esto
+    // usa los créditos directos de la cuenta Runway (RUNWAY_API_KEY) en
+    // vez de cobrar a Replicate. Acepta hasta 3 reference images + prompt.
+    const { generateImageWithReferences, fetchRunwayImageBuffer } = await import("./runway.js");
+    const ratioMap: Record<string, "1080:1080" | "1920:1080" | "1080:1920" | "1360:768" | "1168:880"> = {
+      "1:1": "1080:1080",
+      "16:9": "1920:1080",
+      "9:16": "1080:1920",
+      "4:3": "1440:1080" as any,
+      "3:4": "1080:1440" as any,
+      "match_input_image": "1080:1080",
+    };
+    const ratio = ratioMap[opts.aspectRatio || "1:1"] || "1080:1080";
+    const result = await generateImageWithReferences({
+      promptText: editPrompt,
+      referenceImages: [{ uri: bufferToDataUri(imageBuffer, imageMime), tag: "product" }],
+      ratio,
+      model: "gen4_image",
+    });
+    const { buffer, mimeType } = await fetchRunwayImageBuffer(result.imageUrl);
+    return { buffer, mimeType };
   }
 
   throw new Error(`Edit model unknown: ${model}`);

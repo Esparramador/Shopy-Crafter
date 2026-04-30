@@ -131,6 +131,118 @@ export async function validateImageUrlAsync(url: string): Promise<void> {
   }
 }
 
+export type RunwayImageRatio =
+  | "1920:1080" | "1080:1920" | "1024:1024" | "1360:768" | "1080:1080"
+  | "1168:880" | "1440:1080" | "1080:1440" | "1808:768" | "2112:912";
+
+export interface RunwayImageRequest {
+  promptText: string;
+  referenceImages?: Array<{ uri: string; tag?: string }>;
+  ratio?: RunwayImageRatio;
+  seed?: number;
+  model?: "gen4_image" | "gen4_image_turbo";
+}
+
+export interface RunwayImageResult {
+  taskId: string;
+  imageUrl: string;
+  model: string;
+  cost: number;
+}
+
+const IMAGE_COST: Record<string, number> = {
+  gen4_image: 0.08,
+  gen4_image_turbo: 0.02,
+};
+
+export async function generateImageWithReferences(
+  req: RunwayImageRequest
+): Promise<RunwayImageResult> {
+  const apiKey = getApiKey();
+  const promptText = (req.promptText ?? "").trim();
+  if (!promptText) throw new Error("promptText requerido");
+  if (promptText.length > MAX_PROMPT_LENGTH) {
+    throw new Error(`promptText excede ${MAX_PROMPT_LENGTH} caracteres`);
+  }
+
+  const model = req.model ?? "gen4_image";
+  const ratio: RunwayImageRatio = req.ratio ?? "1080:1080";
+
+  const refs = (req.referenceImages ?? []).slice(0, 3);
+  for (const r of refs) {
+    if (!r.uri) throw new Error("referenceImages[].uri requerido");
+    if (r.uri.startsWith("https://")) {
+      validateImageUrl(r.uri);
+    } else if (!r.uri.startsWith("data:image/")) {
+      throw new Error("referenceImages[].uri debe ser https:// o data:image/...");
+    }
+  }
+
+  const body: Record<string, unknown> = {
+    model,
+    promptText,
+    ratio,
+    referenceImages: refs.map((r) => ({ uri: r.uri, ...(r.tag ? { tag: r.tag } : {}) })),
+  };
+  if (typeof req.seed === "number" && Number.isFinite(req.seed)) {
+    body.seed = Math.floor(req.seed);
+  }
+
+  logger.info({ model, ratio, refs: refs.length, promptLength: promptText.length }, "Runway: enqueue text_to_image");
+
+  const enqueueRes = await fetch(`${RUNWAY_BASE}/text_to_image`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Runway-Version": RUNWAY_VERSION,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!enqueueRes.ok) {
+    const errText = await enqueueRes.text().catch(() => "");
+    throw new Error(`Runway text_to_image enqueue ${enqueueRes.status}: ${errText.slice(0, 300)}`);
+  }
+  const enqueueData = (await enqueueRes.json()) as { id?: string };
+  const taskId = enqueueData.id;
+  if (!taskId) throw new Error("Runway text_to_image: respuesta sin id");
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    const taskRes = await fetch(`${RUNWAY_BASE}/tasks/${encodeURIComponent(taskId)}`, {
+      headers: { "Authorization": `Bearer ${apiKey}`, "X-Runway-Version": RUNWAY_VERSION },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!taskRes.ok) continue;
+    const data = (await taskRes.json()) as { status?: string; output?: string[]; failure?: string; failureCode?: string };
+    if (data.status === "SUCCEEDED") {
+      const imageUrl = Array.isArray(data.output) ? data.output[0] : null;
+      if (!imageUrl || !imageUrl.startsWith("https://")) throw new Error("Runway image: SUCCEEDED sin URL válida");
+      const cost = IMAGE_COST[model] ?? 0.08;
+      try {
+        const { recordApiUsage } = await import("./api-usage.js");
+        void recordApiUsage({ provider: "runway", operation: "generateImage", model, inputUnits: 1, unitsLabel: "images", costUsd: cost });
+      } catch { /* no bloquea */ }
+      return { taskId, imageUrl, model, cost };
+    }
+    if (data.status === "FAILED" || data.status === "CANCELLED") {
+      throw new Error(`Runway image task ${data.status}: ${data.failure || data.failureCode || data.status}`);
+    }
+  }
+  throw new Error(`Runway image: timeout tras ${POLL_TIMEOUT_MS / 1000}s esperando taskId=${taskId}`);
+}
+
+export async function fetchRunwayImageBuffer(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const r = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  if (!r.ok) throw new Error(`Runway download ${r.status}`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  const mimeType = r.headers.get("content-type")?.split(";")[0] || "image/png";
+  return { buffer: buf, mimeType };
+}
+
 export async function generateVideoFromImage(
   req: RunwayVideoRequest
 ): Promise<RunwayVideoResult> {
