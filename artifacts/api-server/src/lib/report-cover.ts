@@ -28,9 +28,14 @@ export function buildCoverPage(opts: CoverPageOptions): string {
   const date = escHtml(opts.date || new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" }));
   const badgeLabel = escHtml(opts.badgeLabel || "Fecha del informe");
 
-  if (template === "classic") return buildClassicCover({ companyName, reportTitle, reportSubtitle, date, badgeLabel });
-  if (template === "elegance") return buildEleganceCover({ companyName, reportTitle, reportSubtitle, date });
-  return buildPrestigeCover({ companyName, reportTitle, reportSubtitle, date });
+  // Portada minimalista (logo + Shopy Crafter + cliente abajo izquierda)
+  // + página interior con la información detallada del informe.
+  const front = buildFrontCover(template, companyName);
+  const info =
+    template === "classic" ? buildClassicInfoPage({ companyName, reportTitle, reportSubtitle, date, badgeLabel })
+    : template === "elegance" ? buildEleganceInfoPage({ companyName, reportTitle, reportSubtitle, date })
+    : buildPrestigeInfoPage({ companyName, reportTitle, reportSubtitle, date });
+  return front + info;
 }
 
 interface CoverArgs {
@@ -41,11 +46,105 @@ interface CoverArgs {
   badgeLabel?: string;
 }
 
-// ── CLASSIC ─────────────────────────────────────────────────────────────────
-// Identidad: dorado #c8a84b sobre dark #08080e, Helvetica Neue, layout limpio
+// ── PORTADAS MINIMALISTAS ───────────────────────────────────────────────────
+// Solo 3 elementos según pidió el usuario:
+//   1. Logo SC centrado (zona media superior)
+//   2. "SHOPY CRAFTER" debajo del logo
+//   3. Nombre de la empresa cliente abajo a la izquierda
+// Cada plantilla adapta tipografías, colores y acabados a su estética.
+
+function buildFrontCover(template: CoverTemplate, companyName: string): string {
+  if (template === "classic") return buildClassicFront(companyName);
+  if (template === "elegance") return buildEleganceFront(companyName);
+  return buildPrestigeFront(companyName);
+}
+
+// CLASSIC FRONT: dark #08080e + dorado #c8a84b, Helvetica Neue, sobrio.
+function buildClassicFront(companyName: string): string {
+  const gold = "#c8a84b";
+  const muted = "rgba(240,240,245,.5)";
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#08080e;page-break-after:always;min-height:100vh;">
+  <tr><td style="padding:0;height:62%;vertical-align:middle;text-align:center;">
+    <div style="display:inline-block;text-align:center;">
+      <div style="width:140px;height:140px;border-radius:50%;overflow:hidden;margin:0 auto 36px;border:1px solid rgba(200,168,75,.25);box-shadow:0 14px 48px rgba(0,0,0,.55);">
+        <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="140" height="140" style="width:140px;height:140px;display:block;" />
+      </div>
+      <p style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:800;color:${gold};letter-spacing:7px;text-transform:uppercase;margin:0;">Shopy Crafter</p>
+    </div>
+  </td></tr>
+  <tr><td style="padding:48px 56px 56px;vertical-align:bottom;">
+    ${companyName ? `
+      <p style="font-size:9px;color:${muted};letter-spacing:3px;text-transform:uppercase;margin:0 0 6px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Preparado para</p>
+      <p style="font-size:15px;color:#f0f0f5;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0;font-family:'Helvetica Neue',Arial,sans-serif;">${companyName}</p>
+    ` : ""}
+  </td></tr>
+</table>`;
+}
+
+// ELEGANCE FRONT: navy #0b1628 + accent azul #4a90d9, Playfair Display, refinado.
+function buildEleganceFront(companyName: string): string {
+  const navy = "#0b1628";
+  const accent = "#4a90d9";
+  const silver = "#c0c8d8";
+  const muted = "#6880a8";
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${navy};page-break-after:always;min-height:100vh;">
+  <tr><td style="padding:0;height:62%;vertical-align:middle;text-align:center;">
+    <div style="display:inline-block;text-align:center;">
+      <div style="position:relative;width:140px;height:140px;margin:0 auto 36px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(74,144,217,.2) 0%,transparent 70%);"></div>
+        <div style="position:absolute;inset:6px;border-radius:50%;overflow:hidden;border:2px solid rgba(74,144,217,.35);box-shadow:0 14px 48px rgba(0,0,0,.55);">
+          <img src="data:image/png;base64,${LOGO_CORPORATE_B64}" alt="SC" width="128" height="128" style="width:128px;height:128px;display:block;" />
+        </div>
+      </div>
+      <p style="font-family:'Playfair Display','Georgia',serif;font-size:22px;font-weight:700;color:${accent};letter-spacing:7px;text-transform:uppercase;margin:0;">Shopy Crafter</p>
+    </div>
+  </td></tr>
+  <tr><td style="padding:48px 56px 56px;vertical-align:bottom;">
+    ${companyName ? `
+      <p style="font-size:9px;color:${muted};letter-spacing:3px;text-transform:uppercase;margin:0 0 8px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Preparado para</p>
+      <p style="font-family:'Playfair Display','Georgia',serif;font-size:20px;font-weight:700;color:${silver};font-style:italic;letter-spacing:0.6px;margin:0;">${companyName}</p>
+    ` : ""}
+  </td></tr>
+</table>`;
+}
+
+// PRESTIGE FRONT: charcoal warm + cobre #c4956a, Cormorant Garamond, lujo.
+function buildPrestigeFront(companyName: string): string {
+  const copper = "#c4956a";
+  const copperLight = "#ddb896";
+  const muted = "#7a6e60";
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#120e0a;background-image:linear-gradient(180deg,#1a1410 0%,#120e0a 60%,#0d0a07 100%);page-break-after:always;min-height:100vh;">
+  <tr><td style="padding:0;height:62%;vertical-align:middle;text-align:center;">
+    <div style="display:inline-block;text-align:center;">
+      <div style="position:relative;width:160px;height:160px;margin:0 auto 36px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(196,149,106,.22) 0%,transparent 70%);"></div>
+        <div style="position:absolute;inset:12px;border-radius:50%;overflow:hidden;border:2px solid rgba(196,149,106,.4);box-shadow:0 16px 56px rgba(0,0,0,.6),inset 0 0 18px rgba(0,0,0,.3);">
+          <img src="data:image/png;base64,${LOGO_PRESTIGE_B64}" alt="SC" width="136" height="136" style="width:136px;height:136px;display:block;" />
+        </div>
+      </div>
+      <p style="font-family:'Cormorant Garamond','Georgia',serif;font-size:24px;font-weight:600;color:${copper};letter-spacing:8px;text-transform:uppercase;margin:0;">Shopy Crafter</p>
+    </div>
+  </td></tr>
+  <tr><td style="padding:48px 56px 56px;vertical-align:bottom;">
+    ${companyName ? `
+      <p style="font-size:9px;color:${muted};letter-spacing:3px;text-transform:uppercase;margin:0 0 8px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:600;">Preparado para</p>
+      <p style="font-family:'Cormorant Garamond','Georgia',serif;font-size:22px;font-weight:700;color:${copperLight};font-style:italic;letter-spacing:0.6px;margin:0;">${companyName}</p>
+    ` : ""}
+  </td></tr>
+</table>`;
+}
+
+// ── PÁGINAS INTERIORES (info detallada del informe) ─────────────────────────
+// Aparecen justo después de la portada minimalista. Aquí va la información
+// elaborada: título, subtítulo, fecha, badge, "Preparado para", ref-code, dots…
+// Cada plantilla mantiene su personalidad visual.
+
+// CLASSIC INFO: dorado #c8a84b sobre dark #08080e, Helvetica Neue, layout limpio
 // con logo corporativo + badge de fecha + título grande + subtítulo + meta dots.
-// Coherente con .cover/.cover-logo-icon/.cover-badge/.cover-title del shell classic.
-function buildClassicCover({ companyName, reportTitle, reportSubtitle, date, badgeLabel }: CoverArgs): string {
+function buildClassicInfoPage({ companyName, reportTitle, reportSubtitle, date, badgeLabel }: CoverArgs): string {
   const gold = "#c8a84b";
   const goldSoft = "rgba(200,168,75,.85)";
   const muted = "rgba(240,240,245,.55)";
@@ -107,12 +206,11 @@ function buildClassicCover({ companyName, reportTitle, reportSubtitle, date, bad
 </table>`;
 }
 
-// ── ELEGANCE ────────────────────────────────────────────────────────────────
-// Identidad: navy #0b1628 + plata #c0c8d8 + accent azul #4a90d9, Playfair Display,
+// ELEGANCE INFO: navy #0b1628 + plata #c0c8d8 + accent azul #4a90d9, Playfair Display,
 // diamante superior, agency-name superior, doc-type, título grande serif,
 // client-box destacada centrada. Coherente con .cover-portfolio/.cover-diamond-top
 // /.cover-client-box del shell elegance.
-function buildEleganceCover({ companyName, reportTitle, reportSubtitle, date }: CoverArgs): string {
+function buildEleganceInfoPage({ companyName, reportTitle, reportSubtitle, date }: CoverArgs): string {
   const navy = "#0b1628";
   const accent = "#4a90d9";
   const accentSoft = "#6ba8f0";
@@ -169,11 +267,10 @@ function buildEleganceCover({ companyName, reportTitle, reportSubtitle, date }: 
 </table>`;
 }
 
-// ── PRESTIGE ────────────────────────────────────────────────────────────────
-// Identidad: charcoal warm + cobre #c4956a, Cormorant Garamond, doble línea
+// PRESTIGE INFO: charcoal warm + cobre #c4956a, Cormorant Garamond, doble línea
 // ornamental, logo prestige circular, ref-code de informe, client-box. Coherente
 // con .cover-portfolio/.cover-logo-circle/.cover-client-box del shell prestige.
-function buildPrestigeCover({ companyName, reportTitle, reportSubtitle, date }: CoverArgs): string {
+function buildPrestigeInfoPage({ companyName, reportTitle, reportSubtitle, date }: CoverArgs): string {
   const copper = "#c4956a";
   const copperLight = "#ddb896";
   const white = "#f5f0eb";
