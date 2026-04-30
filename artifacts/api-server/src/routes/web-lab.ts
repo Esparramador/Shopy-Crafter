@@ -826,15 +826,35 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
   for (const { re, label } of FORBIDDEN_REGEXES) {
     if (re.test(fragmentsBlob)) severeWarnings.push(`HTML contiene patrón prohibido: ${label}`);
   }
-  // CSS sólo: ::placeholder es válido, pero "placeholder text" suelto no
-  if (/[^:]\bplaceholder text\b/i.test(cssLower) || /\blorem\b/i.test(cssLower)) {
-    severeWarnings.push(`CSS contiene patrón prohibido (lorem/placeholder text)`);
+  // T004 — Validación CSS más estricta:
+  // Rechazamos placeholder usado fuera de la pseudo-clase ::placeholder o
+  // de la propiedad placeholder-shown. También cazamos comentarios con TODO/FIXME
+  // y selectores genéricos (que delatan plantilla LLM sin esfuerzo).
+  // Quitamos ::placeholder y :placeholder-shown del CSS antes de buscar
+  // el token suelto "placeholder" para evitar falsos positivos legítimos.
+  const cssSinPseudo = css
+    .replace(/::placeholder\b/gi, "::__valid_pseudo__")
+    .replace(/:placeholder-shown\b/gi, ":__valid_pseudo__")
+    .replace(/\bplaceholder-shown\b/gi, "__valid_pseudo__");
+  if (/\bplaceholder\b/i.test(cssSinPseudo)) {
+    severeWarnings.push(`CSS contiene "placeholder" fuera de ::placeholder/:placeholder-shown`);
+  }
+  if (/\blorem\b/i.test(cssLower)) {
+    severeWarnings.push(`CSS contiene patrón prohibido (lorem)`);
+  }
+  // Comentarios CSS con TODO/FIXME/PLACEHOLDER → severe (no entregamos código a medio terminar)
+  const CSS_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
+  const cssComments = (css.match(CSS_COMMENT_RE) || []).join(" ");
+  if (/\b(TODO|FIXME|TBD|XXX|HACK|PLACEHOLDER)\b/i.test(cssComments)) {
+    severeWarnings.push("CSS contiene comentarios TODO/FIXME/TBD/HACK/PLACEHOLDER");
   }
 
-  // INFO: Selectores genéricos que delatan respuesta plantilla — loguear, no rechazar
-  const GENERIC_SELECTORS = [/\.class1\b/, /\.div1\b/, /\.section1\b/, /\.untitled\b/, /\.foo\b/, /\.bar\b/];
+  // SEVERO: Selectores genéricos que delatan respuesta plantilla del LLM.
+  // Antes era un warning suave; el session plan T004 pide rechazo explícito de
+  // "clases genéricas" → ascendido a severeWarnings.
+  const GENERIC_SELECTORS = [/\.class1\b/, /\.div1\b/, /\.section1\b/, /\.div\d+\b/, /\.untitled\b/, /\.foo\b/, /\.bar\b/];
   for (const re of GENERIC_SELECTORS) {
-    if (re.test(css)) warnings.push(`CSS usa selector genérico: ${re.source}`);
+    if (re.test(css)) severeWarnings.push(`CSS usa selector genérico prohibido: ${re.source}`);
   }
 
   // INFO: Fragmentos donde improved === original — el modelo no mejoró
@@ -890,14 +910,18 @@ Responde SIEMPRE en JSON válido con esta estructura exacta:
 
 router.post("/web-lab/iterate", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { projectId, url, previousCss, previousFragments, changeRequest, brandName } = req.body as {
+    // brandContext es el nombre canónico documentado en el session plan;
+    // brandName se mantiene como alias retro-compatible.
+    const { projectId, url, previousCss, previousFragments, changeRequest, brandContext, brandName } = req.body as {
       projectId?: number;
       url?: string;
       previousCss?: string;
       previousFragments?: Array<{ section: string; original: string; improved: string }>;
       changeRequest?: string;
+      brandContext?: string;
       brandName?: string;
     };
+    const effectiveBrand = (brandContext ?? brandName ?? "").toString();
 
     if (!changeRequest || !changeRequest.trim()) {
       res.status(400).json({ error: "Falta el cambio a aplicar (changeRequest)" });
@@ -921,7 +945,7 @@ router.post("/web-lab/iterate", async (req: Request, res: Response): Promise<voi
     }
 
     const pid = projectId ?? 0;
-    const brand = (brandName || "").trim() || (url ? url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : "");
+    const brand = effectiveBrand.trim() || (url ? url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : "");
 
     // T003 — Comprobación de créditos ANTES de flushHeaders.
     // Una iteración consume el equivalente a una llamada Claude pesada → 1 crédito de tipo "image".

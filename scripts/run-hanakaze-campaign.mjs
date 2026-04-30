@@ -22,7 +22,7 @@ async function api(pathname, opts = {}) {
   const url = `${BASE}${pathname}`;
   const headers = { ...(opts.headers || {}) };
   if (cookieJar) headers["Cookie"] = cookieJar;
-  if (opts.json) {
+  if (opts.json !== undefined) {
     headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(opts.json);
     delete opts.json;
@@ -30,8 +30,7 @@ async function api(pathname, opts = {}) {
   const res = await fetch(url, { ...opts, headers });
   const setCookie = res.headers.get("set-cookie");
   if (setCookie) {
-    const sessionCookie = setCookie.split(";")[0];
-    cookieJar = sessionCookie;
+    cookieJar = setCookie.split(";")[0];
   }
   return res;
 }
@@ -39,7 +38,7 @@ async function api(pathname, opts = {}) {
 async function jsonOrThrow(res, label) {
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`[${label}] HTTP ${res.status}: ${text.slice(0, 500)}`);
+    throw new Error(`[${label}] HTTP ${res.status}: ${text.slice(0, 600)}`);
   }
   try { return JSON.parse(text); } catch { throw new Error(`[${label}] Invalid JSON: ${text.slice(0, 200)}`); }
 }
@@ -48,45 +47,69 @@ async function login() {
   await log("Login admin…");
   const res = await api("/api/auth/login", { method: "POST", json: { email: EMAIL, password: PASSWORD } });
   const data = await jsonOrThrow(res, "login");
-  await log(`Login OK userId=${data.user?.id} role=${data.user?.role}`);
+  await log(`Login OK ${JSON.stringify(data).slice(0, 120)}`);
 }
 
-async function generateImage({ projectId, model, prompt, aspectRatio = "1:1", label }) {
-  await log(`▶ image[${label}] model=${model} ar=${aspectRatio}`);
-  const t0 = Date.now();
-  const res = await api("/api/fs-pro/generate-image", {
-    method: "POST",
-    json: { projectId, model, prompt, aspectRatio },
-  });
-  const data = await jsonOrThrow(res, `image:${label}`);
-  await log(`✔ image[${label}] vaultId=${data.vaultId} (${((Date.now() - t0)/1000).toFixed(1)}s)`);
-  return data.vaultId;
-}
-
-async function generateVideo({ projectId, model, prompt, duration, aspect, imagePath, label }) {
-  await log(`▶ video[${label}] model=${model} dur=${duration}s ${imagePath ? "img→vid" : "txt→vid"}`);
+// ─── RUNWAY: IMAGE-WITH-REFERENCE (gen4_image_turbo, $0.02). Runway requiere ≥1 referenceImage.
+async function runwayImage({ projectId, prompt, ratio = "1080:1080", model = "gen4_image_turbo", referenceLocalPath, referenceUrl, referenceTag, label }) {
+  await log(`▶ runway-image[${label}] ratio=${ratio} model=${model} ref=${referenceLocalPath ? path.basename(referenceLocalPath) : referenceUrl?.slice(0,40)}`);
   const t0 = Date.now();
   const form = new FormData();
   form.append("projectId", String(projectId));
+  form.append("prompt", prompt);
+  form.append("ratio", ratio);
   form.append("model", model);
+  if (referenceTag) form.append("referenceTag", referenceTag);
+  if (referenceLocalPath) {
+    const buf = await fs.readFile(referenceLocalPath);
+    const ext = path.extname(referenceLocalPath).toLowerCase();
+    const mime = ext === ".png" ? "image/png" : "image/jpeg";
+    form.append("referenceImage", new Blob([buf], { type: mime }), path.basename(referenceLocalPath));
+  } else if (referenceUrl) {
+    form.append("referenceImageUrl", referenceUrl);
+  } else {
+    throw new Error(`runway-image[${label}] necesita referenceLocalPath o referenceUrl`);
+  }
+  const headers = {};
+  if (cookieJar) headers["Cookie"] = cookieJar;
+  const res = await fetch(`${BASE}/api/fs-pro/runway-image`, { method: "POST", body: form, headers });
+  const data = await jsonOrThrow(res, `runway-image:${label}`);
+  await log(`✔ runway-image[${label}] vaultId=${data.vaultId} cost=$${data.cost} (${((Date.now() - t0)/1000).toFixed(1)}s)`);
+  return { vaultId: data.vaultId, runwayUrl: data.runwayImageUrl };
+}
+
+// ─── RUNWAY: IMAGE-TO-VIDEO (gen4_turbo, $0.05/s)
+//   imageSource: { runwayUrl?: string } | { localPath: string }
+async function runwayVideo({ projectId, prompt, duration = 10, aspect = "9:16", imageSource, label }) {
+  await log(`▶ runway-video[${label}] dur=${duration}s aspect=${aspect}`);
+  const t0 = Date.now();
+  const form = new FormData();
+  form.append("projectId", String(projectId));
+  form.append("model", "runway-gen4-turbo");
   form.append("prompt", prompt);
   form.append("duration", String(duration));
   form.append("aspect", aspect);
-  if (imagePath) {
-    const buf = await fs.readFile(imagePath);
-    const blob = new Blob([buf], { type: "image/jpeg" });
-    form.append("image", blob, path.basename(imagePath));
+  if (imageSource.localPath) {
+    const buf = await fs.readFile(imageSource.localPath);
+    const ext = path.extname(imageSource.localPath).toLowerCase();
+    const mime = ext === ".png" ? "image/png" : "image/jpeg";
+    form.append("image", new Blob([buf], { type: mime }), path.basename(imageSource.localPath));
+  } else if (imageSource.runwayUrl) {
+    form.append("sourceImageUrl", imageSource.runwayUrl);
+  } else {
+    throw new Error(`runway-video[${label}] necesita localPath o runwayUrl`);
   }
   const headers = {};
   if (cookieJar) headers["Cookie"] = cookieJar;
   const res = await fetch(`${BASE}/api/fs-pro/generate-video`, { method: "POST", body: form, headers });
-  const data = await jsonOrThrow(res, `video:${label}`);
-  await log(`✔ video[${label}] vaultId=${data.vaultId} size=${(data.sizeBytes/1024/1024).toFixed(2)}MB (${((Date.now() - t0)/1000).toFixed(1)}s)`);
+  const data = await jsonOrThrow(res, `runway-video:${label}`);
+  await log(`✔ runway-video[${label}] vaultId=${data.vaultId} size=${(data.sizeBytes/1024/1024).toFixed(2)}MB (${((Date.now() - t0)/1000).toFixed(1)}s)`);
   return data.vaultId;
 }
 
-async function generateTTS({ projectId, voiceId, text, modelId = "eleven_multilingual_v2", stability = 0.40, similarity = 0.88, style = 0.45, speed = 1.0, label }) {
-  await log(`▶ tts[${label}] chars=${text.length} voice=${voiceId}`);
+// ─── ELEVENLABS TTS
+async function tts({ projectId, voiceId, text, modelId = "eleven_multilingual_v2", stability = 0.40, similarity = 0.88, style = 0.45, speed = 1.0, label }) {
+  await log(`▶ tts[${label}] chars=${text.length}`);
   const t0 = Date.now();
   const res = await api("/api/fs-pro/tts", {
     method: "POST",
@@ -97,13 +120,19 @@ async function generateTTS({ projectId, voiceId, text, modelId = "eleven_multili
   return data.vaultId;
 }
 
-async function concatVideos({ projectId, videoVaultIds, voiceVaultId, transitionPreset = "crossfade", crossfadeSec = 0.5, voiceVolume = 1.0 }) {
+// ─── FFMPEG CONCAT (server-side)
+async function concatFinal({ projectId, videoVaultIds, voiceVaultId }) {
   await log(`▶ concat ${videoVaultIds.length} clips + voz off…`);
   const t0 = Date.now();
   const res = await api("/api/fs-pro/concat", {
     method: "POST",
-    json: { projectId, videoVaultIds, voiceVaultId, transitionPreset, crossfadeSec, voiceVolume,
-            width: 1080, height: 1920, fps: 30 },
+    json: {
+      projectId, videoVaultIds, voiceVaultId,
+      transitionPreset: "crossfade",
+      crossfadeSec: 0.4,
+      voiceVolume: 1.0,
+      width: 1080, height: 1920, fps: 30,
+    },
   });
   const data = await jsonOrThrow(res, "concat");
   await log(`✔ concat vaultId=${data.vaultId} size=${(data.sizeBytes/1024/1024).toFixed(2)}MB (${((Date.now() - t0)/1000).toFixed(1)}s)`);
@@ -112,9 +141,8 @@ async function concatVideos({ projectId, videoVaultIds, voiceVaultId, transition
 
 async function main() {
   await fs.writeFile(LOG_FILE, "");
-  await log("=== CAMPAÑA HANAKAZE SERIGRAPHY — INICIO ===");
+  await log("=== CAMPAÑA HANAKAZE SERIGRAPHY (RUNWAY DIRECT) — INICIO ===");
 
-  // Project ID se pasa por env, o se busca por nombre
   const PROJECT_ID = parseInt(process.env.HANAKAZE_PROJECT_ID || "0", 10);
   if (!PROJECT_ID) throw new Error("HANAKAZE_PROJECT_ID env requerido");
   await log(`projectId=${PROJECT_ID}`);
@@ -122,108 +150,102 @@ async function main() {
   await login();
 
   const ASSETS = "attached_assets";
-  const PHOTO_BURRO = `${ASSETS}/PXL_20260410_171731994.RAW-01_1777547033722.jpg`;
+  const PHOTO_BURRO  = `${ASSETS}/PXL_20260410_171731994.RAW-01_1777547033722.jpg`;
   const PHOTO_MODEL_1 = `${ASSETS}/IMG-20260414-WA0010_1777547033700.jpg`;
   const PHOTO_MODEL_2 = `${ASSETS}/IMG-20260414-WA0011_1777547033708.jpg`;
   const PHOTO_MODEL_3 = `${ASSETS}/IMG-20260414-WA0012_1777547033709.jpg`;
 
   const result = {
-    backplates: [],
-    videoClips: [],
-    voiceOff: null,
-    finalVideo: null,
-    staticAds: [],
-    infographic: null,
-    timings: {},
+    backplates: [], imagesIntro: null, imagesOutro: null,
+    videoClips: [], voiceOff: null, finalVideo: null,
+    staticAds: [], infographic: null, timings: {},
   };
 
-  // ─── 1. BACKPLATES (2× Flux Schnell, fondos cinematográficos)
-  await log("\n━━━ FASE 1: BACKPLATES ━━━");
-  result.backplates.push(await generateImage({
+  // ─── FASE 1 — IMÁGENES BASE (Runway gen4_image_turbo, 1080:1920 vertical)
+  await log("\n━━━ FASE 1: IMÁGENES BASE PARA VÍDEO ━━━");
+
+  // Frame intro (kanji 華吹) — usa foto del burro como referencia de marca
+  const intro = await runwayImage({
     projectId: PROJECT_ID,
-    model: "flux-schnell",
-    prompt: "Cinematic Japanese washi paper background, sumi-e ink stains, gold leaf accents, soft tokyo dusk lighting, 9:16, dark moody premium serigraphy aesthetic, no text, no watermarks",
-    aspectRatio: "9:16",
-    label: "washi-bg",
-  }));
-  result.backplates.push(await generateImage({
+    prompt: "Cinematic vertical shot, traditional Japanese washi paper background with subtle texture. A single black sumi-e ink kanji 華吹 (Hanakaze) painted with calligraphic brush strokes in the center, golden leaf flecks scattered around. Dramatic side lighting, deep shadows, premium luxury fashion brand opening frame, no text overlays, no watermarks, magazine-quality 4k. Inspired by the @brand mood.",
+    ratio: "1080:1920",
+    referenceLocalPath: PHOTO_BURRO,
+    referenceTag: "brand",
+    label: "intro-kanji-frame",
+  });
+  result.imagesIntro = intro.vaultId;
+
+  // Frame outro (logo)
+  const outro = await runwayImage({
     projectId: PROJECT_ID,
-    model: "flux-schnell",
-    prompt: "Premium photo studio backdrop, cyclorama, deep neutral charcoal grey, single soft key light from above, ultra clean, ready for product composite, 1:1 square, no objects",
-    aspectRatio: "1:1",
-    label: "studio-neutral",
+    prompt: "Vertical 9:16 frame, pure deep matte black background. Center: elegant golden brushstroke calligraphy logotype reading 'HANAKAZE SERIGRAPHY' in modern minimal serif fused with japanese sumi-e style. Below in smaller letters: 'Worn art from Tokyo'. Subtle gold particle shimmer. Premium luxury fashion brand outro card. Inspired by the @brand aesthetic.",
+    ratio: "1080:1920",
+    referenceLocalPath: PHOTO_BURRO,
+    referenceTag: "brand",
+    label: "outro-logo-frame",
+  });
+  result.imagesOutro = outro.vaultId;
+
+  // ─── FASE 2 — VÍDEO 6 CLIPS (Runway gen4-turbo, image-to-video, 10s)
+  await log("\n━━━ FASE 2: VÍDEO 6 CLIPS (image-to-video Runway) ━━━");
+
+  // Clip 1 — INTRO animado desde frame
+  result.videoClips.push(await runwayVideo({
+    projectId: PROJECT_ID,
+    prompt: "The kanji slowly forms with sumi-e ink dripping and spreading across the washi paper, gold leaf particles drift gently in the air, soft side light reveals texture, premium fashion brand intro animation, no camera movement, 9:16 vertical.",
+    duration: 10, aspect: "9:16",
+    imageSource: { runwayUrl: intro.runwayUrl },
+    label: "intro",
   }));
 
-  // ─── 2. VÍDEO MULTISHOT (6 clips × 10s)
-  await log("\n━━━ FASE 2: VÍDEO 6 CLIPS ━━━");
-
-  // Clip 1 — INTRO (text-to-video, kling-master, premium)
-  result.videoClips.push(await generateVideo({
+  // Clip 2 — Burro de ropa real (foto del usuario)
+  result.videoClips.push(await runwayVideo({
     projectId: PROJECT_ID,
-    model: "kling-master",
-    prompt: "Cinematic opening shot: a single drop of black sumi-e ink falls onto traditional Japanese washi paper in slow motion. As the ink hits, it ripples and morphs into the kanji 華吹 (Hanakaze) — flower wind. Gold leaf particles drift in the air. Dramatic side lighting, shallow depth of field, cinematic 4k, premium fashion brand intro, no text overlays, no watermarks.",
-    duration: 10,
-    aspect: "9:16",
-    label: "intro-kanji",
-  }));
-
-  // Clip 2 — BURRO DE ROPA (image-to-video, runway-gen4-turbo, real product)
-  result.videoClips.push(await generateVideo({
-    projectId: PROJECT_ID,
-    model: "runway-gen4-turbo",
-    prompt: "Camera slowly orbits around a clothing rack displaying premium Hanakaze hoodies and t-shirts with Japanese serigraphy prints. Soft warm light leak crosses the frame, dust particles float in the air, cinematic shallow depth of field, premium streetwear brand b-roll, 9:16 vertical, no text.",
-    duration: 10,
-    aspect: "9:16",
-    imagePath: PHOTO_BURRO,
+    prompt: "Camera slowly orbits around the clothing rack displaying premium Hanakaze hoodies, soft warm light leak crosses the frame, dust particles float, cinematic shallow depth of field, premium streetwear b-roll, 9:16 vertical, no text.",
+    duration: 10, aspect: "9:16",
+    imageSource: { localPath: PHOTO_BURRO },
     label: "burro-ropa",
   }));
 
-  // Clip 3 — MODELO 1 (image-to-video, seedance-pro)
-  result.videoClips.push(await generateVideo({
+  // Clip 3 — Modelo 1
+  result.videoClips.push(await runwayVideo({
     projectId: PROJECT_ID,
-    model: "seedance-pro",
-    prompt: "The model slowly rotates 90 degrees showing the back print of the Hanakaze hoodie, fashion editorial style, cinematic motion blur, soft side light, premium brand campaign, 9:16, no text.",
-    duration: 10,
-    aspect: "9:16",
-    imagePath: PHOTO_MODEL_1,
-    label: "model-rotate-1",
+    prompt: "The model slowly turns 90 degrees showing the back of the Hanakaze hoodie, cinematic motion blur, soft side light, fashion editorial campaign, 9:16, no text.",
+    duration: 10, aspect: "9:16",
+    imageSource: { localPath: PHOTO_MODEL_1 },
+    label: "model-1",
   }));
 
-  // Clip 4 — MODELO 2
-  result.videoClips.push(await generateVideo({
+  // Clip 4 — Modelo 2
+  result.videoClips.push(await runwayVideo({
     projectId: PROJECT_ID,
-    model: "seedance-pro",
-    prompt: "The model takes one slow step toward the camera, fabric of the hoodie moves naturally, rain particles fall in foreground, neon tokyo street reflection, cinematic teal-orange grade, 9:16, no text.",
-    duration: 10,
-    aspect: "9:16",
-    imagePath: PHOTO_MODEL_2,
-    label: "model-walk-2",
+    prompt: "The model takes one slow cinematic step toward camera, fabric of the hoodie moves naturally, light rain particles in foreground, neon Tokyo street reflection, teal-orange grade, 9:16, no text.",
+    duration: 10, aspect: "9:16",
+    imageSource: { localPath: PHOTO_MODEL_2 },
+    label: "model-2",
   }));
 
-  // Clip 5 — MODELO 3
-  result.videoClips.push(await generateVideo({
+  // Clip 5 — Modelo 3
+  result.videoClips.push(await runwayVideo({
     projectId: PROJECT_ID,
-    model: "seedance-pro",
-    prompt: "The model holds a samurai-like pose, soft cherry blossom petals fall and swirl around them, slow motion, cinematic anamorphic look, premium fashion film aesthetic, 9:16, no text.",
-    duration: 10,
-    aspect: "9:16",
-    imagePath: PHOTO_MODEL_3,
-    label: "model-samurai-3",
+    prompt: "The model holds a poised samurai stance, soft cherry blossom petals drift and swirl around them, slow motion, premium fashion film aesthetic, anamorphic look, 9:16, no text.",
+    duration: 10, aspect: "9:16",
+    imageSource: { localPath: PHOTO_MODEL_3 },
+    label: "model-3",
   }));
 
-  // Clip 6 — CIERRE LOGO (text-to-video, wan-2.5-fast)
-  result.videoClips.push(await generateVideo({
+  // Clip 6 — OUTRO logo animado
+  result.videoClips.push(await runwayVideo({
     projectId: PROJECT_ID,
-    model: "wan-2.5-fast",
-    prompt: "Black background. Golden sumi-e ink strokes elegantly draw the brand logotype 'HANAKAZE SERIGRAPHY' from left to right with calligraphic motion. Subtle gold particle shimmer follows each stroke. Below appears the tagline 'Worn art from Tokyo'. Premium luxury fashion brand outro, cinematic, 9:16.",
-    duration: 10,
-    aspect: "9:16",
-    label: "outro-logo",
+    prompt: "Golden sumi-e ink calligraphy strokes elegantly draw the brand logotype HANAKAZE SERIGRAPHY from left to right, subtle gold particle shimmer follows each stroke, premium luxury outro animation, slow reveal, 9:16 vertical.",
+    duration: 10, aspect: "9:16",
+    imageSource: { runwayUrl: outro.runwayUrl },
+    label: "outro",
   }));
 
-  // ─── 3. VOZ OFF (ElevenLabs multilingual v2, voz Antoni cálida natural)
+  // ─── FASE 3 — VOZ OFF (ElevenLabs Antoni multilingual v2)
   await log("\n━━━ FASE 3: VOZ OFF ━━━");
-  const voiceOverScript =
+  const script =
     "Hanakaze. En japonés, viento de flores. " +
     "Cada prenda nace de un trazo de tinta, " +
     "de una pieza serigrafiada a mano en nuestro taller. " +
@@ -231,57 +253,57 @@ async function main() {
     "Algodón premium, tinta al agua, alma japonesa. " +
     "Hanakaze Serigraphy. Arte vestible desde Tokio.";
 
-  result.voiceOff = await generateTTS({
+  result.voiceOff = await tts({
     projectId: PROJECT_ID,
-    voiceId: "ErXwobaYiN019PkySvjV", // Antoni — cálida, natural, perfecta para anuncios
-    text: voiceOverScript,
-    modelId: "eleven_multilingual_v2",
-    stability: 0.40,
-    similarity: 0.88,
-    style: 0.45,
-    speed: 0.95,
-    label: "voz-off-comercial",
+    voiceId: "ErXwobaYiN019PkySvjV", // Antoni — cálida natural masculina
+    text: script,
+    stability: 0.40, similarity: 0.88, style: 0.45, speed: 0.95,
+    label: "voz-off",
   });
 
-  // ─── 4. CONCAT FINAL (6 clips + voz off, 9:16 1080x1920)
+  // ─── FASE 4 — CONCAT FINAL
   await log("\n━━━ FASE 4: MONTAJE FINAL ━━━");
-  result.finalVideo = await concatVideos({
+  result.finalVideo = await concatFinal({
     projectId: PROJECT_ID,
     videoVaultIds: result.videoClips,
     voiceVaultId: result.voiceOff,
-    transitionPreset: "crossfade",
-    crossfadeSec: 0.4,
-    voiceVolume: 1.0,
   });
 
-  // ─── 5. ANUNCIOS ESTÁTICOS (2× Flux Schnell, 1:1, listos para Meta/IG)
+  // ─── FASE 5 — 2 ANUNCIOS ESTÁTICOS (Runway gen4_image_turbo, 1080:1080)
   await log("\n━━━ FASE 5: ANUNCIOS ESTÁTICOS ━━━");
-  result.staticAds.push(await generateImage({
+  const ad1 = await runwayImage({
     projectId: PROJECT_ID,
-    model: "flux-schnell",
-    prompt: "Premium fashion ad poster, Japanese male model wearing Hanakaze hoodie with sumi-e flower wind print, dramatic side light, deep navy background with gold kanji 華吹 large in corner, headline space top, magazine-quality 1:1, no text overlays, leave room for headline, ultra cinematic, editorial, high contrast",
-    aspectRatio: "1:1",
-    label: "ad-1-male-hoodie",
-  }));
-  result.staticAds.push(await generateImage({
-    projectId: PROJECT_ID,
-    model: "flux-schnell",
-    prompt: "Premium fashion ad, flat lay overhead shot of Hanakaze t-shirt folded with sumi-e cherry blossom print visible, on black washi paper background, gold ink splatter accents, single bonsai branch top corner, magazine editorial 1:1, professional product photography, no text, leave space for copy",
-    aspectRatio: "1:1",
-    label: "ad-2-tshirt-flatlay",
-  }));
+    prompt: "Premium fashion editorial poster 1:1, Japanese male model wearing a Hanakaze hoodie with sumi-e flower wind print. Dramatic side lighting, deep navy background. Large translucent gold kanji 華吹 in upper-right corner. Clean negative space top-left for headline copy. Magazine quality, ultra cinematic, high contrast, no text overlays, leave room for headline. Inspired by the @model styling.",
+    ratio: "1080:1080",
+    referenceLocalPath: PHOTO_MODEL_1,
+    referenceTag: "model",
+    label: "ad1-male-hoodie",
+  });
+  result.staticAds.push(ad1.vaultId);
 
-  // ─── 6. INFOGRAFÍA VERTICAL (Flux Schnell)
-  await log("\n━━━ FASE 6: INFOGRAFÍA ━━━");
-  result.infographic = await generateImage({
+  const ad2 = await runwayImage({
     projectId: PROJECT_ID,
-    model: "flux-schnell",
-    prompt: "Vertical infographic style poster, Hanakaze brand storytelling, 4 horizontal sections separated by sumi-e ink lines, each showing a stage of artisan serigraphy: 1) ink mixing 2) screen exposure 3) printing on fabric 4) final folded garment. Premium dark background, gold accents, traditional japanese aesthetic, leave space for captions, 9:16 vertical, no text overlays just the imagery sections, magazine quality",
-    aspectRatio: "9:16",
+    prompt: "Premium fashion product poster 1:1, flat-lay overhead shot of a folded Hanakaze t-shirt on black washi paper, sumi-e cherry blossom print partially visible on fabric, subtle gold ink splatter accents, single bonsai branch in top-right corner. Magazine editorial composition, professional product photography, no text, clean space at bottom for copy. Inspired by the @brand product line.",
+    ratio: "1080:1080",
+    referenceLocalPath: PHOTO_BURRO,
+    referenceTag: "brand",
+    label: "ad2-tshirt-flatlay",
+  });
+  result.staticAds.push(ad2.vaultId);
+
+  // ─── FASE 6 — INFOGRAFÍA VERTICAL (Runway, 1080:1920)
+  await log("\n━━━ FASE 6: INFOGRAFÍA ━━━");
+  const info = await runwayImage({
+    projectId: PROJECT_ID,
+    prompt: "Vertical 9:16 brand storytelling poster, dark premium background. 4 horizontal stacked sections separated by golden sumi-e ink lines, each showing one stage of artisan serigraphy: 1) ink mixing in a ceramic bowl 2) silk screen exposure 3) hand-printing on dark fabric 4) the final folded garment with brand label. Traditional Japanese aesthetic with gold accents, magazine quality. Numbers 1-4 visible as gold kanji, but no other text overlays. Inspired by the @brand product range.",
+    ratio: "1080:1920",
+    referenceLocalPath: PHOTO_BURRO,
+    referenceTag: "brand",
     label: "infografia-proceso",
   });
+  result.infographic = info.vaultId;
 
-  // ─── REPORT
+  // ─── REPORT FINAL
   await log("\n━━━ RESULTADO ━━━");
   await log(JSON.stringify(result, null, 2));
   await log(`\n✓ COMPLETADO en ${((Date.now() - startedAt)/1000/60).toFixed(1)} min`);

@@ -845,6 +845,79 @@ router.post("/fs-pro/save-to-vault", requireAdmin, upload.single("file"), async 
 // ─── COST ESTIMATE / CAMPAIGN PLANNER ─────────────────────────────────────
 // Calcula coste y shotlist optimizado SIN ejecutar nada. Pensado para que el
 // frontend muestre presupuesto antes de quemar créditos.
+// ─── RUNWAY DIRECT IMAGE GENERATION (sin pasar por Replicate) ──────────────
+// POST /fs-pro/runway-image
+// Body: { projectId, prompt, ratio?, model?, referenceImageUrl?, seed? }
+// Genera una imagen llamando directamente a la API de Runway (gen4_image[_turbo])
+// y la guarda en el vault del proyecto. Útil cuando la cuenta Replicate está
+// sin saldo pero RUNWAY_API_KEY sí tiene crédito disponible.
+router.post("/fs-pro/runway-image", requireAdmin, upload.single("referenceImage"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidRaw, prompt, ratio, model, referenceImageUrl, seed: seedRaw, referenceTag } = req.body as {
+      projectId: number | string;
+      prompt: string;
+      ratio?: "1920:1080" | "1080:1920" | "1024:1024" | "1360:768" | "1080:1080" | "1168:880" | "1440:1080" | "1080:1440" | "1808:768" | "2112:912";
+      model?: "gen4_image" | "gen4_image_turbo";
+      referenceImageUrl?: string;
+      seed?: number | string;
+      referenceTag?: string;
+    };
+    const projectId = typeof pidRaw === "string" ? parseInt(pidRaw, 10) : pidRaw;
+    const seed = seedRaw != null && seedRaw !== "" ? (typeof seedRaw === "string" ? parseInt(seedRaw, 10) : seedRaw) : undefined;
+    if (!projectId || !prompt) { res.status(400).json({ error: "projectId, prompt requeridos" }); return; }
+
+    const limit = await checkProductionLimit(projectId, "image", 1);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    // Build reference images: file upload (→ dataURI) or referenceImageUrl
+    const referenceImages: Array<{ uri: string; tag?: string }> = [];
+    if (f) {
+      const dataUri = `data:${f.mimetype};base64,${f.buffer.toString("base64")}`;
+      referenceImages.push({ uri: dataUri, ...(referenceTag ? { tag: referenceTag } : {}) });
+    } else if (referenceImageUrl) {
+      referenceImages.push({ uri: referenceImageUrl, ...(referenceTag ? { tag: referenceTag } : {}) });
+    }
+
+    const { generateImageWithReferences, fetchRunwayImageBuffer } = await import("../lib/runway.js");
+    const result = await generateImageWithReferences({
+      promptText: prompt,
+      ratio: ratio ?? "1080:1080",
+      model: model ?? "gen4_image_turbo",
+      referenceImages,
+      seed: typeof seed === "number" && !isNaN(seed) ? seed : undefined,
+    });
+
+    const { buffer, mimeType } = await fetchRunwayImageBuffer(result.imageUrl);
+    const vaultId = await saveToVaultSmart({
+      projectId,
+      fileType: "fs-pro-image",
+      category: "fusion-studio-pro",
+      title: `FS Pro Runway: ${prompt.slice(0, 60)}`,
+      mimeType,
+      generatedBy: `fs-pro:runway:${result.model}`,
+      buffer,
+    });
+    await recordUsage(projectId, "image", 1);
+
+    res.json({
+      success: true,
+      vaultId,
+      model: result.model,
+      cost: result.cost,
+      runwayImageUrl: result.imageUrl,
+      sizeBytes: buffer.length,
+    });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro runway-image failed");
+    res.status(500).json({ error: err?.message || "Error generando imagen Runway" });
+  }
+});
+
 router.post("/fs-pro/cost-estimate", requireAdmin, async (req, res) => {
   try {
     const { budget, shots } = req.body as { budget: CampaignBudget; shots: ShotRequest[] };

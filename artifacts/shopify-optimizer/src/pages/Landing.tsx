@@ -248,6 +248,21 @@ export default function Landing() {
 
   const isAnimatingRef = useRef(false);
 
+  // Actualiza window.location.hash sin recargar (URL absoluta + reaplicado tras 50ms
+  // para sobrevivir a cualquier re-render disparado por goToSection).
+  const setHashRobust = useCallback((id: string) => {
+    const apply = () => {
+      try {
+        const url = `${window.location.pathname}${window.location.search}#${id}`;
+        window.history.replaceState(null, "", url);
+      } catch {
+        try { window.location.hash = id; } catch {}
+      }
+    };
+    apply();
+    setTimeout(apply, 50);
+  }, []);
+
   const goToSection = useCallback((index: number) => {
     const container = fpRef.current;
     if (!container) return;
@@ -615,7 +630,7 @@ export default function Landing() {
         <ul className="l-nav-links">
           {FP_SECTIONS.map((sec, i) => (
             <li key={sec.id}>
-              <a href={`#${sec.id}`} className={currentSection === i ? "l-nav-active" : ""} onClick={e => { e.preventDefault(); goToSection(i); }}>{sec.nav}</a>
+              <a href={`#${sec.id}`} className={currentSection === i ? "l-nav-active" : ""} onClick={e => { e.preventDefault(); goToSection(i); setHashRobust(sec.id); }}>{sec.nav}</a>
             </li>
           ))}
         </ul>
@@ -625,7 +640,7 @@ export default function Landing() {
           ) : (
             <>
               <Link href="/login" className="l-btn-ghost" {...cmsData("nav.ctaSecondary.label")}>{content.nav.ctaSecondary.label}</Link>
-              <a href="#fp-contact" className="l-btn-gold" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("nav.ctaPrimary.label", e) : goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
+              <a href="#fp-contact" className="l-btn-gold" onClick={e => { e.preventDefault(); if (isPreview) { cmsNotify("nav.ctaPrimary.label", e); } else { goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); } }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
             </>
           )}
         </div>
@@ -634,7 +649,7 @@ export default function Landing() {
       {/* ── SIDE NAV DOTS (right) ── */}
       <nav className="fp-sidenav" aria-label="Secciones">
         {FP_SECTIONS.map((sec, i) => (
-          <button key={sec.id} className={`fp-nav-dot${currentSection === i ? " active" : ""}`} onClick={() => goToSection(i)} title={sec.nav}>
+          <button key={sec.id} className={`fp-nav-dot${currentSection === i ? " active" : ""}`} onClick={() => { goToSection(i); setHashRobust(sec.id); }} title={sec.nav}>
             <span className="fp-nav-dot-label">{sec.nav}</span>
             <div className="fp-nav-dot-circle"></div>
           </button>
@@ -1148,7 +1163,7 @@ export default function Landing() {
                       )}
                     </>
                   )}
-                  <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }}>{calc.ctaLabel}</a>
+                  <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}>{calc.ctaLabel}</a>
                   <p className="fp-calc-disclaimer">{calc.disclaimer}</p>
                 </div>
               </div>
@@ -1465,14 +1480,41 @@ export default function Landing() {
                         if (href.startsWith("http://") || href.startsWith("https://")) {
                           return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer">{l.label}</a></li>;
                         }
-                        // Anchor: secciones fullpage o ids dentro del DOM
+                        // Anchor: secciones fullpage o ids dentro del DOM.
+                        // Actualizamos window.location.hash sin recargar para reflejar
+                        // la sección activa (deep linking). Usamos URL absoluta y un
+                        // timeout de respaldo para que el hash sobreviva a cualquier
+                        // re-render disparado por goToSection (fullpage cambia state).
+                        const setHashRobust = (id: string) => {
+                          const apply = () => {
+                            try {
+                              const url = `${window.location.pathname}${window.location.search}#${id}`;
+                              window.history.replaceState(null, "", url);
+                            } catch {
+                              // Fallback nativo si replaceState está bloqueado
+                              try { window.location.hash = id; } catch {}
+                            }
+                          };
+                          apply();
+                          // Reaplica tras el próximo paint por si goToSection lo borró
+                          setTimeout(apply, 50);
+                        };
                         const onAnchor = (e: React.MouseEvent<HTMLAnchorElement>) => {
                           if (!href.startsWith("#")) return;
                           const id = href.slice(1);
                           const fpIdx = FP_SECTION_IDS.indexOf(id);
-                          if (fpIdx >= 0) { e.preventDefault(); goToSection(fpIdx); return; }
+                          if (fpIdx >= 0) {
+                            e.preventDefault();
+                            goToSection(fpIdx);
+                            setHashRobust(id);
+                            return;
+                          }
                           const target = document.getElementById(id);
-                          if (target) { e.preventDefault(); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
+                          if (target) {
+                            e.preventDefault();
+                            target.scrollIntoView({ behavior: "smooth", block: "start" });
+                            setHashRobust(id);
+                          }
                         };
                         return <li key={li}><a href={href} onClick={onAnchor}>{l.label}</a></li>;
                       })}
@@ -1560,7 +1602,7 @@ export default function Landing() {
             <a
               href="#fp-contact"
               className="l-btn-gold"
-              onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); }}
+              onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}
               style={{ display: "inline-block", padding: "14px 28px", fontSize: 14 }}
             >Solicitar acceso al programa →</a>
           </div>

@@ -298,7 +298,8 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           previousCss: a.improvedCss,
           previousFragments: a.improvedHtmlFragments,
           changeRequest: changeRequest.trim(),
-          brandName: brandName.trim() || undefined,
+          // Nombre canónico del session plan (backend acepta también `brandName` legacy)
+          brandContext: brandName.trim() || undefined,
         }),
       });
       const text = await res.text();
