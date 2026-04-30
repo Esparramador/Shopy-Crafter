@@ -409,4 +409,274 @@ router.put("/shopify-config", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/system-capabilities", async (_req, res): Promise<void> => {
+  try {
+    const has = (...keys: string[]): boolean =>
+      keys.some((k) => Boolean(process.env[k] && String(process.env[k]).trim().length > 0));
+
+    const env = (k: string): string => (process.env[k] ? "set" : "missing");
+
+    const dbConfigured = Boolean(process.env.DATABASE_URL);
+    const sessionConfigured = Boolean(process.env.SESSION_SECRET);
+    const encryptionConfigured = Boolean(process.env.ENCRYPTION_KEY);
+
+    const claudeConfigured = has("ANTHROPIC_API_KEY", "AI_INTEGRATIONS_ANTHROPIC_API_KEY");
+    const geminiConfigured = has("GEMINI_API_KEY", "AI_INTEGRATIONS_GEMINI_API_KEY");
+    const replicateConfigured = has("REPLICATE_API_TOKEN");
+    const elevenConfigured = has("ELEVENLABS_API_KEY");
+    const runwayConfigured = has("RUNWAY_API_KEY");
+
+    let shopifyClientConfigured = has("SHOPIFY_CLIENT_ID");
+    let shopifySecretConfigured = has("SHOPIFY_CLIENT_SECRET");
+    let shopifySource: "environment" | "database" | "missing" = shopifyClientConfigured && shopifySecretConfigured ? "environment" : "missing";
+    try {
+      const dbRows = await db.select().from(platformSettingsTable);
+      const dbClient = dbRows.find(r => r.key === "shopify_client_id");
+      const dbSecret = dbRows.find(r => r.key === "shopify_client_secret");
+      if (dbClient?.value && dbSecret?.value) {
+        shopifyClientConfigured = true;
+        shopifySecretConfigured = true;
+        if (shopifySource === "missing") shopifySource = "database";
+      }
+    } catch {
+      // si la tabla no existe o falla la query, mantenemos sólo el chequeo de env
+    }
+    const klaviyoConfigured = has("KLAVIYO_API_KEY");
+    const pageSpeedConfigured = has("GOOGLE_PAGESPEED_API_KEY");
+    const githubConfigured = has("GITHUB_API_TOKEN");
+    const vapidConfigured = has("VAPID_PUBLIC_KEY") && has("VAPID_PRIVATE_KEY");
+    const objectStoreConfigured = has("PRIVATE_OBJECT_DIR") || has("PUBLIC_OBJECT_SEARCH_PATHS");
+    const chromiumConfigured = has("CHROMIUM_PATH", "PUPPETEER_EXECUTABLE_PATH");
+
+    const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const geminiProModel = process.env.GEMINI_PRO_MODEL || "gemini-3.1-pro-preview";
+
+    const categories = [
+      {
+        id: "ai",
+        name: "Motores de Inteligencia Artificial",
+        icon: "brain",
+        items: [
+          {
+            key: "claude",
+            name: "Anthropic Claude",
+            badge: claudeModel,
+            description: "Modelo principal de razonamiento, redacción de informes, análisis estratégico y visión.",
+            envVars: ["ANTHROPIC_API_KEY", "AI_INTEGRATIONS_ANTHROPIC_API_KEY"],
+            configured: claudeConfigured,
+            uses: ["Auditoría", "Rediseño IA", "ShopyBrain", "Informes profesionales", "Pricing IA", "Consistencia", "Suppliers"],
+          },
+          {
+            key: "gemini",
+            name: "Google Gemini (Flash + Pro)",
+            badge: `${geminiModel} / ${geminiProModel}`,
+            description: "Búsqueda en tiempo real con grounding, URL context, thinking budget y generación de imágenes Nano Banana.",
+            envVars: ["GEMINI_API_KEY", "AI_INTEGRATIONS_GEMINI_API_KEY"],
+            configured: geminiConfigured,
+            uses: ["Gemini Intelligence", "Entity Research", "Fusion Studio Pro (Nano Banana)", "AdStudio (hero images)"],
+          },
+          {
+            key: "replicate",
+            name: "Replicate (SDXL + Whisper + Motion + Lipsync)",
+            badge: "multi-model",
+            description: "Generación de imágenes SDXL, transcripción Whisper, motion video y sincronización labial.",
+            envVars: ["REPLICATE_API_TOKEN"],
+            configured: replicateConfigured,
+            uses: ["Generador de imágenes", "FusionStudio", "WebLab assets", "Vídeos motion", "Lipsync"],
+          },
+          {
+            key: "elevenlabs",
+            name: "ElevenLabs Voice AI",
+            badge: "voice synthesis",
+            description: "Síntesis de voz multilingüe de alta fidelidad para vídeos, anuncios y dubbing.",
+            envVars: ["ELEVENLABS_API_KEY"],
+            configured: elevenConfigured,
+            uses: ["Vídeos AdStudio", "Voiceovers para campañas", "Audio para storyboards"],
+          },
+          {
+            key: "runway",
+            name: "Runway ML Gen-3",
+            badge: "video generation",
+            description: "Generación de vídeo cinematográfico desde texto e imágenes para motion ads y reels.",
+            envVars: ["RUNWAY_API_KEY"],
+            configured: runwayConfigured,
+            uses: ["AdStudio vídeos premium", "Motion ads", "Reels promocionales"],
+          },
+        ],
+      },
+      {
+        id: "ecommerce",
+        name: "eCommerce y Marketing",
+        icon: "store",
+        items: [
+          {
+            key: "shopify",
+            name: "Shopify OAuth + Admin API",
+            badge: "OAuth 2.0",
+            description: "Conexión directa con tiendas Shopify (productos, pedidos, inventario, colecciones, metafields).",
+            envVars: ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"],
+            configured: shopifyClientConfigured && shopifySecretConfigured,
+            uses: ["Vinculación de tiendas", "Sync productos", "Pricing dinámico", "Inventario", "Forecast"],
+          },
+          {
+            key: "klaviyo",
+            name: "Klaviyo Email Marketing",
+            badge: "API v2024",
+            description: "Sincronización de listas, segmentos y campañas de email automatizadas.",
+            envVars: ["KLAVIYO_API_KEY"],
+            configured: klaviyoConfigured,
+            uses: ["Campañas email", "Segmentación clientes", "Email templates"],
+          },
+          {
+            key: "google-mail",
+            name: "Google Mail (Gmail API)",
+            badge: "OAuth integration",
+            description: "Envío y lectura de email transaccional vía Gmail con integración OAuth gestionada.",
+            envVars: [],
+            configured: true,
+            uses: ["Notificaciones", "Email a clientes", "Outbound campaigns"],
+          },
+        ],
+      },
+      {
+        id: "performance",
+        name: "Performance, SEO y datos externos",
+        icon: "gauge",
+        items: [
+          {
+            key: "pagespeed",
+            name: "Google PageSpeed Insights",
+            badge: "Lighthouse v6",
+            description: "Auditoría real de Core Web Vitals, performance, accesibilidad y SEO técnico.",
+            envVars: ["GOOGLE_PAGESPEED_API_KEY"],
+            configured: pageSpeedConfigured,
+            uses: ["Auditoría SEO", "Performance reports", "Web Vitals tracking"],
+          },
+          {
+            key: "github",
+            name: "GitHub API",
+            badge: "REST + GraphQL",
+            description: "Lectura de repositorios para análisis de stack, dependencias y changelog automático.",
+            envVars: ["GITHUB_API_TOKEN"],
+            configured: githubConfigured,
+            uses: ["Stack analysis", "Changelog automation", "Roadmap sync"],
+          },
+        ],
+      },
+      {
+        id: "infra",
+        name: "Infraestructura y plataforma",
+        icon: "server",
+        items: [
+          {
+            key: "postgres",
+            name: "PostgreSQL + Drizzle ORM",
+            badge: "managed",
+            description: "Base de datos relacional con session store, audit log, omnicore memories e historial completo.",
+            envVars: ["DATABASE_URL"],
+            configured: dbConfigured,
+            uses: ["Toda la persistencia", "Sessions", "Audit log", "ShopyBrain memories"],
+          },
+          {
+            key: "session",
+            name: "Session Store (PostgreSQL)",
+            badge: "secure cookies",
+            description: "Sesiones cifradas con SESSION_SECRET y cookies httpOnly + same-site.",
+            envVars: ["SESSION_SECRET"],
+            configured: sessionConfigured,
+            uses: ["Login admin", "Login clientes", "Persistencia de sesión"],
+          },
+          {
+            key: "encryption",
+            name: "Cifrado de credenciales (AES-256-GCM)",
+            badge: "at-rest encryption",
+            description: "Encripta tokens, secrets y API keys de cliente con clave maestra.",
+            envVars: ["ENCRYPTION_KEY"],
+            configured: encryptionConfigured,
+            uses: ["Tokens Shopify", "API keys per-project", "Secrets de cliente"],
+          },
+          {
+            key: "vapid",
+            name: "Web Push (VAPID)",
+            badge: "RFC 8292",
+            description: "Notificaciones push web para alertas de jobs, aprobaciones y eventos críticos.",
+            envVars: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
+            configured: vapidConfigured,
+            uses: ["Push notifications admin", "Alertas de aprobaciones"],
+          },
+          {
+            key: "object-storage",
+            name: "Object Storage (App Storage)",
+            badge: "GCS-compatible",
+            description: "Almacenamiento de PDFs generados, imágenes IA, exports ZIP y assets de informes.",
+            envVars: ["PRIVATE_OBJECT_DIR", "PUBLIC_OBJECT_SEARCH_PATHS"],
+            configured: objectStoreConfigured,
+            uses: ["PDFs de informes", "Imágenes IA", "ZIPs de export", "Brand assets"],
+          },
+          {
+            key: "puppeteer",
+            name: "Puppeteer + Chromium (PDF engine)",
+            badge: "headless render",
+            description: "Renderizado de PDFs profesionales para informes, brand briefs y exports.",
+            envVars: ["CHROMIUM_PATH", "PUPPETEER_EXECUTABLE_PATH"],
+            configured: chromiumConfigured,
+            uses: ["PDFs de informes", "Brand briefs", "Exports premium"],
+          },
+        ],
+      },
+    ];
+
+    const totalItems = categories.reduce((acc, c) => acc + c.items.length, 0);
+    const configuredItems = categories.reduce(
+      (acc, c) => acc + c.items.filter((i) => i.configured).length,
+      0,
+    );
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      summary: {
+        total: totalItems,
+        configured: configuredItems,
+        missing: totalItems - configuredItems,
+        coverage: Math.round((configuredItems / totalItems) * 100),
+      },
+      categories,
+      envSnapshot: {
+        ANTHROPIC_API_KEY: env("ANTHROPIC_API_KEY"),
+        AI_INTEGRATIONS_ANTHROPIC_API_KEY: env("AI_INTEGRATIONS_ANTHROPIC_API_KEY"),
+        GEMINI_API_KEY: env("GEMINI_API_KEY"),
+        AI_INTEGRATIONS_GEMINI_API_KEY: env("AI_INTEGRATIONS_GEMINI_API_KEY"),
+        REPLICATE_API_TOKEN: env("REPLICATE_API_TOKEN"),
+        ELEVENLABS_API_KEY: env("ELEVENLABS_API_KEY"),
+        RUNWAY_API_KEY: env("RUNWAY_API_KEY"),
+        SHOPIFY_CLIENT_ID: env("SHOPIFY_CLIENT_ID"),
+        SHOPIFY_CLIENT_SECRET: env("SHOPIFY_CLIENT_SECRET"),
+        KLAVIYO_API_KEY: env("KLAVIYO_API_KEY"),
+        GOOGLE_PAGESPEED_API_KEY: env("GOOGLE_PAGESPEED_API_KEY"),
+        GITHUB_API_TOKEN: env("GITHUB_API_TOKEN"),
+        DATABASE_URL: env("DATABASE_URL"),
+        SESSION_SECRET: env("SESSION_SECRET"),
+        ENCRYPTION_KEY: env("ENCRYPTION_KEY"),
+        VAPID_PUBLIC_KEY: env("VAPID_PUBLIC_KEY"),
+        VAPID_PRIVATE_KEY: env("VAPID_PRIVATE_KEY"),
+        PRIVATE_OBJECT_DIR: env("PRIVATE_OBJECT_DIR"),
+        PUBLIC_OBJECT_SEARCH_PATHS: env("PUBLIC_OBJECT_SEARCH_PATHS"),
+        CHROMIUM_PATH: env("CHROMIUM_PATH"),
+        PUPPETEER_EXECUTABLE_PATH: env("PUPPETEER_EXECUTABLE_PATH"),
+      },
+      runtime: {
+        node: process.version,
+        platform: process.platform,
+        uptimeSeconds: Math.round(process.uptime()),
+        memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        env: process.env.NODE_ENV || "development",
+      },
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default router;

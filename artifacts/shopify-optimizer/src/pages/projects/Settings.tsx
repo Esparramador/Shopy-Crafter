@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getGetProjectQueryKey } from "@workspace/api-client-react";
 import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain, Eye, EyeOff, Copy, Unplug, PlugZap, Trash2 } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
+import AICapabilitiesPanel from "../../components/AICapabilitiesPanel";
 
 export default function SettingsPage() {
   const [, params] = useRoute("/projects/:id/settings");
@@ -312,22 +313,33 @@ export default function SettingsPage() {
               />
             </div>
 
+            <AICapabilitiesPanel />
+
+            <div className="space-y-2 pt-4 border-t border-white/5">
+              <p className="text-sm font-medium text-foreground">Claves API personalizadas (opcional)</p>
+              <p className="text-xs text-muted-foreground">
+                Por defecto este proyecto usa las claves globales de Shopy Crafter (ya activas arriba). Solo introduce claves propias si quieres facturar el consumo a tu cuenta personal en Replicate o Anthropic.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">API Token de Replicate (Imágenes)</label>
+                <label className="text-sm font-medium text-foreground">API Token de Replicate (override)</label>
                 <input 
                   type="password"
                   value={formData.replicateApiToken}
                   onChange={e => setFormData({...formData, replicateApiToken: e.target.value})}
+                  placeholder="Dejar vacío para usar el token del plan"
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">API Key de Anthropic (Claude)</label>
+                <label className="text-sm font-medium text-foreground">API Key de Anthropic Claude (override)</label>
                 <input 
                   type="password"
                   value={formData.anthropicApiKey}
                   onChange={e => setFormData({...formData, anthropicApiKey: e.target.value})}
+                  placeholder="Dejar vacío para usar la clave del plan"
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono"
                 />
               </div>

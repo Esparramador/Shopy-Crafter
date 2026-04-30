@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Lock, User, Shield, CheckCircle2, Store, Copy, Check, ExternalLink, AlertTriangle, Zap, Bell, RotateCcw } from "lucide-react";
+import { Eye, EyeOff, Lock, User, Shield, CheckCircle2, Store, Copy, Check, ExternalLink, AlertTriangle, Zap, Bell, RotateCcw, Activity, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { ResetCoachMarksButton } from "@/components/CoachMarks";
 
@@ -497,6 +498,8 @@ export default function AdminSettings() {
 
       <VapidSection />
 
+      <CapabilitiesSummary />
+
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <RotateCcw size={15} style={{ color: "var(--gold)" }} />
@@ -506,6 +509,80 @@ export default function AdminSettings() {
           Reinicia el tour de bienvenida para volver a ver las explicaciones de la interfaz.
         </p>
         <ResetCoachMarksButton />
+      </div>
+    </div>
+  );
+}
+
+interface CapsResponse {
+  summary: { total: number; configured: number; missing: number; coverage: number };
+  categories: Array<{ id: string; name: string; items: Array<{ key: string; name: string; configured: boolean; badge: string }> }>;
+}
+
+function CapabilitiesSummary() {
+  const [caps, setCaps] = useState<CapsResponse | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/admin/system-capabilities`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(setCaps)
+      .catch(() => {});
+  }, []);
+
+  if (!caps) return null;
+
+  const coverage = caps.summary.coverage;
+  const ok = coverage >= 90;
+  const warn = coverage >= 60 && coverage < 90;
+  const tone = ok ? "var(--jade)" : warn ? "var(--gold)" : "var(--crim)";
+  const toneBg = ok ? "rgba(45,212,159,0.05)" : warn ? "rgba(200,168,75,0.05)" : "rgba(232,69,88,0.05)";
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid var(--bdr)" }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: toneBg, border: `1px solid ${tone}33`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Activity size={18} style={{ color: tone }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Capacidades del sistema</p>
+          <p style={{ fontSize: 12, color: "var(--t2)" }}>
+            <span style={{ color: tone, fontWeight: 700 }}>{caps.summary.configured}</span> de {caps.summary.total} integraciones activas · cobertura {coverage}%
+          </p>
+        </div>
+        <Link href="/admin/system-health">
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+            background: "rgba(255,255,255,0.04)", border: "1px solid var(--bdr)",
+            color: "var(--t2)", textDecoration: "none", cursor: "pointer",
+          }}>
+            Ver detalle <ArrowRight size={12} />
+          </span>
+        </Link>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(150px, 100%), 1fr))", gap: 8 }}>
+        {caps.categories.flatMap(cat => cat.items).map(item => (
+          <div
+            key={item.key}
+            style={{
+              padding: "8px 10px", borderRadius: 8,
+              background: item.configured ? "rgba(45,212,159,0.04)" : "rgba(200,168,75,0.04)",
+              border: `1px solid ${item.configured ? "rgba(45,212,159,0.18)" : "rgba(200,168,75,0.18)"}`,
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            {item.configured
+              ? <CheckCircle2 size={11} style={{ color: "var(--jade)", flexShrink: 0 }} />
+              : <AlertTriangle size={11} style={{ color: "var(--gold)", flexShrink: 0 }} />}
+            <span style={{ fontSize: 11, color: "var(--t)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {item.name.split("(")[0].trim()}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
