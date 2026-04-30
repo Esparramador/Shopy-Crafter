@@ -12,6 +12,7 @@ import { Palette, Fingerprint, RefreshCcw, AlertTriangle, XCircle, Loader2, Eye,
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import SaveReportButton from "@/components/SaveReportButton";
+import { LiveOperation } from "@/components/LiveOperation";
 function RepairPoller({ projectId, jobId, onComplete }: {
   projectId: number;
   jobId: string;
@@ -216,6 +217,19 @@ ${s?.products?.length ? `<h2>Detalle por Producto</h2><table><tr><th>Producto</t
         </div>
       </div>
 
+      <LiveOperation
+        active={extractDna.isPending}
+        title="Extrayendo DNA visual de tu catálogo"
+        estimatedSec={45}
+        messages={[
+          "Analizando paleta de color, tipografía y composición de cada producto…",
+          "Detectando patrones visuales recurrentes con IA multimodal…",
+          "Calculando score de consistencia global…",
+          "Si tienes muchos productos puede tardar más de un minuto.",
+        ]}
+        className="w-full"
+      />
+
       {/* DNA + Score */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* DNA Card */}
@@ -367,6 +381,19 @@ ${s?.products?.length ? `<h2>Detalle por Producto</h2><table><tr><th>Producto</t
             Reparar Consistencia Masiva
           </button>
         </div>
+
+        <LiveOperation
+          active={repairConsistency.isPending}
+          title="Lanzando reparación masiva de consistencia"
+          estimatedSec={20}
+          messages={[
+            "Encolando productos off-brand para corrección…",
+            "Cada producto se procesará en background con tu DNA visual…",
+            "Verás progreso del job en tiempo real al iniciar.",
+            "Puedes cerrar esta pestaña — el servidor continúa trabajando.",
+          ]}
+          className="w-full mt-3"
+        />
 
         {/* Repair progress */}
         {repairJobId && (

@@ -16,6 +16,7 @@ import { useState, useEffect } from "react";
 import GenerationProgress from "@/components/GenerationProgress";
 import SaveReportButton from "@/components/SaveReportButton";
 import ReferenceMediaPanel from "@/components/ReferenceMediaPanel";
+import { LiveOperation } from "@/components/LiveOperation";
 import {
   Wand2,
   Check,
@@ -330,6 +331,36 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
           </button>
         </div>
       </div>
+
+      {/* Indicador de operación en curso (rediseño individual o bulk) */}
+      <LiveOperation
+        active={isAnyRedesigning}
+        title={
+          bulkRedesign.isPending
+            ? "Lanzando rediseño masivo del catálogo"
+            : redesign.isPending
+            ? "Rediseñando producto con IA"
+            : undefined
+        }
+        estimatedSec={bulkRedesign.isPending ? 30 : 25}
+        messages={
+          bulkRedesign.isPending
+            ? [
+                "Encolando productos para rediseño…",
+                "Cada producto se procesa en background — sigue trabajando.",
+                "El job continúa aunque cierres esta pestaña.",
+                "Verás progreso en tiempo real en el panel inferior.",
+              ]
+            : [
+                "Claude está reescribiendo título SEO…",
+                "Reformulando descripción HTML con tu tono de marca…",
+                "Sugiriendo precio según mercado y competencia…",
+                "Generando tags relevantes y photo briefs…",
+                "Revisando coherencia con el cerebro de tu marca…",
+              ]
+        }
+        className="w-full"
+      />
 
       {/* Reference media + generation progress */}
       <ReferenceMediaPanel

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
 import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -227,6 +228,18 @@ function GenerateTab({ caps, projectId, onSuccess, onError }: { caps: Capabiliti
         <button onClick={generate} disabled={busy || !prompt.trim()} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px", marginTop: 8 }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy ? "Generando..." : "Generar imagen"}
         </button>
+        <LiveOperation
+          active={busy}
+          title="Generando imagen profesional con IA"
+          estimatedSec={25}
+          messages={[
+            "Enviando prompt y referencias al modelo seleccionado…",
+            "Flux/SDXL generando 25-50 pasos de difusión…",
+            "Aplicando post-procesado y validación de calidad…",
+            "Subiendo el resultado al Vault del proyecto…",
+          ]}
+          className="w-full mt-3"
+        />
       </div>
     </div>
   );
@@ -282,6 +295,18 @@ function EditTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities |
         <button onClick={edit} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />} {busy ? "Editando..." : "Editar imagen"}
         </button>
+        <LiveOperation
+          active={busy}
+          title="Editando imagen con IA"
+          estimatedSec={20}
+          messages={[
+            "Subiendo imagen original al motor de edición…",
+            "Aplicando el cambio descrito sin alterar el resto…",
+            "Refinando bordes y consistencia de iluminación…",
+            "Validando que el resultado mantenga calidad profesional…",
+          ]}
+          className="w-full mt-3"
+        />
       </div>
     </div>
   );
@@ -335,6 +360,26 @@ function BackgroundTab({ projectId, onSuccess, onError }: { projectId: number; o
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
           {busy ? "Procesando..." : mode === "remove" ? "Quitar fondo" : "Reemplazar fondo"}
         </button>
+        <LiveOperation
+          active={busy}
+          title={mode === "remove" ? "Quitando fondo de la imagen" : "Reemplazando fondo con escena IA"}
+          estimatedSec={mode === "remove" ? 12 : 25}
+          messages={
+            mode === "remove"
+              ? [
+                  "Subiendo imagen al motor de segmentación…",
+                  "Detectando bordes del producto con precisión…",
+                  "Generando alpha mask y exportando PNG transparente…",
+                ]
+              : [
+                  "Subiendo imagen y prompt de escena…",
+                  "Recortando producto y generando nuevo escenario…",
+                  "Integrando iluminación y sombras coherentes…",
+                  "Validando calidad antes de subir al Vault…",
+                ]
+          }
+          className="w-full mt-3"
+        />
       </div>
     </div>
   );
@@ -396,6 +441,18 @@ function EnhanceTab({ projectId, onSuccess, onError }: { projectId: number; onSu
         <button onClick={run} disabled={busy || !file} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Maximize2 size={16} />} {busy ? "Mejorando..." : "Mejorar imagen"}
         </button>
+        <LiveOperation
+          active={busy}
+          title="Mejorando resolución y calidad"
+          estimatedSec={20}
+          messages={[
+            "Subiendo imagen al motor de upscaling…",
+            "Reconstruyendo detalles a alta resolución…",
+            "Refinando texturas, bordes y rostros…",
+            "Exportando versión mejorada al Vault…",
+          ]}
+          className="w-full mt-3"
+        />
       </div>
     </div>
   );
@@ -486,6 +543,19 @@ function VideoTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities 
         <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Generando video..." : "Generar video (1-3 min)"}
         </button>
+        <LiveOperation
+          active={busy}
+          title="Generando video con IA"
+          estimatedSec={150}
+          messages={[
+            "Enviando prompt y frame de origen al modelo de video…",
+            "Renderizando 24-30 fps por segundo de salida…",
+            "El proceso completo tarda 1-3 minutos según duración.",
+            "El servidor sigue trabajando aunque cierres la pestaña.",
+            "Codificando MP4 final y subiendo al Vault…",
+          ]}
+          className="w-full mt-3"
+        />
       </div>
     </div>
   );
@@ -655,6 +725,46 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: 14 }}>
+        <LiveOperation
+          active={busy}
+          title={
+            mode === "tts" ? "Sintetizando voz con ElevenLabs" :
+            mode === "clone" ? "Clonando voz desde tu muestra" :
+            mode === "sfx" ? `Generando SFX (${duration}s)` :
+            `Generando música (${musicDuration}s)`
+          }
+          estimatedSec={
+            mode === "tts" ? 12 :
+            mode === "clone" ? 30 :
+            mode === "sfx" ? Math.max(15, duration * 2) :
+            Math.max(45, musicDuration * 1.5)
+          }
+          messages={
+            mode === "tts" ? [
+              "Procesando texto y aplicando configuración de voz…",
+              "Sintetizando audio con el modelo seleccionado…",
+              "Subiendo MP3 al Vault del proyecto…",
+            ] : mode === "clone" ? [
+              "Subiendo muestra de audio a ElevenLabs…",
+              "Entrenando huella vocal con tu sample…",
+              "Validando calidad del clon — proceso pesado.",
+              "El servidor sigue trabajando aunque cierres la pestaña.",
+            ] : mode === "sfx" ? [
+              "Generando efecto de sonido con IA…",
+              "Refinando textura y dinámicas…",
+              "Exportando MP3 al Vault…",
+            ] : [
+              "Componiendo música con IA generativa…",
+              "Ajustando BPM, instrumentos y arreglos…",
+              "El renderizado puede tardar más en pistas largas.",
+              "Subiendo WAV al Vault del proyecto…",
+            ]
+          }
+          className="w-full"
+        />
+      </div>
     </div>
   );
 }
@@ -728,6 +838,19 @@ function ComposeTab({ projectId, sessionItems, onSuccess, onError }: { projectId
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />}
           {busy ? "Componiendo..." : "Componer MP4 final"}
         </button>
+        <LiveOperation
+          active={busy}
+          title="Componiendo MP4 final con FFmpeg"
+          estimatedSec={90}
+          messages={[
+            "Descargando video, voz y música del Vault…",
+            "Mezclando pistas de audio según niveles configurados…",
+            "Aplicando overlays de texto si los hay…",
+            "Re-encodeando a H.264 + AAC para compatibilidad universal…",
+            "Subiendo el resultado final al Vault — proceso pesado.",
+          ]}
+          className="w-full mt-3"
+        />
         {videos.length === 0 && (
           <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 12 }}>
             Genera primero un video y/o audio en las pestañas anteriores. Luego vuelves aquí para componer el final.
@@ -1035,6 +1158,47 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
             </button>
           </>
         )}
+
+        <div style={{ marginTop: 14 }}>
+          <LiveOperation
+            active={busy}
+            title={
+              mode === "lipsync" ? "Sincronizando labios con audio (lip-sync)" :
+              mode === "subs" ? "Quemando subtítulos en el video" :
+              mode === "motion" ? "Transfiriendo movimiento entre clips" :
+              "Concatenando videos con FFmpeg"
+            }
+            estimatedSec={
+              mode === "lipsync" ? 180 :
+              mode === "subs" ? 60 :
+              mode === "motion" ? 240 :
+              45
+            }
+            messages={
+              mode === "lipsync" ? [
+                "Analizando fonemas del audio…",
+                "Mapeando movimientos labiales frame a frame…",
+                "Lip-sync es una operación pesada — 2 a 4 minutos.",
+                "El servidor sigue trabajando aunque cierres la pestaña.",
+              ] : mode === "subs" ? [
+                "Extrayendo audio del video…",
+                "Transcribiendo con Whisper en el idioma seleccionado…",
+                "Renderizando subtítulos con tu estilo configurado…",
+                "Re-encodeando MP4 final con subs quemados…",
+              ] : mode === "motion" ? [
+                "Subiendo imagen base y video referencia…",
+                "Extrayendo trayectoria de movimiento del clip…",
+                "Aplicando movimiento sobre tu imagen — proceso muy pesado.",
+                "Puede tardar 3 a 5 minutos según resolución.",
+              ] : [
+                "Descargando los videos seleccionados del Vault…",
+                "Aplicando transición temática si la configuraste…",
+                "Re-encodeando concat final con FFmpeg…",
+              ]
+            }
+            className="w-full"
+          />
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { Loader2, Search, Star, Trash2, Download, ExternalLink, Mail, Phone, Globe, Award, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -236,6 +237,19 @@ export default function Suppliers() {
           >
             {running ? <><Loader2 size={14} className="animate-spin" /> Buscando proveedores reales en Google…</> : <><Search size={14} /> Buscar proveedores reales</>}
           </button>
+          <LiveOperation
+            active={running}
+            title="Buscando proveedores reales en internet"
+            estimatedSec={45}
+            messages={[
+              "Consultando Google con tu nicho/búsqueda…",
+              "Filtrando resultados con dominios reales y datos de contacto…",
+              "Extrayendo email/teléfono/web/categoría con IA…",
+              "Eliminando duplicados y marketplaces genéricos…",
+              "Guardando proveedores nuevos en tu catálogo…",
+            ]}
+            className="w-full"
+          />
           {entries.length > 0 && (
             <>
               <button
@@ -249,6 +263,18 @@ export default function Suppliers() {
               >
                 {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Descargar informe HTML
               </button>
+              <LiveOperation
+                active={downloading}
+                title="Generando informe de proveedores"
+                estimatedSec={20}
+                messages={[
+                  "Compilando datos de proveedores seleccionados…",
+                  "Renderizando tabla con contactos y categorías…",
+                  "Aplicando estilo del informe HTML…",
+                  "Empaquetando archivo descargable…",
+                ]}
+                className="w-full"
+              />
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#bae6fd", cursor: "pointer" }}>
                 <input type="checkbox" checked={onlyStarred} onChange={e => setOnlyStarred(e.target.checked)} />
                 Solo favoritos en informe

@@ -12,6 +12,7 @@ import {
   useAuditPageSpeed,
 } from "@workspace/api-client-react";
 import SaveReportButton from "@/components/SaveReportButton";
+import { LiveOperation } from "@/components/LiveOperation";
 import {
   Search,
   Globe,
@@ -260,6 +261,52 @@ ${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><
           </button>
         </div>
       </div>
+
+      {/* Indicador global de operación SEO en curso */}
+      <LiveOperation
+        active={
+          runSeoAudit.isPending ||
+          generateSchemas.isPending ||
+          generateMetas.isPending ||
+          generateSitemap.isPending ||
+          fixAltTexts.isPending ||
+          getKeywords.isPending ||
+          getBlogStrategy.isPending ||
+          generateBlogPost.isPending ||
+          auditPageSpeed.isPending
+        }
+        title={
+          runSeoAudit.isPending ? "Ejecutando auditoría SEO completa" :
+          generateSchemas.isPending ? "Generando JSON-LD schemas para tus productos" :
+          generateMetas.isPending ? "Reescribiendo metas masivos con IA" :
+          generateSitemap.isPending ? "Generando sitemap.xml y enviándolo a Google" :
+          fixAltTexts.isPending ? "Corrigiendo alt texts de imágenes" :
+          getKeywords.isPending ? "Investigando keywords con IA" :
+          getBlogStrategy.isPending ? "Diseñando estrategia de contenido" :
+          generateBlogPost.isPending ? "Redactando artículo de blog" :
+          auditPageSpeed.isPending ? "Analizando rendimiento con Google PageSpeed" :
+          undefined
+        }
+        estimatedSec={
+          runSeoAudit.isPending ? 60 :
+          generateSchemas.isPending ? 30 :
+          generateMetas.isPending ? 45 :
+          generateSitemap.isPending ? 15 :
+          fixAltTexts.isPending ? 30 :
+          getKeywords.isPending ? 25 :
+          getBlogStrategy.isPending ? 35 :
+          generateBlogPost.isPending ? 60 :
+          auditPageSpeed.isPending ? 30 :
+          20
+        }
+        messages={[
+          "La operación se ejecuta en el servidor — no cierres la pestaña.",
+          "Tu cerebro de marca está ajustando tono y estilo del contenido…",
+          "Si tu catálogo es grande, el proceso puede tardar más.",
+          "Cada operación cuesta créditos de IA — solo pagas por uso real.",
+        ]}
+        className="w-full"
+      />
 
       {/* Score + Issues */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

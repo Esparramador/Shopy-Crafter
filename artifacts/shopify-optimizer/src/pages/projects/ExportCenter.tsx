@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { LiveOperation } from "@/components/LiveOperation";
 import {
   FileText, Download, BarChart3, ShoppingBag, Palette, TestTubes, Image,
   FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package, Eye,
@@ -573,6 +574,34 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
           </button>
         </div>
       </div>
+
+      {/* Indicador unificado para descargas masivas y análisis IA */}
+      <LiveOperation
+        active={aiGenerating || downloading !== null}
+        title={
+          aiGenerating
+            ? "Generando análisis ejecutivo con IA"
+            : downloading !== null
+            ? `Empaquetando ${downloading === "ALL" ? "todos los informes" : downloading}`
+            : undefined
+        }
+        estimatedSec={aiGenerating ? 45 : 25}
+        messages={
+          aiGenerating
+            ? [
+                "Claude está leyendo todos tus reportes del proyecto…",
+                "Identificando patrones y oportunidades de mejora…",
+                "Redactando recomendaciones priorizadas en tu tono de marca…",
+                "Generando PDF maquetado con el resultado final…",
+              ]
+            : [
+                "Compactando archivos en el servidor…",
+                "Preparando descarga — el navegador la lanzará automáticamente.",
+                "Si tienes muchos informes el ZIP puede pesar — descarga estable.",
+              ]
+        }
+        className="w-full"
+      />
 
       {error && (
         <div className="p-3 rounded-xl flex items-center gap-2 text-sm" style={{ background: "rgba(232,69,88,.1)", border: "1px solid rgba(232,69,88,.2)", color: "#e84558" }}>

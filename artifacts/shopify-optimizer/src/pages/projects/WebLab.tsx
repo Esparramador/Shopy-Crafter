@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useRoute } from "wouter";
 import { scoreColor } from "@/lib/utils";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -905,6 +906,19 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                       }}
                     >{iterating ? "Aplicando…" : "✨ Aplicar cambio"}</button>
                   </div>
+                  <LiveOperation
+                    active={iterating}
+                    title="Aplicando tu cambio sobre la web generada"
+                    estimatedSec={35}
+                    messages={[
+                      "Enviando contexto previo + tu petición a Claude…",
+                      "Reescribiendo CSS sin perder coherencia con la marca…",
+                      "Actualizando fragmentos HTML afectados…",
+                      "Validando uniqueness y rechazando placeholders…",
+                      "Refrescando la vista previa con el resultado…",
+                    ]}
+                    className="w-full mt-3"
+                  />
                 </div>
               </div>
             )}

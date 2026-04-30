@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRoute } from "wouter";
 import FusionStudioPro from "./FusionStudioPro";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -939,6 +940,22 @@ export default function FusionStudio() {
               >
                 {isGenerating ? "⟳ Generando sesión de fotos..." : `✦ Generar ${totalPhotos} Fotos Profesionales`}
               </button>
+
+              <div style={{ marginTop: 14 }}>
+                <LiveOperation
+                  active={isGenerating}
+                  title={`Generando ${totalPhotos} fotos profesionales`}
+                  estimatedSec={Math.max(60, totalPhotos * 12)}
+                  messages={[
+                    "Subiendo y analizando tus imágenes de producto…",
+                    "Aplicando los modos seleccionados con Flux/SDXL…",
+                    "Cada foto puede tardar 8-15 segundos por modelo IA.",
+                    "El servidor sigue trabajando aunque cierres esta pestaña.",
+                    "Revisaremos cada salida antes de mostrártela.",
+                  ]}
+                  className="w-full"
+                />
+              </div>
             </div>
 
             <div style={V.right}>
@@ -1205,6 +1222,22 @@ export default function FusionStudio() {
                       }}>
                       {videoGenerating ? "🎥 Generando video... esto tarda 1-3 minutos" : `🎬 Generar video con ${videoModels.find(m => m.key === videoModel)?.label || videoModel}`}
                     </button>
+
+                    <div style={{ marginTop: 12 }}>
+                      <LiveOperation
+                        active={videoGenerating}
+                        title={`Generando video con ${videoModels.find(m => m.key === videoModel)?.label || videoModel}`}
+                        estimatedSec={120}
+                        messages={[
+                          "Enviando frame de origen al modelo de video…",
+                          "El motor está animando 24-30 fps por segundo de salida…",
+                          "Renderizado MP4 con codec optimizado…",
+                          "Esto tarda 1-3 minutos según duración y modelo.",
+                          "El job continúa aunque cierres esta pestaña.",
+                        ]}
+                        className="w-full"
+                      />
+                    </div>
 
                     {/* RESULT */}
                     {videoResult?.url && (

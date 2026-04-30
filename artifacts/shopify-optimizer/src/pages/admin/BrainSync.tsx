@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Brain, Download, Upload, RefreshCw, Activity, Database, Zap, ChevronRight, AlertCircle, CheckCircle2, X, Loader2, FileText, Sparkles, BarChart3, Cpu, Network } from "lucide-react";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -282,6 +283,21 @@ function ExportTab({ onSuccess, onError }: { onSuccess: (m: string) => void; onE
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: 16 }}>
+        <LiveOperation
+          active={downloading !== null}
+          title={`Empaquetando export · ${downloading ?? ""}`}
+          estimatedSec={30}
+          messages={[
+            "Recolectando memorias del cerebro de marca…",
+            "Serializando dominios, embeddings y metadata…",
+            "Comprimiendo el archivo final…",
+            "Descarga lista — el navegador la abrirá automáticamente.",
+          ]}
+          className="w-full"
+        />
+      </div>
     </div>
   );
 }
@@ -371,6 +387,22 @@ function ImportTab({ onSuccess, onError, reloadStats }: { onSuccess: (m: string)
             className="btn btn-gold" style={{ marginTop: 10, width: "100%", justifyContent: "center" }}>
             {uploading ? <><Loader2 size={14} className="animate-spin" /> Importando...</> : <><Upload size={14} /> Importar {mode.toUpperCase()}</>}
           </button>
+
+          <div style={{ marginTop: 12 }}>
+            <LiveOperation
+              active={uploading}
+              title={`Importando memorias (${mode.toUpperCase()})`}
+              estimatedSec={mode === "ndjson" ? 60 : 30}
+              messages={[
+                "Parseando entradas y validando schema…",
+                "Generando embeddings de cada memoria…",
+                "Insertando en el cerebro de marca…",
+                "Si el archivo es grande puede tardar varios minutos.",
+                "No cierres la pestaña hasta ver el toast verde.",
+              ]}
+              className="w-full"
+            />
+          </div>
         </div>
 
         {/* UPLOAD AREA */}
