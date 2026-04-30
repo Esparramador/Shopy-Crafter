@@ -26,6 +26,44 @@ interface VaultFileParams {
 // Retorna el ID del registro creado (o null si falla silenciosamente)
 export async function saveToVault(params: VaultFileParams): Promise<number | null> {
   try {
+    // FIX CRÍTICO: si recibimos `originalUrl` con mimeType binario (image/*) y NO
+    // tenemos `content` ni `objectPath`, descargamos el binario AHORA y lo guardamos
+    // como base64 en `content`. Si no, cuando expire la URL temporal del proveedor
+    // (Replicate borra ficheros a las ~24h) la descarga/preview devolverá 410.
+    const sourceUrl = params.originalUrl;
+    if (
+      sourceUrl &&
+      !params.content &&
+      !params.objectPath &&
+      typeof params.mimeType === "string" &&
+      params.mimeType.startsWith("image/")
+    ) {
+      try {
+        const resp = await fetch(sourceUrl, { signal: AbortSignal.timeout(30_000) });
+        if (resp.ok) {
+          const buf = Buffer.from(await resp.arrayBuffer());
+          if (buf.length > 0 && buf.length <= MAX_CONTENT_BYTES) {
+            params = { ...params, content: buf.toString("base64"), fileSizeBytes: buf.length };
+          } else if (buf.length > MAX_CONTENT_BYTES) {
+            logger.warn(
+              { projectId: params.projectId, bytes: buf.length },
+              "Image binary exceeds vault content limit — keeping originalUrl only"
+            );
+          }
+        } else {
+          logger.warn(
+            { projectId: params.projectId, status: resp.status, url: sourceUrl.slice(0, 120) },
+            "Failed to fetch image binary at save time — will rely on originalUrl"
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          { err, projectId: params.projectId, url: sourceUrl.slice(0, 120) },
+          "Error downloading image binary at save time — will rely on originalUrl"
+        );
+      }
+    }
+
     // FIX C-09: calcular fileSizeBytes automáticamente si no se pasa
     let fileSizeBytes = params.fileSizeBytes ?? null;
     if (!fileSizeBytes && params.content) {

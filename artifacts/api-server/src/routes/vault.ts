@@ -366,9 +366,25 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
 
   res.setHeader("Content-Disposition", "inline");
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
   res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // Determinar si el archivo es binario según el mimeType (imágenes, PDFs, etc.)
+  const mimeType = file.mimeType ?? null;
+  const isBinaryMime = !!mimeType
+    && !mimeType.startsWith("text/")
+    && !mimeType.startsWith("application/json")
+    && !mimeType.startsWith("application/xml")
+    && !mimeType.startsWith("application/javascript")
+    && !mimeType.includes("+xml")
+    && !mimeType.includes("+json");
+
+  // Para HTML aplicamos CSP estricta; para binarios solo el Content-Type real.
+  if (!isBinaryMime) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
+  } else {
+    res.setHeader("Content-Type", mimeType!);
+  }
 
   if (file.objectPath) {
     try {
@@ -381,6 +397,12 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   }
 
   if (file.content) {
+    if (isBinaryMime) {
+      // Binarios (image/png, image/jpeg, application/pdf, etc.) se guardan como base64.
+      const buf = Buffer.from(file.content, "base64");
+      res.send(buf);
+      return;
+    }
     const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
     if (isJson) {
       try {
@@ -394,7 +416,24 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
     return;
   }
 
-  if (file.metadata) {
+  // Fallback: intentar servir el binario desde la URL original (Replicate, etc.)
+  // antes de devolver 410. Si responde, lo proxyamos con el Content-Type real.
+  if (file.originalUrl) {
+    try {
+      const resp = await fetch(file.originalUrl, { signal: AbortSignal.timeout(15_000) });
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        if (!isBinaryMime && mimeType) res.setHeader("Content-Type", mimeType);
+        res.send(buf);
+        return;
+      }
+    } catch {}
+  }
+
+  // Para imágenes/binarios sin contenido recuperable, no devolvemos HTML
+  // (rompería el <img>). Devolvemos 410 y dejamos que el `onError` del frontend
+  // muestre el placeholder.
+  if (file.metadata && !isBinaryMime) {
     try {
       const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
       res.send(htmlReport);

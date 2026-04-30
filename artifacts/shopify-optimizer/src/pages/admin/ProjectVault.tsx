@@ -246,7 +246,13 @@ export default function ProjectVault() {
   });
 
   const _isImage = (file: VaultFile) => file.fileType === "image" || file.mimeType?.startsWith("image/");
-  const imageUrl = (file: VaultFile) => file.originalUrl ?? null;
+  // Para mostrar el thumbnail preferimos nuestro proxy (sirve el binario guardado),
+  // y solo caemos al `originalUrl` si todavía no se ha persistido nada en el vault.
+  // Esto evita que la miniatura se rompa cuando expira la URL temporal de Replicate.
+  const imageUrl = (file: VaultFile) =>
+    file.previewUrl ? `${API_BASE}${file.previewUrl}` :
+    file.downloadUrl ? `${API_BASE}${file.downloadUrl}` :
+    file.originalUrl ?? null;
 
   const _getFolderFiles = (folderId: string) => {
     const folder = FOLDER_CONFIG.find(f => f.id === folderId);
@@ -563,8 +569,18 @@ export default function ProjectVault() {
                           {downloading === file.id ? <RefreshCw size={10} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={10} />}
                           Descargar
                         </button>
-                        {file.originalUrl && (
-                          <a href={file.originalUrl} target="_blank" rel="noreferrer" style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--bdr)", color: "var(--t3)", display: "flex", alignItems: "center" }}>
+                        {(file.previewUrl || file.downloadUrl || file.originalUrl) && (
+                          <a
+                            href={
+                              file.previewUrl ? `${API_BASE}${file.previewUrl}` :
+                              file.downloadUrl ? `${API_BASE}${file.downloadUrl}` :
+                              file.originalUrl!
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Abrir en otra ventana"
+                            style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid var(--bdr)", color: "var(--t3)", display: "flex", alignItems: "center" }}
+                          >
                             <ExternalLink size={10} />
                           </a>
                         )}
