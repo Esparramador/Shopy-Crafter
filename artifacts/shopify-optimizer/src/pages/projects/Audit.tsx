@@ -13,6 +13,7 @@ import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
+import { LiveOperation } from "@/components/LiveOperation";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -856,6 +857,9 @@ export default function AuditPage() {
     setScanStatus("syncing");
     setScanError("");
     setScanResult("");
+    // Si veníamos de un "Token expirado" y ahora el usuario regenera+escanea,
+    // limpiamos también el banner de token para no apilar mensajes contradictorios.
+    setTokenMsg(null);
     try {
       const res = await fetch(`${API}/api/projects/${projectId}/products/sync`, {
         method: "POST",
@@ -887,6 +891,9 @@ export default function AuditPage() {
   const handleRegenerateToken = async () => {
     setTokenLoading(true);
     setTokenMsg(null);
+    // Si el regenerate tiene éxito, los anteriores "Token expirado" ya no aplican —
+    // limpiamos para que no coexistan banners contradictorios (bug visible).
+    setScanError("");
     try {
       const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
@@ -899,6 +906,8 @@ export default function AuditPage() {
         throw new Error(data.error || "Error regenerando token");
       }
       setTokenMsg({ text: data.message || "Token regenerado correctamente", ok: true });
+      // Auto-dismiss del banner de éxito a los 6s para no acumular notificaciones.
+      setTimeout(() => setTokenMsg((m) => (m && m.ok ? null : m)), 6000);
     } catch (e: unknown) {
       setTokenMsg({ text: e instanceof Error ? e.message : "Error regenerando token", ok: false });
     } finally {
@@ -908,7 +917,8 @@ export default function AuditPage() {
 
   const optimizeProduct = async (shopifyProductId: string) => {
     setOptimizingId(shopifyProductId);
-    setOptimizeMsg({ text: "Optimizando con IA... esto puede tardar 30-60 segundos", ok: true });
+    // El feedback en vivo lo muestra <LiveOperation> (timer + mensajes rotativos).
+    setOptimizeMsg(null);
     try {
       const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
@@ -929,7 +939,7 @@ export default function AuditPage() {
 
   const optimizeAll = async () => {
     setBulkOptimizing(true);
-    setOptimizeMsg({ text: "Optimizando todos los productos con IA... esto puede tardar varios minutos", ok: true });
+    setOptimizeMsg(null); // el feedback lo lleva <LiveOperation>
     try {
       const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
@@ -1062,22 +1072,55 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         </div>
       </div>
 
-      {scanError && (
+      {/* Progreso vivo del escaneo (sustituye al texto estático "Sincronizando...") */}
+      <LiveOperation
+        active={isScanning}
+        title={scanStatus === "syncing" ? "Sincronizando catálogo desde Shopify" : "Calculando scores de auditoría"}
+        messages={
+          scanStatus === "syncing"
+            ? [
+                "Conectando con la API de Shopify...",
+                "Descargando productos del catálogo...",
+                "Procesando variantes e inventario...",
+                "Sincronizando imágenes y metadatos...",
+              ]
+            : [
+                "Analizando títulos y descripciones...",
+                "Calculando score SEO de cada producto...",
+                "Detectando productos sin imágenes o sin variantes...",
+                "Asignando grados (A/B/C/D/F)...",
+              ]
+        }
+        estimatedSec={scanStatus === "syncing" ? 60 : 45}
+      />
+      {/* Mutual exclusion: si está activo, ocultamos el resultado/error anterior para no confundir */}
+      {scanError && !isScanning && (
         <div className="flex items-center gap-3 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{scanError}</span>
+          <span className="flex-1">{scanError}</span>
+          <button onClick={() => setScanError("")} className="hover:opacity-70" aria-label="Cerrar"><X className="w-4 h-4" /></button>
         </div>
       )}
-      {scanResult && !scanError && (
+      {scanResult && !scanError && !isScanning && (
         <div className="flex items-center gap-3 p-4 rounded-xl border border-green-500/30 bg-green-500/10 text-green-400 text-sm">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          <span>{scanResult}</span>
+          <span className="flex-1">{scanResult}</span>
+          <button onClick={() => setScanResult("")} className="hover:opacity-70" aria-label="Cerrar"><X className="w-4 h-4" /></button>
         </div>
       )}
-      {tokenMsg && (
+      {/* Token: si el regenerate fue OK, NO mostramos a la vez el viejo "Token expirado".
+          handleRegenerateToken ya limpia scanError; aquí también ocultamos si scanError todavía existe pero el token está OK. */}
+      <LiveOperation
+        active={tokenLoading}
+        title="Regenerando token Shopify"
+        messages={["Solicitando nuevo token de acceso...", "Verificando permisos de la app..."]}
+        estimatedSec={10}
+      />
+      {tokenMsg && !tokenLoading && (
         <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm ${tokenMsg.ok ? "border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>
           {tokenMsg.ok ? <Key className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
-          <span>{tokenMsg.text}</span>
+          <span className="flex-1">{tokenMsg.text}</span>
+          <button onClick={() => setTokenMsg(null)} className="hover:opacity-70" aria-label="Cerrar"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -1225,10 +1268,34 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
       {/* Products Tab */}
       {activeTab === "products" && (
         <>
-          {optimizeMsg && (
+          {/* Progreso vivo de optimización (individual o masiva) */}
+          <LiveOperation
+            active={!!optimizingId && !bulkOptimizing}
+            title="Optimizando producto con IA"
+            messages={[
+              "Cargando datos del producto y contexto de marca...",
+              "Reescribiendo título y descripción con Claude...",
+              "Generando metadatos SEO y palabras clave...",
+              "Aplicando cambios en Shopify...",
+            ]}
+            estimatedSec={45}
+          />
+          <LiveOperation
+            active={bulkOptimizing}
+            title="Optimización masiva con IA (hasta 25 productos)"
+            messages={[
+              "Cargando catálogo y memoria de marca...",
+              "Procesando productos en batch...",
+              "Reescribiendo títulos, descripciones y SEO...",
+              "Aplicando cambios en Shopify uno a uno...",
+              "Esto puede tardar varios minutos: no cierres la pestaña.",
+            ]}
+            estimatedSec={300}
+          />
+          {optimizeMsg && !optimizingId && !bulkOptimizing && (
             <div className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm ${optimizeMsg.ok ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
               {optimizeMsg.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-              {optimizeMsg.text}
+              <span className="flex-1">{optimizeMsg.text}</span>
               <button onClick={() => setOptimizeMsg(null)} className="ml-2 hover:opacity-70"><X className="w-3 h-3" /></button>
             </div>
           )}
@@ -1530,11 +1597,20 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
             </div>
             <div style={{ padding: 24 }}>
               {storeAuditStatus === "running" && (
-                <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                  <Loader2 size={36} className="animate-spin" style={{ color: "#c084fc", margin: "0 auto 16px" }} />
-                  <p style={{ fontSize: 14, color: "var(--t1, #fff)", marginBottom: 8, fontWeight: 600 }}>Auditando tu tienda...</p>
-                  <p style={{ fontSize: 12, color: "var(--t3)" }}>{storeAuditMsg}</p>
-                </div>
+                <LiveOperation
+                  active
+                  title="Auditando tu tienda completa"
+                  messages={[
+                    "Conectando con Google PageSpeed Insights...",
+                    "Midiendo Core Web Vitals (LCP, FID, CLS)...",
+                    "Analizando SEO on-page (meta, headings, schema)...",
+                    "Comprobando accesibilidad (WCAG)...",
+                    "Auditando experiencia móvil...",
+                    "Pidiendo recomendaciones a Claude con contexto de la tienda...",
+                    "Esto tarda 1-3 minutos. El resultado se guarda en el historial.",
+                  ]}
+                  estimatedSec={150}
+                />
               )}
               {storeAuditStatus === "error" && (
                 <div style={{ padding: 20, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5", fontSize: 13 }}>

@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import{ TrendingUp, AlertTriangle, Scale, Loader2, CheckCircle, ChevronDown, ChevronUp, X, Package, Calculator, BarChart3, Target, Brain }from "lucide-react";
+import { LiveOperation } from "@/components/LiveOperation";
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, LineChart, Line, CartesianGrid } from "recharts";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -751,6 +752,19 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
           {estimatingCogs ? "Estimando costes con IA..." : loading ? "Simulando..." : "Simular Impacto"}
         </button>
 
+        <LiveOperation
+          active={loading}
+          title="Simulando impacto de precio"
+          messages={[
+            "Cargando COGS reales y márgenes actuales...",
+            "Aplicando elasticidad de demanda al nuevo precio...",
+            "Proyectando ventas, beneficio y break-even...",
+            "Generando recomendación con IA...",
+          ]}
+          estimatedSec={20}
+          className="mb-4"
+        />
+
         {result && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="bg-black/30 rounded-xl p-4 border border-white/5">
@@ -857,6 +871,18 @@ function ForecastSection({ projectId }: { projectId: number }) {
           </button>
         </div>
       </div>
+
+      <LiveOperation
+        active={loading}
+        title="Calculando forecast financiero"
+        messages={[
+          "Cargando histórico de ventas y márgenes...",
+          "Procesando estacionalidad y tendencias...",
+          "Modelo ML proyectando los próximos meses...",
+          "Generando recomendaciones estratégicas con IA...",
+        ]}
+        estimatedSec={30}
+      />
 
       {forecast && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
