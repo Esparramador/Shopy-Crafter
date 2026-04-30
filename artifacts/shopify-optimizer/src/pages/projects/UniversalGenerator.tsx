@@ -391,7 +391,7 @@ export default function UniversalGenerator() {
                               className="text-[#0c81f5]">{genType.label}</h3>
                             <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
                               {genType.outputFormats.map(f => (
-                                <Badge key={f} variant="outline" style={{ fontSize: 9, padding: "0 4px", textTransform: "uppercase" }}>
+                                <Badge key={f} variant="outline" className="text-[#0a4b8c]" style={{ fontSize: 9, padding: "0 4px", textTransform: "uppercase" }}>
                                   {f}
                                 </Badge>
                               ))}
