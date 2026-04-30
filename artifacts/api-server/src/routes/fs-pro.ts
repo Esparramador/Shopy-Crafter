@@ -23,6 +23,14 @@ import {
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
 import { listTemplates } from "../lib/ad-templates.js";
+import {
+  generateCinematicMultiShot,
+  type CinematicAspect, type CinematicStyle,
+} from "../lib/cinematic-multishot.js";
+import {
+  AVATAR_LIBRARY, listAvatarsByNiche, findAvatar,
+  generateTalkingAvatar, generateProductAvatar, generateMimicMotion,
+} from "../lib/avatar-studio.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
@@ -144,6 +152,29 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       cameraPreset: t.cameraPreset, transitionPreset: t.transitionPreset,
       defaultAspect: t.defaultAspect, defaultDurationSec: t.defaultDurationSec,
     })),
+    cinematicMultiShot: {
+      description: "Genera anuncios multi-shot cinematográficos al estilo Pollo Seedance 2.0: guion por escenas + keyframes + clips concatenados con crossfade + voz + música.",
+      styles: [
+        { key: "cinematic",  label: "Cinematic 35mm", description: "Look anamórfico, golden hour, slow motion" },
+        { key: "ugc",        label: "UGC handheld",   description: "Estilo creador, daylight, vertical nativo" },
+        { key: "editorial",  label: "Editorial",      description: "Magazine cover, geometría, minimalismo" },
+        { key: "luxury",     label: "Luxury",         description: "Hero reveal, monocromo, materiales premium" },
+        { key: "tech",       label: "Tech launch",    description: "Neon, gimbal, futurista" },
+        { key: "energetic",  label: "Energetic",      description: "Cortes rápidos, colores vibrantes, energía pop" },
+      ],
+      scenesRange: { min: 2, max: 8 },
+      durationRange: { min: 6, max: 60 },
+      aspects: ["9:16", "16:9", "1:1"],
+    },
+    avatarStudio: {
+      description: "Pollo Avatar Studio: talking heads por nicho, product avatars y mimic motion. 15+ presets stock + soporte para foto custom.",
+      niches: ["beauty", "health", "fashion", "tech", "food", "home", "fitness", "finance"],
+      avatars: AVATAR_LIBRARY.map((a) => ({
+        id: a.id, name: a.name, niche: a.niche, gender: a.gender,
+        defaultLanguage: a.defaultLanguage, defaultVoiceId: a.defaultVoiceId,
+        personaPrompt: a.personaPrompt,
+      })),
+    },
   });
 });
 
@@ -939,6 +970,343 @@ router.post(
     } catch (err: any) {
       logger.error({ err }, "fs-pro motion-transfer failed");
       res.status(500).json({ error: err?.message || "Error en motion transfer" });
+    }
+  },
+);
+
+// ─── CINEMATIC MULTI-SHOT (Pollo Seedance 2.0 style) ─────────────────────
+// POST /fs-pro/cinematic-multishot
+// multipart: product (image file) + JSON fields (projectId, brand, productName,
+//   scenesCount, totalDurationSec, aspect, videoModel, style, narration?, music?)
+router.post(
+  "/fs-pro/cinematic-multishot",
+  requireAdmin,
+  upload.single("product"),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const f = req.file;
+      const {
+        projectId: pidStr, brand, productName, niche, audience, language,
+        scenesCount: scStr, totalDurationSec: durStr, aspect, videoModel,
+        imageModel, style, customBrief, narrationEnabled, narrationVoiceId,
+        narrationVoiceModel, narrationVolume, musicEnabled, musicPrompt,
+        musicVolume, productVaultId,
+      } = req.body;
+      const projectId = parseInt(pidStr || "0", 10);
+      if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+      if (!brand || !productName) { res.status(400).json({ error: "brand y productName requeridos" }); return; }
+      if (!videoModel) { res.status(400).json({ error: "videoModel requerido" }); return; }
+
+      const scenesCount = parseInt(scStr || "4", 10);
+      const totalDurationSec = parseInt(durStr || "16", 10);
+
+      // Cost: ~3 credits per scene (image + video + concat overhead) + 2 base
+      const SCENE_CREDITS = Math.max(2, Math.min(8, scenesCount));
+      const COST = 2 + SCENE_CREDITS * 3;
+      const limit = await checkProductionLimit(projectId, "image", COST);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+      // Resolve product image
+      let productImage: Buffer | undefined;
+      let productMime = "image/png";
+      if (f) { productImage = f.buffer; productMime = f.mimetype; }
+      else if (productVaultId) {
+        const [row] = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, parseInt(productVaultId, 10))),
+        );
+        productImage = await readVaultContent(row);
+        if (row?.mimeType) productMime = row.mimeType;
+      }
+      if (!productImage) { res.status(400).json({ error: "Imagen de producto requerida (file o productVaultId)" }); return; }
+
+      const result = await generateCinematicMultiShot({
+        projectId,
+        productImage,
+        productMime,
+        brand: String(brand),
+        productName: String(productName),
+        niche: niche ? String(niche) : (project.storeNiche || undefined),
+        audience: audience ? String(audience) : undefined,
+        language: language ? String(language) : "es",
+        scenesCount,
+        totalDurationSec,
+        aspect: ((aspect as CinematicAspect) || "9:16"),
+        videoModel,
+        imageModel: imageModel || undefined,
+        style: ((style as CinematicStyle) || "cinematic"),
+        customBrief: customBrief ? String(customBrief) : undefined,
+        narration: narrationEnabled === "true" || narrationEnabled === true ? {
+          enabled: true,
+          voiceId: narrationVoiceId ? String(narrationVoiceId) : undefined,
+          voiceModel: narrationVoiceModel || undefined,
+          voiceVolume: narrationVolume ? parseFloat(narrationVolume) : 1.0,
+        } : undefined,
+        music: musicEnabled === "true" || musicEnabled === true ? {
+          enabled: true,
+          prompt: musicPrompt ? String(musicPrompt) : undefined,
+          volume: musicVolume ? parseFloat(musicVolume) : 0.22,
+        } : undefined,
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-multishot", category: "fusion-studio-pro",
+        title: `FS Pro MultiShot: ${productName}`,
+        mimeType: result.finalMime, generatedBy: `fs-pro:multishot:${videoModel}`,
+        buffer: result.finalVideo,
+      });
+
+      // Save script as a separate vault asset for traceability
+      const scriptJson = JSON.stringify(result.script, null, 2);
+      const scriptVaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-script", category: "fusion-studio-pro",
+        title: `FS Pro MultiShot Script: ${productName}`,
+        mimeType: "application/json", generatedBy: "fs-pro:multishot:script",
+        buffer: Buffer.from(scriptJson, "utf-8"),
+      });
+
+      await recordUsage(projectId, "image", COST);
+      learnFromOperation({
+        operationType: "fs_pro_cinematic_multishot",
+        niche: project.storeNiche ?? null,
+        title: `FS Pro multishot: ${productName} (${result.script.scenes.length} shots)`,
+        content: `Style ${style || "cinematic"} · ${totalDurationSec}s · ${videoModel}. Title: ${result.script.title}`,
+        confidence: 0.9, tags: ["fusion-studio-pro", "multishot", videoModel, String(style || "cinematic")],
+      });
+
+      res.json({
+        success: true,
+        vaultId,
+        scriptVaultId,
+        sizeBytes: result.finalVideo.length,
+        durationSec: result.durationSec,
+        scenesCount: result.script.scenes.length,
+        script: result.script,
+      });
+    } catch (err: any) {
+      logger.error({ err: err?.message, stack: err?.stack }, "fs-pro cinematic-multishot failed");
+      res.status(500).json({ error: err?.message || "Error generando multi-shot cinematográfico" });
+    }
+  },
+);
+
+// ─── AVATAR STUDIO: LIBRARY ──────────────────────────────────────────────
+router.get("/fs-pro/avatars/library", requireAdmin, (_req, res) => {
+  res.json({
+    library: AVATAR_LIBRARY,
+    grouped: listAvatarsByNiche(),
+  });
+});
+
+// ─── AVATAR STUDIO: TALKING AVATAR ───────────────────────────────────────
+// POST /fs-pro/avatar/talking
+// multipart: customAvatar? (image) + JSON fields
+router.post(
+  "/fs-pro/avatar/talking",
+  requireAdmin,
+  upload.single("customAvatar"),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const f = req.file;
+      const {
+        projectId: pidStr, avatarId, script, voiceId, voiceModel,
+        language, aspect, imageModel, videoModel, applyLipSync,
+      } = req.body;
+      const projectId = parseInt(pidStr || "0", 10);
+      if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+      if (!script) { res.status(400).json({ error: "script requerido" }); return; }
+      if (!avatarId && !f) { res.status(400).json({ error: "avatarId o customAvatar requerido" }); return; }
+
+      // Cost: image gen (1) + video gen (5) + voice (1) + lipsync (3) ~= 10
+      const COST = 10;
+      const limit = await checkProductionLimit(projectId, "image", COST);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+      const result = await generateTalkingAvatar({
+        projectId,
+        avatarId: avatarId ? String(avatarId) : undefined,
+        customAvatarBuffer: f?.buffer,
+        customAvatarMime: f?.mimetype,
+        script: String(script),
+        voiceId: voiceId ? String(voiceId) : undefined,
+        voiceModel: voiceModel || undefined,
+        language: language ? String(language) : undefined,
+        aspect: aspect || "9:16",
+        imageModel: imageModel || undefined,
+        videoModel: videoModel || undefined,
+        applyLipSync: applyLipSync === undefined
+          ? true
+          : !(applyLipSync === "false" || applyLipSync === false || applyLipSync === "0" || applyLipSync === 0),
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-avatar", category: "fusion-studio-pro",
+        title: `FS Pro Talking Avatar${avatarId ? `: ${avatarId}` : ""}`,
+        mimeType: result.finalMime, generatedBy: "fs-pro:avatar:talking",
+        buffer: result.finalVideo,
+      });
+
+      await recordUsage(projectId, "image", COST);
+      res.json({
+        success: true,
+        vaultId,
+        sizeBytes: result.finalVideo.length,
+        durationSec: result.durationSec,
+        avatar: result.avatar,
+      });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "fs-pro avatar/talking failed");
+      res.status(500).json({ error: err?.message || "Error generando talking avatar" });
+    }
+  },
+);
+
+// ─── AVATAR STUDIO: PRODUCT AVATAR ───────────────────────────────────────
+// POST /fs-pro/avatar/product
+// multipart: product (image required) + customPresenter? (image)
+router.post(
+  "/fs-pro/avatar/product",
+  requireAdmin,
+  upload.fields([
+    { name: "product", maxCount: 1 },
+    { name: "customPresenter", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const productFile = files?.["product"]?.[0];
+      const presenterFile = files?.["customPresenter"]?.[0];
+      const {
+        projectId: pidStr, avatarId, script, voiceId, voiceModel,
+        language, aspect, imageModel, videoModel, applyLipSync, productVaultId,
+      } = req.body;
+      const projectId = parseInt(pidStr || "0", 10);
+      if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+      if (!script) { res.status(400).json({ error: "script requerido" }); return; }
+      if (!avatarId && !presenterFile) { res.status(400).json({ error: "avatarId o customPresenter requerido" }); return; }
+
+      const COST = 11;
+      const limit = await checkProductionLimit(projectId, "image", COST);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+      // Resolve product image
+      let productImage: Buffer | undefined;
+      let productMime = "image/png";
+      if (productFile) { productImage = productFile.buffer; productMime = productFile.mimetype; }
+      else if (productVaultId) {
+        const [row] = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, parseInt(productVaultId, 10))),
+        );
+        productImage = await readVaultContent(row);
+        if (row?.mimeType) productMime = row.mimeType;
+      }
+      if (!productImage) { res.status(400).json({ error: "Imagen de producto requerida" }); return; }
+
+      const result = await generateProductAvatar({
+        projectId,
+        productImage,
+        productMime,
+        avatarId: avatarId ? String(avatarId) : undefined,
+        customPresenterBuffer: presenterFile?.buffer,
+        customPresenterMime: presenterFile?.mimetype,
+        script: String(script),
+        voiceId: voiceId ? String(voiceId) : undefined,
+        voiceModel: voiceModel || undefined,
+        language: language ? String(language) : undefined,
+        aspect: aspect || "9:16",
+        imageModel: imageModel || undefined,
+        videoModel: videoModel || undefined,
+        applyLipSync: applyLipSync === undefined
+          ? true
+          : !(applyLipSync === "false" || applyLipSync === false || applyLipSync === "0" || applyLipSync === 0),
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-avatar", category: "fusion-studio-pro",
+        title: `FS Pro Product Avatar`,
+        mimeType: result.finalMime, generatedBy: "fs-pro:avatar:product",
+        buffer: result.finalVideo,
+      });
+
+      await recordUsage(projectId, "image", COST);
+      res.json({
+        success: true,
+        vaultId,
+        sizeBytes: result.finalVideo.length,
+        durationSec: result.durationSec,
+      });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "fs-pro avatar/product failed");
+      res.status(500).json({ error: err?.message || "Error generando product avatar" });
+    }
+  },
+);
+
+// ─── AVATAR STUDIO: MIMIC MOTION ─────────────────────────────────────────
+// POST /fs-pro/avatar/mimic-motion
+// multipart: target (image) + JSON: sourceVideoUrl
+router.post(
+  "/fs-pro/avatar/mimic-motion",
+  requireAdmin,
+  upload.single("target"),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const f = req.file;
+      const { projectId: pidStr, sourceVideoUrl, targetVaultId } = req.body;
+      const projectId = parseInt(pidStr || "0", 10);
+      if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+      if (!sourceVideoUrl) { res.status(400).json({ error: "sourceVideoUrl requerido" }); return; }
+      if (!f && !targetVaultId) { res.status(400).json({ error: "target image (file o targetVaultId) requerido" }); return; }
+
+      const COST = 6;
+      const limit = await checkProductionLimit(projectId, "image", COST);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+      let targetImage: Buffer | undefined;
+      let targetMime = "image/png";
+      if (f) { targetImage = f.buffer; targetMime = f.mimetype; }
+      else if (targetVaultId) {
+        const [row] = await db.select().from(projectFilesTable).where(
+          and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.id, parseInt(targetVaultId, 10))),
+        );
+        targetImage = await readVaultContent(row);
+        if (row?.mimeType) targetMime = row.mimeType;
+      }
+      if (!targetImage) { res.status(400).json({ error: "Imagen target no encontrada" }); return; }
+
+      const result = await generateMimicMotion({
+        projectId,
+        sourceVideoUrl: String(sourceVideoUrl),
+        targetImage,
+        targetMime,
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-mimic", category: "fusion-studio-pro",
+        title: `FS Pro Mimic Motion`,
+        mimeType: result.finalMime, generatedBy: "fs-pro:avatar:mimic",
+        buffer: result.finalVideo,
+      });
+      await recordUsage(projectId, "image", COST);
+      res.json({ success: true, vaultId, sizeBytes: result.finalVideo.length });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "fs-pro avatar/mimic failed");
+      res.status(500).json({ error: err?.message || "Error en mimic motion" });
     }
   },
 );

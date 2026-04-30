@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
-import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "audio" | "compose" | "protools" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "avatars" | "audio" | "compose" | "protools" | "downloads";
 
 interface Capabilities {
   imageGeneration: Array<{ key: string; label: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }>;
@@ -36,6 +36,8 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional" },
   { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Upscale 4K, mejora de caras, detalle creativo" },
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling, Seedance, Hailuo" },
+  { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Pollo Seedance 2.0)" },
+  { id: "avatars",    label: "Avatares",        icon: <UserSquare size={15} />, desc: "Talking heads y product avatars por nicho" },
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
@@ -121,6 +123,8 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "background" && <BackgroundTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "enhance"    && <EnhanceTab    projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen mejorada", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "video"      && <VideoTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "multishot"  && <MultiShotTab caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Multi-shot listo", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "avatars"    && <AvatarsTab   caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Avatar listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
@@ -1227,3 +1231,411 @@ const pillButton = (active: boolean): React.CSSProperties => ({
   color: active ? "#000" : "var(--t2)",
   border: `1px solid ${active ? "var(--gold)" : "var(--bdr)"}`,
 });
+
+// ─── TAB: MULTI-SHOT (Pollo Seedance 2.0) ─────────────────────────────────
+function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+  const [brand, setBrand] = useState("");
+  const [productName, setProductName] = useState("");
+  const [niche, setNiche] = useState("");
+  const [audience, setAudience] = useState("");
+  const [language, setLanguage] = useState("es");
+  const [scenesCount, setScenesCount] = useState(4);
+  const [totalDurationSec, setTotalDurationSec] = useState(20);
+  const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
+  const [videoModel, setVideoModel] = useState("seedance-fast");
+  const [imageModel, setImageModel] = useState("nano-banana");
+  const [style, setStyle] = useState("cinematic");
+  const [customBrief, setCustomBrief] = useState("");
+  const [productFile, setProductFile] = useState<File | null>(null);
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
+  const [narrationVoiceId, setNarrationVoiceId] = useState("21m00Tcm4TlvDq8ikWAM");
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicPrompt, setMusicPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [scriptPreview, setScriptPreview] = useState<any | null>(null);
+
+  const styles = (caps as any)?.cinematicMultiShot?.styles ?? [
+    { key: "cinematic", label: "Cinematic", description: "Look anamórfico" },
+    { key: "ugc", label: "UGC", description: "Estilo creador" },
+    { key: "luxury", label: "Luxury", description: "Premium reveal" },
+  ];
+
+  const run = async () => {
+    if (!brand.trim() || !productName.trim()) { onError("Marca y producto requeridos"); return; }
+    if (!productFile) { onError("Imagen del producto requerida"); return; }
+    setBusy(true);
+    setScriptPreview(null);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("brand", brand);
+      fd.append("productName", productName);
+      if (niche) fd.append("niche", niche);
+      if (audience) fd.append("audience", audience);
+      fd.append("language", language);
+      fd.append("scenesCount", String(scenesCount));
+      fd.append("totalDurationSec", String(totalDurationSec));
+      fd.append("aspect", aspect);
+      fd.append("videoModel", videoModel);
+      fd.append("imageModel", imageModel);
+      fd.append("style", style);
+      if (customBrief) fd.append("customBrief", customBrief);
+      fd.append("narrationEnabled", String(narrationEnabled));
+      if (narrationEnabled) fd.append("narrationVoiceId", narrationVoiceId);
+      fd.append("musicEnabled", String(musicEnabled));
+      if (musicEnabled && musicPrompt) fd.append("musicPrompt", musicPrompt);
+      fd.append("product", productFile);
+
+      const res = await fetch(`${API_BASE}/api/fs-pro/cinematic-multishot`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      setScriptPreview(d.script);
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Multishot: ${productName.slice(0, 30)}`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error en multi-shot"); } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div>
+        <Section title="Producto y marca">
+          <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Marca (ej: Behrens)" style={inputStyle} />
+          <div style={{ height: 6 }} />
+          <input value={productName} onChange={e => setProductName(e.target.value)} placeholder="Nombre del producto (ej: Reloj S-2 Skeleton)" style={inputStyle} />
+          <div style={{ height: 6 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <input value={niche} onChange={e => setNiche(e.target.value)} placeholder="Nicho (opcional)" style={inputStyle} />
+            <input value={audience} onChange={e => setAudience(e.target.value)} placeholder="Audiencia (opcional)" style={inputStyle} />
+          </div>
+        </Section>
+        <Section title="Imagen del producto (referencia)">
+          <input type="file" accept="image/*" onChange={e => setProductFile(e.target.files?.[0] || null)} />
+          <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>El producto aparecerá consistente en todas las escenas usando esta imagen como referencia.</p>
+        </Section>
+        <Section title="Estilo cinematográfico">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {styles.map((s: any) => (
+              <button key={s.key} onClick={() => setStyle(s.key)} style={{ ...cardButton(style === s.key), textAlign: "left" }}>
+                <strong style={{ fontSize: 12 }}>{s.label}</strong>
+                <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{s.description}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+        <Section title="Brief adicional (opcional)">
+          <textarea value={customBrief} onChange={e => setCustomBrief(e.target.value)} placeholder="Ej: Mostrar mecanismo interno en la escena 2, color principal negro mate…" style={{ ...inputStyle, minHeight: 60 }} />
+        </Section>
+      </div>
+      <div>
+        <Section title="Modelo de video">
+          <select value={videoModel} onChange={e => setVideoModel(e.target.value)} style={inputStyle}>
+            {caps?.videoGeneration.map(m => (
+              <option key={m.key} value={m.key}>{m.label} · €{m.costPerSec}/s · Q{m.quality}/10</option>
+            ))}
+          </select>
+          <div style={{ height: 6 }} />
+          <select value={imageModel} onChange={e => setImageModel(e.target.value)} style={inputStyle}>
+            {caps?.imageGeneration.map(m => (
+              <option key={m.key} value={m.key}>Keyframes: {m.label} · €{m.costPerImage}/img</option>
+            ))}
+          </select>
+        </Section>
+        <Section title="Escenas / Duración / Aspecto">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>{scenesCount} escenas</div>
+              <input type="range" min={2} max={8} value={scenesCount} onChange={e => setScenesCount(parseInt(e.target.value))} style={{ width: "100%" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>{totalDurationSec}s totales</div>
+              <input type="range" min={6} max={60} step={2} value={totalDurationSec} onChange={e => setTotalDurationSec(parseInt(e.target.value))} style={{ width: "100%" }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+            {(["9:16", "16:9", "1:1"] as const).map(a => (
+              <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
+            ))}
+            <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...inputStyle, width: 90, padding: "4px 8px", fontSize: 11 }}>
+              <option value="es">ES</option><option value="en">EN</option><option value="pt">PT</option><option value="fr">FR</option><option value="it">IT</option><option value="de">DE</option>
+            </select>
+          </div>
+        </Section>
+        <Section title="Voiceover (ElevenLabs)">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>
+            <input type="checkbox" checked={narrationEnabled} onChange={e => setNarrationEnabled(e.target.checked)} /> Generar voiceover
+          </label>
+          {narrationEnabled && (
+            <input value={narrationVoiceId} onChange={e => setNarrationVoiceId(e.target.value)} placeholder="ElevenLabs voiceId (default: Rachel)" style={inputStyle} />
+          )}
+        </Section>
+        <Section title="Música de fondo">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>
+            <input type="checkbox" checked={musicEnabled} onChange={e => setMusicEnabled(e.target.checked)} /> Generar música
+          </label>
+          {musicEnabled && (
+            <input value={musicPrompt} onChange={e => setMusicPrompt(e.target.value)} placeholder="Prompt música (vacío = automático)" style={inputStyle} />
+          )}
+        </Section>
+        <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />} {busy ? `Generando ${scenesCount} escenas...` : `Generar anuncio multi-shot (${scenesCount} escenas · ${totalDurationSec}s)`}
+        </button>
+        <LiveOperation
+          active={busy}
+          title="Generando anuncio multi-shot"
+          estimatedSec={scenesCount * 90}
+          messages={[
+            "Claude está escribiendo el guion por escenas…",
+            "Generando keyframes consistentes con tu producto…",
+            `Renderizando ${scenesCount} clips de video con ${videoModel}…`,
+            "Concatenando con crossfade cinematográfico…",
+            narrationEnabled ? "Sintetizando voiceover con ElevenLabs…" : "",
+            musicEnabled ? "Generando música original…" : "",
+            "Mezclando MP4 final…",
+          ].filter(Boolean)}
+          className="w-full mt-3"
+        />
+        {scriptPreview && (
+          <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", fontSize: 11, maxHeight: 280, overflow: "auto" }}>
+            <strong style={{ color: "var(--gold)" }}>📝 {scriptPreview.title}</strong>
+            <div style={{ color: "var(--t3)", marginTop: 4, fontStyle: "italic" }}>"{scriptPreview.hook}"</div>
+            <ol style={{ margin: "8px 0", paddingLeft: 18 }}>
+              {scriptPreview.scenes?.map((sc: any) => (
+                <li key={sc.idx} style={{ marginBottom: 4 }}>
+                  <span style={{ color: "var(--gold)" }}>{sc.timeStartSec}s-{sc.timeEndSec}s</span> · {sc.cameraMovement}
+                  <div style={{ color: "var(--t3)", marginTop: 2 }}>"{sc.voiceoverLine}"</div>
+                </li>
+              ))}
+            </ol>
+            <div style={{ color: "var(--t2)", marginTop: 4 }}>CTA: {scriptPreview.cta}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: AVATARS (Pollo Avatar Studio) ───────────────────────────────────
+function AvatarsTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+  const [mode, setMode] = useState<"talking" | "product" | "mimic">("talking");
+  const [niche, setNiche] = useState<string>("beauty");
+  const [avatarId, setAvatarId] = useState<string>("");
+  const [script, setScript] = useState("");
+  const [voiceId, setVoiceId] = useState("");
+  const [language, setLanguage] = useState("es");
+  const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
+  const [videoModel, setVideoModel] = useState("kling-master");
+  const [applyLipSync, setApplyLipSync] = useState(true);
+  const [productFile, setProductFile] = useState<File | null>(null);
+  const [presenterFile, setPresenterFile] = useState<File | null>(null);
+  const [customAvatarFile, setCustomAvatarFile] = useState<File | null>(null);
+  const [targetFile, setTargetFile] = useState<File | null>(null);
+  const [sourceVideoUrl, setSourceVideoUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const avatars = (caps as any)?.avatarStudio?.avatars ?? [];
+  const niches: string[] = (caps as any)?.avatarStudio?.niches ?? ["beauty", "health", "fashion", "tech", "food", "home", "fitness", "finance"];
+  const filtered = avatars.filter((a: any) => a.niche === niche);
+
+  // auto-pick first avatar of niche
+  useEffect(() => {
+    if (filtered.length > 0 && !filtered.find((a: any) => a.id === avatarId)) {
+      setAvatarId(filtered[0].id);
+      setVoiceId(filtered[0].defaultVoiceId);
+      setLanguage(filtered[0].defaultLanguage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [niche, avatars.length]);
+
+  const runTalking = async () => {
+    if (!script.trim()) { onError("Script requerido"); return; }
+    if (!avatarId && !customAvatarFile) { onError("Selecciona avatar o sube foto custom"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      if (avatarId) fd.append("avatarId", avatarId);
+      fd.append("script", script);
+      if (voiceId) fd.append("voiceId", voiceId);
+      fd.append("language", language);
+      fd.append("aspect", aspect);
+      fd.append("videoModel", videoModel);
+      fd.append("applyLipSync", String(applyLipSync));
+      if (customAvatarFile) fd.append("customAvatar", customAvatarFile);
+      const res = await fetch(`${API_BASE}/api/fs-pro/avatar/talking`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Avatar: ${avatarId || "custom"}`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  const runProduct = async () => {
+    if (!script.trim()) { onError("Script requerido"); return; }
+    if (!productFile) { onError("Imagen del producto requerida"); return; }
+    if (!avatarId && !presenterFile) { onError("Selecciona avatar o sube foto presenter"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      if (avatarId) fd.append("avatarId", avatarId);
+      fd.append("script", script);
+      if (voiceId) fd.append("voiceId", voiceId);
+      fd.append("language", language);
+      fd.append("aspect", aspect);
+      fd.append("videoModel", videoModel);
+      fd.append("applyLipSync", String(applyLipSync));
+      fd.append("product", productFile);
+      if (presenterFile) fd.append("customPresenter", presenterFile);
+      const res = await fetch(`${API_BASE}/api/fs-pro/avatar/product`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Product Avatar`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  const runMimic = async () => {
+    if (!sourceVideoUrl.trim()) { onError("URL de video origen requerida (https)"); return; }
+    if (!targetFile) { onError("Imagen target requerida"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("sourceVideoUrl", sourceVideoUrl);
+      fd.append("target", targetFile);
+      const res = await fetch(`${API_BASE}/api/fs-pro/avatar/mimic-motion`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Mimic Motion`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <Section title="Modo">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          <button onClick={() => setMode("talking")} style={{ ...cardButton(mode === "talking"), textAlign: "left" }}>
+            <strong style={{ fontSize: 12 }}>🎤 Talking Avatar</strong>
+            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>Cabeza parlante de un preset por nicho</div>
+          </button>
+          <button onClick={() => setMode("product")} style={{ ...cardButton(mode === "product"), textAlign: "left" }}>
+            <strong style={{ fontSize: 12 }}>🛍️ Product Avatar</strong>
+            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>Presenter mostrando tu producto</div>
+          </button>
+          <button onClick={() => setMode("mimic")} style={{ ...cardButton(mode === "mimic"), textAlign: "left" }}>
+            <strong style={{ fontSize: 12 }}>🪄 Mimic Motion</strong>
+            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>Anima foto con movimiento de un video referencia</div>
+          </button>
+        </div>
+      </Section>
+
+      {mode !== "mimic" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <Section title="Nicho">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {niches.map(n => (
+                  <button key={n} onClick={() => setNiche(n)} style={pillButton(niche === n)}>{n}</button>
+                ))}
+              </div>
+            </Section>
+            <Section title={`Avatar (${filtered.length} disponibles en ${niche})`}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 280, overflowY: "auto" }}>
+                {filtered.map((a: any) => (
+                  <button key={a.id} onClick={() => { setAvatarId(a.id); setVoiceId(a.defaultVoiceId); setLanguage(a.defaultLanguage); }}
+                    style={{ ...cardButton(avatarId === a.id), textAlign: "left" }}>
+                    <strong style={{ fontSize: 12 }}>{a.name}</strong>
+                    <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{a.gender} · {a.defaultLanguage.toUpperCase()}</div>
+                    <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{a.personaPrompt?.slice(0, 60)}…</div>
+                  </button>
+                ))}
+              </div>
+            </Section>
+            <Section title={mode === "talking" ? "O sube foto custom (opcional)" : "Foto presenter custom (opcional, anula el preset)"}>
+              <input type="file" accept="image/*" onChange={e => mode === "talking" ? setCustomAvatarFile(e.target.files?.[0] || null) : setPresenterFile(e.target.files?.[0] || null)} />
+            </Section>
+            {mode === "product" && (
+              <Section title="Imagen del producto (requerida)">
+                <input type="file" accept="image/*" onChange={e => setProductFile(e.target.files?.[0] || null)} />
+              </Section>
+            )}
+          </div>
+          <div>
+            <Section title="Script (lo que el avatar dirá)">
+              <textarea value={script} onChange={e => setScript(e.target.value)} placeholder="¡Hola! Te presento el nuevo Behrens S-2 Skeleton, donde la ingeniería se convierte en arte…" style={{ ...inputStyle, minHeight: 100 }} maxLength={1500} />
+              <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4 }}>{script.length}/1500 caracteres</div>
+            </Section>
+            <Section title="Voz (ElevenLabs ID)">
+              <input value={voiceId} onChange={e => setVoiceId(e.target.value)} placeholder="VoiceId (default según preset)" style={inputStyle} />
+            </Section>
+            <Section title="Modelo de video">
+              <select value={videoModel} onChange={e => setVideoModel(e.target.value)} style={inputStyle}>
+                {caps?.videoGeneration
+                  .filter(m => /kling|seedance|hailuo|veo/i.test(m.key))
+                  .map(m => (<option key={m.key} value={m.key}>{m.label} · €{m.costPerSec}/s</option>))}
+              </select>
+            </Section>
+            <Section title="Aspecto / Idioma / Lip-sync">
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["9:16", "16:9", "1:1"] as const).map(a => (
+                  <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
+                ))}
+                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ ...inputStyle, width: 80, padding: "4px 8px", fontSize: 11 }}>
+                  <option value="es">ES</option><option value="en">EN</option><option value="pt">PT</option><option value="fr">FR</option><option value="it">IT</option><option value="de">DE</option>
+                </select>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--t2)", marginTop: 8 }}>
+                <input type="checkbox" checked={applyLipSync} onChange={e => setApplyLipSync(e.target.checked)} /> Aplicar lip-sync (mejora sincronía labial)
+              </label>
+            </Section>
+            <button onClick={mode === "talking" ? runTalking : runProduct} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <UserSquare size={16} />} {busy ? "Generando avatar..." : (mode === "talking" ? "Generar Talking Avatar" : "Generar Product Avatar")}
+            </button>
+            <LiveOperation
+              active={busy}
+              title={mode === "talking" ? "Generando talking avatar" : "Generando product avatar"}
+              estimatedSec={180}
+              messages={[
+                mode === "talking" ? "Renderizando headshot del avatar…" : "Fusionando presenter + producto en una imagen…",
+                "Animando el avatar con movimiento natural…",
+                "Sintetizando voz con ElevenLabs…",
+                applyLipSync ? "Aplicando lip-sync para sincronizar labios…" : "Mezclando audio + video…",
+                "Codificando MP4 final y guardando en Vault…",
+              ]}
+              className="w-full mt-3"
+            />
+          </div>
+        </div>
+      )}
+
+      {mode === "mimic" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <Section title="Imagen target (la que será animada)">
+              <input type="file" accept="image/*" onChange={e => setTargetFile(e.target.files?.[0] || null)} />
+              <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 6 }}>Una foto estática de una persona. Sus movimientos serán reemplazados por los del video origen.</p>
+            </Section>
+          </div>
+          <div>
+            <Section title="URL del video origen (motion driver)">
+              <input value={sourceVideoUrl} onChange={e => setSourceVideoUrl(e.target.value)} placeholder="https://...mp4" style={inputStyle} />
+              <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 6 }}>Video público con la persona haciendo el movimiento que quieres copiar.</p>
+            </Section>
+            <button onClick={runMimic} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Procesando..." : "Generar Mimic Motion"}
+            </button>
+            <LiveOperation
+              active={busy}
+              title="Transfiriendo movimiento"
+              estimatedSec={240}
+              messages={[
+                "Descargando video de referencia…",
+                "Extrayendo trayectoria de movimiento…",
+                "Aplicando el movimiento sobre tu imagen target…",
+                "Codificando MP4 final…",
+              ]}
+              className="w-full mt-3"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
