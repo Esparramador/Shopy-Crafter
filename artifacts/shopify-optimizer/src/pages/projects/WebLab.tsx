@@ -300,6 +300,16 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
       const text = await res.text();
       let data: any;
       try { data = JSON.parse(text.trim()); } catch { throw new Error(`Error ${res.status}: respuesta inválida`); }
+      // 402 = sin créditos: mensaje específico con el plan actual y CTA a /admin/billing
+      if (res.status === 402) {
+        const plan = data.planLabel ? ` (plan: ${data.planLabel})` : "";
+        const remaining = data.remaining
+          ? ` Te quedan ${data.remaining.products ?? 0} productos / ${data.remaining.images ?? 0} imágenes este mes.`
+          : "";
+        throw new Error(
+          `${data.error || "Sin créditos suficientes para iterar el diseño."}${plan}.${remaining} Recarga créditos desde Facturación para seguir iterando.`
+        );
+      }
       if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
       setResult(prev => prev ? {
         ...prev,

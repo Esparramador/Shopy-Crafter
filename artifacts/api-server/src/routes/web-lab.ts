@@ -9,6 +9,7 @@ import { getReportShell, type ReportTemplate } from "./exports.js";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { checkProductionLimit } from "../lib/plan-limits.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -790,12 +791,19 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
     severeWarnings.push(`CSS demasiado corto (${cssLines} líneas; mínimo 200)`);
   }
 
+  // T004 — Lista ampliada de tokens prohibidos (ES + EN, con y sin variantes)
   const FORBIDDEN_TOKENS = [
-    "lorem ipsum", "lorem-ipsum",
-    "[placeholder]", "{placeholder}",
-    "todo:", "fixme", "tbd",
+    "lorem ipsum", "lorem-ipsum", "lorem,",
+    "[placeholder]", "{placeholder}", "(placeholder)",
+    "todo:", "to-do:", "to do:", "fixme", "tbd",
     "insert text here", "add content here", "add text here",
-    "your text here", "your title here",
+    "your text here", "your title here", "your content here", "your name here",
+    "sample text", "sample content", "sample copy",
+    "dummy text", "dummy content", "dummy copy",
+    "example content", "example text", "example copy",
+    "texto de ejemplo", "contenido de ejemplo", "texto de muestra",
+    "aquí va el texto", "aquí va tu texto", "rellenar aquí", "completar aquí",
+    "xxx_", "xxxxx",
   ];
   const cssLower = css.toLowerCase();
   const fragmentsBlob = (analysis.improvedHtmlFragments || []).map(f => `${f.improved}`).join("\n").toLowerCase();
@@ -803,6 +811,24 @@ function auditWebLabAnalysis(analysis: WebLabAnalysis, brand: string): { warning
   for (const tok of FORBIDDEN_TOKENS) {
     if (cssLower.includes(tok)) severeWarnings.push(`CSS contiene token prohibido: "${tok}"`);
     if (fragmentsBlob.includes(tok)) severeWarnings.push(`HTML contiene token prohibido: "${tok}"`);
+  }
+  // ── SEVERO: regex para variantes de "placeholder" / "lorem" / "TODO" sueltos ──
+  const FORBIDDEN_REGEXES: Array<{ re: RegExp; label: string }> = [
+    { re: /\bplaceholder\b(?!-|:|=|")/i, label: "placeholder" },
+    { re: /\blorem\b/i, label: "lorem" },
+    { re: /\bTODO\b(?!\s*:?\s*[A-Za-z])/, label: "TODO" },
+    { re: /\bdummy\b/i, label: "dummy" },
+    { re: /\bcontent goes here\b/i, label: "content goes here" },
+    { re: /\bnombre del producto\b/i, label: "nombre del producto (genérico)" },
+    { re: /\btitulo aqui\b/i, label: "titulo aqui" },
+  ];
+  // Sólo aplicamos las regex sobre fragments HTML (en CSS "placeholder" puede ser pseudo-clase válida)
+  for (const { re, label } of FORBIDDEN_REGEXES) {
+    if (re.test(fragmentsBlob)) severeWarnings.push(`HTML contiene patrón prohibido: ${label}`);
+  }
+  // CSS sólo: ::placeholder es válido, pero "placeholder text" suelto no
+  if (/[^:]\bplaceholder text\b/i.test(cssLower) || /\blorem\b/i.test(cssLower)) {
+    severeWarnings.push(`CSS contiene patrón prohibido (lorem/placeholder text)`);
   }
 
   // INFO: Selectores genéricos que delatan respuesta plantilla — loguear, no rechazar
@@ -896,6 +922,26 @@ router.post("/web-lab/iterate", async (req: Request, res: Response): Promise<voi
 
     const pid = projectId ?? 0;
     const brand = (brandName || "").trim() || (url ? url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : "");
+
+    // T003 — Comprobación de créditos ANTES de flushHeaders.
+    // Una iteración consume el equivalente a una llamada Claude pesada → 1 crédito de tipo "image".
+    // Si el proyecto no tiene saldo, devolvemos 402 real con detalle del plan.
+    if (pid > 0) {
+      try {
+        const limit = await checkProductionLimit(pid, "image", 1);
+        if (!limit.allowed) {
+          res.status(402).json({
+            error: limit.reason || "Sin créditos suficientes para iterar el diseño.",
+            planLimit: true,
+            planLabel: limit.planLabel,
+            remaining: limit.remaining,
+          });
+          return;
+        }
+      } catch (limitErr) {
+        logger.warn({ err: limitErr, pid }, "Web Lab iterate — checkProductionLimit failed (continuando sin bloquear)");
+      }
+    }
 
     res.status(200);
     res.setHeader("Content-Type", "application/json; charset=utf-8");
