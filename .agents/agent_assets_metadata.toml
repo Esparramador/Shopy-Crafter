@@ -156,6 +156,30 @@ uri = "file://exports/hanakaze-perchero-4-lookbook-frontal.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "Ql2xKLlbqppYFs5cBXWsp"
+uri = "file://exports/hanakaze-infografia-1-kanji-royal.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "yw2wg6D4UiNupenhZhecq"
+uri = "file://exports/hanakaze-infografia-2-mariposa-navy.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "1_0JdbqBK0tU2XH3f3Mdi"
+uri = "file://exports/hanakaze-infografia-3-hoodie-mariposa.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "XpJTcJ8iz8Fe1u5c8AjVz"
+uri = "file://exports/hanakaze-infografia-4-samurai-tee.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "9EyhiMCidMT9gdjJwunVq"
 uri = "file://all-css-for-claude.txt"
@@ -425,3 +449,33 @@ id = "50mjBpTxNHq29RM1dT5T5"
 uri = "file://exports/hanakaze-perchero-2-detalle-azules.png"
 type = "image"
 title = "Hanakaze Perchero 2 — Detalle dúo azules"
+
+[[outputs]]
+id = "dhUhdC6Pa6cqriP9pDiRp"
+uri = "file://exports/hanakaze-infografia-1-kanji-royal.png"
+type = "image"
+title = "Infografía 1 — HANAKAZE SEAL CREWNECK (royal blue)"
+
+[[outputs]]
+id = "cBURDG36vE_GlSzb85zPC"
+uri = "file://exports/hanakaze-infografia-2-mariposa-navy.png"
+type = "image"
+title = "Infografía 2 — BUTTERFLY CREWNECK NAVY"
+
+[[outputs]]
+id = "fR7vwGDsQ1KdebFQ-JFKi"
+uri = "file://exports/hanakaze-infografia-3-hoodie-mariposa.png"
+type = "image"
+title = "Infografía 3 — BLACK BUTTERFLY HOODIE"
+
+[[outputs]]
+id = "DXzt2XXXNgoK-tIYI5Oiw"
+uri = "file://exports/hanakaze-infografia-4-samurai-tee.png"
+type = "image"
+title = "Infografía 4 — SAMURAI TEE WHITE"
+
+[[outputs]]
+id = "QAF80ViKfjR7bqqJ22HOq"
+uri = "file://exports/hanakaze-deconstruccion-sudadera-royal.mp4"
+type = "video"
+title = "Vídeo Deconstrucción — Sudadera Royal Blue Kanji (estilo Seedance 2.0, 8s vertical 1080p)"
