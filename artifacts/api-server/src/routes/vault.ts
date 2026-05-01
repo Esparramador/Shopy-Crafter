@@ -10,7 +10,65 @@ import { logger } from "../lib/logger.js";
 import { setupZipStream, isBinaryMime, isAlreadyCompressed, extForMime, sniffMimeFromMagic } from "../lib/zip-stream.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { readFile, stat, realpath } from "fs/promises";
+import path from "path";
+import os from "os";
 import sharp from "sharp";
+
+// Mismo directorio raíz que `vault.ts` usa para escribir los fallbacks.
+// MANTENER SINCRONIZADO con `lib/vault.ts::DISK_FALLBACK_DIR`.
+const DISK_FALLBACK_ROOT = path.join(os.tmpdir(), "vault-fallback");
+
+/**
+ * Recupera la ruta del disk-fallback registrada por saveToVault cuando OS
+ * estuvo caído. Devuelve { buffer, mime } o null si no existe / no se puede leer.
+ *
+ * SEGURIDAD CRÍTICA: el campo `metadata` de un proyecto puede contener input
+ * controlado por el usuario (p.ej. `save-report` lo acepta de req.body). Por
+ * eso validamos:
+ *  1) La ruta resuelta (realpath) debe vivir bajo `DISK_FALLBACK_ROOT/<projectId>/`.
+ *  2) Sin esto, un usuario podría inyectar `diskFallbackPath:"/etc/passwd"` y
+ *     usar este endpoint como LFI arbitrario.
+ *
+ * Usado como prioridad inmediatamente después de objectPath en TODAS las rutas
+ * de descarga (single, preview, ZIP) para garantizar que ningún asset se pierda.
+ */
+async function tryDiskFallback(
+  metadataRaw: string | null,
+  projectId: number | null | undefined,
+  fallbackMime?: string | null,
+): Promise<{ buffer: Buffer; mime: string } | null> {
+  if (!metadataRaw || projectId == null || !Number.isFinite(projectId)) return null;
+  try {
+    const meta = JSON.parse(metadataRaw) as Record<string, unknown>;
+    const claimed = typeof meta?.diskFallbackPath === "string" ? meta.diskFallbackPath : null;
+    if (!claimed) return null;
+
+    // Whitelist estricta: la ruta canónica DEBE vivir bajo
+    // /tmp/vault-fallback/<projectId>/...  Si no, abortamos.
+    const allowedRoot = path.resolve(DISK_FALLBACK_ROOT, String(projectId)) + path.sep;
+    let real: string;
+    try {
+      real = await realpath(claimed);
+    } catch {
+      return null; // ruta no existe — no la inventamos
+    }
+    if (!real.startsWith(allowedRoot)) {
+      logger.error(
+        { claimed, real, allowedRoot, projectId },
+        "🚨 diskFallback path traversal attempt blocked",
+      );
+      return null;
+    }
+    const st = await stat(real);
+    if (!st.isFile()) return null;
+    const buf = await readFile(real);
+    return { buffer: buf, mime: fallbackMime || "application/octet-stream" };
+  } catch (err: any) {
+    logger.warn({ err: err?.message, projectId }, "diskFallback read failed");
+    return null;
+  }
+}
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -282,7 +340,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Type", file.mimeType ?? "application/octet-stream");
 
-  // PRIORIDAD: objectPath → content → originalUrl
+  // PRIORIDAD: objectPath → diskFallback → content → originalUrl → metadata
   // El contenido REAL guardado siempre gana sobre re-fetchar la URL origen
   // (evita que un análisis o una edición devuelvan la web actual del cliente
   // en vez del artefacto que el usuario guardó en su día).
@@ -293,7 +351,13 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
       const buffer = Buffer.from(await response.arrayBuffer());
       res.send(buffer);
       return;
-    } catch { /* fallback to content/originalUrl */ }
+    } catch { /* fallback to diskFallback/content/originalUrl */ }
+  }
+
+  // Disk fallback: registros guardados cuando OS estaba caído.
+  {
+    const df = await tryDiskFallback(file.metadata, file.projectId, file.mimeType);
+    if (df) { res.send(df.buffer); return; }
   }
 
   if (file.content) {
@@ -403,6 +467,12 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
     } catch { /* fallback */ }
   }
 
+  // Disk fallback (preview): registros guardados cuando OS estaba caído.
+  {
+    const df = await tryDiskFallback(file.metadata, file.projectId, file.mimeType);
+    if (df) { res.send(df.buffer); return; }
+  }
+
   if (file.content) {
     if (isBinaryMime) {
       // Binarios (image/png, image/jpeg, application/pdf, etc.) se guardan como base64.
@@ -497,6 +567,13 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         // CPU y elimina riesgo de fallar DEFLATE sobre buffers de >100MB.
         archive.append(buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
         added++;
+      } else if (await tryDiskFallback(file.metadata, file.projectId, file.mimeType).then(d => {
+        if (!d) return false;
+        archive.append(d.buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
+        added++;
+        return true;
+      })) {
+        // disk fallback handled inside the predicate
       } else if (file.content) {
         if (isBinaryMime(file.mimeType)) {
           try {

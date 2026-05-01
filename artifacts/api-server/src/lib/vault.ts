@@ -1,6 +1,9 @@
 import { db, projectFilesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
+import os from "os";
 import { logger } from "./logger.js";
 import { validateImageUrlAsync } from "./runway.js";
 import { objectStorageClient } from "./objectStorage.js";
@@ -8,12 +11,18 @@ import { objectStorageClient } from "./objectStorage.js";
 const MAX_CONTENT_BYTES = 10 * 1024 * 1024; // 10 MB hard limit (imágenes/binarios pequeños)
 const MAX_VIDEO_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB para vídeos (Runway/Replicate)
 const WARN_CONTENT_BYTES = 2 * 1024 * 1024; // Warn at 2 MB
-// Anuncios largos pueden generar vídeos hasta 500MB. Object Storage absorbe el exceso.
-const MAX_OBJECT_STORAGE_BYTES = 500 * 1024 * 1024; // 500 MB hard ceiling para OS
+// SIN HARD CAP: cualquier tamaño se sube a Object Storage. Antes había 500MB.
+// El usuario exige no perder NINGUNA creación; vídeos largos pueden superarlo.
 
 // Nombre y subruta dentro del PRIVATE_OBJECT_DIR donde guardamos los assets
 // del vault que exceden el límite que cabe en la columna `content` de Postgres.
 const VAULT_OS_PREFIX = "vault";
+
+// Directorio local de respaldo cuando Object Storage falla DESPUÉS de N reintentos.
+// Asegura que el contenido nunca se pierde, aunque haya outage del bucket.
+const DISK_FALLBACK_DIR = path.join(os.tmpdir(), "vault-fallback");
+const OS_UPLOAD_RETRIES = 3;
+const OS_RESUMABLE_THRESHOLD = 5 * 1024 * 1024; // GCS recomienda resumable >5MB
 
 function guessExt(mime: string | undefined | null): string {
   if (!mime) return "bin";
@@ -33,12 +42,14 @@ function guessExt(mime: string | undefined | null): string {
 }
 
 /**
- * Sube un buffer binario al Object Storage privado bajo
- * `${PRIVATE_OBJECT_DIR}/vault/<projectId>/<uuid>.<ext>` y devuelve el
- * `objectPath` interno (forma `/objects/vault/<projectId>/<uuid>.<ext>`)
- * que `routes/vault.ts` ya sabe servir vía `getObjectEntityFile`.
+ * Sube un buffer a Object Storage con:
+ *  - Resumable upload automático para >5MB (GCS best practice).
+ *  - Reintentos exponenciales (3 intentos: 1s → 2s → 4s).
+ *  - Validación CRC32C end-to-end (la propia librería @google-cloud/storage
+ *    aborta si el checksum no cuadra, evitando archivos corruptos).
  *
- * Devuelve null si OS no está configurado o si la subida falla.
+ * Devuelve `/objects/<entityId>` en éxito, o null si OS no está configurado
+ * o si TODOS los reintentos fallan.
  */
 async function uploadBufferToObjectStorage(
   projectId: number,
@@ -49,43 +60,82 @@ async function uploadBufferToObjectStorage(
   if (!privateDir) {
     logger.warn(
       { projectId },
-      "PRIVATE_OBJECT_DIR no configurado: no se puede subir asset grande al Object Storage",
+      "PRIVATE_OBJECT_DIR no configurado: no se puede subir asset al Object Storage",
     );
     return null;
   }
-  if (buffer.length > MAX_OBJECT_STORAGE_BYTES) {
-    logger.error(
-      { projectId, bytes: buffer.length, max: MAX_OBJECT_STORAGE_BYTES },
-      "Asset excede el límite duro de Object Storage (500MB) — no se sube",
-    );
+  const ext = guessExt(mimeType);
+  const objectId = `${VAULT_OS_PREFIX}/${projectId}/${randomUUID()}.${ext}`;
+  const fullPath = privateDir.endsWith("/")
+    ? `${privateDir}${objectId}`
+    : `${privateDir}/${objectId}`;
+  const normalized = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length < 2) {
+    logger.error({ projectId, normalized }, "Ruta inválida para Object Storage");
     return null;
   }
-  try {
-    const ext = guessExt(mimeType);
-    const objectId = `${VAULT_OS_PREFIX}/${projectId}/${randomUUID()}.${ext}`;
-    const fullPath = privateDir.endsWith("/")
-      ? `${privateDir}${objectId}`
-      : `${privateDir}/${objectId}`;
-    // parseObjectPath espera ruta absoluta tipo "/bucket/.../obj"
-    const normalized = fullPath.startsWith("/") ? fullPath : `/${fullPath}`;
-    const parts = normalized.split("/").filter(Boolean);
-    if (parts.length < 2) {
-      throw new Error(`Ruta inválida para Object Storage: ${normalized}`);
+  const bucketName = parts[0];
+  const objectName = parts.slice(1).join("/");
+  const bucket = objectStorageClient.bucket(bucketName);
+  const file = bucket.file(objectName);
+
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= OS_UPLOAD_RETRIES; attempt++) {
+    try {
+      await file.save(buffer, {
+        contentType: mimeType || "application/octet-stream",
+        resumable: buffer.length > OS_RESUMABLE_THRESHOLD,
+        validation: "crc32c",
+      });
+      logger.info(
+        { projectId, objectId, bytes: buffer.length, attempt, mime: mimeType },
+        "✅ Object Storage upload OK",
+      );
+      return `/objects/${objectId}`;
+    } catch (err: any) {
+      lastErr = err;
+      const wait = Math.min(1000 * 2 ** (attempt - 1), 10_000);
+      logger.warn(
+        { err: err?.message, code: err?.code, attempt, projectId, bytes: buffer.length, waitMs: wait },
+        `OS upload attempt ${attempt}/${OS_UPLOAD_RETRIES} failed`,
+      );
+      if (attempt < OS_UPLOAD_RETRIES) await new Promise((r) => setTimeout(r, wait));
     }
-    const bucketName = parts[0];
-    const objectName = parts.slice(1).join("/");
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-    await file.save(buffer, {
-      contentType: mimeType || "application/octet-stream",
-      resumable: false,
-    });
-    // Devolvemos en la forma `/objects/<entityId>` que la ruta GET reconoce.
-    return `/objects/${objectId}`;
-  } catch (err) {
+  }
+  logger.error(
+    { lastErr: (lastErr as any)?.message, projectId, bytes: buffer.length, mime: mimeType },
+    `❌ Object Storage upload FAILED after ${OS_UPLOAD_RETRIES} attempts — falling back to disk`,
+  );
+  return null;
+}
+
+/**
+ * Último recurso de respaldo cuando OS falla: escribe el buffer al filesystem
+ * local en `/tmp/vault-fallback/<projectId>/<uuid>.<ext>` y devuelve la ruta
+ * absoluta. La ruta queda registrada en `metadata.diskFallbackPath` para que
+ * `routes/vault.ts` pueda servirla y un job posterior pueda re-subir a OS.
+ */
+async function diskFallbackSave(
+  projectId: number,
+  buffer: Buffer,
+  mimeType: string | undefined | null,
+): Promise<string | null> {
+  try {
+    const dir = path.join(DISK_FALLBACK_DIR, String(projectId));
+    await mkdir(dir, { recursive: true });
+    const fname = `${randomUUID()}.${guessExt(mimeType)}`;
+    const fullPath = path.join(dir, fname);
+    await writeFile(fullPath, buffer);
     logger.warn(
-      { err, projectId, bytes: buffer.length, mime: mimeType },
-      "Falló subida a Object Storage — se mantendrá originalUrl/metadata",
+      { projectId, fullPath, bytes: buffer.length, mime: mimeType },
+      "💾 Asset guardado en disk fallback (Object Storage falló) — recovery manual o job posterior",
+    );
+    return fullPath;
+  } catch (err: any) {
+    logger.error(
+      { err: err?.message, projectId, bytes: buffer.length },
+      "💥 DISK FALLBACK FAILED — el contenido se perderá si el caller no lo retiene",
     );
     return null;
   }
@@ -208,7 +258,8 @@ export async function saveToVault(params: VaultFileParams): Promise<number | nul
     }
 
     // Si tenemos un buffer pendiente que excede el límite de DB, súbelo a OS y
-    // guarda objectPath en lugar de content.
+    // guarda objectPath en lugar de content. Si OS falla tras retries → disk fallback.
+    let diskFallbackPath: string | null = null;
     if (pendingLargeBuffer && !params.objectPath) {
       const objectPath = await uploadBufferToObjectStorage(
         params.projectId,
@@ -221,19 +272,29 @@ export async function saveToVault(params: VaultFileParams): Promise<number | nul
           { projectId: params.projectId, objectPath, bytes: pendingLargeBuffer.length, mime: params.mimeType },
           "Large asset uploaded to Object Storage"
         );
+      } else {
+        // Object Storage falló. Antes perdíamos el contenido (metadata-only).
+        // Ahora lo escribimos a disco como respaldo de emergencia para no perderlo.
+        diskFallbackPath = await diskFallbackSave(
+          params.projectId,
+          pendingLargeBuffer,
+          params.mimeType,
+        );
       }
     }
 
-    // Si AÚN sigue excediendo (OS falló o no configurado) → metadata only
+    // Si AÚN sigue excediendo (OS falló y disk fallback también) → metadata only
+    // ÚNICO caso donde realmente perdemos bytes. Antes pasaba siempre que OS fallaba.
     if (
       fileSizeBytes &&
       fileSizeBytes > sizeLimit &&
       !params.objectPath &&
-      !params.content
+      !params.content &&
+      !diskFallbackPath
     ) {
       logger.error(
         { projectId: params.projectId, fileType: params.fileType, fileSizeBytes, sizeLimit },
-        `Vault content exceeds ${sizeLimit / 1024 / 1024}MB limit AND Object Storage upload failed — storing metadata only`
+        `🚨 Vault content exceeds ${sizeLimit / 1024 / 1024}MB AND Object Storage AND disk fallback FAILED — content lost`
       );
       const [file] = await db.insert(projectFilesTable).values({
         projectId: params.projectId,
@@ -252,6 +313,22 @@ export async function saveToVault(params: VaultFileParams): Promise<number | nul
         content: null,
       }).returning({ id: projectFilesTable.id });
       return file?.id ?? null;
+    }
+
+    // Si tenemos disk fallback, lo registramos en metadata para que las rutas de
+    // descarga puedan servirlo y un job posterior pueda re-subir a OS.
+    if (diskFallbackPath) {
+      const baseMeta = (params.metadata ?? {}) as Record<string, unknown>;
+      params = {
+        ...params,
+        metadata: {
+          ...baseMeta,
+          diskFallbackPath,
+          diskFallbackBytes: pendingLargeBuffer?.length ?? null,
+          diskFallbackCreatedAt: new Date().toISOString(),
+          recoveryNeeded: true,
+        },
+      };
     }
 
     if (fileSizeBytes && fileSizeBytes > WARN_CONTENT_BYTES && !params.objectPath) {
