@@ -142,6 +142,29 @@ Anuncio publicitario 60s vertical 9:16 para marca @hanakaze.serigraphy generado 
 
 La UI no permite todavía configurar mix manual de motores premium (kling-master + seedance multi-ref con timeline custom de 8 clips). Para eso se usa el script offline.
 
+### Chatbot OmniChatbot — anuncios brand desde el chat (1 may 2026)
+Para que el usuario pueda lanzar el equivalente al script v3 cascada SIN tocar terminal, se potenció el LLM action layer:
+
+**Nuevos límites declarados en `/api/fs-pro/capabilities`** (consumidos por el LLM systemPrompt):
+- `cinematicMultiShot.scenesRange`: 8 → **24** escenas
+- `cinematicMultiShot.durationRange`: 60 → **240s** (4 min)
+- Bloque nuevo `longAd`: 3-240 escenas, 60-1800s (3-30 min)
+
+**Nueva action `create_brand_ad`** (`shopybrain.ts` ~L10024) — equivalente a `run-hanakaze-v3-cascada.mjs` invocable desde chat:
+- Llama directo a `lib/cinematic-multishot.ts::generateCinematicMultiShot` (sin loopback HTTP/multipart, sin `form-data`)
+- Imagen de referencia debe estar PREVIAMENTE en el vault (pasa `referenceImageVaultId`; usa `absorb-image` antes para subirla desde el chat)
+- Params: `projectId, brand, productName, referenceImageVaultId, scenesCount(2-24), totalDurationSec(6-240), aspect, language, videoModel, style, customBrief, narrationEnabled, narrationVoiceId, musicEnabled, musicPrompt`
+- Guarda vídeo final en vault con `saveToVaultSmart` + script reusable como JSON separado
+- Diferencia con `create_long_ad`: ese exige `productId` Shopify; `create_brand_ad` es para campañas brand puras (Hanakaze, drops genéricos)
+
+**Cap subido en `create_montage_video`**: 12 → **32** clipVaultIds (suficiente para concat de los 8 clips Hanakaze más reservas/variantes).
+
+**Helpers exportados en `routes/fs-pro.ts`**: `saveToVaultSmart` y `readVaultContent` (eran privados; ahora reusables desde otros routes con import estático). NUNCA dupliques estas funciones — siempre `import { saveToVaultSmart, readVaultContent } from "./fs-pro.js"`.
+
+**Timeout cliente subido a 25 min** para acciones pesadas en `OmniChatbot.executeShopifyAction` (set `HEAVY_VIDEO_ACTIONS`): `create_brand_ad`, `create_long_ad`, `create_montage_video`, `create_cinematic_multishot`. El backend ya tiene `enableLongRunning(res)` así que la conexión queda viva.
+
+**Smoke verificado**: capabilities reportan los nuevos rangos; `create_brand_ad` valida proyecto/brand/refVaultId con mensajes en español; lookup en `projectFilesTable` funciona contra el id del vault del proyecto.
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

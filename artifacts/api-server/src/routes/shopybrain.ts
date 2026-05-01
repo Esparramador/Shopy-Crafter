@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
 import { randomBytes } from "crypto";
-import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable, charactersTable } from "@workspace/db";
+import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable, charactersTable, projectFilesTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
@@ -666,7 +666,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - update_character: Actualizar campos de un personaje existente sin tocar la imagen. Params: {projectId, characterId, name?, gender?, ageRange?, identityDescription?, voiceId?, voiceGender?, voiceLanguage?, styleNotes?}.
   - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
-  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
+  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
+  - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-2.1"|"kling-master"|"seedance-pro"|"runway-gen4", default kling-2.1), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para ElevenLabs Music)}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
   - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
     • compositionMode "narrative" = cámara y escenas libres (default).
@@ -5946,13 +5947,13 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           if (!projectId || isNaN(Number(projectId))) {
             result = { error: true, message: "❌ Falta projectId válido" }; break;
           }
-          // Validación: enteros positivos únicos, entre 2 y 12 clips
+          // Validación: enteros positivos únicos, entre 2 y 32 clips (anuncios largos)
           const rawIds = Array.isArray(params?.clipVaultIds) ? params!.clipVaultIds : [];
           const clipVaultIds = Array.from(new Set(
             rawIds.map((x: any) => Number(x)).filter((x: number) => Number.isInteger(x) && x > 0)
           )) as number[];
-          if (clipVaultIds.length < 2 || clipVaultIds.length > 12) {
-            result = { error: true, message: "❌ Necesitas entre 2 y 12 clipVaultIds (enteros positivos únicos)" }; break;
+          if (clipVaultIds.length < 2 || clipVaultIds.length > 32) {
+            result = { error: true, message: "❌ Necesitas entre 2 y 32 clipVaultIds (enteros positivos únicos)" }; break;
           }
           const ALLOWED_TRANSITIONS = new Set([
             "hard_cut","cross_dissolve","fade_to_black","white_flash","dissolve_grain",
@@ -10009,6 +10010,90 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               longForm: true,
               message: `🎬 Anuncio largo generado (${dSec}s, ${sCnt} escenas, modo ${compositionMode}). Vault #${vId ?? "?"}.`,
             };
+          }
+          break;
+        }
+
+        // ── ANUNCIO DE MARCA (sin producto Shopify específico) ────────────────
+        // Equivalente al script v3 cascada del runner pero invocable desde el chat.
+        // Usa cinematic-multishot directamente: refs imagen → N clips → voz → música → concat.
+        // Sirve para campañas brand puras (Hanakaze, drops, branding general) donde no
+        // hay productId Shopify pero sí imágenes de referencia y un brief.
+        case "create_brand_ad": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          if (!projectId) { result = { error: true, message: "❌ Falta projectId válido" }; break; }
+          const brand = String(params?.brand || "").trim().slice(0, 200);
+          const productName = String(params?.productName || params?.subject || "").trim().slice(0, 200);
+          if (!brand || !productName) { result = { error: true, message: "❌ Faltan brand y productName/subject" }; break; }
+          const refVaultId = Number(params?.referenceImageVaultId || params?.productVaultId || 0);
+          if (!Number.isInteger(refVaultId) || refVaultId <= 0) {
+            result = { error: true, message: "❌ Necesitas referenceImageVaultId (id de imagen ya en vault — usa absorb-image antes o pásamelo)" }; break;
+          }
+          const scenesCount = Math.max(2, Math.min(24, Number(params?.scenesCount) || 6));
+          const totalDurationSec = Math.max(6, Math.min(240, Number(params?.totalDurationSec) || (scenesCount * 8)));
+          const aspect = (params?.aspect === "16:9" || params?.aspect === "1:1") ? params.aspect : "9:16";
+          const language = typeof params?.language === "string" ? params.language : "es";
+          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1";
+          const imageModel = typeof params?.imageModel === "string" ? params.imageModel : undefined;
+          const style = typeof params?.style === "string" ? params.style : "cinematic";
+          const customBrief = typeof params?.customBrief === "string" ? params.customBrief : (typeof params?.customNotes === "string" ? params.customNotes : undefined);
+          const narrationEnabled = params?.narrationEnabled !== false;
+          const narrationVoiceId = typeof params?.narrationVoiceId === "string" ? params.narrationVoiceId : undefined;
+          const musicEnabled = params?.musicEnabled !== false;
+          const musicPrompt = typeof params?.musicPrompt === "string" ? params.musicPrompt : undefined;
+          try {
+            const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+            if (!project) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+            // Carga la referencia desde el vault y llama directo a la lib (sin loopback HTTP/multipart).
+            const { generateCinematicMultiShot } = await import("../lib/cinematic-multishot.js");
+            const { saveToVaultSmart, readVaultContent } = await import("./fs-pro.js");
+            const [refRow] = await db.select().from(projectFilesTable).where(and(
+              eq(projectFilesTable.projectId, projectId),
+              eq(projectFilesTable.id, refVaultId),
+            ));
+            if (!refRow) { result = { error: true, message: `❌ Referencia vault #${refVaultId} no encontrada en este proyecto` }; break; }
+            const productImage = await readVaultContent(refRow);
+            if (!productImage) { result = { error: true, message: `❌ No se pudo leer el contenido del vault #${refVaultId}` }; break; }
+            const productMime = refRow.mimeType || "image/png";
+            const adResult = await generateCinematicMultiShot({
+              projectId, productImage, productMime,
+              brand, productName,
+              niche: project.storeNiche || undefined,
+              language, scenesCount, totalDurationSec,
+              aspect: aspect as any, videoModel,
+              imageModel: imageModel as any,
+              style: style as any,
+              customBrief,
+              narration: narrationEnabled ? { enabled: true, voiceId: narrationVoiceId, voiceVolume: 1.0 } : undefined,
+              music: musicEnabled ? { enabled: true, prompt: musicPrompt, volume: 0.22 } : undefined,
+            });
+            const finalVaultId = await saveToVaultSmart({
+              projectId, fileType: "fs-pro-multishot", category: "fusion-studio-pro",
+              title: `Brand Ad: ${brand} — ${productName} (${adResult.durationSec}s, ${adResult.script.scenes.length} escenas)`,
+              mimeType: adResult.finalMime, generatedBy: `chatbot:create_brand_ad:${videoModel}`,
+              buffer: adResult.finalVideo,
+            });
+            const scriptVaultId = await saveToVaultSmart({
+              projectId, fileType: "fs-pro-script", category: "fusion-studio-pro",
+              title: `Brand Ad Script: ${brand} — ${productName}`,
+              mimeType: "application/json", generatedBy: "chatbot:create_brand_ad:script",
+              buffer: Buffer.from(JSON.stringify(adResult.script, null, 2), "utf-8"),
+            });
+            const sizeMB = (adResult.finalVideo.length / 1024 / 1024).toFixed(2);
+            result = {
+              ok: true, vaultId: finalVaultId, scriptVaultId,
+              durationSec: adResult.durationSec,
+              scenesCount: adResult.script.scenes.length,
+              sizeBytes: adResult.finalVideo.length,
+              message: `🎬✅ **Anuncio de marca generado**\n\n` +
+                `📦 Vault #${finalVaultId} (vídeo final, ${sizeMB} MB)\n` +
+                `📜 Vault #${scriptVaultId} (script reusable)\n` +
+                `⏱️ Duración: ${adResult.durationSec}s · 🎞️ Escenas: ${adResult.script.scenes.length}\n` +
+                `🎙️ Voz: ${narrationEnabled ? "ES Bella" : "sin voz"} · 🎵 Música: ${musicEnabled ? "ElevenLabs" : "sin música"}\n` +
+                `📐 ${aspect} · 🎬 ${videoModel} · 🎨 ${style}`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error generando anuncio brand: ${err instanceof Error ? err.message : String(err)}` };
           }
           break;
         }

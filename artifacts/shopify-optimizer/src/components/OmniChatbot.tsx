@@ -1018,10 +1018,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   }, [isListening]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
+  // Acciones de generación de vídeo (montage/long_ad/brand_ad/cinematic-multishot) pueden
+  // tardar 5–20 min (8 escenas × 60-120s cada Replicate + voz + música + concat ffmpeg).
+  // Subimos el timeout a 25 min para esas acciones; resto sigue en 3 min.
+  const HEAVY_VIDEO_ACTIONS = new Set(["create_brand_ad", "create_long_ad", "create_montage_video", "create_cinematic_multishot"]);
   const executeShopifyAction = async (action: string, params: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
     try {
       const actionController = new AbortController();
-      const actionTimeout = setTimeout(() => actionController.abort(), 180000);
+      const isHeavy = HEAVY_VIDEO_ACTIONS.has(action);
+      const actionTimeout = setTimeout(() => actionController.abort(), isHeavy ? 1500000 : 180000);
       const res = await fetch(`${API}/api/shopybrain/execute-action`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },

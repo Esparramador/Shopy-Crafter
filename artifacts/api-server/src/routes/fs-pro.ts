@@ -68,7 +68,7 @@ function getProjectReplicateToken(project: any): string | undefined {
 // Files >2MB (raw bytes, ~2.7MB base64) → Object Storage; smaller → content field.
 // Keeps things efficient and avoids the 50MB Express body limit on subsequent reads.
 // Throws on failure so caller's try/catch handles the response (no silent null).
-async function saveToVaultSmart(params: {
+export async function saveToVaultSmart(params: {
   projectId: number;
   fileType: string;
   category: string;
@@ -210,8 +210,15 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
         { key: "tech",       label: "Tech launch",    description: "Neon, gimbal, futurista" },
         { key: "energetic",  label: "Energetic",      description: "Cortes rápidos, colores vibrantes, energía pop" },
       ],
-      scenesRange: { min: 2, max: 8 },
-      durationRange: { min: 6, max: 60 },
+      scenesRange: { min: 2, max: 24 },
+      durationRange: { min: 6, max: 240 },
+      aspects: ["9:16", "16:9", "1:1"],
+    },
+    longAd: {
+      description: "Anuncios largos 60s-30min (3-20 min recomendado) con director cinematográfico inteligente, arco narrativo y Character Lock. productId opcional (anuncios brand admiten solo customNotes + characterId).",
+      scenesRange: { min: 3, max: 240 },
+      durationRange: { min: 60, max: 1800 },
+      compositionModes: ["narrative", "explainer-locked", "composite-pro"],
       aspects: ["9:16", "16:9", "1:1"],
     },
     avatarStudio: {
@@ -1860,7 +1867,7 @@ router.post(
 );
 
 // Shared helper: read vault content from URL → objectStorage → base64 content
-async function readVaultContent(file: any): Promise<Buffer | undefined> {
+export async function readVaultContent(file: any): Promise<Buffer | undefined> {
   if (!file) return undefined;
   if (file.originalUrl?.startsWith("http")) {
     try { return await fetchToBuffer(file.originalUrl); } catch { /* fallthrough */ }
