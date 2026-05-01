@@ -84,8 +84,12 @@ console.log("[boot] Hanakaze v2 SUPER — cliente HTTP raw + state reanudable");
 
 const PROJECT_ID = parseInt(process.env.HANAKAZE_PROJECT_ID || "7", 10);
 const BASE = "http://localhost:8080";
-const EMAIL = "sadiagiljoan@gmail.com";
-const PASSWORD = "Lara14032025#";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
+if (!PASSWORD) {
+  console.error("[FATAL] Falta HANAKAZE_ADMIN_PASSWORD en el entorno. Aborto para no exponer credenciales en código.");
+  process.exit(2);
+}
 const RESET = process.env.RESET === "1";
 const ONLY = (process.env.ONLY || "").split(",").map(s => s.trim()).filter(Boolean);
 const LOG_FILE = "logs/hanakaze-v2.log";

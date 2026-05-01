@@ -100,8 +100,12 @@ function rawRequestBinary({ host = "localhost", port = 8080, path: urlPath, meth
 console.log("[boot] cliente HTTP raw activo (sin timeouts) + sistema reanudable");
 
 const BASE = "http://localhost:8080";
-const EMAIL = "sadiagiljoan@gmail.com";
-const PASSWORD = "Lara14032025#";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
+if (!PASSWORD) {
+  console.error("[FATAL] Falta HANAKAZE_ADMIN_PASSWORD en el entorno. Aborto para no exponer credenciales en código.");
+  process.exit(2);
+}
 const IMAGE_ENGINE = process.env.IMAGE_ENGINE || "runway";
 const VIDEO_ENGINE = process.env.VIDEO_ENGINE || "runway"; // dispatcher por defecto
 const RESET = process.env.RESET === "1";
