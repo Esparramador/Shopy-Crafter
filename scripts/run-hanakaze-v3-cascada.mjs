@@ -3,12 +3,16 @@
  * Hanakaze CASCADA v3 — Anuncio 60s con virtual try-on real, deconstrucción,
  * perchero levitando y cascada de TODA la colección.
  *
- *   8 clips de 7-8s = ~60s totales (después de crossfade 0.35s)
- *   Mix óptimo coste/calidad:
- *     · 3× runway-gen3-alpha ($0.05/s) → escenas hero (try-on + perchero)
- *     · 3× seedance-pro       ($0.07/s) → escenas con multi-ref de modelos
- *     · 2× kling-2.1          ($0.09/s) → deconstrucción artística
- *   Coste estimado total ≈ $4.50-6 (vídeo + voz + música)
+ *   8 clips de 8s = ~60s totales (después de crossfade 0.35s)
+ *   MIX HIPER-PRO (motores tope de gama, vertical 9:16):
+ *     · 6× kling-master  ($0.18/s) → calidad 10, audio nativo, motion top
+ *                                     intro, deconstrucción, try-on, mariposa,
+ *                                     perchero, outro
+ *     · 2× seedance-pro  ($0.07/s) → multi-ref hasta 9 imágenes,
+ *                                     reveal-puesto + cascada-coleccion
+ *                                     (donde necesitamos identidad real
+ *                                      de los 2 modelos + las prendas)
+ *   Coste estimado total ≈ $10-12 (vídeo + voz + música)
  *
  * Uso:
  *   HANAKAZE_PROJECT_ID=7 node scripts/run-hanakaze-v3-cascada.mjs
@@ -20,6 +24,7 @@
  */
 
 import fs from "node:fs/promises";
+import { unlinkSync } from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { Buffer } from "node:buffer";
@@ -418,68 +423,97 @@ function buildClips() {
   return [
     {
       // CLIP 1 — INTRO: kanji 華吹 se serigrafía sobre tela blanca (t2v puro)
-      // seedance-pro soporta text-to-video; runway requiere imagen base.
+      // kling-master: calidad 10 + audio nativo (sonido suave de tela/ink)
       key: "c01-intro-kanji-stamp",
-      model: "seedance-pro", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second sequence on a pure white cotton fabric background with subtle weave texture. TIMELINE: 0-2s the camera holds steady, fabric gently breathing. 3-5s thick black silkscreen ink begins to drip from above and spread across the fabric in elegant brush strokes, slowly forming a black octagonal stamp containing the Japanese kanji 華吹 (Hanakaze) — the strokes appear one by one as if printed by an invisible silkscreen squeegee. 6-8s the freshly printed kanji stamp dries with authentic hand-printed ink texture, slight imperfection on the edges. Below the stamp, the brand text 'HANAKAZE SERIGRAPHY' fades in with clean white sans-serif typography on black underline. Soft natural daylight from above, dust particles floating, indie streetwear handmade aesthetic, no luxury feel, no gold.",
+      model: "kling-master", duration: 5, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 5-second intro on a pure white cotton fabric background with subtle weave texture. TIMELINE: 0-1s the camera holds steady on the empty fabric, slight breathing motion, dust particles floating in soft natural daylight. 1-3s thick black silkscreen ink rapidly drips from above and spreads across the fabric in elegant brush strokes, forming a black octagonal stamp containing the Japanese kanji 華吹 (Hanakaze) — the strokes appear quickly one after another as if printed by an invisible silkscreen squeegee. 3-5s the freshly printed kanji stamp dries with authentic hand-printed ink texture and slight imperfections on the edges, while below the stamp the brand text 'HANAKAZE SERIGRAPHY' fades in with clean white sans-serif typography on a thin black underline. Indie streetwear handmade aesthetic, no luxury feel, no gold ink. Subtle ambient sound of fabric and ink.",
     },
     {
       // CLIP 2 — REVEAL del puesto con los 2 modelos y todas las prendas extendidas
       key: "c02-reveal-puesto",
-      model: "seedance-pro", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second sequence at an outdoor pop-up market stand on a wooden rooftop terrace in Barcelona. TIMELINE: 0-2s slow dolly push-in from above, revealing a wooden table covered with a brown checkered cloth, on top neatly folded WHITE t-shirts and NAVY BLUE sweatshirts arranged in 4 rows of 2, with small octagonal kanji 華吹 stamps visible on chests. Round black-and-red sticker pile in the center. 3-5s camera continues forward and lowers to eye level, revealing two bearded young men sitting behind the table, both wearing the brand garments — one with a beige cap and beige hoodie on the left, the other with a beige cap, sunglasses and a white t-shirt with the small kanji chest stamp on the right. They smile slightly at the camera. 6-8s subtle hand-held drift, sun glare on the wooden table, palm trees and stacked metal chairs blurred in background. Authentic candid streetwear documentary style, photorealistic, natural mid-day sunlight. Keep the two real models, the table arrangement, the fold pattern of the garments, and the stamp designs identical to the reference image.",
+      model: "seedance-pro", duration: 5, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 5-second reveal at an outdoor pop-up market stand on a wooden rooftop terrace in Barcelona. TIMELINE: 0-2s slow dolly push-in from a high angle revealing a wooden table covered with a brown checkered cloth, on top neatly folded WHITE t-shirts and NAVY BLUE sweatshirts arranged in 4 rows of 2 with small octagonal kanji 華吹 stamps visible on chests, plus a round black-and-red sticker pile in the center. 2-4s the camera continues forward and lowers smoothly to eye level, revealing two bearded young men sitting behind the table — one on the left with a beige cap and beige hoodie, the other on the right with a beige cap, sunglasses and a white t-shirt with the small kanji chest stamp. They smile slightly at the camera. 4-5s subtle hand-held drift settles, sun glare on the wooden table, palm trees and stacked metal chairs blurred in background. Authentic candid streetwear documentary style, photorealistic, natural mid-day sunlight. Keep the two real models, the table arrangement, the fold pattern of the garments, and the stamp designs identical to the reference image.",
       refKey: "estante_modelos1",
     },
     {
       // CLIP 3 — DECONSTRUCCIÓN: la camiseta samurái se desteje en hilos
+      // kling-master: VFX hero + audio nativo (sonido de hilos/partículas)
       key: "c03-deconstruccion-samurai",
-      model: "kling-2.1", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second VFX sequence. TIMELINE: 0-2s a WHITE cotton t-shirt held on a wooden hanger by a hand floats in front of a softly blurred outdoor terrace background. The front of the t-shirt features a hand-drawn samurai illustration in BLACK LINE-ART with mustard YELLOW-GOLD kimono fills, conical straw hat, katana at the side, ukiyo-e style. 3-5s the t-shirt fabric begins to deconstruct from the bottom up — individual cotton threads detach and float upward in slow motion like glowing strings, the printed samurai illustration breaks apart into thousands of tiny BLACK and GOLD ink particles that swirl mid-air, the wooden hanger remains static. 6-8s the threads and ink particles continue spiraling upward in an elegant tornado of fabric and serigraphy, leaving the hanger empty. Soft natural daylight, magical realism, photorealistic textures, slow motion, particle physics, art-direction inspired by Apple Vision ad campaigns. Preserve the exact samurai illustration design and the white t-shirt appearance from the reference image — only the deconstruction effect is added.",
+      model: "kling-master", duration: 10, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a WHITE cotton t-shirt held on a wooden hanger by a hand floats in front of a softly blurred outdoor terrace background. The front of the t-shirt features a hand-drawn samurai illustration in BLACK LINE-ART with mustard YELLOW-GOLD kimono fills, conical straw hat, katana at the side, ukiyo-e style. The camera slowly pushes in toward the print. 2-4s the t-shirt fabric begins to deconstruct from the bottom up — individual cotton threads detach and rise upward in slow motion like glowing strings, while the printed samurai illustration starts breaking apart into BLACK and GOLD ink particles that begin swirling. 4-7s the deconstruction reaches the top of the garment — thousands of threads and ink particles swirl mid-air in an elegant tornado, the wooden hanger remains perfectly static, the empty space behind starts becoming visible. 7-10s the threads and ink particles continue spiraling upward and outward, slowly thinning out, leaving only the hanger floating empty in the frame as the last sparkles fade. Soft natural daylight, magical realism, photorealistic textures, slow motion, particle physics, art-direction inspired by Apple Vision ad campaigns. Preserve the exact samurai illustration design and the white t-shirt appearance from the reference image — only the deconstruction effect is added. Subtle ambient sound of soft fabric tearing and shimmering particles.",
       refKey: "prenda_samurai",
     },
     {
       // CLIP 4 — TRY-ON real: hilos vuelven y forman camiseta kanji sobre el modelo barbudo
+      // kling-master: máxima fidelidad al rostro real (character lock natural) + audio
       key: "c04-tryon-kanji-modelo",
-      model: "runway-gen3-alpha", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second virtual try-on sequence. TIMELINE: 0-2s a young man with curly dark hair and a long thick beard stands on a sunny rooftop terrace facing the camera with a calm expression, wearing a plain white undershirt, palm trees and umbrella visible behind him. Thousands of glowing white cotton threads and BLACK ink particles begin to swirl around his torso. 3-5s the threads weave together in mid-air directly onto his body, materializing fabric stitch by stitch — first the collar, then the sleeves, then the full WHITE oversized t-shirt body wraps around him like real fabric falling into place. 6-8s the WHITE fabric is fully formed; on the LEFT chest area, the BLACK octagonal kanji 華吹 stamp silkscreens itself onto the cotton in real time with authentic hand-printed ink texture and slight imperfections. The man smiles softly and looks down at his new t-shirt, then back at the camera. Photorealistic, natural sunlight, character lock — keep his face, beard, hair, skin tone and pose identical to the reference image, only add the materializing garment effect. The kanji stamp design must match the reference exactly.",
+      model: "kling-master", duration: 10, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 10-second virtual try-on sequence. TIMELINE: 0-2s a young man with curly dark hair and a long thick beard stands on a sunny rooftop terrace facing the camera with a calm expression, wearing a plain white undershirt, palm trees and umbrella visible blurred behind him. The frame is calm and quiet. 2-4s thousands of glowing white cotton threads and BLACK ink particles begin to swirl around his torso, slowly orbiting his body. 4-7s the threads weave together in mid-air directly onto his body, materializing fabric stitch by stitch — first the collar wraps around his neck, then the sleeves form down his arms, then the full WHITE oversized t-shirt body wraps around his torso like real fabric falling into place, with realistic cotton drape physics. 7-9s the WHITE fabric is fully formed; on the LEFT chest area, the BLACK octagonal kanji 華吹 stamp silkscreens itself onto the cotton in real time with authentic hand-printed ink texture and slight imperfections, the ink visibly soaking into the fabric. 9-10s the man smiles softly, looks down at his newly materialized t-shirt with subtle delight, then looks back up at the camera. Photorealistic, natural sunlight, character lock — keep his face, beard, hair, skin tone and pose identical to the reference image, only add the materializing garment effect. The kanji stamp design must match the reference exactly. Subtle ambient sound of fabric and a soft chime when the kanji prints.",
       refKey: "modeloB_kanji",
     },
     {
       // CLIP 5 — TRY-ON 2: la mariposa estampada vuela y se posa en otra prenda blanca
+      // kling-master: motion biológico realista + audio nativo (aleteo)
       key: "c05-tryon-mariposa-vuela",
-      model: "kling-2.1", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second VFX sequence. TIMELINE: 0-2s a folded WHITE cotton t-shirt with a black silkscreen-printed butterfly + face design lies on a wooden table at an outdoor market, sunlight streaming sideways. 3-5s the printed butterfly suddenly detaches from the cotton fabric in 3D — its black ink wings come alive and start flapping like a real butterfly, lifting off the t-shirt and flying upward, leaving a temporarily blank white spot on the fabric. The butterfly flies in a graceful arc through the air, leaving a faint trail of black ink particles. 6-8s the butterfly slowly descends and lands on the BACK of a different WHITE t-shirt being held by an unseen hand on a wooden hanger. As it lands, its wings flatten and fuse with the cotton fabric, becoming a flat hand-printed silkscreen design again with authentic textile ink texture. Background: wooden market table with brown checkered cloth and other folded garments visible. Soft natural daylight, magical realism, slow motion, photorealistic. Keep the white t-shirt color and the butterfly design from the reference image — only add the magical flight effect.",
+      model: "kling-master", duration: 10, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 10-second VFX sequence. TIMELINE: 0-2s a folded WHITE cotton t-shirt with a black silkscreen-printed butterfly + face design lies on a wooden table at an outdoor market, sunlight streaming sideways from the left, soft particles in the air. 2-4s the printed butterfly suddenly detaches from the cotton fabric in full 3D — its black ink wings come alive and start flapping like a real butterfly, lifting off the t-shirt slowly, leaving a temporarily blank white spot on the fabric where the print was. 4-7s the butterfly flies in a graceful elegant arc through the air across the frame, its wings flapping in slow motion, leaving a faint trail of black ink particles behind it that dissolve into the air, the camera follows its flight smoothly. 7-9s the butterfly approaches a different WHITE t-shirt being held by an unseen hand on a wooden hanger on the right side of the frame. The butterfly slowly descends toward the back of this t-shirt. 9-10s as the butterfly lands on the back fabric, its wings flatten and fuse with the cotton, becoming a flat hand-printed silkscreen design again with authentic textile ink texture, fully integrated with the new garment. Background: wooden market table with brown checkered cloth, other folded garments visible. Soft natural daylight, magical realism, slow motion, photorealistic. Keep the white t-shirt color and the butterfly design from the reference image — only add the magical flight effect. Subtle ambient sound of soft butterfly wing flutters.",
       refKey: "modeloB_mariposa",
     },
     {
       // CLIP 6 — PERCHERO LEVITA: prendas vuelan y se ordenan en el aire
+      // kling-master: física de tela top + audio nativo (viento + click hangers)
       key: "c06-perchero-levita",
-      model: "runway-gen3-alpha", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second hero VFX sequence. TIMELINE: 0-2s a black metal clothing rack stands on a wooden outdoor terrace floor — hanging on wooden hangers from front to back: WHITE t-shirts on the left side with a small price tag '14€', and on the right side a vibrant ROYAL COBALT BLUE crewneck sweatshirt with a large WHITE silkscreen butterfly design on the back, with a price tag '18€'. Padel court fence and palm trees blurred behind. 3-5s the wooden hangers begin to slowly levitate off the metal bar one by one, the garments floating upward in slow motion as if gravity has reversed — the white t-shirts spin gently in the air, the blue sweatshirt billows like fabric in zero-G, the butterfly print catching the sunlight. 6-8s all the garments rotate in a graceful elliptical orbit around the camera, then snap back to perfect order on the rack as the hangers click into place — but now arranged like a perfect retail showcase. The price labels '14€' and '18€' remain attached and readable. Photorealistic, soft mid-day sunlight, magical realism, levitation VFX, particle dust in the air. Keep the exact garments, colors, the price tags, the rack design, and the wooden hangers from the reference image — only add the levitation effect.",
+      model: "kling-master", duration: 10, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a black metal clothing rack stands on a wooden outdoor terrace floor — hanging on wooden hangers from front to back: WHITE t-shirts on the left side with a small price tag reading '14€', and on the right side a vibrant ROYAL COBALT BLUE crewneck sweatshirt with a large WHITE silkscreen butterfly design on the back, with a price tag reading '18€'. Padel court fence and palm trees blurred behind. The garments hang naturally, slight breeze moving them. 2-5s the wooden hangers begin to slowly levitate off the metal bar one by one, the garments floating upward in slow motion as if gravity has reversed — the white t-shirts spin gently in the air, the blue sweatshirt billows like fabric in zero-G, the butterfly print catching the sunlight beautifully. 5-8s all the garments rotate in a graceful elliptical orbit around the camera, weaving past each other in choreographed slow motion, particle dust catching the light, the price tags '14€' and '18€' remain attached and readable. 8-10s the hangers descend and snap back to perfect order on the rack with a satisfying click sound, but now arranged like a perfect retail showcase, the rack standing proud. Photorealistic, soft mid-day sunlight, magical realism, levitation VFX. Keep the exact garments, colors, the price tags, the rack design, and the wooden hangers from the reference image — only add the levitation effect. Subtle ambient sound of soft wind and a final click of hangers.",
       refKey: "perchero",
     },
     {
       // CLIP 7 — CASCADA: 4 prendas distintas se materializan en cascada vertical
       key: "c07-cascada-coleccion",
-      model: "seedance-pro", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second sequence on a soft cream-painted wall background with subtle wooden terrace floor visible at the bottom. TIMELINE: 0-2s a folded WHITE t-shirt with a small BLACK octagonal kanji 華吹 stamp on the left chest materializes in the upper third of the frame from a swirl of white cotton particles. 3-5s a folded WHITE t-shirt with a black SAMURAI illustration in line-art with yellow-gold kimono materializes just below it from black and gold ink particles. 6-8s a folded NAVY BLUE crewneck sweatshirt with a small WHITE octagonal kanji stamp on the chest materializes below from blue fabric particles, and finally at the bottom a folded WHITE t-shirt with a black butterfly+face print materializes — creating a perfect vertical cascade of 4 different garments, all the real Hanakaze Serigraphy designs. Each garment has authentic hand-printed serigraphy texture. Subtle soft sunlight from the right, photorealistic textures, indie streetwear collection showcase. Each design must remain faithful to the references — no invented graphics.",
+      model: "seedance-pro", duration: 5, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 5-second cascade sequence on a soft cream-painted wall background with subtle wooden terrace floor visible at the bottom. TIMELINE: 0-1s a folded WHITE t-shirt with a small BLACK octagonal kanji 華吹 stamp on the left chest materializes at the top of the frame from a swirl of white cotton particles. 1-2s a folded WHITE t-shirt with a black SAMURAI illustration in line-art with yellow-gold kimono materializes just below it from black and gold ink particles. 2-3s a folded NAVY BLUE crewneck sweatshirt with a small WHITE octagonal kanji stamp on the chest materializes below from blue fabric particles. 3-4s a folded WHITE t-shirt with a black butterfly+face print materializes at the bottom from black ink particles, completing a perfect vertical cascade of 4 different garments — all the real Hanakaze Serigraphy designs stacked from top to bottom. 4-5s the camera holds steady on the full cascade as the last particles dissolve, each garment with authentic hand-printed serigraphy texture clearly visible. Subtle soft sunlight from the right, photorealistic textures, indie streetwear collection showcase. Each design must remain faithful to the references — no invented graphics.",
       refKey: "estante_modelos2",
     },
     {
       // CLIP 8 — OUTRO CTA: kanji + URL + tagline
+      // kling-master: tipografía/render limpio + audio cierre suave
       key: "c08-outro-cta",
-      model: "seedance-pro", duration: 8, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 8-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture. TIMELINE: 0-2s a large white octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in centered in the upper third, drawn with rough hand-printed serigraphy texture. 3-5s the brand text 'HANAKAZE SERIGRAPHY' appears below in bold clean white sans-serif typography, drawn with a slightly imperfect silkscreen-print edge. 6-8s the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below the brand name, then at the very bottom the URL 'shopycrafter.com' appears in clean modern white font. Subtle paper-fabric grain overlay, no gold ink, no luxury aesthetic, authentic indie streetwear brand outro. Camera holds completely steady throughout, only the typography animates in.",
+      model: "kling-master", duration: 5, aspect: "9:16",
+      prompt: "Cinematic 4K vertical 9:16 5-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture. TIMELINE: 0-1s a large white octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in centered in the upper third, drawn with rough hand-printed serigraphy texture and slight ink imperfections. 1-3s the brand text 'HANAKAZE SERIGRAPHY' appears below in bold clean white sans-serif typography, drawn with a slightly imperfect silkscreen-print edge, and the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below it. 3-5s the URL 'shopycrafter.com' appears in clean modern white font at the very bottom of the frame, all elements settle and hold, subtle paper-fabric grain overlay completing the brand identity. No gold ink, no luxury aesthetic, authentic indie streetwear brand outro. Camera holds completely steady throughout, only the typography animates in. Subtle ambient sound of soft fabric and a final quiet bell tone.",
     },
   ];
 }
 
 // ════════════════════════════════ MAIN ═══════════════════════════════════════
+const PID_FILE = "logs/hanakaze-v3.pid";
+
+async function acquireLock() {
+  try {
+    const prev = await fs.readFile(PID_FILE, "utf8").then(s => parseInt(s.trim(), 10)).catch(() => 0);
+    if (prev > 0 && prev !== process.pid) {
+      try {
+        process.kill(prev, 0); // signal 0 = solo comprobar si vive
+        // Si llegamos aquí, el PID anterior sigue vivo → ABORTAR para no duplicar gasto
+        console.error(`[lock] OTRA INSTANCIA ya corriendo PID=${prev}. Abortando para no duplicar Replicate.`);
+        process.exit(2);
+      } catch {
+        // PID muerto, podemos tomar el lock
+      }
+    }
+  } catch {}
+  await fs.writeFile(PID_FILE, String(process.pid));
+  const release = async () => { try { await fs.unlink(PID_FILE); } catch {} };
+  process.on("exit", () => { try { unlinkSync(PID_FILE); } catch {} });
+  process.on("SIGTERM", async () => { await release(); process.exit(143); });
+  process.on("SIGINT", async () => { await release(); process.exit(130); });
+}
+
 async function main() {
   await fs.mkdir("logs", { recursive: true }).catch(()=>{});
+  await acquireLock();
   await fs.appendFile(LOG_FILE, "");
   await log("=== HANAKAZE CASCADA v3 — INICIO ===");
-  await log(`projectId=${PROJECT_ID} reset=${RESET} only=${ONLY.join(",") || "(all)"}`);
+  await log(`projectId=${PROJECT_ID} reset=${RESET} only=${ONLY.join(",") || "(all)"} pid=${process.pid}`);
 
   await login();
   const state = await loadState();
@@ -528,8 +562,8 @@ async function main() {
   const final = await memoize(state, "concat-final-v3", async () => {
     const orderedKeys = clips.map(c => c.key);
     const videoVaultIds = orderedKeys.map(k => clipResults[k]?.vaultId).filter(Boolean);
-    if (videoVaultIds.length < 6) {
-      throw new Error(`Faltan clips: solo ${videoVaultIds.length} de 8 disponibles`);
+    if (videoVaultIds.length !== 8) {
+      throw new Error(`Concat estricto: se requieren 8 clips, solo ${videoVaultIds.length} disponibles. Faltan: ${orderedKeys.filter(k => !clipResults[k]?.vaultId).join(", ")}`);
     }
     return await concatFinal({
       projectId: PROJECT_ID,

@@ -99,6 +99,41 @@ Auditoría completa que garantiza guardado real + descarga 100% del contenido en
 - **Frontend WebLab.tsx**: tab "edit" con dos textarea + label + botón guardar + iframe preview con `srcDoc` actualizado vía `useEffect`. Detecta cambio de URL analizada con `lastSeededUrlRef` y pisa el editor sólo cuando es análisis de URL nueva (evita arrastrar contenido de la URL anterior). Botón "✨ Crear desde cero" abre panel con `pageType` + `brief` + `sections` y lanza `generate-from-scratch`.
 - **Smoke verificado en producción**: `save-edit` devuelve bytes exactos (59B HTML + 72B CSS); `generate-from-scratch` retorna 22.5KB HTML + 36.5KB CSS en ~3min; descarga de archivo legacy con `originalUrl` (vault#1171) ahora devuelve el HTML guardado (9.6KB) en vez de la página live (18.3KB), confirmando el cambio de prioridad.
 
+### Hanakaze v3 Cascada Premium (1 mayo 2026)
+Anuncio publicitario 60s vertical 9:16 para marca @hanakaze.serigraphy generado con script offline `scripts/run-hanakaze-v3-cascada.mjs` (workflow `hanakaze-runner`).
+
+**Mix de motores HIPER-PRO**:
+- 6× `kling-master` (kwaivgi/kling-v2.1-master, $0.18/s, calidad 10 + audio nativo) → intro, deconstrucción samurái, try-on kanji, mariposa vuela, perchero levita, outro CTA
+- 2× `seedance-pro` (bytedance/seedance-1-pro, $0.07/s, calidad 9 multi-ref) → reveal puesto + cascada colección (clips con identidad real de modelos/prendas)
+- Voz off ES Bella `21m00Tcm4TlvDq8ikWAM` (eleven_multilingual_v2 speed 0.96, ~150 palabras encajan en ~55s)
+- 1 segmento música 60s vía ElevenLabs Music API directa (shakuhachi+koto+taiko)
+- Concat ffmpeg server-side: crossfade 0.35s, voz 1.0, música 0.18, 1080×1920 30fps
+
+**Estructura 8 clips × duración estricta de Kling (5s ó 10s) = 60s exactos raw**:
+- 4× clips hero VFX a 10s (deconstrucción/try-on/mariposa/perchero) + 4× clips contextuales a 5s (intro/reveal/cascada/outro)
+- Cada prompt incluye `TIMELINE` interno (segundos 0-X / X-Y) coherente con la duración real del clip
+
+**State reanudable**: `logs/hanakaze-v3-state.json` memoiza cada paso (refs subidas, vault IDs por clip, voz, música, concat). Si falla cualquier paso, relanzar el workflow continúa desde el último completado.
+
+**Hardening tras audit architect**:
+- `concatFinal` exige estricto 8/8 vault IDs (antes permitía 6/8 con `filter(Boolean)` → narrativa rota)
+- Re-subida automática de refs si han pasado >50min (URLs firmadas GCS expiran a la hora; ciclo de render dura ~25-30 min)
+- Polling fallback en `genVideo`/`tts`/`concat` cuando el cliente HTTP corta antes de que Replicate/ElevenLabs respondan
+
+**Coste estimado total**: ~$10-12 por anuncio completo (vídeo $9.70 + voz $0.10 + música $0.30).
+
+**Ejecución 1 may 17:00-17:31 — incidente y estado actual**:
+- ✓ Generados y guardados en vault: c01 (vault 1314, 9.17MB), c02 (vault 1315, 11.39MB), c03 (vault 1317, 24.72MB)
+- ✗ **Bug operativo**: `restart_workflow hanakaze-runner` mientras un POST a generate-video estaba en vuelo NO mata limpiamente el child node (deja el proceso huérfano contra Replicate). En el primer crash del api-server (17:08-17:13) se acumularon 3 instancias del runner ejecutándose en paralelo, todas intentaron generar c03 → Replicate facturó 3 clips que nunca llegaron a `saveToVaultSmart` (~$5.40 perdidos). FIX A APLICAR antes de la próxima ejecución: el runner debe escribir su PID a `logs/hanakaze-v3.pid` al arrancar y abortar inmediato si el PID anterior sigue vivo (lockfile pattern).
+- ✗ c04 falló con `402 Payment Required: Insufficient credit` de Replicate al agotarse el saldo del proyecto. Estado limpio en `logs/hanakaze-v3-state.json` con c01/c02/c03 + 9 refs. Cuando se recargue Replicate, basta con `restart_workflow hanakaze-runner` para retomar desde c04.
+
+**Equivalente desde la UI**: `CreateAdModal` (componente Shopy Crafter) tiene 3 tabs:
+- "Rápido" → `/ads/quick` (1 clip Seedance)
+- "Cinematográfico" → `/ads/smart-cinematic` (4-6 escenas con Character Lock)
+- "Video Try-On" → `/videos/tryon-video` (provider kling/runway, premium, withVoice, lipSync)
+
+La UI no permite todavía configurar mix manual de motores premium (kling-master + seedance multi-ref con timeline custom de 8 clips). Para eso se usa el script offline.
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

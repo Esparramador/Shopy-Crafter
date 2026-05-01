@@ -44,8 +44,26 @@
       "publicUrl": "https://storage.googleapis.com/replit-objstore-74de680a-c573-4843-bb12-88a974bd1cc0/public/runway-refs/1777653866331-zcfkq0db.jpg?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=heimdall-production%40replit-user-deployments.iam.gserviceaccount.com%2F20260501%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260501T164426Z&X-Goog-Expires=3599&X-Goog-Signature=a1992db555ed2c8acb2a2accbd2f61b34fb4e19ce15b618e1d1b2001b9c9af60098cc9d6ad7d93af07dfde801ee55088d3e8773f9319eb3d12ab77e376a482ca09e2fce47b05cd743c77a19ce8594851bf14def7440242da1cd0a0941e925b98c8d3d21a3fa63fbfa201cde0f39e375140036529768ccd99dbea86d4bc57e94fc25a55a5bd81e69c4807fe9eacf084039d315266fcbbb73875fea8e439aca2ab928bd79860bdc18ae8e624fb2224e57122442bc515bc7a69adbef95ed4eab8bbd49f8541a63df57af960afe8412269755eec77db277a1e5606d8712a973747c7dcdad981900ade4795379fe5ab2f52abb9fe81a47d338acb83bf42398d5b8801&X-Goog-SignedHeaders=host",
       "refLocal": "attached_assets/PXL_20260410_171731994.RAW-01_1777652964970.jpg",
       "completedAt": "2026-05-01T16:44:26.677Z"
+    },
+    "c01-intro-kanji-stamp": {
+      "vaultId": 1314,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 5-second intro on a pure white cotton fabric background with subtle weave texture. TIMELINE: 0-1s the camera holds steady on the empty fabric, slight breathing motion, dust particles floating in soft natural daylight. 1-3s thick black silkscreen ink rapidly drips from above and spreads across the fabric in elegant brush strokes, forming a black octagonal stamp containing the Japanese kanji 華吹 (Hanakaze) — the strokes appear quickly one after another as if printed by an invisible silkscreen squeegee. 3-5s the freshly printed kanji stamp dries with authentic hand-printed ink texture and slight imperfections on the edges, while below the stamp the brand text 'HANAKAZE SERIGRAPHY' fades in with clean white sans-serif typography on a thin black underline. Indie streetwear handmade aesthetic, no luxury feel, no gold ink. Subtle ambient sound of fabric and ink.",
+      "completedAt": "2026-05-01T17:01:16.431Z"
+    },
+    "c02-reveal-puesto": {
+      "vaultId": 1315,
+      "model": "seedance-pro",
+      "prompt": "Cinematic 4K vertical 9:16 5-second reveal at an outdoor pop-up market stand on a wooden rooftop terrace in Barcelona. TIMELINE: 0-2s slow dolly push-in from a high angle revealing a wooden table covered with a brown checkered cloth, on top neatly folded WHITE t-shirts and NAVY BLUE sweatshirts arranged in 4 rows of 2 with small octagonal kanji 華吹 stamps visible on chests, plus a round black-and-red sticker pile in the center. 2-4s the camera continues forward and lowers smoothly to eye level, revealing two bearded young men sitting behind the table — one on the left with a beige cap and beige hoodie, the other on the right with a beige cap, sunglasses and a white t-shirt with the small kanji chest stamp. They smile slightly at the camera. 4-5s subtle hand-held drift settles, sun glare on the wooden table, palm trees and stacked metal chairs blurred in background. Authentic candid streetwear documentary style, photorealistic, natural mid-day sunlight. Keep the two real models, the table arrangement, the fold pattern of the garments, and the stamp designs identical to the reference image.",
+      "completedAt": "2026-05-01T17:02:29.016Z"
+    },
+    "c03-deconstruccion-samurai": {
+      "vaultId": 1317,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a WHITE cotton t-shirt held on a wooden hanger by a hand floats in front of a softly blurred outdoor terrace background. The front of the t-shirt features a hand-drawn samurai illustration in BLACK LINE-ART with mustard YELLOW-GOLD kimono fills, conical straw hat, katana at the side, ukiyo-e style. The camera slowly pushes in toward the print. 2-4s the t-shirt fabric begins to deconstruct from the bottom up — individual cotton threads detach and rise upward in slow motion like glowing strings, while the printed samurai illustration starts breaking apart into BLACK and GOLD ink particles that begin swirling. 4-7s the deconstruction reaches the top of the garment — thousands of threads and ink particles swirl mid-air in an elegant tornado, the wooden hanger remains perfectly static, the empty space behind starts becoming visible. 7-10s the threads and ink particles continue spiraling upward and outward, slowly thinning out, leaving only the hanger floating empty in the frame as the last sparkles fade. Soft natural daylight, magical realism, photorealistic textures, slow motion, particle physics, art-direction inspired by Apple Vision ad campaigns. Preserve the exact samurai illustration design and the white t-shirt appearance from the reference image — only the deconstruction effect is added. Subtle ambient sound of soft fabric tearing and shimmering particles.",
+      "completedAt": "2026-05-01T17:31:25.207Z"
     }
   },
   "startedAt": "2026-05-01T16:44:19.814Z",
-  "lastUpdate": "2026-05-01T16:44:26.677Z"
+  "lastUpdate": "2026-05-01T17:31:25.207Z"
 }
