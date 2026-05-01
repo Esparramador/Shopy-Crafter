@@ -865,18 +865,17 @@ function AttachmentPreview({ file, url, onRemove }: {
   );
 }
 
-// ─── QUICK ACTIONS ─────────────────────────────────────────────────────────────
-const QUICK_ACTIONS = [
+// ─── QUICK ACTIONS (FALLBACK ESTÁTICO) ────────────────────────────────────────
+// Fallback usado si /shopybrain/quick-actions falla. Las acciones reales se
+// piden dinámicamente al backend según la ruta actual.
+type QuickAction = { icon: string; label: string; prompt: string; isResearch?: boolean };
+const FALLBACK_QUICK_ACTIONS: QuickAction[] = [
   { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
   { icon: "🏪", label: "Estado de la tienda", prompt: "Muéstrame el estado de la tienda: productos, pedidos y estado del token." },
   { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda." },
-  { icon: "➕", label: "Crear producto", prompt: "Crea un producto nuevo con IA. Título: " },
-  { icon: "🔑", label: "Regenerar token", prompt: "Regenera el token de acceso de la tienda ahora." },
   { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
   { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
-  { icon: "📧", label: "Flujos Klaviyo", prompt: "Genera un workflow completo de Klaviyo para comic-crafter.myshopify.com (nicho: comics y arte). Crea los 6 flujos esenciales con emails HTML completos." },
   { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
-  { icon: "⚖️", label: "Auditoría Copyright", prompt: "Realiza una auditoría de copyright y marcas registradas de todos los productos de la tienda. Identifica posibles infracciones y sugiere nombres alternativos seguros." },
 ];
 
 const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce.
@@ -917,6 +916,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [loading, setLoading] = useState(false);
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachUrl, setAttachUrl] = useState("");
@@ -930,6 +930,23 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
+
+  // Fetch contextual quick actions when panel opens or route changes
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const projectMatch = location.match(/\/projects\/(\d+)/);
+    const projectId = projectMatch?.[1];
+    const url = `${API}/api/shopybrain/quick-actions?route=${encodeURIComponent(location)}${projectId ? `&projectId=${projectId}` : ""}`;
+    fetch(url, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (cancelled || !j?.actions || !Array.isArray(j.actions)) return;
+        setQuickActions(j.actions);
+      })
+      .catch(() => { /* fallback ya está */ });
+    return () => { cancelled = true; };
+  }, [open, location]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -2035,7 +2052,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 </button>
                 {showActions && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: 4, marginBottom: 6 }}>
-                    {QUICK_ACTIONS.map((action, i) => (
+                    {quickActions.map((action, i) => (
                       <button key={i} onClick={() => {
                         setShowActions(false);
                         if ("isResearch" in action && action.isResearch) {

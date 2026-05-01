@@ -78,5 +78,27 @@ export const salesAnalyticsTable = pgTable("sales_analytics", {
   financialStatus: text("financial_status"),
   country: text("country"),
   city: text("city"),
+  refundedQuantity: integer("refunded_quantity").default(0),
+  refundedAmount: real("refunded_amount").default(0),
+  refundReason: text("refund_reason"),
+  refundedAt: timestamp("refunded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const refundsTable = pgTable("refunds", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  orderId: text("order_id").notNull(),
+  refundId: text("refund_id").notNull(),
+  lineItemId: text("line_item_id"),
+  productId: text("product_id"),
+  variantId: text("variant_id"),
+  productTitle: text("product_title"),
+  quantity: integer("quantity").default(0),
+  amount: real("amount").default(0),
+  reason: text("reason"),
+  note: text("note"),
+  currency: text("currency").default("EUR"),
+  refundedAt: timestamp("refunded_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

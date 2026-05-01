@@ -257,6 +257,74 @@ async function ensureDomains() {
   return ensureAllKnowledgeDomains();
 }
 
+// GET /shopybrain/quick-actions?route=/admin/inventory&projectId=2
+// Devuelve acciones rápidas contextuales según la ruta actual del usuario.
+// Reemplaza los QUICK_ACTIONS hardcodeados del frontend.
+router.get("/shopybrain/quick-actions", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { route = "/", projectId } = req.query as Record<string, string>;
+    const r = String(route);
+
+    // Acciones SIEMPRE presentes (globales)
+    const globalActions = [
+      { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: `¿Qué puedo hacer en la página ${r}? Guíame paso a paso con los botones y opciones disponibles.` },
+      { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
+    ];
+
+    // Acciones contextuales según ruta
+    let contextActions: Array<{ icon: string; label: string; prompt: string; isResearch?: boolean }> = [];
+
+    if (r.startsWith("/admin/inventory")) {
+      contextActions = [
+        { icon: "🔄", label: "Sincronizar pedidos", prompt: `Sincroniza todos los pedidos de la tienda${projectId ? ` (proyecto ${projectId})` : ""} con paginación completa, incluyendo refunds.` },
+        { icon: "💸", label: "Sincronizar devoluciones", prompt: `Sincroniza solo las devoluciones de la tienda${projectId ? ` (proyecto ${projectId})` : ""}.` },
+        { icon: "📊", label: "Top productos vendidos", prompt: "Muéstrame los 10 productos más vendidos con cantidades y revenue real." },
+        { icon: "⚠️", label: "Stock crítico", prompt: "¿Qué productos están en stock crítico (≤7 días)? Sugiere pedidos de reabastecimiento." },
+      ];
+    } else if (r.match(/\/projects\/\d+\/(audit|seo|redesign)/)) {
+      contextActions = [
+        { icon: "🔬", label: "Auditoría completa", prompt: "Realiza una auditoría completa de la tienda con análisis SEO, marca, copyright y oportunidades." },
+        { icon: "✏️", label: "Rediseño masivo", prompt: "Rediseña todos los productos con la marca activa." },
+        { icon: "📈", label: "Optimizar SEO", prompt: "Optimiza el SEO de todos los productos con keywords competitivas." },
+      ];
+    } else if (r.match(/\/projects\/\d+\/(images|fusion-studio|generator)/)) {
+      contextActions = [
+        { icon: "🖼", label: "Generar imágenes IA", prompt: "Genera imágenes profesionales de todos los productos con estilo lookbook." },
+        { icon: "🧬", label: "Fusion: producto + escena", prompt: "Quiero fusionar un producto con una escena. Ayúdame paso a paso." },
+        { icon: "🎬", label: "Video persona+producto", prompt: "Genera un video de un avatar mostrando uno de mis productos. Ayúdame a configurarlo (voy a /admin/avatar-studio)." },
+      ];
+    } else if (r.startsWith("/admin/clients") || r === "/" || r === "/home") {
+      contextActions = [
+        { icon: "🏪", label: "Estado de la tienda", prompt: "Muéstrame el estado general de las tiendas conectadas: productos, pedidos, tokens." },
+        { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda principal." },
+        { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
+      ];
+    } else if (r.startsWith("/admin/email")) {
+      contextActions = [
+        { icon: "📧", label: "Crear flujo Klaviyo", prompt: "Genera un workflow completo de Klaviyo con los 6 flujos esenciales." },
+        { icon: "✉️", label: "Plantilla bienvenida", prompt: "Crea una plantilla de email de bienvenida en HTML profesional." },
+      ];
+    } else if (r.startsWith("/admin/avatar-studio")) {
+      contextActions = [
+        { icon: "🗣", label: "Cómo grabar talking avatar", prompt: "Explícame paso a paso cómo grabar un talking avatar profesional." },
+        { icon: "🛍", label: "Cómo grabar product avatar", prompt: "Explícame paso a paso cómo crear un video de avatar mostrando un producto." },
+        { icon: "🎙", label: "Recomendar voz", prompt: "Recomiéndame la mejor voz de ElevenLabs para mi nicho. Pregúntame el nicho si no lo sabes." },
+      ];
+    } else {
+      // Fallback genérico
+      contextActions = [
+        { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda principal." },
+        { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
+        { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
+      ];
+    }
+
+    res.json({ actions: [...globalActions, ...contextActions] });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "quick-actions failed" });
+  }
+});
+
 router.get("/shopybrain/status", requireAdmin, async (_req, res): Promise<void> => {
   try {
     await ensureDomains();

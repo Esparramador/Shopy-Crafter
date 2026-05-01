@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { inventoryTrackingTable, restockOrdersTable, projectsTable, salesAnalyticsTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { inventoryTrackingTable, restockOrdersTable, projectsTable, salesAnalyticsTable, refundsTable } from "@workspace/db";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
-import { shopifyRequest } from "../lib/shopify.js";
+import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { enableLongRunning } from "../lib/long-running.js";
@@ -299,10 +299,25 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
         .where(eq(salesAnalyticsTable.projectId, projectId));
       const existingOrderIds = new Set(existingOrders.map(o => o.orderId));
   
+      type RefundLineItem = {
+        id: number;
+        line_item_id: number;
+        quantity: number;
+        subtotal?: string | number;
+        total_tax?: string | number;
+        line_item?: { product_id?: number; variant_id?: number; title?: string };
+      };
+      type OrderRefund = {
+        id: number;
+        created_at: string;
+        note?: string | null;
+        refund_line_items?: RefundLineItem[];
+      };
       type OrderShape = {
         id: number; name: string; created_at: string;
         customer?: { id: number; email: string; first_name: string; last_name: string };
         line_items: Array<{
+          id?: number;
           product_id: number; variant_id: number; title: string; variant_title: string;
           sku: string; quantity: number; price: string; total_discount: string;
           fulfillment_status: string | null;
@@ -310,9 +325,11 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
         financial_status: string; fulfillment_status: string | null;
         shipping_address?: { country: string; city: string };
         currency: string;
+        refunds?: OrderRefund[];
       };
   
-      let orders: OrderShape[];
+      let orders: OrderShape[] = [];
+      let pagesFetched = 0;
       if (isWoo) {
         const connector = getConnector(project);
         const wcOrders = await connector.getOrders();
@@ -343,22 +360,117 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
           currency: o.currency,
         }));
       } else {
-        const ordersData = await shopifyRequest<{ orders: OrderShape[] }>(
-          parseInt(projectId), project.shopDomain,
-          "/orders.json?status=any&limit=250&fields=id,name,created_at,customer,line_items,financial_status,fulfillment_status,shipping_address,currency"
-        );
-        orders = ordersData.orders;
+        // Shopify: cursor-based pagination over ALL orders (status=any) with refunds embedded
+        const FIELDS = "id,name,created_at,customer,line_items,financial_status,fulfillment_status,shipping_address,currency,refunds";
+        const MAX_PAGES = 200; // 200 * 250 = 50.000 orders cap (safety)
+        let nextPage: string | null = null;
+        do {
+          const path = nextPage
+            ? `/orders.json?limit=250&page_info=${encodeURIComponent(nextPage)}`
+            : `/orders.json?status=any&limit=250&fields=${FIELDS}`;
+          const { data, nextPageInfo } = await shopifyRequestPaged<{ orders: OrderShape[] }>(
+            parseInt(projectId), project.shopDomain, path
+          );
+          orders.push(...(data.orders || []));
+          nextPage = nextPageInfo;
+          pagesFetched++;
+          if (pagesFetched >= MAX_PAGES) break;
+        } while (nextPage);
       }
   
       let inserted = 0;
       let failed = 0;
+      let refundsInserted = 0;
       for (const order of orders) {
-        if (existingOrderIds.has(String(order.id))) continue;
+        // Build per-line-item refund index from order.refunds[]
+        const refundsByLineItem = new Map<string, { qty: number; amount: number; reason: string | null; at: Date | null }>();
+        const flatRefundRows: Array<{
+          refundId: string; lineItemId: string | null; productId: string | null; variantId: string | null;
+          productTitle: string | null; quantity: number; amount: number; reason: string | null;
+          note: string | null; refundedAt: Date | null;
+        }> = [];
+        for (const r of (order.refunds || [])) {
+          const refundedAt = r.created_at ? new Date(r.created_at) : null;
+          for (const rli of (r.refund_line_items || [])) {
+            const lineKey = String(rli.line_item_id);
+            const sub = parseFloat(String(rli.subtotal ?? 0)) || 0;
+            const tax = parseFloat(String(rli.total_tax ?? 0)) || 0;
+            const amount = sub + tax;
+            const cur = refundsByLineItem.get(lineKey) || { qty: 0, amount: 0, reason: null as string | null, at: null as Date | null };
+            cur.qty += rli.quantity || 0;
+            cur.amount += amount;
+            cur.reason = cur.reason || (r.note || null);
+            cur.at = cur.at || refundedAt;
+            refundsByLineItem.set(lineKey, cur);
+            flatRefundRows.push({
+              refundId: String(r.id),
+              lineItemId: lineKey,
+              productId: rli.line_item?.product_id ? String(rli.line_item.product_id) : null,
+              variantId: rli.line_item?.variant_id ? String(rli.line_item.variant_id) : null,
+              productTitle: rli.line_item?.title || null,
+              quantity: rli.quantity || 0,
+              amount,
+              reason: r.note || null,
+              note: r.note || null,
+              refundedAt,
+            });
+          }
+        }
+
+        // Persist individual refund rows (idempotent: skip duplicates per (orderId,refundId,lineItemId))
+        for (const rr of flatRefundRows) {
+          try {
+            await db.insert(refundsTable).values({
+              id: randomUUID(),
+              projectId,
+              orderId: String(order.id),
+              refundId: rr.refundId,
+              lineItemId: rr.lineItemId,
+              productId: rr.productId,
+              variantId: rr.variantId,
+              productTitle: rr.productTitle,
+              quantity: rr.quantity,
+              amount: rr.amount,
+              reason: rr.reason,
+              note: rr.note,
+              currency: order.currency || "EUR",
+              refundedAt: rr.refundedAt,
+            }).onConflictDoNothing();
+            refundsInserted++;
+          } catch { /* swallow */ }
+        }
+
+        if (existingOrderIds.has(String(order.id))) {
+          // Order already imported — only update refund fields on existing line items
+          if (refundsByLineItem.size > 0) {
+            for (const [lineKey, agg] of refundsByLineItem) {
+              const productIdMatch = (() => {
+                const li = order.line_items.find(x => String(x.id) === lineKey);
+                return li ? String(li.product_id) : null;
+              })();
+              if (!productIdMatch) continue;
+              await db.update(salesAnalyticsTable)
+                .set({
+                  refundedQuantity: agg.qty,
+                  refundedAmount: agg.amount,
+                  refundReason: agg.reason,
+                  refundedAt: agg.at,
+                })
+                .where(and(
+                  eq(salesAnalyticsTable.projectId, projectId),
+                  eq(salesAnalyticsTable.orderId, String(order.id)),
+                  eq(salesAnalyticsTable.productId, productIdMatch),
+                ));
+            }
+          }
+          continue;
+        }
   
         for (const item of order.line_items) {
           const variantTracking = await db.select().from(inventoryTrackingTable)
             .where(eq(inventoryTrackingTable.variantId, String(item.variant_id))).limit(1);
           const vt = variantTracking[0];
+          const refAgg = item.id ? refundsByLineItem.get(String(item.id)) : undefined;
   
           try {
             await db.insert(salesAnalyticsTable).values({
@@ -390,6 +502,10 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
               financialStatus: order.financial_status || null,
               country: order.shipping_address?.country || null,
               city: order.shipping_address?.city || null,
+              refundedQuantity: refAgg?.qty || 0,
+              refundedAmount: refAgg?.amount || 0,
+              refundReason: refAgg?.reason || null,
+              refundedAt: refAgg?.at || null,
             });
             inserted++;
           } catch {
@@ -400,15 +516,158 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
   
       learnFromOperation({
         operationType: "inventory_sync",
-        title: `Sync de pedidos: ${inserted} lineas de ${orders.length} pedidos importados`,
-        content: `Synced ${orders.length} orders with ${inserted} line items for project ${projectId}. Platform: ${isWoo ? "WooCommerce" : "Shopify"}.`,
+        title: `Sync de pedidos: ${inserted} lineas de ${orders.length} pedidos (${pagesFetched} páginas) + ${refundsInserted} refunds`,
+        content: `Synced ${orders.length} orders with ${inserted} line items and ${refundsInserted} refunds across ${pagesFetched} pages for project ${projectId}. Platform: ${isWoo ? "WooCommerce" : "Shopify"}.`,
         confidence: 0.8,
       });
   
-      res.json({ synced: true, ordersProcessed: orders.length, lineItemsInserted: inserted, lineItemsFailed: failed });
+      res.json({
+        synced: true,
+        ordersProcessed: orders.length,
+        pagesFetched,
+        lineItemsInserted: inserted,
+        lineItemsFailed: failed,
+        refundsInserted,
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// POST /inventory/sync-refunds — re-sincroniza refunds para órdenes ya importadas
+// Útil cuando se quieren actualizar refunds sin re-importar todas las órdenes (rápido)
+router.post("/inventory/sync-refunds", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const { projectId } = req.body;
+    if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+    if (project.platformType === "woocommerce") {
+      res.status(400).json({ error: "WooCommerce no soportado todavía para sync-refunds" }); return;
+    }
+    if (!project.accessToken) { res.status(400).json({ error: "No access token" }); return; }
+
+    type RefundLineItem = { id: number; line_item_id: number; quantity: number; subtotal?: string|number; total_tax?: string|number; line_item?: { product_id?: number; variant_id?: number; title?: string } };
+    type ShopRefund = { id: number; order_id: number; created_at: string; note?: string|null; refund_line_items?: RefundLineItem[] };
+
+    // Tráenos solo orders + sus refunds embebidos (campos mínimos)
+    const FIELDS = "id,refunds,currency";
+    const MAX_PAGES = 200;
+    let nextPage: string | null = null;
+    let pagesFetched = 0;
+    let ordersScanned = 0;
+    let refundsInserted = 0;
+    let linesUpdated = 0;
+
+    do {
+      const path = nextPage
+        ? `/orders.json?limit=250&page_info=${encodeURIComponent(nextPage)}`
+        : `/orders.json?status=any&limit=250&fields=${FIELDS}`;
+      const { data, nextPageInfo } = await shopifyRequestPaged<{ orders: Array<{ id: number; refunds?: ShopRefund[]; currency?: string }> }>(
+        parseInt(projectId), project.shopDomain, path
+      );
+      for (const order of (data.orders || [])) {
+        ordersScanned++;
+        if (!order.refunds?.length) continue;
+
+        const byLine = new Map<string, { qty: number; amount: number; reason: string|null; at: Date|null; productId: string|null }>();
+        for (const r of order.refunds) {
+          const refundedAt = r.created_at ? new Date(r.created_at) : null;
+          for (const rli of (r.refund_line_items || [])) {
+            const lineKey = String(rli.line_item_id);
+            const sub = parseFloat(String(rli.subtotal ?? 0)) || 0;
+            const tax = parseFloat(String(rli.total_tax ?? 0)) || 0;
+            const amount = sub + tax;
+            const cur = byLine.get(lineKey) || { qty: 0, amount: 0, reason: null as string|null, at: null as Date|null, productId: null as string|null };
+            cur.qty += rli.quantity || 0;
+            cur.amount += amount;
+            cur.reason = cur.reason || (r.note || null);
+            cur.at = cur.at || refundedAt;
+            cur.productId = cur.productId || (rli.line_item?.product_id ? String(rli.line_item.product_id) : null);
+            byLine.set(lineKey, cur);
+
+            try {
+              await db.insert(refundsTable).values({
+                id: randomUUID(),
+                projectId,
+                orderId: String(order.id),
+                refundId: String(r.id),
+                lineItemId: lineKey,
+                productId: rli.line_item?.product_id ? String(rli.line_item.product_id) : null,
+                variantId: rli.line_item?.variant_id ? String(rli.line_item.variant_id) : null,
+                productTitle: rli.line_item?.title || null,
+                quantity: rli.quantity || 0,
+                amount,
+                reason: r.note || null,
+                note: r.note || null,
+                currency: order.currency || "EUR",
+                refundedAt,
+              }).onConflictDoNothing();
+              refundsInserted++;
+            } catch { /* swallow */ }
+          }
+        }
+
+        // Actualizar las líneas de salesAnalytics matching por (orderId, productId)
+        for (const [, agg] of byLine) {
+          if (!agg.productId) continue;
+          const result = await db.update(salesAnalyticsTable)
+            .set({ refundedQuantity: agg.qty, refundedAmount: agg.amount, refundReason: agg.reason, refundedAt: agg.at })
+            .where(and(
+              eq(salesAnalyticsTable.projectId, projectId),
+              eq(salesAnalyticsTable.orderId, String(order.id)),
+              eq(salesAnalyticsTable.productId, agg.productId),
+            ));
+          linesUpdated += (result?.rowCount ?? 0);
+        }
+      }
+      nextPage = nextPageInfo;
+      pagesFetched++;
+      if (pagesFetched >= MAX_PAGES) break;
+    } while (nextPage);
+
+    res.json({ synced: true, ordersScanned, pagesFetched, refundsInserted, linesUpdated });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// GET /inventory/refunds — lista refunds del proyecto + summary
+router.get("/inventory/refunds", async (req, res): Promise<void> => {
+  try {
+    const { projectId } = req.query as Record<string, string>;
+    if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+
+    const items = await db.select().from(refundsTable)
+      .where(eq(refundsTable.projectId, projectId))
+      .orderBy(desc(refundsTable.refundedAt));
+
+    const summary = items.reduce((acc, r) => {
+      acc.totalRefunds++;
+      acc.totalQuantity += r.quantity || 0;
+      acc.totalAmount += r.amount || 0;
+      const key = r.productTitle || r.productId || "unknown";
+      acc.byProduct[key] = (acc.byProduct[key] || { quantity: 0, amount: 0, count: 0, title: key });
+      acc.byProduct[key].quantity += r.quantity || 0;
+      acc.byProduct[key].amount += r.amount || 0;
+      acc.byProduct[key].count++;
+      return acc;
+    }, { totalRefunds: 0, totalQuantity: 0, totalAmount: 0, byProduct: {} as Record<string, { title: string; quantity: number; amount: number; count: number }> });
+
+    res.json({
+      items,
+      summary: {
+        ...summary,
+        topRefundedProducts: Object.values(summary.byProduct).sort((a, b) => b.amount - a.amount).slice(0, 10),
+      },
+    });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
