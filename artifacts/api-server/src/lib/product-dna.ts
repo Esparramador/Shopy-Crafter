@@ -20,6 +20,7 @@
  */
 
 import { askClaudeWithVision, safeJsonParse } from "./claude.js";
+import { askGeminiVisionJson, isGeminiAvailable } from "./gemini.js";
 import { logger } from "./logger.js";
 
 export interface ProductDNA {
@@ -82,6 +83,14 @@ export async function buildProductDNA(args: {
   brandHints?: string;
   /** Language for visualClaims/visualSummary. Other fields stay in English-friendly tokens. */
   language?: string;
+  /**
+   * Vision provider:
+   *  - "auto" (default): Gemini 2.5 Pro if available (handles ALL images at
+   *    once and is cheaper), else Claude Sonnet vision (capped at 5 images).
+   *  - "gemini": force Gemini multi-image exhaustive analysis.
+   *  - "claude": force Claude vision (limited to 5 images by SDK).
+   */
+  provider?: "auto" | "gemini" | "claude";
 }): Promise<ProductDNA> {
   if (!args.images?.length) {
     // Fallback: synthesize a minimal DNA from text alone (best effort).
@@ -89,7 +98,11 @@ export async function buildProductDNA(args: {
   }
 
   const lang = args.language || "es";
-  const imageBlocks = args.images.slice(0, 4).map((img) => ({
+  const provider = args.provider ?? "auto";
+  // Gemini path → analyze ALL images. Claude path → cap at 5 (SDK limit).
+  const useGemini = (provider === "gemini") || (provider === "auto" && isGeminiAvailable());
+  const imagesToSend = useGemini ? args.images : args.images.slice(0, 5);
+  const imageBlocks = imagesToSend.map((img) => ({
     base64: img.buffer.toString("base64"),
     mediaType: img.mime,
   }));
@@ -137,30 +150,48 @@ REGLAS DURAS (NO violar):
 - visibleClaims puede mezclar lo de la imagen + lo de la descripción REAL si la pasaron.
 - Salida 100% JSON válido, sin Markdown ni comentarios.`;
 
-  let raw = "";
-  try {
-    raw = await askClaudeWithVision(
-      args.projectId,
-      userPrompt,
-      imageBlocks,
-      PRODUCT_DNA_SYSTEM,
-      4096,
-      120_000,
-    );
-  } catch (err: any) {
-    logger.warn({ err: err?.message, projectId: args.projectId }, "buildProductDNA: vision call failed, falling back to text-only DNA");
-    return synthDNAFromText(args);
+  let parsed: ProductDNA | null = null;
+
+  if (useGemini) {
+    // ── Path A: Gemini 2.5 Pro multi-image (analyzes ALL images at once) ──
+    try {
+      logger.info({ projectId: args.projectId, images: imagesToSend.length }, "[ProductDNA] using Gemini 2.5 Pro vision (exhaustive multi-image)");
+      parsed = await askGeminiVisionJson<ProductDNA>(
+        userPrompt,
+        imagesToSend,
+        PRODUCT_DNA_SYSTEM,
+        { tier: "vision", thinkingBudget: 8_000 },
+      );
+    } catch (err: any) {
+      logger.warn({ err: err?.message, projectId: args.projectId }, "[ProductDNA] Gemini vision failed, falling back to Claude");
+    }
   }
 
-  let parsed: ProductDNA;
-  try {
-    // Strip code-fence if present
-    const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-    const obj = cleaned.match(/\{[\s\S]*\}/);
-    parsed = safeJsonParse<ProductDNA>(obj ? obj[0] : cleaned, "buildProductDNA");
-  } catch (err: any) {
-    logger.warn({ err: err?.message, raw: raw.slice(0, 200) }, "buildProductDNA: parse failed, using text fallback");
-    return synthDNAFromText(args);
+  if (!parsed) {
+    // ── Path B: Claude Sonnet vision (legacy / fallback) ──
+    let raw = "";
+    try {
+      raw = await askClaudeWithVision(
+        args.projectId,
+        userPrompt,
+        imageBlocks.slice(0, 5), // Claude SDK practical cap
+        PRODUCT_DNA_SYSTEM,
+        8192,
+        180_000,
+        { tier: "vision" },
+      );
+    } catch (err: any) {
+      logger.warn({ err: err?.message, projectId: args.projectId }, "buildProductDNA: vision call failed, falling back to text-only DNA");
+      return synthDNAFromText(args);
+    }
+    try {
+      const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
+      const obj = cleaned.match(/\{[\s\S]*\}/);
+      parsed = safeJsonParse<ProductDNA>(obj ? obj[0] : cleaned, "buildProductDNA");
+    } catch (err: any) {
+      logger.warn({ err: err?.message, raw: raw.slice(0, 200) }, "buildProductDNA: parse failed, using text fallback");
+      return synthDNAFromText(args);
+    }
   }
 
   // Defensive: ensure required fields exist

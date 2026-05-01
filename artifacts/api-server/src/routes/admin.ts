@@ -679,4 +679,48 @@ router.get("/system-capabilities", async (_req, res): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/admin/ai-models
+ * Returns the active model per provider+tier, source (db/env/default),
+ * and the catalog of known models for the dropdowns. Admin only.
+ */
+router.get("/ai-models", async (_req, res) => {
+  try {
+    const { getAIModelMatrix, KNOWN_MODELS } = await import("../lib/ai-models.js");
+    const matrix = await getAIModelMatrix();
+    res.json({ matrix, catalog: KNOWN_MODELS });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "ai-models read failed" });
+  }
+});
+
+/**
+ * POST /api/admin/ai-models
+ * Body: { provider: "claude"|"gemini", tier: "fast"|"smart"|"genius"|"vision", model: string|null }
+ * Sets a per-tier override in platform_settings (null clears it). Admin only.
+ */
+router.post("/ai-models", async (req, res) => {
+  try {
+    const { provider, tier, model } = (req.body ?? {}) as { provider?: string; tier?: string; model?: string | null };
+    if (provider !== "claude" && provider !== "gemini") {
+      res.status(400).json({ error: "provider must be 'claude' or 'gemini'" });
+      return;
+    }
+    if (tier !== "fast" && tier !== "smart" && tier !== "genius" && tier !== "vision") {
+      res.status(400).json({ error: "tier must be one of fast|smart|genius|vision" });
+      return;
+    }
+    if (model !== null && (typeof model !== "string" || model.trim().length === 0 || model.length > 200)) {
+      res.status(400).json({ error: "model must be a non-empty string (≤200 chars) or null to clear" });
+      return;
+    }
+    const { setAIModelOverride, getAIModelMatrix } = await import("../lib/ai-models.js");
+    await setAIModelOverride(provider, tier, model);
+    const matrix = await getAIModelMatrix();
+    res.json({ ok: true, matrix });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "ai-models write failed" });
+  }
+});
+
 export default router;

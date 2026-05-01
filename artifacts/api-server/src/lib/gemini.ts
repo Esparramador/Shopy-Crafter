@@ -38,9 +38,21 @@ export function isGeminiAvailable(): boolean {
   return !!(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY));
 }
 
-// ─── Model selection ──────────────────────────────────────────────────────────
-const GEMINI_MODEL     = "gemini-2.5-flash";
-const GEMINI_PRO_MODEL = "gemini-2.5-pro";
+// ─── Model selection (resolved through the AI registry) ──────────────────────
+// IMPORTANT: do NOT hardcode model names here. The registry (`lib/ai-models.ts`)
+// resolves the active model via override → DB (`platform_settings`) → ENV →
+// hard default, so admins can swap models live from the admin UI / chatbot
+// (`set_ai_model`) without redeploys.
+import { pickModelSync, pickModel } from "./ai-models.js";
+
+/** Fast tier (default Gemini 2.5 Flash). Sync — uses ENV/defaults only. */
+function geminiFast(): string { return pickModelSync("gemini", "fast"); }
+/** Smart/Pro tier (default Gemini 2.5 Pro). Sync — uses ENV/defaults only. */
+function geminiPro(): string { return pickModelSync("gemini", "smart"); }
+/** Async resolver — also reads DB overrides (60s cached). Use in non-hot paths. */
+export async function resolveGeminiModel(tier: "fast" | "smart" | "genius" | "vision" = "fast"): Promise<string> {
+  return pickModel("gemini", tier);
+}
 
 // ─── Timeout & retry config ───────────────────────────────────────────────────
 // Replit proxy cuts at 300s. Server socket at 600s. We use 270s for user-facing
@@ -91,7 +103,7 @@ async function withRetry<T>(
 // ─── Base generation (no search) ─────────────────────────────────────────────
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
   const ai    = getGeminiClient();
-  const model = useProModel ? GEMINI_PRO_MODEL : GEMINI_MODEL;
+  const model = useProModel ? geminiPro() : geminiFast();
 
   const response = await withTimeout(
     ai.models.generateContent({
@@ -134,7 +146,7 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
   const ai    = getGeminiClient();
-  const model = useProModel ? GEMINI_PRO_MODEL : GEMINI_MODEL;
+  const model = useProModel ? geminiPro() : geminiFast();
 
   const response = await withTimeout(
     ai.models.generateContent({
@@ -361,7 +373,7 @@ export async function askGeminiWithSearch(
 
   const response = await withTimeout(
     ai.models.generateContent({
-      model: GEMINI_MODEL,
+      model: geminiFast(),
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
       config: {
         systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
@@ -393,11 +405,11 @@ export async function askGeminiWithSearch(
     void recordApiUsage({
       provider: "gemini",
       operation: "askGeminiWithSearch",
-      model: GEMINI_MODEL,
+      model: geminiFast(),
       inputUnits: inTok,
       outputUnits: outTok,
       unitsLabel: "tokens",
-      costUsd: calcGeminiCost(GEMINI_MODEL, inTok, outTok),
+      costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
       metadata: { sources: sources.length, queries: (searchQueries ?? []).length },
     });
   } catch { /* nunca bloquea */ }
@@ -418,7 +430,7 @@ export async function askGeminiWithUrls(
 
   const response = await withTimeout(
     ai.models.generateContent({
-      model: GEMINI_MODEL,
+      model: geminiFast(),
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
       config: {
         systemInstruction: systemInstruction ?? "You are a deep web intelligence analyst. Read each URL thoroughly and extract all relevant business intelligence, product info, pricing, contact details, social links, and marketing strategies.",
@@ -451,11 +463,11 @@ export async function askGeminiWithUrls(
     void recordApiUsage({
       provider: "gemini",
       operation: "askGeminiWithUrls",
-      model: GEMINI_MODEL,
+      model: geminiFast(),
       inputUnits: inTok,
       outputUnits: outTok,
       unitsLabel: "tokens",
-      costUsd: calcGeminiCost(GEMINI_MODEL, inTok, outTok),
+      costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
       metadata: { urls: urls.length, sources: sources.length },
     });
   } catch { /* nunca bloquea */ }
@@ -706,6 +718,86 @@ export async function deepEntityResearch(
     allSources: [...new Set(allSources)],
     allQueries:  [...new Set(allQueries)],
   };
+}
+
+/**
+ * Multimodal JSON — analyzes N images together with a prompt and forces JSON.
+ * Uses the "vision" tier (Gemini 2.5 Pro by default; fully configurable from
+ * the admin UI). No artificial cap on number of images: we let Gemini handle
+ * up to its context limit (~3000 images on 2.5 Pro), which is exactly what the
+ * "Product DNA exhaustive" use case needs.
+ */
+export async function askGeminiVisionJson<T = unknown>(
+  prompt: string,
+  images: Array<{ buffer: Buffer; mime: "image/jpeg" | "image/png" | "image/webp" }>,
+  systemInstruction?: string,
+  opts?: { tier?: "smart" | "genius" | "vision"; thinkingBudget?: number },
+): Promise<T> {
+  const ai = getGeminiClient();
+  const model = pickModelSync("gemini", opts?.tier ?? "vision");
+
+  const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [];
+  for (const img of images) {
+    parts.push({ inlineData: { data: img.buffer.toString("base64"), mimeType: img.mime } });
+  }
+  parts.push({ text: prompt });
+
+  // Adaptive timeout: 90s base + 8s per image, capped at 8 min.
+  // 4 images → 122s, 30 images → 330s, 100 images → 480s (cap).
+  const adaptiveTimeoutMs = Math.min(
+    480_000,
+    90_000 + images.length * 8_000,
+  );
+
+  // 1 retry for transient 429/5xx — vision is expensive, don't spam.
+  const response = await withRetry(
+    () => withTimeout(
+      ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: parts as any }],
+        config: {
+          systemInstruction: systemInstruction ?? "You are a forensic product analyst. Always respond with valid JSON only, no markdown, no commentary.",
+          responseMimeType: "application/json",
+          maxOutputTokens: 65_536,
+          ...(opts?.thinkingBudget ? { thinkingConfig: { thinkingBudget: opts.thinkingBudget } } : {}),
+        },
+      }),
+      adaptiveTimeoutMs,
+      `askGeminiVisionJson(${model}, ${images.length} imgs)`,
+    ),
+    1,
+    4_000,
+    `askGeminiVisionJson(${model})`,
+  );
+
+  const cand = response.candidates?.[0];
+  if ((cand as any)?.finishReason === "MAX_TOKENS") {
+    logger.warn({ model, images: images.length }, "[Gemini Vision JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens");
+  }
+
+  try {
+    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+    const usage = (response as any).usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = Number(usage.candidatesTokenCount) || 0;
+    void recordApiUsage({
+      provider: "gemini",
+      operation: "askGeminiVisionJson",
+      model,
+      inputUnits: inTok,
+      outputUnits: outTok,
+      unitsLabel: "tokens",
+      costUsd: calcGeminiCost(model, inTok, outTok),
+    });
+  } catch { /* never blocks */ }
+
+  const text = response.text ?? "{}";
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const match = text.match(/```json\s*([\s\S]*?)```/);
+    return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+  }
 }
 
 export { askGemini, askGeminiJson };

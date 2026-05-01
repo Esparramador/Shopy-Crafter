@@ -664,6 +664,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - delete_character: Eliminar personaje guardado. Params: {projectId, characterId} (DESTRUCTIVO — pide confirmación)
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
   - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
+  - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
+  - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
     • compositionMode "narrative" = cámara y escenas libres (default).
     • compositionMode "explainer-locked" = host fijo en primer plano, solo cambia el fondo (ideal para discursos, deconstrucción de producto estilo Apple).
     • compositionMode "composite-pro" = dos capas (host + fondo) para composición chroma key en post.
@@ -9748,6 +9750,44 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           break;
         }
   
+        // ── AI MODEL MATRIX (admin only) ─────────────────────────────────────
+        case "get_ai_models": {
+          const { getAIModelMatrix, KNOWN_MODELS } = await import("../lib/ai-models.js");
+          const matrix = await getAIModelMatrix();
+          result = {
+            success: true,
+            matrix,
+            catalog: KNOWN_MODELS,
+            message: "🧠 Matriz de modelos AI activa (claude/gemini × fast/smart/genius/vision).",
+          };
+          break;
+        }
+        case "set_ai_model": {
+          const provider = String(params?.provider || "");
+          const tier = String(params?.tier || "");
+          const model = params?.model === null || params?.model === undefined ? null : String(params?.model);
+          if (provider !== "claude" && provider !== "gemini") {
+            res.status(400).json({ error: "provider debe ser 'claude' o 'gemini'" });
+            return;
+          }
+          if (!["fast", "smart", "genius", "vision"].includes(tier)) {
+            res.status(400).json({ error: "tier debe ser uno de fast|smart|genius|vision" });
+            return;
+          }
+          const { setAIModelOverride, getAIModelMatrix } = await import("../lib/ai-models.js");
+          await setAIModelOverride(provider as any, tier as any, model);
+          const matrix = await getAIModelMatrix();
+          result = {
+            success: true,
+            provider, tier, model,
+            matrix,
+            message: model
+              ? `✅ ${provider}.${tier} → ${model}`
+              : `🧹 Override eliminado para ${provider}.${tier} (vuelve a env/default).`,
+          };
+          break;
+        }
+
         // ── PERSONAJES (Character Lock para anuncios cinematográficos) ───────
         case "list_characters": {
           const projectId = parseInt(String(params?.projectId || ""), 10);

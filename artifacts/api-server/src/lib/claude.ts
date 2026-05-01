@@ -152,20 +152,44 @@ function enforcePromptBudget(systemPrompt: string, userContent: string, reserveF
   return { system: trimmedSystem, user: trimmedUser };
 }
 
+export interface ClaudeCallOpts {
+  /** Override the model entirely (e.g. "claude-opus-4-1"). */
+  model?: string;
+  /** Pick by tier — "fast"|"smart"|"genius"|"vision". DB/env can remap. */
+  tier?: import("./ai-models.js").AITier;
+}
+
+async function resolveClaudeModel(opts?: ClaudeCallOpts): Promise<string> {
+  if (opts?.model && opts.model.trim().length > 0) return opts.model.trim();
+  if (opts?.tier) {
+    const { pickModel } = await import("./ai-models.js");
+    return pickModel("claude", opts.tier);
+  }
+  // Fall back to legacy global env (smart tier from new registry).
+  try {
+    const { pickModel } = await import("./ai-models.js");
+    return await pickModel("claude", "smart");
+  } catch {
+    return CLAUDE_MODEL;
+  }
+}
+
 export async function askClaude(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
   maxTokens = 8192,
-  timeoutMs = 180_000
+  timeoutMs = 180_000,
+  opts?: ClaudeCallOpts,
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = await getClaudeClient(projectId);
+    const model = await resolveClaudeModel(opts);
 
     const stream = client.messages.stream(
       {
-        model: CLAUDE_MODEL,
+        model,
         max_tokens: maxTokens,
         system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
         messages,
@@ -175,7 +199,7 @@ export async function askClaude(
     const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model: CLAUDE_MODEL, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+      logger.warn({ maxTokens, model, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
     }
 
     // Track real cost (fire-and-forget, never blocks response)
@@ -183,11 +207,11 @@ export async function askClaude(
       const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
       const inTok = response.usage?.input_tokens ?? 0;
       const outTok = response.usage?.output_tokens ?? 0;
-      const costUsd = calcClaudeCost(CLAUDE_MODEL, inTok, outTok);
+      const costUsd = calcClaudeCost(model, inTok, outTok);
       void recordApiUsage({
         provider: "claude",
         operation: "askClaude",
-        model: CLAUDE_MODEL,
+        model,
         projectId: projectId || null,
         inputUnits: inTok,
         outputUnits: outTok,
@@ -207,14 +231,16 @@ export async function askClaudeJson<T>(
   prompt: string,
   systemPrompt?: string,
   maxTokens = 8192,
-  timeoutMs = 180_000
+  timeoutMs = 180_000,
+  opts?: ClaudeCallOpts,
 ): Promise<T> {
   const text = await askClaude(
     projectId,
     [{ role: "user", content: prompt }],
     systemPrompt,
     maxTokens,
-    timeoutMs
+    timeoutMs,
+    opts,
   );
 
   const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
@@ -245,11 +271,14 @@ export async function askClaudeWithVision(
   images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" }>,
   systemPrompt?: string,
   maxTokens = 8192,
-  timeoutMs = 300_000
+  timeoutMs = 300_000,
+  opts?: ClaudeCallOpts,
 ): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = await getClaudeClient(projectId);
+    // Vision tier by default (resolves to a vision-capable Claude model — Sonnet 4.5).
+    const model = await resolveClaudeModel({ tier: "vision", ...opts });
 
     const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
       type: "image",
@@ -262,7 +291,7 @@ export async function askClaudeWithVision(
 
     const stream = client.messages.stream(
       {
-        model: CLAUDE_MODEL,
+        model,
         max_tokens: maxTokens,
         system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
         messages: [
@@ -280,8 +309,20 @@ export async function askClaudeWithVision(
     const response = await stream.finalMessage();
 
     if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude Vision] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+      logger.warn({ maxTokens, model }, "[Claude Vision] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
     }
+
+    // Track real cost
+    try {
+      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
+      const inTok = response.usage?.input_tokens ?? 0;
+      const outTok = response.usage?.output_tokens ?? 0;
+      void recordApiUsage({
+        provider: "claude", operation: "askClaudeWithVision", model,
+        projectId: projectId || null, inputUnits: inTok, outputUnits: outTok,
+        unitsLabel: "tokens", costUsd: calcClaudeCost(model, inTok, outTok),
+      });
+    } catch { /* ignore */ }
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");

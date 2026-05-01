@@ -268,12 +268,16 @@ export async function generateDirectedScript(req: DirectorRequest): Promise<Cine
   // Claude Sonnet 4 supports up to 64k output; cap at 32k to keep latency
   // reasonable. Floor at 4096 for tiny scripts.
   const maxTokens = Math.max(4096, Math.min(32_000, 2048 + req.scenesCount * 280));
+  // Director-grade reasoning: pick the "genius" tier (Opus 4.1 by default,
+  // configurable from admin UI). Long-form arcs with 80+ scenes benefit
+  // dramatically from a stronger reasoner.
   const script = await askClaudeJson<CinematicScript & { narrativeArc?: any[] }>(
     req.projectId,
     prompt,
     sysWithN,
     maxTokens,
     240_000,
+    { tier: req.scenesCount >= 30 || req.totalDurationSec >= 180 ? "genius" : "smart" },
   );
 
   if (!Array.isArray(script.scenes) || script.scenes.length === 0) {

@@ -48,6 +48,16 @@ PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` fo
 ### Super Ad Studio
 A feature for generic brand ad creation, porting the `hanakaze-v2-super` script. It includes an async worker pipeline for video clips (image-to-video/text-to-video), ElevenLabs TTS and music integration, and MP4 concatenation. State is persisted in `bulk_jobs`. The UI provides a 5-step wizard for brief, references, editable storyboard generation (Claude), voice/music selection, and final generation with live polling and download.
 
+### AI Model Tier System (configurable, no hardcoding)
+Centralized model registry that lets the admin change which Claude/Gemini model powers each task tier without code changes:
+- **Library** (`lib/ai-models.ts`): exposes `pickModel(provider, tier, override?)` and `pickModelSync(provider, tier)`. Override chain: explicit arg → DB (`platform_settings`) → ENV → hard default.
+- **Tiers**: `fast` (Haiku 4.5 / Gemini 2.5 Flash), `smart` (Sonnet 4.5 / Gemini 2.5 Pro — default), `genius` (Opus 4.1 / Gemini 3.1 Pro Preview), `vision` (Sonnet 4.5 / Gemini 2.5 Pro).
+- **Refactor**: `askClaude`, `askClaudeJson` and `askClaudeWithVision` accept an `opts: { tier?, model? }` last argument. Backward compatible — old callsites keep working and resolve to "smart" via the registry. `askClaudeWithVision` defaults to `vision` tier and now records cost via `recordApiUsage`.
+- **Admin endpoints** (`/api/admin/ai-models`): GET returns the active matrix (`current`, `default`, `envKey`, `settingsKey`, `source: db|env|default`) plus the `KNOWN_MODELS` catalog for dropdowns. POST `{ provider, tier, model | null }` upserts/clears the override in `platform_settings` (cache invalidated immediately, 60s TTL).
+- **Chatbot tools**: `get_ai_models` (read) and `set_ai_model` (write — destructive, requires `confirmed: true`).
+- **Wired by default**: `cinematic-director.ts` uses `tier: "genius"` for arcs ≥30 scenes or ≥180s (Sonnet for shorter), and `product-dna.ts` uses `tier: "vision"` explicitly. New code should call `askClaude*({ tier: ... })` instead of relying on the global `CLAUDE_MODEL`.
+- **Pending audit (~150 callsites)**: existing routes still rely on the legacy `CLAUDE_MODEL` global. They keep working but need a sweep to opt into specific tiers (e.g. SEO copy → smart, classification/extraction → fast, deep market analysis → genius). Same sweep applies to Gemini callsites once a `gemini.ts` refactor mirrors the Claude pattern.
+
 ### Cinematic Long-Form Ads (3–20 min)
 Professional long-form trailer/explainer/discourse ad pipeline:
 - **No hard caps**: up to 240 scenes / 1800s (30 min). API server `timeout=60min`, headersTimeout=61min.
