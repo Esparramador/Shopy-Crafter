@@ -7,7 +7,7 @@ import { requireAuth } from "../lib/auth.js";
 import { canAccessProject } from "../lib/access.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
-import { setupZipStream, isBinaryMime, extForMime } from "../lib/zip-stream.js";
+import { setupZipStream, isBinaryMime, isAlreadyCompressed, extForMime, sniffMimeFromMagic } from "../lib/zip-stream.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import sharp from "sharp";
@@ -461,15 +461,20 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
     .where(eq(projectFilesTable.projectId, projectId))
     .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
 
-  const zipName = `${(project?.name ?? "tienda").replace(/[^a-zA-Z0-9]/g, "_")}_vault.zip`;
+  // RFC 5987: filename* permite tildes/eñes correctamente (Windows + Mac).
+  const baseName = (project?.name ?? "tienda");
+  const asciiName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_") + "_vault.zip";
+  const utf8Name = encodeURIComponent(baseName + "_vault.zip");
   res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
 
-  const archive = archiver("zip", { zlib: { level: 6 } });
-  const { ac, isClientGone } = setupZipStream(req, res, archive);
+  // forceUTF8 garantiza que nombres de entrada con tildes funcionen en Windows.
+  const archive = archiver("zip", { zlib: { level: 6 }, forceUTF8: true } as any);
+  const { ac, isClientGone, markFinalizing } = setupZipStream(req, res, archive);
   archive.pipe(res);
 
   let added = 0;
+  let skipped = 0;
   for (const file of files) {
     if (isClientGone()) { logger.info({ projectId, added }, "ZIP cancelado por cliente, abortando bucle"); break; }
     try {
@@ -482,23 +487,40 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
         const response = await getStorage().downloadObject(gcsFile);
         const buffer = Buffer.from(await response.arrayBuffer());
-        archive.append(buffer, { name: entryName });
+        // STORE para binarios ya comprimidos (jpg/png/mp4/pdf...) → ahorra
+        // CPU y elimina riesgo de fallar DEFLATE sobre buffers de >100MB.
+        archive.append(buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
         added++;
       } else if (file.originalUrl) {
         const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
         if (response.ok && response.body) {
           const buffer = Buffer.from(await response.arrayBuffer());
-          archive.append(buffer, { name: entryName });
+          // Sniff: si recibimos HTML cuando esperábamos binario (URL expirada
+          // que devuelve página de error), guardamos como .html para no
+          // poner bytes basura con extensión .mp4.
+          const sniffed = sniffMimeFromMagic(buffer);
+          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
+          const realExt = sniffed ? extForMime(sniffed) : ext;
+          const finalName = `${folder}/${safeTitle}_${file.id}.${realExt}`;
+          archive.append(buffer, { name: finalName, store: isAlreadyCompressed(realMime) });
           added++;
+        } else {
+          skipped++;
+          logger.warn({ fileId: file.id, status: response.status, url: file.originalUrl }, "ZIP: originalUrl no disponible, archivo omitido");
         }
       } else if (file.content) {
         if (isBinaryMime(file.mimeType)) {
           try {
             const buf = Buffer.from(file.content, "base64");
-            const realExt = extForMime(file.mimeType);
-            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            // Sniff por magic: si la base64 estaba mal y los bytes no son
+            // realmente del tipo declarado, ajustamos extensión.
+            const sniffed = sniffMimeFromMagic(buf);
+            const realMime = sniffed ?? file.mimeType;
+            const realExt = extForMime(realMime);
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}`, store: isAlreadyCompressed(realMime) });
             added++;
           } catch (e: any) {
+            skipped++;
             logger.warn({ fileId: file.id, err: e?.message }, "ZIP: failed to decode base64 binary");
           }
         } else {
@@ -512,7 +534,9 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
               archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
             }
           } else {
-            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            // Mime de texto conocido → respeta su extensión (txt/csv/md/css/js/xml...)
+            const textExt = extForMime(file.mimeType ?? "text/html");
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.${textExt}` });
           }
           added++;
         }
@@ -520,24 +544,33 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
+      } else {
+        skipped++;
       }
     } catch (err: any) {
       if (err?.name === "AbortError") break;
-      logger.warn({ err, fileId: file.id }, "ZIP: skipped failed file");
+      skipped++;
+      logger.warn({ err: err?.message, fileId: file.id }, "ZIP: skipped failed file");
     }
   }
 
-  if (!isClientGone()) {
-    const indexFiles = files.map(({ content, ...rest }) => rest);
-    archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files: indexFiles }, null, 2), {
-      name: "vault_index.json",
-    });
-    try {
-      await archive.finalize();
-      logger.info({ projectId, added, total: files.length }, "ZIP download-all completado");
-    } catch (err) {
-      logger.error({ err, projectId }, "ZIP download-all finalize failed");
-    }
+  // SIEMPRE finalize (incluso si el cliente abortó) para garantizar central
+  // directory bien escrito. markFinalizing() ignora aborts subsiguientes.
+  const indexFiles = files.map(({ content, ...rest }) => rest);
+  try {
+    archive.append(JSON.stringify({
+      project: project?.name, projectId,
+      totalFiles: files.length, exportedFiles: added, skippedFiles: skipped,
+      generatedAt: new Date().toISOString(),
+      files: indexFiles,
+    }, null, 2), { name: "vault_index.json" });
+  } catch {}
+  markFinalizing();
+  try {
+    await archive.finalize();
+    logger.info({ projectId, added, skipped, total: files.length }, "ZIP download-all completado");
+  } catch (err: any) {
+    logger.error({ err: err?.message, projectId }, "ZIP download-all finalize failed");
   }
 });
 
@@ -552,7 +585,18 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
-  const { fileIds, folderTypes } = req.body as { fileIds?: number[]; folderTypes?: string[] };
+  // Acepta dos formatos:
+  //   1) JSON body: { fileIds, folderTypes }
+  //   2) form-urlencoded body: { _payload: '{"fileIds":[...]}' }
+  //      ← usado por el frontend para descarga nativa sin bufferear en RAM.
+  let parsedBody: { fileIds?: number[]; folderTypes?: string[] } = {};
+  if (req.body && typeof req.body._payload === "string") {
+    try { parsedBody = JSON.parse(req.body._payload); }
+    catch { res.status(400).json({ error: "_payload inválido" }); return; }
+  } else if (req.body && typeof req.body === "object") {
+    parsedBody = req.body as any;
+  }
+  const { fileIds, folderTypes } = parsedBody;
 
   if ((!fileIds || fileIds.length === 0) && (!folderTypes || folderTypes.length === 0)) {
     res.status(400).json({ error: "Debe especificar fileIds o folderTypes" }); return;
@@ -583,15 +627,18 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
   if (files.length === 0) { res.status(404).json({ error: "No se encontraron archivos" }); return; }
 
   const label = folderTypes ? folderTypes.join("_") : `seleccion_${files.length}`;
-  const zipName = `${(project?.name ?? "tienda").replace(/[^a-zA-Z0-9]/g, "_")}_${label}.zip`;
+  const baseName = `${project?.name ?? "tienda"}_${label}.zip`;
+  const asciiName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const utf8Name = encodeURIComponent(baseName);
   res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
 
-  const archive = archiver("zip", { zlib: { level: 6 } });
-  const { ac, isClientGone } = setupZipStream(req, res, archive);
+  const archive = archiver("zip", { zlib: { level: 6 }, forceUTF8: true } as any);
+  const { ac, isClientGone, markFinalizing } = setupZipStream(req, res, archive);
   archive.pipe(res);
 
   let added = 0;
+  let skipped = 0;
   for (const file of files) {
     if (isClientGone()) { logger.info({ projectId, added }, "ZIP cancelado por cliente"); break; }
     try {
@@ -604,14 +651,20 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
         const response = await getStorage().downloadObject(gcsFile);
         const buffer = Buffer.from(await response.arrayBuffer());
-        archive.append(buffer, { name: entryName });
+        archive.append(buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
         added++;
       } else if (file.originalUrl) {
         const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
         if (response.ok && response.body) {
           const buffer = Buffer.from(await response.arrayBuffer());
-          archive.append(buffer, { name: entryName });
+          const sniffed = sniffMimeFromMagic(buffer);
+          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
+          const realExt = sniffed ? extForMime(sniffed) : ext;
+          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${realExt}`, store: isAlreadyCompressed(realMime) });
           added++;
+        } else {
+          skipped++;
+          logger.warn({ fileId: file.id, status: response.status }, "ZIP: originalUrl no disponible");
         }
       } else if (file.content) {
         if (isBinaryMime(file.mimeType)) {
@@ -619,10 +672,13 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
           // Decodificamos y guardamos con la extensión real (mp4/jpg/png/...).
           try {
             const buf = Buffer.from(file.content, "base64");
-            const realExt = extForMime(file.mimeType);
-            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            const sniffed = sniffMimeFromMagic(buf);
+            const realMime = sniffed ?? file.mimeType;
+            const realExt = extForMime(realMime);
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}`, store: isAlreadyCompressed(realMime) });
             added++;
           } catch (e: any) {
+            skipped++;
             logger.warn({ fileId: file.id, err: e?.message }, "ZIP: failed to decode base64 binary");
           }
         } else {
@@ -636,7 +692,8 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
               archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
             }
           } else {
-            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            const textExt = extForMime(file.mimeType ?? "text/html");
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.${textExt}` });
           }
           added++;
         }
@@ -644,18 +701,26 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
+      } else {
+        skipped++;
       }
     } catch (e: any) {
+      skipped++;
       logger.warn({ fileId: file.id, err: e?.message }, "ZIP: skipped failed file");
     }
   }
 
-  archive.append(JSON.stringify({
-    project: project?.name, projectId, totalFiles: files.length,
-    exportedFiles: added, exportType: folderTypes ? "folder" : "selection",
-    files: files.map(({ content, ...rest }) => rest),
-  }, null, 2), { name: "vault_index.json" });
+  try {
+    archive.append(JSON.stringify({
+      project: project?.name, projectId, totalFiles: files.length,
+      exportedFiles: added, skippedFiles: skipped,
+      exportType: folderTypes ? "folder" : "selection",
+      generatedAt: new Date().toISOString(),
+      files: files.map(({ content, ...rest }) => rest),
+    }, null, 2), { name: "vault_index.json" });
+  } catch {}
 
+  markFinalizing();
   await archive.finalize();
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -942,23 +1007,28 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
     const targetFmt = format === "jpeg" ? "jpg" : format;
     const zipName = `${safeName}_imagenes_${targetFmt.toUpperCase()}_${new Date().toISOString().split("T")[0]}.zip`;
   
+    const asciiZipName = zipName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const utf8ZipName = encodeURIComponent(zipName);
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
-  
-    const archive = archiver("zip", { zlib: { level: 6 } });
-    const { ac, isClientGone } = setupZipStream(req, res, archive);
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiZipName}"; filename*=UTF-8''${utf8ZipName}`);
+
+    const archive = archiver("zip", { zlib: { level: 6 }, forceUTF8: true } as any);
+    const { ac, isClientGone, markFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
-  
+
     let added = 0;
-  
+
     async function processImage(buffer: Buffer, name: string, folder: string) {
       try {
         let outputBuffer: Buffer;
         let ext: string;
-  
+
         if (format === "original") {
           outputBuffer = buffer;
-          ext = "png";
+          // Sniff por magic bytes: si los bytes son JPG/PNG/WebP, usa la
+          // extensión real en vez de hardcodear "png".
+          const sniffed = sniffMimeFromMagic(outputBuffer);
+          ext = sniffed ? extForMime(sniffed) : "png";
         } else {
           let pipeline = sharp(buffer);
           if (targetFmt === "png") pipeline = pipeline.png({ quality: 100, compressionLevel: 0 });
@@ -969,10 +1039,14 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
           outputBuffer = await pipeline.toBuffer();
           ext = targetFmt;
         }
-  
-        archive.append(outputBuffer, { name: `${folder}/${name}.${ext}` });
+
+        // STORE para imágenes ya comprimidas (jpg/png/webp/avif): ahorra CPU
+        // y reduce ventana de exposición a aborts en exports grandes.
+        archive.append(outputBuffer, { name: `${folder}/${name}.${ext}`, store: true });
         added++;
-      } catch {}
+      } catch (e: any) {
+        logger.warn({ name, err: e?.message }, "ZIP download-images: skipped image");
+      }
     }
   
     for (const file of imageFiles) {
@@ -1018,11 +1092,12 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
       totalImages: added,
       exportDate: new Date().toISOString(),
     }, null, 2), { name: "info_exportacion.json" });
-  
+
+    markFinalizing();
     await archive.finalize();
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 
@@ -1573,8 +1648,16 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
   try {
     const session = req.session as any;
     if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
-  
-    const { fileIds, entityName } = req.body;
+
+    // Acepta JSON body o form-urlencoded {_payload: '{...}'} (para descarga nativa).
+    let parsedBody: { fileIds?: any; entityName?: string } = {};
+    if (req.body && typeof req.body._payload === "string") {
+      try { parsedBody = JSON.parse(req.body._payload); }
+      catch { res.status(400).json({ error: "_payload inválido" }); return; }
+    } else if (req.body && typeof req.body === "object") {
+      parsedBody = req.body as any;
+    }
+    const { fileIds, entityName } = parsedBody;
     if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 500) {
       res.status(400).json({ error: "fileIds (array 1-500) es requerido" }); return;
     }
@@ -1586,17 +1669,18 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
   
     if (files.length === 0) { res.status(404).json({ error: "No se encontraron archivos" }); return; }
   
-    const zipName = entityName
-      ? `${entityName.replace(/[^a-zA-Z0-9._-]/g, "_")}_vault.zip`
+    const baseName = entityName
+      ? `${entityName}_vault.zip`
       : `global_vault_${Date.now()}.zip`;
-  
-    res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+    const asciiName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const utf8Name = encodeURIComponent(baseName);
     res.setHeader("Content-Type", "application/zip");
-  
-    const archive = archiver("zip", { zlib: { level: 6 } });
-    const { ac, isClientGone } = setupZipStream(req, res, archive);
+    res.setHeader("Content-Disposition", `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
+
+    const archive = archiver("zip", { zlib: { level: 6 }, forceUTF8: true } as any);
+    const { isClientGone, markFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
-  
+
     for (const file of files) {
       if (isClientGone()) break;
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
@@ -1608,15 +1692,23 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
           const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
           const response = await getStorage().downloadObject(gcsFile);
           const buffer = Buffer.from(await response.arrayBuffer());
-          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+          const sniffed = sniffMimeFromMagic(buffer);
+          const realMime = sniffed ?? file.mimeType;
+          const ext = sniffed ? extForMime(sniffed) : realExt;
+          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${ext}`, store: isAlreadyCompressed(realMime) });
           continue;
-        } catch { /* fallback */ }
+        } catch (e: any) {
+          logger.warn({ fileId: file.id, err: e?.message }, "ZIP global: GCS download failed");
+        }
       }
       if (file.content) {
         if (isBinaryMime(file.mimeType)) {
           try {
             const buf = Buffer.from(file.content, "base64");
-            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            const sniffed = sniffMimeFromMagic(buf);
+            const realMime = sniffed ?? file.mimeType;
+            const ext = sniffed ? extForMime(sniffed) : realExt;
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${ext}`, store: isAlreadyCompressed(realMime) });
             continue;
           } catch (e: any) {
             logger.warn({ fileId: file.id, err: e?.message }, "ZIP global: failed to decode base64");
@@ -1632,18 +1724,20 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
             archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
           }
         } else {
-          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          const textExt = extForMime(file.mimeType ?? "text/html");
+          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.${textExt}` });
         }
       } else if (file.metadata) {
         const html = await metadataToReportHtml(file);
         archive.append(html, { name: `${folder}/${safeTitle}_${file.id}.html` });
       }
     }
-  
+
+    markFinalizing();
     await archive.finalize();
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 

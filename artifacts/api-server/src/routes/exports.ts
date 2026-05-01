@@ -4395,8 +4395,8 @@ router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${safeName}_Complete_Export_${dateStr}.zip"`);
   
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    const { ac, isClientGone } = setupZipStream(req, res, archive);
+    const archive = archiver("zip", { zlib: { level: 9 }, forceUTF8: true } as any);
+    const { ac, isClientGone, markFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
   
     const reportEndpoints = [
@@ -4477,10 +4477,11 @@ router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (
   `;
     archive.append(readmeContent, { name: "LEEME.txt" });
   
+    markFinalizing();
     await archive.finalize();
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 
@@ -4808,8 +4809,8 @@ router.get("/exports/brand-kit/:projectId", requireProjectAccess, async (req, re
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
 
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    setupZipStream(req, res, archive);
+    const archive = archiver("zip", { zlib: { level: 9 }, forceUTF8: true } as any);
+    const { markFinalizing: bkMarkFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
 
     archive.append(css, { name: `${brandName}/css/theme-custom.css` });
@@ -4883,6 +4884,7 @@ CONTENIDO DE ESTE KIT:
     }, null, 2);
     archive.append(colorsJson, { name: `${brandName}/brand-tokens.json` });
 
+    bkMarkFinalizing();
     await archive.finalize();
   } catch (e: any) {
     logger.error({ err: e }, "Error generating brand kit");
@@ -5073,8 +5075,8 @@ router.get("/exports/brand-kit-full/:projectId", requireProjectAccess, async (re
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
 
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    setupZipStream(req, res, archive);
+    const archive = archiver("zip", { zlib: { level: 9 }, forceUTF8: true } as any);
+    const { markFinalizing: fbkMarkFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
 
     archive.append(css, { name: `${brandName}/css/theme-custom-base.css` });
@@ -5179,6 +5181,7 @@ PRESTASHOP:
 `;
     archive.append(readmeContent, { name: `${brandName}/LEEME.txt` });
 
+    fbkMarkFinalizing();
     await archive.finalize();
   } catch (e: any) {
     logger.error({ err: e }, "Error generating full brand kit");

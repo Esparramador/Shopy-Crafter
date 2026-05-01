@@ -740,8 +740,8 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="web-lab-pack.zip"`);
 
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    const { isClientGone } = setupZipStream(req, res, archive);
+    const archive = archiver("zip", { zlib: { level: 9 }, forceUTF8: true } as any);
+    const { isClientGone, markFinalizing } = setupZipStream(req, res, archive);
     archive.pipe(res);
 
     for (const f of relatedFiles) {
@@ -771,10 +771,11 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
     const readme = `# Web Lab — Pack de Análisis\n\nURL analizada: ${targetUrl}\nFecha: ${new Date().toLocaleDateString("es-ES")}\n\n## Archivos incluidos\n\n- **preview-visual.html** — Abre en el navegador para ver cómo se ve el CSS aplicado visualmente.\n- **informe-web-lab.html** — Informe profesional completo con scores, issues y recomendaciones.\n- **improved-styles.css** — CSS mejorado listo para copiar/pegar en tu proyecto.\n- **improved-fragments.html** — Fragmentos HTML mejorados como referencia.\n\n## Instrucciones para el equipo de desarrollo\n\n1. Abre preview-visual.html en el navegador para ver los estilos aplicados\n2. Abre el informe HTML para ver el análisis completo\n3. Copia el contenido de improved-styles.css en tu archivo de estilos\n4. Revisa los fragmentos HTML para aplicar las mejoras estructurales\n5. Testea en móvil y escritorio antes de publicar\n\nGenerado por Shopy Crafter — shopycrafter.com`;
 
     archive.append(readme, { name: "README.md" });
+    markFinalizing();
     await archive.finalize();
   } catch (err: any) {
     logger.error({ err }, "Web Lab download pack failed");
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });
 

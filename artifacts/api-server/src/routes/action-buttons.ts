@@ -431,8 +431,8 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.zip"`);
   
-      const archive = archiver("zip", { zlib: { level: 9 } });
-      const { ac, isClientGone } = setupZipStream(req, res, archive);
+      const archive = archiver("zip", { zlib: { level: 9 }, forceUTF8: true } as any);
+      const { ac, isClientGone, markFinalizing } = setupZipStream(req, res, archive);
       archive.pipe(res);
   
       archive.append(htmlContent, { name: `${safeName}.html` });
@@ -490,14 +490,16 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
         ));
   
       for (const img of vaultImages) {
+        if (isClientGone()) break;
         if (img.originalUrl) {
           try {
-            const imgRes = await fetch(img.originalUrl, { signal: AbortSignal.timeout(10000) });
+            const imgRes = await fetch(img.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(10000)]) });
             if (imgRes.ok) {
               const buffer = Buffer.from(await imgRes.arrayBuffer());
               const ext = img.mimeType?.includes("png") ? "png" : img.mimeType?.includes("webp") ? "webp" : "jpg";
               const imgName = (img.productTitle || img.title || `imagen_${img.id}`).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
-              archive.append(buffer, { name: `imagenes/${imgName}.${ext}` });
+              // STORE para imágenes (ya comprimidas)
+              archive.append(buffer, { name: `imagenes/${imgName}.${ext}`, store: true });
             }
           } catch {}
         }
@@ -515,6 +517,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
   - Abrir archivos .html en navegador → Ctrl+P para convertir a PDF
   `, { name: "LEEME.txt" });
   
+      markFinalizing();
       await archive.finalize();
       logger.info({ projectId, actionName, type: "zip" }, "Full ZIP download generated");
     } else {

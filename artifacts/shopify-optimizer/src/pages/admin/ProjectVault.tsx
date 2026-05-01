@@ -157,68 +157,77 @@ export default function ProjectVault() {
     setTimeout(() => setDownloading(null), 1500);
   };
 
-  const downloadAll = async () => {
+  // Descarga ZIP grande SIN bufferear en RAM: navegación nativa del navegador.
+  // Antes: fetch() + res.blob() bufferea TODO en memoria. Para ZIPs de 400MB+
+  // esto era lento, podía dejar archivos truncados en silencio (catch vacío)
+  // y no generar el central directory completo → "ZIP no válido en Windows".
+  // Ahora: el navegador descarga directamente al disco vía Content-Disposition.
+  const downloadAll = () => {
     setZipping(true);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-all`, { credentials: "include" });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${projectName || "tienda"}_vault_completo.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch {}
+      const url = `${API_BASE}/api/projects/${pid}/vault/download-all`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.rel = "noopener";
+      // download attr + Content-Disposition del servidor da el nombre correcto.
+      // No fijamos a.download para respetar el filename* UTF-8 del servidor.
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error("ZIP download failed:", e);
+      alert("Error iniciando la descarga del ZIP. Revisa la consola.");
+    }
     setTimeout(() => setZipping(false), 3000);
   };
 
-  const downloadSelected = async () => {
+  // Para POST descargas (selected/folder) usamos un FORM oculto submit,
+  // que también dispara descarga nativa del navegador sin bufferear.
+  // El backend acepta `fileIds_json` como string JSON en form-urlencoded.
+  const submitDownloadForm = (endpoint: string, body: Record<string, unknown>) => {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = endpoint;
+    form.style.display = "none";
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "_payload";
+    input.value = JSON.stringify(body);
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(() => form.remove(), 5000);
+  };
+
+  const downloadSelected = () => {
     if (selectedIds.size === 0) return;
     setZippingSelected(true);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-selected`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ fileIds: Array.from(selectedIds) }),
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${projectName || "tienda"}_seleccion_${selectedIds.size}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch {}
-    setZippingSelected(false);
+      submitDownloadForm(
+        `${API_BASE}/api/projects/${pid}/vault/download-selected`,
+        { fileIds: Array.from(selectedIds) },
+      );
+    } catch (e) {
+      console.error("ZIP selected download failed:", e);
+      alert("Error iniciando la descarga de la selección.");
+    }
+    setTimeout(() => setZippingSelected(false), 3000);
   };
 
-  const downloadFolder = async (folderId: string) => {
+  const downloadFolder = (folderId: string) => {
     const folder = FOLDER_CONFIG.find(f => f.id === folderId);
     if (!folder) return;
     setZippingFolder(folderId);
     try {
-      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/download-selected`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ folderTypes: folder.matchTypes }),
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${projectName || "tienda"}_${folder.label.replace(/\s+/g, "_")}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch {}
-    setZippingFolder(null);
+      submitDownloadForm(
+        `${API_BASE}/api/projects/${pid}/vault/download-selected`,
+        { folderTypes: folder.matchTypes },
+      );
+    } catch (e) {
+      console.error("ZIP folder download failed:", e);
+      alert("Error iniciando la descarga de la carpeta.");
+    }
+    setTimeout(() => setZippingFolder(null), 3000);
   };
 
   const deleteFile = async (file: VaultFile) => {
