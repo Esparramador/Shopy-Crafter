@@ -121,6 +121,11 @@ function buildDrawtextChain({ width, height, totalDuration }) {
   const outroStart = Math.max(0, totalDuration - 5);
   const outroEnd = totalDuration;
 
+  // Margen lateral mínimo (4% del ancho) — clampamos x para garantizar que el texto
+  // jamás se salga del frame aunque text_w fuera mayor de lo esperado por la fuente.
+  const margin = Math.round(width * 0.04);
+  const xCenterClamped = `'max(${margin},min(w-text_w-${margin},(w-text_w)/2))'`;
+
   const filters = [];
 
   // INTRO 0-5s — texto NEGRO sobre fondo blanco, debajo del kanji
@@ -129,7 +134,7 @@ function buildDrawtextChain({ width, height, totalDuration }) {
     `text='${escFf("HANAKAZE SERIGRAPHY")}'`,
     `fontsize=${fIntroBrand}`,
     `fontcolor=black`,
-    `x=(w-text_w)/2`,
+    `x=${xCenterClamped}`,
     `y=h*0.72`,
     `enable='between(t,3,${introEnd})'`,
     `alpha='if(lt(t,3.3),(t-3)/0.3,1)'`,
@@ -141,7 +146,7 @@ function buildDrawtextChain({ width, height, totalDuration }) {
     `text='${escFf("HANAKAZE SERIGRAPHY")}'`,
     `fontsize=${fOutroBrand}`,
     `fontcolor=white`,
-    `x=(w-text_w)/2`,
+    `x=${xCenterClamped}`,
     `y=h*0.55`,
     `enable='between(t,${outroStart + 1.2},${outroEnd})'`,
     `alpha='if(lt(t,${outroStart + 1.6}),(t-${outroStart + 1.2})/0.4,1)'`,
@@ -152,7 +157,7 @@ function buildDrawtextChain({ width, height, totalDuration }) {
     `text='${escFf("@hanakaze.serigraphy")}'`,
     `fontsize=${fOutroHandle}`,
     `fontcolor=white`,
-    `x=(w-text_w)/2`,
+    `x=${xCenterClamped}`,
     `y=h*0.66`,
     `enable='between(t,${outroStart + 2.2},${outroEnd})'`,
     `alpha='if(lt(t,${outroStart + 2.6}),(t-${outroStart + 2.2})/0.4,1)'`,
@@ -163,7 +168,7 @@ function buildDrawtextChain({ width, height, totalDuration }) {
     `text='${escFf("HECHO A MANO · ESTAMPADO EN CASA")}'`,
     `fontsize=${fOutroTagline}`,
     `fontcolor=white`,
-    `x=(w-text_w)/2`,
+    `x=${xCenterClamped}`,
     `y=h*0.74`,
     `enable='between(t,${outroStart + 3.0},${outroEnd})'`,
     `alpha='if(lt(t,${outroStart + 3.4}),(t-${outroStart + 3.0})/0.4,1)'`,
@@ -195,21 +200,48 @@ async function main() {
 
   // Probar dimensiones/duración
   const probe = await ffprobe(tmpIn);
-  const width = parseInt(probe.width, 10);
-  const height = parseInt(probe.height, 10);
+  const srcW = parseInt(probe.width, 10);
+  const srcH = parseInt(probe.height, 10);
   const duration = parseFloat(probe.duration);
-  console.log(`[overlay] video ${width}x${height} ${duration.toFixed(2)}s`);
+  console.log(`[overlay] video fuente ${srcW}x${srcH} ${duration.toFixed(2)}s`);
 
-  // Construir filtro drawtext
-  const filter = buildDrawtextChain({ width, height, totalDuration: duration });
+  // Resolución de salida (UPSCALE_RES=alto deseado en pixels, default = nativo)
+  // Valores típicos vertical 9:16: 1920 (FHD nativo), 2560 (1440p), 3840 (4K UHD)
+  const targetH = parseInt(process.env.UPSCALE_RES || String(srcH), 10);
+  const targetW = Math.round((targetH / srcH) * srcW / 2) * 2; // par
+  const willUpscale = targetH !== srcH;
+  if (willUpscale) {
+    console.log(`[overlay] UPSCALE → ${targetW}x${targetH} (lanczos)`);
+  }
 
-  // Aplicar overlay (mantener audio intacto)
+  // Calidad
+  const CRF = process.env.CRF || "14"; // 14 = visualmente lossless H.264
+  const PRESET = process.env.PRESET || "veryslow";
+  console.log(`[overlay] x264 crf=${CRF} preset=${PRESET}`);
+
+  // Construir filtro: scale (si upscale) → drawtext (con fontsize basado en altura final)
+  const drawChain = buildDrawtextChain({ width: targetW, height: targetH, totalDuration: duration });
+  const filter = willUpscale
+    ? `scale=${targetW}:${targetH}:flags=lanczos+accurate_rnd+full_chroma_int,${drawChain}`
+    : drawChain;
+
+  // Detectar codec audio para decidir copy vs reencode
+  const audioCodec = await new Promise((resolve) => {
+    const p = spawn("ffprobe", ["-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","default=nw=1:nk=1", tmpIn]);
+    let o=""; p.stdout.on("data",d=>o+=d); p.on("close",()=>resolve(o.trim()));
+  });
+  const audioCanCopy = ["aac","mp3"].includes(audioCodec);
+  console.log(`[overlay] audio codec=${audioCodec} → ${audioCanCopy ? "copy (sin recodificar)" : "aac 320k"}`);
+
+  // Aplicar overlay con calidad MÁXIMA
   await ffmpeg([
     "-i", tmpIn,
     "-vf", filter,
-    "-c:v", "libx264", "-preset", "slow", "-crf", "23",
+    "-c:v", "libx264", "-preset", PRESET, "-crf", CRF,
+    "-profile:v", "high", "-level", "5.1",
     "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "128k",
+    "-x264-params", "ref=6:bframes=4:b-adapt=2:rc-lookahead=60:me=umh:subme=9:trellis=2:aq-mode=3",
+    ...(audioCanCopy ? ["-c:a","copy"] : ["-c:a","aac","-b:a","320k","-ar","48000"]),
     "-movflags", "+faststart",
     tmpOut,
   ]);

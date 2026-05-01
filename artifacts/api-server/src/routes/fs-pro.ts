@@ -44,7 +44,9 @@ import {
 import { planCampaign, type CampaignBudget, type ShotRequest } from "../lib/campaign-planner.js";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
+// 500MB — admite vídeo 4K vertical hasta ~2min con CRF 14. Multer usa memoryStorage,
+// así que mantenemos el techo razonable para evitar OOM (admin-only, pero protege accidentes).
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 
