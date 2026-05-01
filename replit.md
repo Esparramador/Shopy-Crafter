@@ -130,6 +130,16 @@ Anuncio publicitario 60s vertical 9:16 para marca @hanakaze.serigraphy generado 
 - ✓ **Rescate ejecutado**: los 5 clips huérfanos de c03 (predicciones IDs `smz733f6wxrm`, `d255v058k5rm`, `q4ztcx08rhrm`, `bb2raxpy6srm`, `83qygrxpv5rm`) descargados desde URLs `replicate.delivery` (132 MB total) y subidos al vault como variantes 1318-1322. Ningún dólar perdido — los $9 quedan como variantes alternativas del c03 reutilizables.
 - ✗ c04 falló con `402 Payment Required: Insufficient credit` al agotarse el saldo del proyecto. Estado limpio en `logs/hanakaze-v3-state.json` con c01/c02/c03 + 9 refs. Para terminar c04+c05+c06+c07+c08 se necesitan ~$6.65 adicionales en Replicate.
 
+**Ejecución 1 may 18:07-18:37 — RUN COMPLETO ✓ tras recarga Replicate**:
+- Tras recarga del usuario, runner relanzó y completó los 5 clips restantes en 30:43 (c04 vault=1323 503s, c05 vault=1324 498s, c06 vault=1325 503s, c07 vault=1326 68s, c08 vault=1327 174s).
+- Voz off ES Bella vault=1328 (591 chars, 8.6s tts), música 60s vault=1329 (12.4s), **CONCAT FINAL vault=1330 (30.04MB, 60s, 68.4s ffmpeg)**.
+- Auditoría vault 1314-1330: cero huérfanos en este run (todos los IDs producidos en 18:07-18:37 están referenciados por `logs/hanakaze-v3-result.json`). Los huérfanos previos (1316 single + 1318-1322 variantes c03) ya están etiquetados como tales en el título.
+- **Mejoras de hardening añadidas**:
+  - `c06-perchero-levita` reescrito: blue sweatshirt vuela del perchero hacia modelo barbudo, costura puntada por puntada en su torso (antes era ropa abstracta volando sin destino).
+  - `c08-outro-cta` reescrito: kanji + texto "HANAKAZE SERIGRAPHY" + handle `@hanakaze.serigraphy` con icono Instagram, tipografía sans-serif legible sin distorsión. La voz off también dice "arroba hanakaze punto serigraphy".
+  - `memoize()` ahora marca `state.inFlight[key]={startedAt,pid}` antes de cada paso y lo borra al completar; al fallar añade `failedAt+error`. `main()` avisa al inicio si quedan inFlight de runs muertos para detectar abortos forzados.
+- **Coste real del run final**: ~$8.20 (4×kling-master 10s @ $1.80 + kling-master 5s @ $0.90 + 2×seedance-pro 5s @ $0.35 + voz $0.10 + música $0.20).
+
 **Procedimientos críticos**:
 - NUNCA llamar `restart_workflow hanakaze-runner` mientras un POST a generate-video está en vuelo (clip generándose). El SIGTERM no aborta la prediction de Replicate y deja el clip sin escribir al vault. Esperar siempre a que el runner pasee al siguiente clip o use el lockfile.
 - Para auditar gasto real Replicate sin dashboard: `node` + `fetch("https://api.replicate.com/v1/predictions", { Authorization: "Bearer $REPLICATE_API_TOKEN" })` filtrando por `created_at` y `status===succeeded`. Costes: kling-master 5s=$0.90, kling-master 10s=$1.80, seedance-pro 5s=$0.35, seedance-pro 8s=$0.56.

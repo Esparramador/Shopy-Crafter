@@ -92,8 +92,12 @@ console.log("[boot] Hanakaze v3 CASCADA — virtual try-on + deconstrucción + p
 
 const PROJECT_ID = parseInt(process.env.HANAKAZE_PROJECT_ID || "7", 10);
 const BASE = "http://localhost:8080";
-const EMAIL = "sadiagiljoan@gmail.com";
-const PASSWORD = "Lara14032025#";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
+if (!PASSWORD) {
+  console.error("[FATAL] Falta HANAKAZE_ADMIN_PASSWORD en el entorno. Aborto para no exponer credenciales en código.");
+  process.exit(2);
+}
 const RESET = process.env.RESET === "1";
 const ONLY = (process.env.ONLY || "").split(",").map(s => s.trim()).filter(Boolean);
 const LOG_FILE = "logs/hanakaze-v3.log";
@@ -219,10 +223,24 @@ async function memoize(state, key, fn) {
     await log(`◌ filter[${key}] no está en ONLY=${ONLY.join(",")}, salto`);
     return null;
   }
-  const result = await fn();
-  state.steps[key] = { ...result, completedAt: new Date().toISOString() };
+  // ANTI-HUÉRFANOS: marca el step como inFlight ANTES de empezar. Si el proceso muere,
+  // la próxima ejecución verá la marca y avisará para que se audite Replicate manualmente.
+  state.inFlight = state.inFlight || {};
+  state.inFlight[key] = { startedAt: new Date().toISOString(), pid: process.pid };
   await saveState(state);
-  return result;
+  try {
+    const result = await fn();
+    state.steps[key] = { ...result, completedAt: new Date().toISOString() };
+    delete state.inFlight[key];
+    await saveState(state);
+    return result;
+  } catch (err) {
+    // Mantenemos la marca inFlight para auditoría posterior; otra instancia podrá ver
+    // el clip que estaba en vuelo cuando murió este proceso.
+    state.inFlight[key] = { ...state.inFlight[key], failedAt: new Date().toISOString(), error: String(err?.message || err).slice(0, 300) };
+    await saveState(state);
+    throw err;
+  }
 }
 
 async function findRecentAsset({ projectId, fileType, sinceMs, titleFingerprint = null, timeoutMs = 600_000, intervalMs = 10_000 }) {
@@ -407,7 +425,7 @@ El sello kanji 華吹 aparece, trazo a trazo, sobre cada pieza.
 Sudaderas en azul cobalto. Camisetas blancas. Hoodies negros con mariposa.
 Edición limitada. Estampada una a una. Sin moldes industriales.
 Hanakaze Serigraphy. Ese toque handmade que se nota.
-Encuéntranos en shopycrafter punto com.`;
+Síguenos en Instagram, arroba hanakaze punto serigraphy.`;
 
 // Voice ID — Bella ES multilingual (misma que v2, ya validada)
 const VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
@@ -460,11 +478,11 @@ function buildClips() {
       refKey: "modeloB_mariposa",
     },
     {
-      // CLIP 6 — PERCHERO LEVITA: prendas vuelan y se ordenan en el aire
-      // kling-master: física de tela top + audio nativo (viento + click hangers)
+      // CLIP 6 — PERCHERO → CUERPO: la sudadera azul vuela del perchero y se adhiere al modelo
+      // kling-master: física de tela top + audio nativo (viento + tela)
       key: "c06-perchero-levita",
       model: "kling-master", duration: 10, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a black metal clothing rack stands on a wooden outdoor terrace floor — hanging on wooden hangers from front to back: WHITE t-shirts on the left side with a small price tag reading '14€', and on the right side a vibrant ROYAL COBALT BLUE crewneck sweatshirt with a large WHITE silkscreen butterfly design on the back, with a price tag reading '18€'. Padel court fence and palm trees blurred behind. The garments hang naturally, slight breeze moving them. 2-5s the wooden hangers begin to slowly levitate off the metal bar one by one, the garments floating upward in slow motion as if gravity has reversed — the white t-shirts spin gently in the air, the blue sweatshirt billows like fabric in zero-G, the butterfly print catching the sunlight beautifully. 5-8s all the garments rotate in a graceful elliptical orbit around the camera, weaving past each other in choreographed slow motion, particle dust catching the light, the price tags '14€' and '18€' remain attached and readable. 8-10s the hangers descend and snap back to perfect order on the rack with a satisfying click sound, but now arranged like a perfect retail showcase, the rack standing proud. Photorealistic, soft mid-day sunlight, magical realism, levitation VFX. Keep the exact garments, colors, the price tags, the rack design, and the wooden hangers from the reference image — only add the levitation effect. Subtle ambient sound of soft wind and a final click of hangers.",
+      prompt: "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a black metal clothing rack stands on a wooden outdoor terrace floor — hanging on wooden hangers: several WHITE t-shirts on the left and a vibrant ROYAL COBALT BLUE crewneck sweatshirt with a large WHITE silkscreen butterfly design on the back, with small visible price tags. To the right of the rack stands a young man with curly dark hair, a long thick beard, calm expression, wearing only a plain white undershirt and dark pants, palm trees blurred behind him. 2-4s the BLUE sweatshirt slowly LIFTS OFF its wooden hanger by itself in slow motion, billowing in mid-air like fabric in zero-gravity, the wooden hanger swaying empty, white cotton particles trailing in the air. 4-7s the floating BLUE sweatshirt drifts gracefully through the air toward the man, rotating slowly to face him, the white butterfly print catching the sunlight, the fabric rippling realistically. 7-9s the sweatshirt reaches the man and WRAPS around his torso stitch by stitch in slow motion — the collar slips over his head, the sleeves slide down his arms, the fabric falls into perfect drape on his body with realistic cotton physics, fully dressing him in the blue Hanakaze sweatshirt. 9-10s the man looks down at his newly worn sweatshirt with a subtle smile, then looks up at the camera, the white butterfly print on his back briefly visible as he turns slightly. Photorealistic, soft mid-day sunlight, magical realism, real fabric physics, character lock — keep his face, beard, hair identical to the reference image, keep the rack and the BLUE sweatshirt with WHITE butterfly design exactly as in the reference. Subtle ambient sound of soft wind and fabric draping.",
       refKey: "perchero",
     },
     {
@@ -475,11 +493,11 @@ function buildClips() {
       refKey: "estante_modelos2",
     },
     {
-      // CLIP 8 — OUTRO CTA: kanji + URL + tagline
+      // CLIP 8 — OUTRO CTA: kanji + brand + Instagram handle (LEGIBLE)
       // kling-master: tipografía/render limpio + audio cierre suave
       key: "c08-outro-cta",
       model: "kling-master", duration: 5, aspect: "9:16",
-      prompt: "Cinematic 4K vertical 9:16 5-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture. TIMELINE: 0-1s a large white octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in centered in the upper third, drawn with rough hand-printed serigraphy texture and slight ink imperfections. 1-3s the brand text 'HANAKAZE SERIGRAPHY' appears below in bold clean white sans-serif typography, drawn with a slightly imperfect silkscreen-print edge, and the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below it. 3-5s the URL 'shopycrafter.com' appears in clean modern white font at the very bottom of the frame, all elements settle and hold, subtle paper-fabric grain overlay completing the brand identity. No gold ink, no luxury aesthetic, authentic indie streetwear brand outro. Camera holds completely steady throughout, only the typography animates in. Subtle ambient sound of soft fabric and a final quiet bell tone.",
+      prompt: "Cinematic 4K vertical 9:16 5-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture, camera completely STATIC throughout (no movement, no zoom). TIMELINE: 0-1s a large WHITE octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in CENTERED in the upper third of the frame, drawn with crisp clean serigraphy edges and authentic hand-printed ink texture, fully sharp and readable. 1-2s the brand text 'HANAKAZE SERIGRAPHY' fades in directly below the stamp in BOLD CLEAN WHITE SANS-SERIF typography (Helvetica/Inter style), perfectly horizontal and centered, large enough to read instantly — minimum 9% of frame height, with sharp kerning and high contrast against the navy background. 2-4s directly below, the Instagram handle text '@hanakaze.serigraphy' fades in in CLEAN WHITE SANS-SERIF with a small white Instagram camera icon to the LEFT of the handle, fully legible and high-contrast, minimum 6% of frame height, perfectly horizontal. 4-5s the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below the handle in light-weight white typography, all elements settle perfectly still, holding stable until the end. Strict typography rules: NO distortion, NO motion blur on text, NO drop shadow, NO ornate fonts, NO gold ink, NO luxury aesthetic. All text must be perfectly horizontal, perfectly readable, sharp kerning, English/Latin alphabet only — the @hanakaze.serigraphy handle must be spelled EXACTLY as written. Authentic indie streetwear brand outro. Subtle ambient sound of soft fabric and a final quiet bell tone.",
     },
   ];
 }
@@ -517,6 +535,13 @@ async function main() {
 
   await login();
   const state = await loadState();
+
+  // ─── 0) AUDITORÍA HUÉRFANOS: avisar si hay steps en vuelo de una corrida muerta ────
+  if (state.inFlight && Object.keys(state.inFlight).length) {
+    for (const [k, v] of Object.entries(state.inFlight)) {
+      await log(`⚠️ ANTI-HUÉRFANOS: step '${k}' quedó EN VUELO el ${v.startedAt} (PID muerto ${v.pid}). Audita Replicate /v1/predictions filtrando por created_at >= ${v.startedAt} antes de continuar — puede haber un clip succeeded sin guardar al vault. Limpia state.inFlight['${k}'] manualmente cuando hayas auditado.`);
+    }
+  }
 
   // ─── 1) Subir refs (9 imágenes) → URLs HTTPS firmadas (1h) ─────────
   const refs = {};

@@ -62,8 +62,51 @@
       "model": "kling-master",
       "prompt": "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a WHITE cotton t-shirt held on a wooden hanger by a hand floats in front of a softly blurred outdoor terrace background. The front of the t-shirt features a hand-drawn samurai illustration in BLACK LINE-ART with mustard YELLOW-GOLD kimono fills, conical straw hat, katana at the side, ukiyo-e style. The camera slowly pushes in toward the print. 2-4s the t-shirt fabric begins to deconstruct from the bottom up — individual cotton threads detach and rise upward in slow motion like glowing strings, while the printed samurai illustration starts breaking apart into BLACK and GOLD ink particles that begin swirling. 4-7s the deconstruction reaches the top of the garment — thousands of threads and ink particles swirl mid-air in an elegant tornado, the wooden hanger remains perfectly static, the empty space behind starts becoming visible. 7-10s the threads and ink particles continue spiraling upward and outward, slowly thinning out, leaving only the hanger floating empty in the frame as the last sparkles fade. Soft natural daylight, magical realism, photorealistic textures, slow motion, particle physics, art-direction inspired by Apple Vision ad campaigns. Preserve the exact samurai illustration design and the white t-shirt appearance from the reference image — only the deconstruction effect is added. Subtle ambient sound of soft fabric tearing and shimmering particles.",
       "completedAt": "2026-05-01T17:31:25.207Z"
+    },
+    "c04-tryon-kanji-modelo": {
+      "vaultId": 1323,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 10-second virtual try-on sequence. TIMELINE: 0-2s a young man with curly dark hair and a long thick beard stands on a sunny rooftop terrace facing the camera with a calm expression, wearing a plain white undershirt, palm trees and umbrella visible blurred behind him. The frame is calm and quiet. 2-4s thousands of glowing white cotton threads and BLACK ink particles begin to swirl around his torso, slowly orbiting his body. 4-7s the threads weave together in mid-air directly onto his body, materializing fabric stitch by stitch — first the collar wraps around his neck, then the sleeves form down his arms, then the full WHITE oversized t-shirt body wraps around his torso like real fabric falling into place, with realistic cotton drape physics. 7-9s the WHITE fabric is fully formed; on the LEFT chest area, the BLACK octagonal kanji 華吹 stamp silkscreens itself onto the cotton in real time with authentic hand-printed ink texture and slight imperfections, the ink visibly soaking into the fabric. 9-10s the man smiles softly, looks down at his newly materialized t-shirt with subtle delight, then looks back up at the camera. Photorealistic, natural sunlight, character lock — keep his face, beard, hair, skin tone and pose identical to the reference image, only add the materializing garment effect. The kanji stamp design must match the reference exactly. Subtle ambient sound of fabric and a soft chime when the kanji prints.",
+      "completedAt": "2026-05-01T18:15:24.579Z"
+    },
+    "c05-tryon-mariposa-vuela": {
+      "vaultId": 1324,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 10-second VFX sequence. TIMELINE: 0-2s a folded WHITE cotton t-shirt with a black silkscreen-printed butterfly + face design lies on a wooden table at an outdoor market, sunlight streaming sideways from the left, soft particles in the air. 2-4s the printed butterfly suddenly detaches from the cotton fabric in full 3D — its black ink wings come alive and start flapping like a real butterfly, lifting off the t-shirt slowly, leaving a temporarily blank white spot on the fabric where the print was. 4-7s the butterfly flies in a graceful elegant arc through the air across the frame, its wings flapping in slow motion, leaving a faint trail of black ink particles behind it that dissolve into the air, the camera follows its flight smoothly. 7-9s the butterfly approaches a different WHITE t-shirt being held by an unseen hand on a wooden hanger on the right side of the frame. The butterfly slowly descends toward the back of this t-shirt. 9-10s as the butterfly lands on the back fabric, its wings flatten and fuse with the cotton, becoming a flat hand-printed silkscreen design again with authentic textile ink texture, fully integrated with the new garment. Background: wooden market table with brown checkered cloth, other folded garments visible. Soft natural daylight, magical realism, slow motion, photorealistic. Keep the white t-shirt color and the butterfly design from the reference image — only add the magical flight effect. Subtle ambient sound of soft butterfly wing flutters.",
+      "completedAt": "2026-05-01T18:23:44.024Z"
+    },
+    "c06-perchero-levita": {
+      "vaultId": 1325,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 10-second hero VFX sequence. TIMELINE: 0-2s a black metal clothing rack stands on a wooden outdoor terrace floor — hanging on wooden hangers: several WHITE t-shirts on the left and a vibrant ROYAL COBALT BLUE crewneck sweatshirt with a large WHITE silkscreen butterfly design on the back, with small visible price tags. To the right of the rack stands a young man with curly dark hair, a long thick beard, calm expression, wearing only a plain white undershirt and dark pants, palm trees blurred behind him. 2-4s the BLUE sweatshirt slowly LIFTS OFF its wooden hanger by itself in slow motion, billowing in mid-air like fabric in zero-gravity, the wooden hanger swaying empty, white cotton particles trailing in the air. 4-7s the floating BLUE sweatshirt drifts gracefully through the air toward the man, rotating slowly to face him, the white butterfly print catching the sunlight, the fabric rippling realistically. 7-9s the sweatshirt reaches the man and WRAPS around his torso stitch by stitch in slow motion — the collar slips over his head, the sleeves slide down his arms, the fabric falls into perfect drape on his body with realistic cotton physics, fully dressing him in the blue Hanakaze sweatshirt. 9-10s the man looks down at his newly worn sweatshirt with a subtle smile, then looks up at the camera, the white butterfly print on his back briefly visible as he turns slightly. Photorealistic, soft mid-day sunlight, magical realism, real fabric physics, character lock — keep his face, beard, hair identical to the reference image, keep the rack and the BLUE sweatshirt with WHITE butterfly design exactly as in the reference. Subtle ambient sound of soft wind and fabric draping.",
+      "completedAt": "2026-05-01T18:32:08.979Z"
+    },
+    "c07-cascada-coleccion": {
+      "vaultId": 1326,
+      "model": "seedance-pro",
+      "prompt": "Cinematic 4K vertical 9:16 5-second cascade sequence on a soft cream-painted wall background with subtle wooden terrace floor visible at the bottom. TIMELINE: 0-1s a folded WHITE t-shirt with a small BLACK octagonal kanji 華吹 stamp on the left chest materializes at the top of the frame from a swirl of white cotton particles. 1-2s a folded WHITE t-shirt with a black SAMURAI illustration in line-art with yellow-gold kimono materializes just below it from black and gold ink particles. 2-3s a folded NAVY BLUE crewneck sweatshirt with a small WHITE octagonal kanji stamp on the chest materializes below from blue fabric particles. 3-4s a folded WHITE t-shirt with a black butterfly+face print materializes at the bottom from black ink particles, completing a perfect vertical cascade of 4 different garments — all the real Hanakaze Serigraphy designs stacked from top to bottom. 4-5s the camera holds steady on the full cascade as the last particles dissolve, each garment with authentic hand-printed serigraphy texture clearly visible. Subtle soft sunlight from the right, photorealistic textures, indie streetwear collection showcase. Each design must remain faithful to the references — no invented graphics.",
+      "completedAt": "2026-05-01T18:33:18.415Z"
+    },
+    "c08-outro-cta": {
+      "vaultId": 1327,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 5-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture, camera completely STATIC throughout (no movement, no zoom). TIMELINE: 0-1s a large WHITE octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in CENTERED in the upper third of the frame, drawn with crisp clean serigraphy edges and authentic hand-printed ink texture, fully sharp and readable. 1-2s the brand text 'HANAKAZE SERIGRAPHY' fades in directly below the stamp in BOLD CLEAN WHITE SANS-SERIF typography (Helvetica/Inter style), perfectly horizontal and centered, large enough to read instantly — minimum 9% of frame height, with sharp kerning and high contrast against the navy background. 2-4s directly below, the Instagram handle text '@hanakaze.serigraphy' fades in in CLEAN WHITE SANS-SERIF with a small white Instagram camera icon to the LEFT of the handle, fully legible and high-contrast, minimum 6% of frame height, perfectly horizontal. 4-5s the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below the handle in light-weight white typography, all elements settle perfectly still, holding stable until the end. Strict typography rules: NO distortion, NO motion blur on text, NO drop shadow, NO ornate fonts, NO gold ink, NO luxury aesthetic. All text must be perfectly horizontal, perfectly readable, sharp kerning, English/Latin alphabet only — the @hanakaze.serigraphy handle must be spelled EXACTLY as written. Authentic indie streetwear brand outro. Subtle ambient sound of soft fabric and a final quiet bell tone.",
+      "completedAt": "2026-05-01T18:36:12.788Z"
+    },
+    "voice-off-v3": {
+      "vaultId": 1328,
+      "completedAt": "2026-05-01T18:36:21.394Z"
+    },
+    "music-full-60s": {
+      "vaultId": 1329,
+      "completedAt": "2026-05-01T18:36:33.763Z"
+    },
+    "concat-final-v3": {
+      "vaultId": 1330,
+      "completedAt": "2026-05-01T18:37:42.215Z"
     }
   },
   "startedAt": "2026-05-01T16:44:19.814Z",
-  "lastUpdate": "2026-05-01T17:31:25.207Z"
+  "lastUpdate": "2026-05-01T18:37:42.215Z",
+  "inFlight": {}
 }

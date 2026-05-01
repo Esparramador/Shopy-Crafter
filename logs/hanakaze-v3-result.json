@@ -1,0 +1,69 @@
+{
+  "completedAt": "2026-05-01T18:37:42.216Z",
+  "elapsedSec": "1843.2",
+  "refs": {
+    "modeloA_blanca": "uploaded",
+    "modeloA_someulp": "uploaded",
+    "modeloB_kanji": "uploaded",
+    "modeloB_mariposa": "uploaded",
+    "estante_modelos1": "uploaded",
+    "estante_modelos2": "uploaded",
+    "perchero": "uploaded",
+    "prenda_espectral": "uploaded",
+    "prenda_samurai": "uploaded"
+  },
+  "clips": [
+    {
+      "key": "c01-intro-kanji-stamp",
+      "model": "kling-master",
+      "duration": 5,
+      "vaultId": 1314
+    },
+    {
+      "key": "c02-reveal-puesto",
+      "model": "seedance-pro",
+      "duration": 5,
+      "vaultId": 1315
+    },
+    {
+      "key": "c03-deconstruccion-samurai",
+      "model": "kling-master",
+      "duration": 10,
+      "vaultId": 1317
+    },
+    {
+      "key": "c04-tryon-kanji-modelo",
+      "model": "kling-master",
+      "duration": 10,
+      "vaultId": 1323
+    },
+    {
+      "key": "c05-tryon-mariposa-vuela",
+      "model": "kling-master",
+      "duration": 10,
+      "vaultId": 1324
+    },
+    {
+      "key": "c06-perchero-levita",
+      "model": "kling-master",
+      "duration": 10,
+      "vaultId": 1325
+    },
+    {
+      "key": "c07-cascada-coleccion",
+      "model": "seedance-pro",
+      "duration": 5,
+      "vaultId": 1326
+    },
+    {
+      "key": "c08-outro-cta",
+      "model": "kling-master",
+      "duration": 5,
+      "vaultId": 1327
+    }
+  ],
+  "voice": 1328,
+  "music": 1329,
+  "finalConcat": 1330,
+  "estimatedDurationSec": 60
+}
