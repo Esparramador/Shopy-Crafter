@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import DOMPurify from "dompurify";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
@@ -598,6 +598,34 @@ export default function ImagesPage() {
     );
   };
 
+  // Universal downloader: works with both data URIs (base64) and HTTP(S) URLs
+  const downloadDataUri = (uriOrUrl: string, filename: string) => {
+    try {
+      const a = document.createElement("a");
+      a.href = uriOrUrl;
+      a.download = filename;
+      a.target = uriOrUrl.startsWith("data:") ? "_self" : "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "No se pudo descargar";
+      toast({ title: "Error de descarga", description: msg, variant: "destructive" });
+    }
+  };
+
+  const extFromDataUri = (uri: string): string => {
+    if (!uri.startsWith("data:")) return "png";
+    const m = /^data:([^;]+);/.exec(uri);
+    const mime = m?.[1] || "image/png";
+    if (mime.includes("png")) return "png";
+    if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+    if (mime.includes("webp")) return "webp";
+    if (mime.includes("gif")) return "gif";
+    return "png";
+  };
+
   const downloadSvg = (svgContent: string, filename: string) => {
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
@@ -649,6 +677,15 @@ export default function ImagesPage() {
               Boost en progreso...
             </div>
           )}
+          <Link
+            href={`/projects/${projectId}/vault`}
+            data-testid="link-vault-from-images"
+            className="bg-amber-500/15 text-amber-300 border border-amber-500/30 px-5 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-amber-500/25 transition-all"
+            title="Ver y descargar todos tus archivos generados"
+          >
+            <Download className="w-4 h-4" />
+            Bóveda
+          </Link>
           <button
             onClick={handleBoostMasivo}
             disabled={bulkGenerate.isPending || !!bulkJobId}
@@ -858,14 +895,27 @@ export default function ImagesPage() {
                         ) : (
                           <>
                             {imageUrl && (
-                              <a
-                                href={imageUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="w-full text-xs bg-white/10 text-foreground px-2 py-1.5 rounded-lg font-medium hover:bg-white/20 flex items-center justify-center gap-1"
-                              >
-                                <Eye className="w-3 h-3" /> Ver
-                              </a>
+                              <>
+                                <a
+                                  href={imageUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-full text-xs bg-white/10 text-foreground px-2 py-1.5 rounded-lg font-medium hover:bg-white/20 flex items-center justify-center gap-1"
+                                >
+                                  <Eye className="w-3 h-3" /> Ver
+                                </a>
+                                <button
+                                  onClick={() =>
+                                    downloadDataUri(
+                                      imageUrl,
+                                      `${type.id}-${product.handle || product.id}.${extFromDataUri(imageUrl)}`
+                                    )
+                                  }
+                                  className="w-full text-xs bg-amber-500/20 text-amber-300 px-2 py-1.5 rounded-lg hover:bg-amber-500/30 flex items-center justify-center gap-1"
+                                >
+                                  <Download className="w-3 h-3" /> Descargar
+                                </button>
+                              </>
                             )}
                             {svgContent && (
                               <button
