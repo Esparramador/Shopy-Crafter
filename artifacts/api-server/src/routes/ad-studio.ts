@@ -113,6 +113,11 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
     template: body.template,
     burnSubs: body.burnSubs,
     subsLanguage: body.subsLanguage,
+    // Default ON: render brand+CTA via deterministic ffmpeg drawtext rather
+    // than letting the AI video model hallucinate misspelled typography.
+    renderBrandOverlay: body.renderBrandOverlay !== false,
+    brandOverlayText: body.brandOverlayText,
+    ctaOverlayText: body.ctaOverlayText,
   };
 
   const replicateToken = (() => {
@@ -161,7 +166,16 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
 
       // Persist assets to vault and build response
       const savedVariants = await Promise.all(variants.map(async (v, idx) => {
-        const saved: any = { copy: v.copy, variantIndex: idx, error: v.assets.error };
+        const saved: any = {
+          copy: v.copy,
+          variantIndex: idx,
+          error: v.assets.error,
+          // Surface the deterministic-overlay outcome so the UI/admin can
+          // detect a silent fail-soft fallback (overlay was requested but
+          // FFmpeg failed and the ad shipped without brand/CTA text).
+          overlayApplied: v.assets.overlayApplied,
+          overlayError: v.assets.overlayError,
+        };
         try {
           if (v.assets.finalMp4Path) {
             const buf = await fs.readFile(v.assets.finalMp4Path);

@@ -39,6 +39,12 @@ interface SavedVariant {
   finalMp4VaultId?: number;
   heroImageVaultId?: number;
   voiceVaultId?: number;
+  /** True = deterministic FFmpeg drawtext brand/CTA was burned in;
+   *  false = overlay was requested but FFmpeg failed and the ad shipped
+   *  WITHOUT the brand/CTA text (the model-rendered text — if any —
+   *  may be present and could be garbled). undefined = overlay was off. */
+  overlayApplied?: boolean;
+  overlayError?: string;
 }
 
 const OBJECTIVE_META: Record<Objective, { label: string; icon: React.ReactNode; desc: string }> = {
@@ -88,6 +94,9 @@ export default function AdStudio() {
   const [templateKey, setTemplateKey] = useState<string>("");
   const [burnSubs, setBurnSubs] = useState<boolean>(false);
   const [subsLanguage, setSubsLanguage] = useState<string>("auto");
+  // Default ON: brand name + CTA are burned with crisp DejaVu Bold typography
+  // (FFmpeg drawtext) instead of being hallucinated by the AI video model.
+  const [renderBrandOverlay, setRenderBrandOverlay] = useState<boolean>(true);
   const [showClone, setShowClone] = useState<boolean>(false);
   const [cloneUrl, setCloneUrl] = useState<string>("");
   const [cloneFile, setCloneFile] = useState<File | null>(null);
@@ -145,6 +154,7 @@ export default function AdStudio() {
       template: templateKey || undefined,
       burnSubs: burnSubs || undefined,
       subsLanguage: burnSubs && subsLanguage !== "auto" ? subsLanguage : undefined,
+      renderBrandOverlay,
     };
 
     const ctrl = new AbortController();
@@ -207,7 +217,7 @@ export default function AdStudio() {
     } finally {
       abortRef.current = null;
     }
-  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, canGenerate, templateKey, burnSubs, subsLanguage]);
+  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, canGenerate, templateKey, burnSubs, subsLanguage, renderBrandOverlay]);
 
   const cancel = () => {
     abortRef.current?.abort();
@@ -493,6 +503,22 @@ export default function AdStudio() {
             </label>
           </Section>
 
+          <Section title="Tipografía nítida de marca y CTA (recomendado)">
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, borderRadius: 8, background: renderBrandOverlay ? "rgba(200,168,75,0.10)" : "var(--ink2)", border: `1px solid ${renderBrandOverlay ? "rgba(200,168,75,0.45)" : "var(--bdr)"}`, cursor: "pointer" }}>
+              <input type="checkbox" checked={renderBrandOverlay} onChange={e => setRenderBrandOverlay(e.target.checked)} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)" }}>
+                  Sobreimponer nombre de marca + CTA con FFmpeg <span style={{ color: "var(--gold)" }}>(recomendado)</span>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4, lineHeight: 1.5 }}>
+                  Los modelos de video IA inventan letras y faltas de ortografía cuando intentan escribir.
+                  Con esto desactivamos el texto en el modelo y quemamos la marca <strong style={{ color: "var(--t2)" }}>"{brandName || productTitle || "(define brand/título)"}"</strong> en intro
+                  y el CTA en outro con DejaVu Bold y fade. Texto siempre legible y bien escrito.
+                </div>
+              </div>
+            </label>
+          </Section>
+
           <Section title="Subtítulos automáticos quemados">
             <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer" }}>
               <input type="checkbox" checked={burnSubs} onChange={e => setBurnSubs(e.target.checked)} />
@@ -538,6 +564,7 @@ export default function AdStudio() {
                 <div><strong style={{ color: "var(--t1)" }}>Duración:</strong> {videoDurationSec}s</div>
                 <div><strong style={{ color: "var(--t1)" }}>Variantes:</strong> {variantsCount}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Música:</strong> {addMusic ? "Sí" : "No"}</div>
+                <div><strong style={{ color: "var(--t1)" }}>Texto marca/CTA nítido:</strong> {renderBrandOverlay ? <span style={{ color: "var(--gold)" }}>Sí (FFmpeg)</span> : <span style={{ color: "#e57373" }}>No (riesgo IA)</span>}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Créditos a usar:</strong> {totalCredits}</div>
               </div>
               <button onClick={generateCampaign} disabled={!canGenerate}
@@ -636,6 +663,20 @@ function VariantCard({ variant, projectId }: { variant: SavedVariant; projectId:
       <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600 }}>
         → {variant.copy.cta}
       </div>
+
+      {/* Deterministic-overlay status: shows whether brand/CTA was burned in
+          via FFmpeg drawtext (clean typography) or whether the overlay step
+          fail-soft fell through (text may be missing or model-rendered). */}
+      {variant.overlayApplied === true && (
+        <div style={{ marginTop: 8, fontSize: 10, color: "#2dd49f", display: "flex", alignItems: "center", gap: 4 }}>
+          <CheckCircle2 size={11} /> Marca y CTA con tipografía nítida (FFmpeg)
+        </div>
+      )}
+      {variant.overlayApplied === false && (
+        <div style={{ marginTop: 8, fontSize: 10, color: "#fbbf24", display: "flex", alignItems: "center", gap: 4 }} title={variant.overlayError || ""}>
+          <AlertCircle size={11} /> Overlay no aplicado — texto puede faltar o ser del modelo IA
+        </div>
+      )}
     </div>
   );
 }

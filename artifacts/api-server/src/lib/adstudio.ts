@@ -14,6 +14,7 @@
  */
 
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
@@ -26,6 +27,29 @@ const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
 
 const NANO_BANANA_MODEL = "gemini-2.5-flash-image";
+
+/**
+ * Resolve the ffmpeg binary path. We prefer `ffmpeg-static` (bundled binary),
+ * but fall back to the system `ffmpeg` (provided by Nix runtime path) when the
+ * static path is missing or invalid — this happens when esbuild bundles the
+ * server and `__dirname` inside `ffmpeg-static/index.js` resolves to `dist/`
+ * instead of the original `node_modules/ffmpeg-static/` directory.
+ */
+let _resolvedFfmpegPath: string | null = null;
+async function resolveFfmpegPath(): Promise<string> {
+  if (_resolvedFfmpegPath) return _resolvedFfmpegPath;
+  try {
+    const staticPath = (await import("ffmpeg-static")).default as unknown as string;
+    if (staticPath && typeof staticPath === "string" && existsSync(staticPath)) {
+      _resolvedFfmpegPath = staticPath;
+      return staticPath;
+    }
+  } catch {
+    // ignore — fall through to system ffmpeg
+  }
+  _resolvedFfmpegPath = "ffmpeg";
+  return "ffmpeg";
+}
 
 // Pricing rough estimates (€ per unit) — conservative upper-bound for credit deduction
 export const AD_PRICING = {
@@ -81,7 +105,40 @@ export interface AdCampaignInput {
   burnSubs?: boolean;
   /** Subtitle language (ISO 639-1) for Whisper. Defaults to "auto". */
   subsLanguage?: string;
+  /** Render deterministic brand-name + CTA text via FFmpeg drawtext after compose.
+   *  When true (default), the AI video model is instructed NOT to render text,
+   *  and the brand label + CTA are burned in with crisp DejaVu Sans Bold. */
+  renderBrandOverlay?: boolean;
+  /** Optional explicit brand overlay text (defaults to input.brandName). */
+  brandOverlayText?: string;
+  /** Optional explicit CTA overlay text (defaults to copy.cta per variant). */
+  ctaOverlayText?: string;
 }
+
+// ─── DETERMINISTIC TEXT OVERLAY (FFmpeg drawtext) ────────────────────────
+//
+// The AI video models (Runway Gen-4, Kling, Seedance, Hailuo, etc.) routinely
+// hallucinate misspelled text, garbled brand names, and incoherent captions
+// when asked to render typography. To deliver production-grade ads we follow
+// the same rule used by the Hanakaze v3 master pipeline:
+//   1) instruct the model to render ABSOLUTELY NO text/logos/captions
+//   2) burn the brand label and CTA in afterwards with FFmpeg drawtext using
+//      DejaVu Sans Bold so spelling is guaranteed and typography is crisp.
+
+const DEJAVU_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+
+/** Strict instruction we append to every video-model prompt to suppress text
+ *  hallucinations and design drift. Same wording used by Hanakaze v3 master. */
+const ANTI_TEXT_AND_FIDELITY = [
+  "STRICT DESIGN FIDELITY: every garment, product and surface is a solid",
+  "rigid object that never deconstructs, recolors, morphs, melts or redraws",
+  "mid-frame. The exact design from the input image is preserved frame-by-frame.",
+  "Consistent shape, consistent color palette, consistent print, consistent logo position.",
+  "ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO LOGOS, NO BRAND NAMES,",
+  "NO CAPTIONS, NO SUBTITLES, NO WATERMARKS, NO TYPOGRAPHY, NO WRITING OF ANY KIND",
+  "on any surface, garment, product, wall, sign, screen or background.",
+  "Photorealistic motion, smooth camera, no flicker, no warping, no artifacts.",
+].join(" ");
 
 export interface AdAssetPaths {
   copyVariantIndex: number;
@@ -95,6 +152,13 @@ export interface AdAssetPaths {
   sfxUrl?: string;
   finalMp4Path?: string;
   finalMp4Url?: string;
+  /** True when the deterministic FFmpeg drawtext brand/CTA overlay was
+   *  successfully applied. False when overlay was requested but failed
+   *  (the ad still ships, but text may be absent). Undefined when overlay
+   *  was not requested at all. */
+  overlayApplied?: boolean;
+  /** Error message from the overlay step, if it failed. */
+  overlayError?: string;
   error?: string;
 }
 
@@ -310,7 +374,7 @@ async function generateVideoRunway(
   const tpl = getTemplate(input.template);
   const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
   const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  const runwayPrompt = `${copy.body}. Cinematic product advertising shot.${cameraLine} Professional lighting, ${copy.tone} atmosphere.`;
+  const runwayPrompt = `${copy.body}. Cinematic product advertising shot.${cameraLine} Professional lighting, ${copy.tone} atmosphere. ${ANTI_TEXT_AND_FIDELITY}`;
 
   // 1. Create task
   const createRes = await fetch(`${RUNWAY_BASE}/image_to_video`, {
@@ -381,23 +445,34 @@ async function generateVideoReplicate(
   const tpl = getTemplate(input.template);
   const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
   const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  const prompt = `${copy.body}. Cinematic product advertising,${cameraLine} professional lighting, ${copy.tone} mood, smooth camera.`;
+  const prompt = `${copy.body}. Cinematic product advertising,${cameraLine} professional lighting, ${copy.tone} mood, smooth camera. ${ANTI_TEXT_AND_FIDELITY}`;
+  const negativePrompt = "text, words, letters, captions, subtitles, watermark, logo, brand name, typography, writing, sign, label, garbled text, misspelled letters, deconstruction, melting, morphing, color shift, design change, flicker, warping";
 
   const input_params: any = modelId.startsWith("bytedance/")
     ? { prompt, image: dataUri, duration: input.videoDurationSec, resolution: "1080p" }
     : modelId.startsWith("kwaivgi/")
-    ? { prompt, start_image: dataUri, duration: input.videoDurationSec, aspect_ratio: input.aspect }
-    : { prompt, first_frame_image: dataUri, duration: input.videoDurationSec };
+    ? { prompt, negative_prompt: negativePrompt, start_image: dataUri, duration: input.videoDurationSec, aspect_ratio: input.aspect }
+    : { prompt, prompt_optimizer: false, first_frame_image: dataUri, duration: input.videoDurationSec };
 
   const output = await rep.run(modelId as `${string}/${string}`, { input: input_params });
   const raw = Array.isArray(output) ? output[0] : output;
   let videoUrl: string;
-  if (typeof raw === "string") videoUrl = raw;
-  else if (raw && typeof (raw as any).url === "function") videoUrl = (raw as any).url();
-  else if (raw && typeof (raw as any).url === "string") videoUrl = (raw as any).url;
-  else throw new Error(`Replicate invalid output: ${String(raw).slice(0, 200)}`);
+  if (typeof raw === "string") {
+    videoUrl = raw;
+  } else if (raw && typeof (raw as any).url === "function") {
+    const u = (raw as any).url();
+    videoUrl = typeof u === "string" ? u : (u && typeof u.toString === "function" ? u.toString() : String(u));
+  } else if (raw && typeof (raw as any).url === "string") {
+    videoUrl = (raw as any).url;
+  } else if (raw && (raw as any).url && typeof (raw as any).url.toString === "function") {
+    videoUrl = (raw as any).url.toString();
+  } else {
+    throw new Error(`Replicate invalid output: ${String(raw).slice(0, 200)}`);
+  }
 
-  if (!videoUrl?.startsWith("http")) throw new Error(`Replicate invalid URL: ${videoUrl?.slice(0, 200)}`);
+  if (!videoUrl || !videoUrl.startsWith("http")) {
+    throw new Error(`Replicate invalid URL: ${(videoUrl || "").slice(0, 200)}`);
+  }
   return await fetchToBuffer(videoUrl);
 }
 
@@ -525,13 +600,11 @@ export async function composeFinalAd(
       await fs.writeFile(sfxPath, sfxBuffer);
     }
 
-    // Lazy-load fluent-ffmpeg + ffmpeg-static so the server still starts if they're missing
+    // Lazy-load fluent-ffmpeg so the server still starts if it's missing
     let ffmpeg: any;
-    let ffmpegPath: string;
     try {
       ffmpeg = (await import("fluent-ffmpeg")).default;
-      ffmpegPath = (await import("ffmpeg-static")).default as unknown as string;
-      ffmpeg.setFfmpegPath(ffmpegPath);
+      ffmpeg.setFfmpegPath(await resolveFfmpegPath());
     } catch (err) {
       throw new Error("FFmpeg not installed. Run: pnpm add fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg");
     }
@@ -572,6 +645,190 @@ export async function composeFinalAd(
     });
   } finally {
     // Cleanup tmp
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ─── STEP 6.5: BRAND + CTA OVERLAY (deterministic FFmpeg drawtext) ──────
+//
+// Burns the brand label (intro fade-in over the first ~3.5s) and the CTA
+// (outro fade-in over the last ~3.5s) into the final MP4 with crisp
+// DejaVu Sans Bold typography. Spelling is guaranteed because the text is
+// rendered by FFmpeg, not by the AI video model.
+
+/** Sanitize text for use with FFmpeg drawtext via textfile (we still strip
+ *  control characters and normalize whitespace; the textfile mechanism handles
+ *  most special-character escaping for us). */
+function sanitizeOverlayText(raw: string, maxLen: number): string {
+  const cleaned = String(raw || "")
+    // strip control chars that ffmpeg/libass dislike
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    // collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+  if (cleaned.length <= maxLen) return cleaned;
+  // Hard truncate at word boundary if possible
+  const cut = cleaned.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
+async function probeVideoMeta(filePath: string): Promise<{ durationSec: number; width: number; height: number }> {
+  // Use the system ffprobe (provided by Nix runtime path); fluent-ffmpeg picks
+  // it up from PATH automatically. We avoid pulling an extra `ffprobe-static`
+  // dep so the bundle stays slim and the OS binary is always in sync with the
+  // ffmpeg we run.
+  const ffmpeg = (await import("fluent-ffmpeg")).default;
+  return await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err: Error | null, data: any) => {
+      if (err) return reject(err);
+      const stream = (data?.streams || []).find((s: any) => s.codec_type === "video");
+      const durationSec = Number(data?.format?.duration) || Number(stream?.duration) || 0;
+      const width = Number(stream?.width) || 0;
+      const height = Number(stream?.height) || 0;
+      if (!durationSec || !width || !height) {
+        return reject(new Error(`ffprobe: invalid metadata duration=${durationSec} ${width}x${height}`));
+      }
+      resolve({ durationSec, width, height });
+    });
+  });
+}
+
+export async function applyBrandOverlay(
+  videoBuffer: Buffer,
+  opts: {
+    brandText: string;
+    ctaText: string;
+    aspect?: AdAspect;
+  },
+): Promise<Buffer> {
+  const brand = sanitizeOverlayText(opts.brandText, 28);
+  const cta = sanitizeOverlayText(opts.ctaText, 36);
+  // If both empty, nothing to do — return original.
+  if (!brand && !cta) return videoBuffer;
+
+  // Verify font exists; fail-soft to original video if not (overlay is a
+  // nice-to-have — the user still gets a working ad MP4).
+  try { await fs.access(DEJAVU_BOLD_PATH); } catch {
+    logger.warn({ path: DEJAVU_BOLD_PATH }, "adstudio: DejaVu Bold not found, skipping brand overlay");
+    return videoBuffer;
+  }
+
+  const tmp = await makeTmpDir("overlay");
+  try {
+    const inPath = path.join(tmp, "in.mp4");
+    const outPath = path.join(tmp, "out.mp4");
+    await fs.writeFile(inPath, videoBuffer);
+
+    const { durationSec, height, width } = await probeVideoMeta(inPath);
+
+    // Probe successful — fontsize/positioning ratios tuned to look good across
+    // 9:16 (720x1280, 1080x1920), 16:9 (1280x720), 1:1, 4:5.
+    const margin  = Math.round(height * 0.04);    // lateral safety margin (clamped)
+    const safeW   = Math.max(100, width - 2 * margin);
+
+    // Auto-shrink fontsize so the longest text always fits inside safeW.
+    // DejaVu Sans Bold average glyph width ≈ 0.70 × fontsize for mixed case
+    // (empirically measured at 1088×1920 — leaves a small visual safety margin).
+    const fitFontSize = (text: string, baseSize: number): number => {
+      if (!text) return baseSize;
+      const estimated = text.length * 0.70;
+      const maxFs = Math.floor(safeW / Math.max(1, estimated));
+      return Math.max(20, Math.min(baseSize, maxFs));
+    };
+    const brandFs = fitFontSize(opts.brandText, Math.round(height * 0.045));
+    const ctaFs   = fitFontSize(opts.ctaText,   Math.round(height * 0.062));
+
+    // Brand intro window: 0.4s … min(4.5s, 35% of video)
+    const brandStart = 0.4;
+    const brandEnd = Math.max(brandStart + 1.5, Math.min(4.5, durationSec * 0.35));
+    const brandFadeIn = 0.35;
+    const brandFadeOut = 0.4;
+
+    // CTA outro window: last 3.5s (or 60% of video, whichever shorter)
+    const ctaWindow = Math.min(3.5, durationSec * 0.6);
+    const ctaStart = Math.max(0.5, durationSec - ctaWindow);
+    const ctaEnd = Math.max(ctaStart + 0.5, durationSec - 0.3);
+    const ctaFadeIn = 0.35;
+    const ctaFadeOut = 0.4;
+
+    // Write text bodies to files so FFmpeg drawtext doesn't have to escape
+    // arbitrary unicode/quotes/colons inside the filtergraph string.
+    const brandFile = path.join(tmp, "brand.txt");
+    const ctaFile = path.join(tmp, "cta.txt");
+    if (brand) await fs.writeFile(brandFile, brand, "utf8");
+    if (cta) await fs.writeFile(ctaFile, cta, "utf8");
+
+    // Helper: filter chunk for one drawtext layer (escaped path is required
+    // because filter syntax uses : and , as separators).
+    const escFilterPath = (p: string) => p.replace(/\\/g, "\\\\").replace(/:/g, "\\:");
+    const fontEsc = escFilterPath(DEJAVU_BOLD_PATH);
+
+    // x is centered AND clamped so very long labels never run off-screen.
+    const xCentered = `if(lt(text_w\\,w-2*${margin})\\,(w-text_w)/2\\,${margin})`;
+
+    // Build alpha expressions: linear fade in, hold, fade out.
+    const alphaExpr = (t0: number, t1: number, fIn: number, fOut: number) =>
+      `if(lt(t\\,${t0})\\,0\\,if(lt(t\\,${t0 + fIn})\\,(t-${t0})/${fIn}\\,if(lt(t\\,${t1 - fOut})\\,1\\,if(lt(t\\,${t1})\\,(${t1}-t)/${fOut}\\,0))))`;
+
+    const layers: string[] = [];
+
+    if (brand) {
+      // Brand: top of frame at 8% from top, white with black outline + soft shadow.
+      const brandY = `${Math.round(height * 0.08)}`;
+      const brandAlpha = alphaExpr(brandStart, brandEnd, brandFadeIn, brandFadeOut);
+      layers.push(
+        `drawtext=fontfile='${fontEsc}':textfile='${escFilterPath(brandFile)}'` +
+        `:fontsize=${brandFs}:fontcolor=white:borderw=3:bordercolor=black@0.85` +
+        `:shadowcolor=black@0.55:shadowx=0:shadowy=2` +
+        `:x=${xCentered}:y=${brandY}` +
+        `:enable='between(t\\,${brandStart}\\,${brandEnd})'` +
+        `:alpha='${brandAlpha}'`,
+      );
+    }
+    if (cta) {
+      // CTA: lower third (~78% from top), bold gold with strong outline so it
+      // remains legible over any background.
+      const ctaY = `${Math.round(height * 0.78)}`;
+      const ctaAlpha = alphaExpr(ctaStart, ctaEnd, ctaFadeIn, ctaFadeOut);
+      layers.push(
+        `drawtext=fontfile='${fontEsc}':textfile='${escFilterPath(ctaFile)}'` +
+        `:fontsize=${ctaFs}:fontcolor=0xC8A84B:borderw=4:bordercolor=black@0.9` +
+        `:shadowcolor=black@0.6:shadowx=0:shadowy=3` +
+        `:x=${xCentered}:y=${ctaY}` +
+        `:enable='between(t\\,${ctaStart}\\,${ctaEnd})'` +
+        `:alpha='${ctaAlpha}'`,
+      );
+    }
+
+    if (layers.length === 0) return videoBuffer;
+
+    const ffmpeg = (await import("fluent-ffmpeg")).default;
+    ffmpeg.setFfmpegPath(await resolveFfmpegPath());
+
+    const vf = layers.join(",");
+
+    return await new Promise<Buffer>((resolve, reject) => {
+      ffmpeg(inPath)
+        .videoFilter(vf)
+        .videoCodec("libx264")
+        .audioCodec("copy")
+        .outputOptions([
+          "-preset medium",
+          "-crf 18",
+          "-pix_fmt yuv420p",
+          "-movflags +faststart",
+        ])
+        .on("end", async () => {
+          try {
+            const buf = await fs.readFile(outPath);
+            resolve(buf);
+          } catch (e) { reject(e); }
+        })
+        .on("error", (err: Error) => reject(new Error(`drawtext overlay error: ${err.message}`)))
+        .save(outPath);
+    });
+  } finally {
     fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -626,6 +883,40 @@ export async function runAdCampaign(
       // STEP 6: Compose
       onProgress?.({ stage: "compose", variantIndex: i, message: `[${i + 1}/${copies.length}] Componiendo video final con FFmpeg...` });
       let finalMp4 = await composeFinalAd(videoBuf, voiceBuf, sfxBuf);
+
+      // STEP 6.5 (always-on by default): Burn deterministic brand + CTA overlay
+      // with FFmpeg drawtext. This replaces the AI-rendered text that the video
+      // model used to hallucinate (misspelled brand names, garbled captions).
+      // Default ON because publishing ads with broken text is unacceptable.
+      const wantBrandOverlay = input.renderBrandOverlay !== false;
+      if (wantBrandOverlay) {
+        try {
+          onProgress?.({ stage: "overlay", variantIndex: i, message: `[${i + 1}/${copies.length}] Sobreimponiendo marca y CTA con tipografía nítida...` });
+          const brandText = (input.brandOverlayText ?? input.brandName ?? input.productTitle ?? "").toString();
+          const ctaText = (input.ctaOverlayText ?? copy.cta ?? "").toString();
+          const before = finalMp4;
+          finalMp4 = await applyBrandOverlay(finalMp4, {
+            brandText,
+            ctaText,
+            aspect: input.aspect,
+          });
+          // applyBrandOverlay() returns the original buffer when there's no
+          // text or when the font is missing — only count as "applied" when
+          // the buffer actually changed.
+          assets.overlayApplied = finalMp4 !== before;
+          if (!assets.overlayApplied) {
+            assets.overlayError = "overlay produced no change (empty text or missing font)";
+          }
+        } catch (overlayErr: any) {
+          // Non-fatal: ad still ships without overlay rather than failing the
+          // whole campaign for a typography step. We surface overlayApplied=false
+          // and overlayError so the UI / admin can detect silent fallback.
+          assets.overlayApplied = false;
+          assets.overlayError = overlayErr?.message || "unknown";
+          logger.warn({ err: overlayErr, variant: i }, "adstudio: brand overlay failed, continuing without it");
+          errors.push(`Variant ${i + 1} overlay: ${overlayErr?.message || "unknown"}`);
+        }
+      }
 
       // STEP 7 (optional): Burn auto-subtitles via Whisper + FFmpeg subtitles filter
       const { getTemplate } = await import("./ad-templates.js");
