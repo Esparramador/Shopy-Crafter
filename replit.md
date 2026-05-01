@@ -122,10 +122,18 @@ Anuncio publicitario 60s vertical 9:16 para marca @hanakaze.serigraphy generado 
 
 **Coste estimado total**: ~$10-12 por anuncio completo (vídeo $9.70 + voz $0.10 + música $0.30).
 
-**Ejecución 1 may 17:00-17:31 — incidente y estado actual**:
-- ✓ Generados y guardados en vault: c01 (vault 1314, 9.17MB), c02 (vault 1315, 11.39MB), c03 (vault 1317, 24.72MB)
-- ✗ **Bug operativo**: `restart_workflow hanakaze-runner` mientras un POST a generate-video estaba en vuelo NO mata limpiamente el child node (deja el proceso huérfano contra Replicate). En el primer crash del api-server (17:08-17:13) se acumularon 3 instancias del runner ejecutándose en paralelo, todas intentaron generar c03 → Replicate facturó 3 clips que nunca llegaron a `saveToVaultSmart` (~$5.40 perdidos). FIX A APLICAR antes de la próxima ejecución: el runner debe escribir su PID a `logs/hanakaze-v3.pid` al arrancar y abortar inmediato si el PID anterior sigue vivo (lockfile pattern).
-- ✗ c04 falló con `402 Payment Required: Insufficient credit` de Replicate al agotarse el saldo del proyecto. Estado limpio en `logs/hanakaze-v3-state.json` con c01/c02/c03 + 9 refs. Cuando se recargue Replicate, basta con `restart_workflow hanakaze-runner` para retomar desde c04.
+**Ejecución 1 may 17:00-17:42 — incidente, rescate y estado actual**:
+- ✓ Generados y guardados en vault originales: c01 (vault 1314), c02 (vault 1315), c03 (vault 1317).
+- ✗ **Bug operativo**: `restart_workflow hanakaze-runner` mientras un POST a generate-video estaba en vuelo NO mata limpiamente el child node (deja proceso huérfano contra Replicate). Tres instancias del runner se acumularon en paralelo cargando c03 → Replicate facturó 6 generaciones de c03 ($10.80) cuando solo 1 llegó al vault.
+- ✓ **Lockfile aplicado**: `scripts/run-hanakaze-v3-cascada.mjs` ahora escribe `logs/hanakaze-v3.pid` al arrancar y aborta con exit 2 si el PID anterior sigue vivo. Handlers `SIGTERM`/`SIGINT`/`exit` limpian el lockfile.
+- ✓ **Auditoría Replicate completa**: 13 predicciones succeeded en 16:00-17:30 = $16.22 facturado. Inventariadas todas con la API directa (`GET /v1/predictions`).
+- ✓ **Rescate ejecutado**: los 5 clips huérfanos de c03 (predicciones IDs `smz733f6wxrm`, `d255v058k5rm`, `q4ztcx08rhrm`, `bb2raxpy6srm`, `83qygrxpv5rm`) descargados desde URLs `replicate.delivery` (132 MB total) y subidos al vault como variantes 1318-1322. Ningún dólar perdido — los $9 quedan como variantes alternativas del c03 reutilizables.
+- ✗ c04 falló con `402 Payment Required: Insufficient credit` al agotarse el saldo del proyecto. Estado limpio en `logs/hanakaze-v3-state.json` con c01/c02/c03 + 9 refs. Para terminar c04+c05+c06+c07+c08 se necesitan ~$6.65 adicionales en Replicate.
+
+**Procedimientos críticos**:
+- NUNCA llamar `restart_workflow hanakaze-runner` mientras un POST a generate-video está en vuelo (clip generándose). El SIGTERM no aborta la prediction de Replicate y deja el clip sin escribir al vault. Esperar siempre a que el runner pasee al siguiente clip o use el lockfile.
+- Para auditar gasto real Replicate sin dashboard: `node` + `fetch("https://api.replicate.com/v1/predictions", { Authorization: "Bearer $REPLICATE_API_TOKEN" })` filtrando por `created_at` y `status===succeeded`. Costes: kling-master 5s=$0.90, kling-master 10s=$1.80, seedance-pro 5s=$0.35, seedance-pro 8s=$0.56.
+- Para rescatar clips huérfanos: las URLs `replicate.delivery/.../tmp*.mp4` viven ~24h. Descargar el buffer y POST a `/api/fs-pro/save-to-vault` (multipart con `projectId`, `fileType=fs-pro-video`, `mimeType=video/mp4`, `file=@...`).
 
 **Equivalente desde la UI**: `CreateAdModal` (componente Shopy Crafter) tiene 3 tabs:
 - "Rápido" → `/ads/quick` (1 clip Seedance)
