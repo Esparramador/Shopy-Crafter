@@ -22,6 +22,95 @@ interface ExtractedWebContent {
   html: string;
   css: string;
   stylesheetUrls: string[];
+  designSignals: DesignSignals;
+}
+
+interface DesignSignals {
+  fontFamilies: Array<{ family: string; uses: number }>;
+  fontFaces: Array<{ family: string; src: string }>;
+  palette: Array<{ color: string; uses: number }>;
+  cssVars: Array<{ name: string; value: string }>;
+  googleFonts: string[];
+}
+
+// Extrae señales cuantitativas del CSS (paleta con frecuencia, fuentes
+// realmente usadas, @font-face, custom properties). Damos a la IA atajos
+// numéricos en vez de obligarla a inferirlos del CSS bruto, que muchas veces
+// viene minificado y truncado.
+function extractDesignSignals(html: string, css: string): DesignSignals {
+  const fontUses = new Map<string, number>();
+  const familyRegex = /font-family\s*:\s*([^;}\n]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = familyRegex.exec(css)) !== null) {
+    const list = m[1].split(",").map(s => s.trim().replace(/['"]/g, "")).filter(Boolean);
+    if (list.length) {
+      const primary = list[0];
+      if (primary && primary.length < 80 && !/^var\(/i.test(primary)) {
+        fontUses.set(primary, (fontUses.get(primary) || 0) + 1);
+      }
+    }
+  }
+
+  const fontFaces: Array<{ family: string; src: string }> = [];
+  const faceRegex = /@font-face\s*\{([^}]+)\}/gi;
+  while ((m = faceRegex.exec(css)) !== null) {
+    const block = m[1];
+    const fam = /font-family\s*:\s*['"]?([^;'"\n]+)['"]?/i.exec(block)?.[1]?.trim();
+    const src = /src\s*:\s*([^;]+);/i.exec(block)?.[1]?.trim().slice(0, 200);
+    if (fam) fontFaces.push({ family: fam, src: src || "" });
+  }
+
+  const colorUses = new Map<string, number>();
+  const hexRegex = /#([0-9a-fA-F]{3,8})\b/g;
+  while ((m = hexRegex.exec(css)) !== null) {
+    let hex = m[1].toLowerCase();
+    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    if (hex.length === 6 || hex.length === 8) {
+      const norm = "#" + hex.slice(0, 6);
+      colorUses.set(norm, (colorUses.get(norm) || 0) + 1);
+    }
+  }
+  const rgbRegex = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi;
+  while ((m = rgbRegex.exec(css)) !== null) {
+    const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
+    if ([r, g, b].every(v => v >= 0 && v <= 255)) {
+      const norm = "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+      colorUses.set(norm, (colorUses.get(norm) || 0) + 1);
+    }
+  }
+
+  const cssVars: Array<{ name: string; value: string }> = [];
+  const varRegex = /--([a-zA-Z0-9_-]+)\s*:\s*([^;}\n]+)/g;
+  const seenVar = new Set<string>();
+  while ((m = varRegex.exec(css)) !== null) {
+    const name = `--${m[1]}`;
+    if (seenVar.has(name)) continue;
+    seenVar.add(name);
+    cssVars.push({ name, value: m[2].trim().slice(0, 80) });
+    if (cssVars.length >= 40) break;
+  }
+
+  const googleFonts: string[] = [];
+  // Captura cada parámetro family= dentro de URLs de fonts.googleapis.com
+  // (las URLs Google Fonts v2 pueden encadenar varios family= con &).
+  const gfUrlRegex = /fonts\.googleapis\.com\/css2?\?([^"'\s>]+)/gi;
+  while ((m = gfUrlRegex.exec(html)) !== null) {
+    const query = m[1].replace(/&amp;/g, "&");
+    const famRegex = /family=([^&]+)/gi;
+    let fm: RegExpExecArray | null;
+    while ((fm = famRegex.exec(query)) !== null) {
+      const fam = decodeURIComponent(fm[1]).split(":")[0].replace(/\+/g, " ").trim();
+      if (fam && !googleFonts.includes(fam)) googleFonts.push(fam);
+    }
+  }
+
+  return {
+    fontFamilies: [...fontUses.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([family, uses]) => ({ family, uses })),
+    fontFaces: fontFaces.slice(0, 12),
+    palette: [...colorUses.entries()].sort((a, b) => b[1] - a[1]).slice(0, 16).map(([color, uses]) => ({ color, uses })),
+    cssVars,
+    googleFonts: googleFonts.slice(0, 10),
+  };
 }
 
 async function extractFullWebContent(url: string): Promise<ExtractedWebContent> {
@@ -103,12 +192,35 @@ async function extractFullWebContent(url: string): Promise<ExtractedWebContent> 
   }
 
   const allCss = [...inlineStyles, ...externalCss].join("\n\n");
+  const designSignals = extractDesignSignals(html, allCss);
 
   return {
     html: html.substring(0, 200_000),
     css: allCss.substring(0, 120_000),
     stylesheetUrls,
+    designSignals,
   };
+}
+
+function formatDesignSignals(s: DesignSignals): string {
+  const lines: string[] = [];
+  lines.push("--- SEÑALES DE DISEÑO EXTRAÍDAS DEL CSS REAL ---");
+  if (s.fontFamilies.length) {
+    lines.push(`Fuentes (por frecuencia): ${s.fontFamilies.map(f => `${f.family}(${f.uses})`).join(", ")}`);
+  }
+  if (s.fontFaces.length) {
+    lines.push(`@font-face declarados: ${s.fontFaces.map(f => f.family).join(", ")}`);
+  }
+  if (s.googleFonts.length) {
+    lines.push(`Google Fonts cargados: ${s.googleFonts.join(", ")}`);
+  }
+  if (s.palette.length) {
+    lines.push(`Paleta cuantitativa (color → usos): ${s.palette.slice(0, 10).map(p => `${p.color}(${p.uses})`).join(" · ")}`);
+  }
+  if (s.cssVars.length) {
+    lines.push(`Custom properties detectadas: ${s.cssVars.slice(0, 16).map(v => `${v.name}=${v.value}`).join(" · ")}`);
+  }
+  return lines.join("\n");
 }
 
 interface WebLabAnalysis {
@@ -272,11 +384,13 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       instagramInfo: Record<string, unknown> | null;
       competitorDesign: Record<string, unknown> | null;
       sectorDesign: Record<string, unknown> | null;
+      encyclopedia: Record<string, unknown> | null;
     } = {
       brandInfo: null,
       instagramInfo: null,
       competitorDesign: null,
       sectorDesign: null,
+      encyclopedia: null,
     };
 
     const parsedUrl = new URL(normalizedUrl);
@@ -286,10 +400,11 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
     logger.info({ searchName, instagram, domain }, "🔍 Web Lab: Starting brand research");
 
     try {
-      const [brandResult, igResult, competitorResult, sectorResult] = await Promise.allSettled([
+      const multiSourceHint = "Cruza información de MÚLTIPLES fuentes (Google, Bing, DuckDuckGo, Wikipedia, Trustpilot, Crunchbase, LinkedIn, Instagram, prensa local). Cita 'sources' con URLs reales encontradas. Si dos fuentes se contradicen, usa la más reciente o la oficial.";
+      const [brandResult, igResult, competitorResult, sectorResult, encyclopediaResult] = await Promise.allSettled([
         askGeminiWithSearch(
-          `Investiga "${searchName}" (${url}). Qué es, qué vende, sector/nicho, público objetivo (edad, género, poder adquisitivo), estilo de marca (luxury, streetwear, corporate, artesanal, tech, minimal, bold...), colores que usa, valores de marca, rango de precios. SOLO JSON: { "name": "", "sector": "", "audience": "", "style": "", "colors": [], "values": [], "priceRange": "", "luxuryLevel": 0, "designAdjectives": [] }`,
-          "Brand analyst. Return ONLY valid JSON. Search Google for real info."
+          `Investiga "${searchName}" (${url}). ${multiSourceHint} Qué es, qué vende, sector/nicho, público objetivo (edad, género, poder adquisitivo), estilo de marca (luxury, streetwear, corporate, artesanal, tech, minimal, bold...), colores que usa, valores de marca, rango de precios. SOLO JSON: { "name": "", "sector": "", "audience": "", "style": "", "colors": [], "values": [], "priceRange": "", "luxuryLevel": 0, "designAdjectives": [], "sources": [] }`,
+          "Brand analyst riguroso. Return ONLY valid JSON. Cruza Google, Bing, DuckDuckGo y fuentes oficiales antes de afirmar nada."
         ),
         instagram
           ? askGeminiWithSearch(
@@ -297,16 +412,20 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
               "Instagram visual analyst. Return ONLY JSON."
             )
           : askGeminiWithSearch(
-              `Busca la cuenta oficial de Instagram de "${searchName}" (${url}). Si la encuentras, analiza su estilo visual. JSON: { "handle": "", "found": false, "aesthetic": "", "colors": [] }`,
+              `Busca la cuenta oficial de Instagram de "${searchName}" (${url}) en Google, Bing y DuckDuckGo. Si la encuentras, analiza su estilo visual. JSON: { "handle": "", "found": false, "aesthetic": "", "colors": [] }`,
               "Social media researcher. Return ONLY JSON."
             ),
         askGeminiWithSearch(
-          `Busca 3 webs de competidores de "${searchName}" y analiza su DISEÑO WEB. Patrones de diseño, colores, tipografías, estilo de layout, estilo de fotos. JSON: { "competitors": [{ "name": "", "url": "", "designStyle": "", "colors": [], "fonts": [], "highlights": "" }] }`,
+          `Busca 3 webs de competidores DIRECTOS de "${searchName}" y analiza su DISEÑO WEB. ${multiSourceHint} Patrones de diseño, colores, tipografías, estilo de layout, estilo de fotos. JSON: { "competitors": [{ "name": "", "url": "", "designStyle": "", "colors": [], "fonts": [], "highlights": "" }] }`,
           "Competitive design analyst. Return ONLY JSON."
         ),
         askGeminiWithSearch(
-          `What are the best web design trends for ${searchName}'s sector in 2026? Find 3 award-winning websites in the same industry. JSON: { "trends": [], "awardWinningExamples": [{ "url": "", "why": "" }], "recommendedFonts": [], "colorTrends": [] }`,
+          `What are the best web design trends for ${searchName}'s sector in 2026? Find 3 award-winning websites (Awwwards, CSSDA, FWA) in the same industry. JSON: { "trends": [], "awardWinningExamples": [{ "url": "", "why": "" }], "recommendedFonts": [], "colorTrends": [] }`,
           "Web design trend analyst. Return ONLY JSON."
+        ),
+        askGeminiWithSearch(
+          `Busca a "${searchName}" en Wikipedia (es y en) y en bases enciclopédicas/empresariales (Crunchbase, LinkedIn, OpenCorporates). ${multiSourceHint} Devuelve JSON: { "wikipediaUrl": "", "summary": "", "founded": "", "headquarters": "", "founders": [], "categoryTags": [], "knownFor": [], "sources": [] }`,
+          "Encyclopedic researcher. Return ONLY JSON. Si nada concluyente, devuelve campos vacíos pero NO inventes."
         ),
       ]);
 
@@ -323,6 +442,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       brandResearch.instagramInfo = parseSafe(igResult);
       brandResearch.competitorDesign = parseSafe(competitorResult);
       brandResearch.sectorDesign = parseSafe(sectorResult);
+      brandResearch.encyclopedia = parseSafe(encyclopediaResult);
 
       logger.info({
         hasBrand: !!brandResearch.brandInfo,
@@ -340,6 +460,7 @@ ${brandResearch.brandInfo ? `MARCA: ${JSON.stringify(brandResearch.brandInfo)}` 
 ${brandResearch.instagramInfo ? `INSTAGRAM: ${JSON.stringify(brandResearch.instagramInfo)}\nINSTRUCCIÓN: El CSS DEBE reflejar la estética de su Instagram.` : ""}
 ${brandResearch.competitorDesign ? `COMPETIDORES (diseño web): ${JSON.stringify(brandResearch.competitorDesign)}\nINSTRUCCIÓN: El CSS mejorado debe ser MEJOR que el de los competidores.` : ""}
 ${brandResearch.sectorDesign ? `TENDENCIAS DEL SECTOR: ${JSON.stringify(brandResearch.sectorDesign)}` : ""}
+${brandResearch.encyclopedia ? `ENCICLOPEDIA / FUENTES OFICIALES: ${JSON.stringify(brandResearch.encyclopedia)}` : ""}
 REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como la marca "${searchName}".
 ═══ FIN INTELIGENCIA DE MARCA ═══
 `;
@@ -348,6 +469,7 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
     contextParts.push(brandContextBlock);
     contextParts.push(`URL ANALIZADA: ${url}`);
     contextParts.push(`\n--- HTML REAL DE LA PÁGINA (${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
+    contextParts.push(`\n${formatDesignSignals(extraction.designSignals)}`);
     contextParts.push(`\n--- CSS REAL (inline + ${extraction.stylesheetUrls.length} archivos externos, ${cssForClaude.length} chars) ---\n${cssForClaude}`);
 
     if (pageSpeed) {
@@ -493,7 +615,7 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
       learnFromOperation({
         operationType: "web_lab_brand_intelligence",
         title: `Brand intelligence: ${searchName} — ${url}`,
-        content: `Marca: ${JSON.stringify(brandResearch.brandInfo)}. Instagram: ${JSON.stringify(brandResearch.instagramInfo)}. Competidores: ${JSON.stringify(brandResearch.competitorDesign)}. Sector design trends: ${JSON.stringify(brandResearch.sectorDesign)}.`,
+        content: `Marca: ${JSON.stringify(brandResearch.brandInfo)}. Instagram: ${JSON.stringify(brandResearch.instagramInfo)}. Competidores: ${JSON.stringify(brandResearch.competitorDesign)}. Sector design trends: ${JSON.stringify(brandResearch.sectorDesign)}. Enciclopedia: ${JSON.stringify(brandResearch.encyclopedia)}.`,
         confidence: 0.85,
         tags: ["web-lab", "brand-intelligence", searchName, url],
       });
@@ -1137,6 +1259,7 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
   let contextParts: string[] = [];
   contextParts.push(`URL ANALIZADA: ${url}`);
   contextParts.push(`\n--- HTML REAL (${htmlForClaude.length} chars) ---\n${htmlForClaude}`);
+  contextParts.push(`\n${formatDesignSignals(extraction.designSignals)}`);
   contextParts.push(`\n--- CSS REAL (${extraction.stylesheetUrls.length} archivos, ${cssForClaude.length} chars) ---\n${cssForClaude}`);
 
   if (pageSpeed) {
@@ -1473,5 +1596,209 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+// ─── Manual edit save: persist user-edited HTML/CSS as a NEW vault version ──
+// El frontend pasa html y css editados; los guardamos como nueva entrada con
+// fileType "web-lab-edited-html" / "web-lab-edited-css", referenciando la URL
+// original. Permite descargar y versionar libremente sin perder el original.
+router.post("/web-lab/save-edit", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, url, html, css, label, parentVaultId } = req.body as {
+      projectId: number;
+      url?: string;
+      html?: string;
+      css?: string;
+      label?: string;
+      parentVaultId?: number;
+    };
+    if (!projectId || (!html && !css)) {
+      res.status(400).json({ error: "projectId y al menos html o css son requeridos" });
+      return;
+    }
+
+    const ts = new Date().toISOString();
+    const labelTxt = label?.trim() || `Edición ${new Date().toLocaleString("es-ES")}`;
+    const ids: { htmlId?: number; cssId?: number } = {};
+
+    // OJO: NO pasamos `originalUrl` porque el endpoint de descarga del vault
+    // intentaría re-fetchar esa URL en vez de servir nuestro `content` editado.
+    // La URL queda referenciada en metadata para trazabilidad.
+    if (html && html.trim()) {
+      const id = await saveToVault({
+        projectId,
+        fileType: "web-lab-edited-html",
+        category: "web-lab",
+        title: `${labelTxt} — HTML${url ? ` (${url})` : ""}`,
+        description: `Edición manual de HTML${url ? ` para ${url}` : ""}.`,
+        mimeType: "text/html",
+        generatedBy: "web-lab-edit",
+        content: html,
+        metadata: { url, parentVaultId, editedAt: ts, label: labelTxt, kind: "html" },
+      });
+      if (id) ids.htmlId = id;
+    }
+    if (css && css.trim()) {
+      const id = await saveToVault({
+        projectId,
+        fileType: "web-lab-edited-css",
+        category: "web-lab",
+        title: `${labelTxt} — CSS${url ? ` (${url})` : ""}`,
+        description: `Edición manual de CSS${url ? ` para ${url}` : ""}.`,
+        mimeType: "text/css",
+        generatedBy: "web-lab-edit",
+        content: css,
+        metadata: { url, parentVaultId, editedAt: ts, label: labelTxt, kind: "css" },
+      });
+      if (id) ids.cssId = id;
+    }
+
+    res.json({ ok: true, ...ids });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "POST /web-lab/save-edit failed");
+    res.status(500).json({ error: err?.message || "Save failed" });
+  }
+});
+
+// ─── Generate from scratch: usa ADN visual de la tienda para generar una
+//     página web profesional de cero (sin URL existente). Devuelve html+css
+//     editables y los guarda en vault.
+router.post("/web-lab/generate-from-scratch", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, pageType, brief, sections, language } = req.body as {
+      projectId: number;
+      pageType?: "landing" | "about" | "product" | "contact" | "blog" | "pricing";
+      brief?: string;
+      sections?: string[];
+      language?: string;
+    };
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    // Comprobación de créditos ANTES de flushHeaders.
+    // Generar una página completa desde cero consume 1 crédito tipo "image"
+    // (mismo coste que iterate, ya que es una llamada Claude pesada de hasta 16K tokens).
+    if (projectId > 0) {
+      try {
+        const limit = await checkProductionLimit(projectId, "image", 1);
+        if (!limit.allowed) {
+          res.status(402).json({
+            error: limit.reason || "Sin créditos suficientes para generar una página desde cero.",
+            planLimit: true,
+            planLabel: limit.planLabel,
+            remaining: limit.remaining,
+          });
+          return;
+        }
+      } catch (limitErr) {
+        logger.warn({ err: limitErr, projectId }, "Web Lab from-scratch — checkProductionLimit failed (continuando sin bloquear)");
+      }
+    }
+
+    res.status(200);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    enableLongRunning(res);
+    if (typeof (res as unknown as { flushHeaders?: () => void }).flushHeaders === "function") {
+      (res as unknown as { flushHeaders: () => void }).flushHeaders();
+    }
+
+    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!proj) { res.end(JSON.stringify({ error: "Proyecto no encontrado" })); return; }
+
+    // Cargamos brand profile para inyectar paleta/fuentes/voz reales.
+    const { fetchBrandProfile, generateBrandCss, buildBrandDnaContext } = await import("../lib/brand-css-generator.js");
+    const brandProfile = await fetchBrandProfile(projectId).catch(() => null);
+    const brandCss = brandProfile ? generateBrandCss(brandProfile) : "";
+    const brandContext = brandProfile ? buildBrandDnaContext(brandProfile) : "Sin ADN de marca registrado.";
+
+    const lang = language || "es";
+    const type = pageType || "landing";
+    const sectionList = (sections && sections.length ? sections : ["hero", "features", "social-proof", "pricing", "cta", "footer"]).join(", ");
+
+    const sysPrompt = `Eres un director de arte web senior especializado en diseño de marca. Generas páginas HTML+CSS profesionales que parecen hechas a medida por un estudio premium. Nunca producción genérica, nunca Lorem ipsum, siempre lenguaje en ${lang}.`;
+    const userPrompt = `Diseña una página "${type}" para la marca "${proj.name}" con secciones: ${sectionList}.
+
+ADN de marca (úsalo literalmente para colores, tipografías, voz):
+${brandContext}
+
+${brief ? `Brief adicional del usuario:\n"""${brief.slice(0, 2000)}"""\n` : ""}
+
+Devuelve JSON ESTRICTO:
+{
+  "html": "<!DOCTYPE html>...</html>  (página entera, semántica, en ${lang}, copy real para ${proj.name})",
+  "css": "/* CSS completo profesional, mínimo 250 líneas, custom properties con paleta REAL de la marca, responsive 480/768/1024, hover/focus states, transitions */",
+  "summary": "1-2 frases describiendo el diseño"
+}
+
+REGLAS DURAS:
+- Cero placeholder, cero Lorem ipsum.
+- Copy en ${lang}, contextual a "${proj.name}" y su sector.
+- CSS plano profesional (NO Tailwind), con tokens :root.
+- Imágenes: usa <img> con src "https://images.unsplash.com/photo-..." reales o placeholders descritos en alt.
+- Footer con datos plausibles ${proj.name ? `de ${proj.name}` : ""}.`;
+
+    // 32K tokens output: una página HTML+CSS profesional necesita ~20-25K tokens
+    // (HTML ~5K + CSS ~250 líneas + summary). Con 16K se truncaba el JSON.
+    const result = await askClaudeJsonWithBrain<{ html: string; css: string; summary: string }>(
+      projectId, userPrompt, sysPrompt, "general", undefined, 32000, 420_000,
+    );
+
+    if (!result.html || !result.css) {
+      res.end(JSON.stringify({ error: "El generador devolvió HTML/CSS vacío" }));
+      return;
+    }
+
+    // Si la marca tiene CSS de tokens base, lo prependemos para reforzar identidad visual.
+    const finalCss = brandCss ? `/* === BRAND TOKENS === */\n${brandCss}\n\n/* === PAGE === */\n${result.css}` : result.css;
+
+    const tags = [proj.name || "marca", "web-lab", "from-scratch", type];
+    const [htmlId, cssId] = await Promise.all([
+      saveToVault({
+        projectId,
+        fileType: "web-lab-generated-html",
+        category: "web-lab",
+        title: `Página ${type} — ${proj.name}`,
+        description: result.summary || `Página ${type} generada desde cero para ${proj.name}.`,
+        mimeType: "text/html",
+        generatedBy: "web-lab-from-scratch",
+        content: result.html,
+        metadata: { pageType: type, sections, tags, summary: result.summary },
+      }),
+      saveToVault({
+        projectId,
+        fileType: "web-lab-generated-css",
+        category: "web-lab",
+        title: `CSS página ${type} — ${proj.name}`,
+        description: `CSS profesional página ${type} para ${proj.name}.`,
+        mimeType: "text/css",
+        generatedBy: "web-lab-from-scratch",
+        content: finalCss,
+        metadata: { pageType: type, sections, tags },
+      }),
+    ]);
+
+    // Registramos consumo (1 crédito de tipo "image", coherente con iterate).
+    if (projectId > 0) {
+      try {
+        await recordUsage(projectId, "image", 1);
+      } catch (usageErr) {
+        logger.warn({ err: usageErr, projectId }, "Web Lab from-scratch — recordUsage failed (no bloquea respuesta)");
+      }
+    }
+
+    res.end(JSON.stringify({
+      ok: true,
+      html: result.html,
+      css: finalCss,
+      summary: result.summary,
+      vaultIds: { htmlId, cssId },
+    }));
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "POST /web-lab/generate-from-scratch failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: err?.message || "Generation failed" });
+    } else {
+      res.end(JSON.stringify({ error: err?.message || "Generation failed" }));
+    }
+  }
+});
 
 export default router;

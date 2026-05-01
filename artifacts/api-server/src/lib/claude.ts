@@ -29,6 +29,14 @@ function repairJson(raw: string): string {
     else if (c === "]") brackets--;
   }
 
+  // Caso: respuesta truncada en mitad de un valor string (e.g. HTML/CSS muy largos).
+  // Cerramos la string colgante y luego cortamos en el último punto seguro.
+  if (inString) {
+    // Si terminamos con un escape pendiente (\) lo eliminamos para no romper la "
+    if (escape) s = s.slice(0, -1);
+    s += '"';
+  }
+
   if (braces > 0 || brackets > 0) {
     const lastValidIdx = findLastValidJsonPosition(s);
     if (lastValidIdx > 0 && lastValidIdx < s.length - 1) {
@@ -243,9 +251,18 @@ export async function askClaudeJson<T>(
     opts,
   );
 
+  // 1) Fence ```json ... ``` cerrado correctamente.
   const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
   if (codeBlockMatch) {
     return safeJsonParse<T>(codeBlockMatch[1], "askClaudeJson:codeblock");
+  }
+
+  // 2) Fence ```json sin cerrar (respuesta truncada) — capturamos hasta el final.
+  //    safeJsonParse hará la reparación del JSON incompleto.
+  const openFenceMatch = text.match(/```(?:json)?\s*([\s\S]*)$/);
+  if (openFenceMatch && /^[\s]*[\{\[]/.test(openFenceMatch[1])) {
+    const stripped = openFenceMatch[1].replace(/```\s*$/, "");
+    return safeJsonParse<T>(stripped, "askClaudeJson:openfence");
   }
 
   const objectMatch = text.match(/(\{[\s\S]*\})/);

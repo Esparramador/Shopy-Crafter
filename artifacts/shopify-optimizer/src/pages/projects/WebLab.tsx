@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
 import { scoreColor } from "@/lib/utils";
 import { LiveOperation } from "@/components/LiveOperation";
@@ -104,7 +104,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [phase, setPhase] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview">("summary");
+  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview" | "edit">("summary");
   const [copied, setCopied] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -113,6 +113,21 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [changeRequest, setChangeRequest] = useState("");
   const [iterating, setIterating] = useState(false);
   const [iterError, setIterError] = useState("");
+  // Editor manual: HTML/CSS editables sincronizados con el resultado vigente.
+  const [editHtml, setEditHtml] = useState("");
+  const [editCss, setEditCss] = useState("");
+  const [editLabel, setEditLabel] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [savedEditMsg, setSavedEditMsg] = useState("");
+
+  // "Generar desde cero": inventamos una página entera con ADN de marca, sin URL
+  // de partida. El backend usa fetchBrandProfile + Claude para componer HTML+CSS.
+  const [showScratch, setShowScratch] = useState(false);
+  const [scratchPageType, setScratchPageType] = useState<"landing" | "about" | "product" | "contact" | "blog" | "pricing">("landing");
+  const [scratchBrief, setScratchBrief] = useState("");
+  const [scratchSections, setScratchSections] = useState("hero, features, social-proof, pricing, cta, footer");
+  const [scratchLoading, setScratchLoading] = useState(false);
+  const [scratchMsg, setScratchMsg] = useState("");
 
   const loadHistory = useCallback(async () => {
     if (!projectId) return;
@@ -122,6 +137,92 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setHistory(data.items || []);
     } catch {}
   }, [projectId]);
+
+  // Cuando llega un análisis nuevo o se itera, precargamos el editor con la
+  // versión vigente. Distinguimos dos escenarios:
+  //   1) Cambia la URL analizada → análisis NUEVO → pisamos el editor (lo que
+  //      el usuario hubiese tecleado para la URL anterior queda obsoleto).
+  //   2) Misma URL pero el análisis se actualizó (iteración) → respetamos lo
+  //      que el usuario está editando y sólo precargamos si el editor está vacío.
+  const lastSeededUrlRef = useRef<string>("");
+  useEffect(() => {
+    const a = result?.analysis;
+    if (!a) return;
+    const currentUrl = result?.url || "";
+    const fragments = (a.improvedHtmlFragments || []).map(f => `<!-- ${f.section} -->\n${f.improved}`).join("\n\n");
+    const css = a.improvedCss || "";
+    const isNewUrl = currentUrl !== lastSeededUrlRef.current;
+    if (isNewUrl) {
+      // Análisis de otra URL → pisamos siempre.
+      setEditHtml(fragments);
+      setEditCss(css);
+      lastSeededUrlRef.current = currentUrl;
+    } else {
+      // Misma URL → solo rellenamos huecos.
+      setEditHtml(prev => prev?.trim() ? prev : fragments);
+      setEditCss(prev => prev?.trim() ? prev : css);
+    }
+  }, [result?.url, result?.analysis?.improvedCss, result?.analysis?.improvedHtmlFragments]);
+
+  const saveEdit = useCallback(async () => {
+    if (!projectId) { setSavedEditMsg("⚠ No hay proyecto seleccionado"); return; }
+    if (!editHtml.trim() && !editCss.trim()) { setSavedEditMsg("⚠ Nada que guardar"); return; }
+    setSavingEdit(true); setSavedEditMsg("");
+    try {
+      const r = await fetch(`${API_BASE}/api/web-lab/save-edit`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          url: url || result?.url,
+          html: editHtml,
+          css: editCss,
+          label: editLabel || undefined,
+          parentVaultId: result?.vaultIds?.html || result?.vaultIds?.css || undefined,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+      setSavedEditMsg(`✓ Guardado en bóveda${data.htmlId ? ` (HTML #${data.htmlId})` : ""}${data.cssId ? ` (CSS #${data.cssId})` : ""}`);
+      loadHistory();
+    } catch (e: any) {
+      setSavedEditMsg(`⚠ Error: ${e.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [projectId, url, result, editHtml, editCss, editLabel, loadHistory]);
+
+  const generateFromScratch = useCallback(async () => {
+    if (!projectId) { setScratchMsg("⚠ Selecciona un proyecto"); return; }
+    setScratchLoading(true); setScratchMsg("");
+    try {
+      const r = await fetch(`${API_BASE}/api/web-lab/generate-from-scratch`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          pageType: scratchPageType,
+          brief: scratchBrief || undefined,
+          sections: scratchSections.split(",").map(s => s.trim()).filter(Boolean),
+          language: "es",
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+      setEditHtml(data.html || "");
+      setEditCss(data.css || "");
+      setEditLabel(`from-scratch · ${scratchPageType}`);
+      setTab("edit");
+      setScratchMsg(`✓ Generado y guardado en bóveda (HTML #${data.vaultIds?.htmlId} · CSS #${data.vaultIds?.cssId}). Cargado en el editor para refinar.`);
+      loadHistory();
+    } catch (e: any) {
+      setScratchMsg(`⚠ Error: ${e.message}`);
+    } finally {
+      setScratchLoading(false);
+    }
+  }, [projectId, scratchPageType, scratchBrief, scratchSections, loadHistory]);
 
   const analyze = async () => {
     if (!url.trim()) return;
@@ -458,8 +559,82 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           >
             📜 Historial
           </button>}
+          {projectId > 0 && <button
+            onClick={() => setShowScratch(s => !s)}
+            style={{
+              padding: "12px 16px",
+              background: showScratch ? "linear-gradient(135deg, #d4a843, #b8860b)" : "transparent",
+              border: "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: showScratch ? "#000" : "var(--t2, #aaa)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: showScratch ? 700 : 400,
+            }}
+          >
+            ✨ Crear desde cero
+          </button>}
         </div>
       </div>
+
+      {showScratch && projectId > 0 && (
+        <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 20, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
+          <div style={{ marginBottom: 12 }}>
+            <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>✨ Generar página profesional desde cero</h3>
+            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              Sin URL de partida. Usamos el ADN de marca registrado del proyecto (paleta, tipografías, voz) y un brief opcional para componer una página completa con HTML+CSS guardada automáticamente en la bóveda.
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 12, marginBottom: 12 }}>
+            <select
+              value={scratchPageType}
+              onChange={(e) => setScratchPageType(e.target.value as typeof scratchPageType)}
+              style={{ padding: "10px 12px", background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10, color: "#eee", fontSize: 13 }}
+            >
+              <option value="landing">Landing</option>
+              <option value="about">About / Sobre nosotros</option>
+              <option value="product">Product page</option>
+              <option value="contact">Contact</option>
+              <option value="blog">Blog index</option>
+              <option value="pricing">Pricing</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Secciones separadas por coma (hero, features, testimonios, pricing, faq, cta, footer…)"
+              value={scratchSections}
+              onChange={(e) => setScratchSections(e.target.value)}
+              style={{ padding: "10px 12px", background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10, color: "#eee", fontSize: 13 }}
+            />
+          </div>
+          <textarea
+            value={scratchBrief}
+            onChange={(e) => setScratchBrief(e.target.value)}
+            placeholder="Brief opcional: tono, audiencia, mensaje principal, llamada a la acción, referencias…"
+            style={{
+              width: "100%", minHeight: 100, padding: 12,
+              background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
+              color: "#eee", fontSize: 13, resize: "vertical",
+              boxSizing: "border-box", outline: "none", marginBottom: 12,
+              fontFamily: "inherit",
+            }}
+          />
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              onClick={generateFromScratch}
+              disabled={scratchLoading}
+              style={{
+                padding: "10px 22px",
+                background: scratchLoading ? "#2a2a30" : "linear-gradient(135deg, #d4a843, #b8860b)",
+                border: "none", borderRadius: 10, color: scratchLoading ? "#666" : "#000",
+                fontWeight: 700, cursor: scratchLoading ? "not-allowed" : "pointer", fontSize: 13,
+              }}
+            >{scratchLoading ? "Componiendo…" : "🎨 Generar y guardar"}</button>
+            {scratchMsg && (
+              <span style={{ fontSize: 12, color: scratchMsg.startsWith("✓") ? "#22c55e" : "#ef4444" }}>{scratchMsg}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 32, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
@@ -526,8 +701,8 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
       {a && result && (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            {(["summary", "css", "html", "preview"] as const).map((t) => {
-              const labels = { summary: "📊 Resumen", css: "💻 Código CSS", html: "🏗️ HTML", preview: "👁️ Preview" };
+            {(["summary", "css", "html", "preview", "edit"] as const).map((t) => {
+              const labels = { summary: "📊 Resumen", css: "💻 Código CSS", html: "🏗️ HTML", preview: "👁️ Preview", edit: "✏️ Editar y Guardar" };
               return (
                 <button
                   key={t}
@@ -870,7 +1045,7 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                 {/* Device-sized preview frame */}
                 <div style={{ display: "flex", justifyContent: "center", padding: 16, background: "#0a0a0a", borderRadius: 12 }}>
                   <iframe
-                    sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                    sandbox="allow-popups"
                     title="Preview de la página mejorada"
                     style={{
                       width: previewDevice === "desktop" ? "100%" : previewDevice === "tablet" ? 768 : 390,
@@ -933,6 +1108,108 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                       "Refrescando la vista previa con el resultado…",
                     ]}
                     className="w-full mt-3"
+                  />
+                </div>
+              </div>
+            )}
+
+            {tab === "edit" && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700 }}>✏️ Editor manual de HTML/CSS</h3>
+                  <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                    Edita libremente el HTML y el CSS. Al guardar, se crea una nueva versión en la bóveda del proyecto sin tocar el original. Puedes descargarla luego desde el historial.
+                  </p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 6, fontWeight: 600 }}>HTML editable</label>
+                    <textarea
+                      value={editHtml}
+                      onChange={(e) => setEditHtml(e.target.value)}
+                      spellCheck={false}
+                      style={{
+                        width: "100%", height: 400,
+                        background: "#0a0a0a", color: "#dcdcaa",
+                        border: "1px solid #2a2a30", borderRadius: 10,
+                        padding: 12, fontFamily: "ui-monospace, monospace",
+                        fontSize: 12, lineHeight: 1.5, resize: "vertical",
+                        boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "#aaa", marginBottom: 6, fontWeight: 600 }}>CSS editable</label>
+                    <textarea
+                      value={editCss}
+                      onChange={(e) => setEditCss(e.target.value)}
+                      spellCheck={false}
+                      style={{
+                        width: "100%", height: 400,
+                        background: "#0a0a0a", color: "#9cdcfe",
+                        border: "1px solid #2a2a30", borderRadius: 10,
+                        padding: 12, fontFamily: "ui-monospace, monospace",
+                        fontSize: 12, lineHeight: 1.5, resize: "vertical",
+                        boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="Etiqueta opcional (p.ej. 'v2 — header oscuro')"
+                    value={editLabel}
+                    onChange={(e) => setEditLabel(e.target.value)}
+                    style={{
+                      flex: 1, minWidth: 220, padding: "9px 14px",
+                      background: "#0a0a0a", border: "1px solid #2a2a30",
+                      borderRadius: 10, color: "#eee", fontSize: 13, outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={saveEdit}
+                    disabled={savingEdit}
+                    style={{
+                      padding: "10px 22px",
+                      background: savingEdit ? "#2a2a30" : "linear-gradient(135deg, #22c55e, #16a34a)",
+                      border: "none", borderRadius: 10, color: savingEdit ? "#666" : "#000",
+                      fontWeight: 700, cursor: savingEdit ? "not-allowed" : "pointer", fontSize: 13,
+                    }}
+                  >{savingEdit ? "Guardando…" : "💾 Guardar versión en bóveda"}</button>
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([editHtml], { type: "text/html" });
+                      const a2 = document.createElement("a");
+                      a2.href = URL.createObjectURL(blob);
+                      a2.download = `editado-${Date.now()}.html`;
+                      a2.click();
+                    }}
+                    style={{ padding: "10px 16px", background: "#1a1a2e", border: "1px solid #333", borderRadius: 10, color: "#ccc", cursor: "pointer", fontSize: 12 }}
+                  >⬇ HTML</button>
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([editCss], { type: "text/css" });
+                      const a2 = document.createElement("a");
+                      a2.href = URL.createObjectURL(blob);
+                      a2.download = `editado-${Date.now()}.css`;
+                      a2.click();
+                    }}
+                    style={{ padding: "10px 16px", background: "#1a1a2e", border: "1px solid #333", borderRadius: 10, color: "#ccc", cursor: "pointer", fontSize: 12 }}
+                  >⬇ CSS</button>
+                </div>
+                {savedEditMsg && (
+                  <div style={{ fontSize: 12, color: savedEditMsg.startsWith("✓") ? "#22c55e" : "#ef4444", marginBottom: 12 }}>
+                    {savedEditMsg}
+                  </div>
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: "#e6c668", marginBottom: 8 }}>🔍 Preview en vivo de tu edición</h4>
+                  <iframe
+                    sandbox="allow-popups"
+                    title="Preview de la edición manual"
+                    style={{ width: "100%", height: 520, border: "1px solid #2a2a30", borderRadius: 12, background: "#fff" }}
+                    srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><base target="_blank"><style>${editCss}\nbody{margin:0;padding:0;min-height:100vh}</style></head><body>${editHtml}</body></html>`}
                   />
                 </div>
               </div>

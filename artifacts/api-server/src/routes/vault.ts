@@ -282,7 +282,10 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Type", file.mimeType ?? "application/octet-stream");
 
-  // Intentar servir desde Object Storage primero, luego desde URL original
+  // PRIORIDAD: objectPath → content → originalUrl
+  // El contenido REAL guardado siempre gana sobre re-fetchar la URL origen
+  // (evita que un análisis o una edición devuelvan la web actual del cliente
+  // en vez del artefacto que el usuario guardó en su día).
   if (file.objectPath) {
     try {
       const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
@@ -290,18 +293,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
       const buffer = Buffer.from(await response.arrayBuffer());
       res.send(buffer);
       return;
-    } catch { /* fallback to originalUrl */ }
-  }
-
-  if (file.originalUrl) {
-    try {
-      const response = await fetch(file.originalUrl);
-      if (response.ok) {
-        const buffer = Buffer.from(await response.arrayBuffer());
-        res.send(buffer);
-        return;
-      }
-    } catch {}
+    } catch { /* fallback to content/originalUrl */ }
   }
 
   if (file.content) {
@@ -343,6 +335,20 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.send(htmlReport);
       return;
+    } catch {}
+  }
+
+  // Último recurso: si no hay objectPath, content ni metadata, intentamos
+  // re-fetchar la URL original (sólo aplica a registros legacy de imágenes
+  // que se referenciaban sin clonar).
+  if (file.originalUrl) {
+    try {
+      const response = await fetch(file.originalUrl);
+      if (response.ok) {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
+        return;
+      }
     } catch {}
   }
 
@@ -491,23 +497,6 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         // CPU y elimina riesgo de fallar DEFLATE sobre buffers de >100MB.
         archive.append(buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
         added++;
-      } else if (file.originalUrl) {
-        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
-        if (response.ok && response.body) {
-          const buffer = Buffer.from(await response.arrayBuffer());
-          // Sniff: si recibimos HTML cuando esperábamos binario (URL expirada
-          // que devuelve página de error), guardamos como .html para no
-          // poner bytes basura con extensión .mp4.
-          const sniffed = sniffMimeFromMagic(buffer);
-          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
-          const realExt = sniffed ? extForMime(sniffed) : ext;
-          const finalName = `${folder}/${safeTitle}_${file.id}.${realExt}`;
-          archive.append(buffer, { name: finalName, store: isAlreadyCompressed(realMime) });
-          added++;
-        } else {
-          skipped++;
-          logger.warn({ fileId: file.id, status: response.status, url: file.originalUrl }, "ZIP: originalUrl no disponible, archivo omitido");
-        }
       } else if (file.content) {
         if (isBinaryMime(file.mimeType)) {
           try {
@@ -544,6 +533,21 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
+      } else if (file.originalUrl) {
+        // Sólo cuando NO hay objectPath/content/metadata: re-fetchamos.
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
+        if (response.ok && response.body) {
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const sniffed = sniffMimeFromMagic(buffer);
+          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
+          const realExt = sniffed ? extForMime(sniffed) : ext;
+          const finalName = `${folder}/${safeTitle}_${file.id}.${realExt}`;
+          archive.append(buffer, { name: finalName, store: isAlreadyCompressed(realMime) });
+          added++;
+        } else {
+          skipped++;
+          logger.warn({ fileId: file.id, status: response.status, url: file.originalUrl }, "ZIP: originalUrl no disponible");
+        }
       } else {
         skipped++;
       }
@@ -653,19 +657,6 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         const buffer = Buffer.from(await response.arrayBuffer());
         archive.append(buffer, { name: entryName, store: isAlreadyCompressed(file.mimeType) });
         added++;
-      } else if (file.originalUrl) {
-        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
-        if (response.ok && response.body) {
-          const buffer = Buffer.from(await response.arrayBuffer());
-          const sniffed = sniffMimeFromMagic(buffer);
-          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
-          const realExt = sniffed ? extForMime(sniffed) : ext;
-          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${realExt}`, store: isAlreadyCompressed(realMime) });
-          added++;
-        } else {
-          skipped++;
-          logger.warn({ fileId: file.id, status: response.status }, "ZIP: originalUrl no disponible");
-        }
       } else if (file.content) {
         if (isBinaryMime(file.mimeType)) {
           // Binario almacenado como base64 en DB (fallback cuando GCS falló).
@@ -701,6 +692,20 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
+      } else if (file.originalUrl) {
+        // Sólo cuando NO hay objectPath/content/metadata.
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
+        if (response.ok && response.body) {
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const sniffed = sniffMimeFromMagic(buffer);
+          const realMime = sniffed ?? file.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream";
+          const realExt = sniffed ? extForMime(sniffed) : ext;
+          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${realExt}`, store: isAlreadyCompressed(realMime) });
+          added++;
+        } else {
+          skipped++;
+          logger.warn({ fileId: file.id, status: response.status }, "ZIP: originalUrl no disponible");
+        }
       } else {
         skipped++;
       }

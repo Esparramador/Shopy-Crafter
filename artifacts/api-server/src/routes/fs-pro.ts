@@ -93,9 +93,10 @@ async function saveToVaultSmart(params: {
     const safeTitle = params.title.replace(/[^a-z0-9-_]/gi, "_").slice(0, 50);
     const ext = params.mimeType.split("/")[1] || "bin";
     const objectPath = `projects/${params.projectId}/${params.fileType}/${safeTitle}_${Date.now()}.${ext}`;
+    let uploadedFileRef: any = null;
     try {
-      const gcsFile = await getStorage().getObjectEntityFile(objectPath);
-      await getStorage().uploadObject(gcsFile, params.buffer, params.mimeType);
+      uploadedFileRef = await getStorage().getObjectEntityFile(objectPath);
+      await getStorage().uploadObject(uploadedFileRef, params.buffer, params.mimeType);
       const vaultId = await saveToVault({
         projectId: params.projectId,
         fileType: params.fileType,
@@ -110,6 +111,16 @@ async function saveToVaultSmart(params: {
       logger.info({ vaultId, fileType: params.fileType, sizeMB: (params.buffer.length / 1024 / 1024).toFixed(2), storage: "objectStorage" }, "fs-pro: asset guardado");
       return vaultId;
     } catch (err) {
+      // ROLLBACK: si subimos a Object Storage pero la inserción en DB falló,
+      // borramos el blob para no dejar orphans (cuestan dinero y se acumulan).
+      if (uploadedFileRef) {
+        try {
+          await getStorage().deleteObject(uploadedFileRef);
+          logger.info({ objectPath, fileType: params.fileType }, "fs-pro: rollback OK — orphan blob borrado de Object Storage");
+        } catch (delErr) {
+          logger.error({ delErr, objectPath, fileType: params.fileType }, "fs-pro: ⚠ rollback FAILED — orphan blob quedó en Object Storage");
+        }
+      }
       // Si el archivo es demasiado grande para caber en `content` después del
       // fallo de Object Storage, fallamos rápido en vez de devolver un vaultId
       // que el endpoint de preview no podrá servir (vault.ts truncaría a meta).
