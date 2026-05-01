@@ -48,6 +48,11 @@ PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` fo
 ### Super Ad Studio
 A feature for generic brand ad creation, porting the `hanakaze-v2-super` script. It includes an async worker pipeline for video clips (image-to-video/text-to-video), ElevenLabs TTS and music integration, and MP4 concatenation. State is persisted in `bulk_jobs`. The UI provides a 5-step wizard for brief, references, editable storyboard generation (Claude), voice/music selection, and final generation with live polling and download.
 
+### Premium Image Endpoints
+Two specialized endpoints in `routes/images.ts` complement the 8 classic generation modes:
+- `POST /api/projects/:projectId/products/:productId/images/generate-infographic-premium` — Claude extracts only literal product data (no inference of specs/origin/materials), builds an English Ideogram v3 prompt with quoted text for verbatim rendering. **Anti-hallucination guard** post-validates every quoted string against the product corpus (title+description+tags+price+productType) and strips any non-literal invention before generation. Default model `ideogram-v3-turbo` with automatic fallback to `nano-banana` (Gemini 2.5 Flash Image) on quota/billing errors (402). Persists to vault.
+- `POST /api/projects/:projectId/products/:productId/images/tryon-quick` — Universal virtual try-on (clothing, cosmetics, accessories, any product). Multipart upload of model image + scene preset + aspect ratio. Downloads product image via SSRF-safe `fetchToBuffer` (DNS validation, private-IP/localhost blocked, no redirects), enforces 15MB max payload, validates magic bytes (PNG/JPEG/WEBP only). Fuses model + product via `gemini-2.5-flash-image` preserving identity and product appearance. Persists to vault.
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, generationJobsTable } from "@workspace/db";
 import { saveToVault } from "../lib/vault.js";
@@ -9,6 +10,15 @@ import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
+
+const tryonUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Solo se aceptan imágenes"));
+  },
+});
 
 const router = Router();
 
@@ -748,6 +758,423 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
     }
   }
 });
+
+// ── Premium Infographic (Ideogram v3, raster PNG with REAL legible text) ────
+// Uses real product data (title, description, variants, price) — NEVER invents.
+
+router.post("/projects/:projectId/products/:productId/images/generate-infographic-premium", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+
+    if (!project || !product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const limitCheck = await checkProductionLimit(projectId, "image", 1);
+    if (!limitCheck.allowed) {
+      res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true });
+      return;
+    }
+
+    const aspectRatio = (req.body?.aspectRatio as string) || "1:1";
+    const styleHint = (req.body?.style as string) || "modern minimal premium editorial";
+    // Default = ideogram-v3-turbo (mejor renderizado de texto literal). Fallback a nano-banana si Ideogram falla por quota/billing.
+    const requestedModel = (req.body?.model as string) || "ideogram-v3-turbo";
+
+    const productTitle = product.title || "Producto";
+    const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500);
+    const productType = product.productType || "";
+    const vendor = product.vendor || project.name || "";
+    const tagsRaw: any = (product as any).tags;
+    const tags = Array.isArray(tagsRaw) ? tagsRaw.join(", ") : (typeof tagsRaw === "string" ? tagsRaw : "");
+    const niche = project.storeNiche || "general";
+
+    const variantsList: any[] = Array.isArray((product as any).variants) ? (product as any).variants : [];
+    const minPrice = variantsList.length > 0
+      ? Math.min(...variantsList.map((v: any) => parseFloat(v.price || "0") || 0).filter(p => p > 0))
+      : null;
+    const currency = variantsList[0]?.currency || (project as any).currency || "EUR";
+
+    const claudePrompt = `Eres director creativo experto en infografías de producto e-commerce. Tu trabajo: extraer ÚNICAMENTE datos REALES del producto y construir un prompt en INGLÉS para Ideogram v3 (modelo de generación de imagen con texto perfectamente legible).
+
+PRODUCTO REAL (NO INVENTES NADA, usa solo lo que está aquí):
+- Título: ${productTitle}
+- Tipo: ${productType || "(no especificado)"}
+- Marca/vendor: ${vendor || "(no especificado)"}
+- Descripción: ${productDescription || "(no disponible)"}
+- Tags: ${tags || "(ninguno)"}
+- Precio: ${minPrice ? `${minPrice} ${currency}` : "(no mostrar)"}
+- Nicho de tienda: ${niche}
+
+INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
+1. Extrae 0-5 BENEFICIOS/CARACTERÍSTICAS literalmente extraídos de la descripción y tags arriba. SI UN DATO NO ESTÁ ESCRITO LITERALMENTE EN LA DESCRIPCIÓN/TAGS/TÍTULO, NO LO INCLUYAS. Está PROHIBIDO inferir especificaciones técnicas (ml, %, materiales, ingredientes, certificaciones, origen, año) que no figuren en el texto. Si no hay datos suficientes, usa MENOS bullets (incluso 0).
+2. Construye UN prompt en INGLÉS para Ideogram v3 que describa una infografía con:
+   - Headline = título EXACTO del producto (entre comillas inglesas dobles para que Ideogram lo renderice palabra por palabra).
+   - Bullet points = SOLO con los beneficios extraídos literalmente del texto (entre comillas inglesas dobles cada uno). Si no hay nada extraíble, omite los bullets — la infografía puede ser solo headline + visual de producto.
+   - Si hay precio (${minPrice ? `${minPrice} ${currency}` : "no hay"}), inclúyelo como "from ${minPrice ? `${minPrice} ${currency}` : "X"}" (entre comillas). Si no hay precio, NO lo menciones.
+   - Texturas y materiales coherentes SOLO con lo que diga la descripción (ej: si dice "wood" → wood texture; si no dice nada → usa texturas neutras minimalistas).
+   - Estilo: ${styleHint}.
+   - Layout: composición editorial premium, jerarquía clara (titular grande, sub-bullets si los hay, badge precio si hay precio), color palette consistente con el nicho.
+3. El prompt debe DECIR EXPLÍCITAMENTE qué texto debe aparecer (entre comillas inglesas dobles) — Ideogram renderiza texto literal entre comillas. NUNCA introduzcas texto que no exista en el producto real.
+4. Idioma del texto en la imagen: el del título del producto.
+5. NO incluyas marcas de agua, watermarks, certificados falsos, sellos inventados, ni códigos QR.
+6. Devuelve SOLO el prompt final en inglés (1 párrafo, máx 250 palabras), sin markdown, sin explicaciones, sin comillas alrededor del párrafo.`;
+
+    const ideogramPromptRaw = await askClaudeWithBrain(
+      projectId,
+      [{ role: "user", content: claudePrompt }],
+      undefined,
+      "images",
+      niche,
+      2000,
+    );
+    let ideogramPrompt = (ideogramPromptRaw || "").replace(/```[\s\S]*?```/g, "").trim();
+
+    if (!ideogramPrompt || ideogramPrompt.length < 30) {
+      res.status(422).json({ error: "No se pudo construir el prompt de la infografía premium" });
+      return;
+    }
+
+    // ANTI-HALLUCINATION POST-VALIDATION: Verify every quoted text in the prompt is literally
+    // present in the product corpus (title + description + tags + price + product type).
+    // Strip any quoted string that is NOT a literal substring of the corpus to prevent invented specs.
+    const productCorpus = [
+      productTitle,
+      productDescription,
+      tags || "",
+      minPrice ? `${minPrice} ${currency} from ${minPrice} ${currency}` : "",
+      productType,
+    ].join(" ").toLowerCase();
+    const quotedRegex = /"([^"\n]{1,180})"/g;
+    const allowedQuoted: string[] = [];
+    const removedQuoted: string[] = [];
+    let auditMatch: RegExpExecArray | null;
+    while ((auditMatch = quotedRegex.exec(ideogramPrompt)) !== null) {
+      const text = auditMatch[1].trim();
+      if (!text) continue;
+      const norm = text.toLowerCase().replace(/\s+/g, " ");
+      // Allow if literal substring (after normalization) OR pure number/currency/year
+      const isLiteral = productCorpus.includes(norm);
+      const isNumeric = /^[\d.,€$£¥%/\-\sa-z]{1,20}$/i.test(text) && /\d/.test(text);
+      if (isLiteral || isNumeric) {
+        allowedQuoted.push(text);
+      } else {
+        removedQuoted.push(text);
+      }
+    }
+    if (removedQuoted.length > 0) {
+      logger.warn({ projectId, productId: req.params.productId, removedQuoted, allowedQuoted }, "infographic-premium: stripped non-literal quoted strings (anti-hallucination)");
+      // Replace each non-literal quoted string with empty to prevent Ideogram rendering invented text
+      for (const bad of removedQuoted) {
+        const escaped = bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        ideogramPrompt = ideogramPrompt.replace(new RegExp(`"${escaped}"\\s*[,;.]?`, "g"), "");
+      }
+      ideogramPrompt = ideogramPrompt.replace(/\s{2,}/g, " ").trim();
+    }
+
+    const { generateImage } = await import("../lib/fusion-studio-pro.js");
+    let buffer: Buffer;
+    let mimeType: string;
+    let model: string;
+    try {
+      const result = await generateImage(requestedModel as any, ideogramPrompt, { aspectRatio });
+      buffer = result.buffer;
+      mimeType = result.mimeType;
+      model = result.model;
+    } catch (errPrimary: any) {
+      const msg = String(errPrimary?.message || "");
+      const isQuota = /402|payment|insufficient|quota|credit/i.test(msg);
+      // Fallback automático a nano-banana (Gemini) si el modelo principal falla por billing/quota
+      if (requestedModel !== "nano-banana" && isQuota) {
+        logger.warn({ requestedModel, msg }, "infographic-premium: fallback to nano-banana");
+        const result = await generateImage("nano-banana", ideogramPrompt, { aspectRatio });
+        buffer = result.buffer;
+        mimeType = result.mimeType;
+        model = result.model;
+      } else {
+        throw errPrimary;
+      }
+    }
+
+    const pngBase64 = buffer.toString("base64");
+    const dataUri = `data:${mimeType};base64,${pngBase64}`;
+
+    let vaultId: number | null = null;
+    try {
+      vaultId = await saveToVault({
+        projectId,
+        fileType: "image",
+        category: "infographic_premium",
+        title: `Infografía Premium — ${productTitle}`,
+        description: `Generada con Ideogram v3 (texto legible real) para ${project.name}.`,
+        mimeType,
+        productId: product.shopifyProductId,
+        productTitle: product.title,
+        generatedBy: "ideogram-v3-turbo",
+        content: pngBase64,
+        metadata: {
+          niche,
+          model,
+          aspectRatio,
+          prompt: ideogramPrompt.slice(0, 1000),
+          generatedAt: new Date().toISOString(),
+          tags: ["infographic", "premium", "ideogram", "raster"],
+        },
+      });
+    } catch (e) {
+      logger.warn({ err: e, projectId }, "No se pudo guardar la infografía premium en el vault (no fatal)");
+    }
+
+    await recordUsage(projectId, "image", 1);
+
+    try {
+      await db.insert(generationJobsTable).values({
+        projectId,
+        shopifyProductId,
+        imageType: "infographic_premium",
+        status: "succeeded",
+        prompt: ideogramPrompt.slice(0, 2000),
+        model: "ideogram-v3-turbo",
+        estimatedCost: 0.03,
+        completedAt: new Date(),
+      });
+    } catch (e) {
+      logger.warn({ err: e }, "No se pudo registrar generation job de infografía premium (no fatal)");
+    }
+
+    learnFromOperation({
+      operationType: "premium_infographic",
+      title: `Infografía premium generada: ${productTitle}`,
+      content: `Producto: ${productTitle}. Nicho: ${niche}. VaultId: ${vaultId ?? "(no)"}. Modelo: ideogram-v3-turbo.`,
+      confidence: 0.85,
+      tags: ["infographic", "premium", "ideogram"],
+    });
+
+    res.json({
+      success: true,
+      pngBase64,
+      mimeType,
+      dataUri,
+      model,
+      promptUsed: ideogramPrompt,
+      vaultId,
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack, projectId: req.params.projectId }, "generate-infographic-premium failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: err?.message || "Error generando infografía premium" });
+    }
+  }
+});
+
+// ── Virtual Try-On Quick (single-shot, uses nano-banana to fuse model+product) ─
+
+router.post(
+  "/projects/:projectId/products/:productId/images/tryon-quick",
+  tryonUpload.single("modelImage"),
+  async (req, res): Promise<void> => {
+    enableLongRunning(res);
+    try {
+      const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+      const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+
+      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      const [product] = await db.select().from(productsTable)
+        .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+
+      if (!project || !product) {
+        res.status(404).json({ error: "Producto no encontrado" });
+        return;
+      }
+
+      const limitCheck = await checkProductionLimit(projectId, "image", 1);
+      if (!limitCheck.allowed) {
+        res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true });
+        return;
+      }
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "Falta la imagen del modelo (modelImage)" });
+        return;
+      }
+
+      const sceneKey = (req.body?.scene as string) || "model_front";
+      const aspectRatio = (req.body?.aspectRatio as string) || "3:4";
+
+      const productTitle = product.title || "Producto";
+      const productType = product.productType || "";
+      const niche = project.storeNiche || "general";
+
+      // Robust image fallback: prefer non-empty imagesJson, fall back to legacy images field/string
+      const imagesJsonRaw: any = (product as any).imagesJson;
+      const imagesLegacyRaw: any = (product as any).images;
+      let productImages: any[] = [];
+      if (Array.isArray(imagesJsonRaw) && imagesJsonRaw.length > 0) {
+        productImages = imagesJsonRaw;
+      } else if (Array.isArray(imagesLegacyRaw) && imagesLegacyRaw.length > 0) {
+        productImages = imagesLegacyRaw;
+      } else if (typeof imagesLegacyRaw === "string" && imagesLegacyRaw.trim().startsWith("[")) {
+        try { const parsed = JSON.parse(imagesLegacyRaw); if (Array.isArray(parsed)) productImages = parsed; } catch { /* ignore */ }
+      }
+      const productImageUrl: string | null =
+        (product as any).featuredImage ||
+        productImages[0]?.src ||
+        productImages[0]?.url ||
+        null;
+
+      if (!productImageUrl) {
+        res.status(400).json({ error: "El producto no tiene imágenes en Shopify para hacer el try-on" });
+        return;
+      }
+
+      // Download product image (SSRF-safe: validateImageUrlAsync inside fetchToBuffer rejects private IPs/localhost)
+      const { fetchToBuffer } = await import("../lib/fusion-studio-pro.js");
+      const productBuffer = await fetchToBuffer(productImageUrl, 60_000);
+
+      // SECURITY: Reject oversized payloads (DoS guard) — 15MB cap on product images
+      const MAX_PRODUCT_IMAGE_BYTES = 15 * 1024 * 1024;
+      if (productBuffer.length > MAX_PRODUCT_IMAGE_BYTES) {
+        res.status(413).json({ error: `Imagen del producto excede el tamaño máximo (15MB). Tamaño: ${(productBuffer.length / 1024 / 1024).toFixed(1)}MB` });
+        return;
+      }
+
+      // SECURITY: Validate magic bytes — only accept PNG/JPEG/WEBP (reject GIF/SVG/HTML/etc.)
+      let productMime: string | null = null;
+      if (productBuffer.length >= 12) {
+        const sig = productBuffer.subarray(0, 4).toString("hex");
+        const sig12 = productBuffer.subarray(0, 12).toString("hex");
+        if (sig.startsWith("89504e47")) productMime = "image/png";
+        else if (sig.startsWith("ffd8ff")) productMime = "image/jpeg";
+        else if (sig12.startsWith("52494646") && sig12.includes("57454250")) productMime = "image/webp";
+      }
+      if (!productMime) {
+        res.status(415).json({ error: "Formato de imagen del producto no soportado. Solo PNG, JPEG o WEBP." });
+        return;
+      }
+
+      // Build smart prompt with Claude
+      const sceneLabels: Record<string, string> = {
+        model_front: "front-facing studio shot, model wearing/holding/using the product naturally",
+        model_street: "street style urban shot, model with the product, natural daylight",
+        model_lifestyle: "lifestyle scene, model interacting with the product in a real environment",
+        model_editorial: "editorial fashion magazine shot, dramatic lighting, model with the product",
+        model_close: "close-up shot, focused on the product worn/held by the model",
+      };
+      const sceneDescription = sceneLabels[sceneKey] || sceneLabels.model_front;
+
+      const promptForFusion = `Take the person from the FIRST image and the product from the SECOND image (${productTitle}, ${productType}). Create a single hyper-realistic photograph: ${sceneDescription}. The person's face, identity, body, skin tone, and natural features must be PRESERVED EXACTLY from image 1. The product details (color, design, texture, brand elements, shape) must be PRESERVED EXACTLY from image 2 — do NOT redesign the product. The result must look like a real photograph, no AI artifacts, no floating objects, proper scale, natural lighting and shadows that match the scene. Photographic quality, sharp focus, ${aspectRatio} aspect ratio. NEVER include text, watermarks, or logos that are not on the original product.`;
+
+      // Use nano-banana (Gemini 2.5 Flash Image) for multi-image fusion
+      const { GoogleGenAI } = await import("@google/genai");
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY no configurado");
+      const ai = new GoogleGenAI({ apiKey });
+
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: [
+          { text: promptForFusion },
+          { inlineData: { mimeType: file.mimetype, data: file.buffer.toString("base64") } },
+          { inlineData: { mimeType: productMime, data: productBuffer.toString("base64") } },
+        ],
+        config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } } as any,
+      });
+
+      let resultBuffer: Buffer | null = null;
+      let resultMime = "image/png";
+      const parts = result?.candidates?.[0]?.content?.parts ?? [];
+      for (const part of parts) {
+        const inline = (part as any).inlineData || (part as any).inline_data;
+        if (inline?.data) {
+          resultBuffer = Buffer.from(inline.data, "base64");
+          resultMime = inline.mimeType || inline.mime_type || "image/png";
+          break;
+        }
+      }
+
+      if (!resultBuffer) {
+        throw new Error("Gemini no devolvió imagen del try-on");
+      }
+
+      const pngBase64 = resultBuffer.toString("base64");
+      const dataUri = `data:${resultMime};base64,${pngBase64}`;
+
+      // Persist
+      let vaultId: number | null = null;
+      try {
+        vaultId = await saveToVault({
+          projectId,
+          fileType: "image",
+          category: `tryon_${sceneKey}`,
+          title: `Virtual Try-On (${sceneKey}) — ${productTitle}`,
+          description: `Try-on generado con nano-banana (Gemini 2.5 Flash Image) para ${project.name}.`,
+          mimeType: resultMime,
+          productId: product.shopifyProductId,
+          productTitle: product.title,
+          generatedBy: "nano-banana-tryon",
+          content: pngBase64,
+          metadata: {
+            niche,
+            scene: sceneKey,
+            aspectRatio,
+            generatedAt: new Date().toISOString(),
+            tags: ["tryon", "virtual-tryon", "nano-banana"],
+          },
+        });
+      } catch (e) {
+        logger.warn({ err: e, projectId }, "No se pudo guardar el tryon en el vault (no fatal)");
+      }
+
+      await recordUsage(projectId, "image", 1);
+
+      try {
+        await db.insert(generationJobsTable).values({
+          projectId,
+          shopifyProductId,
+          imageType: `tryon_${sceneKey}`,
+          status: "succeeded",
+          prompt: promptForFusion.slice(0, 2000),
+          model: "gemini-2.5-flash-image",
+          estimatedCost: 0.04,
+          completedAt: new Date(),
+        });
+      } catch (e) {
+        logger.warn({ err: e }, "No se pudo registrar generation job de tryon (no fatal)");
+      }
+
+      learnFromOperation({
+        operationType: "virtual_tryon_quick",
+        title: `Try-on quick: ${productTitle}`,
+        content: `Producto: ${productTitle}. Escena: ${sceneKey}. VaultId: ${vaultId ?? "(no)"}.`,
+        confidence: 0.85,
+        tags: ["tryon", "nano-banana", niche],
+      });
+
+      res.json({
+        success: true,
+        pngBase64,
+        mimeType: resultMime,
+        dataUri,
+        scene: sceneKey,
+        model: "gemini-2.5-flash-image",
+        vaultId,
+      });
+    } catch (err: any) {
+      logger.error({ err: err?.message, stack: err?.stack, projectId: req.params.projectId }, "tryon-quick failed");
+      if (!res.headersSent) {
+        res.status(500).json({ error: err?.message || "Error en virtual try-on" });
+      }
+    }
+  }
+);
 
 // ── Bulk image generation (FIXED: actually runs Replicate per product) ───────
 

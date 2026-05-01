@@ -54,7 +54,6 @@ const TemplateStudio = lazy(() => import("@/pages/admin/TemplateStudio"));
 const Billing = lazy(() => import("@/pages/admin/Billing"));
 const BrainSync = lazy(() => import("@/pages/admin/BrainSync"));
 const AdStudio = lazy(() => import("@/pages/projects/AdStudio"));
-const SuperAdStudio = lazy(() => import("@/pages/projects/SuperAdStudio"));
 const AvatarStudio = lazy(() => import("@/pages/admin/AvatarStudio"));
 
 const AuditPage = lazy(() => import("@/pages/projects/Audit"));
@@ -433,9 +432,6 @@ function Router() {
         </Route>
         <Route path="/projects/:id/ad-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
-        </Route>
-        <Route path="/projects/:id/super-ad">
-          <RequireAdmin><AdminWrapper><AppLayout><S><SuperAdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/web-lab">
           <RequireAdmin><AdminWrapper><AppLayout><S><WebLabStandalone /></S></AppLayout></AdminWrapper></RequireAdmin>

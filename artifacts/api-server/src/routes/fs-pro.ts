@@ -28,7 +28,14 @@ import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../li
 import { listTemplates } from "../lib/ad-templates.js";
 import {
   generateCinematicMultiShot,
-  type CinematicAspect, type CinematicStyle,
+  generateCinematicScript,
+  persistCinematicScript,
+  loadCinematicScript,
+  listCinematicScripts,
+  deleteCinematicScript,
+  toggleCinematicScriptFavorite,
+  updateCinematicScript,
+  type CinematicAspect, type CinematicStyle, type CinematicScript,
 } from "../lib/cinematic-multishot.js";
 import {
   AVATAR_LIBRARY, listAvatarsByNiche, findAvatar,
@@ -1292,6 +1299,7 @@ router.post(
         imageModel, style, customBrief, narrationEnabled, narrationVoiceId,
         narrationVoiceModel, narrationVolume, musicEnabled, musicPrompt,
         musicVolume, productVaultId,
+        savedPromptId, script: scriptJsonStr,
       } = req.body;
       const projectId = parseInt(pidStr || "0", 10);
       if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
@@ -1323,6 +1331,16 @@ router.post(
       }
       if (!productImage) { res.status(400).json({ error: "Imagen de producto requerida (file o productVaultId)" }); return; }
 
+      // Optional pre-rendered/edited script
+      let presetScript: CinematicScript | undefined;
+      if (scriptJsonStr) {
+        try {
+          presetScript = typeof scriptJsonStr === "string" ? JSON.parse(scriptJsonStr) : scriptJsonStr;
+        } catch (err: any) {
+          res.status(400).json({ error: `script JSON inválido: ${err?.message}` }); return;
+        }
+      }
+
       const result = await generateCinematicMultiShot({
         projectId,
         productImage,
@@ -1350,6 +1368,8 @@ router.post(
           prompt: musicPrompt ? String(musicPrompt) : undefined,
           volume: musicVolume ? parseFloat(musicVolume) : 0.22,
         } : undefined,
+        presetScript,
+        savedPromptId: savedPromptId ? String(savedPromptId) : undefined,
       });
 
       const vaultId = await saveToVaultSmart({
@@ -1385,6 +1405,7 @@ router.post(
         durationSec: result.durationSec,
         scenesCount: result.script.scenes.length,
         script: result.script,
+        savedPromptId: result.savedPromptId || null,
       });
     } catch (err: any) {
       logger.error({ err: err?.message, stack: err?.stack }, "fs-pro cinematic-multishot failed");
@@ -1392,6 +1413,131 @@ router.post(
     }
   },
 );
+
+// ─── CINEMATIC PROMPT LIBRARY ────────────────────────────────────────────
+// POST /fs-pro/cinematic-script (JSON body — no multipart)
+//   Generates ONLY the script via Claude (no rendering) and persists it as a
+//   reusable template in omnicore_prompt_library. Returns the script + savedPromptId.
+router.post("/fs-pro/cinematic-script", requireAdmin, async (req, res) => {
+  try {
+    const {
+      projectId: pidStr, brand, productName, niche, audience, language,
+      scenesCount, totalDurationSec, aspect, videoModel, imageModel, style, customBrief,
+      narration, music,
+    } = req.body || {};
+    const projectId = parseInt(String(pidStr || "0"), 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (!brand || !productName) { res.status(400).json({ error: "brand y productName requeridos" }); return; }
+    if (!videoModel) { res.status(400).json({ error: "videoModel requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const reqObj = {
+      projectId,
+      brand: String(brand),
+      productName: String(productName),
+      niche: niche ? String(niche) : (project.storeNiche || undefined),
+      audience: audience ? String(audience) : undefined,
+      language: language ? String(language) : "es",
+      scenesCount: parseInt(String(scenesCount || 4), 10),
+      totalDurationSec: parseInt(String(totalDurationSec || 16), 10),
+      aspect: ((aspect as CinematicAspect) || "9:16") as CinematicAspect,
+      videoModel: String(videoModel) as any,
+      imageModel: imageModel || undefined,
+      style: ((style as CinematicStyle) || "cinematic") as CinematicStyle,
+      customBrief: customBrief ? String(customBrief) : undefined,
+      narration: narration && (narration.enabled === true || narration.enabled === "true") ? {
+        enabled: true,
+        voiceId: narration.voiceId ? String(narration.voiceId) : undefined,
+        voiceModel: narration.voiceModel || undefined,
+        voiceVolume: narration.voiceVolume != null ? parseFloat(String(narration.voiceVolume)) : 1.0,
+      } : undefined,
+      music: music && (music.enabled === true || music.enabled === "true") ? {
+        enabled: true,
+        prompt: music.prompt ? String(music.prompt) : undefined,
+        volume: music.volume != null ? parseFloat(String(music.volume)) : 0.22,
+      } : undefined,
+    };
+
+    const script = await generateCinematicScript(reqObj);
+    const savedPromptId = await persistCinematicScript({ script, config: reqObj, source: "draft" });
+    res.json({ success: true, savedPromptId, script });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack }, "fs-pro cinematic-script failed");
+    res.status(500).json({ error: err?.message || "Error generando script cinemático" });
+  }
+});
+
+// GET /fs-pro/cinematic-prompts?projectId&niche&limit
+router.get("/fs-pro/cinematic-prompts", requireAdmin, async (req, res) => {
+  try {
+    const projectId = req.query.projectId ? parseInt(String(req.query.projectId), 10) : undefined;
+    const niche = req.query.niche ? String(req.query.niche) : undefined;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const items = await listCinematicScripts({ projectId, niche, limit });
+    res.json({ success: true, items });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "list cinematic-prompts failed");
+    res.status(500).json({ error: err?.message || "Error listando plantillas" });
+  }
+});
+
+// GET /fs-pro/cinematic-prompts/:id
+router.get("/fs-pro/cinematic-prompts/:id", requireAdmin, async (req, res) => {
+  try {
+    const loaded = await loadCinematicScript(String(req.params.id));
+    if (!loaded) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    res.json({ success: true, id: String(req.params.id), ...loaded });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "get cinematic-prompt failed");
+    res.status(500).json({ error: err?.message || "Error cargando plantilla" });
+  }
+});
+
+// DELETE /fs-pro/cinematic-prompts/:id
+router.delete("/fs-pro/cinematic-prompts/:id", requireAdmin, async (req, res) => {
+  try {
+    const ok = await deleteCinematicScript(String(req.params.id));
+    if (!ok) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "delete cinematic-prompt failed");
+    res.status(500).json({ error: err?.message || "Error borrando plantilla" });
+  }
+});
+
+// PUT /fs-pro/cinematic-prompts/:id  — persist EXACT edited script (no Claude)
+router.put("/fs-pro/cinematic-prompts/:id", requireAdmin, async (req, res) => {
+  try {
+    const { script, name, description } = req.body || {};
+    if (!script || !Array.isArray(script.scenes) || script.scenes.length === 0) {
+      res.status(400).json({ error: "script con scenes[] requerido" }); return;
+    }
+    const ok = await updateCinematicScript(String(req.params.id), {
+      script: script as CinematicScript,
+      name: name ? String(name) : undefined,
+      description: description ? String(description) : undefined,
+    });
+    if (!ok) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    res.json({ success: true, id: String(req.params.id) });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "update cinematic-prompt failed");
+    res.status(500).json({ error: err?.message || "Error actualizando plantilla" });
+  }
+});
+
+// POST /fs-pro/cinematic-prompts/:id/favorite (toggle)
+router.post("/fs-pro/cinematic-prompts/:id/favorite", requireAdmin, async (req, res) => {
+  try {
+    const updated = await toggleCinematicScriptFavorite(String(req.params.id));
+    if (!updated) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    res.json({ success: true, ...updated });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "toggle favorite cinematic-prompt failed");
+    res.status(500).json({ error: err?.message || "Error toggling favorito" });
+  }
+});
 
 // ─── AVATAR STUDIO: LIBRARY ──────────────────────────────────────────────
 router.get("/fs-pro/avatars/library", requireAdmin, (_req, res) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRoute } from "wouter";
 import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";
@@ -1562,12 +1562,16 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
   const [customBrief, setCustomBrief] = useState("");
   const [productFile, setProductFile] = useState<File | null>(null);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
-  // Vacío → backend usa voz por defecto auto-detectada (multilingüe ES).
   const [narrationVoiceId, setNarrationVoiceId] = useState("");
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicPrompt, setMusicPrompt] = useState("");
   const [busy, setBusy] = useState(false);
-  const [scriptPreview, setScriptPreview] = useState<any | null>(null);
+  const [busyMode, setBusyMode] = useState<"script" | "render" | "save" | null>(null);
+  const [editableScript, setEditableScript] = useState<any | null>(null);
+  const editableScriptRef = useRef<any | null>(null);
+  useEffect(() => { editableScriptRef.current = editableScript; }, [editableScript]);
+  const [activeTemplateId, setActiveTemplateId] = useState<string>("");
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string | null; useCount: number | null; isPublic: number | null; niche: string | null }>>([]);
 
   const styles = (caps as any)?.cinematicMultiShot?.styles ?? [
     { key: "cinematic", label: "Cinematic", description: "Look anamórfico" },
@@ -1575,11 +1579,119 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
     { key: "luxury", label: "Luxury", description: "Premium reveal" },
   ];
 
-  const run = async () => {
+  // ─── Templates: load on mount + after save ────────────────────────────
+  const refreshTemplates = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-prompts?projectId=${projectId}&limit=100`, { credentials: "include" });
+      const d = await r.json();
+      if (r.ok && Array.isArray(d.items)) setTemplates(d.items);
+    } catch {/* silent */}
+  };
+  useEffect(() => { refreshTemplates(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+
+  const loadTemplate = async (id: string) => {
+    if (!id) { setActiveTemplateId(""); setEditableScript(null); return; }
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-prompts/${id}`, { credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) { onError(d.error || "No se pudo cargar plantilla"); return; }
+      setActiveTemplateId(id);
+      setEditableScript(d.script);
+      // Auto-rellenar config base si la plantilla la trae
+      const cfg = d.config || {};
+      if (cfg.brand) setBrand(cfg.brand);
+      if (cfg.productName) setProductName(cfg.productName);
+      if (cfg.niche) setNiche(cfg.niche);
+      if (cfg.audience) setAudience(cfg.audience);
+      if (cfg.language) setLanguage(cfg.language);
+      if (cfg.scenesCount) setScenesCount(cfg.scenesCount);
+      if (cfg.totalDurationSec) setTotalDurationSec(cfg.totalDurationSec);
+      if (cfg.aspect) setAspect(cfg.aspect);
+      if (cfg.videoModel) setVideoModel(cfg.videoModel);
+      if (cfg.imageModel) setImageModel(cfg.imageModel);
+      if (cfg.style) setStyle(cfg.style);
+      if (cfg.customBrief) setCustomBrief(cfg.customBrief);
+    } catch (e: any) { onError(e?.message || "Error cargando plantilla"); }
+  };
+
+  const deleteTemplate = async (id: string) => {
+    if (!confirm("¿Borrar esta plantilla? No se puede deshacer.")) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-prompts/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) { const d = await r.json(); onError(d.error || "No se pudo borrar"); return; }
+      if (activeTemplateId === id) { setActiveTemplateId(""); setEditableScript(null); }
+      await refreshTemplates();
+    } catch (e: any) { onError(e?.message || "Error borrando"); }
+  };
+
+  // ─── Phase 1: generate script-only (preview + edit) ───────────────────
+  const generateScriptPreview = async () => {
+    if (!brand.trim() || !productName.trim()) { onError("Marca y producto requeridos"); return; }
+    setBusy(true); setBusyMode("script");
+    try {
+      const body = {
+        projectId, brand, productName,
+        niche: niche || undefined, audience: audience || undefined,
+        language, scenesCount, totalDurationSec, aspect, videoModel, imageModel, style,
+        customBrief: customBrief || undefined,
+        narration: { enabled: narrationEnabled, voiceId: narrationVoiceId || undefined },
+        music: { enabled: musicEnabled, prompt: musicPrompt || undefined },
+      };
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-script`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) { onError(d.error || `Error ${r.status}`); return; }
+      setEditableScript(d.script);
+      setActiveTemplateId(d.savedPromptId || "");
+      await refreshTemplates();
+    } catch (e: any) { onError(e?.message || "Error generando guion"); } finally { setBusy(false); setBusyMode(null); }
+  };
+
+  // ─── Phase 2: render with the (edited) script ─────────────────────────
+  const renderEditedScript = async () => {
+    if (!editableScript) { onError("Genera o carga un guion primero"); return; }
+    if (!productFile) { onError("Imagen del producto requerida para renderizar"); return; }
+    setBusy(true); setBusyMode("render");
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("brand", brand);
+      fd.append("productName", productName);
+      if (niche) fd.append("niche", niche);
+      if (audience) fd.append("audience", audience);
+      fd.append("language", language);
+      fd.append("scenesCount", String(scenesCount));
+      fd.append("totalDurationSec", String(totalDurationSec));
+      fd.append("aspect", aspect);
+      fd.append("videoModel", videoModel);
+      fd.append("imageModel", imageModel);
+      fd.append("style", style);
+      if (customBrief) fd.append("customBrief", customBrief);
+      fd.append("narrationEnabled", String(narrationEnabled));
+      if (narrationEnabled) fd.append("narrationVoiceId", narrationVoiceId);
+      fd.append("musicEnabled", String(musicEnabled));
+      if (musicEnabled && musicPrompt) fd.append("musicPrompt", musicPrompt);
+      fd.append("product", productFile);
+      // Pasamos el script editado: prevalece sobre el savedPromptId.
+      fd.append("script", JSON.stringify(editableScript));
+      if (activeTemplateId) fd.append("savedPromptId", activeTemplateId);
+
+      const res = await fetch(`${API_BASE}/api/fs-pro/cinematic-multishot`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Multishot: ${productName.slice(0, 30)}`, mimeType: "video/mp4" });
+      await refreshTemplates();
+    } catch (e: any) { onError(e?.message || "Error en render"); } finally { setBusy(false); setBusyMode(null); }
+  };
+
+  // ─── One-shot legacy: generate script + render in one call ────────────
+  const runOneShot = async () => {
     if (!brand.trim() || !productName.trim()) { onError("Marca y producto requeridos"); return; }
     if (!productFile) { onError("Imagen del producto requerida"); return; }
-    setBusy(true);
-    setScriptPreview(null);
+    setBusy(true); setBusyMode("render"); setEditableScript(null);
     try {
       const fd = new FormData();
       fd.append("projectId", String(projectId));
@@ -1604,14 +1716,80 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
       const res = await fetch(`${API_BASE}/api/fs-pro/cinematic-multishot`, { method: "POST", credentials: "include", body: fd });
       const d = await res.json();
       if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
-      setScriptPreview(d.script);
+      setEditableScript(d.script);
+      setActiveTemplateId(d.savedPromptId || "");
       onSuccess({ vaultId: d.vaultId, type: "video", label: `Multishot: ${productName.slice(0, 30)}`, mimeType: "video/mp4" });
-    } catch (e: any) { onError(e?.message || "Error en multi-shot"); } finally { setBusy(false); }
+      await refreshTemplates();
+    } catch (e: any) { onError(e?.message || "Error en multi-shot"); } finally { setBusy(false); setBusyMode(null); }
+  };
+
+  const updateScene = (idx: number, patch: Record<string, any>) => {
+    setEditableScript((s: any) => {
+      if (!s) return s;
+      const scenes = s.scenes.map((sc: any, i: number) => i === idx ? { ...sc, ...patch } : sc);
+      return { ...s, scenes };
+    });
+  };
+
+  const saveAsTemplate = async () => {
+    // Use ref to ALWAYS read the most recent edited script (avoid stale closure).
+    const scriptToSave = editableScriptRef.current ?? editableScript;
+    if (!scriptToSave) { onError("No hay guion para guardar"); return; }
+    setBusy(true); setBusyMode("save");
+    try {
+      // If we have an active template id → PUT (overwrite with exact edits).
+      // Otherwise → POST cinematic-script (creates a fresh draft via Claude),
+      //             then PUT the EXACT edited JSON to overwrite its content.
+      let targetId = activeTemplateId;
+      if (!targetId) {
+        const body = {
+          projectId, brand, productName,
+          niche: niche || undefined, audience: audience || undefined,
+          language, scenesCount, totalDurationSec, aspect, videoModel, imageModel, style,
+          customBrief: customBrief || undefined,
+        };
+        const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-script`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (!r.ok) { onError(d.error || "No se pudo crear plantilla"); return; }
+        targetId = d.savedPromptId;
+        setActiveTemplateId(targetId);
+      }
+      const r2 = await fetch(`${API_BASE}/api/fs-pro/cinematic-prompts/${targetId}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script: scriptToSave }),
+      });
+      const d2 = await r2.json();
+      if (!r2.ok) { onError(d2.error || "No se pudo guardar las ediciones"); return; }
+      await refreshTemplates();
+    } catch (e: any) { onError(e?.message || "Error guardando"); } finally { setBusy(false); setBusyMode(null); }
   };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
+        <Section title="📚 Plantillas guardadas">
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <select value={activeTemplateId} onChange={e => loadTemplate(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+              <option value="">— Sin plantilla (crear nueva) —</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.isPublic === 0 ? "🔒 " : "★ "}{t.name} {t.useCount ? `· ${t.useCount} uso${t.useCount > 1 ? "s" : ""}` : ""}
+                </option>
+              ))}
+            </select>
+            {activeTemplateId && (
+              <button onClick={() => deleteTemplate(activeTemplateId)} style={{ ...pillButton(false), color: "#f87171", padding: "4px 10px" }} title="Borrar plantilla">🗑️</button>
+            )}
+          </div>
+          <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0" }}>
+            Selecciona una plantilla para reusar su guion completo (hooks, voicelines, prompts), o genera una nueva abajo.
+          </p>
+        </Section>
         <Section title="Producto y marca">
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Marca (ej: Behrens)" style={inputStyle} />
           <div style={{ height: 6 }} />
@@ -1690,15 +1868,24 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
             <input value={musicPrompt} onChange={e => setMusicPrompt(e.target.value)} placeholder="Prompt música (vacío = automático)" style={inputStyle} />
           )}
         </Section>
-        <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />} {busy ? `Generando ${scenesCount} escenas...` : `Generar anuncio multi-shot (${scenesCount} escenas · ${totalDurationSec}s)`}
+        {/* ─── 2-PHASE WORKFLOW: phase 1 = script preview ─────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 4 }}>
+          <button onClick={generateScriptPreview} disabled={busy} className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", padding: "10px 12px" }}>
+            {busy && busyMode === "script" ? <Loader2 size={14} className="animate-spin" /> : <span>🪄</span>} {busy && busyMode === "script" ? "Escribiendo guion…" : "Generar guion (vista previa)"}
+          </button>
+          <button onClick={renderEditedScript} disabled={busy || !editableScript || !productFile} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "10px 12px" }}>
+            {busy && busyMode === "render" ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />} {busy && busyMode === "render" ? "Renderizando…" : "🎬 Renderizar este guion"}
+          </button>
+        </div>
+        <button onClick={runOneShot} disabled={busy} className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", padding: "8px 12px", marginTop: 6, fontSize: 11 }}>
+          {busy && busyMode === "render" && !editableScript ? <Loader2 size={12} className="animate-spin" /> : null} O en un solo paso (script + render automáticos)
         </button>
         <LiveOperation
-          active={busy}
-          title="Generando anuncio multi-shot"
+          active={busy && busyMode === "render"}
+          title={editableScript ? "Renderizando guion editado" : "Generando anuncio multi-shot"}
           estimatedSec={scenesCount * 90}
           messages={[
-            "Claude está escribiendo el guion por escenas…",
+            !editableScript ? "Claude está escribiendo el guion por escenas…" : "Usando guion editado…",
             "Generando keyframes consistentes con tu producto…",
             `Renderizando ${scenesCount} clips de video con ${videoModel}…`,
             "Concatenando con crossfade cinematográfico…",
@@ -1708,19 +1895,64 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
           ].filter(Boolean)}
           className="w-full mt-3"
         />
-        {scriptPreview && (
-          <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", fontSize: 11, maxHeight: 280, overflow: "auto" }}>
-            <strong style={{ color: "var(--gold)" }}>📝 {scriptPreview.title}</strong>
-            <div style={{ color: "var(--t3)", marginTop: 4, fontStyle: "italic" }}>"{scriptPreview.hook}"</div>
-            <ol style={{ margin: "8px 0", paddingLeft: 18 }}>
-              {scriptPreview.scenes?.map((sc: any) => (
-                <li key={sc.idx} style={{ marginBottom: 4 }}>
-                  <span style={{ color: "var(--gold)" }}>{sc.timeStartSec}s-{sc.timeEndSec}s</span> · {sc.cameraMovement}
-                  <div style={{ color: "var(--t3)", marginTop: 2 }}>"{sc.voiceoverLine}"</div>
-                </li>
+
+        {/* ─── Phase 1.5: editable script ───────────────────────────────── */}
+        {editableScript && (
+          <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", fontSize: 11 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  value={editableScript.title || ""}
+                  onChange={e => setEditableScript((s: any) => ({ ...s, title: e.target.value }))}
+                  style={{ ...inputStyle, color: "var(--gold)", fontWeight: 600, fontSize: 13 }}
+                  placeholder="Título del anuncio"
+                />
+              </div>
+              <button onClick={saveAsTemplate} disabled={busy} className="btn btn-ghost" style={{ padding: "6px 10px", fontSize: 11 }}>
+                {busy && busyMode === "save" ? <Loader2 size={12} className="animate-spin" /> : "💾"} Guardar plantilla
+              </button>
+            </div>
+            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <input value={editableScript.hook || ""} onChange={e => setEditableScript((s: any) => ({ ...s, hook: e.target.value }))} placeholder="Hook inicial" style={{ ...inputStyle, fontStyle: "italic" }} />
+              <input value={editableScript.cta || ""} onChange={e => setEditableScript((s: any) => ({ ...s, cta: e.target.value }))} placeholder="Call to action" style={inputStyle} />
+            </div>
+            <div style={{ maxHeight: 360, overflow: "auto", marginTop: 8 }}>
+              {editableScript.scenes?.map((sc: any, idx: number) => (
+                <details key={sc.idx ?? idx} open={idx === 0} style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: "var(--ink)", border: "1px solid var(--bdr)" }}>
+                  <summary style={{ cursor: "pointer", color: "var(--gold)", fontWeight: 600 }}>
+                    Escena {sc.idx ?? idx + 1} · {sc.timeStartSec}s → {sc.timeEndSec}s · {sc.cameraMovement || "—"}
+                  </summary>
+                  <div style={{ marginTop: 8 }}>
+                    <label style={{ fontSize: 10, color: "var(--t3)" }}>Voice line ({language})</label>
+                    <input
+                      value={sc.voiceoverLine || ""}
+                      onChange={e => updateScene(idx, { voiceoverLine: e.target.value })}
+                      placeholder="Frase narrada para esta escena"
+                      style={inputStyle}
+                    />
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginTop: 6, display: "block" }}>Movimiento de cámara</label>
+                    <input
+                      value={sc.cameraMovement || ""}
+                      onChange={e => updateScene(idx, { cameraMovement: e.target.value })}
+                      placeholder="ej: slow dolly-in, orbit 360°…"
+                      style={inputStyle}
+                    />
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginTop: 6, display: "block" }}>Keyframe prompt (image · EN)</label>
+                    <textarea
+                      value={sc.keyframePrompt || ""}
+                      onChange={e => updateScene(idx, { keyframePrompt: e.target.value })}
+                      style={{ ...inputStyle, minHeight: 80, fontFamily: "monospace", fontSize: 10 }}
+                    />
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginTop: 6, display: "block" }}>Video prompt (motion · EN)</label>
+                    <textarea
+                      value={sc.videoPrompt || ""}
+                      onChange={e => updateScene(idx, { videoPrompt: e.target.value })}
+                      style={{ ...inputStyle, minHeight: 60, fontFamily: "monospace", fontSize: 10 }}
+                    />
+                  </div>
+                </details>
               ))}
-            </ol>
-            <div style={{ color: "var(--t2)", marginTop: 4 }}>CTA: {scriptPreview.cta}</div>
+            </div>
           </div>
         )}
       </div>

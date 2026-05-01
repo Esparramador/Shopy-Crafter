@@ -160,7 +160,12 @@ export async function generateImage(
         return { buffer: Buffer.from(inline.data, "base64"), mimeType: inline.mimeType || inline.mime_type || "image/png", model };
       }
     }
-    throw new Error("Nano Banana no devolvió imagen");
+    const candidate = result?.candidates?.[0];
+    const finishReason = (candidate as any)?.finishReason;
+    const safety = (candidate as any)?.safetyRatings;
+    const blockReason = (result as any)?.promptFeedback?.blockReason;
+    const debugInfo = JSON.stringify({ finishReason, blockReason, safety, partsCount: parts.length, partsTypes: parts.map((p: any) => Object.keys(p)) }).slice(0, 500);
+    throw new Error(`Nano Banana no devolvió imagen. Debug: ${debugInfo}`);
   }
 
   // ── Replicate models
@@ -404,6 +409,7 @@ export interface TTSOptions {
   style?: number;           // 0-1
   speakerBoost?: boolean;
   speed?: number;           // 0.7-1.2
+  languageCode?: string;    // ISO 639-1 (e.g. "es", "en"); only honored by multilingual models
 }
 
 export async function generateTTS(text: string, opts: TTSOptions): Promise<Buffer> {
@@ -421,6 +427,9 @@ export async function generateTTS(text: string, opts: TTSOptions): Promise<Buffe
         use_speaker_boost: opts.speakerBoost ?? true,
         speed: opts.speed ?? 1.0,
       },
+      ...(opts.languageCode && /^[a-z]{2}(-[A-Z]{2})?$/.test(opts.languageCode)
+        ? { language_code: opts.languageCode }
+        : {}),
     }),
   });
   if (!res.ok) throw new Error(`ElevenLabs TTS failed: ${res.status}`);

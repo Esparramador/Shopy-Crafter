@@ -365,10 +365,10 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
         const MAX_PAGES = 200; // 200 * 250 = 50.000 orders cap (safety)
         let nextPage: string | null = null;
         do {
-          const path = nextPage
+          const path: string = nextPage
             ? `/orders.json?limit=250&page_info=${encodeURIComponent(nextPage)}`
             : `/orders.json?status=any&limit=250&fields=${FIELDS}`;
-          const { data, nextPageInfo } = await shopifyRequestPaged<{ orders: OrderShape[] }>(
+          const { data, nextPageInfo }: { data: { orders: OrderShape[] }; nextPageInfo: string | null } = await shopifyRequestPaged<{ orders: OrderShape[] }>(
             parseInt(projectId), project.shopDomain, path
           );
           orders.push(...(data.orders || []));
@@ -566,10 +566,10 @@ router.post("/inventory/sync-refunds", async (req, res): Promise<void> => {
     let linesUpdated = 0;
 
     do {
-      const path = nextPage
+      const path: string = nextPage
         ? `/orders.json?limit=250&page_info=${encodeURIComponent(nextPage)}`
         : `/orders.json?status=any&limit=250&fields=${FIELDS}`;
-      const { data, nextPageInfo } = await shopifyRequestPaged<{ orders: Array<{ id: number; refunds?: ShopRefund[]; currency?: string }> }>(
+      const { data, nextPageInfo }: { data: { orders: Array<{ id: number; refunds?: ShopRefund[]; currency?: string }> }; nextPageInfo: string | null } = await shopifyRequestPaged<{ orders: Array<{ id: number; refunds?: ShopRefund[]; currency?: string }> }>(
         parseInt(projectId), project.shopDomain, path
       );
       for (const order of (data.orders || [])) {

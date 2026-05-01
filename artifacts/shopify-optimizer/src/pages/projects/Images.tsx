@@ -41,6 +41,8 @@ const IMAGE_TYPES = [
   { id: "escala", label: "Escala", icon: "📏", model: "Flux Dev", color: "yellow" },
   { id: "bundle", label: "Bundle", icon: "🛍️", model: "Flux 1.1 Pro", color: "indigo" },
   { id: "infografia", label: "Infografía SVG", icon: "📊", model: "Claude SVG", color: "teal" },
+  { id: "infografia-premium", label: "Infografía Premium", icon: "💎", model: "Ideogram v3 (texto real)", color: "amber" },
+  { id: "tryon", label: "Virtual Try-On", icon: "🧍", model: "Gemini Fusion", color: "rose" },
 ];
 
 type JobEntry = { jobId: string; type: string };
@@ -226,6 +228,174 @@ function PromptModal({
   );
 }
 
+function TryonModal({
+  productId,
+  projectId,
+  onClose,
+  onSuccess,
+}: {
+  productId: string;
+  projectId: number;
+  onClose: () => void;
+  onSuccess: (dataUri: string) => void;
+}) {
+  const { toast } = useToast();
+  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [scene, setScene] = useState("model_front");
+  const [aspectRatio, setAspectRatio] = useState("3:4");
+  const [loading, setLoading] = useState(false);
+
+  const SCENES = [
+    { key: "model_front", label: "Frontal estudio" },
+    { key: "model_street", label: "Street style urbano" },
+    { key: "model_lifestyle", label: "Lifestyle natural" },
+    { key: "model_editorial", label: "Editorial revista" },
+    { key: "model_close", label: "Close-up del producto puesto" },
+  ];
+  const ASPECTS = ["3:4", "9:16", "1:1", "4:3", "16:9"];
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setModelFile(f);
+    const url = URL.createObjectURL(f);
+    setPreviewUrl(url);
+  };
+
+  const handleGenerate = async () => {
+    if (!modelFile) {
+      toast({ title: "Falta la imagen", description: "Sube una foto de la persona/modelo", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("modelImage", modelFile);
+      fd.append("scene", scene);
+      fd.append("aspectRatio", aspectRatio);
+      const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/tryon-quick`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      if (!data.dataUri) throw new Error("Respuesta sin imagen");
+      onSuccess(data.dataUri);
+      toast({ title: "✓ Try-On generado", description: "Imagen lista en la galería del producto." });
+      onClose();
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Error en virtual try-on";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-card border border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            🧍 Virtual Try-On
+          </h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Cerrar">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-xs text-muted-foreground mb-4">
+          Sube una foto de la persona/modelo. La imagen del producto se carga automáticamente desde Shopify.
+          Fusión con Gemini 2.5 Flash Image (preserva identidad y producto).
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">📷 Foto del modelo</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFile}
+              data-testid="tryon-model-file"
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-primary file:text-white file:cursor-pointer hover:file:bg-primary/80"
+            />
+            {previewUrl && (
+              <div className="mt-2 rounded-lg overflow-hidden border border-white/10">
+                <img src={previewUrl} alt="Preview modelo" className="w-full h-48 object-cover" />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">🎬 Escena</label>
+            <select
+              value={scene}
+              onChange={(e) => setScene(e.target.value)}
+              data-testid="tryon-scene"
+              className="w-full bg-background border border-white/20 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
+            >
+              {SCENES.map((s) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">📐 Proporción</label>
+            <div className="flex gap-2 flex-wrap">
+              {ASPECTS.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAspectRatio(a)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-md border transition-colors",
+                    aspectRatio === a
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white/5 text-foreground border-white/10 hover:bg-white/10"
+                  )}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !modelFile}
+            data-testid="tryon-generate"
+            className="w-full bg-rose-500 hover:bg-rose-600 disabled:bg-rose-500/40 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Fusionando con Gemini...
+              </>
+            ) : (
+              <>🧍 Generar Try-On (~$0.04)</>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function ImagesPage() {
   const [, params] = useRoute("/projects/:id/images");
   const projectId = parseInt(params?.id || "0");
@@ -253,6 +423,7 @@ export default function ImagesPage() {
     productId: string;
     imageType: string;
   } | null>(null);
+  const [tryonModal, setTryonModal] = useState<{ productId: string } | null>(null);
   // Motor IA seleccionado por (productId+tipo). Vacío = motor por defecto del backend.
   const [selectedEngines, setSelectedEngines] = useState<Record<string, string>>({});
   const { data: enginesData } = useListImageEngines();
@@ -317,6 +488,39 @@ export default function ImagesPage() {
 
   const handleGenerate = (productId: string, imageType: string, engine?: string) => {
     const key = jobKey(productId, imageType);
+
+    if (imageType === "tryon") {
+      setTryonModal({ productId });
+      return;
+    }
+
+    if (imageType === "infografia-premium") {
+      setJobs((prev) => ({ ...prev, [key]: { jobId: "infografia-premium", type: imageType } }));
+      (async () => {
+        try {
+          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aspectRatio: "1:1", model: "ideogram-v3-turbo" }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${resp.status}`);
+          }
+          const data = await resp.json();
+          if (!data.dataUri) throw new Error("Respuesta sin imagen");
+          setCompletedImages((prev) => ({ ...prev, [key]: data.dataUri }));
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "✓ Infografía Premium generada", description: "Texto perfectamente legible con datos reales." });
+        } catch (err) {
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          const msg = (err as { message?: string })?.message || "Error generando infografía premium";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        }
+      })();
+      return;
+    }
 
     if (imageType === "infografia") {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "infografia", type: imageType } }));
@@ -412,7 +616,7 @@ export default function ImagesPage() {
     <div className="space-y-8 pb-12">
       {/* Job pollers for in-progress jobs */}
       {Object.entries(jobs)
-        .filter(([, e]) => e.jobId && e.jobId !== "infografia")
+        .filter(([, e]) => e.jobId && e.jobId !== "infografia" && e.jobId !== "infografia-premium" && e.jobId !== "tryon")
         .map(([key, entry]) => (
           <JobPoller key={key} projectId={projectId} jobId={entry.jobId} onComplete={handleJobComplete(key)} />
         ))}
@@ -636,6 +840,10 @@ export default function ImagesPage() {
                             >
                               {type.id === "infografia"
                                 ? "Generar SVG"
+                                : type.id === "infografia-premium"
+                                ? "💎 Generar Premium (~$0.03)"
+                                : type.id === "tryon"
+                                ? "🧍 Configurar Try-On"
                                 : selectedEngines[key]
                                 ? `Generar con ${engines.find((e) => e.model === selectedEngines[key])?.label ?? "motor"}`
                                 : "Generar (~$0.04)"}
@@ -702,6 +910,23 @@ export default function ImagesPage() {
             projectId={projectId}
             imageType={previewModal.imageType}
             onClose={() => setPreviewModal(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Virtual Try-On Modal */}
+      <AnimatePresence>
+        {tryonModal && (
+          <TryonModal
+            productId={tryonModal.productId}
+            projectId={projectId}
+            onClose={() => setTryonModal(null)}
+            onSuccess={(dataUri) => {
+              setCompletedImages((prev) => ({
+                ...prev,
+                [jobKey(tryonModal.productId, "tryon")]: dataUri,
+              }));
+            }}
           />
         )}
       </AnimatePresence>
