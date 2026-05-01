@@ -439,23 +439,62 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   res.setHeader("Content-Disposition", "inline");
   res.setHeader("X-Content-Type-Options", "nosniff");
 
-  // Determinar si el archivo es binario según el mimeType (imágenes, PDFs, etc.)
+  // === Clasificación correcta del Content-Type para PREVIEW ===
+  // BUG previo: forzábamos `text/html` para TODO archivo "no binario", lo que
+  // significaba que CSS/JS/JSON/SVG/XML se servían como HTML y el navegador los
+  // interpretaba mal (CSS aparecía como texto sin estilos, etc.).
+  //
+  // Ahora clasificamos en 4 categorías:
+  //  - "binary": image/* (no SVG), video/*, audio/*, application/pdf, application/zip, etc.
+  //              → Content-Type = mime real, sin CSP.
+  //  - "html":   text/html (o JSON renderizado a HTML por el branch JSON-as-report).
+  //              → Content-Type = text/html, CSP estricta (defensa XSS).
+  //  - "svg":    image/svg+xml. SVG puede contener <script> → CSP estricta
+  //              + Content-Type real para que el navegador lo renderice.
+  //  - "other-text": text/css, text/javascript, application/json, application/xml,
+  //              text/plain, etc. → Content-Type = mime real (CSS aplica estilos,
+  //              JS se ejecuta si se abre directo, JSON se ve formateado por el
+  //              navegador). Sin CSP de "default-src 'none'" porque rompería el
+  //              renderizado nativo del navegador y no es una superficie de XSS
+  //              en sí misma (el origen está en CORS y same-origin policy).
   const mimeType = file.mimeType ?? null;
-  const isBinaryMime = !!mimeType
-    && !mimeType.startsWith("text/")
-    && !mimeType.startsWith("application/json")
-    && !mimeType.startsWith("application/xml")
-    && !mimeType.startsWith("application/javascript")
-    && !mimeType.includes("+xml")
-    && !mimeType.includes("+json");
+  const STRICT_CSP = "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;";
 
-  // Para HTML aplicamos CSP estricta; para binarios solo el Content-Type real.
-  if (!isBinaryMime) {
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
-  } else {
-    res.setHeader("Content-Type", mimeType!);
+  type PreviewKind = "binary" | "html" | "svg" | "other-text";
+  function classifyKind(mt: string | null): PreviewKind {
+    if (!mt) return "binary"; // sin mime conocido → tratar como binario (octet-stream)
+    if (mt === "image/svg+xml" || mt.includes("svg+xml")) return "svg";
+    if (mt === "text/html" || mt.startsWith("text/html")) return "html";
+    if (mt.startsWith("text/")
+      || mt === "application/json" || mt === "application/xml"
+      || mt === "application/javascript" || mt === "application/ecmascript"
+      || mt.endsWith("+xml") || mt.endsWith("+json")) {
+      return "other-text";
+    }
+    return "binary";
   }
+
+  let kind: PreviewKind = classifyKind(mimeType);
+
+  // Si es JSON con metadata legacy (informes pre-buildBrandedHtmlFromMetadata),
+  // se renderizará a HTML más abajo. En ese caso forzamos kind="html" y se
+  // sobreescribe el Content-Type ANTES de enviar (no antes de saber).
+  // Esto se decide diferido en el branch `isJson` más abajo.
+
+  function applyHeadersForKind(k: PreviewKind) {
+    if (k === "binary") {
+      res.setHeader("Content-Type", mimeType ?? "application/octet-stream");
+    } else if (k === "html") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Security-Policy", STRICT_CSP);
+    } else if (k === "svg") {
+      res.setHeader("Content-Type", "image/svg+xml");
+      res.setHeader("Content-Security-Policy", STRICT_CSP);
+    } else { // other-text
+      res.setHeader("Content-Type", mimeType ?? "text/plain; charset=utf-8");
+    }
+  }
+  applyHeadersForKind(kind);
 
   if (file.objectPath) {
     try {
@@ -474,21 +513,30 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   }
 
   if (file.content) {
-    if (isBinaryMime) {
+    if (kind === "binary") {
       // Binarios (image/png, image/jpeg, application/pdf, etc.) se guardan como base64.
       const buf = Buffer.from(file.content, "base64");
       res.send(buf);
       return;
     }
-    const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
-    if (isJson) {
+    // JSON-as-report (legacy): solo si el JSON contiene un objeto con
+    // estructura de informe. Lo detectamos por mimeType=application/json en
+    // entries antiguos donde el `content` es un JSON serializable a HTML.
+    const isJsonReport = (file.mimeType === "application/json")
+      && (!!file.metadata || file.fileType === "report");
+    if (isJsonReport) {
       try {
         const parsed = JSON.parse(file.content);
         const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+        // Reemplazar headers (eran application/json) con html+CSP.
+        res.removeHeader("Content-Type");
+        applyHeadersForKind("html");
         res.send(htmlReport);
         return;
-      } catch {}
+      } catch { /* si el JSON no parsea, caemos al envío crudo abajo */ }
     }
+    // Texto plano (CSS, JS, JSON, XML, HTML, SVG): enviamos el contenido tal cual
+    // con el Content-Type correcto ya seteado en applyHeadersForKind().
     res.send(file.content);
     return;
   }
@@ -500,7 +548,7 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
       const resp = await fetch(file.originalUrl, { signal: AbortSignal.timeout(15_000) });
       if (resp.ok) {
         const buf = Buffer.from(await resp.arrayBuffer());
-        if (!isBinaryMime && mimeType) res.setHeader("Content-Type", mimeType);
+        if (kind !== "binary" && mimeType) res.setHeader("Content-Type", mimeType);
         res.send(buf);
         return;
       }
@@ -510,9 +558,12 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   // Para imágenes/binarios sin contenido recuperable, no devolvemos HTML
   // (rompería el <img>). Devolvemos 410 y dejamos que el `onError` del frontend
   // muestre el placeholder.
-  if (file.metadata && !isBinaryMime) {
+  if (file.metadata && kind !== "binary") {
     try {
       const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
+      // Forzamos text/html porque el report es un wrapper HTML del metadata.
+      res.removeHeader("Content-Type");
+      applyHeadersForKind("html");
       res.send(htmlReport);
       return;
     } catch {}
@@ -1685,9 +1736,30 @@ router.get("/vault/global/:fileId/preview", requireAuth, async (req, res): Promi
     if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
 
     res.setHeader("Content-Disposition", "inline");
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;");
     res.setHeader("X-Content-Type-Options", "nosniff");
+
+    // Mismo fix que /projects/.../vault/:fileId/preview: NO forzar text/html
+    // para todo. Sirvo cada tipo con su mime real (CSS como text/css, imagen
+    // como image/*, etc.) para que el navegador renderice correctamente. CSP
+    // estricta solo en HTML/SVG (donde hay riesgo XSS).
+    const STRICT_CSP_G = "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:;";
+    type GKind = "binary" | "html" | "svg" | "other-text";
+    const mt = file.mimeType ?? null;
+    const gkind: GKind = !mt ? "binary"
+      : (mt === "image/svg+xml" || mt.includes("svg+xml")) ? "svg"
+      : (mt === "text/html" || mt.startsWith("text/html")) ? "html"
+      : (mt.startsWith("text/") || mt === "application/json" || mt === "application/xml"
+         || mt === "application/javascript" || mt === "application/ecmascript"
+         || mt.endsWith("+xml") || mt.endsWith("+json")) ? "other-text"
+      : "binary";
+
+    const setKindHeaders = (k: GKind) => {
+      if (k === "binary") res.setHeader("Content-Type", mt ?? "application/octet-stream");
+      else if (k === "html") { res.setHeader("Content-Type", "text/html; charset=utf-8"); res.setHeader("Content-Security-Policy", STRICT_CSP_G); }
+      else if (k === "svg") { res.setHeader("Content-Type", "image/svg+xml"); res.setHeader("Content-Security-Policy", STRICT_CSP_G); }
+      else res.setHeader("Content-Type", mt ?? "text/plain; charset=utf-8");
+    };
+    setKindHeaders(gkind);
 
     if (file.objectPath) {
       try {
@@ -1700,21 +1772,34 @@ router.get("/vault/global/:fileId/preview", requireAuth, async (req, res): Promi
     }
 
     if (file.content) {
-      const isJson = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
-      if (isJson) {
+      if (gkind === "binary") {
+        // Binarios persistidos como base64 (image/*, video/*, application/pdf...).
+        const buf = Buffer.from(file.content, "base64");
+        res.send(buf);
+        return;
+      }
+      const isJsonReport = (file.mimeType === "application/json")
+        && (!!file.metadata || file.fileType === "report");
+      if (isJsonReport) {
         try {
           const parsed = JSON.parse(file.content);
           const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+          res.removeHeader("Content-Type");
+          setKindHeaders("html");
           res.send(htmlReport);
           return;
         } catch {}
       }
+      // Texto plano (HTML, CSS, JS, JSON, XML, SVG): se envía tal cual con
+      // su Content-Type correcto.
       res.send(file.content);
       return;
     }
 
     if (file.metadata) {
       const reportHtml = await metadataToReportHtml(file);
+      res.removeHeader("Content-Type");
+      setKindHeaders("html");
       res.send(reportHtml);
       return;
     }

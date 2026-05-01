@@ -3,6 +3,7 @@ import multer from "multer";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, generationJobsTable } from "@workspace/db";
 import { saveToVault } from "../lib/vault.js";
+import { safeDownloadReplicateImage } from "../lib/safe-image-fetch.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
@@ -330,18 +331,61 @@ export async function runImageGeneration(params: {
       .set(statusUpdate)
       .where(eq(generationJobsTable.id, job.id));
 
+    // === BUG FIX CRÍTICO ===
+    // Antes guardábamos `originalUrl: imageUrl` SIN descargar el binario. Las
+    // URLs de Replicate caducan en ~1h, así que cualquier intento posterior de
+    // visualizar/descargar la imagen desde el vault fallaba con 404. Ahora
+    // descargamos el archivo con el helper hardened (allowlist anti-SSRF, MIME
+    // allowlist, cap 15MB porque Flux 1.1 Pro 1440x1440 PNG ~5-8MB, redirect
+    // manual con 4 hops, timeout 25s) y lo persistimos como base64. El
+    // `saveToVault` se encarga internamente de subirlo a Object Storage si
+    // excede el límite inline (10MB) o de tener disk fallback en outage.
+    let savedAsBase64: string | null = null;
+    let savedMime = "image/png";
+    let downloadedSizeKB = 0;
+    let downloadFailed = false;
+    let downloadError: string | undefined;
+    try {
+      const dl = await safeDownloadReplicateImage(imageUrl, {
+        tag: "[images]",
+        maxBytes: 15 * 1024 * 1024,
+      });
+      savedAsBase64 = dl.buffer.toString("base64");
+      savedMime = dl.mime;
+      downloadedSizeKB = dl.sizeKB;
+    } catch (dlErr: any) {
+      // Si la descarga estricta falla, registramos y degradamos:
+      //  - guardamos la URL en metadata SOLO para debug/auditoría,
+      //  - NO la pasamos como `originalUrl` para evitar que `saveToVault`
+      //    haga su propio re-fetch con un validador SSRF más laxo (defensa en
+      //    profundidad: cierra caveat de architect-PASS).
+      // El registro queda en vault sin contenido visible y aparecerá como
+      // 410 al previsualizar — preferible a un fetch silencioso a una URL
+      // que ya rechazamos por nuestra allowlist estricta.
+      downloadFailed = true;
+      downloadError = dlErr?.message;
+      logger.error({ err: dlErr?.message, model, jobId: job.id }, "[images] descarga del binario falló — entry guardada sin originalUrl para evitar re-fetch laxo");
+    }
+
     await saveToVault({
       projectId,
       fileType: "image",
       category: imageType,
       title: `${imageType.charAt(0).toUpperCase() + imageType.slice(1)} — ${product.title}`,
       description: altText.slice(0, 125),
-      originalUrl: imageUrl,
-      mimeType: "image/png",
+      // Solo pasamos originalUrl si la descarga estricta tuvo ÉXITO. Si falló,
+      // omitimos para que saveToVault NO intente otro fetch con validator más
+      // laxo. La URL queda registrada en metadata para auditoría.
+      originalUrl: downloadFailed ? undefined : imageUrl,
+      content: savedAsBase64 ?? undefined,
+      mimeType: savedMime,
       productId: shopifyProductId,
       productTitle: product.title,
       generatedBy: "images_motor",
-      metadata: { model, prompt: finalPrompt, jobId: job.id, estimatedCost },
+      metadata: {
+        model, prompt: finalPrompt, jobId: job.id, estimatedCost, downloadedSizeKB,
+        ...(downloadFailed ? { downloadFailed: true, downloadError, attemptedUrl: imageUrl } : {}),
+      },
     });
 
     // ShopyBrain aprende del prompt de imagen exitoso (fire-and-forget)

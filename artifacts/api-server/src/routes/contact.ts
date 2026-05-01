@@ -16,6 +16,7 @@ import { getReportShell } from "./exports.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import juice from "juice";
 import { enableLongRunning } from "../lib/long-running.js";
+import { safeDownloadReplicateImageAsDataUri } from "../lib/safe-image-fetch.js";
 
 const router = Router();
 const contactUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
@@ -118,38 +119,11 @@ async function generateProductPhotoFromPrompt(prompt: string | null | undefined)
     { model: "google/nano-banana", input: { prompt: cleaned, output_format: "jpg" } },
   ];
 
-  // === Allowlist anti-SSRF (architect-PASS) ===
-  // El SDK de Replicate devuelve URLs de su CDN (replicate.delivery). Nunca
-  // debemos hacer fetch a un host arbitrario porque la salida del modelo es,
-  // técnicamente, contenido controlable por terceros. Restringimos a HTTPS y a
-  // hosts conocidos para evitar SSRF a metadata endpoints, redes privadas, etc.
-  const ALLOWED_HOSTS = new Set([
-    "replicate.delivery",
-    "pbxt.replicate.delivery",
-    "tjzk.replicate.delivery",
-    "xezq.replicate.delivery",
-    "replicate.com",
-    "api.replicate.com",
-    "cdn.replicate.com",
-  ]);
-  function isUrlSafe(rawUrl: string): boolean {
-    try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== "https:") return false;
-      const host = u.hostname.toLowerCase();
-      // exact match o subdominio de replicate.delivery / replicate.com
-      if (ALLOWED_HOSTS.has(host)) return true;
-      if (host.endsWith(".replicate.delivery") || host.endsWith(".replicate.com")) return true;
-      return false;
-    } catch { return false; }
-  }
-
-  // Tamaño máximo de imagen aceptado: 4MB (cubre Flux 1.1 Pro 1024x1024 con
-  // margen). Mayor que esto es señal de respuesta corrupta o CDN equivocado.
-  const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-  // MIME types aceptados (excluye SVG explícitamente — SVG puede contener JS).
-  const ALLOWED_MIME = /^image\/(jpe?g|png|webp|gif)$/i;
-
+  // El hardening anti-SSRF / MIME / size / timeout / redirects vive ahora en
+  // el helper compartido `safeDownloadReplicateImageAsDataUri`. Lo reusan tanto
+  // este endpoint público (contact.ts) como el motor principal de imágenes
+  // (images.ts), garantizando que CUALQUIER imagen que descarguemos de
+  // Replicate pasa por las mismas validaciones de producción.
   try {
     const Replicate = (await import("replicate")).default;
     const replicate = new Replicate({ auth: token });
@@ -168,79 +142,14 @@ async function generateProductPhotoFromPrompt(prompt: string | null | undefined)
           logger.warn({ model: step.model }, "[contact] no URL extraída — fallback al siguiente modelo");
           continue;
         }
-        if (!isUrlSafe(url)) {
-          logger.error({ model: step.model, host: (() => { try { return new URL(url).hostname; } catch { return "<invalid>"; } })() }, "[contact] URL fuera de allowlist — descartada (anti-SSRF)");
-          continue;
-        }
 
-        // Descargamos la imagen y la embebemos como data:URI para que el HTML
-        // del informe sea autocontenido (las URLs de Replicate caducan en ~1h
-        // y el informe se guarda en vault + se envía por email).
+        // Descarga validada + data:URI. El helper aplica TODA la cadena de
+        // hardening (allowlist host, manual redirects, MIME allowlist, cap
+        // 4MB con cutoff, timeout 25s).
         try {
-          // === Anti-SSRF en cadena de redirecciones (architect-PASS) ===
-          // `redirect: "manual"` evita que fetch siga 30x automáticamente sin
-          // revalidación. Iteramos manualmente, validando cada `Location` con
-          // isUrlSafe(), con un cap de 3 saltos para evitar loops infinitos.
-          let currentUrl = url;
-          let imgRes: Response | null = null;
-          // Timeout único que cubre TODO el ciclo de descarga (headers + body):
-          // si limpiamos sólo tras headers, un body lento queda sin protección.
-          const dlCtrl = new AbortController();
-          const dlTimer = setTimeout(() => dlCtrl.abort(), 25_000);
-          try {
-            for (let hop = 0; hop < 4; hop++) {
-              const res = await fetch(currentUrl, { signal: dlCtrl.signal, redirect: "manual" });
-              if (res.status >= 300 && res.status < 400) {
-                const loc = res.headers.get("location");
-                if (!loc) throw new Error(`30x sin Location (status ${res.status})`);
-                const nextUrl = new URL(loc, currentUrl).toString();
-                if (!isUrlSafe(nextUrl)) throw new Error(`Redirect a host fuera de allowlist: ${(() => { try { return new URL(nextUrl).hostname; } catch { return "<invalid>"; } })()}`);
-                currentUrl = nextUrl;
-                continue;
-              }
-              imgRes = res;
-              break;
-            }
-            if (!imgRes) throw new Error("Demasiados redirects");
-            if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
-
-            // Defensa en profundidad: revalidar el host final efectivo.
-            if (imgRes.url && !isUrlSafe(imgRes.url)) throw new Error(`URL final fuera de allowlist: ${imgRes.url}`);
-
-            // Validación temprana de Content-Length antes de descargar body.
-            const cl = imgRes.headers.get("content-length");
-            if (cl && Number(cl) > MAX_IMAGE_BYTES) throw new Error(`Content-Length ${cl} > ${MAX_IMAGE_BYTES}`);
-
-            const ct = (imgRes.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
-            if (!ALLOWED_MIME.test(ct)) throw new Error(`MIME no permitido: ${ct}`);
-
-            // Stream con cutoff: si el body excede el cap aborta de inmediato.
-            // El timeout dlCtrl sigue activo aquí — se limpia en el `finally`.
-            if (!imgRes.body) throw new Error("Sin body");
-            const reader = imgRes.body.getReader();
-            const chunks: Uint8Array[] = [];
-            let total = 0;
-            // eslint-disable-next-line no-constant-condition
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              if (value) {
-                total += value.byteLength;
-                if (total > MAX_IMAGE_BYTES) {
-                  try { await reader.cancel(); } catch { /* ignore */ }
-                  throw new Error(`Stream excede ${MAX_IMAGE_BYTES} bytes`);
-                }
-                chunks.push(value);
-              }
-            }
-            const buf = Buffer.concat(chunks.map(c => Buffer.from(c)));
-            if (buf.length < 1024) throw new Error(`Imagen demasiado pequeña: ${buf.length}b`);
-            const dataUri = `data:${ct};base64,${buf.toString("base64")}`;
-            logger.info({ model: step.model, sizeKB: Math.round(buf.length / 1024), mime: ct }, "[contact] ✅ pre-informe product photo generated (embedded as data URI)");
-            return dataUri;
-          } finally {
-            clearTimeout(dlTimer);
-          }
+          const r = await safeDownloadReplicateImageAsDataUri(url, { tag: "[contact]", maxBytes: 4 * 1024 * 1024 });
+          logger.info({ model: step.model, sizeKB: r.sizeKB, mime: r.mime }, "[contact] ✅ pre-informe product photo generated (embedded as data URI)");
+          return r.dataUri;
         } catch (embedErr: any) {
           // Si no podemos embeber con seguridad, mejor devolver null que
           // arriesgar inyectar HTML/contenido no validado en email del admin.
