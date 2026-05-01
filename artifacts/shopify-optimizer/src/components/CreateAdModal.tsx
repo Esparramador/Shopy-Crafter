@@ -69,6 +69,12 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
   // Cinematic
   const [scenesCount, setScenesCount] = useState(5);
   const [videoModel, setVideoModel] = useState("kling-2.1");
+  // LONG-FORM: ad de 30s a 20min con director cinematográfico, paralelización y composición pro
+  const [longForm, setLongForm] = useState(false);
+  const [totalDurationSec, setTotalDurationSec] = useState(180); // 3 min default cuando longForm
+  const [compositionMode, setCompositionMode] = useState<"narrative" | "explainer-locked" | "composite-pro">("narrative");
+  // Progreso por escena (poll-friendly más adelante)
+  const [sceneProgress, setSceneProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Tryon
   const [tryonProvider, setTryonProvider] = useState<TryonProvider>("kling");
@@ -298,6 +304,11 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
         body.scenesCount = scenesCount;
         body.videoModel = videoModel;
         if (characterId) body.characterId = parseInt(characterId, 10);
+        if (longForm) {
+          body.totalDurationSec = totalDurationSec;
+          body.compositionMode = compositionMode;
+          body.longForm = true;
+        }
       }
       const res = await fetch(endpoint, {
         method: "POST",
@@ -616,21 +627,100 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                 </label>
               </div>
               {tab === "cinematic" && (
-                <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5">
-                  <label className="block">
-                    <span className="text-xs font-semibold text-amber-300 mb-1 block">Escenas (3-8)</span>
-                    <input type="number" min={3} max={8} value={scenesCount} onChange={e => setScenesCount(parseInt(e.target.value) || 5)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-semibold text-amber-300 mb-1 block">Modelo de video</span>
-                    <select value={videoModel} onChange={e => setVideoModel(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm">
-                      <option value="kling-2.1">Kling 2.1 (1080p)</option>
-                      <option value="kling-master">Kling Master (premium)</option>
-                      <option value="seedance-pro">Seedance Pro</option>
-                      <option value="runway-gen4-turbo">Runway Gen-4 Turbo</option>
-                      <option value="hailuo-02">Hailuo 02 (rápido)</option>
-                    </select>
-                  </label>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-amber-300 mb-1 block">Escenas {longForm ? "(2-240)" : "(2-12)"}</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={longForm ? 240 : 12}
+                        value={scenesCount}
+                        onChange={e => setScenesCount(Math.max(2, Math.min(longForm ? 240 : 12, parseInt(e.target.value) || 5)))}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-amber-300 mb-1 block">Modelo de video</span>
+                      <select value={videoModel} onChange={e => setVideoModel(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm">
+                        <option value="kling-2.1">Kling 2.1 (1080p)</option>
+                        <option value="kling-master">Kling Master (premium)</option>
+                        <option value="seedance-pro">Seedance Pro</option>
+                        <option value="seedance-fast">Seedance Fast (barato)</option>
+                        <option value="runway-gen4-turbo">Runway Gen-4 Turbo</option>
+                        <option value="hailuo-02">Hailuo 02 (rápido)</option>
+                        <option value="veo-3-fast">Veo 3 Fast (audio nativo)</option>
+                        <option value="wan-2.5-fast">Wan 2.5 (low-cost)</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  {/* LONG-FORM: trailers, explainers, discursos, gameplay */}
+                  <div className="rounded-xl border-2 border-purple-500/40 bg-purple-500/5 p-4 space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={longForm} onChange={e => {
+                        const v = e.target.checked;
+                        setLongForm(v);
+                        if (v) {
+                          setScenesCount(Math.max(scenesCount, Math.ceil(totalDurationSec / 5)));
+                        } else {
+                          setScenesCount(Math.min(scenesCount, 8));
+                        }
+                      }} />
+                      <span className="text-sm font-bold text-purple-300">🎬 Modo LONG-FORM (3-20 min)</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Para <strong>trailers</strong> de gameplay, <strong>explainers extensos</strong>, <strong>discursos de empresa</strong> o <strong>storytelling profesional</strong>. El director cinematográfico planifica un <strong>arco narrativo coherente</strong>, paraleliza la generación, mantiene el personaje y producto consistentes en todas las escenas y monta transiciones profesionales.
+                    </p>
+                    {longForm && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-purple-200 mb-1 block">Duración total (segundos)</span>
+                            <input
+                              type="number"
+                              min={30}
+                              max={1200}
+                              step={30}
+                              value={totalDurationSec}
+                              onChange={e => {
+                                const v = Math.max(30, Math.min(1200, parseInt(e.target.value) || 180));
+                                setTotalDurationSec(v);
+                                setScenesCount(Math.max(2, Math.ceil(v / 5)));
+                              }}
+                              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                            />
+                            <span className="text-[10px] text-muted-foreground">≈ {(totalDurationSec / 60).toFixed(1)} min · {scenesCount} escenas</span>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-purple-200 mb-1 block">Composición</span>
+                            <select value={compositionMode} onChange={e => setCompositionMode(e.target.value as any)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm">
+                              <option value="narrative">Narrativa libre (cámara y escena cambian)</option>
+                              <option value="explainer-locked">Explainer-locked (personaje fijo, fondo cambia)</option>
+                              <option value="composite-pro">Composite-pro (capa modelo + capa fondo)</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-[10px]">
+                          <div className="rounded p-2 bg-background/40 border border-border">
+                            <strong className="text-purple-300">Narrativa</strong><br/>
+                            Cinematográfico, cámaras varían, ideal trailers
+                          </div>
+                          <div className="rounded p-2 bg-background/40 border border-border">
+                            <strong className="text-purple-300">Explainer-locked</strong><br/>
+                            Modelo siempre visible al frente, fondo dinámico (deconstrucciones, infografías)
+                          </div>
+                          <div className="rounded p-2 bg-background/40 border border-border">
+                            <strong className="text-purple-300">Composite-pro</strong><br/>
+                            Dos capas separadas + chroma-key (máxima preservación de identidad)
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-amber-300 bg-amber-500/10 rounded p-2 border border-amber-500/20">
+                          💡 Estimación: {(totalDurationSec / 60).toFixed(1)} min con {videoModel} ≈ ${(totalDurationSec * (videoModel.includes("master") ? 0.18 : videoModel.includes("seedance-fast") || videoModel.includes("hailuo") ? 0.05 : videoModel.includes("kling-2.1") ? 0.09 : 0.07)).toFixed(2)} en API providers · Tiempo wall-clock estimado: {Math.ceil(scenesCount / 5 * 1.5)}-{Math.ceil(scenesCount / 5 * 3)} min (5 clips en paralelo).
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </>

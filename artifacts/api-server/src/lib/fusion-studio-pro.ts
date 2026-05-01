@@ -496,6 +496,81 @@ export async function generateMusic(
   );
 }
 
+/**
+ * Generate music for a long-form ad (>47s) by stitching multiple 47s blocks
+ * with FFmpeg crossfade. Each block uses a "section directive" so the music
+ * builds an arc instead of looping the same motif.
+ */
+export async function generateMusicLong(
+  basePrompt: string,
+  totalDurationSec: number,
+  replicateToken?: string,
+): Promise<Buffer> {
+  const MAX_BLOCK = 45; // 47 cap minus 2s overlap for crossfade
+  if (totalDurationSec <= MAX_BLOCK) {
+    return generateMusic(basePrompt, totalDurationSec, replicateToken);
+  }
+  const blocks = Math.ceil(totalDurationSec / MAX_BLOCK);
+  const sections = [
+    "intro: soft entry, sparse instrumentation, builds tension",
+    "rise: layers added, rhythm tightens, melodic hook emerges",
+    "verse: confident groove, mid-density, supports voiceover",
+    "bridge: textural shift, new color, harmonic surprise",
+    "drop: peak energy, full mix, hook restated",
+    "verse: groove returns refined, callback to motif",
+    "climax: maximum intensity, all elements together",
+    "outro: dissolves into ambience, soft tail",
+  ];
+  const buffers: Buffer[] = [];
+  for (let i = 0; i < blocks; i++) {
+    const section = sections[Math.min(i, sections.length - 1)];
+    const blockSec = i === blocks - 1
+      ? Math.max(8, totalDurationSec - i * MAX_BLOCK + 2) // last block + 2s tail for fade
+      : MAX_BLOCK + 2;
+    const blockPrompt = `${basePrompt}. Section ${i + 1}/${blocks} - ${section}. Seamless musical continuation with previous section, same key and tempo.`;
+    const buf = await generateMusic(blockPrompt, Math.min(47, blockSec), replicateToken);
+    buffers.push(buf);
+  }
+  // Crossfade-concat the music blocks via FFmpeg (audio-only).
+  return await concatAudioBuffers(buffers, 1.5);
+}
+
+async function concatAudioBuffers(buffers: Buffer[], crossfadeSec: number): Promise<Buffer> {
+  if (buffers.length === 1) return buffers[0];
+  const tmp = await makeTmpDir("music");
+  try {
+    const inputs: string[] = [];
+    for (let i = 0; i < buffers.length; i++) {
+      const p = path.join(tmp, `m_${i}.mp3`);
+      await fs.writeFile(p, buffers[i]);
+      inputs.push(p);
+    }
+    const outPath = path.join(tmp, "music.mp3");
+    const ffmpeg: any = await loadFfmpeg();
+    return await new Promise<Buffer>((resolve, reject) => {
+      const cmd = ffmpeg();
+      for (const p of inputs) cmd.input(p);
+      const N = inputs.length;
+      // acrossfade chain: 2 inputs at a time. Build cumulatively.
+      const filters: string[] = [];
+      let prev = "0:a";
+      for (let i = 1; i < N; i++) {
+        const out = i === N - 1 ? "aout" : `ax${i}`;
+        filters.push(`[${prev}][${i}:a]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[${out}]`);
+        prev = out;
+      }
+      cmd.complexFilter(filters, ["aout"])
+        .audioCodec("libmp3lame")
+        .audioBitrate("192k")
+        .on("end", async () => { try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); } })
+        .on("error", (err: Error) => reject(new Error(`FFmpeg music concat error: ${err.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY 10: VIDEO GENERATION (Runway Gen-4 + all Replicate top models)
 // ═══════════════════════════════════════════════════════════════════════════

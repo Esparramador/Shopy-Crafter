@@ -48,6 +48,20 @@ PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` fo
 ### Super Ad Studio
 A feature for generic brand ad creation, porting the `hanakaze-v2-super` script. It includes an async worker pipeline for video clips (image-to-video/text-to-video), ElevenLabs TTS and music integration, and MP4 concatenation. State is persisted in `bulk_jobs`. The UI provides a 5-step wizard for brief, references, editable storyboard generation (Claude), voice/music selection, and final generation with live polling and download.
 
+### Cinematic Long-Form Ads (3–20 min)
+Professional long-form trailer/explainer/discourse ad pipeline:
+- **No hard caps**: up to 240 scenes / 1800s (30 min). API server `timeout=60min`, headersTimeout=61min.
+- **Parallelism**: keyframes generated with concurrency=4, video clips with concurrency=5 (3 for runway), retry=2 with exponential backoff per scene (`runWithConcurrency` + `retry` helpers in `cinematic-multishot.ts`).
+- **Multi-block music**: when totalSec>45, `generateMusicLong` produces 8 sectional blocks (intro→outro) and concatenates them with FFmpeg `acrossfade` (1.5s crossfade) for seamless 5-min+ tracks (`fusion-studio-pro.ts`).
+- **Cinematic Director** (`lib/cinematic-director.ts`): plans a narrative arc matching the requested duration (3 acts ≤90s, 5 acts ≤300s, 8 acts >300s). Distributes scenes across acts proportionally to act weight. Builds a single coherent voiceover that flows scene-to-scene. Anchors character + product identity in every prompt.
+- **Composition modes** (`compositionMode`):
+  - `narrative` — free cinematic camera/scene shifts (default, also for short ads).
+  - `explainer-locked` — host anchored center-frame, only the BACKGROUND composition shifts (deconstructions, blueprints, exploded views in BG). Ideal for Apple-style explainer discourse.
+  - `composite-pro` — director outputs `[FOREGROUND]/[BACKGROUND]` sub-blocks per scene for FFmpeg chroma-key composition in post.
+- **Product DNA** (`lib/product-dna.ts`): Claude vision multi-image (up to 4 angles) extraction returning materials, layers, textures, hardware, palette, branding visible-text, key features, dimensions, and 3-8 deconstruction points. Builds an `identityLockBlock` injected verbatim into every keyframe + video prompt to prevent invention/drift across scenes.
+- **Endpoint**: `POST /api/projects/:projectId/products/:productId/ads/smart-cinematic` accepts `longForm: boolean`, `compositionMode`, `totalDurationSec` up to 1800. Auto-enables director mode when `totalDurationSec>60`.
+- **Chatbot tools**: `list_characters`, `get_character`, `delete_character` (destructive, requires confirmation), `build_product_dna`, and `create_long_ad` registered in `shopybrain.ts execute-action` switch with documentation in the system prompt.
+
 ### Premium Image Endpoints
 Two specialized endpoints in `routes/images.ts` complement the 8 classic generation modes:
 - `POST /api/projects/:projectId/products/:productId/images/generate-infographic-premium` — Two text rendering modes:

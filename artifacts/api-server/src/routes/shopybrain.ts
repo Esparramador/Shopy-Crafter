@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
 import { randomBytes } from "crypto";
-import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable } from "@workspace/db";
+import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable, charactersTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
@@ -657,6 +657,16 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
   - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
   - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
+  
+  ── 🎬 ANUNCIOS LARGOS (3-20 min) Y PERSONAJES BLOQUEADOS ──
+  - list_characters: Listar personajes guardados (Character Lock para anuncios). Params: {projectId}
+  - get_character: Ver detalles de un personaje. Params: {projectId, characterId}
+  - delete_character: Eliminar personaje guardado. Params: {projectId, characterId} (DESTRUCTIVO — pide confirmación)
+  - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
+  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
+    • compositionMode "narrative" = cámara y escenas libres (default).
+    • compositionMode "explainer-locked" = host fijo en primer plano, solo cambia el fondo (ideal para discursos, deconstrucción de producto estilo Apple).
+    • compositionMode "composite-pro" = dos capas (host + fondo) para composición chroma key en post.
   
   CMS PATHS (usa update_cms/update_cms_batch, N=índice):
     site.name|tagline|primaryColor|accentColor|favicon|logo.type|logo.value|logo.imageUrl|font_heading|font_body
@@ -9738,6 +9748,224 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           break;
         }
   
+        // ── PERSONAJES (Character Lock para anuncios cinematográficos) ───────
+        case "list_characters": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+          const rows = await db
+            .select({
+              id: charactersTable.id,
+              name: charactersTable.name,
+              gender: charactersTable.gender,
+              ageRange: charactersTable.ageRange,
+              identityDescription: charactersTable.identityDescription,
+              voiceId: charactersTable.voiceId,
+              voiceLanguage: charactersTable.voiceLanguage,
+              styleNotes: charactersTable.styleNotes,
+              createdAt: charactersTable.createdAt,
+            })
+            .from(charactersTable)
+            .where(eq(charactersTable.projectId, projectId))
+            .orderBy(desc(charactersTable.createdAt))
+            .limit(50);
+          result = {
+            count: rows.length,
+            characters: rows,
+            message: rows.length
+              ? `📚 ${rows.length} personaje(s) bloqueados disponibles para anuncios.`
+              : `Aún no hay personajes guardados. Crea uno desde Brain Studio → Personajes.`,
+          };
+          break;
+        }
+
+        case "get_character": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const cid = parseInt(String(params?.characterId || params?.id || ""), 10);
+          if (!projectId || !cid) { res.status(400).json({ error: "projectId y characterId requeridos" }); return; }
+          const [ch] = await db
+            .select()
+            .from(charactersTable)
+            .where(and(eq(charactersTable.projectId, projectId), eq(charactersTable.id, cid)));
+          if (!ch) { res.status(404).json({ error: "Personaje no encontrado" }); return; }
+          result = {
+            id: ch.id,
+            name: ch.name,
+            gender: ch.gender,
+            ageRange: ch.ageRange,
+            identityDescription: ch.identityDescription,
+            voiceId: ch.voiceId,
+            voiceLanguage: ch.voiceLanguage,
+            styleNotes: ch.styleNotes,
+            hasReferenceImage: Boolean(ch.refVaultFileId),
+            message: `🎭 Personaje "${ch.name}" cargado.`,
+          };
+          break;
+        }
+
+        case "delete_character": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const cid = parseInt(String(params?.characterId || params?.id || ""), 10);
+          if (!projectId || !cid) { res.status(400).json({ error: "projectId y characterId requeridos" }); return; }
+          const [deleted] = await db
+            .delete(charactersTable)
+            .where(and(eq(charactersTable.projectId, projectId), eq(charactersTable.id, cid)))
+            .returning({ id: charactersTable.id, name: charactersTable.name });
+          if (!deleted) { res.status(404).json({ error: "Personaje no encontrado" }); return; }
+          result = { id: deleted.id, name: deleted.name, message: `🗑️ Personaje "${deleted.name}" eliminado.` };
+          break;
+        }
+
+        // ── PRODUCT DNA (extracción hiper-detallada por visión IA) ───────────
+        case "build_product_dna": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const productIdParam = String(params?.productId || "");
+          if (!projectId || !productIdParam) {
+            res.status(400).json({ error: "projectId y productId requeridos" });
+            return;
+          }
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+          if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+          // Resolver producto por id numérico interno o por shopifyProductId
+          const numericPid = /^\d+$/.test(productIdParam) ? parseInt(productIdParam, 10) : null;
+          const productConditions = [eq(productsTable.projectId, projectId)];
+          const [product] = await db
+            .select()
+            .from(productsTable)
+            .where(
+              numericPid
+                ? and(...productConditions, eq(productsTable.id, numericPid))
+                : and(...productConditions, eq(productsTable.shopifyProductId, productIdParam)),
+            )
+            .limit(1);
+          if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+
+          // Obtener primera imagen del producto desde Shopify (la más fiable)
+          let productImageUrl: string | null = null;
+          try {
+            const sp = await shopifyRequest<{ product: { image?: { src: string } } }>(
+              projectId,
+              project.shopDomain,
+              `/products/${product.shopifyProductId}.json?fields=image`,
+            );
+            productImageUrl = sp.product?.image?.src || null;
+          } catch (_) { /* fallthrough a fallback de texto */ }
+
+          const { fetchToBuffer } = await import("../lib/fusion-studio-pro.js");
+          const { buildProductDNA } = await import("../lib/product-dna.js");
+          const stripHtmlLocal = (s: string | null | undefined): string =>
+            (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+          let images: Array<{ buffer: Buffer; mime: "image/jpeg" | "image/png" | "image/webp" }> = [];
+          if (productImageUrl) {
+            try {
+              const buf = await fetchToBuffer(productImageUrl);
+              const lower = productImageUrl.toLowerCase();
+              const mime: "image/jpeg" | "image/png" | "image/webp" = lower.includes(".png")
+                ? "image/png" : lower.includes(".webp") ? "image/webp" : "image/jpeg";
+              images = [{ buffer: buf, mime }];
+            } catch (_) { /* ignore */ }
+          }
+          const dna = await buildProductDNA({
+            projectId,
+            productName: product.title || "Producto",
+            brand: project.name || undefined,
+            category: project.storeNiche || undefined,
+            description: stripHtmlLocal(product.bodyHtml).slice(0, 1500) || undefined,
+            images,
+          });
+          result = {
+            productName: dna.productName,
+            brand: dna.brand,
+            category: dna.category,
+            visualSummary: dna.visualSummary,
+            materialsCount: dna.materials.length,
+            materials: dna.materials,
+            layers: dna.layers,
+            textures: dna.textures,
+            hardware: dna.hardware,
+            palette: dna.palette,
+            keyFeatures: dna.keyFeatures,
+            visibleClaims: dna.visibleClaims,
+            deconstructionPoints: dna.deconstructionPoints,
+            identityLockBlock: dna.identityLockBlock,
+            message: `🧬 Product DNA listo: ${dna.materials.length} materiales, ${dna.deconstructionPoints.length} capas para deconstrucción.`,
+          };
+          break;
+        }
+
+        // ── ANUNCIO LARGO (3-20 min) DIRIGIDO POR DIRECTOR DE CINE ───────────
+        case "create_long_ad": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const productIdParam = String(params?.productId || "");
+          if (!projectId || !productIdParam) {
+            res.status(400).json({ error: "projectId y productId requeridos" });
+            return;
+          }
+          const totalDurationSec = Math.max(60, Math.min(1800, Number(params?.totalDurationSec) || Number(params?.durationSec) || 180));
+          const scenesCount = Math.max(2, Math.min(240, Number(params?.scenesCount) || Math.round(totalDurationSec / 6)));
+          const compositionMode: "narrative" | "explainer-locked" | "composite-pro" =
+            params?.compositionMode === "explainer-locked" || params?.compositionMode === "composite-pro"
+              ? params.compositionMode
+              : "narrative";
+          const characterId = params?.characterId ? parseInt(String(params.characterId), 10) : undefined;
+          const ctaText = typeof params?.ctaText === "string" ? params.ctaText : undefined;
+          const customNotes = typeof params?.customNotes === "string" ? params.customNotes : undefined;
+          const aspect = (params?.aspect === "16:9" || params?.aspect === "1:1") ? params.aspect : "9:16";
+          const language = typeof params?.language === "string" ? params.language : "es";
+          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1";
+
+          // Llamada interna al endpoint smart-cinematic (mantiene un único flujo).
+          const port = process.env.PORT || "8080";
+          const cookie = req.headers.cookie || "";
+          const url = `http://127.0.0.1:${port}/api/projects/${projectId}/products/${encodeURIComponent(productIdParam)}/ads/smart-cinematic`;
+          const body = {
+            scenesCount,
+            totalDurationSec,
+            longForm: true,
+            compositionMode,
+            characterId,
+            ctaText,
+            customNotes,
+            aspect,
+            language,
+            videoModel,
+            addMusic: params?.addMusic !== false,
+          };
+          let resp: Response;
+          try {
+            resp = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", cookie },
+              body: JSON.stringify(body),
+            });
+          } catch (e: any) {
+            res.status(502).json({ error: `No se pudo invocar smart-cinematic: ${e?.message || e}` });
+            return;
+          }
+          const data = await resp.json().catch(() => ({})) as Record<string, unknown>;
+          if (!resp.ok) {
+            result = { error: true, status: resp.status, ...data, message: `❌ Generación falló: ${(data as any)?.error || resp.statusText}` };
+          } else {
+            // smart-cinematic responde { success, result: { videoUrl, vaultId, durationSec, scenesCount, ... }, ... }
+            const inner = ((data as any)?.result || data) as Record<string, unknown>;
+            const vId = (inner as any)?.vaultId ?? (data as any)?.vaultId ?? null;
+            const vUrl = (inner as any)?.videoUrl ?? (inner as any)?.finalVideoUrl ?? (data as any)?.url ?? null;
+            const dSec = (inner as any)?.durationSec ?? (data as any)?.durationSec ?? totalDurationSec;
+            const sCnt = (inner as any)?.scenesCount ?? (data as any)?.scenesCount ?? scenesCount;
+            result = {
+              ok: true,
+              vaultId: vId,
+              videoUrl: vUrl,
+              durationSec: dSec,
+              scenesCount: sCnt,
+              compositionMode,
+              longForm: true,
+              message: `🎬 Anuncio largo generado (${dSec}s, ${sCnt} escenas, modo ${compositionMode}). Vault #${vId ?? "?"}.`,
+            };
+          }
+          break;
+        }
+
         default:
           res.status(400).json({ error: `Acción desconocida: ${action}` });
           return;

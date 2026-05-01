@@ -378,19 +378,20 @@ const server = app.listen(port, (err?: Error) => {
     });
 });
 
-// ── Extended timeouts for long-running AI research tasks ─────────────────────
-// Entity research can take up to 4-5 minutes (8+ parallel Gemini searches + Claude)
-// These prevent 504 Gateway Timeout errors from the Replit proxy
-server.timeout          = 600_000;   // 10 min — max time for a single request socket
-server.headersTimeout   = 660_000;   // 11 min — must be > timeout
+// ── Extended timeouts for long-running AI tasks ──────────────────────────────
+// Long-form ad generation (3-20 min trailers / explainers / company speeches)
+// concatenates 30-120 video clips. Even with 5x parallelism that can take
+// 15-45 min wall-clock. Heartbeat (lib/long-running) keeps proxy alive.
+server.timeout          = 3_600_000; // 60 min — max time for a single request socket
+server.headersTimeout   = 3_660_000; // 61 min — must be > timeout
 server.keepAliveTimeout = 65_000;    // 65s   — keep-alive between requests
-server.requestTimeout   = 600_000;   // 10 min — full request completion budget
+server.requestTimeout   = 3_600_000; // 60 min — full request completion budget
 
 logger.info({
-  timeout: "10min",
-  headersTimeout: "11min",
+  timeout: "60min",
+  headersTimeout: "61min",
   keepAliveTimeout: "65s",
-}, "⏱ Server timeout config applied");
+}, "⏱ Server timeout config applied (long-form ad ready)");
 
 let isShuttingDown = false;
 async function gracefulShutdown(signal: string) {

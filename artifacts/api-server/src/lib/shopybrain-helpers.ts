@@ -133,6 +133,7 @@ export const DESTRUCTIVE_ACTIONS = new Set<string>([
   "delete_collection",
   "delete_variant",
   "delete_email_flow",
+  "delete_character",
   "deactivate_user",
   "reset_user_password",
   "reset_cms",

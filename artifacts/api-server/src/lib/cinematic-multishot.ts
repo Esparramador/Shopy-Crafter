@@ -8,6 +8,7 @@ import {
   generateVideoFromImage,
   generateTTS,
   generateMusic,
+  generateMusicLong,
   composeAd,
   concatVideos,
   CAMERA_PRESETS,
@@ -80,6 +81,32 @@ export interface CinematicMultiShotRequest {
     /** Identity-lock prompt block (built via buildIdentityLockPrompt). */
     identityPrompt: string;
   };
+  /**
+   * LONG-FORM mode: when true, uses the cinematic-director (narrative arc +
+   * Product DNA + composition modes) instead of the simple per-scene script
+   * generator. Recommended for any totalDurationSec > 60.
+   */
+  longForm?: boolean;
+  /**
+   * Composition mode (only effective when longForm=true):
+   *  - "narrative":         free cinematic camera/scene shifts (default)
+   *  - "explainer-locked":  host fixed center-frame, only background changes
+   *  - "composite-pro":     two layers (host + bg) for FFmpeg chroma-key compose
+   */
+  compositionMode?: "narrative" | "explainer-locked" | "composite-pro";
+  /** Optional CTA text injected into the director prompt. */
+  ctaText?: string;
+  /**
+   * Optional pre-built ProductDNA. If not provided AND longForm=true, the
+   * director will build one on-the-fly from req.productImage + req.productName.
+   */
+  productDNA?: import("./product-dna.js").ProductDNA;
+  /** Audience description (forwarded to director). */
+  audienceText?: string;
+  /** Extra product reference images (additional angles for richer DNA). */
+  extraProductImages?: Array<{ buffer: Buffer; mime: "image/jpeg" | "image/png" | "image/webp" }>;
+  /** Plain-text product description (used by product-dna and director). */
+  productDescription?: string;
 }
 
 export interface CinematicMultiShotResult {
@@ -95,10 +122,53 @@ export interface CinematicMultiShotResult {
   savedPromptId?: string;
 }
 
+// LONG-FORM AD CAPS (raised for trailers / explainers / company speeches up to 20 min).
+// Provider clips remain 5-10s; the engine concatenates dozens of them.
 const MIN_SCENES = 2;
-const MAX_SCENES = 8;
+const MAX_SCENES = 240;       // 240 * 5s = 1200s = 20 min upper safety net
 const MIN_DURATION = 6;
-const MAX_DURATION = 60;
+const MAX_DURATION = 1800;    // 30 min ceiling (admin only realistically uses 5-10 min)
+
+/**
+ * Run an array of async tasks with bounded concurrency.
+ * Preserves return order via task index. Throws on first unrecovered error
+ * (after retry budget is exhausted upstream).
+ */
+async function runWithConcurrency<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= tasks.length) return;
+      results[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Retry an async operation N times with exponential backoff. Provider APIs
+ * (Kling, Runway, Veo, Replicate) occasionally return transient 5xx or
+ * timeouts — one or two retries dramatically improve the success rate of
+ * long-form jobs that need 30-60 clips to all succeed.
+ */
+async function retry<T>(fn: () => Promise<T>, attempts: number, label: string): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      const isLast = i === attempts;
+      logger.warn({ err: err?.message, attempt: i + 1, of: attempts + 1, label }, isLast ? "🎬 retry exhausted" : "🎬 retry");
+      if (isLast) break;
+      await new Promise((r) => setTimeout(r, 2_000 * Math.pow(2, i))); // 2s, 4s, 8s...
+    }
+  }
+  throw lastErr;
+}
 
 const STYLE_DIRECTIVES: Record<CinematicStyle, string> = {
   cinematic: "Cinematic 35mm look, anamorphic lens flare, shallow depth of field, golden-hour or moody key light, slow motion accents, color grade with warm shadows and teal highlights.",
@@ -130,7 +200,12 @@ function pickCameraPreset(style: CinematicStyle): string | undefined {
 }
 
 function clampScenesCount(n: number, totalSec: number): number {
-  const v = Math.max(MIN_SCENES, Math.min(MAX_SCENES, Math.floor(n)));
+  let v = Math.max(MIN_SCENES, Math.min(MAX_SCENES, Math.floor(n)));
+  // Each scene is capped at 10s by provider; ensure we have ENOUGH scenes to
+  // actually reach totalSec (otherwise a long-form 1800s ad with 5 scenes
+  // would render as ~50s). Floor at ceil(totalSec/10).
+  const minByDuration = Math.max(MIN_SCENES, Math.ceil(totalSec / 10));
+  if (v < minByDuration) v = Math.min(MAX_SCENES, minByDuration);
   // Each scene needs at least ~3s of video; cap accordingly.
   const maxByDuration = Math.max(MIN_SCENES, Math.floor(totalSec / 3));
   return Math.min(v, maxByDuration);
@@ -141,15 +216,29 @@ function clampDuration(n: number): number {
 }
 
 function distributeSceneDurations(totalSec: number, scenes: number): number[] {
-  // Each clip rounded to nearest 5s slot (Runway/Veo support 5/8/10s typical).
-  // We use 5s clips by default; if total > 5*scenes we extend evenly.
-  const baseClip = totalSec / scenes;
-  const out: number[] = [];
-  for (let i = 0; i < scenes; i++) {
-    const target = Math.max(3, Math.min(10, Math.round(baseClip)));
-    out.push(target);
+  // Each clip is 3-10s (provider physical limit). We greedily fill totalSec
+  // distributing the remaining seconds across clips so the SUM equals totalSec
+  // (within rounding). For long-form (totalSec > 60), this ensures we hit the
+  // requested total instead of shipping under-length videos.
+  const out: number[] = new Array(scenes).fill(5);
+  let remaining = totalSec;
+  // First pass: give every scene 5s baseline
+  remaining -= 5 * scenes;
+  // Second pass: bump scenes to 10s as long as we have surplus
+  for (let i = 0; i < scenes && remaining > 0; i++) {
+    const bump = Math.min(5, remaining);
+    out[i] += bump;
+    remaining -= bump;
   }
-  return out;
+  // If totalSec was tiny (< 5*scenes), shrink each clip down to 3s minimum
+  if (remaining < 0) {
+    for (let i = 0; i < scenes && remaining < 0; i++) {
+      const shrink = Math.min(2, -remaining); // can go down to 3s
+      out[i] -= shrink;
+      remaining += shrink;
+    }
+  }
+  return out.map((d) => Math.max(3, Math.min(10, d)));
 }
 
 /**
@@ -516,44 +605,103 @@ export async function generateCinematicMultiShot(
     if (!loaded) throw new Error(`Plantilla cinematic no encontrada: ${req.savedPromptId}`);
     loadedFromTemplate = req.savedPromptId;
     script = normalizeScriptTimings(loaded.script, sceneDurations, req.style);
+  } else if (req.longForm || totalSec > 60 || (req.compositionMode && req.compositionMode !== "narrative")) {
+    // ── DIRECTOR MODE (long-form / explainer-locked / composite-pro) ───────
+    // Build Product DNA first (or reuse if caller already passed one), then
+    // generate the directed script with full narrative arc + continuity.
+    const { buildProductDNA } = await import("./product-dna.js");
+    const { generateDirectedScript } = await import("./cinematic-director.js");
+    const productDNA = req.productDNA ?? await buildProductDNA({
+      projectId: req.projectId,
+      productName: req.productName,
+      brand: req.brand,
+      category: req.niche,
+      description: req.productDescription,
+      images: [
+        { buffer: req.productImage, mime: (req.productMime as any) || "image/jpeg" },
+        ...(req.extraProductImages || []),
+      ],
+      language: req.language,
+    });
+    logger.info({
+      projectId: req.projectId,
+      materials: productDNA.materials.length,
+      decoLayers: productDNA.deconstructionPoints.length,
+    }, "🧬 Product DNA built");
+    script = await generateDirectedScript({
+      projectId: req.projectId,
+      productName: req.productName,
+      brand: req.brand,
+      niche: req.niche,
+      audience: req.audienceText || req.audience,
+      language: req.language,
+      totalDurationSec: totalSec,
+      scenesCount,
+      sceneDurations,
+      aspect: req.aspect,
+      style: req.style,
+      customBrief: req.customBrief,
+      compositionMode: req.compositionMode || "narrative",
+      productDNA,
+      character: req.character ? { name: req.character.name, identityPrompt: req.character.identityPrompt } : undefined,
+      ctaText: req.ctaText,
+    });
   } else {
     script = await generateCinematicScript(req, scenesCount, sceneDurations);
   }
-  logger.info({ scenes: script.scenes.length, title: script.title, loadedFromTemplate }, "🎬 CinematicMultiShot: script ready");
+  logger.info({ scenes: script.scenes.length, title: script.title, loadedFromTemplate, longForm: Boolean(req.longForm), composition: req.compositionMode }, "🎬 CinematicMultiShot: script ready");
 
-  // ── 2. Per-scene keyframes (sequential to keep memory bounded) ──────────
+  // ── 2. Per-scene keyframes (PARALLEL with concurrency limit) ────────────
   // Si hay Character Lock, antepondemos el bloque de identidad al prompt y pasamos
   // la foto del personaje como referencia adicional (nano-banana acepta varias).
   const characterRefExtras = req.character
     ? [{ buffer: req.character.image, mime: req.character.mime, tag: "character" }]
     : undefined;
   const identityPrefix = req.character ? `${req.character.identityPrompt}\n\n` : "";
-  const keyframes: Array<{ idx: number; buffer: Buffer; mime: string }> = [];
-  for (const scene of script.scenes) {
-    const { buffer, mimeType } = await generateImage(imageModel, identityPrefix + scene.keyframePrompt, {
-      aspectRatio: req.aspect,
-      referenceImage: req.productImage,
-      referenceMime: req.productMime,
-      extraReferences: characterRefExtras,
-    });
-    keyframes.push({ idx: scene.idx, buffer, mime: mimeType });
-    logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character) }, "🎬 keyframe generated");
-  }
 
-  // ── 3. Per-scene videos (sequential — heavy operation) ──────────────────
-  const clips: Array<{ idx: number; buffer: Buffer; mime: string; durationSec: number }> = [];
-  for (let i = 0; i < script.scenes.length; i++) {
-    const scene = script.scenes[i];
-    const dur = sceneDurations[i];
-    const kf = keyframes[i];
-    const buf = await generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, scene.videoPrompt, {
-      duration: dur,
-      aspect: req.aspect,
-      cameraPreset: scene.cameraPreset || cameraPreset,
-    });
-    clips.push({ idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur });
-    logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 clip generated");
-  }
+  // Concurrency: 4 keyframes en paralelo (image-gen es ligero ~3-10s).
+  const KF_CONCURRENCY = Math.min(4, script.scenes.length);
+  const keyframes: Array<{ idx: number; buffer: Buffer; mime: string }> = await runWithConcurrency(
+    script.scenes.map((scene) => async () => {
+      const { buffer, mimeType } = await retry(
+        () => generateImage(imageModel, identityPrefix + scene.keyframePrompt, {
+          aspectRatio: req.aspect,
+          referenceImage: req.productImage,
+          referenceMime: req.productMime,
+          extraReferences: characterRefExtras,
+        }),
+        2,
+        `keyframe scene ${scene.idx}`,
+      );
+      logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character) }, "🎬 keyframe generated");
+      return { idx: scene.idx, buffer, mime: mimeType };
+    }),
+    KF_CONCURRENCY,
+  ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
+
+  // ── 3. Per-scene videos (PARALLEL with concurrency limit + retry) ───────
+  // Concurrency: 5 vídeos en paralelo (cada uno tarda 60-180s en provider).
+  // Para 30 escenas: ~9 min wall-clock vs ~45 min secuencial.
+  // Provider rate-limits: kling permite ~5-10 paralelos; runway 3; veo 5.
+  const VIDEO_CONCURRENCY = req.videoModel.startsWith("runway") ? 3 : 5;
+  const clips = await runWithConcurrency(
+    script.scenes.map((scene, i) => async () => {
+      const dur = sceneDurations[i];
+      const kf = keyframes[i];
+      const buf = await retry(
+        () => generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, scene.videoPrompt, {
+          duration: dur,
+          aspect: req.aspect,
+          cameraPreset: scene.cameraPreset || cameraPreset,
+        }),
+        2,
+        `video scene ${scene.idx}`,
+      );
+      logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 clip generated");
+      return { idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur };
+    }),
+    VIDEO_CONCURRENCY,
+  ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
 
   // ── 4. Concat with cinematic crossfade ──────────────────────────────────
   const concatenated = await concatVideos({
@@ -593,7 +741,11 @@ export async function generateCinematicMultiShot(
     const musicPrompt = req.music.prompt
       || `${req.style} background music for a ${req.productName} ad, no vocals, builds energy, fits ${totalSec} seconds`;
     try {
-      musicBuffer = await generateMusic(musicPrompt, totalSec);
+      // Use generateMusicLong for >47s — stitches multiple Stable Audio blocks
+      // with crossfade and a section-based arc (intro/rise/verse/bridge/drop/outro).
+      musicBuffer = totalSec > 45
+        ? await generateMusicLong(musicPrompt, totalSec)
+        : await generateMusic(musicPrompt, totalSec);
       logger.info({ musicBytes: musicBuffer.length }, "🎬 music ready");
     } catch (err) {
       logger.warn({ err }, "🎬 music generation failed, continuing without music");

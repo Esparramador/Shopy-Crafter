@@ -213,7 +213,14 @@ router.post(
     try {
       const projectId = parseInt(String(req.params.projectId), 10);
       const productIdParam = String(req.params.productId);
-      const body = (req.body || {}) as SmartAdBody & { scenesCount?: number; videoModel?: string; characterId?: string | number };
+      const body = (req.body || {}) as SmartAdBody & {
+        scenesCount?: number;
+        videoModel?: string;
+        characterId?: string | number;
+        totalDurationSec?: number;
+        longForm?: boolean;
+        compositionMode?: "narrative" | "explainer-locked" | "composite-pro";
+      };
 
       const { project, product } = await loadProjectAndProduct(projectId, productIdParam);
       if (!project || !product) {
@@ -271,8 +278,17 @@ router.post(
       const finalVoiceId = lockedCharacter?.voiceId || body.voiceId || voice.voiceId;
 
       // Direct invocation of generateCinematicMultiShot — avoids HTTP loopback.
-      const scenesCount = Math.max(3, Math.min(8, Number(body.scenesCount) || 5));
-      const totalDurationSec = Math.max(scenesCount * 3, Math.min(60, scenesCount * 5));
+      // LONG-FORM: caps removed. Defaults stay short (5 scenes, 25s) but the user
+      // can request up to 240 scenes / 1200s (20 min) for trailers, explainers,
+      // company speeches, gameplay highlights, etc.
+      const requestedScenes = Number(body.scenesCount) || 5;
+      const requestedDuration = Number(body.totalDurationSec) || 0;
+      const scenesCount = Math.max(2, Math.min(240, Math.floor(requestedScenes)));
+      // If totalDurationSec explicitly given, honor it (clamped to safety ceiling).
+      // Otherwise derive from scenesCount * 5s/clip.
+      const totalDurationSec = requestedDuration > 0
+        ? Math.max(scenesCount * 3, Math.min(1800, Math.round(requestedDuration)))
+        : scenesCount * 5;
 
       const productImageUrl = getFirstProductImageUrl(product);
       if (!productImageUrl) {
@@ -291,6 +307,22 @@ router.post(
         return;
       }
 
+      // LONG-FORM: activado automáticamente si totalDurationSec > 60 o si el
+      // usuario lo pide explícitamente desde el frontend.
+      const isLongForm = Boolean(body.longForm) || totalDurationSec > 60;
+      // NOTA: "composite-pro" emite [FOREGROUND]/[BACKGROUND] en los prompts pero
+      // todavía no aplica un compositor real (chroma-key FFmpeg dual-layer).
+      // Mientras esa pieza no esté en producción, degradamos a "explainer-locked"
+      // que SÍ produce vídeo final coherente (host fijo, BG dinámico vía prompt).
+      let compositionMode: "narrative" | "explainer-locked" | "composite-pro" =
+        body.compositionMode === "explainer-locked" || body.compositionMode === "composite-pro"
+          ? body.compositionMode
+          : "narrative";
+      if (compositionMode === "composite-pro") {
+        logger.warn({ projectId }, "composite-pro requested but compositor not implemented — degrading to explainer-locked for safe output");
+        compositionMode = "explainer-locked";
+      }
+
       const result = await generateCinematicMultiShot({
         projectId,
         productImage,
@@ -299,6 +331,7 @@ router.post(
         productName: product.title || "Producto",
         niche: project.storeNiche || undefined,
         audience: undefined,
+        audienceText: project.targetAudience || undefined,
         language: language === "auto" ? "es" : language,
         scenesCount,
         totalDurationSec,
@@ -329,6 +362,11 @@ router.post(
               identityPrompt: buildIdentityLockPrompt(lockedCharacter),
             }
           : undefined,
+        // Long-form / director-mode parameters
+        longForm: isLongForm,
+        compositionMode,
+        ctaText: body.ctaText || undefined,
+        productDescription: stripHtml(product.bodyHtml).slice(0, 1500) || undefined,
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.
