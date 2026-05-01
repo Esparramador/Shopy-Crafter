@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Wand2, Film, Shirt, Loader2, Volume2, CheckCircle2, AlertCircle, Download, RefreshCw, Upload } from "lucide-react";
+import { X, Wand2, Film, Shirt, Loader2, Volume2, CheckCircle2, AlertCircle, Download, RefreshCw, Upload, UserCircle2, Plus } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -39,6 +39,12 @@ interface VoiceRecommendation {
   voiceId: string; voiceName: string; gender: string; age?: string;
   tone: string; reason: string; stability: number; style: number;
   characterGender: CharacterGender;
+}
+interface CharacterItem {
+  id: number; name: string; gender?: string | null; ageRange?: string | null;
+  identityDescription?: string | null;
+  voiceId?: string | null; voiceGender?: string | null; voiceLanguage?: string | null;
+  refMimeType?: string | null;
 }
 
 interface Props {
@@ -87,6 +93,22 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<{ url?: string; vaultId?: number | null; meta?: any } | null>(null);
 
+  // Character Lock
+  const [characters, setCharacters] = useState<CharacterItem[]>([]);
+  const [charactersLoading, setCharactersLoading] = useState(false);
+  const [characterId, setCharacterId] = useState<string>("");
+  const [showCharCreate, setShowCharCreate] = useState(false);
+  const [charForm, setCharForm] = useState<{
+    name: string;
+    gender: string;
+    ageRange: string;
+    identityDescription: string;
+  }>({ name: "", gender: "female", ageRange: "", identityDescription: "" });
+  const charRefImageRef = useRef<HTMLInputElement | null>(null);
+  const [charRefFile, setCharRefFile] = useState<File | null>(null);
+  const [charSaving, setCharSaving] = useState(false);
+  const [charError, setCharError] = useState<string>("");
+
   // ── Load voices once ─────────────────────────────────────────────────────
   useEffect(() => {
     setVoicesLoading(true);
@@ -96,6 +118,83 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
       .catch(() => setVoices([]))
       .finally(() => setVoicesLoading(false));
   }, []);
+
+  // ── Load characters (Character Lock) ─────────────────────────────────────
+  const reloadCharacters = () => {
+    setCharactersLoading(true);
+    fetch(`${API}/api/projects/${projectId}/characters`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(data => {
+        const list = Array.isArray(data?.characters)
+          ? data.characters
+          : Array.isArray(data?.items)
+            ? data.items
+            : [];
+        setCharacters(list);
+      })
+      .catch(() => setCharacters([]))
+      .finally(() => setCharactersLoading(false));
+  };
+  useEffect(() => { reloadCharacters(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+
+  // Sync gender + voice when character is chosen
+  useEffect(() => {
+    if (!characterId) return;
+    const c = characters.find(c => String(c.id) === characterId);
+    if (!c) return;
+    if (c.gender === "female" || c.gender === "male") {
+      setCharacterGender(c.gender);
+    }
+    if (c.voiceId) setVoiceId(c.voiceId);
+    if (c.voiceGender === "female" || c.voiceGender === "male") {
+      setVoiceGender(c.voiceGender as VoiceGender);
+    }
+  }, [characterId, characters]);
+
+  const saveCharacter = async () => {
+    if (!charForm.name.trim()) { setCharError("Pon un nombre al personaje"); return; }
+    if (!charRefFile) { setCharError("Sube una foto de referencia"); return; }
+    setCharSaving(true);
+    setCharError("");
+    try {
+      const fd = new FormData();
+      fd.append("refImage", charRefFile);
+      fd.append("name", charForm.name.trim());
+      if (charForm.gender) fd.append("gender", charForm.gender);
+      if (charForm.ageRange.trim()) fd.append("ageRange", charForm.ageRange.trim());
+      // Backend exige identityDescription. Si el usuario lo deja vacío,
+      // generamos una descripción mínima coherente con el resto de campos.
+      const idDescRaw = charForm.identityDescription.trim();
+      const idDesc = idDescRaw.length > 0
+        ? idDescRaw
+        : `Modelo${charForm.gender ? ` ${charForm.gender === "male" ? "masculino" : charForm.gender === "female" ? "femenino" : "neutral"}` : ""}${charForm.ageRange.trim() ? ` de ${charForm.ageRange.trim()} años` : ""}, identidad capturada en la foto de referencia adjunta. Mantener mismos rasgos faciales, peinado, color y tono de piel en todas las generaciones.`;
+      fd.append("identityDescription", idDesc);
+      // Hereda la voz actual elegida en el modal (si la hay)
+      if (voiceId) fd.append("voiceId", voiceId);
+      if (voiceGender && voiceGender !== "auto") fd.append("voiceGender", voiceGender);
+      if (language && language !== "auto") fd.append("voiceLanguage", language);
+      const res = await fetch(`${API}/api/projects/${projectId}/characters`, {
+        method: "POST", credentials: "include", body: fd,
+      });
+      const text = await res.text();
+      let data: any; try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 300) }; }
+      if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+      const created: CharacterItem | null = data?.character || null;
+      if (created) {
+        setCharacters(prev => [created, ...prev]);
+        setCharacterId(String(created.id));
+      } else {
+        reloadCharacters();
+      }
+      setCharForm({ name: "", gender: "female", ageRange: "", identityDescription: "" });
+      setCharRefFile(null);
+      setShowCharCreate(false);
+    } catch (e: any) {
+      setCharError(e?.message || "No se pudo guardar el personaje");
+    } finally {
+      setCharSaving(false);
+    }
+  };
 
   // ── Auto-recommend voice when language/voiceGender changes ───────────────
   useEffect(() => {
@@ -198,6 +297,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
       if (tab === "cinematic") {
         body.scenesCount = scenesCount;
         body.videoModel = videoModel;
+        if (characterId) body.characterId = parseInt(characterId, 10);
       }
       const res = await fetch(endpoint, {
         method: "POST",
@@ -226,8 +326,8 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
   };
 
   const submitTryon = async () => {
-    if (!modelFile) {
-      setError("Sube una imagen del modelo primero");
+    if (!modelFile && !characterId) {
+      setError("Sube una imagen del modelo o elige un personaje guardado");
       return;
     }
     setSubmitting(true);
@@ -248,7 +348,8 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
     }, 25_000);
     try {
       const fd = new FormData();
-      fd.append("modelImage", modelFile);
+      if (modelFile) fd.append("modelImage", modelFile);
+      if (characterId) fd.append("characterId", characterId);
       fd.append("provider", tryonProvider);
       fd.append("effectStyle", effectStyle);
       fd.append("characterGender", characterGender);
@@ -390,6 +491,103 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
             </div>
             <audio ref={audioRef} className="hidden" />
           </div>
+
+          {/* ── Character Lock — disponible en cinematic + tryon ── */}
+          {(tab === "cinematic" || tab === "tryon") && (
+            <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <UserCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <h4 className="text-sm font-bold text-foreground">Personaje (Character Lock)</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowCharCreate(s => !s); setCharError(""); }}
+                  className="px-2.5 py-1 text-xs bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 rounded-md font-medium flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5" />{showCharCreate ? "Cancelar" : "Crear nuevo"}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Bloquea la <strong>identidad visual</strong> del presentador/modelo entre generaciones (mismo rostro, peinado, voz). Opcional.
+              </p>
+              <div className="flex gap-2">
+                <select
+                  value={characterId}
+                  onChange={e => setCharacterId(e.target.value)}
+                  disabled={charactersLoading}
+                  className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Sin personaje (libre) —</option>
+                  {characters.map(c => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}{c.gender ? ` · ${c.gender}` : ""}{c.ageRange ? ` · ${c.ageRange}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {characterId && (
+                  <img
+                    src={`${API}/api/projects/${projectId}/characters/${characterId}/image`}
+                    alt="ref"
+                    className="w-10 h-10 rounded-lg object-cover border border-border" />
+                )}
+              </div>
+              {showCharCreate && (
+                <div className="space-y-2 pt-2 border-t border-emerald-500/20">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nombre (ej. Sofía)"
+                      value={charForm.name}
+                      onChange={e => setCharForm(f => ({ ...f, name: e.target.value }))}
+                      className="bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+                    <select
+                      value={charForm.gender}
+                      onChange={e => setCharForm(f => ({ ...f, gender: e.target.value }))}
+                      className="bg-background border border-border rounded-lg px-3 py-2 text-sm">
+                      <option value="female">Mujer</option>
+                      <option value="male">Hombre</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Rango edad (ej. 25-30)"
+                    value={charForm.ageRange}
+                    onChange={e => setCharForm(f => ({ ...f, ageRange: e.target.value }))}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+                  <textarea
+                    rows={2}
+                    placeholder="Descripción identidad (rasgos faciales, peinado, estilo). Opcional."
+                    value={charForm.identityDescription}
+                    onChange={e => setCharForm(f => ({ ...f, identityDescription: e.target.value }))}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm resize-none" />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    ref={charRefImageRef}
+                    onChange={e => setCharRefFile(e.target.files?.[0] || null)} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => charRefImageRef.current?.click()}
+                      className="flex-1 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+                      <Upload className="w-4 h-4" />{charRefFile ? `${charRefFile.name.slice(0, 22)}…` : "Foto referencia"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveCharacter}
+                      disabled={charSaving}
+                      className="px-4 py-2 bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-100 rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-2">
+                      {charSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}Guardar
+                    </button>
+                  </div>
+                  {charError && (
+                    <p className="text-xs text-red-300">{charError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tab-specific fields */}
           {(tab === "quick" || tab === "cinematic") && (
@@ -600,7 +798,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
             </button>
             <button
               onClick={onSubmit}
-              disabled={submitting || (tab === "tryon" && !modelFile)}
+              disabled={submitting || (tab === "tryon" && !modelFile && !characterId)}
               className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {submitting ? "Generando..." : tab === "tryon" ? "Generar Video Try-On" : tab === "cinematic" ? "Crear Anuncio Cinematográfico" : "Crear Anuncio Rápido"}

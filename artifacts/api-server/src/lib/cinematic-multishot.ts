@@ -72,6 +72,14 @@ export interface CinematicMultiShotRequest {
     prompt?: string;
     volume?: number;
   };
+  /** OPTIONAL Character Lock: ensures the same person appears across every scene. */
+  character?: {
+    name: string;
+    image: Buffer;
+    mime: string;
+    /** Identity-lock prompt block (built via buildIdentityLockPrompt). */
+    identityPrompt: string;
+  };
 }
 
 export interface CinematicMultiShotResult {
@@ -514,15 +522,22 @@ export async function generateCinematicMultiShot(
   logger.info({ scenes: script.scenes.length, title: script.title, loadedFromTemplate }, "🎬 CinematicMultiShot: script ready");
 
   // ── 2. Per-scene keyframes (sequential to keep memory bounded) ──────────
+  // Si hay Character Lock, antepondemos el bloque de identidad al prompt y pasamos
+  // la foto del personaje como referencia adicional (nano-banana acepta varias).
+  const characterRefExtras = req.character
+    ? [{ buffer: req.character.image, mime: req.character.mime, tag: "character" }]
+    : undefined;
+  const identityPrefix = req.character ? `${req.character.identityPrompt}\n\n` : "";
   const keyframes: Array<{ idx: number; buffer: Buffer; mime: string }> = [];
   for (const scene of script.scenes) {
-    const { buffer, mimeType } = await generateImage(imageModel, scene.keyframePrompt, {
+    const { buffer, mimeType } = await generateImage(imageModel, identityPrefix + scene.keyframePrompt, {
       aspectRatio: req.aspect,
       referenceImage: req.productImage,
       referenceMime: req.productMime,
+      extraReferences: characterRefExtras,
     });
     keyframes.push({ idx: scene.idx, buffer, mime: mimeType });
-    logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length }, "🎬 keyframe generated");
+    logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character) }, "🎬 keyframe generated");
   }
 
   // ── 3. Per-scene videos (sequential — heavy operation) ──────────────────

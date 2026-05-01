@@ -33,6 +33,7 @@ import {
 } from "../lib/fusion-studio-pro.js";
 import { generateCinematicMultiShot, type CinematicAspect, type CinematicStyle } from "../lib/cinematic-multishot.js";
 import { askClaudeJsonWithBrain } from "../lib/claude.js";
+import { loadCharacter, buildIdentityLockPrompt } from "../lib/character-loader.js";
 
 const router = Router();
 
@@ -212,7 +213,7 @@ router.post(
     try {
       const projectId = parseInt(String(req.params.projectId), 10);
       const productIdParam = String(req.params.productId);
-      const body = (req.body || {}) as SmartAdBody & { scenesCount?: number; videoModel?: string };
+      const body = (req.body || {}) as SmartAdBody & { scenesCount?: number; videoModel?: string; characterId?: string | number };
 
       const { project, product } = await loadProjectAndProduct(projectId, productIdParam);
       if (!project || !product) {
@@ -227,6 +228,34 @@ router.post(
 
       const language: VoiceLanguage = body.language || "auto";
 
+      // ── CHARACTER LOCK (opcional) ─────────────────────────────────────────
+      // Si el usuario eligió un personaje, lo cargamos del DB y forzaremos:
+      //  - voz del personaje (si tiene voiceId asignado, prevalece sobre el picker)
+      //  - identity-lock prompt + foto ref en cada keyframe
+      let lockedCharacter: Awaited<ReturnType<typeof loadCharacter>> = null;
+      const characterIdRaw = body.characterId;
+      const hasCharacterIdInput =
+        characterIdRaw !== undefined &&
+        characterIdRaw !== null &&
+        String(characterIdRaw).trim() !== "";
+      if (hasCharacterIdInput) {
+        const cidStr = String(characterIdRaw).trim();
+        if (!/^\d+$/.test(cidStr)) {
+          res.status(400).json({ error: "characterId debe ser un entero positivo", code: "BAD_CHARACTER_ID" });
+          return;
+        }
+        const cidNum = parseInt(cidStr, 10);
+        if (!Number.isFinite(cidNum) || cidNum <= 0) {
+          res.status(400).json({ error: "characterId debe ser un entero positivo", code: "BAD_CHARACTER_ID" });
+          return;
+        }
+        lockedCharacter = await loadCharacter(projectId, cidNum);
+        if (!lockedCharacter) {
+          res.status(404).json({ error: `Personaje ${cidNum} no encontrado en este proyecto`, code: "CHARACTER_NOT_FOUND" });
+          return;
+        }
+      }
+
       const voice = await recommendVoiceForProduct({
         projectId,
         productTitle: product.title || "Producto",
@@ -234,10 +263,12 @@ router.post(
         productType: product.productType || undefined,
         niche: project.storeNiche || undefined,
         language,
-        genderPref: body.voiceGender || "auto",
+        genderPref: (lockedCharacter?.voiceGender as VoiceGenderPref) || body.voiceGender || "auto",
         shortFormat: false,
       });
-      const finalVoiceId = body.voiceId || voice.voiceId;
+      // Prioridad de voiceId: explícito en body > voz del personaje > voz recomendada
+      // Character Lock prevalece sobre override manual (lock sonoro real)
+      const finalVoiceId = lockedCharacter?.voiceId || body.voiceId || voice.voiceId;
 
       // Direct invocation of generateCinematicMultiShot — avoids HTTP loopback.
       const scenesCount = Math.max(3, Math.min(8, Number(body.scenesCount) || 5));
@@ -279,6 +310,9 @@ router.post(
           body.customNotes ? `Notas: ${body.customNotes.slice(0, 300)}` : "",
           `Tono de voz: ${voice.tone}`,
           `Personaje: ${voice.characterGender}`,
+          lockedCharacter
+            ? `MUY IMPORTANTE: TODAS las escenas con personas deben mostrar al MISMO personaje "${lockedCharacter.name}" — ${lockedCharacter.identityDescription.slice(0, 200)}.`
+            : "",
         ].filter(Boolean).join(". ") || undefined,
         narration: {
           enabled: true,
@@ -287,6 +321,14 @@ router.post(
           voiceVolume: 1.0,
         },
         music: body.addMusic !== false ? { enabled: true, volume: 0.22 } : undefined,
+        character: lockedCharacter
+          ? {
+              name: lockedCharacter.name,
+              image: lockedCharacter.refImage,
+              mime: lockedCharacter.refMime,
+              identityPrompt: buildIdentityLockPrompt(lockedCharacter),
+            }
+          : undefined,
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.
@@ -309,8 +351,9 @@ router.post(
             voiceId: finalVoiceId,
             voiceName: voice.voiceName,
             language,
+            character: lockedCharacter ? { id: lockedCharacter.id, name: lockedCharacter.name } : null,
             generatedAt: new Date().toISOString(),
-            tags: ["ad", "smart", "cinematic"],
+            tags: ["ad", "smart", "cinematic", ...(lockedCharacter ? ["character_locked"] : [])],
           },
         });
       } catch (e) {
@@ -345,6 +388,9 @@ router.post(
         },
         voice: { id: finalVoiceId, name: voice.voiceName, gender: voice.gender, tone: voice.tone, reason: voice.reason },
         characterGender: voice.characterGender,
+        characterLocked: lockedCharacter
+          ? { id: lockedCharacter.id, name: lockedCharacter.name }
+          : null,
         productTitle: product.title,
         language,
       });
@@ -370,14 +416,45 @@ router.post(
       const projectId = parseInt(String(req.params.projectId), 10);
       const productIdParam = String(req.params.productId);
       const file = req.file;
-      if (!file) {
-        res.status(400).json({ error: "Falta la imagen del modelo (campo 'modelImage')" });
+
+      // characterId opcional: si está, usamos su imagen ref del DB y NO exigimos upload
+      const characterIdRawT = req.body?.characterId;
+      const hasCharacterIdInputT =
+        characterIdRawT !== undefined &&
+        characterIdRawT !== null &&
+        String(characterIdRawT).trim() !== "";
+      let cidNumT: number | null = null;
+      if (hasCharacterIdInputT) {
+        const cidStrT = String(characterIdRawT).trim();
+        if (!/^\d+$/.test(cidStrT)) {
+          res.status(400).json({ error: "characterId debe ser un entero positivo", code: "BAD_CHARACTER_ID" });
+          return;
+        }
+        const n = parseInt(cidStrT, 10);
+        if (!Number.isFinite(n) || n <= 0) {
+          res.status(400).json({ error: "characterId debe ser un entero positivo", code: "BAD_CHARACTER_ID" });
+          return;
+        }
+        cidNumT = n;
+      }
+
+      if (!file && cidNumT === null) {
+        res.status(400).json({ error: "Falta la imagen del modelo: sube 'modelImage' o pasa 'characterId'" });
         return;
       }
 
       const { project, product } = await loadProjectAndProduct(projectId, productIdParam);
       if (!project || !product) {
         res.status(404).json({ error: "Producto no encontrado" });
+        return;
+      }
+
+      // Cargar character (si aplica) — su imagen sustituye al upload, su voz prevalece
+      const lockedCharacter = cidNumT !== null
+        ? await loadCharacter(projectId, cidNumT)
+        : null;
+      if (cidNumT !== null && !lockedCharacter) {
+        res.status(404).json({ error: `Personaje ${cidNumT} no encontrado en este proyecto`, code: "CHARACTER_NOT_FOUND" });
         return;
       }
 
@@ -389,7 +466,12 @@ router.post(
 
       const provider = (String(req.body?.provider || "kling") as TryonProvider);
       const effectStyle = (String(req.body?.effectStyle || "natural_wear") as EffectStyle);
-      const characterGender = (String(req.body?.characterGender || "female") as CharacterGender);
+      // Si hay character con gender, prevalece sobre el body
+      const characterGender = (
+        lockedCharacter?.gender === "male" || lockedCharacter?.gender === "female"
+          ? lockedCharacter.gender
+          : String(req.body?.characterGender || "female")
+      ) as CharacterGender;
       const language = String(req.body?.language || "es");
       const duration = clampDuration(req.body?.duration, 5);
       const aspect = String(req.body?.aspect || "9:16") as "9:16" | "16:9" | "1:1";
@@ -398,9 +480,20 @@ router.post(
       // NEW: voiceover + lip-sync opcionales (talking-head profesional)
       const withVoiceover = String(req.body?.withVoiceover || "false") === "true";
       const applyLipSync = String(req.body?.applyLipSync || "false") === "true";
-      const voiceIdReq = req.body?.voiceId ? String(req.body.voiceId) : undefined;
-      const voiceGenderPref = (req.body?.voiceGender ? String(req.body.voiceGender) : "auto") as VoiceGenderPref;
+      // Character Lock prevalece sobre override manual (lock sonoro real)
+      const voiceIdReq = lockedCharacter?.voiceId
+        ? lockedCharacter.voiceId
+        : (req.body?.voiceId ? String(req.body.voiceId) : undefined);
+      const voiceGenderPref = (
+        lockedCharacter?.voiceGender
+          ? lockedCharacter.voiceGender
+          : (req.body?.voiceGender ? String(req.body.voiceGender) : "auto")
+      ) as VoiceGenderPref;
       const ctaText = req.body?.ctaText ? String(req.body.ctaText).slice(0, 120) : undefined;
+
+      // Imagen base: si hay character, su foto; si no, el upload del usuario
+      const baseModelImage: Buffer = lockedCharacter ? lockedCharacter.refImage : file!.buffer;
+      const baseModelMime: string = lockedCharacter ? lockedCharacter.refMime : (file!.mimetype || "image/png");
 
       if (!["kling", "hailuo", "runway"].includes(provider)) {
         res.status(400).json({ error: "Provider inválido (kling | hailuo | runway)" });
@@ -418,8 +511,8 @@ router.post(
       // producto real del catálogo. Sin esto, el video try-on no muestra el
       // producto real (solo lo describe). Si la fusión falla, caemos a usar
       // sólo la modelImage (no fatal).
-      let referenceBuffer: Buffer = file.buffer;
-      let referenceMime: string = file.mimetype || "image/png";
+      let referenceBuffer: Buffer = baseModelImage;
+      let referenceMime: string = baseModelMime;
       const productImageUrl = getFirstProductImageUrl(product);
       let fusedFromProduct = false;
       if (productImageUrl) {
@@ -434,15 +527,19 @@ router.post(
           const apiKey = process.env.GEMINI_API_KEY;
           if (apiKey) {
             const ai = new GoogleGenAI({ apiKey });
+            // Si hay character, reforzamos el identity-lock dentro del prompt de fusión
+            const identityBlock = lockedCharacter
+              ? ` ${buildIdentityLockPrompt(lockedCharacter)} `
+              : "";
             const fusionPrompt =
               `Edit the FIRST image (the model). Insert and place on the model the EXACT product shown in the SECOND image — keep the product 100% recognizable, same colors, same shape, same materials. ` +
               `Effect: ${effectStyle === "lifestyle_use" ? "the model is naturally using the product" : "the model is wearing/holding the product"}. ` +
-              `Photorealistic, professional commercial lighting, ${aspect} aspect ratio. Do not invent a different product — copy the one in the SECOND image faithfully.`;
+              `Photorealistic, professional commercial lighting, ${aspect} aspect ratio. Do not invent a different product — copy the one in the SECOND image faithfully.${identityBlock}`;
             const response = await ai.models.generateContent({
               model: "gemini-2.5-flash-image",
               contents: [
                 { text: fusionPrompt },
-                { inlineData: { mimeType: file.mimetype || "image/png", data: file.buffer.toString("base64") } } as any,
+                { inlineData: { mimeType: baseModelMime, data: baseModelImage.toString("base64") } } as any,
                 { inlineData: { mimeType: productMime, data: productBuf.toString("base64") } } as any,
               ],
               config: { responseModalities: ["IMAGE"] } as any,
@@ -583,9 +680,10 @@ router.post(
             lipSyncApplied,
             voice: voiceUsed,
             script: scriptUsed,
+            character: lockedCharacter ? { id: lockedCharacter.id, name: lockedCharacter.name } : null,
             promptUsed: result.prompt,
             generatedAt: new Date().toISOString(),
-            tags: ["video", "tryon", provider, effectStyle, ...(withVoiceover ? ["voiceover"] : []), ...(lipSyncApplied ? ["lipsync"] : [])],
+            tags: ["video", "tryon", provider, effectStyle, ...(withVoiceover ? ["voiceover"] : []), ...(lipSyncApplied ? ["lipsync"] : []), ...(lockedCharacter ? ["character_locked"] : [])],
           },
         });
       } catch (e) {
@@ -622,6 +720,7 @@ router.post(
         lipSyncApplied,
         voice: voiceUsed,
         script: scriptUsed,
+        characterLocked: lockedCharacter ? { id: lockedCharacter.id, name: lockedCharacter.name } : null,
         promptUsed: result.prompt,
       });
     } catch (err: any) {

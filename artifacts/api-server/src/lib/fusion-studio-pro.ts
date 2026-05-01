@@ -136,7 +136,16 @@ export const IMAGE_EDIT_MODELS: Record<ImageEditModel, { provider: ImageProvider
 export async function generateImage(
   model: ImageGenModel,
   prompt: string,
-  opts: { aspectRatio?: string; replicateToken?: string; seed?: number; negativePrompt?: string; referenceImage?: Buffer; referenceMime?: string },
+  opts: {
+    aspectRatio?: string;
+    replicateToken?: string;
+    seed?: number;
+    negativePrompt?: string;
+    referenceImage?: Buffer;
+    referenceMime?: string;
+    /** Optional second reference (e.g. character identity lock). Currently used by nano-banana. */
+    extraReferences?: Array<{ buffer: Buffer; mime: string; tag?: string }>;
+  },
 ): Promise<{ buffer: Buffer; mimeType: string; model: string }> {
   const cfg = IMAGE_MODELS[model];
   if (!cfg) throw new Error(`Modelo de imagen desconocido: ${model}`);
@@ -145,9 +154,17 @@ export async function generateImage(
   // ── Nano Banana (Gemini)
   if (model === "nano-banana") {
     const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
-    const contents: any = opts.referenceImage
-      ? [{ text: prompt }, { inlineData: { mimeType: opts.referenceMime || "image/png", data: opts.referenceImage.toString("base64") } }]
-      : prompt;
+    const contents: any = (() => {
+      if (!opts.referenceImage && (!opts.extraReferences || opts.extraReferences.length === 0)) return prompt;
+      const parts: any[] = [{ text: prompt }];
+      if (opts.referenceImage) {
+        parts.push({ inlineData: { mimeType: opts.referenceMime || "image/png", data: opts.referenceImage.toString("base64") } });
+      }
+      for (const r of opts.extraReferences || []) {
+        parts.push({ inlineData: { mimeType: r.mime || "image/png", data: r.buffer.toString("base64") } });
+      }
+      return parts;
+    })();
     const result = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
       contents,
