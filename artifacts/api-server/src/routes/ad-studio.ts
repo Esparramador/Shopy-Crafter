@@ -175,6 +175,10 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
           // FFmpeg failed and the ad shipped without brand/CTA text).
           overlayApplied: v.assets.overlayApplied,
           overlayError: v.assets.overlayError,
+          // Which Nano Banana provider rendered the hero image. Surfaces a
+          // silent fallback (Gemini direct → Replicate google/nano-banana)
+          // so the UI/admin can spot Google API quota/permission issues.
+          heroImageProvider: v.assets.heroImageProvider,
         };
         try {
           if (v.assets.finalMp4Path) {

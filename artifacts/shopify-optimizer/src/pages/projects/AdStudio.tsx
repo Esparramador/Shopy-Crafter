@@ -45,6 +45,11 @@ interface SavedVariant {
    *  may be present and could be garbled). undefined = overlay was off. */
   overlayApplied?: boolean;
   overlayError?: string;
+  /** Which Nano Banana provider rendered the hero. "replicate" means Gemini
+   *  failed (quota/permission/5xx) and we transparently fell back to
+   *  Replicate's `google/nano-banana`. undefined when sourceImageUrl was
+   *  used (no AI hero). */
+  heroImageProvider?: "gemini" | "replicate";
 }
 
 const OBJECTIVE_META: Record<Objective, { label: string; icon: React.ReactNode; desc: string }> = {
@@ -675,6 +680,14 @@ function VariantCard({ variant, projectId }: { variant: SavedVariant; projectId:
       {variant.overlayApplied === false && (
         <div style={{ marginTop: 8, fontSize: 10, color: "#fbbf24", display: "flex", alignItems: "center", gap: 4 }} title={variant.overlayError || ""}>
           <AlertCircle size={11} /> Overlay no aplicado — texto puede faltar o ser del modelo IA
+        </div>
+      )}
+      {/* When Gemini direct API fails (quota/permission/5xx) we transparently
+          fall back to Replicate's `google/nano-banana`. This badge surfaces
+          that so the operator knows to check the GEMINI_API_KEY. */}
+      {variant.heroImageProvider === "replicate" && (
+        <div style={{ marginTop: 6, fontSize: 10, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }} title="La API directa de Gemini falló (cuota/permiso). El sistema usó automáticamente Replicate como respaldo.">
+          <AlertCircle size={11} /> Imagen vía Replicate (fallback Nano Banana)
         </div>
       )}
     </div>

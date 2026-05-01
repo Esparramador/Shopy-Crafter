@@ -151,38 +151,18 @@ export async function generateImage(
   if (!cfg) throw new Error(`Modelo de imagen desconocido: ${model}`);
   const aspect = opts.aspectRatio && cfg.aspectRatios.includes(opts.aspectRatio) ? opts.aspectRatio : cfg.aspectRatios[0];
 
-  // ── Nano Banana (Gemini)
+  // ── Nano Banana (Gemini → Replicate fallback)
   if (model === "nano-banana") {
-    const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
-    const contents: any = (() => {
-      if (!opts.referenceImage && (!opts.extraReferences || opts.extraReferences.length === 0)) return prompt;
-      const parts: any[] = [{ text: prompt }];
-      if (opts.referenceImage) {
-        parts.push({ inlineData: { mimeType: opts.referenceMime || "image/png", data: opts.referenceImage.toString("base64") } });
-      }
-      for (const r of opts.extraReferences || []) {
-        parts.push({ inlineData: { mimeType: r.mime || "image/png", data: r.buffer.toString("base64") } });
-      }
-      return parts;
-    })();
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
-      contents,
-      config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: aspect } } as any,
+    const { generateNanoBanana } = await import("./nano-banana.js");
+    const refs: Array<{ buffer: Buffer; mimeType: string }> = [];
+    if (opts.referenceImage) refs.push({ buffer: opts.referenceImage, mimeType: opts.referenceMime || "image/png" });
+    for (const r of opts.extraReferences || []) refs.push({ buffer: r.buffer, mimeType: r.mime || "image/png" });
+    const out = await generateNanoBanana(prompt, {
+      aspectRatio: aspect,
+      references: refs,
+      replicateToken: opts.replicateToken,
     });
-    const parts = result?.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      const inline = (part as any).inlineData || (part as any).inline_data;
-      if (inline?.data) {
-        return { buffer: Buffer.from(inline.data, "base64"), mimeType: inline.mimeType || inline.mime_type || "image/png", model };
-      }
-    }
-    const candidate = result?.candidates?.[0];
-    const finishReason = (candidate as any)?.finishReason;
-    const safety = (candidate as any)?.safetyRatings;
-    const blockReason = (result as any)?.promptFeedback?.blockReason;
-    const debugInfo = JSON.stringify({ finishReason, blockReason, safety, partsCount: parts.length, partsTypes: parts.map((p: any) => Object.keys(p)) }).slice(0, 500);
-    throw new Error(`Nano Banana no devolvió imagen. Debug: ${debugInfo}`);
+    return { buffer: out.buffer, mimeType: out.mimeType, model };
   }
 
   // ── Replicate models
@@ -219,21 +199,13 @@ export async function editImage(
   opts: { replicateToken?: string; aspectRatio?: string },
 ): Promise<{ buffer: Buffer; mimeType: string }> {
   if (model === "nano-banana") {
-    const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
-      contents: [
-        { text: editPrompt },
-        { inlineData: { mimeType: imageMime, data: imageBuffer.toString("base64") } } as any,
-      ],
-      config: { responseModalities: ["IMAGE"] } as any,
+    const { generateNanoBanana } = await import("./nano-banana.js");
+    const out = await generateNanoBanana(editPrompt, {
+      aspectRatio: opts.aspectRatio,
+      references: [{ buffer: imageBuffer, mimeType: imageMime }],
+      replicateToken: opts.replicateToken,
     });
-    const parts = result?.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      const inline = (part as any).inlineData || (part as any).inline_data;
-      if (inline?.data) return { buffer: Buffer.from(inline.data, "base64"), mimeType: inline.mimeType || "image/png" };
-    }
-    throw new Error("Nano Banana edit returned no image");
+    return { buffer: out.buffer, mimeType: out.mimeType };
   }
 
   if (model === "flux-kontext-pro") {

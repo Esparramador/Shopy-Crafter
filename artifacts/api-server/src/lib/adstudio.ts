@@ -18,15 +18,13 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
+import { generateNanoBanana } from "./nano-banana.js";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
-
-const NANO_BANANA_MODEL = "gemini-2.5-flash-image";
 
 /**
  * Resolve the ffmpeg binary path. We prefer `ffmpeg-static` (bundled binary),
@@ -159,6 +157,10 @@ export interface AdAssetPaths {
   overlayApplied?: boolean;
   /** Error message from the overlay step, if it failed. */
   overlayError?: string;
+  /** Which provider generated the hero image: "gemini" (Google direct) or
+   *  "replicate" (fallback via google/nano-banana on Replicate). Undefined
+   *  when sourceImageUrl was supplied (no AI generation). */
+  heroImageProvider?: "gemini" | "replicate";
   error?: string;
 }
 
@@ -285,10 +287,10 @@ Each hook must STOP THE SCROLL. Avoid generic phrases like "check this out" or "
 export async function generateHeroImage(
   input: AdCampaignInput,
   copy: AdCopyVariant,
-): Promise<{ buffer: Buffer; mimeType: string }> {
+  projectReplicateToken?: string,
+): Promise<{ buffer: Buffer; mimeType: string; provider: "gemini" | "replicate" }> {
   const { getTemplate } = await import("./ad-templates.js");
   const tpl = getTemplate(input.template);
-  const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
 
   const aspectHint = input.aspect === "9:16" ? "vertical portrait (9:16 aspect)"
     : input.aspect === "16:9" ? "cinematic wide (16:9 aspect)"
@@ -312,32 +314,16 @@ Requirements:
 - Colors that match the brand (premium, saturated but tasteful)
 - NO text, NO logos, NO watermarks in the image`;
 
-  let result;
   try {
-    result = await ai.models.generateContent({
-      model: NANO_BANANA_MODEL,
-      contents: prompt,
-      config: {
-        responseModalities: ["IMAGE"],
-        imageConfig: { aspectRatio: input.aspect },
-      } as any,
+    const out = await generateNanoBanana(prompt, {
+      aspectRatio: input.aspect,
+      replicateToken: projectReplicateToken,
     });
+    return out;
   } catch (err: any) {
-    logger.error({ err }, "adstudio: Nano Banana image generation failed");
+    logger.error({ err: err?.message || err }, "adstudio: Nano Banana hero image failed (all providers)");
     throw new Error(`Hero image generation failed: ${err.message}`);
   }
-
-  // Nano Banana returns inline binary data in parts
-  const parts = result?.candidates?.[0]?.content?.parts ?? [];
-  for (const part of parts) {
-    const inlineData = (part as any).inlineData || (part as any).inline_data;
-    if (inlineData?.data) {
-      const data = inlineData.data as string;
-      const mimeType = inlineData.mimeType || inlineData.mime_type || "image/png";
-      return { buffer: Buffer.from(data, "base64"), mimeType };
-    }
-  }
-  throw new Error("Nano Banana returned no image data");
 }
 
 // ─── STEP 3: VIDEO (Runway Gen-4 Turbo or Replicate fallback) ──────────────
@@ -865,8 +851,9 @@ export async function runAdCampaign(
         imgBuf = await fetchToBuffer(input.sourceImageUrl, 120_000, { ssrfGuard: true });
         imgMime = "image/jpeg";
       } else {
-        const hero = await generateHeroImage(input, copy);
+        const hero = await generateHeroImage(input, copy, projectReplicateToken);
         imgBuf = hero.buffer; imgMime = hero.mimeType;
+        assets.heroImageProvider = hero.provider;
       }
 
       // STEP 3: Video
