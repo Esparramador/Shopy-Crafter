@@ -68,6 +68,8 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
   const [tryonProvider, setTryonProvider] = useState<TryonProvider>("kling");
   const [effectStyle, setEffectStyle] = useState<EffectStyle>("natural_wear");
   const [tryonPremium, setTryonPremium] = useState(false);
+  const [tryonWithVoice, setTryonWithVoice] = useState(false);
+  const [tryonLipSync, setTryonLipSync] = useState(false);
   const modelImageRef = useRef<HTMLInputElement | null>(null);
   const [modelFile, setModelFile] = useState<File | null>(null);
 
@@ -231,7 +233,19 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
     setSubmitting(true);
     setError("");
     setResult(null);
-    setProgress(`Generando video try-on con ${tryonProvider}...`);
+    const steps: string[] = [
+      "1/4 · Fusionando modelo + producto…",
+      "2/4 · Generando vídeo con " + tryonProvider + " (puede tardar 1-3 min)…",
+    ];
+    if (tryonWithVoice || tryonLipSync) steps.push("3/4 · Generando guión + voz…");
+    if (tryonLipSync) steps.push("4/4 · Sincronizando labios (lip-sync)…");
+    setProgress(steps[0]);
+    // Rotación visual de pasos para feedback al usuario (UX)
+    let stepIdx = 0;
+    const stepTimer = setInterval(() => {
+      stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+      setProgress(steps[stepIdx]);
+    }, 25_000);
     try {
       const fd = new FormData();
       fd.append("modelImage", modelFile);
@@ -242,6 +256,12 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
       fd.append("duration", String(duration));
       fd.append("aspect", aspect === "4:5" ? "9:16" : aspect);
       fd.append("premium", String(tryonPremium));
+      // Talking-head profesional: voiceover + lip-sync
+      fd.append("withVoiceover", String(tryonWithVoice || tryonLipSync));
+      fd.append("applyLipSync", String(tryonLipSync));
+      fd.append("voiceGender", voiceGender);
+      if (voiceId) fd.append("voiceId", voiceId);
+      if (ctaText) fd.append("ctaText", ctaText);
       if (customNotes) fd.append("customNotes", customNotes);
 
       const res = await fetch(
@@ -259,6 +279,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
       setError(e?.message || "Error generando try-on video");
       setProgress("");
     } finally {
+      clearInterval(stepTimer);
       setSubmitting(false);
     }
   };
@@ -461,6 +482,54 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                   <span className="text-sm">Premium (calidad+)</span>
                 </label>
               </div>
+
+              {/* Talking-head: voiceover + lip-sync profesional */}
+              <div className="rounded-xl border-2 border-pink-500/30 bg-pink-500/5 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-pink-400" />
+                  <h4 className="text-sm font-bold text-foreground">Talking-head profesional (opcional)</h4>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Activa para que el modelo del vídeo <strong>hable del producto</strong> con la voz inteligente.
+                  Lip-sync sincroniza los labios con el audio (tarda 2-4 min extra, +costo).
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label htmlFor="tryon-with-voice" className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-white/5">
+                    <input
+                      id="tryon-with-voice"
+                      type="checkbox"
+                      checked={tryonWithVoice}
+                      onChange={e => {
+                        const v = e.target.checked;
+                        setTryonWithVoice(v);
+                        if (!v) setTryonLipSync(false);
+                      }} />
+                    <span className="text-sm">🎙️ Añadir voz hablando</span>
+                  </label>
+                  <label htmlFor="tryon-lip-sync" className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-white/5">
+                    <input
+                      id="tryon-lip-sync"
+                      type="checkbox"
+                      checked={tryonLipSync}
+                      onChange={e => {
+                        const v = e.target.checked;
+                        setTryonLipSync(v);
+                        // Auto-activa voz si no estaba activada (lip-sync requiere voz)
+                        if (v && !tryonWithVoice) setTryonWithVoice(true);
+                      }} />
+                    <span className="text-sm">👄 Lip-sync (sincronizar labios)</span>
+                  </label>
+                </div>
+                {(tryonWithVoice || tryonLipSync) && (
+                  <input
+                    type="text"
+                    value={ctaText}
+                    onChange={e => setCtaText(e.target.value)}
+                    placeholder='CTA al final (opcional). Ej: "¡Pruébalo hoy!"'
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+                )}
+              </div>
+
               <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
                 <input
                   type="file"
@@ -495,9 +564,25 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
           )}
           {result && (
             <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30 space-y-2">
-              <div className="flex items-center gap-2 text-green-300 text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4" />Anuncio listo {result.vaultId ? `· bóveda #${result.vaultId}` : ""}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-green-300 text-sm font-medium">
+                  <CheckCircle2 className="w-4 h-4" />Anuncio listo {result.vaultId ? `· bóveda #${result.vaultId}` : ""}
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {result.meta?.fusedFromProduct && (
+                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">producto fusionado</span>
+                  )}
+                  {result.meta?.withVoiceover && (
+                    <span className="px-2 py-0.5 rounded bg-pink-500/20 text-pink-300">🎙️ voz</span>
+                  )}
+                  {result.meta?.lipSyncApplied && (
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">👄 lip-sync</span>
+                  )}
+                </div>
               </div>
+              {result.meta?.script && (
+                <p className="text-xs italic text-muted-foreground">"{result.meta.script}"</p>
+              )}
               {result.url && (
                 <video src={result.url} controls className="w-full max-h-[300px] rounded-lg bg-black" />
               )}

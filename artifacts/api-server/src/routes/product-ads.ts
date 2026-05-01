@@ -28,8 +28,11 @@ import {
   generateTryonVideo, type TryonProvider, type EffectStyle, type CharacterGender,
 } from "../lib/video-tryon.js";
 import { learnFromOperation } from "../lib/claude.js";
-import { fetchToBuffer } from "../lib/fusion-studio-pro.js";
+import {
+  fetchToBuffer, generateTTS, composeAd, lipSyncVideoToAudio,
+} from "../lib/fusion-studio-pro.js";
 import { generateCinematicMultiShot, type CinematicAspect, type CinematicStyle } from "../lib/cinematic-multishot.js";
+import { askClaudeJsonWithBrain } from "../lib/claude.js";
 
 const router = Router();
 
@@ -392,6 +395,12 @@ router.post(
       const aspect = String(req.body?.aspect || "9:16") as "9:16" | "16:9" | "1:1";
       const premium = String(req.body?.premium || "false") === "true";
       const customNotes = req.body?.customNotes ? String(req.body.customNotes).slice(0, 400) : undefined;
+      // NEW: voiceover + lip-sync opcionales (talking-head profesional)
+      const withVoiceover = String(req.body?.withVoiceover || "false") === "true";
+      const applyLipSync = String(req.body?.applyLipSync || "false") === "true";
+      const voiceIdReq = req.body?.voiceId ? String(req.body.voiceId) : undefined;
+      const voiceGenderPref = (req.body?.voiceGender ? String(req.body.voiceGender) : "auto") as VoiceGenderPref;
+      const ctaText = req.body?.ctaText ? String(req.body.ctaText).slice(0, 120) : undefined;
 
       if (!["kling", "hailuo", "runway"].includes(provider)) {
         res.status(400).json({ error: "Provider inválido (kling | hailuo | runway)" });
@@ -470,27 +479,113 @@ router.post(
         customNotes,
       });
 
+      // ── VOICE-OVER + LIP-SYNC (opcional) ────────────────────────────────────
+      // Si el usuario activa "talking-head" generamos:
+      //  1) Guión corto coherente (Claude) con CTA si lo pide.
+      //  2) TTS con la voz recomendada/elegida (ElevenLabs).
+      //  3) Mux audio sobre el vídeo (composeAd).
+      //  4) Lip-sync sobre el resultado vía Replicate (cudanexus/lipsync-v2).
+      let finalVideo: Buffer = result.buffer;
+      let voiceUsed: { id: string; name: string; reason: string } | null = null;
+      let lipSyncApplied = false;
+      let scriptUsed: string | null = null;
+
+      if (withVoiceover) {
+        try {
+          // 1) Voz inteligente
+          const reco = await recommendVoiceForProduct({
+            projectId,
+            productTitle: product.title || "Producto",
+            productDescription: stripHtml(product.bodyHtml || "").slice(0, 500),
+            productType: product.productType || undefined,
+            language: (language === "auto" ? "auto" : language) as VoiceLanguage,
+            niche: project.storeNiche || undefined,
+            genderPref: voiceGenderPref,
+            shortFormat: true,
+          });
+          const finalVoiceId = voiceIdReq || reco.voiceId;
+
+          // 2) Guión corto (8-22 palabras) coherente con personaje + producto
+          const scriptPrompt = `Producto: "${product.title}". Tipo: ${product.productType || "n/d"}. ` +
+            `Idioma: ${language === "auto" ? "es" : language}. Personaje: ${characterGender}. ` +
+            `${ctaText ? `CTA obligatoria al final: "${ctaText}".` : "Acaba con un cierre potente."} ` +
+            `Genera UN guión hablado de 8 a 22 palabras, natural, conversacional, coherente con el personaje. ` +
+            `Devuelve JSON: {"script":"..."}.`;
+          const scriptResp = await askClaudeJsonWithBrain<{ script: string }>(
+            projectId,
+            scriptPrompt,
+            "Eres un copywriter publicitario experto. Respondes SOLO con JSON válido.",
+            "general",
+            project.storeNiche || undefined,
+            500,
+            45_000,
+          );
+          scriptUsed = (scriptResp?.script || "").trim();
+          if (!scriptUsed) throw new Error("Guión vacío");
+
+          // 3) TTS
+          const voiceBuffer = await generateTTS(scriptUsed, {
+            voiceId: finalVoiceId,
+            modelId: "eleven_turbo_v2_5",
+            stability: reco.stability,
+            style: reco.style,
+            languageCode: language === "auto" || language.length !== 2 ? undefined : language,
+          });
+
+          // 4) Mux voz (+ música baja)
+          const muxed = await composeAd({
+            videoBuffer: result.buffer,
+            voiceBuffer,
+            voiceVolume: 1.0,
+          });
+          finalVideo = muxed;
+
+          // 5) Lip-sync (opcional — costoso pero profesional)
+          if (applyLipSync) {
+            try {
+              const synced = await lipSyncVideoToAudio(finalVideo, voiceBuffer, {
+                replicateToken,
+                videoMime: "video/mp4",
+                audioMime: "audio/mpeg",
+              });
+              finalVideo = synced;
+              lipSyncApplied = true;
+            } catch (e) {
+              logger.warn({ err: (e as Error)?.message }, "tryon-video: lip-sync falló — devuelvo el muxed sin sync");
+            }
+          }
+
+          voiceUsed = { id: finalVoiceId, name: reco.voiceName, reason: reco.reason };
+        } catch (e) {
+          logger.warn({ err: (e as Error)?.message }, "tryon-video: voiceover falló — devuelvo solo el vídeo crudo");
+        }
+      }
+
       let vaultId: number | null = null;
       try {
         vaultId = await saveToVault({
           projectId,
           fileType: "video",
           category: "tryon_video",
-          title: `Video Try-On — ${product.title} [${effectStyle}]`,
-          description: `Try-on en video con ${provider} (${result.model}). Personaje: ${characterGender}. Efecto: ${effectStyle}.${fusedFromProduct ? " Producto fusionado pre-vídeo." : ""}`,
+          title: `Video Try-On — ${product.title} [${effectStyle}]${withVoiceover ? " 🎙️" : ""}${lipSyncApplied ? " 👄" : ""}`,
+          description: `Try-on en video con ${provider} (${result.model}). Personaje: ${characterGender}. Efecto: ${effectStyle}.${fusedFromProduct ? " Producto fusionado pre-vídeo." : ""}${withVoiceover ? ` Narración: "${(scriptUsed || "").slice(0, 100)}"` : ""}${lipSyncApplied ? " Lip-sync aplicado." : ""}`,
           mimeType: "video/mp4",
           productId: product.shopifyProductId,
           productTitle: product.title,
-          generatedBy: `video-tryon:${result.model}`,
-          content: result.buffer.toString("base64"),
+          generatedBy: `video-tryon:${result.model}${lipSyncApplied ? "+lipsync" : withVoiceover ? "+vo" : ""}`,
+          content: finalVideo.toString("base64"),
           metadata: {
             provider, model: result.model, effectStyle, characterGender,
             language, duration: result.durationSec, aspect, premium,
             costEstimateUsd: result.costEstimateUsd,
             fusedFromProduct,
+            withVoiceover,
+            lipSyncApplied,
+            voice: voiceUsed,
+            script: scriptUsed,
             promptUsed: result.prompt,
             generatedAt: new Date().toISOString(),
-            tags: ["video", "tryon", provider, effectStyle],
+            tags: ["video", "tryon", provider, effectStyle, ...(withVoiceover ? ["voiceover"] : []), ...(lipSyncApplied ? ["lipsync"] : [])],
           },
         });
       } catch (e) {
@@ -515,7 +610,7 @@ router.post(
         vaultId,
         videoUrl,
         finalVideoUrl: videoUrl,
-        sizeBytes: result.buffer.length,
+        sizeBytes: finalVideo.length,
         durationSec: result.durationSec,
         model: result.model,
         provider,
@@ -523,6 +618,10 @@ router.post(
         characterGender,
         costEstimateUsd: result.costEstimateUsd,
         fusedFromProduct,
+        withVoiceover,
+        lipSyncApplied,
+        voice: voiceUsed,
+        script: scriptUsed,
         promptUsed: result.prompt,
       });
     } catch (err: any) {
