@@ -45,6 +45,12 @@
       "refLocal": "attached_assets/PXL_20260410_171731994.RAW-01_1777652964970.jpg",
       "completedAt": "2026-05-01T16:44:26.677Z"
     },
+    "c01-intro-kanji-stamp": {
+      "vaultId": 1314,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 5-second intro on a pure white cotton fabric background with subtle weave texture. TIMELINE: 0-1s the camera holds steady on the empty fabric, slight breathing motion, dust particles floating in soft natural daylight. 1-3s thick black silkscreen ink rapidly drips from above and spreads across the fabric in elegant brush strokes, forming a black octagonal stamp containing the Japanese kanji 華吹 (Hanakaze) — the strokes appear quickly one after another as if printed by an invisible silkscreen squeegee. 3-5s the freshly printed kanji stamp dries with authentic hand-printed ink texture and slight imperfections on the edges, while below the stamp the brand text 'HANAKAZE SERIGRAPHY' fades in with clean white sans-serif typography on a thin black underline. Indie streetwear handmade aesthetic, no luxury feel, no gold ink. Subtle ambient sound of fabric and ink.",
+      "completedAt": "2026-05-01T17:01:16.431Z"
+    },
     "c02-reveal-puesto": {
       "vaultId": 1315,
       "model": "seedance-pro",
@@ -62,6 +68,12 @@
       "model": "seedance-pro",
       "prompt": "Cinematic 4K vertical 9:16 5-second cascade sequence on a soft cream-painted wall background with subtle wooden terrace floor visible at the bottom. TIMELINE: 0-1s a folded WHITE t-shirt with a small BLACK octagonal kanji 華吹 stamp on the left chest materializes at the top of the frame from a swirl of white cotton particles. 1-2s a folded WHITE t-shirt with a black SAMURAI illustration in line-art with yellow-gold kimono materializes just below it from black and gold ink particles. 2-3s a folded NAVY BLUE crewneck sweatshirt with a small WHITE octagonal kanji stamp on the chest materializes below from blue fabric particles. 3-4s a folded WHITE t-shirt with a black butterfly+face print materializes at the bottom from black ink particles, completing a perfect vertical cascade of 4 different garments — all the real Hanakaze Serigraphy designs stacked from top to bottom. 4-5s the camera holds steady on the full cascade as the last particles dissolve, each garment with authentic hand-printed serigraphy texture clearly visible. Subtle soft sunlight from the right, photorealistic textures, indie streetwear collection showcase. Each design must remain faithful to the references — no invented graphics.",
       "completedAt": "2026-05-01T18:33:18.415Z"
+    },
+    "c08-outro-cta": {
+      "vaultId": 1327,
+      "model": "kling-master",
+      "prompt": "Cinematic 4K vertical 9:16 5-second outro sequence on a deep navy blue background with subtle cotton fabric weave texture, camera completely STATIC throughout (no movement, no zoom). TIMELINE: 0-1s a large WHITE octagonal silkscreen stamp containing the Japanese kanji 華吹 fades in CENTERED in the upper third of the frame, drawn with crisp clean serigraphy edges and authentic hand-printed ink texture, fully sharp and readable. 1-2s the brand text 'HANAKAZE SERIGRAPHY' fades in directly below the stamp in BOLD CLEAN WHITE SANS-SERIF typography (Helvetica/Inter style), perfectly horizontal and centered, large enough to read instantly — minimum 9% of frame height, with sharp kerning and high contrast against the navy background. 2-4s directly below, the Instagram handle text '@hanakaze.serigraphy' fades in in CLEAN WHITE SANS-SERIF with a small white Instagram camera icon to the LEFT of the handle, fully legible and high-contrast, minimum 6% of frame height, perfectly horizontal. 4-5s the tagline 'HECHO A MANO · ESTAMPADO EN CASA' fades in smaller below the handle in light-weight white typography, all elements settle perfectly still, holding stable until the end. Strict typography rules: NO distortion, NO motion blur on text, NO drop shadow, NO ornate fonts, NO gold ink, NO luxury aesthetic. All text must be perfectly horizontal, perfectly readable, sharp kerning, English/Latin alphabet only — the @hanakaze.serigraphy handle must be spelled EXACTLY as written. Authentic indie streetwear brand outro. Subtle ambient sound of soft fabric and a final quiet bell tone.",
+      "completedAt": "2026-05-01T18:36:12.788Z"
     },
     "voice-off-v3": {
       "vaultId": 1328,
@@ -85,6 +97,13 @@
     }
   },
   "startedAt": "2026-05-01T16:44:19.814Z",
-  "lastUpdate": "2026-05-01T19:39:29.267Z",
-  "inFlight": {}
+  "lastUpdate": "2026-05-01T19:37:08.859Z",
+  "inFlight": {
+    "c06-perchero-levita": {
+      "startedAt": "2026-05-01T19:37:06.842Z",
+      "pid": 78790,
+      "failedAt": "2026-05-01T19:37:08.859Z",
+      "error": "video[c06-perchero-levita] [video:kling-master:c06-perchero-levita] HTTP 500: {\"error\":\"Request to https://api.replicate.com/v1/models/kwaivgi/kling-v2.1-master/predictions failed with status 402 Payment Required: {\\\"title\\\":\\\"Insufficient credit\\\",\\\"detail\\\":\\\"You have insufficient credit to run th"
+    }
+  }
 }
