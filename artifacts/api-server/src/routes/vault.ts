@@ -2,42 +2,12 @@ import { Router } from "express";
 import { createRequire } from "module";
 import { db, projectFilesTable, projectsTable } from "@workspace/db";
 import { generationJobsTable } from "@workspace/db/schema";
-import { eq, and, desc, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { canAccessProject } from "../lib/access.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
-import { enableLongRunning } from "../lib/long-running.js";
-import type { Request, Response } from "express";
-
-function setupZipStream(req: Request, res: Response, archive: any): { ac: AbortController; isClientGone: () => boolean } {
-  enableLongRunning(res);
-  const ac = new AbortController();
-  let clientGone = false;
-  const onAbort = (reason: string) => {
-    if (clientGone) return;
-    clientGone = true;
-    logger.warn({ reason, url: req.originalUrl }, "ZIP stream aborted by client");
-    try { ac.abort(); } catch {}
-    try { archive.destroy(); } catch {}
-  };
-  req.on("close", () => { if (!res.writableEnded) onAbort("req-close"); });
-  req.on("aborted", () => onAbort("req-aborted"));
-  res.on("error", (err) => onAbort(`res-error:${err?.message ?? err}`));
-  archive.on("error", (err: any) => {
-    logger.error({ err, url: req.originalUrl }, "ZIP archive error");
-    if (!res.headersSent) {
-      try { res.status(500).json({ error: "Error generando ZIP" }); } catch {}
-    } else {
-      try { res.destroy(); } catch {}
-    }
-  });
-  archive.on("warning", (err: any) => {
-    if (err?.code === "ENOENT") logger.warn({ err }, "ZIP warning (skipped entry)");
-    else logger.error({ err }, "ZIP warning");
-  });
-  return { ac, isClientGone: () => clientGone };
-}
+import { setupZipStream, isBinaryMime, extForMime } from "../lib/zip-stream.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import sharp from "sharp";
@@ -522,19 +492,30 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
           added++;
         }
       } else if (file.content) {
-        const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
-        if (isJsonContent) {
+        if (isBinaryMime(file.mimeType)) {
           try {
-            const parsed = JSON.parse(file.content);
-            const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
-            archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
-          } catch {
-            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            const buf = Buffer.from(file.content, "base64");
+            const realExt = extForMime(file.mimeType);
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            added++;
+          } catch (e: any) {
+            logger.warn({ fileId: file.id, err: e?.message }, "ZIP: failed to decode base64 binary");
           }
         } else {
-          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+          if (isJsonContent) {
+            try {
+              const parsed = JSON.parse(file.content);
+              const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+              archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            } catch {
+              archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            }
+          } else {
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          }
+          added++;
         }
-        added++;
       } else if (file.metadata) {
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
@@ -585,14 +566,16 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
     files = await db.select().from(projectFilesTable)
       .where(and(
         eq(projectFilesTable.projectId, projectId),
-        sql`${projectFilesTable.fileType} = ANY(${folderTypes})`
+        inArray(projectFilesTable.fileType, folderTypes)
       ))
       .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
   } else {
+    const numericIds = fileIds!.map(Number).filter((n) => !isNaN(n));
+    if (numericIds.length === 0) { res.status(400).json({ error: "fileIds inválidos" }); return; }
     files = await db.select().from(projectFilesTable)
       .where(and(
         eq(projectFilesTable.projectId, projectId),
-        sql`${projectFilesTable.id} = ANY(${fileIds!.map(Number)})`
+        inArray(projectFilesTable.id, numericIds)
       ))
       .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
   }
@@ -631,25 +614,40 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
           added++;
         }
       } else if (file.content) {
-        const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
-        if (isJsonContent) {
+        if (isBinaryMime(file.mimeType)) {
+          // Binario almacenado como base64 en DB (fallback cuando GCS falló).
+          // Decodificamos y guardamos con la extensión real (mp4/jpg/png/...).
           try {
-            const parsed = JSON.parse(file.content);
-            const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
-            archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
-          } catch {
-            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            const buf = Buffer.from(file.content, "base64");
+            const realExt = extForMime(file.mimeType);
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            added++;
+          } catch (e: any) {
+            logger.warn({ fileId: file.id, err: e?.message }, "ZIP: failed to decode base64 binary");
           }
         } else {
-          archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
+          if (isJsonContent) {
+            try {
+              const parsed = JSON.parse(file.content);
+              const htmlReport = await buildBrandedHtmlFromMetadata({ ...file, metadata: parsed }, (req.query.template as CoverTemplate) || "prestige");
+              archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            } catch {
+              archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+            }
+          } else {
+            archive.append(file.content, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          }
+          added++;
         }
-        added++;
       } else if (file.metadata) {
         const htmlReport = await buildBrandedHtmlFromMetadata(file, (req.query.template as CoverTemplate) || "prestige");
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
-    } catch { /* skip failed file */ }
+    } catch (e: any) {
+      logger.warn({ fileId: file.id, err: e?.message }, "ZIP: skipped failed file");
+    }
   }
 
   archive.append(JSON.stringify({
@@ -1603,17 +1601,27 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
       if (isClientGone()) break;
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
       const folder = file.fileType || "otros";
+      const realExt = extForMime(file.mimeType);
 
       if (file.objectPath) {
         try {
           const gcsFile = await getStorage().getObjectEntityFile(file.objectPath);
           const response = await getStorage().downloadObject(gcsFile);
           const buffer = Buffer.from(await response.arrayBuffer());
-          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.html` });
+          archive.append(buffer, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
           continue;
         } catch { /* fallback */ }
       }
       if (file.content) {
+        if (isBinaryMime(file.mimeType)) {
+          try {
+            const buf = Buffer.from(file.content, "base64");
+            archive.append(buf, { name: `${folder}/${safeTitle}_${file.id}.${realExt}` });
+            continue;
+          } catch (e: any) {
+            logger.warn({ fileId: file.id, err: e?.message }, "ZIP global: failed to decode base64");
+          }
+        }
         const isJsonContent = (file.mimeType === "application/json") || (!file.mimeType && file.content.trim().startsWith("{"));
         if (isJsonContent) {
           try {

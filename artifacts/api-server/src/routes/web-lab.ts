@@ -10,6 +10,7 @@ import { db, projectsTable, projectFilesTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
+import { setupZipStream } from "../lib/zip-stream.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -740,9 +741,11 @@ router.get("/web-lab/download-pack/:vaultId", async (req: Request, res: Response
     res.setHeader("Content-Disposition", `attachment; filename="web-lab-pack.zip"`);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
+    const { isClientGone } = setupZipStream(req, res, archive);
     archive.pipe(res);
 
     for (const f of relatedFiles) {
+      if (isClientGone()) break;
       if (!f.content) continue;
       if (f.fileType === "web-lab-report") {
         archive.append(f.content, { name: "informe-web-lab.html" });

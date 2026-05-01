@@ -9,6 +9,7 @@ import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { setupZipStream } from "../lib/zip-stream.js";
 import archiver from "archiver";
 
 const router = Router();
@@ -431,10 +432,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${dateStr}.zip"`);
   
       const archive = archiver("zip", { zlib: { level: 9 } });
-      archive.on("error", (err: any) => {
-        logger.error({ err, projectId }, "ZIP archive error");
-        if (!res.headersSent) res.status(500).json({ error: err.message });
-      });
+      const { ac, isClientGone } = setupZipStream(req, res, archive);
       archive.pipe(res);
   
       archive.append(htmlContent, { name: `${safeName}.html` });
@@ -445,7 +443,7 @@ router.post("/projects/:projectId/actions/download", async (req, res): Promise<v
   
       const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
       const cookieHeader = req.headers.cookie || "";
-      const fetchOpts = { headers: { Cookie: cookieHeader }, signal: AbortSignal.timeout(15000) };
+      const fetchOpts = { headers: { Cookie: cookieHeader }, signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) };
       const reportEndpoints = [
         { name: "Informe_Completo", path: "complete-report" },
         { name: "SEO_Audit", path: "seo-audit" },

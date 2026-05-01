@@ -28,6 +28,7 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import { fetchBrandProfile, generateBrandCss, generateBrandGuideHtml, generateAiBrandCss, buildBrandDnaContext } from "../lib/brand-css-generator.js";
 import type { Request, Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
+import { setupZipStream } from "../lib/zip-stream.js";
 
 const router = Router();
 
@@ -4395,7 +4396,7 @@ router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (
     res.setHeader("Content-Disposition", `attachment; filename="${safeName}_Complete_Export_${dateStr}.zip"`);
   
     const archive = archiver("zip", { zlib: { level: 9 } });
-    archive.on("error", (err: any) => { res.status(500).json({ error: err.message }); });
+    const { ac, isClientGone } = setupZipStream(req, res, archive);
     archive.pipe(res);
   
     const reportEndpoints = [
@@ -4416,10 +4417,13 @@ router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (
   
     const zipTpl = (req.query.template as ReportTemplate) || "prestige";
     const baseUrl = `http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/exports`;
+    const cookieHeader = req.headers.cookie || "";
+    const fetchOpts: RequestInit = { headers: { Cookie: cookieHeader }, signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) };
   
     for (const rpt of reportEndpoints) {
+      if (isClientGone()) break;
       try {
-        const response = await fetch(`${baseUrl}/${rpt.path}?template=${zipTpl}`);
+        const response = await fetch(`${baseUrl}/${rpt.path}?template=${zipTpl}`, fetchOpts);
         if (response.ok) {
           const html = await response.text();
           archive.append(html, { name: `informes/${rpt.name}_${dateStr}.html` });
@@ -4427,24 +4431,24 @@ router.get("/projects/:projectId/exports/zip/all", requireProjectAccess, async (
       } catch {}
     }
   
-    try {
-      const csvRes = await fetch(`${baseUrl}/csv/products`);
+    if (!isClientGone()) try {
+      const csvRes = await fetch(`${baseUrl}/csv/products`, fetchOpts);
       if (csvRes.ok) {
         const csv = await csvRes.text();
         archive.append(csv, { name: `datos/Productos_${dateStr}.csv` });
       }
     } catch {}
   
-    try {
-      const jsonRes = await fetch(`${baseUrl}/json/full`);
+    if (!isClientGone()) try {
+      const jsonRes = await fetch(`${baseUrl}/json/full`, fetchOpts);
       if (jsonRes.ok) {
         const json = await jsonRes.text();
         archive.append(json, { name: `datos/Exportacion_Completa_${dateStr}.json` });
       }
     } catch {}
   
-    try {
-      const jsonProdRes = await fetch(`${baseUrl}/json/products`);
+    if (!isClientGone()) try {
+      const jsonProdRes = await fetch(`${baseUrl}/json/products`, fetchOpts);
       if (jsonProdRes.ok) {
         const jsonProd = await jsonProdRes.text();
         archive.append(jsonProd, { name: `datos/Productos_${dateStr}.json` });
@@ -4805,6 +4809,7 @@ router.get("/exports/brand-kit/:projectId", requireProjectAccess, async (req, re
     res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
+    setupZipStream(req, res, archive);
     archive.pipe(res);
 
     archive.append(css, { name: `${brandName}/css/theme-custom.css` });
@@ -5069,6 +5074,7 @@ router.get("/exports/brand-kit-full/:projectId", requireProjectAccess, async (re
     res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
 
     const archive = archiver("zip", { zlib: { level: 9 } });
+    setupZipStream(req, res, archive);
     archive.pipe(res);
 
     archive.append(css, { name: `${brandName}/css/theme-custom-base.css` });
