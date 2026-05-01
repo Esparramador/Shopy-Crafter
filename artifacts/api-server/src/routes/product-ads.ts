@@ -220,7 +220,11 @@ router.post(
         totalDurationSec?: number;
         longForm?: boolean;
         compositionMode?: "narrative" | "explainer-locked" | "composite-pro";
+        savedPromptId?: string;
       };
+      const savedPromptId = typeof body.savedPromptId === "string" && body.savedPromptId.trim()
+        ? body.savedPromptId.trim()
+        : undefined;
 
       const { project, product } = await loadProjectAndProduct(projectId, productIdParam);
       if (!project || !product) {
@@ -367,6 +371,8 @@ router.post(
         compositionMode,
         ctaText: body.ctaText || undefined,
         productDescription: stripHtml(product.bodyHtml).slice(0, 1500) || undefined,
+        // Reuse a previously persisted multi-shot template (chatbot persist_cinematic_script)
+        savedPromptId,
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.

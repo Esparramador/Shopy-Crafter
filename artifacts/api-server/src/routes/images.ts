@@ -787,6 +787,9 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
     const styleHint = (req.body?.style as string) || "modern minimal premium editorial";
     // Default = ideogram-v3-turbo (mejor renderizado de texto literal). Fallback a nano-banana si Ideogram falla por quota/billing.
     const requestedModel = (req.body?.model as string) || "ideogram-v3-turbo";
+    const requestedProductImageUrl = typeof req.body?.productImageUrl === "string" && req.body.productImageUrl.trim()
+      ? req.body.productImageUrl.trim()
+      : null;
 
     // LANGUAGE selector — user picks language for the text rendered on the image.
     // Supported: es/en/fr/it/pt/de/ja/zh + 'auto' (uses product title language).
@@ -810,11 +813,88 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
     const tags = Array.isArray(tagsRaw) ? tagsRaw.join(", ") : (typeof tagsRaw === "string" ? tagsRaw : "");
     const niche = project.storeNiche || "general";
 
+    // Whitelist + selección de imagen real del producto a usar como referencia visual
+    const imagesJsonRaw: any = (product as any).imagesJson;
+    const imagesLegacyRaw: any = (product as any).images;
+    let productImagesArr: any[] = [];
+    if (Array.isArray(imagesJsonRaw) && imagesJsonRaw.length > 0) productImagesArr = imagesJsonRaw;
+    else if (Array.isArray(imagesLegacyRaw) && imagesLegacyRaw.length > 0) productImagesArr = imagesLegacyRaw;
+    else if (typeof imagesLegacyRaw === "string" && imagesLegacyRaw.trim().startsWith("[")) {
+      try { const parsed = JSON.parse(imagesLegacyRaw); if (Array.isArray(parsed)) productImagesArr = parsed; } catch { /* ignore */ }
+    }
+    const allowedProductUrls = new Set<string>();
+    if ((product as any).featuredImage) allowedProductUrls.add(String((product as any).featuredImage));
+    for (const img of productImagesArr) {
+      if (img?.src) allowedProductUrls.add(String(img.src));
+      if (img?.url) allowedProductUrls.add(String(img.url));
+    }
+    let chosenProductImageUrl: string | null = null;
+    if (requestedProductImageUrl) {
+      if (!allowedProductUrls.has(requestedProductImageUrl)) {
+        res.status(400).json({
+          error: "La imagen seleccionada no pertenece al producto. Elige una de las imágenes oficiales del producto.",
+          code: "IMAGE_NOT_IN_PRODUCT",
+          allowedCount: allowedProductUrls.size,
+        });
+        return;
+      }
+      chosenProductImageUrl = requestedProductImageUrl;
+    } else {
+      chosenProductImageUrl =
+        (product as any).featuredImage ||
+        productImagesArr[0]?.src ||
+        productImagesArr[0]?.url ||
+        null;
+    }
+
     const variantsList: any[] = Array.isArray((product as any).variants) ? (product as any).variants : [];
     const minPrice = variantsList.length > 0
       ? Math.min(...variantsList.map((v: any) => parseFloat(v.price || "0") || 0).filter(p => p > 0))
       : null;
     const currency = variantsList[0]?.currency || (project as any).currency || "EUR";
+
+    // Descarga (best-effort) la imagen REAL del producto para usarla como referencia visual.
+    // Si falla, seguimos sin ella (no rompemos el flujo). productImageBuffer/Mime se usan
+    // más abajo: en overlay → Gemini multi-image fusion; en ai → análisis visual para enriquecer prompt.
+    let productImageBuffer: Buffer | null = null;
+    let productImageMime: string | null = null;
+    let productVisualSummary: string = "";
+    if (chosenProductImageUrl) {
+      try {
+        const { fetchToBuffer } = await import("../lib/fusion-studio-pro.js");
+        const buf = await fetchToBuffer(chosenProductImageUrl, 30_000);
+        if (buf.length <= 15 * 1024 * 1024) {
+          const sig = buf.subarray(0, 4).toString("hex");
+          const sig12 = buf.subarray(0, 12).toString("hex");
+          if (sig.startsWith("89504e47")) productImageMime = "image/png";
+          else if (sig.startsWith("ffd8ff")) productImageMime = "image/jpeg";
+          else if (sig12.startsWith("52494646") && sig12.includes("57454250")) productImageMime = "image/webp";
+          if (productImageMime) productImageBuffer = buf;
+        }
+      } catch (e) {
+        logger.warn({ err: (e as Error)?.message, url: chosenProductImageUrl }, "infographic-premium: no se pudo descargar imagen del producto, sigo sin ref visual");
+      }
+    }
+
+    // En modo "ai" pedimos a Claude vision una descripción visual ultra-fiel del producto
+    // (color exacto, forma, branding visible) que se inyecta en el prompt de Ideogram.
+    if (textMode === "ai" && productImageBuffer && productImageMime) {
+      try {
+        const { askClaudeWithVision } = await import("../lib/claude.js");
+        const visualPrompt = `Describe en INGLÉS, en 2-3 frases breves y muy concretas, el aspecto visual EXACTO del producto que ves en la imagen: color principal y secundario (con nombre preciso), forma/silueta, materiales aparentes, branding/texto visible si lo hay, proporciones. NO inventes nada que no veas. Devuelve SOLO la descripción, sin preámbulo.`;
+        const visionMime = productImageMime as "image/jpeg" | "image/png" | "image/webp";
+        const summary = await askClaudeWithVision(
+          projectId,
+          visualPrompt,
+          [{ base64: productImageBuffer.toString("base64"), mediaType: visionMime }],
+          undefined,
+          800,
+        );
+        productVisualSummary = String(summary || "").trim().slice(0, 600);
+      } catch (e) {
+        logger.warn({ err: (e as Error)?.message }, "infographic-premium ai: vision summary failed (no fatal)");
+      }
+    }
 
     const claudePrompt = textMode === "overlay"
       // OVERLAY MODE: ask Claude for a STRUCTURED JSON of texts (in target language) + a clean background prompt with NO text.
@@ -856,6 +936,7 @@ PRODUCTO REAL (NO INVENTES NADA, usa solo lo que está aquí):
 - Tags: ${tags || "(ninguno)"}
 - Precio: ${minPrice ? `${minPrice} ${currency}` : "(no mostrar)"}
 - Nicho de tienda: ${niche}
+${productVisualSummary ? `- Aspecto visual REAL del producto (extraído de su foto oficial): ${productVisualSummary}\n  → El prompt DEBE describir el producto EXACTAMENTE con estos rasgos visuales (mismo color, forma, branding). NO inventes otra apariencia.` : ""}
 
 IDIOMA OBJETIVO PARA EL TEXTO EN LA IMAGEN: ${targetLanguage}.
 ${langCode === "auto" ? "(idioma del título del producto)" : `IMPORTANTE: el texto que aparezca rendered en la imagen debe estar en ${targetLanguage}. Traduce el headline y bullets a ${targetLanguage} pero conserva nombres propios y marcas en su forma original.`}
@@ -946,7 +1027,42 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
       let bgBuffer: Buffer | null = null;
       let bgModel = "";
       const bgErrors: string[] = [];
-      for (let i = 0; i < bgFallbackChain.length; i++) {
+
+      // PASO 1 (preferido si hay imagen del producto): Gemini multi-image — usa la foto REAL
+      // del producto como referencia visual para que aparezca tal cual en el fondo.
+      if (productImageBuffer && productImageMime) {
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+          if (!apiKey) throw new Error("GEMINI_API_KEY no configurado");
+          const ai = new GoogleGenAI({ apiKey });
+          const fusionPrompt = `Create a premium editorial product photograph using the EXACT product shown in the reference image. The product (${productTitle}${productType ? `, ${productType}` : ""}) must appear with its REAL color, shape, materials, branding and proportions — do NOT redesign, restyle or recolor it. Place it in this scene: ${bgPrompt}. The product is the hero of the composition, beautifully lit, sharp focus, photoreal, no AI artifacts. STRICT: do not render any text, letters, words, numbers, logos, watermarks or typography that is not literally on the original product.`;
+          const r = await ai.models.generateContent({
+            model: "gemini-2.5-flash-image",
+            contents: [
+              { text: fusionPrompt },
+              { inlineData: { mimeType: productImageMime, data: productImageBuffer.toString("base64") } },
+            ],
+            config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } } as any,
+          });
+          const parts = r?.candidates?.[0]?.content?.parts ?? [];
+          for (const part of parts) {
+            const inline = (part as any).inlineData || (part as any).inline_data;
+            if (inline?.data) {
+              bgBuffer = Buffer.from(inline.data, "base64");
+              bgModel = "gemini-2.5-flash-image+productref";
+              break;
+            }
+          }
+          if (!bgBuffer) bgErrors.push("gemini-2.5-flash-image+productref: no image returned");
+        } catch (errFusion: any) {
+          const msg = String(errFusion?.message || "").slice(0, 240);
+          bgErrors.push(`gemini-2.5-flash-image+productref: ${msg}`);
+          logger.warn({ err: msg }, "infographic-premium overlay: gemini-with-product-ref fallback to model cascade");
+        }
+      }
+
+      for (let i = 0; !bgBuffer && i < bgFallbackChain.length; i++) {
         const modelTry = bgFallbackChain[i];
         try {
           const r = await generateImage(modelTry as any, bgPrompt, { aspectRatio });
@@ -1090,6 +1206,9 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
             niche, model, aspectRatio, language: langCode, textMode: "overlay",
             headline, bullets, priceBadge,
             backgroundPrompt: bgPrompt.slice(0, 500),
+            productImageUrl: chosenProductImageUrl,
+            productImageWasUserSelected: !!requestedProductImageUrl,
+            usedProductImageAsRef: !!productImageBuffer,
             generatedAt: new Date().toISOString(),
             tags: ["infographic", "premium", "vector-overlay", "guaranteed-text"],
           },
@@ -1217,6 +1336,9 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
           model,
           aspectRatio,
           prompt: ideogramPrompt.slice(0, 1000),
+          productImageUrl: chosenProductImageUrl,
+          productImageWasUserSelected: !!requestedProductImageUrl,
+          productVisualSummary: productVisualSummary || null,
           generatedAt: new Date().toISOString(),
           tags: ["infographic", "premium", "ideogram", "raster"],
         },
@@ -1301,9 +1423,17 @@ router.post(
 
       const sceneKey = (req.body?.scene as string) || "model_front";
       const aspectRatio = (req.body?.aspectRatio as string) || "3:4";
+      const requestedProductImageUrl = typeof req.body?.productImageUrl === "string" && req.body.productImageUrl.trim()
+        ? req.body.productImageUrl.trim()
+        : null;
 
       const productTitle = product.title || "Producto";
       const productType = product.productType || "";
+      const productDescription = (product.bodyHtml || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 600);
       const niche = project.storeNiche || "general";
 
       // Robust image fallback: prefer non-empty imagesJson, fall back to legacy images field/string
@@ -1317,11 +1447,34 @@ router.post(
       } else if (typeof imagesLegacyRaw === "string" && imagesLegacyRaw.trim().startsWith("[")) {
         try { const parsed = JSON.parse(imagesLegacyRaw); if (Array.isArray(parsed)) productImages = parsed; } catch { /* ignore */ }
       }
-      const productImageUrl: string | null =
-        (product as any).featuredImage ||
-        productImages[0]?.src ||
-        productImages[0]?.url ||
-        null;
+
+      // Build whitelist of legitimate product image URLs (anti-SSRF: cliente solo puede pedir
+      // las imágenes que el producto realmente tiene en Shopify).
+      const allowedUrls = new Set<string>();
+      if ((product as any).featuredImage) allowedUrls.add(String((product as any).featuredImage));
+      for (const img of productImages) {
+        if (img?.src) allowedUrls.add(String(img.src));
+        if (img?.url) allowedUrls.add(String(img.url));
+      }
+
+      let productImageUrl: string | null = null;
+      if (requestedProductImageUrl) {
+        if (!allowedUrls.has(requestedProductImageUrl)) {
+          res.status(400).json({
+            error: "La imagen seleccionada no pertenece al producto. Elige una de las imágenes oficiales del producto.",
+            code: "IMAGE_NOT_IN_PRODUCT",
+            allowedCount: allowedUrls.size,
+          });
+          return;
+        }
+        productImageUrl = requestedProductImageUrl;
+      } else {
+        productImageUrl =
+          (product as any).featuredImage ||
+          productImages[0]?.src ||
+          productImages[0]?.url ||
+          null;
+      }
 
       if (!productImageUrl) {
         res.status(400).json({ error: "El producto no tiene imágenes en Shopify para hacer el try-on" });
@@ -1363,7 +1516,13 @@ router.post(
       };
       const sceneDescription = sceneLabels[sceneKey] || sceneLabels.model_front;
 
-      const promptForFusion = `Take the person from the FIRST image and the product from the SECOND image (${productTitle}, ${productType}). Create a single hyper-realistic photograph: ${sceneDescription}. The person's face, identity, body, skin tone, and natural features must be PRESERVED EXACTLY from image 1. The product details (color, design, texture, brand elements, shape) must be PRESERVED EXACTLY from image 2 — do NOT redesign the product. The result must look like a real photograph, no AI artifacts, no floating objects, proper scale, natural lighting and shadows that match the scene. Photographic quality, sharp focus, ${aspectRatio} aspect ratio. NEVER include text, watermarks, or logos that are not on the original product.`;
+      const productContextLine = productDescription
+        ? `Product context: "${productTitle}"${productType ? ` (${productType})` : ""}. ${productDescription}`
+        : `Product context: "${productTitle}"${productType ? ` (${productType})` : ""}.`;
+
+      const promptForFusion = `${productContextLine}
+
+Take the person from the FIRST image and the product from the SECOND image. Create a single hyper-realistic photograph: ${sceneDescription}. The person's face, identity, body, skin tone, hair, and natural features must be PRESERVED EXACTLY from image 1 — do NOT alter the model's appearance. The product details (exact color, design, texture, brand elements, shape, materials) must be PRESERVED EXACTLY from image 2 — do NOT redesign or restyle the product, do NOT change its color or proportions. Place/wear/hold the product on the model in a way coherent with what the product is and how it is used (clothing → wear it; accessory → wear/hold; cosmetic → applied on face/skin; gadget → held in hands; food/beverage → held/served). The result must look like a real photograph, no AI artifacts, no floating objects, proper scale, natural lighting and shadows that match the scene. Photographic quality, sharp focus, ${aspectRatio} aspect ratio. NEVER include text, watermarks, or logos that are not on the original product.`;
 
       // Use nano-banana (Gemini 2.5 Flash Image) for multi-image fusion
       const { GoogleGenAI } = await import("@google/genai");
@@ -1418,6 +1577,8 @@ router.post(
             niche,
             scene: sceneKey,
             aspectRatio,
+            productImageUrl,
+            productImageWasUserSelected: !!requestedProductImageUrl,
             generatedAt: new Date().toISOString(),
             tags: ["tryon", "virtual-tryon", "nano-banana"],
           },

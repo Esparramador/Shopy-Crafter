@@ -231,11 +231,17 @@ function PromptModal({
 function TryonModal({
   productId,
   projectId,
+  productTitle,
+  productDescription,
+  productImages,
   onClose,
   onSuccess,
 }: {
   productId: string;
   projectId: number;
+  productTitle: string;
+  productDescription: string;
+  productImages: string[];
   onClose: () => void;
   onSuccess: (dataUri: string) => void;
 }) {
@@ -244,6 +250,7 @@ function TryonModal({
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [scene, setScene] = useState("model_front");
   const [aspectRatio, setAspectRatio] = useState("3:4");
+  const [selectedProductImageUrl, setSelectedProductImageUrl] = useState<string>(productImages[0] || "");
   const [loading, setLoading] = useState(false);
 
   const SCENES = [
@@ -268,12 +275,17 @@ function TryonModal({
       toast({ title: "Falta la imagen", description: "Sube una foto de la persona/modelo", variant: "destructive" });
       return;
     }
+    if (productImages.length > 0 && !selectedProductImageUrl) {
+      toast({ title: "Selecciona una foto del producto", description: "Elige cuál de las imágenes del producto se usará como referencia.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const fd = new FormData();
       fd.append("modelImage", modelFile);
       fd.append("scene", scene);
       fd.append("aspectRatio", aspectRatio);
+      if (selectedProductImageUrl) fd.append("productImageUrl", selectedProductImageUrl);
       const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/tryon-quick`, {
         method: "POST",
         credentials: "include",
@@ -320,12 +332,59 @@ function TryonModal({
           </button>
         </div>
 
+        <div className="mb-4 p-3 rounded-lg bg-rose-500/5 border border-rose-500/20">
+          <div className="text-xs uppercase tracking-wide text-rose-300 font-semibold mb-1">Producto</div>
+          <div className="text-sm font-bold text-foreground line-clamp-1">{productTitle}</div>
+          {productDescription && (
+            <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{productDescription}</div>
+          )}
+        </div>
+
         <p className="text-xs text-muted-foreground mb-4">
-          Sube una foto de la persona/modelo. La imagen del producto se carga automáticamente desde Shopify.
-          Fusión con Gemini 2.5 Flash Image (preserva identidad y producto).
+          Sube una foto de la persona/modelo y elige qué imagen oficial del producto usar como referencia.
+          Fusión con Gemini 2.5 Flash Image (preserva identidad y producto exactos).
         </p>
 
         <div className="space-y-4">
+          {productImages.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                🖼️ Imagen del producto a usar como referencia
+                <span className="text-xs text-muted-foreground font-normal ml-2">
+                  ({productImages.length} disponible{productImages.length === 1 ? "" : "s"})
+                </span>
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {productImages.map((url) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setSelectedProductImageUrl(url)}
+                    data-testid={`tryon-product-image-${url.slice(-30)}`}
+                    className={cn(
+                      "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                      selectedProductImageUrl === url
+                        ? "border-rose-400 ring-2 ring-rose-400/40"
+                        : "border-white/10 hover:border-white/30 opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <img src={url} alt="Imagen del producto" className="w-full h-full object-cover" />
+                    {selectedProductImageUrl === url && (
+                      <div className="absolute inset-0 bg-rose-500/20 flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-rose-200 drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {productImages.length === 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+              Este producto no tiene imágenes en Shopify. El try-on no podrá usar referencia visual del producto.
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-2">📷 Foto del modelo</label>
             <input
@@ -391,6 +450,296 @@ function TryonModal({
             )}
           </button>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ============================================================================
+// InfographicPremiumModal — selector de imagen del producto + idioma + textMode
+// ============================================================================
+function InfographicPremiumModal({
+  productId,
+  projectId,
+  productTitle,
+  productDescription,
+  productImages,
+  defaultLanguage,
+  defaultTextMode,
+  onClose,
+  onSuccess,
+}: {
+  productId: string;
+  projectId: number;
+  productTitle: string;
+  productDescription: string;
+  productImages: string[];
+  defaultLanguage: string;
+  defaultTextMode: "ai" | "overlay";
+  onClose: () => void;
+  onSuccess: (dataUri: string) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedProductImageUrl, setSelectedProductImageUrl] = useState<string>(productImages[0] || "");
+  const [language, setLanguage] = useState<string>(defaultLanguage);
+  const [textMode, setTextMode] = useState<"ai" | "overlay">(defaultTextMode);
+  const [aspectRatio, setAspectRatio] = useState<string>("1:1");
+  const [loading, setLoading] = useState(false);
+
+  const ASPECTS = ["1:1", "4:5", "3:4", "9:16", "16:9"];
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aspectRatio,
+          model: "ideogram-v3-turbo",
+          language,
+          textMode,
+          ...(selectedProductImageUrl ? { productImageUrl: selectedProductImageUrl } : {}),
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        if (err.code === "AI_TEXT_UNAVAILABLE" && err.suggestedTextMode === "overlay") {
+          throw new Error("Ideogram sin saldo. Cambia a 'Vectorial' arriba y reintenta.");
+        }
+        throw new Error(err.error || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      if (!data.dataUri) throw new Error("Respuesta sin imagen");
+      onSuccess(data.dataUri);
+      toast({ title: "✓ Infografía Premium generada", description: "Imagen lista en la galería del producto." });
+      onClose();
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Error en infografía premium";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-card border border-amber-500/30 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold flex items-center gap-2">💎 Infografía Premium</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Cerrar">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="mb-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+          <div className="text-xs uppercase tracking-wide text-amber-300 font-semibold mb-1">Producto</div>
+          <div className="text-sm font-bold text-foreground line-clamp-1">{productTitle}</div>
+          {productDescription && (
+            <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{productDescription}</div>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground mb-4">
+          Elige qué imagen del producto se usará como referencia visual real. La infografía mostrará el producto
+          tal cual es (color, forma, branding) sin inventos.
+        </p>
+
+        <div className="space-y-4">
+          {productImages.length > 0 ? (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                🖼️ Imagen del producto
+                <span className="text-xs text-muted-foreground font-normal ml-2">
+                  ({productImages.length} disponible{productImages.length === 1 ? "" : "s"})
+                </span>
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {productImages.map((url) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setSelectedProductImageUrl(url)}
+                    data-testid={`premium-product-image-${url.slice(-30)}`}
+                    className={cn(
+                      "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                      selectedProductImageUrl === url
+                        ? "border-amber-400 ring-2 ring-amber-400/40"
+                        : "border-white/10 hover:border-white/30 opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <img src={url} alt="Imagen del producto" className="w-full h-full object-cover" />
+                    {selectedProductImageUrl === url && (
+                      <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-amber-200 drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+              Este producto no tiene imágenes en Shopify. La infografía se generará solo con el texto del producto.
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">🌐 Idioma</label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                data-testid="premium-modal-language"
+                className="w-full bg-background border border-amber-500/30 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              >
+                <option value="auto">Auto (idioma del producto)</option>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português</option>
+                <option value="de">Deutsch</option>
+                <option value="ja">日本語</option>
+                <option value="zh">中文</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">🛡️ Modo texto</label>
+              <select
+                value={textMode}
+                onChange={(e) => setTextMode(e.target.value as "ai" | "overlay")}
+                data-testid="premium-modal-text-mode"
+                className="w-full bg-background border border-amber-500/30 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              >
+                <option value="overlay">Vectorial (perfecto)</option>
+                <option value="ai">IA Ideogram (texto AI)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">📐 Proporción</label>
+            <div className="flex gap-2 flex-wrap">
+              {ASPECTS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAspectRatio(a)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-md border transition-colors",
+                    aspectRatio === a
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-white/5 text-foreground border-white/10 hover:bg-white/10"
+                  )}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            data-testid="premium-modal-generate"
+            className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/40 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Generando infografía...
+              </>
+            ) : (
+              <>💎 Generar Infografía Premium (~$0.03)</>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ============================================================================
+// ImageLightbox — visor seguro para imágenes generadas (data: URIs y URLs)
+// Resuelve el bug del botón "Ver" que rompía al abrir data: URIs gigantes en
+// nueva pestaña (los navegadores bloquean top-frame navigation a data: URLs).
+// ============================================================================
+function ImageLightbox({
+  src,
+  filename,
+  onClose,
+  onDownload,
+}: {
+  src: string;
+  filename?: string;
+  onClose: () => void;
+  onDownload?: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+      data-testid="image-lightbox"
+    >
+      <motion.div
+        initial={{ scale: 0.97, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.97, opacity: 0 }}
+        className="relative max-w-[95vw] max-h-[95vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={src}
+          alt={filename || "Imagen generada"}
+          className="max-w-[95vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+        />
+        <div className="absolute top-3 right-3 flex gap-2">
+          {onDownload && (
+            <button
+              onClick={onDownload}
+              className="bg-amber-500/90 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 shadow-lg"
+              data-testid="lightbox-download"
+            >
+              <Download className="w-4 h-4" /> Descargar
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="bg-black/70 hover:bg-black text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 shadow-lg"
+            data-testid="lightbox-close"
+          >
+            <X className="w-4 h-4" /> Cerrar
+          </button>
+        </div>
+        {filename && (
+          <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2.5 py-1 rounded-md">
+            {filename}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -1041,19 +1390,28 @@ export default function ImagesPage() {
 
       {/* Virtual Try-On Modal */}
       <AnimatePresence>
-        {tryonModal && (
-          <TryonModal
-            productId={tryonModal.productId}
-            projectId={projectId}
-            onClose={() => setTryonModal(null)}
-            onSuccess={(dataUri) => {
-              setCompletedImages((prev) => ({
-                ...prev,
-                [jobKey(tryonModal.productId, "tryon")]: dataUri,
-              }));
-            }}
-          />
-        )}
+        {tryonModal && (() => {
+          const products = (data as { products?: Array<{ id: string; title?: string; description?: string; images?: Array<{ src: string }> }> } | undefined)?.products ?? [];
+          const product = products.find((p) => p.id === tryonModal.productId);
+          const images = (product?.images ?? []).map((i) => i.src).filter(Boolean);
+          const uniqueImages = Array.from(new Set(images));
+          return (
+            <TryonModal
+              productId={tryonModal.productId}
+              projectId={projectId}
+              productTitle={product?.title || ""}
+              productDescription={product?.description || ""}
+              productImages={uniqueImages}
+              onClose={() => setTryonModal(null)}
+              onSuccess={(dataUri) => {
+                setCompletedImages((prev) => ({
+                  ...prev,
+                  [jobKey(tryonModal.productId, "tryon")]: dataUri,
+                }));
+              }}
+            />
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

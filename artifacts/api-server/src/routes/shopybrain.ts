@@ -662,8 +662,11 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - list_characters: Listar personajes guardados (Character Lock para anuncios). Params: {projectId}
   - get_character: Ver detalles de un personaje. Params: {projectId, characterId}
   - delete_character: Eliminar personaje guardado. Params: {projectId, characterId} (DESTRUCTIVO — pide confirmación)
+  - create_character: Crear un personaje "anchor" reutilizable para anuncios largos con identidad visual fija. Acepta refImageUrl (https público) O refImageBase64 (data: URI o base64 puro). Params: {projectId, name, identityDescription (descripción detallada de rasgos físicos, vestimenta, expresión), refImageUrl? | refImageBase64?, gender?, ageRange?, voiceId?, voiceGender?, voiceLanguage?, styleNotes?}. Devuelve {character.id} → úsalo en create_long_ad como characterId.
+  - update_character: Actualizar campos de un personaje existente sin tocar la imagen. Params: {projectId, characterId, name?, gender?, ageRange?, identityDescription?, voiceId?, voiceGender?, voiceLanguage?, styleNotes?}.
+  - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
-  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
+  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
   - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
     • compositionMode "narrative" = cámara y escenas libres (default).
@@ -9953,6 +9956,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const aspect = (params?.aspect === "16:9" || params?.aspect === "1:1") ? params.aspect : "9:16";
           const language = typeof params?.language === "string" ? params.language : "es";
           const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1";
+          const savedPromptId = typeof params?.savedPromptId === "string" && params.savedPromptId.trim()
+            ? params.savedPromptId.trim()
+            : undefined;
 
           // Llamada interna al endpoint smart-cinematic (mantiene un único flujo).
           const port = process.env.PORT || "8080";
@@ -9970,6 +9976,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             language,
             videoModel,
             addMusic: params?.addMusic !== false,
+            savedPromptId,
           };
           let resp: Response;
           try {
@@ -10003,6 +10010,197 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               message: `🎬 Anuncio largo generado (${dSec}s, ${sCnt} escenas, modo ${compositionMode}). Vault #${vId ?? "?"}.`,
             };
           }
+          break;
+        }
+
+        // ── CREAR PERSONAJE (anchor para anuncios largos) ─────────────────────
+        // Acepta refImageUrl (https) o refImageBase64 (data: URI o base64 puro).
+        // Descarga/decodifica internamente y guarda al vault con character_reference.
+        case "create_character": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const name = String(params?.name || "").trim().slice(0, 80);
+          const identityDescription = String(params?.identityDescription || "").trim().slice(0, 1500);
+          if (!projectId || !name || !identityDescription) {
+            res.status(400).json({ error: "projectId, name e identityDescription son requeridos" });
+            return;
+          }
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+          if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+          const refImageUrl = typeof params?.refImageUrl === "string" ? params.refImageUrl : null;
+          const refImageBase64 = typeof params?.refImageBase64 === "string" ? params.refImageBase64 : null;
+          if (!refImageUrl && !refImageBase64) {
+            res.status(400).json({ error: "refImageUrl o refImageBase64 requerido" });
+            return;
+          }
+          const ALLOWED_IMG_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+          const MAX_REF_BYTES = 12 * 1024 * 1024; // 12MB
+          let imgBuffer: Buffer | null = null;
+          let imgMime = "image/png";
+          if (refImageBase64) {
+            const m = /^data:([^;]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(refImageBase64);
+            if (m) {
+              const declared = m[1].toLowerCase();
+              if (!ALLOWED_IMG_MIMES.has(declared)) {
+                res.status(400).json({ error: `MIME no permitido: ${declared}. Permitidos: image/png, image/jpeg, image/webp.` });
+                return;
+              }
+              imgMime = declared;
+              imgBuffer = Buffer.from(m[2].replace(/\s+/g, ""), "base64");
+            } else if (/^[A-Za-z0-9+/=\s]+$/.test(refImageBase64)) {
+              imgBuffer = Buffer.from(refImageBase64.replace(/\s+/g, ""), "base64");
+            } else {
+              res.status(400).json({ error: "refImageBase64 inválido (debe ser data URI o base64 puro)" });
+              return;
+            }
+            if (imgBuffer.length > MAX_REF_BYTES) {
+              res.status(413).json({ error: `Imagen demasiado grande (${imgBuffer.length} bytes). Máximo ${MAX_REF_BYTES} bytes.` });
+              return;
+            }
+          } else if (refImageUrl) {
+            try {
+              const { fetchToBuffer } = await import("../lib/fusion-studio-pro.js");
+              imgBuffer = await fetchToBuffer(refImageUrl);
+              if (imgBuffer.length > MAX_REF_BYTES) {
+                res.status(413).json({ error: `Imagen demasiado grande (${imgBuffer.length} bytes). Máximo ${MAX_REF_BYTES} bytes.` });
+                return;
+              }
+              const lower = refImageUrl.toLowerCase();
+              imgMime = lower.includes(".png") ? "image/png"
+                : lower.includes(".webp") ? "image/webp"
+                : lower.includes(".jpg") || lower.includes(".jpeg") ? "image/jpeg"
+                : "image/png";
+            } catch (e: any) {
+              res.status(400).json({ error: `No se pudo descargar refImageUrl: ${e?.message || e}` });
+              return;
+            }
+          }
+          if (!imgBuffer || imgBuffer.length === 0) {
+            res.status(400).json({ error: "Imagen de referencia vacía" });
+            return;
+          }
+          // Validación de magic bytes para prevenir spoof de MIME
+          const hdr = imgBuffer.subarray(0, 12);
+          const isPng = hdr[0] === 0x89 && hdr[1] === 0x50 && hdr[2] === 0x4e && hdr[3] === 0x47;
+          const isJpg = hdr[0] === 0xff && hdr[1] === 0xd8 && hdr[2] === 0xff;
+          const isWebp = hdr[0] === 0x52 && hdr[1] === 0x49 && hdr[2] === 0x46 && hdr[3] === 0x46 && hdr[8] === 0x57 && hdr[9] === 0x45 && hdr[10] === 0x42 && hdr[11] === 0x50;
+          if (!isPng && !isJpg && !isWebp) {
+            res.status(400).json({ error: "Formato no reconocido. Solo PNG, JPEG o WEBP." });
+            return;
+          }
+          imgMime = isPng ? "image/png" : isJpg ? "image/jpeg" : "image/webp";
+          const vaultId = await saveToVault({
+            projectId,
+            fileType: "image",
+            category: "character_reference",
+            title: `Character ref — ${name}`,
+            description: `Imagen de referencia del personaje "${name}". ${identityDescription.slice(0, 200)}`,
+            mimeType: imgMime,
+            generatedBy: "chatbot.create_character",
+            content: imgBuffer.toString("base64"),
+            metadata: { characterName: name, source: refImageUrl ? "url" : "base64", uploadedAt: new Date().toISOString() },
+          });
+          if (!vaultId) {
+            res.status(500).json({ error: "No se pudo guardar la imagen del personaje" });
+            return;
+          }
+          const gender = typeof params?.gender === "string" ? params.gender.slice(0, 30) : null;
+          const ageRange = typeof params?.ageRange === "string" ? params.ageRange.slice(0, 30) : null;
+          const voiceId = typeof params?.voiceId === "string" ? params.voiceId.slice(0, 80) : null;
+          const voiceGender = typeof params?.voiceGender === "string" ? params.voiceGender.slice(0, 30) : null;
+          const voiceLanguage = typeof params?.voiceLanguage === "string" ? params.voiceLanguage.slice(0, 10) : null;
+          const styleNotes = typeof params?.styleNotes === "string" ? params.styleNotes.slice(0, 800) : null;
+          const [created] = await db.insert(charactersTable).values({
+            projectId,
+            name,
+            gender,
+            ageRange,
+            identityDescription,
+            voiceId,
+            voiceGender,
+            voiceLanguage,
+            refVaultFileId: vaultId,
+            refMimeType: imgMime,
+            styleNotes,
+          }).returning();
+          result = {
+            ok: true,
+            character: { ...created, imageUrl: `/api/projects/${projectId}/characters/${created.id}/image` },
+            message: `🎭 Personaje "${name}" creado (id ${created.id}). Úsalo en create_long_ad pasando characterId=${created.id}.`,
+          };
+          break;
+        }
+
+        // ── ACTUALIZAR PERSONAJE (campos de identidad/voz/estilo) ─────────────
+        case "update_character": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const cid = parseInt(String(params?.characterId || params?.id || ""), 10);
+          if (!projectId || !cid) {
+            res.status(400).json({ error: "projectId y characterId requeridos" });
+            return;
+          }
+          const editable = ["name", "gender", "ageRange", "identityDescription", "voiceId", "voiceGender", "voiceLanguage", "styleNotes"] as const;
+          const updates: Record<string, unknown> = {};
+          for (const f of editable) {
+            if (params && Object.prototype.hasOwnProperty.call(params, f)) {
+              const max = f === "identityDescription" ? 1500 : f === "styleNotes" ? 800 : 80;
+              const v = params[f];
+              updates[f] = v == null ? null : String(v).slice(0, max);
+            }
+          }
+          if (Object.keys(updates).length === 0) {
+            res.status(400).json({ error: "Nada que actualizar" });
+            return;
+          }
+          const [updated] = await db
+            .update(charactersTable)
+            .set(updates)
+            .where(and(eq(charactersTable.projectId, projectId), eq(charactersTable.id, cid)))
+            .returning();
+          if (!updated) { res.status(404).json({ error: "Personaje no encontrado" }); return; }
+          result = { ok: true, character: updated, message: `✏️ Personaje "${updated.name}" actualizado.` };
+          break;
+        }
+
+        // ── GUARDAR SCRIPT CINEMATOGRÁFICO (reutilizable como savedPromptId) ─
+        case "persist_cinematic_script": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const script = params?.script as any;
+          if (!projectId || !script || typeof script !== "object" || !Array.isArray(script.scenes)) {
+            res.status(400).json({ error: "projectId y script.scenes[] son requeridos" });
+            return;
+          }
+          const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+          if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+          const { persistCinematicScript } = await import("../lib/cinematic-multishot.js");
+          const totalDurationSec = Math.max(6, Math.min(1800, Number(params?.totalDurationSec) || script.scenes.reduce((s: number, sc: any) => s + (sc.timeEndSec - sc.timeStartSec || 5), 0) || 60));
+          const scenesCount = script.scenes.length;
+          const savedId = await persistCinematicScript({
+            script,
+            config: {
+              projectId,
+              brand: typeof params?.brand === "string" ? params.brand : (project.name || "brand"),
+              productName: typeof params?.productName === "string" ? params.productName : "product",
+              niche: typeof params?.niche === "string" ? params.niche : (project.storeNiche || undefined),
+              audience: typeof params?.audience === "string" ? params.audience : undefined,
+              language: typeof params?.language === "string" ? params.language : "es",
+              scenesCount,
+              totalDurationSec,
+              aspect: (params?.aspect === "16:9" || params?.aspect === "1:1" || params?.aspect === "9:16") ? params.aspect : "9:16",
+              videoModel: typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1",
+              imageModel: typeof params?.imageModel === "string" ? params.imageModel : undefined,
+              style: typeof params?.style === "string" ? params.style : "cinematic",
+              customBrief: typeof params?.customBrief === "string" ? params.customBrief : undefined,
+              narration: undefined,
+              music: undefined,
+            },
+            source: "edited",
+          });
+          result = {
+            ok: true,
+            scriptId: savedId,
+            message: `📝 Script cinematográfico guardado (id ${savedId}). Reutilízalo en create_long_ad pasando savedPromptId="${savedId}".`,
+          };
           break;
         }
 

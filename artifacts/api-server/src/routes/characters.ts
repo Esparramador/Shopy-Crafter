@@ -15,8 +15,15 @@ import multer from "multer";
 import { db, charactersTable, projectsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { saveToVault, getVaultContent } from "../lib/vault.js";
+import { ObjectStorageService } from "../lib/objectStorage.js";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+
+let _osCharacters: ObjectStorageService | null = null;
+function getStorageForCharacters(): ObjectStorageService {
+  if (!_osCharacters) _osCharacters = new ObjectStorageService();
+  return _osCharacters;
+}
 
 const router = Router();
 
@@ -212,12 +219,31 @@ router.get(
         return;
       }
       const file = await getVaultContent(row.refVaultFileId, projectId);
-      if (!file?.content) {
+      if (!file) {
+        res.status(404).json({ error: "Imagen no disponible" });
+        return;
+      }
+      const ct = row.refMimeType || file.mimeType || "image/png";
+      // PRIORIDAD: objectPath → content (refs grandes se offloadean a Object Storage)
+      if (file.objectPath) {
+        try {
+          const gcs = await getStorageForCharacters().getObjectEntityFile(file.objectPath);
+          const response = await getStorageForCharacters().downloadObject(gcs);
+          const buf = Buffer.from(await response.arrayBuffer());
+          res.setHeader("Content-Type", ct);
+          res.setHeader("Cache-Control", "private, max-age=3600");
+          res.end(buf);
+          return;
+        } catch (e: any) {
+          logger.warn({ err: e?.message, vaultId: row.refVaultFileId }, "character image: object storage fetch failed, fallback to content");
+        }
+      }
+      if (!file.content) {
         res.status(404).json({ error: "Contenido vacío" });
         return;
       }
       const buf = Buffer.from(file.content, "base64");
-      res.setHeader("Content-Type", row.refMimeType || file.mimeType || "image/png");
+      res.setHeader("Content-Type", ct);
       res.setHeader("Cache-Control", "private, max-age=3600");
       res.end(buf);
     } catch (err: any) {
