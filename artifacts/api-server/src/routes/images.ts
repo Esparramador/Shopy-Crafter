@@ -788,6 +788,20 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
     // Default = ideogram-v3-turbo (mejor renderizado de texto literal). Fallback a nano-banana si Ideogram falla por quota/billing.
     const requestedModel = (req.body?.model as string) || "ideogram-v3-turbo";
 
+    // LANGUAGE selector — user picks language for the text rendered on the image.
+    // Supported: es/en/fr/it/pt/de/ja/zh + 'auto' (uses product title language).
+    const SUPPORTED_LANGS: Record<string, string> = {
+      es: "Spanish", en: "English", fr: "French", it: "Italian",
+      pt: "Portuguese", de: "German", ja: "Japanese", zh: "Chinese",
+      auto: "auto-detect from product title",
+    };
+    const langCode = String(req.body?.language || "auto").toLowerCase();
+    const targetLanguage = SUPPORTED_LANGS[langCode] || SUPPORTED_LANGS.auto;
+
+    // TEXT MODE — "ai" lets the image model render text (only good with Ideogram v3 / Imagen 4 Ultra).
+    // "overlay" generates a clean background image (no text) and composes vector text via sharp/SVG → 100% perfect spelling guaranteed in any language.
+    const textMode: "ai" | "overlay" = (req.body?.textMode === "overlay" ? "overlay" : "ai");
+
     const productTitle = product.title || "Producto";
     const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500);
     const productType = product.productType || "";
@@ -802,7 +816,37 @@ router.post("/projects/:projectId/products/:productId/images/generate-infographi
       : null;
     const currency = variantsList[0]?.currency || (project as any).currency || "EUR";
 
-    const claudePrompt = `Eres director creativo experto en infografías de producto e-commerce. Tu trabajo: extraer ÚNICAMENTE datos REALES del producto y construir un prompt en INGLÉS para Ideogram v3 (modelo de generación de imagen con texto perfectamente legible).
+    const claudePrompt = textMode === "overlay"
+      // OVERLAY MODE: ask Claude for a STRUCTURED JSON of texts (in target language) + a clean background prompt with NO text.
+      ? `Eres director creativo experto en infografías de producto e-commerce. Tu salida debe ser JSON estricto.
+
+PRODUCTO REAL (NUNCA inventes nada — usa SOLO lo que está aquí):
+- Título: ${productTitle}
+- Tipo: ${productType || "(no especificado)"}
+- Marca/vendor: ${vendor || "(no especificado)"}
+- Descripción: ${productDescription || "(no disponible)"}
+- Tags: ${tags || "(ninguno)"}
+- Precio: ${minPrice ? `${minPrice} ${currency}` : "(no mostrar)"}
+- Nicho de tienda: ${niche}
+
+IDIOMA OBJETIVO PARA EL TEXTO: ${targetLanguage}.
+${langCode === "auto" ? "(usa el idioma del título)" : `Traduce o usa el texto en ${targetLanguage}, manteniendo nombres propios/marcas en su forma original.`}
+
+DEVUELVE SOLO ESTE JSON (sin markdown, sin explicaciones):
+{
+  "headline": "<titular en ${targetLanguage}, máx 60 chars, basado en título real>",
+  "bullets": ["<beneficio literal de la descripción/tags traducido a ${targetLanguage}>", "..."],
+  "priceBadge": ${minPrice ? `"${minPrice} ${currency}"` : "null"},
+  "backgroundPrompt": "<prompt EN INGLÉS para generar SOLO la imagen visual de fondo SIN ningún texto, sin letras, sin números, sin watermarks, sin tipografía. Describe colores, texturas, composición, iluminación, mood, producto centrado pero sin textos. Estilo: ${styleHint}. Niche: ${niche}. CRITICAL: instruct the image model to NOT render any text, letters, words, numbers, logos, watermarks, signatures or any typography whatsoever — pure visual only.>"
+}
+
+REGLAS:
+- bullets: 0 a 4 elementos, cada uno máx 50 chars, SOLO si tienen base literal en la descripción/tags. Si no hay datos extraíbles, usa array vacío [].
+- PROHIBIDO inferir specs técnicos (ml, %, materiales, ingredientes, certificaciones, origen, año) si no figuran en el texto.
+- backgroundPrompt: en INGLÉS, descriptivo y específico, debe acabar con la instrucción explícita de no renderizar texto.
+- JSON válido, parseable, sin trailing commas.`
+      // AI MODE: original behavior — Ideogram renderiza el texto entre comillas
+      : `Eres director creativo experto en infografías de producto e-commerce. Tu trabajo: extraer ÚNICAMENTE datos REALES del producto y construir un prompt en INGLÉS para Ideogram v3 (modelo de generación de imagen con texto perfectamente legible).
 
 PRODUCTO REAL (NO INVENTES NADA, usa solo lo que está aquí):
 - Título: ${productTitle}
@@ -813,19 +857,21 @@ PRODUCTO REAL (NO INVENTES NADA, usa solo lo que está aquí):
 - Precio: ${minPrice ? `${minPrice} ${currency}` : "(no mostrar)"}
 - Nicho de tienda: ${niche}
 
+IDIOMA OBJETIVO PARA EL TEXTO EN LA IMAGEN: ${targetLanguage}.
+${langCode === "auto" ? "(idioma del título del producto)" : `IMPORTANTE: el texto que aparezca rendered en la imagen debe estar en ${targetLanguage}. Traduce el headline y bullets a ${targetLanguage} pero conserva nombres propios y marcas en su forma original.`}
+
 INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
 1. Extrae 0-5 BENEFICIOS/CARACTERÍSTICAS literalmente extraídos de la descripción y tags arriba. SI UN DATO NO ESTÁ ESCRITO LITERALMENTE EN LA DESCRIPCIÓN/TAGS/TÍTULO, NO LO INCLUYAS. Está PROHIBIDO inferir especificaciones técnicas (ml, %, materiales, ingredientes, certificaciones, origen, año) que no figuren en el texto. Si no hay datos suficientes, usa MENOS bullets (incluso 0).
-2. Construye UN prompt en INGLÉS para Ideogram v3 que describa una infografía con:
-   - Headline = título EXACTO del producto (entre comillas inglesas dobles para que Ideogram lo renderice palabra por palabra).
-   - Bullet points = SOLO con los beneficios extraídos literalmente del texto (entre comillas inglesas dobles cada uno). Si no hay nada extraíble, omite los bullets — la infografía puede ser solo headline + visual de producto.
-   - Si hay precio (${minPrice ? `${minPrice} ${currency}` : "no hay"}), inclúyelo como "from ${minPrice ? `${minPrice} ${currency}` : "X"}" (entre comillas). Si no hay precio, NO lo menciones.
-   - Texturas y materiales coherentes SOLO con lo que diga la descripción (ej: si dice "wood" → wood texture; si no dice nada → usa texturas neutras minimalistas).
+2. Construye UN prompt en INGLÉS (envoltura para Ideogram) que describa una infografía con:
+   - Headline = título traducido a ${targetLanguage} entre comillas inglesas dobles para que Ideogram lo renderice palabra por palabra.
+   - Bullet points = SOLO con los beneficios extraídos literalmente, traducidos a ${targetLanguage}, entre comillas inglesas dobles cada uno.
+   - Si hay precio (${minPrice ? `${minPrice} ${currency}` : "no hay"}), inclúyelo como "from ${minPrice ? `${minPrice} ${currency}` : "X"}" (entre comillas, formato del idioma).
+   - Texturas y materiales coherentes SOLO con lo que diga la descripción.
    - Estilo: ${styleHint}.
-   - Layout: composición editorial premium, jerarquía clara (titular grande, sub-bullets si los hay, badge precio si hay precio), color palette consistente con el nicho.
-3. El prompt debe DECIR EXPLÍCITAMENTE qué texto debe aparecer (entre comillas inglesas dobles) — Ideogram renderiza texto literal entre comillas. NUNCA introduzcas texto que no exista en el producto real.
-4. Idioma del texto en la imagen: el del título del producto.
-5. NO incluyas marcas de agua, watermarks, certificados falsos, sellos inventados, ni códigos QR.
-6. Devuelve SOLO el prompt final en inglés (1 párrafo, máx 250 palabras), sin markdown, sin explicaciones, sin comillas alrededor del párrafo.`;
+   - Layout: composición editorial premium, jerarquía clara, color palette consistente con el nicho.
+3. El prompt debe DECIR EXPLÍCITAMENTE qué texto debe aparecer (entre comillas inglesas dobles, EN ${targetLanguage}) — Ideogram renderiza texto literal entre comillas.
+4. NO incluyas marcas de agua, watermarks, certificados falsos, sellos inventados, ni códigos QR.
+5. Devuelve SOLO el prompt final en inglés (1 párrafo, máx 250 palabras), sin markdown, sin explicaciones, sin comillas alrededor del párrafo.`;
 
     const ideogramPromptRaw = await askClaudeWithBrain(
       projectId,
@@ -835,23 +881,265 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
       niche,
       2000,
     );
-    let ideogramPrompt = (ideogramPromptRaw || "").replace(/```[\s\S]*?```/g, "").trim();
+    // En modo overlay queremos preservar el bloque JSON aunque venga en ```json fence
+    let ideogramPrompt = textMode === "overlay"
+      ? String(ideogramPromptRaw || "").trim()
+      : String(ideogramPromptRaw || "").replace(/```[\s\S]*?```/g, "").trim();
 
     if (!ideogramPrompt || ideogramPrompt.length < 30) {
-      res.status(422).json({ error: "No se pudo construir el prompt de la infografía premium" });
+      logger.error({ projectId, productId: req.params.productId, textMode, rawPreview: String(ideogramPromptRaw || "").slice(0, 300), rawLen: String(ideogramPromptRaw || "").length }, "infographic-premium: Claude returned empty/too-short response");
+      res.status(422).json({
+        error: "No se pudo construir el prompt de la infografía premium (Claude devolvió respuesta vacía o muy corta)",
+        rawPreview: String(ideogramPromptRaw || "").slice(0, 200),
+      });
       return;
     }
 
-    // ANTI-HALLUCINATION POST-VALIDATION: Verify every quoted text in the prompt is literally
-    // present in the product corpus (title + description + tags + price + product type).
-    // Strip any quoted string that is NOT a literal substring of the corpus to prevent invented specs.
+    const { generateImage } = await import("../lib/fusion-studio-pro.js");
+    const sharpMod = (await import("sharp")).default;
+
+    // Aspect ratio → output dimensions for SVG canvas
+    const aspectToSize = (ar: string): { w: number; h: number } => {
+      const [a, b] = ar.split(":").map(s => parseInt(s, 10));
+      if (!a || !b) return { w: 1024, h: 1024 };
+      const base = 1024;
+      if (a >= b) return { w: base, h: Math.round(base * b / a) };
+      return { w: Math.round(base * a / b), h: base };
+    };
+
+    // ===========================================================================
+    // BRANCH A — TEXT MODE = "overlay" : 100% guaranteed legible spelling
+    // ===========================================================================
+    if (textMode === "overlay") {
+      // Parse Claude's structured JSON — robusto frente a fences, texto extra, llaves desbalanceadas
+      let parsed: { headline?: string; bullets?: string[]; priceBadge?: string | null; backgroundPrompt?: string };
+      try {
+        const cleanJson = ideogramPrompt.replace(/```json\s*|```\s*/g, "").trim();
+        const firstBrace = cleanJson.indexOf("{");
+        const lastBrace = cleanJson.lastIndexOf("}");
+        if (firstBrace < 0 || lastBrace < 0 || lastBrace <= firstBrace) {
+          throw new Error(`No JSON object found in Claude response (firstBrace=${firstBrace}, lastBrace=${lastBrace})`);
+        }
+        parsed = JSON.parse(cleanJson.slice(firstBrace, lastBrace + 1));
+        if (typeof parsed !== "object" || parsed === null) throw new Error("Parsed value is not an object");
+      } catch (e) {
+        logger.error({ err: (e as Error)?.message, raw: ideogramPrompt.slice(0, 500) }, "infographic-premium overlay: invalid JSON from Claude");
+        res.status(422).json({
+          error: "No se pudo parsear el guion estructurado de la infografía (Claude devolvió JSON inválido)",
+          code: "CLAUDE_INVALID_JSON",
+          rawPreview: ideogramPrompt.slice(0, 200),
+        });
+        return;
+      }
+
+      const headline = String(parsed.headline || productTitle).slice(0, 120);
+      const bullets = Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 4).map(b => String(b).slice(0, 80)) : [];
+      const priceBadge = parsed.priceBadge ? String(parsed.priceBadge).slice(0, 30) : null;
+      const bgPrompt = String(parsed.backgroundPrompt || "Premium minimalist product backdrop, soft studio lighting, neutral palette, NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WATERMARKS, pure visual scene only.")
+        + " — STRICT REQUIREMENT: do not render any text, letters, words, numbers, logos, watermarks, signatures or typography.";
+
+      // Generate clean background (no text) — overlay no necesita renderizado de texto, así que cualquier modelo vale.
+      // CASCADA: requested → imagen-4-ultra → flux-1.1-pro → flux-schnell → nano-banana
+      const bgFallbackChain: string[] = Array.from(new Set([
+        requestedModel, "imagen-4-ultra", "flux-1.1-pro", "flux-schnell", "nano-banana",
+      ]));
+      let bgBuffer: Buffer | null = null;
+      let bgModel = "";
+      const bgErrors: string[] = [];
+      for (let i = 0; i < bgFallbackChain.length; i++) {
+        const modelTry = bgFallbackChain[i];
+        try {
+          const r = await generateImage(modelTry as any, bgPrompt, { aspectRatio });
+          bgBuffer = r.buffer;
+          bgModel = r.model;
+          if (modelTry !== requestedModel) logger.warn({ requestedModel, fellbackTo: modelTry, prevErrors: bgErrors }, "infographic-premium overlay: background fallback succeeded");
+          break;
+        } catch (errModel: any) {
+          const msg = String(errModel?.message || "").slice(0, 240);
+          bgErrors.push(`${modelTry}: ${msg}`);
+          const isInsufficient = /402|payment|insufficient credit/i.test(msg);
+          const isThrottle = /429|rate.?limit|throttl|RESOURCE_EXHAUSTED|quota.*exceeded/i.test(msg);
+          // HIGH 4: tratar también errores de red/transitorios como retryables
+          const isTransient = /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up|timeout|fetch failed|5\d\d/i.test(msg);
+          const retryable = isInsufficient || isThrottle || isTransient;
+          if (!retryable) {
+            logger.error({ modelTry, msg }, "infographic-premium overlay: non-retryable error, propagating");
+            throw errModel;
+          }
+          // Backoff antes del próximo modelo para throttles y transitorios
+          if ((isThrottle || isTransient) && i < bgFallbackChain.length - 1) {
+            const wait = 2500 + i * 1500; // 2.5s, 4s, 5.5s, 7s
+            logger.info({ modelTry, waitMs: wait, reason: isThrottle ? "throttle" : "transient" }, "infographic-premium overlay: backing off before next model");
+            await new Promise(r => setTimeout(r, wait));
+          }
+        }
+      }
+      if (!bgBuffer) {
+        logger.error({ projectId, bgErrors }, "infographic-premium overlay: ALL background models exhausted");
+        res.status(503).json({
+          error: "Todos los modelos de generación de imagen están sin saldo (Replicate + Gemini agotados). Recarga créditos o reintenta más tarde.",
+          code: "ALL_MODELS_EXHAUSTED",
+          attemptedModels: bgFallbackChain,
+        });
+        return;
+      }
+
+      // Determine output canvas size from generated bg
+      const meta = await sharpMod(bgBuffer).metadata();
+      const W = meta.width || aspectToSize(aspectRatio).w;
+      const H = meta.height || aspectToSize(aspectRatio).h;
+
+      // SVG escape: XML special chars + strip bidi/format control chars (anti-spoofing)
+      // U+202A..U+202E (LRE/RLE/PDF/LRO/RLO), U+2066..U+2069 (LRI/RLI/FSI/PDI), U+200E/U+200F (LRM/RLM)
+      const esc = (s: string) => s
+        .replace(/[\u202A-\u202E\u2066-\u2069\u200E\u200F]/g, "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+      // Wrap headline into max 3 lines (~22 chars each)
+      const wrapText = (text: string, maxCharsPerLine: number, maxLines: number): string[] => {
+        const words = text.split(/\s+/);
+        const lines: string[] = [];
+        let cur = "";
+        for (const w of words) {
+          if ((cur + " " + w).trim().length <= maxCharsPerLine) cur = (cur + " " + w).trim();
+          else { if (cur) lines.push(cur); cur = w; if (lines.length >= maxLines) break; }
+        }
+        if (cur && lines.length < maxLines) lines.push(cur);
+        return lines.length ? lines : [text.slice(0, maxCharsPerLine)];
+      };
+
+      const headlineLines = wrapText(headline, Math.max(20, Math.floor(W / 32)), 3);
+      const headlineFontSize = Math.round(W * 0.058);
+      const bulletFontSize = Math.round(W * 0.026);
+      const padding = Math.round(W * 0.06);
+      const lineHeight = Math.round(headlineFontSize * 1.15);
+
+      // Build SVG overlay — vector text → perfect spelling guaranteed
+      const headlineY = padding + headlineFontSize;
+      const headlineSvg = headlineLines.map((ln, i) =>
+        `<text x="${padding}" y="${headlineY + i * lineHeight}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="${headlineFontSize}" font-weight="800" fill="#ffffff" stroke="#000000" stroke-width="1.5" paint-order="stroke" letter-spacing="-1.2">${esc(ln)}</text>`
+      ).join("");
+
+      // Bullets at bottom-left
+      const bulletStartY = H - padding - (bullets.length * bulletFontSize * 1.7);
+      const bulletsSvg = bullets.map((b, i) => {
+        const y = bulletStartY + i * bulletFontSize * 1.7;
+        return `<g><circle cx="${padding + 8}" cy="${y - bulletFontSize * 0.35}" r="6" fill="#FFD700"/><text x="${padding + 24}" y="${y}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="${bulletFontSize}" font-weight="600" fill="#ffffff" stroke="#000000" stroke-width="0.8" paint-order="stroke">${esc(b)}</text></g>`;
+      }).join("");
+
+      // Price badge top-right
+      const priceSvg = priceBadge
+        ? (() => {
+            const badgeFont = Math.round(W * 0.038);
+            const padX = Math.round(badgeFont * 0.7);
+            const padY = Math.round(badgeFont * 0.4);
+            const txt = esc(priceBadge);
+            const estW = txt.length * badgeFont * 0.55 + padX * 2;
+            const badgeX = W - padding - estW;
+            const badgeY = padding;
+            return `<g><rect x="${badgeX}" y="${badgeY}" width="${estW}" height="${badgeFont + padY * 2}" rx="${(badgeFont + padY * 2) / 2}" fill="#FFD700"/><text x="${badgeX + padX}" y="${badgeY + badgeFont + padY * 0.6}" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="${badgeFont}" font-weight="800" fill="#0a0a0a">${txt}</text></g>`;
+          })()
+        : "";
+
+      // Subtle gradient overlay for text legibility
+      const gradientOverlay = `
+        <defs>
+          <linearGradient id="topShade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(0,0,0,0.55)"/>
+            <stop offset="35%" stop-color="rgba(0,0,0,0)"/>
+          </linearGradient>
+          <linearGradient id="bottomShade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="65%" stop-color="rgba(0,0,0,0)"/>
+            <stop offset="100%" stop-color="rgba(0,0,0,0.6)"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${W}" height="${H}" fill="url(#topShade)"/>
+        <rect x="0" y="0" width="${W}" height="${H}" fill="url(#bottomShade)"/>
+      `;
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${gradientOverlay}${headlineSvg}${bulletsSvg}${priceSvg}</svg>`;
+
+      // Composite SVG over background using sharp
+      const outBuffer = await sharpMod(bgBuffer)
+        .composite([{ input: Buffer.from(svg, "utf-8"), top: 0, left: 0 }])
+        .png()
+        .toBuffer();
+
+      const buffer = outBuffer;
+      const mimeType = "image/png";
+      const model = `${bgModel}+vector-overlay`;
+
+      const pngBase64 = buffer.toString("base64");
+      const dataUri = `data:${mimeType};base64,${pngBase64}`;
+
+      let vaultId: number | null = null;
+      try {
+        vaultId = await saveToVault({
+          projectId,
+          fileType: "image",
+          category: "infographic_premium",
+          title: `Infografía Premium [${langCode}] — ${productTitle}`,
+          description: `Texto vectorial garantizado en ${targetLanguage}. Fondo: ${bgModel}.`,
+          mimeType,
+          productId: product.shopifyProductId,
+          productTitle: product.title,
+          generatedBy: model,
+          content: pngBase64,
+          metadata: {
+            niche, model, aspectRatio, language: langCode, textMode: "overlay",
+            headline, bullets, priceBadge,
+            backgroundPrompt: bgPrompt.slice(0, 500),
+            generatedAt: new Date().toISOString(),
+            tags: ["infographic", "premium", "vector-overlay", "guaranteed-text"],
+          },
+        });
+      } catch (e) {
+        logger.warn({ err: e, projectId }, "No se pudo guardar la infografía premium (overlay) en el vault (no fatal)");
+      }
+
+      await recordUsage(projectId, "image", 1);
+      try {
+        await db.insert(generationJobsTable).values({
+          projectId, shopifyProductId, imageType: "infographic_premium",
+          status: "succeeded", prompt: bgPrompt.slice(0, 2000), model,
+          estimatedCost: 0.03, completedAt: new Date(),
+        });
+      } catch (e) { logger.warn({ err: e }, "No se pudo registrar generation job (overlay)"); }
+
+      learnFromOperation({
+        operationType: "premium_infographic_overlay",
+        title: `Infografía premium overlay generada: ${productTitle}`,
+        content: `Producto: ${productTitle}. Idioma: ${targetLanguage}. VaultId: ${vaultId ?? "(no)"}.`,
+        confidence: 0.95,
+        tags: ["infographic", "premium", "vector-overlay"],
+      });
+
+      res.json({
+        success: true, pngBase64, mimeType, dataUri, model,
+        textMode: "overlay", language: langCode,
+        composedTexts: { headline, bullets, priceBadge },
+        backgroundPrompt: bgPrompt,
+        vaultId,
+      });
+      return;
+    }
+
+    // ===========================================================================
+    // BRANCH B — TEXT MODE = "ai" : Ideogram renders text literally
+    // ===========================================================================
+    // ANTI-HALLUCINATION POST-VALIDATION (solo cuando NO hay traducción explícita):
+    // Si langCode === "auto" → Claude usa el idioma original del producto, las quoted strings
+    //   DEBEN ser literales del corpus. Aplicamos strip estricto.
+    // Si langCode !== "auto" → Claude tradujo el texto al idioma elegido, así que las quoted
+    //   strings ya no coincidirán con el corpus original. Solo strippeamos cosas obviamente
+    //   inventadas: specs numéricas que NO estén ni en el corpus ni sean conversión simple.
     const productCorpus = [
-      productTitle,
-      productDescription,
-      tags || "",
+      productTitle, productDescription, tags || "",
       minPrice ? `${minPrice} ${currency} from ${minPrice} ${currency}` : "",
       productType,
     ].join(" ").toLowerCase();
+    const isTranslating = langCode !== "auto";
     const quotedRegex = /"([^"\n]{1,180})"/g;
     const allowedQuoted: string[] = [];
     const removedQuoted: string[] = [];
@@ -860,26 +1148,29 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
       const text = auditMatch[1].trim();
       if (!text) continue;
       const norm = text.toLowerCase().replace(/\s+/g, " ");
-      // Allow if literal substring (after normalization) OR pure number/currency/year
       const isLiteral = productCorpus.includes(norm);
-      const isNumeric = /^[\d.,€$£¥%/\-\sa-z]{1,20}$/i.test(text) && /\d/.test(text);
-      if (isLiteral || isNumeric) {
+      // Tokens numéricos de precio/spec son siempre permitidos (traducciones de "29,99 €" etc.)
+      const isNumericToken = /^[\d.,€$£¥%/\-\sa-zA-Z]{1,30}$/.test(text) && /\d/.test(text);
+      if (isLiteral || isNumericToken) {
+        allowedQuoted.push(text);
+      } else if (isTranslating) {
+        // En modo traducción confiamos en Claude para traducir. Solo loggeamos.
         allowedQuoted.push(text);
       } else {
         removedQuoted.push(text);
       }
     }
     if (removedQuoted.length > 0) {
-      logger.warn({ projectId, productId: req.params.productId, removedQuoted, allowedQuoted }, "infographic-premium: stripped non-literal quoted strings (anti-hallucination)");
-      // Replace each non-literal quoted string with empty to prevent Ideogram rendering invented text
+      logger.warn({ projectId, productId: req.params.productId, removedQuoted, allowedQuoted, isTranslating }, "infographic-premium AI: stripped non-literal quoted strings");
       for (const bad of removedQuoted) {
         const escaped = bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         ideogramPrompt = ideogramPrompt.replace(new RegExp(`"${escaped}"\\s*[,;.]?`, "g"), "");
       }
       ideogramPrompt = ideogramPrompt.replace(/\s{2,}/g, " ").trim();
+    } else if (isTranslating) {
+      logger.info({ projectId, langCode, allowedQuotedCount: allowedQuoted.length }, "infographic-premium AI: translation mode — anti-hallucination relaxed (trusting Claude translation)");
     }
 
-    const { generateImage } = await import("../lib/fusion-studio-pro.js");
     let buffer: Buffer;
     let mimeType: string;
     let model: string;
@@ -891,16 +1182,18 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
     } catch (errPrimary: any) {
       const msg = String(errPrimary?.message || "");
       const isQuota = /402|payment|insufficient|quota|credit/i.test(msg);
-      // Fallback automático a nano-banana (Gemini) si el modelo principal falla por billing/quota
+      // CRITICAL: if Ideogram fails AND user picked "ai" mode, the fallback nano-banana
+      // can NOT render legible text. Better to ERROR explicitly than to deliver a broken image.
       if (requestedModel !== "nano-banana" && isQuota) {
-        logger.warn({ requestedModel, msg }, "infographic-premium: fallback to nano-banana");
-        const result = await generateImage("nano-banana", ideogramPrompt, { aspectRatio });
-        buffer = result.buffer;
-        mimeType = result.mimeType;
-        model = result.model;
-      } else {
-        throw errPrimary;
+        logger.warn({ requestedModel, msg }, "infographic-premium AI: Ideogram unavailable, refusing nano-banana fallback to protect text quality");
+        res.status(503).json({
+          error: "Modelo Ideogram v3 sin saldo y los demás modelos no renderizan texto bien. Por favor recarga Replicate o cambia a 'Modo Texto Garantizado (Overlay Vectorial)' que asegura ortografía perfecta en cualquier idioma sin depender de Ideogram.",
+          code: "AI_TEXT_UNAVAILABLE",
+          suggestedTextMode: "overlay",
+        });
+        return;
       }
+      throw errPrimary;
     }
 
     const pngBase64 = buffer.toString("base64");

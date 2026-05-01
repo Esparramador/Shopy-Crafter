@@ -426,6 +426,21 @@ export default function ImagesPage() {
   const [tryonModal, setTryonModal] = useState<{ productId: string } | null>(null);
   // Motor IA seleccionado por (productId+tipo). Vacío = motor por defecto del backend.
   const [selectedEngines, setSelectedEngines] = useState<Record<string, string>>({});
+  // Premium Infographic — language + text mode (per-project, persisted in localStorage)
+  // Whitelist de idiomas soportados por el backend; cualquier otro valor se sanea a "auto".
+  const SUPPORTED_LANGS = ["auto", "es", "en", "fr", "it", "pt", "de", "ja", "zh"] as const;
+  const [premiumLanguage, setPremiumLanguage] = useState<string>(() => {
+    if (typeof window === "undefined") return "auto";
+    const raw = localStorage.getItem("premiumInfographicLang");
+    return raw && (SUPPORTED_LANGS as readonly string[]).includes(raw) ? raw : "auto";
+  });
+  const [premiumTextMode, setPremiumTextMode] = useState<"ai" | "overlay">(() => {
+    if (typeof window === "undefined") return "overlay";
+    const raw = localStorage.getItem("premiumInfographicTextMode");
+    return raw === "ai" || raw === "overlay" ? raw : "overlay";
+  });
+  useEffect(() => { try { localStorage.setItem("premiumInfographicLang", premiumLanguage); } catch {} }, [premiumLanguage]);
+  useEffect(() => { try { localStorage.setItem("premiumInfographicTextMode", premiumTextMode); } catch {} }, [premiumTextMode]);
   const { data: enginesData } = useListImageEngines();
   const engines = (enginesData as { engines?: Array<{ id: string; label: string; model: string; cost: number; description?: string }> } | undefined)?.engines ?? [];
 
@@ -502,17 +517,27 @@ export default function ImagesPage() {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ aspectRatio: "1:1", model: "ideogram-v3-turbo" }),
+            body: JSON.stringify({
+              aspectRatio: "1:1",
+              model: "ideogram-v3-turbo",
+              language: premiumLanguage,
+              textMode: premiumTextMode,
+            }),
           });
           if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
+            // Si AI mode falla por falta de Ideogram, sugerir overlay
+            if (err.code === "AI_TEXT_UNAVAILABLE" && err.suggestedTextMode === "overlay") {
+              throw new Error("Ideogram sin saldo. Cambia a 'Texto Garantizado (Vectorial)' en el selector y reintenta.");
+            }
             throw new Error(err.error || `HTTP ${resp.status}`);
           }
           const data = await resp.json();
           if (!data.dataUri) throw new Error("Respuesta sin imagen");
           setCompletedImages((prev) => ({ ...prev, [key]: data.dataUri }));
           setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
-          toast({ title: "✓ Infografía Premium generada", description: "Texto perfectamente legible con datos reales." });
+          const modeMsg = data.textMode === "overlay" ? `Texto vectorial garantizado en ${data.language}.` : "Texto perfectamente legible con datos reales.";
+          toast({ title: "✓ Infografía Premium generada", description: modeMsg });
         } catch (err) {
           setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
           const msg = (err as { message?: string })?.message || "Error generando infografía premium";
@@ -703,6 +728,56 @@ export default function ImagesPage() {
         title="Motor de Imágenes generando en masa..."
         subtitle="Flux IA procesa cada producto del catálogo con prompts optimizados por Shopy Crafter"
       />
+
+      {/* Premium Infographic — Idioma + Modo de texto (controla ortografía 100%) */}
+      <GlassCard className="p-4 border-amber-500/20" data-testid="premium-text-config">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">💎</span>
+            <div>
+              <div className="font-semibold text-amber-300">Infografía Premium — Texto</div>
+              <div className="text-xs text-muted-foreground">
+                Elige idioma y modo de renderizado del texto. <strong className="text-amber-200">Modo Vectorial</strong> garantiza ortografía 100% perfecta en cualquier idioma.
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col">
+              <label htmlFor="premium-lang" className="text-xs text-muted-foreground mb-1">Idioma</label>
+              <select
+                id="premium-lang"
+                data-testid="select-premium-language"
+                value={premiumLanguage}
+                onChange={(e) => setPremiumLanguage(e.target.value)}
+                className="bg-background border border-amber-500/30 rounded-lg px-3 py-2 text-sm text-foreground focus:border-amber-400 focus:outline-none min-w-[160px]"
+              >
+                <option value="auto">Auto (idioma del producto)</option>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português</option>
+                <option value="de">Deutsch</option>
+                <option value="ja">日本語 (Japonés)</option>
+                <option value="zh">中文 (Chino)</option>
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="premium-text-mode" className="text-xs text-muted-foreground mb-1">Modo de texto</label>
+              <select
+                id="premium-text-mode"
+                data-testid="select-premium-text-mode"
+                value={premiumTextMode}
+                onChange={(e) => setPremiumTextMode(e.target.value as "ai" | "overlay")}
+                className="bg-background border border-amber-500/30 rounded-lg px-3 py-2 text-sm text-foreground focus:border-amber-400 focus:outline-none min-w-[260px]"
+              >
+                <option value="overlay">🛡️ Vectorial (ortografía 100% garantizada)</option>
+                <option value="ai">🤖 IA (Ideogram renderiza el texto — requiere saldo)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
 
       {/* Legend */}
       <GlassCard className="p-4">
