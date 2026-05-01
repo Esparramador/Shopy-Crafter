@@ -7,6 +7,37 @@ import { requireAuth } from "../lib/auth.js";
 import { canAccessProject } from "../lib/access.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
+import { enableLongRunning } from "../lib/long-running.js";
+import type { Request, Response } from "express";
+
+function setupZipStream(req: Request, res: Response, archive: any): { ac: AbortController; isClientGone: () => boolean } {
+  enableLongRunning(res);
+  const ac = new AbortController();
+  let clientGone = false;
+  const onAbort = (reason: string) => {
+    if (clientGone) return;
+    clientGone = true;
+    logger.warn({ reason, url: req.originalUrl }, "ZIP stream aborted by client");
+    try { ac.abort(); } catch {}
+    try { archive.destroy(); } catch {}
+  };
+  req.on("close", () => { if (!res.writableEnded) onAbort("req-close"); });
+  req.on("aborted", () => onAbort("req-aborted"));
+  res.on("error", (err) => onAbort(`res-error:${err?.message ?? err}`));
+  archive.on("error", (err: any) => {
+    logger.error({ err, url: req.originalUrl }, "ZIP archive error");
+    if (!res.headersSent) {
+      try { res.status(500).json({ error: "Error generando ZIP" }); } catch {}
+    } else {
+      try { res.destroy(); } catch {}
+    }
+  });
+  archive.on("warning", (err: any) => {
+    if (err?.code === "ENOENT") logger.warn({ err }, "ZIP warning (skipped entry)");
+    else logger.error({ err }, "ZIP warning");
+  });
+  return { ac, isClientGone: () => clientGone };
+}
 import { sanitizeHtml } from "../lib/html-escape.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import sharp from "sharp";
@@ -465,10 +496,12 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
 
   const archive = archiver("zip", { zlib: { level: 6 } });
+  const { ac, isClientGone } = setupZipStream(req, res, archive);
   archive.pipe(res);
 
   let added = 0;
   for (const file of files) {
+    if (isClientGone()) { logger.info({ projectId, added }, "ZIP cancelado por cliente, abortando bucle"); break; }
     try {
       const ext = getExtension(file.mimeType ?? "application/octet-stream");
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
@@ -482,7 +515,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         archive.append(buffer, { name: entryName });
         added++;
       } else if (file.originalUrl) {
-        const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(15000) });
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
         if (response.ok && response.body) {
           const buffer = Buffer.from(await response.arrayBuffer());
           archive.append(buffer, { name: entryName });
@@ -507,16 +540,24 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
         archive.append(htmlReport, { name: `${folder}/${safeTitle}_${file.id}.html` });
         added++;
       }
-    } catch { /* skip failed file */ }
+    } catch (err: any) {
+      if (err?.name === "AbortError") break;
+      logger.warn({ err, fileId: file.id }, "ZIP: skipped failed file");
+    }
   }
 
-  // Añadir índice JSON con todos los metadatos
-  const indexFiles = files.map(({ content, ...rest }) => rest);
-  archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files: indexFiles }, null, 2), {
-    name: "vault_index.json",
-  });
-
-  await archive.finalize();
+  if (!isClientGone()) {
+    const indexFiles = files.map(({ content, ...rest }) => rest);
+    archive.append(JSON.stringify({ project: project?.name, projectId, totalFiles: files.length, exportedFiles: added, files: indexFiles }, null, 2), {
+      name: "vault_index.json",
+    });
+    try {
+      await archive.finalize();
+      logger.info({ projectId, added, total: files.length }, "ZIP download-all completado");
+    } catch (err) {
+      logger.error({ err, projectId }, "ZIP download-all finalize failed");
+    }
+  }
 });
 
 // ─── DESCARGAR ARCHIVOS SELECCIONADOS COMO ZIP ────────────────────────────────
@@ -564,10 +605,12 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
 
   const archive = archiver("zip", { zlib: { level: 6 } });
+  const { ac, isClientGone } = setupZipStream(req, res, archive);
   archive.pipe(res);
 
   let added = 0;
   for (const file of files) {
+    if (isClientGone()) { logger.info({ projectId, added }, "ZIP cancelado por cliente"); break; }
     try {
       const ext = getExtension(file.mimeType ?? "application/octet-stream");
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
@@ -581,7 +624,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
         archive.append(buffer, { name: entryName });
         added++;
       } else if (file.originalUrl) {
-        const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(15000) });
+        const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
         if (response.ok && response.body) {
           const buffer = Buffer.from(await response.arrayBuffer());
           archive.append(buffer, { name: entryName });
@@ -905,6 +948,7 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
     res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
   
     const archive = archiver("zip", { zlib: { level: 6 } });
+    const { ac, isClientGone } = setupZipStream(req, res, archive);
     archive.pipe(res);
   
     let added = 0;
@@ -934,6 +978,7 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
     }
   
     for (const file of imageFiles) {
+      if (isClientGone()) break;
       let buffer: Buffer | null = null;
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
       const folder = file.category ?? "general";
@@ -947,24 +992,25 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
       }
       if (!buffer && file.originalUrl) {
         try {
-          const response = await fetch(file.originalUrl, { signal: AbortSignal.timeout(20000) });
+          const response = await fetch(file.originalUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
           if (response.ok) buffer = Buffer.from(await response.arrayBuffer());
-        } catch {}
+        } catch (err: any) { if (err?.name === "AbortError") break; }
       }
       if (buffer) await processImage(buffer, `${safeTitle}_${file.id}`, folder);
     }
   
     for (const job of aiImages) {
+      if (isClientGone()) break;
       if (!job.imageUrl) continue;
       try {
-        const response = await fetch(job.imageUrl, { signal: AbortSignal.timeout(20000) });
+        const response = await fetch(job.imageUrl, { signal: AbortSignal.any([ac.signal, AbortSignal.timeout(30000)]) });
         if (response.ok) {
           const buffer = Buffer.from(await response.arrayBuffer());
           const safeTitle = (job.altText || job.imageType || `imagen_${job.id}`).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
           const folder = `ia_generadas/${job.imageType ?? "general"}`;
           await processImage(buffer, `${safeTitle}_${job.id}`, folder);
         }
-      } catch {}
+      } catch (err: any) { if (err?.name === "AbortError") break; }
     }
   
     archive.append(JSON.stringify({
@@ -1550,9 +1596,11 @@ router.post("/vault/global/download-selected", requireAuth, async (req, res): Pr
     res.setHeader("Content-Type", "application/zip");
   
     const archive = archiver("zip", { zlib: { level: 6 } });
+    const { ac, isClientGone } = setupZipStream(req, res, archive);
     archive.pipe(res);
   
     for (const file of files) {
+      if (isClientGone()) break;
       const safeTitle = file.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
       const folder = file.fileType || "otros";
 
