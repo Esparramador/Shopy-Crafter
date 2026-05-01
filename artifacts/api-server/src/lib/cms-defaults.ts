@@ -448,7 +448,6 @@ export const DEFAULT_CMS_CONTENT = {
       { label: "Flujos de Email", icon: "🔄", href: "/admin/email-flows" },
       { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
       { label: "Ver Landing", icon: "🌐", href: "/landing" },
-      { label: "Generador Universal IA", icon: "✨", href: "/projects/2/generator" },
       { label: "Lab Web", icon: "🔬", href: "/web-lab" },
       { label: "Informes y Auditorías", icon: "📋", href: "/projects/2/exports" },
       { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
