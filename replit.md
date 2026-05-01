@@ -51,6 +51,12 @@ PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` fo
 ### Super Ad Studio
 A feature for generic brand ad creation, porting the `hanakaze-v2-super` script. It includes an async worker pipeline for video clips (image-to-video/text-to-video), ElevenLabs TTS and music integration, and MP4 concatenation. The UI provides a 5-step wizard for brief, references, editable storyboard generation (Claude), voice/music selection, and final generation with live polling and download. It supports cinematic long-form ads up to 30 minutes with parallel processing, multi-block music, and a Cinematic Director for narrative planning. Product DNA extraction ensures consistent branding across scenes.
 
+### Hanakaze Cascade v3 (final ad)
+- Pipeline `scripts/run-hanakaze-v3-cascada.mjs` generates 8-clip 60s vertical 9:16 ad: c01 intro, c02 reveal, c03 deconstruction, c04/c05 try-on, c06 perchero, c07 cascade, c08 outro. Plus voice-off + 60s music. Memoize via `logs/hanakaze-v3-state.json`. Anti-orphan inFlight tracking + PID lock prevents double-spend on Replicate. Admin password is read from `HANAKAZE_ADMIN_PASSWORD` env var (never hardcoded).
+- Strict prompt fidelity rules added for try-on clips (c04, c05) and floating-garment clip (c06): garments are described as solid rigid objects that never deconstruct/recolor/redraw mid-frame, eliminating IA distortions of the print and color.
+- Text overlay post-processing: `scripts/add-final-text-overlay.mjs` downloads the concat from vault, applies ffmpeg `drawtext` (DejaVu Sans Bold) on intro (3-5s) and outro (last 5s) to render brand text, Instagram handle and tagline as crisp typography — replaces the illegible IA-generated text. Output is re-encoded with libx264 crf=23 yuv420p AAC and re-uploaded to vault.
+- Final result: vault=1339 (60s, 25.10MB, 1080x1920) — clips 1334/1315/1317/1332/1333/1335/1326/1336, voice=1328, music=1329, raw concat=1337, **with text overlay=1339**.
+
 ### Premium Image Endpoints
 Specialized endpoints offer infographic generation with AI or overlay text rendering modes, ensuring perfect spelling. A universal virtual try-on feature fuses model and product images using Gemini, preserving identity and product appearance.
 

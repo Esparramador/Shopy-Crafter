@@ -1,6 +1,6 @@
 {
-  "completedAt": "2026-05-01T19:03:00.615Z",
-  "elapsedSec": "0.4",
+  "completedAt": "2026-05-01T20:21:09.492Z",
+  "elapsedSec": "914.4",
   "refs": {
     "modeloA_blanca": "uploaded",
     "modeloA_someulp": "uploaded",
@@ -17,7 +17,7 @@
       "key": "c01-intro-kanji-stamp",
       "model": "kling-master",
       "duration": 5,
-      "vaultId": 1314
+      "vaultId": 1334
     },
     {
       "key": "c02-reveal-puesto",
@@ -35,19 +35,19 @@
       "key": "c04-tryon-kanji-modelo",
       "model": "kling-master",
       "duration": 10,
-      "vaultId": 1323
+      "vaultId": 1332
     },
     {
       "key": "c05-tryon-mariposa-vuela",
       "model": "kling-master",
       "duration": 10,
-      "vaultId": 1324
+      "vaultId": 1333
     },
     {
       "key": "c06-perchero-levita",
       "model": "kling-master",
       "duration": 10,
-      "vaultId": 1325
+      "vaultId": 1335
     },
     {
       "key": "c07-cascada-coleccion",
@@ -59,11 +59,11 @@
       "key": "c08-outro-cta",
       "model": "kling-master",
       "duration": 5,
-      "vaultId": 1327
+      "vaultId": 1336
     }
   ],
   "voice": 1328,
   "music": 1329,
-  "finalConcat": 1330,
+  "finalConcat": 1337,
   "estimatedDurationSec": 60
 }
