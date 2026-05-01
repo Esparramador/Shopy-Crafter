@@ -72,6 +72,194 @@ interface ProductSample {
   generatedImagePrompt?: string;
 }
 
+/**
+ * Genera una foto profesional REAL del producto/servicio para el pre-informe
+ * de la landing pública usando Replicate (Flux 1.1 Pro — calidad fotográfica
+ * premium, ~$0.04/img).
+ *
+ * Best-effort: si REPLICATE_API_TOKEN no está, si Replicate falla, o si el
+ * prompt está vacío → devuelve null y el HTML del pre-informe cae al
+ * placeholder con emoji que ya existía. NUNCA lanza para no romper /api/contact.
+ *
+ * Cascada de modelos: flux-1.1-pro (premium) → flux-schnell (rápido y barato)
+ * → nano-banana (último recurso). Esto reproduce la estrategia de la chatbot
+ * tools y garantiza una imagen incluso bajo carga/quotas.
+ */
+async function generateProductPhotoFromPrompt(prompt: string | null | undefined): Promise<string | null> {
+  if (!prompt || typeof prompt !== "string") return null;
+  const cleaned = prompt.trim();
+  if (cleaned.length < 20) return null;
+
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) {
+    logger.warn({}, "[contact] REPLICATE_API_TOKEN no configurado — pre-informe sin imagen IA");
+    return null;
+  }
+
+  function extractUrl(val: unknown): string | null {
+    if (!val) return null;
+    if (typeof val === "string" && val.startsWith("http")) return val;
+    if (Array.isArray(val) && val.length > 0) return extractUrl(val[0]);
+    if (typeof val === "object") {
+      const o = val as Record<string, unknown>;
+      if (typeof o.url === "function") {
+        try { const u = (val as { url: () => { href: string } }).url(); return u?.href ?? String(u); } catch { /* ignore */ }
+      }
+      if (typeof o.url === "string" && (o.url as string).startsWith("http")) return o.url as string;
+      const s = String(val);
+      if (s.startsWith("http")) return s;
+    }
+    return null;
+  }
+
+  const cascade: Array<{ model: `${string}/${string}`; input: Record<string, unknown> }> = [
+    { model: "black-forest-labs/flux-1.1-pro", input: { prompt: cleaned, width: 1024, height: 1024, num_outputs: 1, output_format: "jpg", output_quality: 92 } },
+    { model: "black-forest-labs/flux-schnell", input: { prompt: cleaned, num_outputs: 1, aspect_ratio: "1:1", output_format: "jpg", output_quality: 90, num_inference_steps: 4 } },
+    { model: "google/nano-banana", input: { prompt: cleaned, output_format: "jpg" } },
+  ];
+
+  // === Allowlist anti-SSRF (architect-PASS) ===
+  // El SDK de Replicate devuelve URLs de su CDN (replicate.delivery). Nunca
+  // debemos hacer fetch a un host arbitrario porque la salida del modelo es,
+  // técnicamente, contenido controlable por terceros. Restringimos a HTTPS y a
+  // hosts conocidos para evitar SSRF a metadata endpoints, redes privadas, etc.
+  const ALLOWED_HOSTS = new Set([
+    "replicate.delivery",
+    "pbxt.replicate.delivery",
+    "tjzk.replicate.delivery",
+    "xezq.replicate.delivery",
+    "replicate.com",
+    "api.replicate.com",
+    "cdn.replicate.com",
+  ]);
+  function isUrlSafe(rawUrl: string): boolean {
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol !== "https:") return false;
+      const host = u.hostname.toLowerCase();
+      // exact match o subdominio de replicate.delivery / replicate.com
+      if (ALLOWED_HOSTS.has(host)) return true;
+      if (host.endsWith(".replicate.delivery") || host.endsWith(".replicate.com")) return true;
+      return false;
+    } catch { return false; }
+  }
+
+  // Tamaño máximo de imagen aceptado: 4MB (cubre Flux 1.1 Pro 1024x1024 con
+  // margen). Mayor que esto es señal de respuesta corrupta o CDN equivocado.
+  const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+  // MIME types aceptados (excluye SVG explícitamente — SVG puede contener JS).
+  const ALLOWED_MIME = /^image\/(jpe?g|png|webp|gif)$/i;
+
+  try {
+    const Replicate = (await import("replicate")).default;
+    const replicate = new Replicate({ auth: token });
+
+    for (const step of cascade) {
+      // Cancelación REAL de la inferencia (architect-PASS): el SDK de Replicate
+      // acepta `signal` que llama internamente a `predictions.cancel(id)` si el
+      // controller aborta. Esto evita "jobs zombies" y coste residual cuando
+      // expiramos por timeout en lugar de abandonar la promesa silenciosamente.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(new Error(`Timeout ${step.model} 75s`)), 75_000);
+      try {
+        const out = await replicate.run(step.model, { input: step.input, signal: ctrl.signal });
+        const url = extractUrl(out);
+        if (!url) {
+          logger.warn({ model: step.model }, "[contact] no URL extraída — fallback al siguiente modelo");
+          continue;
+        }
+        if (!isUrlSafe(url)) {
+          logger.error({ model: step.model, host: (() => { try { return new URL(url).hostname; } catch { return "<invalid>"; } })() }, "[contact] URL fuera de allowlist — descartada (anti-SSRF)");
+          continue;
+        }
+
+        // Descargamos la imagen y la embebemos como data:URI para que el HTML
+        // del informe sea autocontenido (las URLs de Replicate caducan en ~1h
+        // y el informe se guarda en vault + se envía por email).
+        try {
+          // === Anti-SSRF en cadena de redirecciones (architect-PASS) ===
+          // `redirect: "manual"` evita que fetch siga 30x automáticamente sin
+          // revalidación. Iteramos manualmente, validando cada `Location` con
+          // isUrlSafe(), con un cap de 3 saltos para evitar loops infinitos.
+          let currentUrl = url;
+          let imgRes: Response | null = null;
+          // Timeout único que cubre TODO el ciclo de descarga (headers + body):
+          // si limpiamos sólo tras headers, un body lento queda sin protección.
+          const dlCtrl = new AbortController();
+          const dlTimer = setTimeout(() => dlCtrl.abort(), 25_000);
+          try {
+            for (let hop = 0; hop < 4; hop++) {
+              const res = await fetch(currentUrl, { signal: dlCtrl.signal, redirect: "manual" });
+              if (res.status >= 300 && res.status < 400) {
+                const loc = res.headers.get("location");
+                if (!loc) throw new Error(`30x sin Location (status ${res.status})`);
+                const nextUrl = new URL(loc, currentUrl).toString();
+                if (!isUrlSafe(nextUrl)) throw new Error(`Redirect a host fuera de allowlist: ${(() => { try { return new URL(nextUrl).hostname; } catch { return "<invalid>"; } })()}`);
+                currentUrl = nextUrl;
+                continue;
+              }
+              imgRes = res;
+              break;
+            }
+            if (!imgRes) throw new Error("Demasiados redirects");
+            if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
+
+            // Defensa en profundidad: revalidar el host final efectivo.
+            if (imgRes.url && !isUrlSafe(imgRes.url)) throw new Error(`URL final fuera de allowlist: ${imgRes.url}`);
+
+            // Validación temprana de Content-Length antes de descargar body.
+            const cl = imgRes.headers.get("content-length");
+            if (cl && Number(cl) > MAX_IMAGE_BYTES) throw new Error(`Content-Length ${cl} > ${MAX_IMAGE_BYTES}`);
+
+            const ct = (imgRes.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
+            if (!ALLOWED_MIME.test(ct)) throw new Error(`MIME no permitido: ${ct}`);
+
+            // Stream con cutoff: si el body excede el cap aborta de inmediato.
+            // El timeout dlCtrl sigue activo aquí — se limpia en el `finally`.
+            if (!imgRes.body) throw new Error("Sin body");
+            const reader = imgRes.body.getReader();
+            const chunks: Uint8Array[] = [];
+            let total = 0;
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) {
+                total += value.byteLength;
+                if (total > MAX_IMAGE_BYTES) {
+                  try { await reader.cancel(); } catch { /* ignore */ }
+                  throw new Error(`Stream excede ${MAX_IMAGE_BYTES} bytes`);
+                }
+                chunks.push(value);
+              }
+            }
+            const buf = Buffer.concat(chunks.map(c => Buffer.from(c)));
+            if (buf.length < 1024) throw new Error(`Imagen demasiado pequeña: ${buf.length}b`);
+            const dataUri = `data:${ct};base64,${buf.toString("base64")}`;
+            logger.info({ model: step.model, sizeKB: Math.round(buf.length / 1024), mime: ct }, "[contact] ✅ pre-informe product photo generated (embedded as data URI)");
+            return dataUri;
+          } finally {
+            clearTimeout(dlTimer);
+          }
+        } catch (embedErr: any) {
+          // Si no podemos embeber con seguridad, mejor devolver null que
+          // arriesgar inyectar HTML/contenido no validado en email del admin.
+          // El placeholder emoji 🛍️ es preferible a un payload sospechoso.
+          logger.warn({ model: step.model, err: embedErr?.message }, "[contact] embed bloqueado por validación — descartado");
+          continue;
+        }
+      } catch (err: any) {
+        logger.warn({ model: step.model, err: err?.message, aborted: ctrl.signal.aborted }, "[contact] modelo falló — siguiente cascada");
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "[contact] generateProductPhotoFromPrompt totalmente falló");
+  }
+  return null;
+}
+
 function sanitizeAiHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -467,7 +655,7 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     };
   }
 
-  return buildReportHtml(lead, {
+  return await buildReportHtml(lead, {
     business: structuredResearch.business,
     market: structuredResearch.market,
     seo: structuredResearch.seo,
@@ -477,10 +665,10 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
   });
 }
 
-function buildReportHtml(
+async function buildReportHtml(
   lead: LeadData,
   research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean },
-): string {
+): Promise<string> {
   const esc = sanitizeHtml;
 
   function safeUrl(url: string): string {
@@ -598,7 +786,16 @@ function buildReportHtml(
     : "<li class=\"muted\">Sin fuentes verificadas</li>";
 
   const ps = research.productSample;
-  const productImageUrl = lead.productImageUrl || "";
+  // Si el visitante NO adjuntó imagen propia, usamos el `generatedImagePrompt`
+  // que el LLM acaba de inventar para producir una FOTO REAL del producto vía
+  // Replicate (Flux 1.1 Pro). Antes este prompt se descartaba y el HTML caía
+  // a un placeholder con emoji 🛍️ — ahora el pre-informe siempre puede mostrar
+  // una imagen profesional, y los visitantes ven el producto "como en Shopify".
+  let productImageUrl = lead.productImageUrl || "";
+  if (!productImageUrl && ps?.generatedImagePrompt) {
+    const aiUrl = await generateProductPhotoFromPrompt(ps.generatedImagePrompt);
+    if (aiUrl) productImageUrl = aiUrl;
+  }
 
   // FIX: el LLM puede devolver objetos/arrays donde esperamos string;
   // esto causaba `[object Object]` literal en el HTML del producto.
@@ -932,7 +1129,7 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
         if (isGeminiAvailable()) {
           reportHtml = await generateAIPreReport(leadData);
         } else {
-          reportHtml = buildReportHtml(leadData, {
+          reportHtml = await buildReportHtml(leadData, {
             business: "Gemini no está configurado — no se pudo realizar investigación automática.",
             market: "Gemini no está configurado.",
             seo: "Gemini no está configurado.",
