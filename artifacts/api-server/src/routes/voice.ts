@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { db, projectsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, projectsTable, productsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { synthesizeSpeech, listVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
 import { logger } from "../lib/logger.js";
+import { recommendVoiceForProduct, type VoiceGenderPref, type VoiceLanguage } from "../lib/voice-recommender.js";
+import { requireAdmin } from "../lib/auth.js";
 
 const router = Router();
 
@@ -255,6 +257,53 @@ router.post("/voice/command", async (req, res): Promise<void> => {
       const msg = err instanceof Error ? err.message : "Internal server error";
       res.status(500).json({ error: msg });
     }
+  }
+});
+
+// ============================================================
+// SMART VOICE RECOMMENDATION (Claude analyses product → ideal ElevenLabs voice)
+// ============================================================
+router.get("/voice/recommend", requireAdmin, async (req, res) => {
+  try {
+    const projectId = parseInt(String(req.query.projectId || "0"), 10);
+    const productId = String(req.query.productId || "").slice(0, 64);
+    const language = (String(req.query.language || "auto") as VoiceLanguage);
+    const genderPref = (String(req.query.gender || "auto") as VoiceGenderPref);
+    const shortFormat = String(req.query.shortFormat || "false") === "true";
+
+    if (!projectId || !productId) {
+      res.status(400).json({ error: "projectId y productId requeridos" });
+      return;
+    }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) {
+      res.status(404).json({ error: "Proyecto no encontrado" });
+      return;
+    }
+
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, productId)));
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const recommendation = await recommendVoiceForProduct({
+      projectId,
+      productTitle: product.title || "Producto",
+      productDescription: (product.bodyHtml || "").replace(/<[^>]+>/g, "").slice(0, 600),
+      productType: product.productType || undefined,
+      niche: project.storeNiche || undefined,
+      language,
+      genderPref,
+      shortFormat,
+    });
+
+    res.json({ success: true, recommendation });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "voice/recommend failed");
+    res.status(500).json({ error: err?.message || "Error recomendando voz" });
   }
 });
 

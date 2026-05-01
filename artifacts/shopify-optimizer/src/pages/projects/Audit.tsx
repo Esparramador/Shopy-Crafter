@@ -8,7 +8,8 @@ import {
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff }from "lucide-react";
+import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film }from "lucide-react";
+import CreateAdModal from "@/components/CreateAdModal";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -761,6 +762,7 @@ export default function AuditPage() {
   const [scanResult, setScanResult] = useState<string>("");
   const [tokenLoading, setTokenLoading] = useState(false);
   const [editProduct, setEditProduct] = useState<EditableProduct | null>(null);
+  const [adProduct, setAdProduct] = useState<{ id: string; title: string } | null>(null);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
   const [bulkOptimizing, setBulkOptimizing] = useState(false);
   const [optimizeMsg, setOptimizeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -1146,6 +1148,15 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         />
       )}
 
+      {adProduct && (
+        <CreateAdModal
+          projectId={projectId}
+          productId={adProduct.id}
+          productTitle={adProduct.title}
+          onClose={() => setAdProduct(null)}
+        />
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <GlassCard delay={0.1} className="p-5">
@@ -1377,6 +1388,15 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                           aria-label="Optimizar producto con IA"
                         >
                           {optimizingId === String((product as any).shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
+                        </button>
+                        <button
+                          onClick={() => setAdProduct({ id: String((product as any).shopifyProductId || product.id), title: product.title })}
+                          className="p-2.5 rounded-lg hover:bg-purple-500/10 text-muted-foreground hover:text-purple-400 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                          title="Crear anuncio profesional"
+                          aria-label="Crear anuncio profesional con IA"
+                          data-testid={`btn-create-ad-${product.id}`}
+                        >
+                          <Film className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => setEditProduct(product as unknown as EditableProduct)}

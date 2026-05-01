@@ -807,6 +807,97 @@ router.post("/fs-pro/concat", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── CONCAT DE CLIPS SUBIDOS POR EL USUARIO (multipart) ──────────────────
+// Permite subir directamente varios MP4 propios y concatenarlos sin pasar antes
+// por la bóveda. Acepta opcionalmente voiceover y música también subidos.
+const concatUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024, files: 25 }, // 200MB por archivo, máx 25
+  fileFilter: (_req, file, cb) => {
+    const ok = /^video\/(mp4|quicktime|webm|x-matroska)$|^audio\/(mp3|mpeg|wav|ogg|x-m4a)$/i.test(file.mimetype);
+    if (ok) cb(null, true);
+    else cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`) as any, false);
+  },
+});
+
+router.post(
+  "/fs-pro/concat-uploaded",
+  requireAdmin,
+  concatUpload.fields([
+    { name: "clips", maxCount: 20 },
+    { name: "voice", maxCount: 1 },
+    { name: "music", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    enableLongRunning(res);
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const clipFiles = (files?.clips || []).filter(f => /^video\//.test(f.mimetype));
+      const voiceFile = files?.voice?.[0];
+      const musicFile = files?.music?.[0];
+
+      if (clipFiles.length < 1) {
+        res.status(400).json({ error: "Sube al menos 1 clip de vídeo (campo 'clips')" });
+        return;
+      }
+      if (clipFiles.length > 20) {
+        res.status(400).json({ error: "Máximo 20 clips por concat" });
+        return;
+      }
+
+      const projectId = parseInt(String(req.body.projectId || "0"), 10);
+      if (!projectId) {
+        res.status(400).json({ error: "projectId requerido en form-data" });
+        return;
+      }
+
+      const width = req.body.width ? Number(req.body.width) : undefined;
+      const height = req.body.height ? Number(req.body.height) : undefined;
+      const fps = req.body.fps ? Number(req.body.fps) : undefined;
+      const crossfadeSec = req.body.crossfadeSec ? Number(req.body.crossfadeSec) : undefined;
+      const transitionPreset = typeof req.body.transitionPreset === "string" ? req.body.transitionPreset : undefined;
+      const voiceVolume = req.body.voiceVolume ? parseFloat(String(req.body.voiceVolume)) : undefined;
+      const musicVolume = req.body.musicVolume ? parseFloat(String(req.body.musicVolume)) : undefined;
+      const title = (req.body.title ? String(req.body.title) : `Mis clips concatenados (${clipFiles.length})`).slice(0, 200);
+
+      logger.info({ projectId, clipsCount: clipFiles.length, hasVoice: !!voiceFile, hasMusic: !!musicFile, transitionPreset }, "fs-pro concat-uploaded: starting");
+
+      const finalBuf = await concatVideos({
+        videoBuffers: clipFiles.map(f => f.buffer),
+        width, height, fps, crossfadeSec, transitionPreset,
+        voiceBuffer: voiceFile?.buffer,
+        musicBuffer: musicFile?.buffer,
+        voiceVolume, musicVolume,
+      });
+
+      const vaultId = await saveToVaultSmart({
+        projectId,
+        fileType: "fs-pro-concat",
+        category: "fusion-studio-pro",
+        title,
+        mimeType: "video/mp4",
+        generatedBy: "fs-pro:user-upload-concat",
+        buffer: finalBuf,
+      });
+
+      res.json({
+        success: true,
+        vaultId,
+        sizeBytes: finalBuf.length,
+        clipsCount: clipFiles.length,
+        title,
+      });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "fs-pro concat-uploaded failed");
+      const isMulter = err?.code === "LIMIT_FILE_SIZE" || /file size|too large/i.test(String(err?.message));
+      res.status(isMulter ? 413 : 500).json({
+        error: isMulter ? "Archivo demasiado grande (máx 200MB por clip)" : (err?.message || "Error concatenando clips subidos"),
+        code: isMulter ? "FILE_TOO_LARGE" : "CONCAT_FAILED",
+      });
+    }
+  },
+);
+
 // ─── UPLOAD ARBITRARY CLIP/AUDIO/IMAGE TO VAULT ───────────────────────────
 // Permite a otros agentes (chatbot, scripts batch, ffmpeg local) guardar un
 // archivo binario directamente en el vault del proyecto. Usado por el pipeline

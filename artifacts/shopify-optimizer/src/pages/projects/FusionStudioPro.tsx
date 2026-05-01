@@ -5,7 +5,7 @@ import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "downloads";
 
 type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
@@ -127,6 +127,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Upscale 4K, mejora de caras, detalle creativo" },
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling, Seedance, Hailuo" },
   { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Pollo Seedance 2.0)" },
+  { id: "uploadconcat", label: "Concat propio", icon: <Film size={15} />,     desc: "Sube tus propios clips MP4 y los concatena con voz/música" },
   { id: "avatars",    label: "Avatares",        icon: <UserSquare size={15} />, desc: "Talking heads y product avatars por nicho" },
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
@@ -231,6 +232,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "enhance"    && <EnhanceTab    projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen mejorada", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "video"      && <VideoTab    caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "multishot"  && <MultiShotTab caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Multi-shot listo", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "uploadconcat" && <UploadConcatTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Concat listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "avatars"    && <AvatarsTab   caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Avatar listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
@@ -2319,6 +2321,143 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
           <strong style={{ color: "var(--gold, #fbbf24)" }}>💡 Tip:</strong> combina <em>lente + iluminación + paleta + mood</em> para fotos editoriales.
           Para vídeo, añade <em>movimiento de cámara + transición</em>. Sin elecciones devuelve un baseline cinematográfico.
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UploadConcatTab — sube tus propios clips MP4 (hasta 20) y los concatena
+// con voz/música opcional. Reutiliza POST /api/fs-pro/concat-uploaded (T001).
+// ─────────────────────────────────────────────────────────────────────────────
+function UploadConcatTab({
+  projectId, onSuccess, onError,
+}: {
+  projectId: number;
+  onSuccess: (it: VaultItem) => void;
+  onError: (m: string) => void;
+}) {
+  const [clips, setClips] = useState<File[]>([]);
+  const [voice, setVoice] = useState<File | null>(null);
+  const [music, setMusic] = useState<File | null>(null);
+  const [title, setTitle] = useState("Concat propio");
+  const [crossfade, setCrossfade] = useState(0.4);
+  const [voiceVol, setVoiceVol] = useState(1.0);
+  const [musicVol, setMusicVol] = useState(0.25);
+  const [busy, setBusy] = useState(false);
+  const [resultUrl, setResultUrl] = useState<string>("");
+
+  const addClips = (files: FileList | null) => {
+    if (!files) return;
+    const arr = Array.from(files).filter(f => f.type.startsWith("video/"));
+    setClips(prev => [...prev, ...arr].slice(0, 20));
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    setClips(prev => {
+      const copy = [...prev];
+      const j = i + dir;
+      if (j < 0 || j >= copy.length) return prev;
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  };
+  const remove = (i: number) => setClips(prev => prev.filter((_, idx) => idx !== i));
+
+  const run = async () => {
+    if (clips.length < 2) {
+      onError("Sube al menos 2 clips para concatenar");
+      return;
+    }
+    setBusy(true);
+    setResultUrl("");
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("title", title);
+      fd.append("crossfadeSec", String(crossfade));
+      fd.append("voiceVolume", String(voiceVol));
+      fd.append("musicVolume", String(musicVol));
+      clips.forEach((c) => fd.append("clips", c));
+      if (voice) fd.append("voice", voice);
+      if (music) fd.append("music", music);
+
+      const res = await fetch(`${API_BASE}/api/fs-pro/concat-uploaded`, {
+        method: "POST", credentials: "include", body: fd,
+      });
+      const text = await res.text();
+      let d: any;
+      try { d = JSON.parse(text); } catch { d = { error: text.slice(0, 300) }; }
+      if (!res.ok) { onError(d?.error || `Error ${res.status}`); return; }
+      const url = `${API_BASE}/api/projects/${projectId}/vault/${d.vaultId}/raw`;
+      setResultUrl(url);
+      onSuccess({ vaultId: d.vaultId, type: "video", label: title, dataUrl: url, mimeType: "video/mp4" });
+    } catch (e: any) {
+      onError(e?.message || "Error en concatenación");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div>
+        <Section title="Clips de video (hasta 20, MP4 ≤200MB cada uno)">
+          <input type="file" accept="video/*" multiple onChange={e => addClips(e.target.files)} />
+          {clips.length > 0 && (
+            <ul style={{ marginTop: 8, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+              {clips.map((c, i) => (
+                <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)", borderRadius: 8, fontSize: 12 }}>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    #{i + 1} · {c.name} · {(c.size / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                  <button onClick={() => move(i, -1)} disabled={i === 0} className="btn" style={{ padding: "2px 6px" }}>↑</button>
+                  <button onClick={() => move(i, 1)} disabled={i === clips.length - 1} className="btn" style={{ padding: "2px 6px" }}>↓</button>
+                  <button onClick={() => remove(i)} className="btn" style={{ padding: "2px 6px" }}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+        <Section title="Voz over (MP3/WAV opcional)">
+          <input type="file" accept="audio/*" onChange={e => setVoice(e.target.files?.[0] || null)} />
+        </Section>
+        <Section title="Música de fondo (opcional)">
+          <input type="file" accept="audio/*" onChange={e => setMusic(e.target.files?.[0] || null)} />
+        </Section>
+      </div>
+      <div>
+        <Section title="Título">
+          <input type="text" value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
+        </Section>
+        <Section title="Ajustes">
+          <label style={{ display: "block", fontSize: 12, color: "var(--t3, #6c6c7c)", marginBottom: 4 }}>Crossfade entre clips: {crossfade.toFixed(2)}s</label>
+          <input type="range" min={0} max={1.5} step={0.05} value={crossfade} onChange={e => setCrossfade(parseFloat(e.target.value))} style={{ width: "100%" }} />
+          <label style={{ display: "block", fontSize: 12, color: "var(--t3, #6c6c7c)", marginTop: 8, marginBottom: 4 }}>Volumen voz: {voiceVol.toFixed(2)}</label>
+          <input type="range" min={0} max={1.5} step={0.05} value={voiceVol} onChange={e => setVoiceVol(parseFloat(e.target.value))} style={{ width: "100%" }} />
+          <label style={{ display: "block", fontSize: 12, color: "var(--t3, #6c6c7c)", marginTop: 8, marginBottom: 4 }}>Volumen música: {musicVol.toFixed(2)}</label>
+          <input type="range" min={0} max={1} step={0.05} value={musicVol} onChange={e => setMusicVol(parseFloat(e.target.value))} style={{ width: "100%" }} />
+        </Section>
+        <button onClick={run} disabled={busy || clips.length < 2} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}
+          {busy ? "Concatenando…" : `Concatenar ${clips.length} clips y guardar en bóveda`}
+        </button>
+        <LiveOperation
+          active={busy}
+          title="Concatenando clips con FFmpeg"
+          estimatedSec={Math.max(20, clips.length * 8)}
+          messages={[
+            "Validando codecs y resoluciones de cada clip…",
+            "Aplicando crossfades y normalizando audio…",
+            "Mezclando voz over y música de fondo…",
+            "Codificando MP4 final con calidad alta…",
+            "Subiendo a la bóveda del proyecto…",
+          ]}
+        />
+        {resultUrl && (
+          <div style={{ marginTop: 12 }}>
+            <video src={resultUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000" }} />
+          </div>
+        )}
       </div>
     </div>
   );
