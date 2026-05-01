@@ -47,6 +47,7 @@ import webLabRouter from "./web-lab.js";
 import fusionStudioRouter from "./fusion-studio.js";
 import adStudioRouter from "./ad-studio.js";
 import fsProRouter from "./fs-pro.js";
+import superAdRouter from "./super-ad.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
@@ -128,6 +129,7 @@ router.use(webLabRouter);
 router.use(fusionStudioRouter);
 router.use(adStudioRouter);
 router.use(fsProRouter);
+router.use(superAdRouter);
 router.use(reportTemplatesRouter);
 router.use(billingRouter);
 

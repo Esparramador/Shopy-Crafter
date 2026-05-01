@@ -169,3 +169,43 @@ como seguimiento; aplicar el mismo patrón cuando se reporten 502 en
 otras rutas largas, o refactorizar el helper para hacer flushHeaders por
 defecto (cambio de mayor riesgo, requiere auditar cada handler para
 asegurar que ningún `res.status(...)` vive después de enableLongRunning).
+
+---
+
+## 2026-05-01 · Super Ad Studio (port del script hanakaze-v2-super)
+
+**Objetivo:** portar `scripts/run-hanakaze-v2-super.mjs` (orquestador externo
+de 12 clips video + voz ElevenLabs + música ElevenLabs + concat MP4 9:16) a la
+app de forma genérica para CUALQUIER marca, con UI de wizard, backend
+orquestador async, persistencia en `bulk_jobs`, y aprendizaje en ShopyBrain.
+
+**Arquitectura:**
+- `artifacts/api-server/src/lib/super-ad-runner.ts` — worker async
+  fire-and-forget (`setImmediate`), pipeline: clips i2v/t2v → TTS → música
+  (1-2 segmentos con crossfade ffmpeg local) → concat → `learnFromOperation`.
+  State persistente en `bulk_jobs.{status, completedItems, totalItems, log[],
+  result jsonb}`. **CRITICAL FIXES aplicados tras code review:** `runFfmpeg`
+  con stdio stdout="ignore" (evita bloqueo por buffer pipe); cleanup tmpDir
+  en `finally` (no leak si ffmpeg falla).
+- `artifacts/api-server/src/lib/vault-smart.ts` — extracción de
+  `saveToVaultSmart`, `getProjectReplicateToken`, `fetchVaultBufferById`
+  desde `routes/fs-pro.ts` (helpers privados) a lib reusable. **fs-pro.ts NO
+  modificado** — sigue usando sus copias internas, sin riesgo en producción.
+- `artifacts/api-server/src/routes/super-ad.ts` — 5 endpoints REST con
+  `requireAdmin`:
+  - `POST /super-ad/upload-ref` (multipart, guarda imagen ref en vault)
+  - `POST /super-ad/storyboard` (Claude `askClaudeJsonWithBrain` genera
+    storyboard editable con prompts cinemáticos en INGLÉS)
+  - `POST /super-ad/run` (arranca worker async, devuelve jobId)
+  - `GET /super-ad/jobs/:jobId` (estado + log + result)
+  - `GET /super-ad/jobs?projectId=X` (historial)
+- `artifacts/shopify-optimizer/src/pages/projects/SuperAdStudio.tsx` —
+  wizard 5 pasos (Brief → Referencias drag&drop → Storyboard editable →
+  Voz+Música → Generar con polling 3s + log en vivo + descarga MP4 final).
+  Polling con **inflight guard + cancelled flag** + cleanup `URL.revokeObjectURL`
+  al desmontar.
+- Ruta registrada en `App.tsx`: `/projects/:id/super-ad`. Entrada sidebar
+  añadida a `DEFAULT_MODULE_NAV` en `AppLayout.tsx` (icono 🎬 Super Ad).
+
+**Validación:** typecheck limpio, los 5 endpoints responden 403 (admin
+guard activo), Vite resuelve y recarga el wizard sin errores.
