@@ -2189,18 +2189,69 @@ function AvatarsTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
   );
 }
 
-// ─── TAB: PROMPT LAB (PRO PRESETS) ───────────────────────────────────────
+// ─── TAB: PROMPT LAB (PRO PRESETS + IA ENHANCE + LIBRARY) ────────────────
 type PromptCategory = "lens" | "lighting" | "palette" | "mood" | "composition" | "cameraMovement" | "style" | "apps" | "transitions";
 type PromptCatalog = Record<PromptCategory, Array<{ key: string; label: string; description?: string; value?: string }>>;
 
+type PromptIntent =
+  | "image" | "video"
+  | "ad_cinematic" | "multishot_director"
+  | "image_hero_product" | "ugc_video"
+  | "ad_copy_meta" | "infographic_html"
+  | "seo_product_100" | "email_marketing"
+  | "landing_hero" | "brand_kit_ocr";
+
+const INTENT_LABELS: Record<PromptIntent, { label: string; emoji: string; visual: boolean }> = {
+  image:               { label: "Imagen libre",                 emoji: "📸", visual: true  },
+  video:               { label: "Vídeo libre",                  emoji: "🎬", visual: true  },
+  image_hero_product:  { label: "Hero shot producto",           emoji: "✨", visual: true  },
+  ad_cinematic:        { label: "Anuncio cinematográfico",      emoji: "🎥", visual: true  },
+  multishot_director:  { label: "Anuncio largo (showrunner)",   emoji: "🎞️", visual: true  },
+  ugc_video:           { label: "UGC creator",                  emoji: "📱", visual: true  },
+  ad_copy_meta:        { label: "Copy Meta/TikTok",             emoji: "✍️", visual: false },
+  infographic_html:    { label: "Infografía HTML",              emoji: "📊", visual: false },
+  seo_product_100:     { label: "Descripción SEO 100/100",      emoji: "🔍", visual: false },
+  email_marketing:     { label: "Email marketing",              emoji: "📧", visual: false },
+  landing_hero:        { label: "Landing hero",                 emoji: "🚀", visual: false },
+  brand_kit_ocr:       { label: "Brand kit OCR",                emoji: "🎨", visual: false },
+};
+
+interface LibraryItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  useCase: string;
+  niche?: string | null;
+  promptTemplate: { systemPrompt?: string; userTemplate?: string } | string;
+  variables: string[];
+  avgQualityScore?: number | null;
+  useCount?: number | null;
+  isSeed: boolean;
+}
+
 function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onError: (m: string) => void }) {
   const [catalog, setCatalog] = useState<PromptCatalog | null>(null);
-  const [kind, setKind] = useState<"image" | "video">("image");
+  const [intent, setIntent] = useState<PromptIntent>("image_hero_product");
   const [subject, setSubject] = useState("");
   const [brand, setBrand] = useState("");
+  const [extraContext, setExtraContext] = useState("");
   const [picks, setPicks] = useState<Partial<Record<PromptCategory, string>>>({});
   const [busy, setBusy] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [baseline, setBaseline] = useState<string>("");
   const [output, setOutput] = useState<string>("");
+  const [negativePrompt, setNegativePrompt] = useState<string>("");
+  const [enhancedModel, setEnhancedModel] = useState<"claude" | "fallback" | "">("");
+
+  // Library state
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [libraryFilter, setLibraryFilter] = useState<"all" | PromptIntent>("all");
+  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [savingToLib, setSavingToLib] = useState(false);
+
+  const isVisualIntent = INTENT_LABELS[intent]?.visual ?? true;
+  const presetKind: "image" | "video" = intent === "video" || intent === "ad_cinematic" || intent === "multishot_director" || intent === "ugc_video" ? "video" : "image";
 
   useEffect(() => {
     let cancelled = false;
@@ -2211,6 +2262,23 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
     return () => { cancelled = true; };
   }, []);
 
+  const loadLibrary = async (filter: "all" | PromptIntent = libraryFilter) => {
+    setLibraryLoading(true);
+    try {
+      const url = filter === "all"
+        ? `${API_BASE}/api/fs-pro/prompt-library`
+        : `${API_BASE}/api/fs-pro/prompt-library?useCase=${encodeURIComponent(filter)}`;
+      const res = await fetch(url, { credentials: "include" });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      setLibrary(d.items || []);
+    } catch (e: any) {
+      onError(e?.message || "Error cargando biblioteca");
+    } finally { setLibraryLoading(false); }
+  };
+
+  useEffect(() => { loadLibrary(libraryFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [libraryFilter]);
+
   const build = async () => {
     if (subject.trim().length < 3) { onError("Describe el sujeto (mínimo 3 caracteres)"); return; }
     setBusy(true);
@@ -2218,24 +2286,117 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
       const res = await fetch(`${API_BASE}/api/fs-pro/prompt/build`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, subject: subject.trim(), brand: brand.trim() || undefined, picks }),
+        body: JSON.stringify({ kind: presetKind, subject: subject.trim(), brand: brand.trim() || undefined, picks }),
       });
       const d = await res.json();
       if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
-      setOutput(d.prompt || "");
-      onInfo("Prompt construido");
+      const builtPrompt = d.prompt || "";
+      setBaseline(builtPrompt);
+      setOutput(builtPrompt);
+      setNegativePrompt(d.negativePrompt || "");
+      setEnhancedModel("");
+      onInfo("Baseline construido — pulsa 🪄 Potenciar con IA para refinarlo");
     } catch (e: any) {
       onError(e?.message || "Error de red");
     } finally { setBusy(false); }
   };
 
-  const copy = async () => {
-    if (!output) return;
-    try { await navigator.clipboard.writeText(output); onInfo("Prompt copiado al portapapeles"); }
+  const enhance = async () => {
+    const baseToUse = output || baseline;
+    if (!baseToUse || baseToUse.trim().length < 10) {
+      onError("Construye primero un baseline (Construir prompt) o pega texto en el output"); return;
+    }
+    if (subject.trim().length < 3) { onError("Describe el sujeto (mínimo 3 caracteres)"); return; }
+    setEnhancing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/enhance`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent,
+          baselinePrompt: baseToUse,
+          subject: subject.trim(),
+          brand: brand.trim() || null,
+          language: "es",
+          extraContext: extraContext.trim() || undefined,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      setOutput(d.enhanced || baseToUse);
+      setNegativePrompt(d.negativePrompt || negativePrompt);
+      setEnhancedModel(d.model || "claude");
+      if (d.model === "fallback") {
+        onError("Claude no respondió — manteniendo baseline (revisa GEMINI_API_KEY/ANTHROPIC_API_KEY)");
+      } else {
+        onInfo(`Prompt potenciado con IA (${d.model})`);
+      }
+    } catch (e: any) {
+      onError(e?.message || "Error de red");
+    } finally { setEnhancing(false); }
+  };
+
+  const copy = async (text: string, label = "Texto") => {
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); onInfo(`${label} copiado al portapapeles`); }
     catch { onError("No se pudo copiar"); }
   };
 
-  const reset = () => { setPicks({}); setOutput(""); };
+  const saveToLibrary = async () => {
+    if (!output || output.trim().length < 10) { onError("Necesitas un prompt en el output para guardar"); return; }
+    const name = window.prompt("Nombre para esta plantilla en tu biblioteca:", `${INTENT_LABELS[intent].label} · ${subject.slice(0, 30)}`);
+    if (!name || name.trim().length < 3) return;
+    setSavingToLib(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt-library`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: `Custom · ${INTENT_LABELS[intent].label}${brand ? " · " + brand : ""}`,
+          useCase: intent,
+          systemPrompt: "",
+          userTemplate: output,
+          variables: ["SUBJECT", "BRAND"],
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onInfo("Plantilla guardada en biblioteca");
+      loadLibrary(libraryFilter);
+    } catch (e: any) {
+      onError(e?.message || "Error de red");
+    } finally { setSavingToLib(false); }
+  };
+
+  const loadFromLibrary = async (item: LibraryItem) => {
+    const tpl = typeof item.promptTemplate === "object" && item.promptTemplate !== null
+      ? (item.promptTemplate.userTemplate || item.promptTemplate.systemPrompt || "")
+      : String(item.promptTemplate || "");
+    setOutput(tpl);
+    setBaseline(tpl);
+    if (item.useCase && (INTENT_LABELS as any)[item.useCase]) setIntent(item.useCase as PromptIntent);
+    onInfo(`Plantilla "${item.name}" cargada en el editor`);
+    fetch(`${API_BASE}/api/fs-pro/prompt-library/${encodeURIComponent(item.id)}/use`, {
+      method: "POST", credentials: "include",
+    }).catch(() => { /* non-fatal */ });
+  };
+
+  const deleteFromLibrary = async (item: LibraryItem) => {
+    if (item.isSeed) { onError("Las plantillas pre-cargadas no se pueden eliminar"); return; }
+    if (!window.confirm(`¿Eliminar "${item.name}" de tu biblioteca?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt-library/${encodeURIComponent(item.id)}`, {
+        method: "DELETE", credentials: "include",
+      });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onInfo("Plantilla eliminada");
+      loadLibrary(libraryFilter);
+    } catch (e: any) { onError(e?.message || "Error de red"); }
+  };
+
+  const reset = () => { setPicks({}); setOutput(""); setBaseline(""); setNegativePrompt(""); setEnhancedModel(""); };
 
   const CATEGORY_TITLES: Record<PromptCategory, string> = {
     lens: "🔭 Óptica / Lente",
@@ -2249,77 +2410,181 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
     transitions: "✂️ Transiciones (vídeo)",
   };
 
-  const visibleCategories: PromptCategory[] = kind === "image"
+  const visibleCategories: PromptCategory[] = presetKind === "image"
     ? ["lens","lighting","palette","mood","composition","style","apps"]
     : ["lens","lighting","palette","mood","composition","cameraMovement","style","apps","transitions"];
+
+  const filteredLibrary = library;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
-        <Section title="Tipo">
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setKind("image")} style={pillButton(kind === "image")}>📸 Imagen</button>
-            <button onClick={() => setKind("video")} style={pillButton(kind === "video")}>🎬 Vídeo</button>
-          </div>
+        <Section title="🎯 Tipo de creación">
+          <select value={intent} onChange={e => setIntent(e.target.value as PromptIntent)} style={inputStyle}>
+            {(Object.entries(INTENT_LABELS) as Array<[PromptIntent, typeof INTENT_LABELS[PromptIntent]]>).map(([k, v]) => (
+              <option key={k} value={k}>{v.emoji} {v.label}</option>
+            ))}
+          </select>
+          <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 6 }}>
+            Selecciona el tipo. La IA usará el system prompt PREMIUM correspondiente para refinar.
+          </p>
         </Section>
-        <Section title="Sujeto principal">
+        <Section title="Sujeto / tema principal">
           <textarea
             value={subject}
             onChange={e => setSubject(e.target.value)}
-            placeholder="reloj de oro sobre mármol negro / modelo joven con auriculares en azotea / botella de perfume premium en estudio…"
-            style={{ ...inputStyle, minHeight: 80 }}
+            placeholder="reloj de oro sobre mármol negro / producto X para audiencia Y / email para abandono carrito de Brand Z / landing para SaaS de…"
+            style={{ ...inputStyle, minHeight: 70 }}
           />
         </Section>
         <Section title="Marca (opcional)">
           <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej: Hanakaze, Nike, Apple…" style={inputStyle} />
         </Section>
-        {!catalog && <p style={{ fontSize: 11, color: "var(--t3)" }}>Cargando catálogo de presets…</p>}
-        {catalog && visibleCategories.map(cat => {
-          const items = catalog[cat] || [];
-          if (items.length === 0) return null;
-          return (
-            <Section key={cat} title={CATEGORY_TITLES[cat]}>
-              <select
-                value={picks[cat] || ""}
-                onChange={e => setPicks(p => ({ ...p, [cat]: e.target.value || undefined }))}
-                style={inputStyle}
-              >
-                <option value="">— Sin elección —</option>
-                {items.map(it => (
-                  <option key={it.key} value={it.key}>
-                    {it.label}{it.description ? ` · ${it.description}` : ""}
-                  </option>
-                ))}
-              </select>
-            </Section>
-          );
-        })}
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button onClick={build} disabled={busy || subject.trim().length < 3} className="btn btn-gold" style={{ flex: 1, justifyContent: "center", padding: "12px 16px" }}>
-            {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy ? "Construyendo…" : "Construir prompt PRO"}
+        <Section title="Contexto extra (audiencia, USP, restricciones)">
+          <textarea
+            value={extraContext}
+            onChange={e => setExtraContext(e.target.value)}
+            placeholder="audiencia: mujeres 30-45 urbanas / USP: único reloj con cristal de zafiro real / evitar lenguaje pomposo…"
+            style={{ ...inputStyle, minHeight: 50 }}
+          />
+        </Section>
+        {isVisualIntent && (
+          <>
+            {!catalog && <p style={{ fontSize: 11, color: "var(--t3)" }}>Cargando catálogo de presets…</p>}
+            {catalog && visibleCategories.map(cat => {
+              const items = catalog[cat] || [];
+              if (items.length === 0) return null;
+              return (
+                <Section key={cat} title={CATEGORY_TITLES[cat]}>
+                  <select
+                    value={picks[cat] || ""}
+                    onChange={e => setPicks(p => ({ ...p, [cat]: e.target.value || undefined }))}
+                    style={inputStyle}
+                  >
+                    <option value="">— Sin elección —</option>
+                    {items.map(it => (
+                      <option key={it.key} value={it.key}>
+                        {it.label}{it.description ? ` · ${it.description.slice(0, 80)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Section>
+              );
+            })}
+          </>
+        )}
+        {!isVisualIntent && (
+          <div style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)", fontSize: 11, color: "var(--t3, #6c6c7c)", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--gold, #fbbf24)" }}>ℹ Modo texto / copy:</strong> los presets visuales no aplican aquí. Construye un baseline (opcional) y pulsa <em>🪄 Potenciar con IA</em> — se aplicará el system prompt PREMIUM de {INTENT_LABELS[intent].label}.
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <button onClick={build} disabled={busy || enhancing || subject.trim().length < 3} className="btn" style={{ flex: 1, justifyContent: "center", padding: "12px 16px", minWidth: 180 }}>
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy ? "Construyendo…" : "Construir baseline"}
           </button>
-          <button onClick={reset} disabled={busy} className="btn" style={{ padding: "12px 16px" }}>
+          <button onClick={enhance} disabled={busy || enhancing || subject.trim().length < 3 || !(output || baseline)} className="btn btn-gold" style={{ flex: 1, justifyContent: "center", padding: "12px 16px", minWidth: 180 }}>
+            {enhancing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />} {enhancing ? "Refinando…" : "🪄 Potenciar con IA"}
+          </button>
+          <button onClick={reset} disabled={busy || enhancing} className="btn" style={{ padding: "12px 16px" }}>
             <RefreshCw size={14} /> Reset
           </button>
         </div>
       </div>
       <div>
-        <Section title="Prompt cinematográfico generado">
+        <Section title={`Output · ${INTENT_LABELS[intent].emoji} ${INTENT_LABELS[intent].label}${enhancedModel === "claude" ? " · ✨ potenciado" : enhancedModel === "fallback" ? " · ⚠ baseline (Claude offline)" : ""}`}>
           <textarea
             value={output}
-            readOnly
-            placeholder="Tu prompt profesional aparecerá aquí. Cópialo y pégalo en la pestaña Generar / Editar / Vídeo."
-            style={{ ...inputStyle, minHeight: 320, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.5 }}
+            onChange={e => setOutput(e.target.value)}
+            placeholder="Tu prompt profesional aparecerá aquí. Es editable: ajusta lo que necesites antes de copiar/guardar."
+            style={{ ...inputStyle, minHeight: 280, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, lineHeight: 1.5 }}
           />
         </Section>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={copy} disabled={!output} className="btn" style={{ flex: 1, justifyContent: "center", padding: "10px 14px" }}>
+        {negativePrompt && (
+          <Section title="🚫 Negative prompt (para Flux/SDXL/Nano Banana)">
+            <textarea
+              value={negativePrompt}
+              onChange={e => setNegativePrompt(e.target.value)}
+              style={{ ...inputStyle, minHeight: 60, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11 }}
+            />
+          </Section>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <button onClick={() => copy(output, "Prompt")} disabled={!output} className="btn" style={{ flex: 1, justifyContent: "center", padding: "10px 14px", minWidth: 130 }}>
             <Copy size={14} /> Copiar prompt
           </button>
+          {negativePrompt && (
+            <button onClick={() => copy(negativePrompt, "Negative")} disabled={!negativePrompt} className="btn" style={{ padding: "10px 14px" }}>
+              <Copy size={14} /> Negative
+            </button>
+          )}
+          <button onClick={saveToLibrary} disabled={!output || savingToLib} className="btn" style={{ padding: "10px 14px" }}>
+            {savingToLib ? <Loader2 size={14} className="animate-spin" /> : <span>💾</span>} Guardar en biblioteca
+          </button>
         </div>
+
+        {/* ─── BIBLIOTECA ─────────────────────────────────────────── */}
+        <div style={{ marginTop: 16, borderRadius: 10, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)" }}>
+          <button
+            onClick={() => setLibraryOpen(o => !o)}
+            style={{ width: "100%", textAlign: "left", padding: "12px 14px", background: "transparent", border: "none", color: "var(--t1)", fontWeight: 600, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+          >
+            <span>📚 Biblioteca de Prompts Pro <span style={{ color: "var(--t3)", fontWeight: 400, fontSize: 12 }}>({filteredLibrary.length})</span></span>
+            <span style={{ color: "var(--t3)" }}>{libraryOpen ? "▾" : "▸"}</span>
+          </button>
+          {libraryOpen && (
+            <div style={{ padding: "0 14px 14px 14px" }}>
+              <select value={libraryFilter} onChange={e => setLibraryFilter(e.target.value as any)} style={{ ...inputStyle, marginBottom: 10 }}>
+                <option value="all">— Todas las plantillas —</option>
+                {(Object.entries(INTENT_LABELS) as Array<[PromptIntent, typeof INTENT_LABELS[PromptIntent]]>).map(([k, v]) => (
+                  <option key={k} value={k}>{v.emoji} {v.label}</option>
+                ))}
+              </select>
+              {libraryLoading && <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>Cargando…</p>}
+              {!libraryLoading && filteredLibrary.length === 0 && (
+                <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>
+                  No hay plantillas para este tipo. Cambia el filtro a "Todas".
+                </p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                {filteredLibrary.map(item => {
+                  const intentMeta = (INTENT_LABELS as any)[item.useCase] as { emoji: string; label: string } | undefined;
+                  return (
+                    <div key={item.id} style={{ padding: 10, borderRadius: 6, background: "var(--ink, #0d0d14)", border: "1px solid var(--bdr, #22222e)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 12, color: "var(--t1)", display: "flex", alignItems: "center", gap: 6 }}>
+                            {item.isSeed && <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: "rgba(200,168,75,0.15)", color: "var(--gold, #fbbf24)" }}>SEED</span>}
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                          </div>
+                          {item.description && (
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2, lineHeight: 1.3 }}>{item.description}</div>
+                          )}
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4 }}>
+                            {intentMeta ? `${intentMeta.emoji} ${intentMeta.label}` : item.useCase}
+                            {typeof item.useCount === "number" && item.useCount > 0 && ` · usado ${item.useCount}×`}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <button onClick={() => loadFromLibrary(item)} className="btn" style={{ padding: "4px 8px", fontSize: 11 }} title="Cargar al editor">
+                            📥
+                          </button>
+                          {!item.isSeed && (
+                            <button onClick={() => deleteFromLibrary(item)} className="btn" style={{ padding: "4px 8px", fontSize: 11 }} title="Eliminar">
+                              🗑
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--ink2, #14141d)", border: "1px solid var(--bdr, #22222e)", fontSize: 11, color: "var(--t3, #6c6c7c)", lineHeight: 1.5 }}>
-          <strong style={{ color: "var(--gold, #fbbf24)" }}>💡 Tip:</strong> combina <em>lente + iluminación + paleta + mood</em> para fotos editoriales.
-          Para vídeo, añade <em>movimiento de cámara + transición</em>. Sin elecciones devuelve un baseline cinematográfico.
+          <strong style={{ color: "var(--gold, #fbbf24)" }}>💡 Flujo recomendado:</strong> 1) Escoge tipo y describe el sujeto. 2) (Visual) Combina presets y "Construir baseline". 3) Pulsa <em>🪄 Potenciar con IA</em> para refinarlo. 4) Edita el output. 5) <em>💾 Guardar en biblioteca</em> si te gusta para reutilizarlo.
         </div>
       </div>
     </div>

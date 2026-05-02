@@ -25,6 +25,10 @@ import {
 } from "../lib/fusion-studio-pro.js";
 import { getAllProvidersHealth, invalidateProviderHealthCache, type ProviderId } from "../lib/provider-health.js";
 import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../lib/prompt-templates.js";
+import { enhancePrompt, type EnhanceIntent } from "../lib/prompt-enhance.js";
+import { ensureSeedsExist, PROMPT_LIBRARY_SEEDS } from "../lib/prompt-library-seeds.js";
+import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
+import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
 import {
   generateCinematicMultiShot,
@@ -263,6 +267,173 @@ router.post("/fs-pro/providers/refresh-cache", requireAdmin, async (_req, res) =
 // GET /api/fs-pro/prompt/catalog → presets disponibles (style, lens, lighting...)
 router.get("/fs-pro/prompt/catalog", requireAdmin, (_req, res) => {
   res.json(getPromptCatalog());
+});
+
+// POST /api/fs-pro/prompt/enhance → toma el baseline y lo refina con Claude
+//   según el intent (ad / image / video / infographic / email / landing / seo /
+//   brand / ugc / multishot). Devuelve { enhanced, negativePrompt, breakdown,
+//   intent, model }. Si Claude falla, devuelve el baseline.
+router.post("/fs-pro/prompt/enhance", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body as Partial<{
+      intent: EnhanceIntent;
+      baselinePrompt: string;
+      subject: string;
+      brand: string | null;
+      language: "es" | "en";
+      extraContext: string;
+      projectId: number;
+    }>;
+    if (!body || typeof body.subject !== "string" || body.subject.trim().length < 3) {
+      res.status(400).json({ error: "subject (min 3 chars) requerido" });
+      return;
+    }
+    if (!body.baselinePrompt || typeof body.baselinePrompt !== "string") {
+      res.status(400).json({ error: "baselinePrompt requerido (usa /prompt/build primero)" });
+      return;
+    }
+    const ALLOWED_INTENTS: EnhanceIntent[] = [
+      "ad_cinematic", "image_hero_product", "ad_copy_meta", "infographic_html",
+      "seo_product_100", "brand_kit_ocr", "email_marketing", "landing_hero",
+      "ugc_video", "multishot_director", "image", "video",
+    ];
+    const intent: EnhanceIntent = ALLOWED_INTENTS.includes(body.intent as EnhanceIntent) ? body.intent! : "image";
+
+    const result = await enhancePrompt({
+      intent,
+      baselinePrompt: String(body.baselinePrompt).slice(0, 8000),
+      subject: String(body.subject).trim().slice(0, 1500),
+      brand: body.brand ? String(body.brand).trim().slice(0, 120) : null,
+      language: body.language === "en" ? "en" : "es",
+      extraContext: body.extraContext ? String(body.extraContext).slice(0, 1500) : undefined,
+      projectId: typeof body.projectId === "number" ? body.projectId : 0,
+    });
+    res.json({ ok: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt enhance failed" });
+  }
+});
+
+// ─── PROMPT LIBRARY (biblioteca persistente de plantillas reutilizables) ──
+// GET /api/fs-pro/prompt-library?useCase=...  → lista (auto-seed si vacía)
+router.get("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
+  try {
+    await ensureSeedsExist();
+    const useCase = typeof req.query.useCase === "string" ? req.query.useCase : null;
+    let rows;
+    if (useCase) {
+      rows = await _dbForLibrary
+        .select()
+        .from(omnicorePromptLibraryTable)
+        .where(_eqLib(omnicorePromptLibraryTable.useCase, useCase))
+        .orderBy(_descLib(omnicorePromptLibraryTable.useCount), _descLib(omnicorePromptLibraryTable.avgQualityScore));
+    } else {
+      rows = await _dbForLibrary
+        .select()
+        .from(omnicorePromptLibraryTable)
+        .orderBy(_descLib(omnicorePromptLibraryTable.useCount), _descLib(omnicorePromptLibraryTable.avgQualityScore));
+    }
+    // Parse promptTemplate (we stored seeds as { systemPrompt, userTemplate })
+    // and variables as JSON array. Be defensive against legacy rows that stored
+    // the prompt as a raw string.
+    const items = rows.map(r => {
+      let template: any = r.promptTemplate;
+      try {
+        const parsed = JSON.parse(String(r.promptTemplate));
+        if (parsed && typeof parsed === "object") template = parsed;
+      } catch { /* keep as string */ }
+      let vars: any = [];
+      try { vars = r.variables ? JSON.parse(r.variables) : []; } catch { /* keep [] */ }
+      return {
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        useCase: r.useCase,
+        niche: r.niche,
+        promptTemplate: template,
+        variables: vars,
+        avgQualityScore: r.avgQualityScore,
+        useCount: r.useCount,
+        createdBy: r.createdBy,
+        isPublic: r.isPublic,
+        isSeed: typeof r.id === "string" && r.id.startsWith("seed:"),
+      };
+    });
+    res.json({ ok: true, items, total: items.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt-library list failed" });
+  }
+});
+
+// POST /api/fs-pro/prompt-library  → crear plantilla custom del usuario
+router.post("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
+  try {
+    const { name, description, useCase, niche, systemPrompt, userTemplate, variables } = req.body as Record<string, any>;
+    if (!name || typeof name !== "string" || name.trim().length < 3) {
+      res.status(400).json({ error: "name (min 3 chars) requerido" }); return;
+    }
+    if (!userTemplate || typeof userTemplate !== "string" || userTemplate.trim().length < 10) {
+      res.status(400).json({ error: "userTemplate (min 10 chars) requerido" }); return;
+    }
+    const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await _dbForLibrary.insert(omnicorePromptLibraryTable).values({
+      id,
+      name: String(name).trim().slice(0, 200),
+      description: description ? String(description).slice(0, 500) : null,
+      niche: niche ? String(niche).slice(0, 80) : null,
+      useCase: useCase ? String(useCase).slice(0, 80) : "user_custom",
+      promptTemplate: JSON.stringify({
+        systemPrompt: systemPrompt ? String(systemPrompt).slice(0, 8000) : "",
+        userTemplate: String(userTemplate).slice(0, 12000),
+      }),
+      variables: Array.isArray(variables) ? JSON.stringify(variables.slice(0, 30).map(String)) : "[]",
+      avgQualityScore: 0.5,
+      useCount: 0,
+      createdBy: ((req as any).session?.userId ? `user:${(req as any).session.userId}` : "user:unknown"),
+      isPublic: 1,
+    });
+    res.json({ ok: true, id });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt-library create failed" });
+  }
+});
+
+// DELETE /api/fs-pro/prompt-library/:id  → solo plantillas user-* (no seeds)
+router.delete("/fs-pro/prompt-library/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    if (id.startsWith("seed:")) {
+      res.status(403).json({ error: "Las plantillas pre-cargadas (seeds) no se pueden eliminar." }); return;
+    }
+    await _dbForLibrary.delete(omnicorePromptLibraryTable).where(_eqLib(omnicorePromptLibraryTable.id, id));
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt-library delete failed" });
+  }
+});
+
+// POST /api/fs-pro/prompt-library/:id/use  → incrementa contador de uso
+router.post("/fs-pro/prompt-library/:id/use", requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    await _dbForLibrary.update(omnicorePromptLibraryTable)
+      .set({ useCount: _sqlLib`COALESCE(${omnicorePromptLibraryTable.useCount}, 0) + 1` })
+      .where(_eqLib(omnicorePromptLibraryTable.id, id));
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt-library use failed" });
+  }
+});
+
+// POST /api/fs-pro/prompt-library/seed  → fuerza re-sembrado (idempotente)
+router.post("/fs-pro/prompt-library/seed", requireAdmin, async (_req, res) => {
+  try {
+    const { seedPromptLibrary } = await import("../lib/prompt-library-seeds.js");
+    const r = await seedPromptLibrary();
+    res.json({ ok: true, ...r, availableSeeds: PROMPT_LIBRARY_SEEDS.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "prompt-library seed failed" });
+  }
 });
 
 // POST /api/fs-pro/prompt/build → combina presets en un prompt cinematográfico
