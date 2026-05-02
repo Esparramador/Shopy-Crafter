@@ -30,6 +30,17 @@ A centralized model registry allows administrators to change which Claude/Gemini
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, and Gallery features.
 
+### Cinematic Ad Templates Library (May 2026)
+A permanent in-platform library of 5 master cinematic ad templates inspired by Pollo/Kling/Seedance grammar (Anatomía 4×5s, Deconstrucción 1×5s, Construcción 1×5s, Exploded View 2×5s, Apple-Porsche 3×5s) lives at `artifacts/api-server/src/lib/cinematic-ad-templates.ts`. Each template is a structured object with `segments[]`, `masterConfig` (recommendedVideoModel, recommendedImageModel, motionScore, negativePrompt, styleTag, defaultAspect) and a `variables[]` declaration ({{PRODUCT_NAME}}, {{BRAND}}, {{PRODUCT_MATERIALS}}, {{PRODUCT_COLORS}}, {{INDUSTRY}}). Templates persist in `omnicore_prompt_library` (useCase=`cinematic_ad_template`) so the platform owns them as durable knowledge.
+
+REST surface (admin): `GET /api/fs-pro/cinematic-templates` (catalog), `GET /api/fs-pro/cinematic-templates/:id` (detail), `POST /api/fs-pro/cinematic-templates/:id/compose` (substitutes variables and returns a `cinematicScriptForRenderer` directly compatible with the existing `presetScript` field of `POST /api/fs-pro/cinematic-multishot`).
+
+UI: a new tab `cinematic-templates` in Fusion Studio Pro renders the catalog + detail + product-data form + composed-script preview + real render launcher (reuses the existing multishot endpoint passing the composed script as `presetScript`, skipping Claude script generation entirely).
+
+Engine integration in `cinematic-multishot.ts`: when a `presetScript` is supplied, the engine now derives `scenesCount`/`sceneDurations`/`totalDurationSec` directly from `script.scenes[].timeStartSec/timeEndSec` (clamp 3..10s/scene) instead of forcing MIN_SCENES=2/MIN_DURATION=6 — this is what makes 1×5s templates renderable. The `CinematicScript` type carries an optional `negativePrompt` field that is passed to `generateImage()` for every keyframe (both locked-shot and parallel paths). `composeCinematicScript()` validates `recommendedVideoModel` against the canonical `VideoModel` whitelist and falls back to `kling-2.1` if a stale provider modelId is encountered.
+
+Persistence safety: `seedCinematicAdTemplates()` swallows duplicate-key errors for race-safe concurrent calls; `ensureCinematicAdTemplatesExist()` performs a self-healing UPDATE pass that re-serializes the in-code template payload and overwrites stale rows on every call (auto-migration without manual scripts).
+
 ### Report Generation & Vault System
 Reports follow a "PRODUCE, NOT RECOMMEND" philosophy, delivering complete, ready-to-use content with Claude-powered professional recommendations. A centralized "Bóveda Global" stores reports, images, and research. Reports are stored as JSON metadata and rendered through `buildBrandedHtmlFromMetadata()` for consistent branded output. Template Studio allows visual editing of custom report templates.
 

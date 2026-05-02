@@ -27,6 +27,14 @@ import { getAllProvidersHealth, invalidateProviderHealthCache, type ProviderId }
 import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../lib/prompt-templates.js";
 import { enhancePrompt, type EnhanceIntent } from "../lib/prompt-enhance.js";
 import { ensureSeedsExist, PROMPT_LIBRARY_SEEDS } from "../lib/prompt-library-seeds.js";
+import {
+  ensureCinematicAdTemplatesExist,
+  loadCinematicTemplate,
+  composeCinematicScript,
+  CINEMATIC_AD_TEMPLATES,
+  seedCinematicAdTemplates,
+  type ComposeVariables,
+} from "../lib/cinematic-ad-templates.js";
 import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
@@ -319,6 +327,7 @@ router.post("/fs-pro/prompt/enhance", requireAdmin, async (req, res) => {
 router.get("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
   try {
     await ensureSeedsExist();
+    await ensureCinematicAdTemplatesExist();
     const useCase = typeof req.query.useCase === "string" ? req.query.useCase : null;
     let rows;
     if (useCase) {
@@ -430,9 +439,100 @@ router.post("/fs-pro/prompt-library/seed", requireAdmin, async (_req, res) => {
   try {
     const { seedPromptLibrary } = await import("../lib/prompt-library-seeds.js");
     const r = await seedPromptLibrary();
-    res.json({ ok: true, ...r, availableSeeds: PROMPT_LIBRARY_SEEDS.length });
+    const c = await seedCinematicAdTemplates();
+    res.json({
+      ok: true,
+      promptLibrary: r,
+      cinematicTemplates: c,
+      availableSeeds: PROMPT_LIBRARY_SEEDS.length + CINEMATIC_AD_TEMPLATES.length,
+    });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "prompt-library seed failed" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CINEMATIC AD TEMPLATES — Plantillas multi-segmento "Masterpiece"
+// (Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET /api/fs-pro/cinematic-templates → catálogo visual de templates cinematográficos
+router.get("/fs-pro/cinematic-templates", requireAdmin, async (_req, res) => {
+  try {
+    await ensureCinematicAdTemplatesExist();
+    const items = CINEMATIC_AD_TEMPLATES.map(t => ({
+      id: t.id,
+      category: t.category,
+      name: t.name,
+      shortDescription: t.shortDescription,
+      longDescription: t.longDescription,
+      conceptName: t.conceptName,
+      totalDurationSec: t.totalDurationSec,
+      segmentsCount: t.segments.length,
+      inspirationReference: t.inspirationReference,
+      estimatedCreditsHint: t.estimatedCreditsHint,
+      masterConfig: t.masterConfig,
+      variables: t.variables,
+      segmentsPreview: t.segments.map(s => ({
+        idx: s.idx,
+        name: s.name,
+        startSec: s.startSec,
+        endSec: s.endSec,
+        effectDescription: s.effectDescription,
+        screenText: s.screenText,
+        audioCue: s.audioCue,
+      })),
+    }));
+    res.json({ ok: true, items, total: items.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cinematic-templates list failed" });
+  }
+});
+
+// GET /api/fs-pro/cinematic-templates/:id → detalle completo (incluye prompts crudos)
+router.get("/fs-pro/cinematic-templates/:id", requireAdmin, async (req, res) => {
+  try {
+    const tpl = await loadCinematicTemplate(String(req.params.id));
+    if (!tpl) { res.status(404).json({ error: "Template no encontrado" }); return; }
+    res.json({ ok: true, template: tpl });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cinematic-templates detail failed" });
+  }
+});
+
+// POST /api/fs-pro/cinematic-templates/:id/compose
+//   body: { productName, brand, productMaterials?, productColors?, industry?, aspect? }
+//   → devuelve { composed } con todos los placeholders sustituidos por datos reales,
+//   listo para previsualizar en UI o pasar como `presetScript` a /cinematic-multishot.
+router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req, res) => {
+  try {
+    const tpl = await loadCinematicTemplate(String(req.params.id));
+    if (!tpl) { res.status(404).json({ error: "Template no encontrado" }); return; }
+    const {
+      productName, brand, productMaterials, productColors, industry, aspect,
+    } = (req.body || {}) as Partial<ComposeVariables> & { aspect?: "9:16" | "16:9" | "1:1" };
+    if (!productName || String(productName).trim().length < 2) {
+      res.status(400).json({ error: "productName requerido (mín 2 caracteres)" });
+      return;
+    }
+    if (!brand || String(brand).trim().length < 2) {
+      res.status(400).json({ error: "brand requerido (mín 2 caracteres)" });
+      return;
+    }
+    const composed = composeCinematicScript(
+      tpl,
+      {
+        productName: String(productName).trim().slice(0, 200),
+        brand: String(brand).trim().slice(0, 120),
+        productMaterials: productMaterials ? String(productMaterials).trim().slice(0, 300) : undefined,
+        productColors: productColors ? String(productColors).trim().slice(0, 200) : undefined,
+        industry: industry ? String(industry).trim().slice(0, 120) : undefined,
+      },
+      { aspect: aspect && ["9:16", "16:9", "1:1"].includes(aspect) ? aspect : undefined },
+    );
+    res.json({ ok: true, composed });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cinematic-templates compose failed" });
   }
 });
 

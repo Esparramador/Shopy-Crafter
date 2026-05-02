@@ -5,7 +5,7 @@ import { LiveOperation } from "@/components/LiveOperation";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "downloads";
 
 type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
@@ -133,6 +133,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
   { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts cinematográficos estilo pollo.ai con presets" },
+  { id: "cinematic-templates", label: "Cinematic Templates", icon: <Film size={15} />, desc: "Plantillas masterpiece: Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
 
@@ -238,6 +239,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "promptlab"  && <PromptLabTab onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
+        {tab === "cinematic-templates" && <CinematicTemplatesTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Anuncio cinematográfico generado y guardado en Vault", true); }} onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "downloads"  && <DownloadsTab projectId={projectId} sessionItems={sessionItems} onError={(m) => showToast(m, false)} />}
       </div>
     </div>
@@ -2722,6 +2724,510 @@ function UploadConcatTab({
           <div style={{ marginTop: 12 }}>
             <video src={resultUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000" }} />
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB: CINEMATIC TEMPLATES — Plantillas masterpiece multi-segmento
+// (Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche)
+// ═══════════════════════════════════════════════════════════════════════════
+interface CinematicTplListItem {
+  id: string;
+  category: "anatomy" | "deconstruction" | "construction" | "exploded_view" | "apple_porsche";
+  name: string;
+  shortDescription: string;
+  longDescription: string;
+  conceptName: string;
+  totalDurationSec: number;
+  segmentsCount: number;
+  inspirationReference?: string;
+  estimatedCreditsHint?: number;
+  masterConfig: {
+    recommendedVideoModel: string;
+    recommendedImageModel: string;
+    defaultAspect: "9:16" | "16:9" | "1:1";
+    motionScore: number;
+    negativePrompt: string;
+    styleTag: string;
+  };
+  variables: string[];
+  segmentsPreview: Array<{
+    idx: number;
+    name: string;
+    startSec: number;
+    endSec: number;
+    effectDescription: string;
+    screenText: string;
+    audioCue: string;
+  }>;
+}
+
+interface ComposedScript {
+  templateId: string;
+  templateName: string;
+  conceptName: string;
+  totalDurationSec: number;
+  aspect: "9:16" | "16:9" | "1:1";
+  recommendedVideoModel: string;
+  recommendedImageModel: string;
+  motionScore: number;
+  negativePrompt: string;
+  styleTag: string;
+  segments: Array<{
+    idx: number;
+    name: string;
+    startSec: number;
+    endSec: number;
+    effectDescription: string;
+    keyframePrompt: string;
+    videoPrompt: string;
+    screenText: string;
+    audioCue: string;
+  }>;
+  cinematicScriptForRenderer: any;
+}
+
+const CINEMATIC_CATEGORY_BADGE: Record<CinematicTplListItem["category"], { label: string; color: string }> = {
+  anatomy:        { label: "Anatomía",        color: "#c8a84b" },
+  deconstruction: { label: "Deconstrucción",  color: "#e2664f" },
+  construction:   { label: "Construcción",    color: "#4fa3e2" },
+  exploded_view:  { label: "Exploded View",   color: "#7e6dd6" },
+  apple_porsche:  { label: "Apple/Porsche",   color: "#9aa0a6" },
+};
+
+function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCreditError }: {
+  projectId: number;
+  onSuccess: (it: VaultItem) => void;
+  onInfo: (m: string) => void;
+  onError: (m: string) => void;
+  onCreditError?: () => void;
+}) {
+  const [templates, setTemplates] = useState<CinematicTplListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string>("");
+
+  // Variables del producto
+  const [productName, setProductName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [productMaterials, setProductMaterials] = useState("");
+  const [productColors, setProductColors] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
+
+  // Composición / render
+  const [composing, setComposing] = useState(false);
+  const [composed, setComposed] = useState<ComposedScript | null>(null);
+  const [productFile, setProductFile] = useState<File | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderResult, setRenderResult] = useState<{ vaultId: number; durationSec: number; scenesCount: number } | null>(null);
+
+  const selected = useMemo(() => templates.find(t => t.id === selectedId) || null, [templates, selectedId]);
+
+  // Carga inicial del catálogo
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-templates`, { credentials: "include" });
+        const d = await r.json();
+        if (!r.ok) { onError(d.error || `Error ${r.status}`); return; }
+        if (!cancelled) {
+          setTemplates(d.items || []);
+          if (!selectedId && d.items?.length) {
+            setSelectedId(d.items[0].id);
+            setAspect(d.items[0].masterConfig.defaultAspect);
+          }
+        }
+      } catch (e: any) {
+        if (!cancelled) onError(e?.message || "No se pudo cargar el catálogo de plantillas");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cuando el usuario cambia de template, ajusta el aspect por defecto y limpia composición
+  useEffect(() => {
+    if (selected) {
+      setAspect(selected.masterConfig.defaultAspect);
+      setComposed(null);
+      setRenderResult(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const compose = async () => {
+    if (!selected) { onError("Selecciona una plantilla primero"); return; }
+    if (productName.trim().length < 2) { onError("Nombre del producto requerido (mín 2 caracteres)"); return; }
+    if (brand.trim().length < 2) { onError("Marca requerida (mín 2 caracteres)"); return; }
+    setComposing(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-templates/${encodeURIComponent(selected.id)}/compose`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: productName.trim(),
+          brand: brand.trim(),
+          productMaterials: productMaterials.trim() || undefined,
+          productColors: productColors.trim() || undefined,
+          industry: industry.trim() || undefined,
+          aspect,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) { onError(d.error || `Error ${r.status}`); return; }
+      setComposed(d.composed);
+      setRenderResult(null);
+      onInfo(`Guion compuesto: "${d.composed.conceptName}" — ${d.composed.segments.length} segmentos · ${d.composed.totalDurationSec}s`);
+    } catch (e: any) {
+      onError(e?.message || "Error componiendo el guion");
+    } finally {
+      setComposing(false);
+    }
+  };
+
+  const launchRender = async () => {
+    if (!composed) { onError("Componer el guion primero"); return; }
+    if (!selected) return;
+    if (!productFile) { onError("Sube una imagen del producto para renderizar"); return; }
+    const credits = selected.estimatedCreditsHint ?? (2 + composed.segments.length * 3);
+    const ok = window.confirm(
+      `Vas a generar un anuncio cinematográfico real:\n\n` +
+      `• Plantilla: ${selected.name}\n` +
+      `• Producto: ${productName} (${brand})\n` +
+      `• Duración: ${composed.totalDurationSec}s · ${composed.segments.length} segmentos\n` +
+      `• Modelo: ${composed.recommendedVideoModel}\n` +
+      `• Coste estimado: ${credits} créditos\n\n` +
+      `¿Continuar?`,
+    );
+    if (!ok) return;
+    setRendering(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("brand", brand.trim());
+      fd.append("productName", productName.trim());
+      fd.append("language", "es");
+      fd.append("scenesCount", String(composed.segments.length));
+      fd.append("totalDurationSec", String(composed.totalDurationSec));
+      fd.append("aspect", composed.aspect);
+      fd.append("videoModel", composed.recommendedVideoModel);
+      fd.append("imageModel", composed.recommendedImageModel);
+      fd.append("style", composed.styleTag);
+      if (industry.trim()) fd.append("niche", industry.trim());
+      fd.append("narrationEnabled", "false");
+      fd.append("musicEnabled", "false");
+      fd.append("product", productFile);
+      // Pasamos el guion compuesto como presetScript — el motor saltará la generación con Claude
+      fd.append("script", JSON.stringify(composed.cinematicScriptForRenderer));
+      const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-multishot`, {
+        method: "POST", credentials: "include", body: fd,
+      });
+      const d = await r.json();
+      if (r.status === 402) { onCreditError?.(); onError(d.error || "Sin créditos suficientes"); return; }
+      if (!r.ok) { onError(d.error || `Error ${r.status}`); return; }
+      setRenderResult({ vaultId: d.vaultId, durationSec: d.durationSec, scenesCount: d.scenesCount });
+      onSuccess({
+        vaultId: d.vaultId,
+        type: "fs-pro-multishot",
+        label: `Cinematic: ${productName}`,
+        mimeType: "video/mp4",
+      } as VaultItem);
+    } catch (e: any) {
+      onError(e?.message || "Error generando el anuncio cinematográfico");
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "var(--t3)" }}>
+        <Loader2 size={20} className="animate-spin" style={{ marginBottom: 8 }} />
+        <div>Cargando biblioteca de plantillas cinematográficas…</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
+      {/* ─── COLUMNA IZQUIERDA: Catálogo de templates ─── */}
+      <div>
+        <Section title="🎬 Biblioteca de plantillas">
+          <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 0, marginBottom: 12, lineHeight: 1.5 }}>
+            Plantillas cinematográficas profesionales (estilo Pollo / Kling / Seedance) que la plataforma usa
+            como conocimiento permanente. Cada una rellena las variables con datos reales del producto.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {templates.map(t => {
+              const badge = CINEMATIC_CATEGORY_BADGE[t.category];
+              const isActive = t.id === selectedId;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedId(t.id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: isActive
+                      ? "linear-gradient(135deg, rgba(200,168,75,0.18), rgba(200,168,75,0.05))"
+                      : "var(--ink2, #14141d)",
+                    border: isActive
+                      ? "1px solid rgba(200,168,75,0.45)"
+                      : "1px solid var(--bdr, #22222e)",
+                    color: "var(--t1, #fff)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    transition: "all 0.15s ease",
+                  }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: `${badge.color}22`, color: badge.color, textTransform: "uppercase", letterSpacing: 0.4,
+                    }}>{badge.label}</span>
+                    <span style={{
+                      fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                      background: "var(--ink, #0a0a14)", color: "var(--t3)",
+                    }}>{t.totalDurationSec}s · {t.segmentsCount} seg</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--t3, #6c6c7c)", lineHeight: 1.4 }}>
+                    {t.shortDescription}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+      </div>
+
+      {/* ─── COLUMNA DERECHA: Detalle + form + preview + render ─── */}
+      <div>
+        {!selected ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--t3)" }}>
+            Selecciona una plantilla para verla en detalle
+          </div>
+        ) : (
+          <>
+            <Section title={`✨ ${selected.conceptName}`}>
+              <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.6, marginTop: 0 }}>
+                {selected.longDescription}
+              </p>
+              {selected.inspirationReference && (
+                <div style={{ fontSize: 11, color: "var(--gold, #c8a84b)", fontStyle: "italic", marginTop: 8 }}>
+                  Inspiración: {selected.inspirationReference}
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 12, fontSize: 11 }}>
+                <div style={{ padding: 8, background: "var(--ink2)", borderRadius: 6, border: "1px solid var(--bdr)" }}>
+                  <div style={{ color: "var(--t3)", fontSize: 10, marginBottom: 2 }}>Modelo IA</div>
+                  <div style={{ fontWeight: 700 }}>{selected.masterConfig.recommendedVideoModel}</div>
+                </div>
+                <div style={{ padding: 8, background: "var(--ink2)", borderRadius: 6, border: "1px solid var(--bdr)" }}>
+                  <div style={{ color: "var(--t3)", fontSize: 10, marginBottom: 2 }}>Aspecto</div>
+                  <div style={{ fontWeight: 700 }}>{selected.masterConfig.defaultAspect}</div>
+                </div>
+                <div style={{ padding: 8, background: "var(--ink2)", borderRadius: 6, border: "1px solid var(--bdr)" }}>
+                  <div style={{ color: "var(--t3)", fontSize: 10, marginBottom: 2 }}>Motion score</div>
+                  <div style={{ fontWeight: 700 }}>{selected.masterConfig.motionScore}/10</div>
+                </div>
+                <div style={{ padding: 8, background: "var(--ink2)", borderRadius: 6, border: "1px solid var(--bdr)" }}>
+                  <div style={{ color: "var(--t3)", fontSize: 10, marginBottom: 2 }}>Coste estimado</div>
+                  <div style={{ fontWeight: 700, color: "var(--gold)" }}>~{selected.estimatedCreditsHint ?? 8} créd.</div>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="🧬 Estructura de segmentos (sin rellenar)">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {selected.segmentsPreview.map(seg => (
+                  <div key={seg.idx} style={{
+                    padding: 10, background: "var(--ink2)", borderRadius: 8,
+                    border: "1px solid var(--bdr)", fontSize: 12,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                      <strong style={{ color: "var(--gold)" }}>Segmento {seg.idx}: {seg.name}</strong>
+                      <span style={{ fontSize: 10, color: "var(--t3)" }}>{seg.startSec}s → {seg.endSec}s</span>
+                    </div>
+                    <div style={{ color: "var(--t2)", marginBottom: 4 }}>{seg.effectDescription}</div>
+                    {seg.screenText && (
+                      <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>
+                        <strong>Texto en pantalla:</strong> {seg.screenText}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>
+                      <strong>Audio:</strong> {seg.audioCue}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="📦 Datos del producto (variables a rellenar)">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Producto *</label>
+                  <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
+                    placeholder="Ej. Day-Date 40mm KAWS Edition"
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Marca *</label>
+                  <input type="text" value={brand} onChange={e => setBrand(e.target.value)}
+                    placeholder="Ej. Rolex"
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Materiales</label>
+                  <input type="text" value={productMaterials} onChange={e => setProductMaterials(e.target.value)}
+                    placeholder="Ej. 18kt yellow gold, ceramic, sapphire crystal"
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Colores</label>
+                  <input type="text" value={productColors} onChange={e => setProductColors(e.target.value)}
+                    placeholder="Ej. champagne gold, deep black, ivory white"
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Industria / Contexto</label>
+                  <input type="text" value={industry} onChange={e => setIndustry(e.target.value)}
+                    placeholder="Ej. luxury watchmaking, executive lifestyle"
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Aspecto</label>
+                  <select value={aspect} onChange={e => setAspect(e.target.value as any)} style={inputStyle}>
+                    <option value="9:16">9:16 (vertical · Reels/TikTok)</option>
+                    <option value="16:9">16:9 (cinematográfico)</option>
+                    <option value="1:1">1:1 (cuadrado · feed)</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={compose}
+                disabled={composing}
+                className="btn btn-gold"
+                style={{ width: "100%", justifyContent: "center", marginTop: 12, padding: "10px 18px" }}>
+                {composing ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                {composing ? "Componiendo guion…" : "Componer guion con datos del producto"}
+              </button>
+            </Section>
+
+            {composed && (
+              <Section title={`🎯 Guion compuesto: "${composed.conceptName}"`}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {composed.segments.map(seg => (
+                    <div key={seg.idx} style={{
+                      padding: 12, background: "var(--ink2)", borderRadius: 8,
+                      border: "1px solid var(--bdr)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                        <strong style={{ color: "var(--gold)", fontSize: 13 }}>
+                          Segmento {seg.idx}: {seg.name}
+                        </strong>
+                        <span style={{ fontSize: 10, color: "var(--t3)" }}>{seg.startSec}s → {seg.endSec}s</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 6 }}>
+                        <strong style={{ color: "var(--t2)" }}>Keyframe prompt (image model):</strong>
+                        <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 10, lineHeight: 1.5,
+                          padding: 8, background: "var(--ink, #0a0a14)", borderRadius: 4, color: "var(--t1)",
+                        }}>{seg.keyframePrompt}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 6 }}>
+                        <strong style={{ color: "var(--t2)" }}>Video prompt (motion model):</strong>
+                        <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 10, lineHeight: 1.5,
+                          padding: 8, background: "var(--ink, #0a0a14)", borderRadius: 4, color: "var(--t1)",
+                        }}>{seg.videoPrompt}</div>
+                      </div>
+                      {seg.screenText && (
+                        <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>
+                          <strong style={{ color: "var(--t2)" }}>Texto en pantalla:</strong> {seg.screenText}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "var(--t3)" }}>
+                        <strong style={{ color: "var(--t2)" }}>Audio:</strong> {seg.audioCue}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, padding: 10, background: "var(--ink2)", borderRadius: 8,
+                  border: "1px solid var(--bdr)", fontSize: 11, color: "var(--t3)",
+                }}>
+                  <strong style={{ color: "var(--t2)" }}>Negative prompt (aplicado a cada keyframe):</strong>
+                  <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 10, lineHeight: 1.5 }}>
+                    {composed.negativePrompt}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 10, color: "var(--t3)", fontStyle: "italic" }}>
+                    Nota: motionScore y audioCue del template son orientativos (sound design y
+                    motion strength se gestionan por modelo). El render real respetará la estructura
+                    de segmentos, los prompts compuestos y este negative prompt.
+                  </div>
+                </div>
+              </Section>
+            )}
+
+            {composed && (
+              <Section title="🎬 Lanzar generación real">
+                <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 0, lineHeight: 1.5, marginBottom: 10 }}>
+                  Sube la imagen del producto y lanza la generación. El motor usará el guion compuesto
+                  directamente (sin pasar por Claude para escribir prompts) y producirá un MP4 final
+                  guardado en la bóveda del proyecto.
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setProductFile(e.target.files?.[0] || null)}
+                  style={{ marginBottom: 10, color: "var(--t2)" }}
+                />
+                {productFile && (
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10 }}>
+                    Imagen lista: <strong>{productFile.name}</strong> ({(productFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+                <button
+                  onClick={launchRender}
+                  disabled={rendering || !productFile}
+                  className="btn btn-gold"
+                  style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+                  {rendering ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}
+                  {rendering
+                    ? "Generando anuncio cinematográfico…"
+                    : `Generar anuncio (~${selected.estimatedCreditsHint ?? (2 + composed.segments.length * 3)} créditos)`}
+                </button>
+                <LiveOperation
+                  active={rendering}
+                  title={`Generando "${composed.conceptName}"`}
+                  estimatedSec={Math.max(60, composed.segments.length * 35)}
+                  messages={[
+                    "Generando keyframes con el modelo de imagen…",
+                    "Animando cada segmento con el modelo de vídeo…",
+                    "Concatenando los clips con cross-fade cinematográfico…",
+                    "Aplicando negative prompt del template a cada keyframe…",
+                    "Subiendo MP4 final a la bóveda del proyecto…",
+                  ]}
+                />
+                {renderResult && (
+                  <div style={{ marginTop: 12, padding: 12, background: "rgba(200,168,75,0.10)",
+                    border: "1px solid rgba(200,168,75,0.35)", borderRadius: 8, fontSize: 12,
+                  }}>
+                    <CheckCircle2 size={14} style={{ color: "var(--gold)", marginRight: 6, verticalAlign: "middle" }} />
+                    Anuncio generado: <strong>{renderResult.scenesCount} segmentos · {renderResult.durationSec}s</strong>
+                    {" "}· Vault #{renderResult.vaultId}
+                  </div>
+                )}
+              </Section>
+            )}
+          </>
         )}
       </div>
     </div>

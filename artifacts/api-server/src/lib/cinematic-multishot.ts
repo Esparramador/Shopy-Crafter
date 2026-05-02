@@ -46,6 +46,8 @@ export interface CinematicScript {
   cta: string;
   closingLine: string;
   scenes: CinematicScene[];
+  /** OPTIONAL: when set, applied to every per-scene image generation. */
+  negativePrompt?: string;
 }
 
 export interface CinematicMultiShotRequest {
@@ -604,9 +606,25 @@ export async function generateCinematicMultiShot(
     savedPromptId?: string;
   },
 ): Promise<CinematicMultiShotResult & { savedPromptId: string }> {
-  const totalSec = clampDuration(req.totalDurationSec);
-  const scenesCount = clampScenesCount(req.scenesCount, totalSec);
-  const sceneDurations = distributeSceneDurations(totalSec, scenesCount);
+  // ── Derive scene/duration shape:
+  //    • If presetScript is provided, RESPECT its segment shape (1 scene/5s
+  //      templates must work; do NOT clamp to MIN_SCENES/MIN_DURATION).
+  //    • Otherwise clamp to engine defaults.
+  let totalSec: number;
+  let scenesCount: number;
+  let sceneDurations: number[];
+  if (req.presetScript && Array.isArray(req.presetScript.scenes) && req.presetScript.scenes.length > 0) {
+    scenesCount = req.presetScript.scenes.length;
+    sceneDurations = req.presetScript.scenes.map(s => {
+      const d = Math.round((s.timeEndSec ?? 0) - (s.timeStartSec ?? 0));
+      return Math.min(Math.max(d || 5, 3), 10);
+    });
+    totalSec = sceneDurations.reduce((a, b) => a + b, 0);
+  } else {
+    totalSec = clampDuration(req.totalDurationSec);
+    scenesCount = clampScenesCount(req.scenesCount, totalSec);
+    sceneDurations = distributeSceneDurations(totalSec, scenesCount);
+  }
   const imageModel: ImageGenModel = req.imageModel || "nano-banana";
   const { width, height } = ratioToWH(req.aspect);
   const cameraPreset = pickCameraPreset(req.style);
@@ -741,6 +759,7 @@ export async function generateCinematicMultiShot(
             referenceImage: req.productImage,
             referenceMime: req.productMime,
             extraReferences: characterRefExtras,
+            negativePrompt: script.negativePrompt,
           }),
           2,
           `keyframe scene ${scene.idx} (locked-shot)`,
@@ -786,6 +805,7 @@ export async function generateCinematicMultiShot(
             referenceImage: req.productImage,
             referenceMime: req.productMime,
             extraReferences: characterRefExtras,
+            negativePrompt: script.negativePrompt,
           }),
           2,
           `keyframe scene ${scene.idx}`,
