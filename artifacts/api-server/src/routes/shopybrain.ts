@@ -10066,6 +10066,10 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               customBrief,
               narration: narrationEnabled ? { enabled: true, voiceId: narrationVoiceId, voiceVolume: 1.0 } : undefined,
               music: musicEnabled ? { enabled: true, prompt: musicPrompt, volume: 0.22 } : undefined,
+              // Deterministic brand overlay (text + logo). Auto-builds a
+              // 3-segment overlay from the chatbot params if brandKit is given.
+              brandOverlay: (params as any)?.brandOverlay,
+              brandKit: (params as any)?.brandKit,
             });
             const finalVaultId = await saveToVaultSmart({
               projectId, fileType: "fs-pro-multishot", category: "fusion-studio-pro",

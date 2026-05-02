@@ -380,6 +380,11 @@ router.post(
         productDescription: stripHtml(product.bodyHtml).slice(0, 1500) || undefined,
         // Reuse a previously persisted multi-shot template (chatbot persist_cinematic_script)
         savedPromptId,
+        // Deterministic brand overlay (text + logo burned with FFmpeg drawtext
+        // after the AI render). The caller may pass a full BrandOverlayConfig
+        // OR a brandKit and we auto-build a sensible 3-segment overlay.
+        brandOverlay: (body as any).brandOverlay,
+        brandKit: (body as any).brandKit,
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.

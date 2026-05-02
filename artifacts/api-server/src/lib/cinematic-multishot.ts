@@ -109,6 +109,28 @@ export interface CinematicMultiShotRequest {
   extraProductImages?: Array<{ buffer: Buffer; mime: "image/jpeg" | "image/png" | "image/webp" }>;
   /** Plain-text product description (used by product-dna and director). */
   productDescription?: string;
+  /**
+   * DETERMINISTIC BRAND OVERLAY — burned into the final video AFTER the AI
+   * pipeline finishes. AI video models (Kling, Runway, Veo, Hailuo, Seedance)
+   * cannot render readable text or accurate logos; this overlay fixes that
+   * by burning brand text + logo + social handles + URL with FFmpeg drawtext
+   * + overlay (DejaVu Sans Bold, byte-perfect spelling, crisp typography).
+   *
+   * Pass either `brandOverlay` (full BrandOverlayConfig — pixel control) OR
+   * `brandKit` (we auto-build a sensible 3-segment overlay: intro brand
+   * reveal + persistent footer with handles/URL + outro CTA + logo).
+   */
+  brandOverlay?: import("./brand-overlay.js").BrandOverlayConfig;
+  brandKit?: {
+    brandName?: string;
+    tagline?: string;
+    socialHandles?: Array<{ platform: string; handle: string }>;
+    url?: string;
+    /** Logo PNG/JPG/WEBP buffer + mime. Composited as RGBA via Sharp. */
+    logo?: { buffer: Buffer; mimeType?: string };
+    /** Hex accent color for the CTA layer. */
+    accentHex?: string;
+  };
 }
 
 export interface CinematicMultiShotResult {
@@ -866,6 +888,42 @@ export async function generateCinematicMultiShot(
       musicVolume: req.music?.volume ?? 0.22,
     });
     logger.info({ finalBytes: finalVideo.length }, "🎬 final compose ready");
+  }
+
+  // ── 7.5. Brand overlay (deterministic FFmpeg drawtext + logo) ──────────
+  // AI video models cannot render readable text/logos — we burn them in
+  // here AFTER the mux. This is the only way to ship production-grade ads
+  // with byte-perfect spelling on brand name, social handles, URL and CTA.
+  if (req.brandOverlay || req.brandKit) {
+    try {
+      const { applyBrandOverlay, buildAutoBrandOverlay } = await import("./brand-overlay.js");
+      const overlayConfig = req.brandOverlay
+        ? req.brandOverlay
+        : buildAutoBrandOverlay({
+            videoDurationSec: totalSec,
+            brandName: req.brandKit?.brandName ?? req.brand,
+            tagline: req.brandKit?.tagline,
+            socialHandles: req.brandKit?.socialHandles,
+            url: req.brandKit?.url,
+            ctaText: req.ctaText,
+            accentHex: req.brandKit?.accentHex,
+            logo: req.brandKit?.logo,
+            aspect: req.aspect as any,
+          });
+      const overlayResult = await applyBrandOverlay(finalVideo, overlayConfig);
+      finalVideo = overlayResult.buffer;
+      logger.info({
+        applied: overlayResult.applied,
+        skipped: overlayResult.skipped,
+        finalBytes: finalVideo.length,
+      }, "🎬 brand overlay applied");
+    } catch (err: any) {
+      // FAIL-SOFT: if the overlay step crashes (e.g. font missing on a
+      // freshly-built deploy) we still ship the underlying video instead
+      // of failing the whole render. The error is logged loudly so ops
+      // can fix it.
+      logger.error({ err: err?.message }, "🎬 brand overlay FAILED — shipping video without overlay");
+    }
   }
 
   // ── 8. Persist final script to library (or bump existing) ───────────────
