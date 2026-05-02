@@ -24,6 +24,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "generator",   label: "Generador IA", icon: "✨" },
   { id: "web-lab",     label: "Lab Web",      icon: "🔬" },
   { id: "fusion-studio", label: "Fusion Studio", icon: "🧬" },
+  { id: "cards", label: "Card Studio", icon: "💳" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [

@@ -50,6 +50,7 @@ import adStudioRouter from "./ad-studio.js";
 import fsProRouter from "./fs-pro.js";
 import productAdsRouter from "./product-ads.js";
 import charactersRouter from "./characters.js";
+import cardsRouter from "./cards.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
@@ -134,6 +135,7 @@ router.use(adStudioRouter);
 router.use(fsProRouter);
 router.use(productAdsRouter);
 router.use(charactersRouter);
+router.use(cardsRouter);
 router.use(reportTemplatesRouter);
 router.use(billingRouter);
 

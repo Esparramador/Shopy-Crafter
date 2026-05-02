@@ -130,6 +130,14 @@ After observing IA-rendered "noise text" persisting in finished ads despite the 
 ### Premium Image Endpoints
 Specialized endpoints offer infographic generation with AI or overlay text rendering modes, ensuring perfect spelling. A universal virtual try-on feature fuses model and product images using Gemini, preserving identity and product appearance.
 
+### Card Studio (Tarjetas profesionales 300 DPI)
+- **Backend**: schema `business_cards` (drizzle, push hecho), `lib/card-templates.ts` (6 plantillas: elite-executive, minimalist-mono, luxury-foil, creative-bold, corporate-clean, tech-dark), `lib/card-qr.ts` (QR PNG/SVG + vCard escapado), `lib/card-renderer.ts` (Puppeteer 1080×720 px = 85×55mm @ 300 DPI con 3mm bleed), `lib/card-studio.ts` (orchestrator: bg IA opcional → texto vectorial → composición Sharp → vault).
+- **Routes** (`routes/cards.ts`, admin-only): `GET /cards/templates`, `POST /cards/auto-design` (Claude propone template+paleta+fonts+bg prompt), `GET/POST /projects/:projectId/cards`, `GET/PATCH/DELETE /cards/:id`, `POST /cards/:id/upload-logo`, `POST /cards/:id/generate` (long-running, persiste front+back+PDF imprimible en vault, falla duro si vault no guarda), `GET /cards/:id/qr.svg` (vector standalone).
+- **Frontend** (`pages/projects/CardStudio.tsx`, ruta `/projects/:id/cards`, item "Card Studio 💳" en sidebar de proyecto): editor 3 columnas (lista+templates / editor datos+paleta+fonts+layout+bg / preview live + acciones generate/download PNG/PDF/SVG). Auto-save por blur en cada campo + auto-save validado antes de generar (aborta si falla).
+- **Modelos IA fondo**: Recraft v3, Ideogram v3 Turbo, Imagen 4 Ultra, Nano Banana, GPT-Image-1 (rango $0.03-$0.06 por fondo).
+- **Anti-leak texto IA**: prompt negativo "text, letters, words, typography, watermark, logo" en bg generation; texto humano se renderiza vectorialmente en capa Puppeteer separada compuesta sobre el fondo.
+- **Override de layout**: el orchestrator clona el template y reemplaza `layout` con el guardado en BD para que el render respete los cambios del usuario (centered/left/grid).
+
 ### Vault & Web Lab Hardening
 Ensures reliable storage and download of content in the vault. The Web Lab module allows users to edit and generate HTML/CSS from scratch with secure iframe previews and enriched design signal extraction. Multi-source research enhances context for generation.
 
