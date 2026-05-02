@@ -24,6 +24,13 @@
 
 import { db, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
+import {
+  CINEMATOGRAPHY_PRESETS,
+  CONTINUITY_TOKENS,
+  NEGATIVE_PROMPT_LIBRARY,
+  type CinematographyIntent,
+  type IndustrySegment,
+} from "./cinematic-knowledge-base";
 
 export type CinematicTemplateCategory =
   | "deconstruction"
@@ -31,7 +38,10 @@ export type CinematicTemplateCategory =
   | "anatomy"
   | "exploded_view"
   | "apple_porsche"
-  | "presenter_hybrid";
+  | "presenter_hybrid"
+  | "lifestyle"
+  | "personal_brand"
+  | "action_pulse";
 
 export interface CinematicTemplateSegment {
   /** Position in the timeline (1..N) */
@@ -571,6 +581,231 @@ const TPL_PRESENTER_HYBRID: CinematicAdTemplate = {
   variables: ["PRODUCT_NAME", "BRAND", "PRODUCT_MATERIALS", "PRODUCT_COLORS"],
 };
 
+// ─── 7) Lifestyle Orbit — Universal premium B-roll (3 segmentos = 18s)
+//      Para Home / Decor / Fashion / Beauty / Cosmetics / Lifestyle products
+//      donde la deconstrucción mecánica no encaja. Movimientos elegantes:
+//      slow orbit + dolly-in + parallax pull-back. Sin presentador.
+const TPL_LIFESTYLE_ORBIT: CinematicAdTemplate = {
+  id: "seed:cinematic_ad_lifestyle_orbit",
+  category: "lifestyle",
+  name: "🌿 Lifestyle Orbit — Universal Premium B-roll (18s)",
+  shortDescription: "3 segmentos: orbit hero → dolly-in detalle → parallax lifestyle. Para hogar, decoración, moda, belleza, cosmética y cualquier producto donde la deconstrucción mecánica no encaja.",
+  longDescription: "Plantilla agnóstica de gama alta inspirada en spots Aesop / Le Labo / Vitra. Tres planos consecutivos sin presentador: hero orbit del producto en escena natural, dolly-in macro al detalle hero, parallax pull-back ambient. Funciona para velas, perfumes, sillones, prendas, productos de skincare, accesorios premium. Incluye toda la inteligencia del Knowledge Base (intent fashion, continuity LUT cálido).",
+  conceptName: "{{PRODUCT_NAME}} — Crafted by {{BRAND}}",
+  totalDurationSec: 18,
+  inspirationReference: "Aesop / Le Labo / Vitra / Hermès lifestyle film",
+  estimatedCreditsHint: 11,
+  segments: [
+    {
+      idx: 1,
+      name: "Hero Orbit",
+      startSec: 0,
+      endSec: 6,
+      shotType: "product",
+      effectDescription: "Plano hero del {{PRODUCT_NAME}} sobre superficie natural premium con luz lateral cálida; cámara orbita lentamente 90°.",
+      keyframePrompt: "Hero shot of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} with {{PRODUCT_COLORS}} accents, placed on a warm walnut wood or honed marble surface in a softly blurred premium minimalist interior, natural side window light pouring from frame-left at golden-hour temperature creating long elegant shadows extending to frame-right, single key light + subtle bounce fill, atmospheric haze catching the light, shot on 50mm at f/2.8 with shallow depth of field, museum-quality composition with negative space top-right, warm natural cinematic grade, photorealistic Phase One IQ4 medium-format aesthetic, no on-screen text",
+      videoPrompt: "Camera performs an ultra-slow 90-degree orbit around the {{PRODUCT_NAME}} from frame-left to behind-center over 6 seconds with cinematic inertia, the warm side light slowly raking across the {{PRODUCT_MATERIALS}} surface revealing texture and craftsmanship, atmospheric haze drifting subtly through the light, the product itself remains perfectly still on its pedestal, museum-quality slow reveal, no jump-cuts, no zoom",
+      voiceoverLine: "{{PRODUCT_NAME}}. Hecho para quienes saben que el detalle define el resultado.",
+      screenText: "",
+      audioCue: "Soft acoustic guitar fingerpicking + warm room-tone; gentle field-recording ambience underneath.",
+    },
+    {
+      idx: 2,
+      name: "Macro Detail",
+      startSec: 6,
+      endSec: 12,
+      shotType: "b_roll",
+      effectDescription: "Macro extremo del detalle hero del {{PRODUCT_NAME}}: textura, costura, acabado, material o etiqueta — el alma del producto.",
+      keyframePrompt: "Extreme macro detail shot of {{PRODUCT_NAME}}, focusing on the signature craftsmanship element (premium {{PRODUCT_MATERIALS}} surface texture, hand-finished edge, embossed brand mark, or fabric weave at thread level), filling the frame with rich tactile detail, single warm directional key light grazing the surface to maximize texture, shot on 100mm macro at f/4 with razor-thin depth of field, warm natural cinematic grade with crushed shadows, individual fibers / pores / grain photographically rendered, no on-screen text",
+      videoPrompt: "Camera performs a slow elegant probe-lens dolly-in toward the hero detail over 6 seconds with cinematic inertia, focus pulls smoothly from front to the signature element, the warm directional light slowly shifts angle by a few degrees revealing micro-textures, atmospheric particles drift through the light, no shake, no rotation, pure dolly-in only",
+      voiceoverLine: "Cada detalle de {{PRODUCT_MATERIALS}} ha sido pensado para durar.",
+      screenText: "",
+      audioCue: "Acoustic guitar swells gently; subtle foley on material texture (paper rustle / wood grain / soft fabric).",
+    },
+    {
+      idx: 3,
+      name: "Lifestyle Parallax + CTA",
+      startSec: 12,
+      endSec: 18,
+      shotType: "b_roll",
+      effectDescription: "Pull-back con parallax revelando el {{PRODUCT_NAME}} en su contexto lifestyle completo (interior premium / mesa servida / dressing room) y aparición elegante del logo {{BRAND}}.",
+      keyframePrompt: "Wide lifestyle composition showing {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} as the focal point of a premium minimalist interior scene tailored to {{INDUSTRY}} (a serene living room, an elegant dressing area, a curated kitchen, a spa-like bathroom — pick the most natural context), warm natural window light from frame-left, atmospheric haze, soft shadows, perfectly composed negative space top-right ready for a wordmark, shot on 35mm at f/2.8, warm natural cinematic grade, photorealistic medium-format aesthetic, no on-screen text yet",
+      videoPrompt: "Camera performs a slow elegant pull-back with subtle parallax over 6 seconds revealing the full lifestyle context, the warm side light maintains its golden-hour direction, atmospheric particles drift gently, the {{PRODUCT_NAME}} remains the visual focal point throughout the pull-back, in the final second a clean serif wordmark of {{BRAND}} fades in elegantly into the negative space top-right with a soft cross-dissolve",
+      voiceoverLine: "{{BRAND}}. {{PRODUCT_NAME}}.",
+      screenText: "{{BRAND}}",
+      audioCue: "Acoustic guitar resolves into a single warm sustained chord; brand chime closes the spot on the wordmark reveal.",
+    },
+  ],
+  masterConfig: {
+    recommendedVideoModel: "kling-2.1",
+    recommendedImageModel: "nano-banana",
+    defaultAspect: "16:9",
+    motionScore: 3,
+    negativePrompt: "harsh shadows, washed-out colors, plastic-looking texture, low resolution, oversaturated, neon, garbled typography, watermark, cartoon, illustration",
+    styleTag: "lifestyle",
+  },
+  variables: ["PRODUCT_NAME", "BRAND", "PRODUCT_MATERIALS", "PRODUCT_COLORS", "INDUSTRY"],
+};
+
+// ─── 8) Talking Head Direct — Personal Brand / Creator / Coach / Educator
+//      4 segmentos = 24s. requiresPresenter. Para creators, educadores,
+//      coaches, consultores, marca personal SIN producto físico. B-roll
+//      conceptual con typography animada en lugar de producto.
+const TPL_TALKING_HEAD_DIRECT: CinematicAdTemplate = {
+  id: "seed:cinematic_ad_talking_head_direct",
+  category: "personal_brand",
+  name: "🎤 Talking Head Direct — Personal Brand / Creator (24s)",
+  shortDescription: "4 segmentos: hook directo a cámara → B-roll conceptual con texto → desarrollo del beneficio → CTA primer plano. Para creators, coaches, educadores, consultores, marca personal sin producto físico.",
+  longDescription: "Formato Tier-1 para Instagram Reels, TikTok, LinkedIn personal brand y YouTube Shorts. El presentador habla directamente a cámara en idx 1, 3, 4; el segmento idx 2 es un B-roll conceptual con typography animada que ilustra el {{PAIN_POINT}} o el {{CORE_BENEFIT}}. No requiere producto físico — solo el avatar del creator y su mensaje. El motor aplica character lock SOLO en escenas presenter; el B-roll es typography pura sin la cara del host.",
+  conceptName: "{{BRAND}} — {{CORE_BENEFIT}}",
+  totalDurationSec: 24,
+  inspirationReference: "Alex Hormozi / Gary Vee / Steven Bartlett personal brand reel",
+  estimatedCreditsHint: 14,
+  segments: [
+    {
+      idx: 1,
+      name: "Hook Directo",
+      startSec: 0,
+      endSec: 6,
+      shotType: "presenter",
+      effectDescription: "Plano medio del presentador en estudio premium minimalista, hablando directamente a cámara con energía y autoridad para enganchar a {{TARGET_AUDIENCE}}.",
+      keyframePrompt: "Medium shot of a charismatic presenter in a premium minimalist studio with soft warm key light from frame-left and a deep teal/navy background with subtle vignette, looking directly into camera with confident energy and a focused expression, shot on 50mm at f/2.4, shallow depth of field separating presenter from the clean background, photorealistic 8K skin textures with natural pores, museum-quality portrait lighting with Rembrandt 45-degree key + soft rim, warm natural grade with crushed shadows, no on-screen text",
+      videoPrompt: "The presenter speaks directly to camera with controlled energy and engaged facial expressions; subtle natural hand gesture entering frame from below at second 3 to emphasize the hook, gentle head movement for emphasis, blink and micro-smile shifts. Camera locked-off on tripod, no movement at all. Background remains static. Cinematic warm grade preserved with consistent lighting",
+      voiceoverLine: "Si eres {{TARGET_AUDIENCE}} y aún luchas con {{PAIN_POINT}}, este vídeo va a cambiar cómo lo ves.",
+      screenText: "",
+      audioCue: "Subtle low cinematic pad rises with the hook; no music peaks until segment 4.",
+    },
+    {
+      idx: 2,
+      name: "B-Roll Conceptual + Typography",
+      startSec: 6,
+      endSec: 12,
+      shotType: "b_roll",
+      effectDescription: "B-roll abstracto con tipografía animada que ilustra el {{PAIN_POINT}} y la transformación hacia el {{CORE_BENEFIT}}.",
+      keyframePrompt: "Abstract conceptual B-roll composition with elegant minimalist typography centered on a deep teal/navy gradient background, the words representing {{PAIN_POINT}} appearing in soft white serif letters with subtle motion blur, atmospheric particles floating slowly through the frame catching warm directional light from frame-left, museum-quality composition with deep negative space, shot on 50mm at f/4, warm cinematic grade with crushed shadows, photorealistic depth and texture, no other on-screen text",
+      videoPrompt: "The {{PAIN_POINT}} typography fades in elegantly with a soft cross-dissolve over the first 2 seconds, holds for 2 seconds, then morphs / cross-dissolves smoothly into typography representing {{CORE_BENEFIT}} over the final 2 seconds, atmospheric particles drift slowly through the frame the entire time, camera performs a barely-perceptible slow push-in for kinetic feel, warm grade preserved",
+      voiceoverLine: "El problema no es {{PAIN_POINT}}. Es que nadie te enseñó a transformarlo en {{CORE_BENEFIT}}.",
+      screenText: "",
+      audioCue: "Cinematic pad swells underneath; subtle whoosh on the typography morph at the midpoint.",
+    },
+    {
+      idx: 3,
+      name: "Desarrollo del Beneficio",
+      startSec: 12,
+      endSec: 18,
+      shotType: "presenter",
+      effectDescription: "Plano medio-corto del presentador desarrollando el cómo: explica la promesa de {{CORE_BENEFIT}} con energía controlada y gesticulación elegante.",
+      keyframePrompt: "Medium-close shot of the same presenter in the same premium minimalist studio with the same warm key light setup and deep teal/navy background, leaning slightly forward with engaged confident expression conveying authority on {{CORE_BENEFIT}}, hand gesture mid-movement entering the frame, shot on 85mm at f/2 with shallow depth of field, photorealistic 8K skin textures with natural pores, Rembrandt 45-degree key light + soft rim, warm cinematic grade with crushed shadows, museum-quality portrait lighting consistent with segment 1, no on-screen text",
+      videoPrompt: "The presenter speaks with measured energy explaining the path to {{CORE_BENEFIT}}, natural authoritative hand gestures entering and exiting frame, subtle head emphasis on key words, controlled blinks. Camera locked-off on tripod, no movement at all. Background remains static. Identical lighting and warm grade as segment 1 for visual continuity",
+      voiceoverLine: "Lo que voy a darte hoy es exactamente lo que necesitas para conseguir {{CORE_BENEFIT}} sin perder más tiempo.",
+      screenText: "",
+      audioCue: "Cinematic pad continues with subtle harmonic shift; no music peaks until the CTA.",
+    },
+    {
+      idx: 4,
+      name: "CTA Primer Plano",
+      startSec: 18,
+      endSec: 24,
+      shotType: "presenter",
+      effectDescription: "Primer plano del presentador cerrando con el llamado a la acción {{CALL_TO_ACTION}} con autoridad calmada y un asentimiento final.",
+      keyframePrompt: "Tight close-up of the same presenter, deep teal/navy background softly out of focus behind, looking directly into camera with calm authority and the subtle smile of someone making a definitive promise, the warm key light from frame-left producing the signature Rembrandt triangle highlight on the cheek + soft rim from behind, shot on 105mm at f/1.8 with extreme shallow depth of field, photorealistic 8K skin textures with natural pores, museum-quality portrait lighting with consistent setup from segments 1 and 3, warm cinematic grade with crushed shadows, no on-screen text yet",
+      videoPrompt: "The presenter delivers the closing CTA line with calm confident authority, single confident nod at the very end, gentle blink, micro-smile shift. Camera locked-off on tripod, no movement at all. In the final second a clean serif wordmark of {{BRAND}} fades in elegantly bottom-center with a soft cross-dissolve, identical lighting and warm grade preserved from previous segments",
+      voiceoverLine: "{{CALL_TO_ACTION}}. Te estoy esperando.",
+      screenText: "{{BRAND}}",
+      audioCue: "Cinematic pad reaches its full warm sustain, resolves into a single warm chord on the final word; brand chime closes the spot.",
+    },
+  ],
+  masterConfig: {
+    recommendedVideoModel: "kling-2.1",
+    recommendedImageModel: "nano-banana",
+    defaultAspect: "9:16",
+    motionScore: 2,
+    negativePrompt: "deformed face, asymmetric face, extra fingers, deformed hands, plastic skin, unnatural skin, garbled typography, text artifacts, watermark, low-resolution, cartoon, anime, illustration, double exposure",
+    styleTag: "documentary",
+    requiresPresenter: true,
+    defaultPresenterPrompt: "A confident charismatic creator/educator in modern smart-casual attire (blazer over a quality t-shirt OR refined button-down), natural makeup, intelligent engaged gaze, subtle warm smile, perfectly groomed hair, photorealistic 8K skin textures with natural pores, looking directly at camera with the calm authority of someone speaking to their personal brand audience",
+  },
+  variables: ["BRAND", "PAIN_POINT", "CORE_BENEFIT", "TARGET_AUDIENCE", "CALL_TO_ACTION"],
+};
+
+// ─── 9) Action Pulse — High Energy / Sport / Fitness / Automotive (16s)
+//      4 segmentos × 4s = 16s. Cortes rápidos, alta intensidad. Sin presentador.
+//      Para fitness, sport, automotive, energy drinks, performance products.
+const TPL_ACTION_PULSE: CinematicAdTemplate = {
+  id: "seed:cinematic_ad_action_pulse",
+  category: "action_pulse",
+  name: "⚡ Action Pulse — High Energy (16s)",
+  shortDescription: "4 segmentos × 4s: tensión inicial → liberación de energía → impacto hero → CTA. Para fitness, sport, automotive, energy drinks y productos de performance.",
+  longDescription: "Plantilla de alta energía con cortes rápidos inspirada en spots Nike / Red Bull / Porsche / Ferrari. Cuatro planos consecutivos sin presentador, cada uno con un movimiento de cámara cinético distinto (whip-pan, rack-zoom, crash-zoom, parallax pull-back). Pensada para productos donde la elegancia museum-quality no encaja: zapatillas de running, suplementos, coches, bebidas energéticas, equipamiento deportivo. Music score sincronizado con drop en idx 3.",
+  conceptName: "{{PRODUCT_NAME}} — Built for {{INDUSTRY}}",
+  totalDurationSec: 16,
+  inspirationReference: "Nike / Red Bull / Porsche / Gymshark performance reel",
+  estimatedCreditsHint: 12,
+  segments: [
+    {
+      idx: 1,
+      name: "Tensión Inicial",
+      startSec: 0,
+      endSec: 4,
+      shotType: "product",
+      effectDescription: "Macro contenido del {{PRODUCT_NAME}} en penumbra dramática con un único haz de luz lateral; tensión visual antes del estallido.",
+      keyframePrompt: "Dramatic macro close-up of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} with {{PRODUCT_COLORS}} accents, partially lit by a single hard rim-light from frame-right slicing through deep shadows, the rest of the frame in moody darkness with subtle teal-to-orange split-tone, atmospheric haze catching the rim-light revealing texture, shot on 100mm macro at f/4, sharp focus on the hero detail, high-contrast cinematic grade with crushed blacks and bright specular highlights, photorealistic Phantom Flex aesthetic with film grain, no on-screen text",
+      videoPrompt: "Camera performs a slow tense push-in toward the hero detail of {{PRODUCT_NAME}} over 4 seconds, the rim-light slowly intensifies from 60% to 100% suggesting accumulating energy, atmospheric haze drifts through the light, focus stays razor-sharp on the central detail, no shake, building tension only — no movement of the product itself",
+      voiceoverLine: "Cuando todo lo demás se rinde...",
+      screenText: "",
+      audioCue: "Sub-bass drone rises in pitch and intensity, single percussion hit at second 3.5 telegraphing the drop.",
+    },
+    {
+      idx: 2,
+      name: "Liberación de Energía",
+      startSec: 4,
+      endSec: 8,
+      shotType: "b_roll",
+      effectDescription: "Estallido visual: el {{PRODUCT_NAME}} cobra vida con un crash-zoom dinámico y partículas de energía explotando en alta velocidad.",
+      keyframePrompt: "High-energy dynamic shot of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}}, captured at the apex of an explosive moment, surrounded by directional energy particles streaking outward (sand kicked up / water droplets / sparks / dust shockwave depending on {{INDUSTRY}}), high-contrast teal-to-orange split-tone grade with crushed blacks and bright specular highlights, motion-blur on the particles, sharp focus on the product, shot on 35mm at f/2.8, Phantom Flex 4K 1000fps aesthetic, no on-screen text",
+      videoPrompt: "Aggressive crash-zoom-in toward the {{PRODUCT_NAME}} at the start, then the camera locks and the directional energy particles continue to streak outward in slow-motion across the entire 4-second clip, the {{PRODUCT_NAME}} itself remains sharply focused at the center, micro-motion blur trails on every particle, high-contrast teal-orange grade preserved",
+      voiceoverLine: "...{{PRODUCT_NAME}} se libera.",
+      screenText: "",
+      audioCue: "MUSIC DROP — punchy electronic kick + bass + filtered synth lead enters at full intensity.",
+    },
+    {
+      idx: 3,
+      name: "Impacto Hero",
+      startSec: 8,
+      endSec: 12,
+      shotType: "product",
+      effectDescription: "Plano hero del {{PRODUCT_NAME}} en pleno uso/movimiento — pies del runner / volante del coche / atleta — capturando el momento de máximo rendimiento.",
+      keyframePrompt: "Dynamic action hero shot of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} captured in the middle of intense real-world use appropriate to {{INDUSTRY}} (a runner's foot mid-stride, an athlete's grip, a steering wheel mid-corner, a hand crushing a can), with motion-blur trails on the surrounding environment indicating high speed, the product itself razor-sharp in the center, deep teal-to-orange split-tone grade with crushed blacks and saturated mid-tones, atmospheric haze catching directional rim-light, shot on 50mm at f/2 with motion blur on background, photorealistic Phantom Flex 4K aesthetic with subtle film grain, no on-screen text",
+      videoPrompt: "Camera performs a fast whip-pan that locks instantly onto the {{PRODUCT_NAME}} hero moment, motion-blur trails on the surrounding environment continue across the entire 4-second clip indicating sustained high-speed action, the product itself is razor-sharp at the center with crisp edges, the directional rim-light shifts angle by a few degrees revealing material texture, high-contrast teal-orange grade preserved with consistent specular highlights",
+      voiceoverLine: "Para los que entrenan duro. Para los que no se conforman.",
+      screenText: "",
+      audioCue: "Music score continues at full intensity with rhythmic percussion + driving bass; subtle whoosh foley on the whip-pan.",
+    },
+    {
+      idx: 4,
+      name: "CTA Logo",
+      startSec: 12,
+      endSec: 16,
+      shotType: "b_roll",
+      effectDescription: "Resolución cinética: pull-back con parallax revelando el {{PRODUCT_NAME}} centrado en composición limpia y aparición del logo {{BRAND}} con un flash de luz.",
+      keyframePrompt: "Clean hero composition of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} centered on a deep matte-black background with subtle teal-to-orange directional rim-light from frame-right and frame-left simultaneously creating a dramatic dual-rim outline, atmospheric haze catching both rim-lights, shot on 50mm at f/2.8 with deep DOF for product clarity, high-contrast cinematic grade with crushed blacks and saturated highlights, museum-quality central composition with negative space top for the wordmark, photorealistic medium-format aesthetic, no on-screen text yet",
+      videoPrompt: "Camera performs a controlled parallax pull-back from the {{PRODUCT_NAME}} over the first 2 seconds settling at a clean wide composition, then in the final 2 seconds a clean bold sans-serif {{BRAND}} wordmark fades in elegantly into the negative space top-center with a single bright lens-flare flash punctuating its appearance, the dual rim-lights remain consistent, atmospheric haze drifts through the light, high-contrast teal-orange grade preserved",
+      voiceoverLine: "{{BRAND}}. {{PRODUCT_NAME}}.",
+      screenText: "{{BRAND}}",
+      audioCue: "Music score crescendos and resolves on the wordmark reveal with a single low impact hit + brand sting.",
+    },
+  ],
+  masterConfig: {
+    recommendedVideoModel: "kling-2.1",
+    recommendedImageModel: "nano-banana",
+    defaultAspect: "9:16",
+    motionScore: 5,
+    negativePrompt: "static, lifeless, washed-out, low contrast, low resolution, blurry, garbled typography, watermark, cartoon, anime, illustration",
+    styleTag: "sport",
+  },
+  variables: ["PRODUCT_NAME", "BRAND", "PRODUCT_MATERIALS", "PRODUCT_COLORS", "INDUSTRY"],
+};
+
 export const CINEMATIC_AD_TEMPLATES: CinematicAdTemplate[] = [
   TPL_ANATOMY,
   TPL_DECONSTRUCTION,
@@ -578,6 +813,9 @@ export const CINEMATIC_AD_TEMPLATES: CinematicAdTemplate[] = [
   TPL_EXPLODED_VIEW,
   TPL_APPLE_PORSCHE,
   TPL_PRESENTER_HYBRID,
+  TPL_LIFESTYLE_ORBIT,
+  TPL_TALKING_HEAD_DIRECT,
+  TPL_ACTION_PULSE,
 ];
 
 const CINEMATIC_TEMPLATE_USECASE = "cinematic_ad_template";
@@ -725,6 +963,14 @@ export interface ComposeVariables {
   productMaterials?: string;
   productColors?: string;
   industry?: string;
+  // Service / personal-brand / educator variables. Used by `lifestyle`,
+  // `personal_brand`, and `action_pulse` templates so the same compose
+  // pipeline serves physical-product ads AND services / creators / coaches
+  // / Instagram personal brands without Shopify.
+  painPoint?: string;
+  coreBenefit?: string;
+  targetAudience?: string;
+  callToAction?: string;
 }
 
 export interface ComposedCinematicScript {
@@ -784,6 +1030,11 @@ export interface ComposedCinematicScript {
  * Substitute {{VARIABLE}} placeholders in a template string with actual values.
  * Missing variables are replaced with a neutral placeholder so the LLM/IA never
  * sees raw `{{...}}` syntax (which would degrade the result).
+ *
+ * Supports BOTH product-style variables (PRODUCT_NAME, BRAND, PRODUCT_MATERIALS,
+ * PRODUCT_COLORS, INDUSTRY) and service/personal-brand variables (PAIN_POINT,
+ * CORE_BENEFIT, TARGET_AUDIENCE, CALL_TO_ACTION) so the same templating layer
+ * powers physical-product ads AND service/educator/personal-brand ads.
  */
 function substituteVariables(
   template: string,
@@ -793,13 +1044,129 @@ function substituteVariables(
     const v = vars[key];
     if (v && v.trim().length > 0) return v.trim();
     // Fallbacks for missing optional fields — keep prompt natural.
-    if (key === "PRODUCT_MATERIALS") return "premium materials";
-    if (key === "PRODUCT_COLORS") return "elegant tones";
-    if (key === "INDUSTRY") return "premium lifestyle";
-    if (key === "BRAND") return "the brand";
-    if (key === "PRODUCT_NAME") return "the product";
+    if (key === "PRODUCT_MATERIALS")  return "premium materials";
+    if (key === "PRODUCT_COLORS")     return "elegant tones";
+    if (key === "INDUSTRY")           return "premium lifestyle";
+    if (key === "BRAND")              return "the brand";
+    if (key === "PRODUCT_NAME")       return "the product";
+    if (key === "PAIN_POINT")         return "the everyday challenge";
+    if (key === "CORE_BENEFIT")       return "a meaningful transformation";
+    if (key === "TARGET_AUDIENCE")    return "people who care about excellence";
+    if (key === "CALL_TO_ACTION")     return "Discover more";
     return key.toLowerCase().replace(/_/g, " ");
   });
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// KNOWLEDGE-BASE AUTO-INJECTION HELPERS
+// ───────────────────────────────────────────────────────────────────────────
+// These helpers automatically enrich every composed script with the right
+// cinematic intent preset, industry-specific negative prompt, and Visual-DNA
+// continuity tokens — without requiring the user to know about the KB. This
+// is what gives the platform Pollo/Omneky-grade output by default.
+
+/**
+ * Map a template category to its best-fit cinematography intent. The preset's
+ * promptFragment (lens / lighting / grade / motion language) is appended to
+ * each scene's videoPrompt so the IA producer always speaks the right
+ * professional vocabulary.
+ */
+function inferIntentFromCategory(category: CinematicTemplateCategory): CinematographyIntent {
+  switch (category) {
+    case "anatomy":          return "luxury";
+    case "deconstruction":   return "scientific";
+    case "construction":     return "scientific";
+    case "exploded_view":    return "scientific";
+    case "apple_porsche":    return "luxury";
+    case "presenter_hybrid": return "luxury";
+    case "lifestyle":        return "fashion";
+    case "personal_brand":   return "documentary";
+    case "action_pulse":     return "sport";
+    default:                 return "luxury";
+  }
+}
+
+/**
+ * Map a free-form industry string (whatever the user types) to a canonical
+ * IndustrySegment of the negative-prompt library. Falls back to "general".
+ */
+function inferIndustrySegment(industry?: string): IndustrySegment {
+  if (!industry) return "general";
+  const norm = industry.toLowerCase().trim();
+  const segments = Object.keys(NEGATIVE_PROMPT_LIBRARY) as IndustrySegment[];
+  // 1) Exact match
+  if ((segments as string[]).includes(norm)) return norm as IndustrySegment;
+  // 2) Substring / synonym match
+  if (/(watch|jewel|jewell|gold|diamond|silver|chrono|luxury watch)/.test(norm))      return "watches";
+  if (/(beauty|cosme|skin|makeup|fragrance|perfume)/.test(norm))                       return "beauty";
+  if (/(fashion|apparel|cloth|wardrob|outfit|shoe|sneaker|bag|hand-?bag)/.test(norm))  return "fashion";
+  if (/(tech|gadget|electronic|phone|laptop|drone|head-?phone|ear-?bud)/.test(norm))   return "tech";
+  if (/(food|drink|beverage|snack|kitchen|culinary|gastro|recipe)/.test(norm))         return "food";
+  if (/(auto|car|vehicle|motor|moto|bike|cycl)/.test(norm))                            return "automotive";
+  if (/(home|decor|furniture|interior|kitchenware|tableware|household)/.test(norm))    return "home";
+  if (/(fitness|workout|gym|sport|athletic|performance|run|yoga)/.test(norm))          return "fitness";
+  if (/(jewel|jewell)/.test(norm))                                                      return "jewelry";
+  return "general";
+}
+
+/**
+ * Append the inferred industry's negative prompt to the template's own
+ * negative prompt. Both layers (template-author intent + industry-segment
+ * library) are preserved — duplicates are merged.
+ */
+function mergeNegativePrompt(templateNegative: string, industry?: string): string {
+  const fromKB = NEGATIVE_PROMPT_LIBRARY[inferIndustrySegment(industry)] || "";
+  if (!fromKB) return templateNegative;
+  const seen = new Set<string>();
+  const tokens = [
+    ...templateNegative.split(/,\s*/),
+    ...fromKB.split(/,\s*/),
+  ]
+    .map(t => t.trim().toLowerCase())
+    .filter(Boolean)
+    .filter(t => {
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    });
+  return tokens.join(", ");
+}
+
+/**
+ * Build a "Visual DNA" continuity fragment that gets appended to every
+ * keyframePrompt in the composed script. The token mix is derived from the
+ * template's intent so a luxury watch ad gets the gold LUT + 85mm lock + soft
+ * dust motes, while a sport/fitness ad gets the teal LUT + atmospheric haze.
+ *
+ * This is the "stitch logic" called out in the specs (Manual de Ingeniería de
+ * Continuidad y Recuperación Autónoma) — the same Visual DNA constants are
+ * forced into every clip so the look stays locked frame-to-frame.
+ */
+function buildContinuityFragment(intent: CinematographyIntent): string {
+  const tokensByIntent: Record<CinematographyIntent, string[]> = {
+    luxury:       ["cnt:gold_lut", "cnt:focal_85_product", "cnt:dust_motes_low",       "cnt:micro_reflections"],
+    tech:         ["cnt:teal_lut", "cnt:focal_85_product", "cnt:micro_reflections"],
+    sport:        ["cnt:teal_lut", "cnt:atmospheric_haze_low"],
+    documentary:  ["cnt:light_lock_top_right", "cnt:micro_reflections"],
+    fashion:      ["cnt:gold_lut", "cnt:micro_reflections"],
+    automotive:   ["cnt:teal_lut", "cnt:atmospheric_haze_low", "cnt:micro_reflections"],
+    beauty:       ["cnt:gold_lut", "cnt:focal_85_product", "cnt:micro_reflections"],
+    scientific:   ["cnt:light_lock_top_right", "cnt:focal_85_product"],
+  };
+  const ids = tokensByIntent[intent] || tokensByIntent.luxury;
+  const fragments = ids
+    .map(id => CONTINUITY_TOKENS.find(c => c.id === id)?.fragment)
+    .filter((s): s is string => !!s);
+  return fragments.join(". ");
+}
+
+/**
+ * Derive the cinematic intent's prompt fragment (focal / lighting / grade /
+ * motion vocabulary) for a given template category. Used to enrich every
+ * scene's videoPrompt with the right professional language.
+ */
+function buildIntentFragment(category: CinematicTemplateCategory): string {
+  return CINEMATOGRAPHY_PRESETS[inferIntentFromCategory(category)].promptFragment;
 }
 
 /**
@@ -819,23 +1186,48 @@ export function composeCinematicScript(
     PRODUCT_MATERIALS: vars.productMaterials || "",
     PRODUCT_COLORS: vars.productColors || "",
     INDUSTRY: vars.industry || "",
+    // Service / personal-brand / educator variables — the same templating
+    // layer powers physical-product ads AND non-product ads.
+    PAIN_POINT:         (vars as any).painPoint        || "",
+    CORE_BENEFIT:       (vars as any).coreBenefit      || "",
+    TARGET_AUDIENCE:    (vars as any).targetAudience   || "",
+    CALL_TO_ACTION:     (vars as any).callToAction     || "",
   };
 
   const aspect = overrides?.aspect ?? template.masterConfig.defaultAspect;
 
-  const composedSegments = template.segments.map(seg => ({
-    idx: seg.idx,
-    name: seg.name,
-    startSec: seg.startSec,
-    endSec: seg.endSec,
-    effectDescription: seg.effectDescription,
-    keyframePrompt: substituteVariables(seg.keyframePrompt, subVars),
-    videoPrompt: substituteVariables(seg.videoPrompt, subVars),
-    screenText: substituteVariables(seg.screenText, subVars),
-    audioCue: seg.audioCue,
-    shotType: seg.shotType,
-    voiceoverLine: seg.voiceoverLine ? substituteVariables(seg.voiceoverLine, subVars) : undefined,
-  }));
+  // ──── KNOWLEDGE-BASE AUTO-INJECTION ────────────────────────────────────
+  // Every composed script is automatically enriched with:
+  //  1. Industry-specific negative prompt (merged with the template's own)
+  //  2. Visual-DNA continuity fragment appended to every keyframePrompt
+  //  3. Cinematography intent fragment appended to every videoPrompt
+  // This is what gives every render Pollo/Omneky-grade quality by default,
+  // without requiring the user to manually pick technical tokens.
+  const intentFragment      = buildIntentFragment(template.category);
+  const continuityFragment  = buildContinuityFragment(inferIntentFromCategory(template.category));
+  const enrichedNegative    = mergeNegativePrompt(template.masterConfig.negativePrompt, vars.industry);
+
+  const composedSegments = template.segments.map(seg => {
+    const baseKeyframe = substituteVariables(seg.keyframePrompt, subVars);
+    const baseVideo    = substituteVariables(seg.videoPrompt, subVars);
+    // Talking-head presenter shots don't need product-grade continuity (focal
+    // 85mm for product, micro-reflections, etc.) — they need consistent host
+    // lighting only. So we still inject the continuity fragment for ALL shot
+    // types but the model will weight it appropriately given the shot context.
+    return {
+      idx: seg.idx,
+      name: seg.name,
+      startSec: seg.startSec,
+      endSec: seg.endSec,
+      effectDescription: seg.effectDescription,
+      keyframePrompt: continuityFragment ? `${baseKeyframe}. ${continuityFragment}` : baseKeyframe,
+      videoPrompt:    intentFragment     ? `${baseVideo}. ${intentFragment}`        : baseVideo,
+      screenText: substituteVariables(seg.screenText, subVars),
+      audioCue: seg.audioCue,
+      shotType: seg.shotType,
+      voiceoverLine: seg.voiceoverLine ? substituteVariables(seg.voiceoverLine, subVars) : undefined,
+    };
+  });
 
   const composedTitle = substituteVariables(template.conceptName, subVars);
 
@@ -861,7 +1253,7 @@ export function composeCinematicScript(
     recommendedVideoModel: safeVideoModel,
     recommendedImageModel: template.masterConfig.recommendedImageModel,
     motionScore: template.masterConfig.motionScore,
-    negativePrompt: template.masterConfig.negativePrompt,
+    negativePrompt: enrichedNegative,
     styleTag: template.masterConfig.styleTag,
     segments: composedSegments,
     cinematicScriptForRenderer: {
@@ -869,7 +1261,7 @@ export function composeCinematicScript(
       hook: composedSegments[0]?.effectDescription ?? composedTitle,
       cta: composedSegments[composedSegments.length - 1]?.screenText || `${vars.brand}`,
       closingLine: composedSegments[composedSegments.length - 1]?.screenText || `${vars.brand}`,
-      negativePrompt: template.masterConfig.negativePrompt,
+      negativePrompt: enrichedNegative,
       scenes: composedSegments.map(seg => ({
         idx: seg.idx,
         timeStartSec: seg.startSec,

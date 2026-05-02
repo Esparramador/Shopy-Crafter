@@ -2736,7 +2736,7 @@ function UploadConcatTab({
 // ═══════════════════════════════════════════════════════════════════════════
 interface CinematicTplListItem {
   id: string;
-  category: "anatomy" | "deconstruction" | "construction" | "exploded_view" | "apple_porsche" | "presenter_hybrid";
+  category: "anatomy" | "deconstruction" | "construction" | "exploded_view" | "apple_porsche" | "presenter_hybrid" | "lifestyle" | "personal_brand" | "action_pulse";
   name: string;
   shortDescription: string;
   longDescription: string;
@@ -2802,8 +2802,11 @@ const CINEMATIC_CATEGORY_BADGE: Record<CinematicTplListItem["category"], { label
   deconstruction:   { label: "Deconstrucción",    color: "#e2664f" },
   construction:     { label: "Construcción",      color: "#4fa3e2" },
   presenter_hybrid: { label: "Presentador",       color: "#c8a84b" },
-  exploded_view:  { label: "Exploded View",   color: "#7e6dd6" },
-  apple_porsche:  { label: "Apple/Porsche",   color: "#9aa0a6" },
+  exploded_view:    { label: "Exploded View",     color: "#7e6dd6" },
+  apple_porsche:    { label: "Apple/Porsche",     color: "#9aa0a6" },
+  lifestyle:        { label: "Lifestyle",         color: "#7fb38a" },
+  personal_brand:   { label: "Marca Personal",    color: "#d68fb3" },
+  action_pulse:     { label: "Action / Sport",    color: "#e74c3c" },
 };
 
 function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCreditError }: {
@@ -2817,12 +2820,17 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string>("");
 
-  // Variables del producto
+  // Variables del producto / marca
   const [productName, setProductName] = useState("");
   const [brand, setBrand] = useState("");
   const [productMaterials, setProductMaterials] = useState("");
   const [productColors, setProductColors] = useState("");
   const [industry, setIndustry] = useState("");
+  // Variables de marca personal / servicio / educator (plantillas no-producto)
+  const [painPoint, setPainPoint] = useState("");
+  const [coreBenefit, setCoreBenefit] = useState("");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [callToAction, setCallToAction] = useState("");
   const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16");
 
   // Composición / render
@@ -2840,6 +2848,16 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
 
   const selected = useMemo(() => templates.find(t => t.id === selectedId) || null, [templates, selectedId]);
   const requiresPresenter = Boolean(selected?.masterConfig?.requiresPresenter);
+
+  // Variables-aware UI: solo mostramos inputs que la plantilla declara en
+  // `variables[]`. Esto da soporte universal a plantillas de marca personal
+  // / educator (que no necesitan materiales/colores pero sí pain-point/CTA).
+  const tplVars = useMemo(() => new Set(selected?.variables || []), [selected]);
+  const wants = (key: string) => tplVars.size === 0 || tplVars.has(key);
+  // El producto físico es opcional para plantillas talking-head / personal-brand
+  // que no usan {{PRODUCT_NAME}}. Si la plantilla no lo declara, no exigimos
+  // ni el nombre de producto ni el upload de imagen.
+  const requiresPhysicalProduct = wants("PRODUCT_NAME");
 
   // Pre-rellena identityPrompt cuando la plantilla tiene defaultPresenterPrompt.
   // Se ejecuta cuando cambia la plantilla seleccionada (no cuando cambia
@@ -2895,19 +2913,34 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
 
   const compose = async () => {
     if (!selected) { onError("Selecciona una plantilla primero"); return; }
-    if (productName.trim().length < 2) { onError("Nombre del producto requerido (mín 2 caracteres)"); return; }
+    if (requiresPhysicalProduct && productName.trim().length < 2) {
+      onError("Nombre del producto requerido (mín 2 caracteres)"); return;
+    }
     if (brand.trim().length < 2) { onError("Marca requerida (mín 2 caracteres)"); return; }
+    // Validación específica para plantillas marca personal: pedimos al
+    // menos el beneficio principal y el CTA, las dos variables que dan
+    // sentido al guion talking-head.
+    if (wants("CORE_BENEFIT") && coreBenefit.trim().length < 2) {
+      onError("Beneficio principal requerido (mín 2 caracteres)"); return;
+    }
+    if (wants("CALL_TO_ACTION") && callToAction.trim().length < 2) {
+      onError("Llamado a la acción requerido (mín 2 caracteres)"); return;
+    }
     setComposing(true);
     try {
       const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-templates/${encodeURIComponent(selected.id)}/compose`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productName: productName.trim(),
+          productName: productName.trim() || brand.trim(),
           brand: brand.trim(),
           productMaterials: productMaterials.trim() || undefined,
           productColors: productColors.trim() || undefined,
           industry: industry.trim() || undefined,
+          painPoint:      painPoint.trim()      || undefined,
+          coreBenefit:    coreBenefit.trim()    || undefined,
+          targetAudience: targetAudience.trim() || undefined,
+          callToAction:   callToAction.trim()   || undefined,
           aspect,
         }),
       });
@@ -3134,36 +3167,76 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
 
             <Section title="📦 Datos del producto (variables a rellenar)">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Producto *</label>
-                  <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
-                    placeholder="Ej. Day-Date 40mm KAWS Edition"
-                    style={inputStyle} />
-                </div>
+                {wants("PRODUCT_NAME") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Producto *</label>
+                    <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
+                      placeholder="Ej. Day-Date 40mm KAWS Edition"
+                      style={inputStyle} />
+                  </div>
+                )}
                 <div>
                   <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Marca *</label>
                   <input type="text" value={brand} onChange={e => setBrand(e.target.value)}
-                    placeholder="Ej. Rolex"
+                    placeholder={requiresPhysicalProduct ? "Ej. Rolex" : "Ej. Tu nombre o marca personal"}
                     style={inputStyle} />
                 </div>
-                <div>
-                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Materiales</label>
-                  <input type="text" value={productMaterials} onChange={e => setProductMaterials(e.target.value)}
-                    placeholder="Ej. 18kt yellow gold, ceramic, sapphire crystal"
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Colores</label>
-                  <input type="text" value={productColors} onChange={e => setProductColors(e.target.value)}
-                    placeholder="Ej. champagne gold, deep black, ivory white"
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Industria / Contexto</label>
-                  <input type="text" value={industry} onChange={e => setIndustry(e.target.value)}
-                    placeholder="Ej. luxury watchmaking, executive lifestyle"
-                    style={inputStyle} />
-                </div>
+                {wants("PRODUCT_MATERIALS") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Materiales</label>
+                    <input type="text" value={productMaterials} onChange={e => setProductMaterials(e.target.value)}
+                      placeholder="Ej. 18kt yellow gold, ceramic, sapphire crystal"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("PRODUCT_COLORS") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Colores</label>
+                    <input type="text" value={productColors} onChange={e => setProductColors(e.target.value)}
+                      placeholder="Ej. champagne gold, deep black, ivory white"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("INDUSTRY") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Industria / Contexto</label>
+                    <input type="text" value={industry} onChange={e => setIndustry(e.target.value)}
+                      placeholder="Ej. luxury watchmaking, fitness, beauty, fashion, home decor, automotive, food, tech"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("TARGET_AUDIENCE") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Audiencia objetivo</label>
+                    <input type="text" value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
+                      placeholder="Ej. emprendedores que escalan su negocio digital"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("PAIN_POINT") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Punto de dolor</label>
+                    <input type="text" value={painPoint} onChange={e => setPainPoint(e.target.value)}
+                      placeholder="Ej. la dificultad de captar clientes premium"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("CORE_BENEFIT") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Beneficio principal *</label>
+                    <input type="text" value={coreBenefit} onChange={e => setCoreBenefit(e.target.value)}
+                      placeholder="Ej. libertad financiera real en 90 días"
+                      style={inputStyle} />
+                  </div>
+                )}
+                {wants("CALL_TO_ACTION") && (
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Llamado a la acción *</label>
+                    <input type="text" value={callToAction} onChange={e => setCallToAction(e.target.value)}
+                      placeholder="Ej. Reserva tu sesión gratuita en el link"
+                      style={inputStyle} />
+                  </div>
+                )}
                 <div>
                   <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Aspecto</label>
                   <select value={aspect} onChange={e => setAspect(e.target.value as any)} style={inputStyle}>
