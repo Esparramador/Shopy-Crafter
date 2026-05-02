@@ -863,13 +863,28 @@ export async function applyBrandOverlay(
 
     const layers: string[] = [];
 
+    // Professional legibility strategy (broadcast-grade):
+    //  1. Semi-transparent dark backplate (drawtext box=1) behind every text
+    //     line so the typography stays readable on bright/busy backgrounds.
+    //     This is the same technique used by Reels/Shorts captions, Apple
+    //     Keynote lower-thirds and Netflix subtitles.
+    //  2. Strong outline (borderw 3-4 black @0.9) for hard edges.
+    //  3. Soft drop shadow for depth.
+    //  4. Tight padding (boxborderw) so the plate hugs the text on both axes.
+    //
+    // boxborderw is supported by FFmpeg drawtext since 4.2 (Replit ships 5.x).
+    // Using single-value boxborderw applies same padding to all 4 sides.
     if (brand) {
-      // Brand: top of frame at 8% from top, white with black outline + soft shadow.
+      // Brand: top of frame at 8% from top, white text on dark backplate.
       const brandY = `${Math.round(height * 0.08)}`;
       const brandAlpha = alphaExpr(brandStart, brandEnd, brandFadeIn, brandFadeOut);
+      // Padding scales with font size so the plate always looks proportional.
+      const brandBoxPad = Math.max(8, Math.round(brandFs * 0.35));
       layers.push(
         `drawtext=fontfile='${fontEsc}':textfile='${escFilterPath(brandFile)}'` +
-        `:fontsize=${brandFs}:fontcolor=white:borderw=3:bordercolor=black@0.85` +
+        `:fontsize=${brandFs}:fontcolor=white` +
+        `:box=1:boxcolor=black@0.55:boxborderw=${brandBoxPad}` +
+        `:borderw=3:bordercolor=black@0.9` +
         `:shadowcolor=black@0.55:shadowx=0:shadowy=2` +
         `:x=${xCentered}:y=${brandY}` +
         `:enable='between(t\\,${brandStart}\\,${brandEnd})'` +
@@ -877,13 +892,17 @@ export async function applyBrandOverlay(
       );
     }
     if (cta) {
-      // CTA: lower third (~78% from top), bold gold with strong outline so it
-      // remains legible over any background.
+      // CTA: lower third (~78% from top), bold gold text on dark backplate.
+      // Higher box opacity than the brand because the CTA is the conversion
+      // moment — it MUST be legible no matter what is happening in the frame.
       const ctaY = `${Math.round(height * 0.78)}`;
       const ctaAlpha = alphaExpr(ctaStart, ctaEnd, ctaFadeIn, ctaFadeOut);
+      const ctaBoxPad = Math.max(10, Math.round(ctaFs * 0.4));
       layers.push(
         `drawtext=fontfile='${fontEsc}':textfile='${escFilterPath(ctaFile)}'` +
-        `:fontsize=${ctaFs}:fontcolor=0xC8A84B:borderw=4:bordercolor=black@0.9` +
+        `:fontsize=${ctaFs}:fontcolor=0xC8A84B` +
+        `:box=1:boxcolor=black@0.65:boxborderw=${ctaBoxPad}` +
+        `:borderw=4:bordercolor=black@0.95` +
         `:shadowcolor=black@0.6:shadowx=0:shadowy=3` +
         `:x=${xCentered}:y=${ctaY}` +
         `:enable='between(t\\,${ctaStart}\\,${ctaEnd})'` +

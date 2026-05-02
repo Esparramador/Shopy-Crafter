@@ -126,7 +126,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional" },
   { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Upscale 4K, mejora de caras, detalle creativo" },
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling, Seedance, Hailuo" },
-  { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Pollo Seedance 2.0)" },
+  { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (orquestador propio sobre Seedance Pro / Kling / Veo)" },
   { id: "uploadconcat", label: "Concat propio", icon: <Film size={15} />,     desc: "Sube tus propios clips MP4 y los concatena con voz/música" },
   { id: "avatars",    label: "Avatares",        icon: <UserSquare size={15} />, desc: "Talking heads y product avatars por nicho" },
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
@@ -1548,7 +1548,7 @@ const pillButton = (active: boolean): React.CSSProperties => ({
   border: `1px solid ${active ? "var(--gold)" : "var(--bdr)"}`,
 });
 
-// ─── TAB: MULTI-SHOT (Pollo Seedance 2.0) ─────────────────────────────────
+// ─── TAB: MULTI-SHOT (orquesta Seedance Pro / Kling / Veo) ────────────────
 function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
   const [brand, setBrand] = useState("");
   const [productName, setProductName] = useState("");
