@@ -996,6 +996,14 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
             args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
           });
           const page = await browser.newPage();
+          // FIX A4: viewport explícito a 794px (A4 @ 96dpi) para que el contenido
+          // de los shells de informe (max-width:794px) renderice 1:1 sin recortes.
+          await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+          // FIX VISUAL: forzar media `screen` para que las reglas @media print
+          // de los shells dark-luxury (que blanquean el tema) NO se activen.
+          // Igual que en lib/pdf-generator.ts. Sin esto los informes exportados
+          // desde la bóveda en PDF perdían el aspecto charcoal+cobre.
+          await page.emulateMediaType("screen");
           await page.setRequestInterception(true);
           page.on("request", (req: any) => {
             const rtype = req.resourceType();
@@ -1010,7 +1018,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
           const pdfBuffer = await page.pdf({
             format: "A4",
             printBackground: true,
-            margin: { top: "15mm", bottom: "15mm", left: "10mm", right: "10mm" },
+            margin: { top: 0, right: 0, bottom: 0, left: 0 },
           });
           await browser.close();
   

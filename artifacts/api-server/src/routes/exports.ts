@@ -988,7 +988,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: ${BRAND.dark}; color: ${BRAND.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
-  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+  .page { max-width: 794px; margin: 0 auto; padding: 0; }
 
   .cover { background: #0e0e18; padding: 48px 48px 40px; border-bottom: 1px solid ${BRAND.border}; overflow: hidden; }
   .cover-logo-icon { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }
@@ -1002,7 +1002,7 @@ function reportShell(title: string, subtitle: string, body: string, date: string
   .cover-title .subtitle { font-size: 15px; color: ${BRAND.mutedLight}; margin-top: 8px; font-weight: 400; }
   .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: ${BRAND.gold}; display: inline-block; }
 
-  .body-content { padding: 40px 56px 48px; }
+  .body-content { padding: 32px 28px 40px; }
 
   .section { margin-bottom: 40px; }
   .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${BRAND.border}; }
@@ -1316,7 +1316,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${ELEGANCE.navy}; color: ${ELEGANCE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
-  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+  .page { max-width: 794px; margin: 0 auto; padding: 0; }
 
   .cover-portfolio {
     width: 100%;
@@ -1348,7 +1348,7 @@ function reportShellElegance(title: string, subtitle: string, body: string, date
 
   .cover-footer-text { font-size: 9px; color: rgba(104,128,168,.4); letter-spacing: 2px; text-transform: uppercase; }
 
-  .body-content { padding: 40px 56px 48px; }
+  .body-content { padding: 32px 28px 40px; }
 
   .section { margin-bottom: 40px; }
   .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${ELEGANCE.border}; }
@@ -1588,7 +1588,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, sans-serif; background: ${PRESTIGE.charcoal}; color: ${PRESTIGE.white}; line-height: 1.65; -webkit-font-smoothing: antialiased; }
-  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+  .page { max-width: 794px; margin: 0 auto; padding: 0; }
 
   .cover-portfolio {
     width: 100%;
@@ -1622,7 +1622,7 @@ function reportShellPrestige(title: string, subtitle: string, body: string, date
 
   .cover-footer-text { font-size: 9px; color: rgba(128,110,90,.4); letter-spacing: 2px; text-transform: uppercase; }
 
-  .body-content { padding: 40px 56px 48px; }
+  .body-content { padding: 32px 28px 40px; }
 
   .section { margin-bottom: 40px; }
   .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid ${PRESTIGE.border}; }
@@ -1930,7 +1930,7 @@ function buildCustomReportShell(tpl: CustomReportTemplate) {
   .cover-subtitle { font-size: 16px; color: ${tc}80; margin-bottom: 24px; line-height: 1.5; }
   .cover-company { font-size: 14px; color: ${pc}; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; ${cs === "minimal" ? `padding-top: 12px; border-top: 1px solid ${bc};` : ""} }
   .cover-date { font-size: 12px; color: ${tc}50; margin-top: ${cs === "minimal" ? "32px" : "16px"}; letter-spacing: ${cs === "minimal" ? "1.5px" : "0"}; text-transform: ${cs === "minimal" ? "uppercase" : "none"}; }
-  .report-body { padding: 48px; max-width: 900px; margin: 0 auto; }
+  .report-body { padding: 32px 28px; max-width: 794px; margin: 0 auto; }
   .section { margin-bottom: 32px; }
   .section-title { font-family: '${hf}', serif; font-size: 20px; font-weight: ${hw}; color: ${pc}; margin-bottom: 16px; ${ss === "accent-bar" ? `border-left: 4px solid ${pc}; padding-left: 16px;` : ""} }
   .card { background: ${cb}; border: 1px solid ${bc}; border-radius: 12px; padding: 20px; margin-bottom: 12px; }
@@ -3167,6 +3167,20 @@ router.get("/projects/:projectId/exports/complete-report", requireProjectAccess,
       };
     });
     const catalogCardsHtml = buildProductCardsSection(catalogCardsList, "Catalogo Completo");
+    // FIX VOLUMEN PDF: el complete-audit incluía TODAS las product cards en una
+    // sola .report-page, generando PDFs de 150+ páginas en catálogos grandes.
+    // Limitamos a TOP-50 priorizando los productos con peor score SEO (los que
+    // más necesitan atención del usuario). El catálogo íntegro sigue
+    // disponible en el endpoint dedicado /exports/product-catalog.
+    const catalogCardsListPriority = [...catalogCardsList]
+      .sort((a, b) => (a.auditScore ?? 0) - (b.auditScore ?? 0))
+      .slice(0, 50);
+    const catalogCardsHtmlLimited = buildProductCardsSection(
+      catalogCardsListPriority,
+      catalogCardsList.length > 50
+        ? `Productos prioritarios (top 50 por score SEO de ${catalogCardsList.length})`
+        : "Catalogo Completo"
+    );
   
     let cogsDetailRows = "";
     for (const p of products) {
@@ -3654,11 +3668,14 @@ router.get("/projects/:projectId/exports/complete-report", requireProjectAccess,
         </div>
       </div>
   
-      <!-- PAGE 9: FULL PRODUCT CARDS -->
+      <!-- PAGE 9: TOP PRODUCT CARDS (limitado a 50 para evitar PDFs de 150+ páginas) -->
       <div class="report-page">
         ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 9 : 8)}
         <div class="section">
-          ${catalogCardsHtml || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
+          ${catalogCardsHtmlLimited || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
+          ${products.length > 50 ? `<div class="card" style="margin-top:18px;border:1px dashed ${BRAND.gold};background:rgba(200,168,75,.06);text-align:center;">
+            <p class="text-muted" style="font-size:13px;line-height:1.6;margin:0;">Mostrando los <strong style="color:${BRAND.gold};">50 productos prioritarios</strong> (peor score SEO primero) de un total de <strong style="color:${BRAND.white};">${products.length}</strong>. Para el catálogo completo, descarga el informe específico <em>"Catálogo de Productos"</em> desde el Centro de Exportación.</p>
+          </div>` : ""}
         </div>
       </div>`;
   

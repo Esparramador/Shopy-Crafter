@@ -45,6 +45,18 @@ export async function generatePdfFromHtml(
     // (efecto "portada partida en dos hojas" al imprimir el PDF).
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
 
+    // FIX VISUAL DARK-LUXURY: por defecto Puppeteer.page.pdf() activa el
+    // media query `print`, lo cual dispara reglas como
+    //   `@media print { body { background: white; color: #1a1a1a } }`
+    // presentes en los shells (classic/elegance/prestige/custom). Esto
+    // CONVIERTE el tema oscuro corporativo (charcoal #120e0a + cobre #c4956a)
+    // en cream/beige/blanco, rompiendo la coherencia visual entre la portada
+    // (que usa estilos inline dark inmunes a @media print) y el cuerpo del
+    // informe. Forzar `screen` preserva la estética premium del HTML original
+    // 1:1 en el PDF y elimina la principal queja de los usuarios sobre
+    // "el PDF no se parece al HTML / queda menos profesional".
+    await page.emulateMediaType("screen");
+
     await page.setRequestInterception(true);
     page.on("request", (r: any) => {
       const t = r.resourceType();

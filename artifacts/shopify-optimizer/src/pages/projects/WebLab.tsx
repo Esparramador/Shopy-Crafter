@@ -104,7 +104,13 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [phase, setPhase] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview" | "edit">("summary");
+  // FIX UX: arrancamos en "css" en vez de "summary" para que el usuario vea
+  // INMEDIATAMENTE el .css real generado (era la queja principal: "solo veo
+  // las instrucciones, no el CSS"). Cuando llega un análisis nuevo `analyze()`
+  // pasa explícitamente a "preview" para mostrar el iframe con el rediseño,
+  // pero el primer renderizado al cargar la página o un histórico ya muestra
+  // el código CSS real (con botones de copiar / descargar visibles).
+  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview" | "edit">("css");
   const [copied, setCopied] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -700,9 +706,49 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
 
       {a && result && (
         <>
+          {/* CTA visible: el usuario reportaba "solo veo las instrucciones, no veo
+              el .css real". Antes el tab "Resumen" salía por defecto y ocultaba
+              el CSS. Ahora arrancamos en "css" y mostramos este banner para que
+              quede crystal-clear que el CSS REAL generado está debajo y se puede
+              copiar/descargar. */}
+          {a.improvedCss && a.improvedCss.length > 50 && (
+            <div style={{
+              marginBottom: 14,
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(212,168,67,.10), rgba(184,134,11,.06))",
+              border: "1px solid rgba(212,168,67,.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}>
+              <div style={{ fontSize: 13, color: "var(--t1, #eee)" }}>
+                <strong style={{ color: "#d4a843" }}>✓ CSS real generado y listo</strong>
+                <span style={{ color: "var(--t2, #aaa)", marginLeft: 8 }}>
+                  ({a.improvedCss.length.toLocaleString("es-ES")} caracteres) — pestañas: <em>Código CSS</em> ver/copiar, <em>Preview</em> ver renderizado, <em>Editar</em> ajustar y guardar.
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setTab("css")}
+                  style={{ padding: "6px 12px", background: tab === "css" ? "#d4a843" : "#1a1a2e", color: tab === "css" ? "#000" : "#d4a843", border: "1px solid #d4a843", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                >💻 Ver CSS</button>
+                <button
+                  onClick={() => copyToClipboard(a.improvedCss, "CSS")}
+                  style={{ padding: "6px 12px", background: "#1a1a2e", color: "#22c55e", border: "1px solid #22c55e44", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                >📋 Copiar</button>
+                <button
+                  onClick={() => downloadFile(a.improvedCss, "improved-styles.css", "text/css")}
+                  style={{ padding: "6px 12px", background: "#1a1a2e", color: "#aaa", border: "1px solid #333", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                >💾 Descargar</button>
+              </div>
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            {(["summary", "css", "html", "preview", "edit"] as const).map((t) => {
-              const labels = { summary: "📊 Resumen", css: "💻 Código CSS", html: "🏗️ HTML", preview: "👁️ Preview", edit: "✏️ Editar y Guardar" };
+            {(["css", "preview", "edit", "summary", "html"] as const).map((t) => {
+              const labels = { summary: "📊 Recomendaciones", css: "💻 CSS Real Generado", html: "🏗️ HTML", preview: "👁️ Preview Visual", edit: "✏️ Editar y Guardar" };
               return (
                 <button
                   key={t}

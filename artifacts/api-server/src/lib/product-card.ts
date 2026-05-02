@@ -189,11 +189,16 @@ export function buildProductCard(product: ProductCardData): string {
   const gc = gradeColor(product.auditGrade);
   const gb = gradeBg(product.auditGrade);
 
+  // FIX RECORTE PDF: en A4 (794px) la imagen 140px+grid de info quedaba justa
+  // y los badges anchos (ej "+32-60% CTR SERP") salían por la derecha. Bajamos
+  // la imagen a 120px y añadimos `min-width:0` al contenedor info para que el
+  // grid de métricas pueda colapsar correctamente cuando el ancho disponible
+  // es escaso, en vez de forzar overflow horizontal.
   const imgSection = product.imageUrl
-    ? `<div style="width:140px;height:140px;flex-shrink:0;border-radius:12px;overflow:hidden;background:${BRAND.surface};border:1px solid ${BRAND.border};">
-        <img src="${esc(product.imageUrl)}" alt="${esc(product.title)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:${BRAND.muted};font-size:32px;\\'>&#128247;</div>'" />
+    ? `<div style="width:120px;height:120px;flex-shrink:0;border-radius:12px;overflow:hidden;background:${BRAND.surface};border:1px solid ${BRAND.border};">
+        <img src="${esc(product.imageUrl)}" alt="${esc(product.title)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:${BRAND.muted};font-size:28px;\\'>&#128247;</div>'" />
       </div>`
-    : `<div style="width:140px;height:140px;flex-shrink:0;border-radius:12px;overflow:hidden;background:${BRAND.surface};border:1px solid ${BRAND.border};display:flex;align-items:center;justify-content:center;color:${BRAND.muted};font-size:32px;">&#128247;</div>`;
+    : `<div style="width:120px;height:120px;flex-shrink:0;border-radius:12px;overflow:hidden;background:${BRAND.surface};border:1px solid ${BRAND.border};display:flex;align-items:center;justify-content:center;color:${BRAND.muted};font-size:28px;">&#128247;</div>`;
 
   const imgCountColor = product.imageCount === 0 ? BRAND.red : product.imageCount < 3 ? BRAND.orange : product.imageCount < 8 ? BRAND.gold : BRAND.jade;
 

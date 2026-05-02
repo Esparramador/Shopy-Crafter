@@ -869,7 +869,7 @@ export function generateBrandGuideHtml(profile: BrandProfile): string {
 @import url('${fonts.importUrl}');
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Inter', sans-serif; background: #0a0a12; color: #f0f0f5; line-height: 1.6; }
-.page { max-width: 960px; margin: 0 auto; padding: 48px; }
+.page { max-width: 794px; margin: 0 auto; padding: 32px 28px; }
 .cover { text-align: center; padding: 80px 40px; border-bottom: 2px solid #1a1a28; margin-bottom: 48px; }
 .cover h1 { font-size: 42px; font-weight: 900; color: #c8a84b; margin-bottom: 8px; }
 .cover p { color: #9494a8; font-size: 16px; }
