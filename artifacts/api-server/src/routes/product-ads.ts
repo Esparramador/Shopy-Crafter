@@ -154,14 +154,21 @@ router.post(
         voiceStyle: voice.style,
         addMusic: body.addMusic !== false,
         variantsCount: 1,
+        // customPrompt is consumed by the COPY-WRITER (Claude) only; never
+        // injected verbatim into the video model's prompt. We deliberately
+        // keep CTA text and price OUT of the video prompt — they go ONLY
+        // into the FFmpeg overlay (ctaOverlayText below) so the AI can't
+        // render them as garbled hallucinated typography.
         customPrompt: [
-          body.ctaText ? `CTA obligatorio al final: "${body.ctaText}"` : "",
           body.customNotes ? `Notas extra: ${body.customNotes.slice(0, 300)}` : "",
           `Idioma del voiceover: ${language === "auto" ? "español" : language}`,
-          `Precio: ${product.price || "(no disponible)"} ${(project as any).currency || "EUR"}`,
-          `Descripción producto: ${stripHtml(product.bodyHtml).slice(0, 400)}`,
+          `Descripción producto (solo para guion / voz): ${stripHtml(product.bodyHtml).slice(0, 400)}`,
         ].filter(Boolean).join(". "),
         sourceImageUrl,
+        // Deterministic overlay (always-on by default in runAdCampaign)
+        renderBrandOverlay: true,
+        brandOverlayText: project.name || product.title || "",
+        ctaOverlayText: body.ctaText || undefined,
       };
 
       const { variants, errors } = await runAdCampaign(input, replicateToken);

@@ -183,7 +183,7 @@ ${productDNA.identityLockBlock}
 
 Materiales reales: ${productDNA.materials.map((m) => `${m.name}@${m.location}`).join("; ") || "—"}
 Capas para deconstrucción/exploded view: ${productDNA.deconstructionPoints.map((d) => `${d.layer}: ${d.explanation}`).join(" | ") || "—"}
-Texto visible en producto (preserva ORTOGRAFÍA exacta): ${productDNA.branding.visibleText.join('", "') || "—"}
+NOTA SOBRE TEXTO DEL PRODUCTO: el producto puede tener etiquetas/marcas/letras visibles en su diseño físico, pero los modelos generativos NO saben renderizar texto sin deformarlo. Cuando describas el producto en keyframePrompt/videoPrompt, refiérete a esos elementos por SU FORMA Y POSICIÓN ("rectangular fabric tag at the inner collar", "embroidered logo motif at chest"), NUNCA escribas el texto literal. La marca verbal se sobreimprime después con tipografía vectorial limpia.
 `;
 
   return `Diseña el GUION DIRECTORIAL completo de un anuncio largo de ${req.totalDurationSec} segundos (${(req.totalDurationSec / 60).toFixed(1)} min) para "${productDNA.productName}" de la marca "${req.brand}".
@@ -200,7 +200,7 @@ BRIEF:
 - Idioma del voiceover: ${req.language}
 - Estilo visual: ${styleHint}
 - Aspecto: ${req.aspect}
-- CTA específica: ${req.ctaText || "—"}
+- CTA verbal (SOLO para voiceoverLine de la última escena, NUNCA para keyframePrompt ni videoPrompt): ${req.ctaText || "—"}
 - Brief adicional: ${req.customBrief || "—"}
 - Modo composición: ${req.compositionMode.toUpperCase()}
 ${compositionDirective}
@@ -243,6 +243,14 @@ REGLAS DURAS:
 - timeStartSec/timeEndSec respetan exactamente las duraciones indicadas arriba.
 - voiceoverLine en ${req.language}; keyframePrompt y videoPrompt en INGLÉS.
 - NUNCA cambies la identidad del personaje ni del producto (usa los bloques de identidad).
+- ANTI-TEXTO ESTRICTO: keyframePrompt y videoPrompt NUNCA contienen el nombre de la marca,
+  el nombre del producto, el CTA, el precio, ni ninguna palabra entre comillas. Los modelos de
+  imagen y vídeo pintan ese texto deformado. La marca y el CTA se sobreimprimen DETERMINISTAMENTE
+  después con FFmpeg drawtext; tu trabajo es describir solo el contenido VISUAL de la escena.
+  Termina cada keyframePrompt y cada videoPrompt con: "no text, no letters, no logos, no
+  brand names, no captions, no typography of any kind on any surface".
+- TRANSICIONES: cada escena hereda paleta, sujeto y ángulo aproximado de la anterior — el corte
+  debe sentirse continuo (no saltes de set ni de paleta sin justificación del style/act).
 - NO devuelvas Markdown, NO devuelvas explicaciones — solo el JSON.`;
 }
 
@@ -337,7 +345,11 @@ export async function generateDirectedScript(req: DirectorRequest): Promise<Cine
         const next: any = script.scenes[i + 1] || {};
         return `idx=${script.scenes[i].idx} act=${p.act} dur=${p.durationSec}s prev_VO="${(prev.voiceoverLine || "").slice(0, 80)}" next_VO="${(next.voiceoverLine || "").slice(0, 80)}"`;
       }).join("\n");
-      const repairPrompt = `Repara SOLO las escenas marcadas (idx ${idsList}) del anuncio "${script.title}". Devuelve JSON: { "scenes": [ { "idx": <id>, "keyframePrompt": "...EN INGLÉS >=90 palabras...", "videoPrompt": "...EN INGLÉS 40-90 palabras...", "voiceoverLine": "...frase en ${lang}, encadenada..." } ] }. Anchor character + product DNA en cada keyframePrompt. Contexto:\n${ctx}\n\nProduct DNA:\n${req.productDNA.identityLockBlock}`;
+      const repairPrompt = `Repara SOLO las escenas marcadas (idx ${idsList}) del anuncio "${script.title}". Devuelve JSON: { "scenes": [ { "idx": <id>, "keyframePrompt": "...EN INGLÉS >=90 palabras...", "videoPrompt": "...EN INGLÉS 40-90 palabras...", "voiceoverLine": "...frase en ${lang}, encadenada..." } ] }. Anchor character + product DNA en cada keyframePrompt.
+
+ANTI-TEXTO ESTRICTO (regla absoluta): keyframePrompt y videoPrompt NUNCA contienen el nombre de la marca "${req.brand}", el nombre del producto "${req.productDNA.productName}", precios, CTA, ni ninguna palabra entre comillas. Refiere etiquetas/logos del producto por su forma y posición, no por el texto que llevan. Termina cada keyframePrompt y videoPrompt con: "no text, no letters, no logos, no brand names, no captions, no typography of any kind on any surface".
+
+Contexto:\n${ctx}\n\nProduct DNA:\n${req.productDNA.identityLockBlock}`;
       const repaired = await askClaudeJson<{ scenes: Array<{ idx: number; keyframePrompt?: string; videoPrompt?: string; voiceoverLine?: string }> }>(
         req.projectId,
         repairPrompt,
@@ -359,11 +371,53 @@ export async function generateDirectedScript(req: DirectorRequest): Promise<Cine
     }
   }
 
+  // ── FINAL DEFENSIVE SANITIZATION ─────────────────────────────────────────
+  // Even after all the prompt-engineering rules above, Claude occasionally
+  // leaks brand/product/CTA tokens into keyframePrompt or videoPrompt (long
+  // generations, model regressions, repaired scenes). We do a runtime regex
+  // scrub here as the last line of defense BEFORE the script reaches any
+  // image/video provider. The actual provider calls in cinematic-multishot.ts
+  // also re-sanitize via fusion-studio-pro.sanitizeVideoPrompt() — this is
+  // belt-and-suspenders, not duplication, because each layer catches a
+  // slightly different failure mode (long-run drift vs. provider-side cache).
+  const forbidden = [
+    req.brand,
+    req.productDNA.productName,
+    req.ctaText || "",
+    script.title || "",
+    script.cta || "",
+    script.hook || "",
+  ].filter((s) => typeof s === "string" && s.trim().length >= 2);
+  const tail = " no text, no letters, no logos, no brand names, no captions, no typography of any kind on any surface";
+  const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let scrubbed = 0;
+  for (const sc of script.scenes as any[]) {
+    for (const field of ["keyframePrompt", "videoPrompt"] as const) {
+      const before = String(sc[field] || "");
+      let after = before;
+      // Strip quoted brand/CTA spans
+      after = after.replace(/[""„«»][^""„«»]{1,80}[""„«»]/g, " ");
+      after = after.replace(/"[^"]{1,80}"/g, " ");
+      // Strip dynamic forbidden tokens
+      for (const tk of forbidden) {
+        try { after = after.replace(new RegExp(escapeRe(tk), "gi"), " "); } catch { /* skip */ }
+      }
+      // Strip price-like numerics
+      after = after.replace(/[$€£¥]\s?\d{1,5}([.,]\d{1,2})?/g, " ");
+      after = after.replace(/\s+/g, " ").trim();
+      if (!/no\s+text/i.test(after)) after = after + tail;
+      if (after !== before) scrubbed++;
+      sc[field] = after;
+    }
+  }
+
   logger.info({
     projectId: req.projectId,
     scenes: script.scenes.length,
     title: script.title,
-  }, "🎬 Director: script ready");
+    scenesScrubbed: scrubbed,
+    forbiddenTokenCount: forbidden.length,
+  }, "🎬 Director: script ready (post-sanitization)");
 
   return script;
 }

@@ -594,6 +594,60 @@ export function modelSupportsTextToVideo(model: VideoModel): boolean {
   return !!T2V_SUPPORTED[model];
 }
 
+/**
+ * Centralized anti-text guard for any video-generation prompt.
+ *
+ * The narrative pipeline (Claude director, Multi-shot scripts, user briefs)
+ * routinely leaks brand names, CTAs, prices and quoted phrases into video
+ * prompts. The video models will then try to "burn" them into frames as
+ * garbled hallucinated typography. This guard:
+ *   - strips quoted phrases and bracketed brand placeholders
+ *   - removes CTA-shaped imperatives ("buy now", "compra ya", "click here")
+ *   - removes price tokens ("$19.99", "19,99 €")
+ *   - appends a hard ANTI_TEXT instruction tail
+ * It runs once before EVERY provider call so cinematic / hanakaze / quick-ad
+ * paths cannot silently regress.
+ */
+const FSP_ANTI_TEXT_TAIL = " ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO LOGOS, NO BRAND NAMES, NO CAPTIONS, NO SUBTITLES, NO WATERMARKS, NO TYPOGRAPHY of any kind on any surface. Strict design fidelity, no morphing, no flicker.";
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function sanitizeVideoPrompt(raw: string, forbiddenTokens?: string[]): string {
+  if (!raw) return raw;
+  let p = raw;
+  // Drop "double-quoted spans" — usually CTAs / brand mentions
+  p = p.replace(/[""„«»][^""„«»]{1,80}[""„«»]/g, " ");
+  // Drop straight ASCII "..." quotes too
+  p = p.replace(/"[^"]{1,80}"/g, " ");
+  // Drop bracketed placeholders [BRAND] {{cta}}
+  p = p.replace(/[\[{]{1,2}[A-Za-z0-9_\- ]{1,40}[\]}]{1,2}/g, " ");
+  // Drop common CTA imperatives (English + Spanish) up to a punctuation boundary
+  p = p.replace(/\b(buy now|shop now|click here|claim yours|order today|learn more|sign up|get yours|compra ya|comprar ahora|hazte con|consigue|llama ahora|regístrate|reservar|añadir al carrito)\b[^.,;!?]{0,30}/gi, " ");
+  // Drop prices in major formats
+  p = p.replace(/[$€£¥]\s?\d{1,5}([.,]\d{1,2})?/g, " ");
+  p = p.replace(/\b\d{1,5}[.,]\d{1,2}\s?(€|EUR|USD|GBP|JPY)\b/gi, " ");
+  // Drop dynamic forbidden tokens (brand name, product name, CTA copy, …)
+  // The cinematic stack passes these explicitly so even when Claude leaks the
+  // verbatim brand/product, we strip it before the model burns it as text.
+  if (forbiddenTokens && forbiddenTokens.length) {
+    for (const tk of forbiddenTokens) {
+      const t = (tk || "").trim();
+      if (t.length < 2) continue;
+      try {
+        const re = new RegExp(escapeRegex(t), "gi");
+        p = p.replace(re, " ");
+      } catch { /* ignore bad token */ }
+    }
+  }
+  // Collapse whitespace
+  p = p.replace(/\s+/g, " ").trim();
+  // Append the anti-text tail (idempotent — if prompt already contains
+  // "no text" we don't re-append). Match on a substring to be permissive.
+  if (!/no\s+text/i.test(p)) p = p + FSP_ANTI_TEXT_TAIL;
+  return p;
+}
+
 export async function generateVideoFromImage(
   model: VideoModel,
   imageBuffer: Buffer | null, imageMime: string,
@@ -607,6 +661,9 @@ export async function generateVideoFromImage(
   if (!imageBuffer && !T2V_SUPPORTED[model]) {
     throw new Error(`Modelo "${model}" requiere imagen origen (no soporta text-to-video puro)`);
   }
+  // Centralized anti-text-leak guard — strips brand quotes / CTAs / prices
+  // from ANY upstream prompt (cinematic, hanakaze, custom briefs).
+  prompt = sanitizeVideoPrompt(prompt);
   // Apply camera preset prompt prefix if requested (Pollo-style cinematic
   // grammar). Preset is a no-op when unknown/empty.
   prompt = applyCameraPreset(prompt, opts.cameraPreset);

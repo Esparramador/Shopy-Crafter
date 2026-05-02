@@ -138,6 +138,97 @@ const ANTI_TEXT_AND_FIDELITY = [
   "Photorealistic motion, smooth camera, no flicker, no warping, no artifacts.",
 ].join(" ");
 
+/** Negative prompt sent to every Replicate video model that supports it. */
+const VIDEO_NEGATIVE_PROMPT = [
+  "text, words, letters, captions, subtitles, watermark, logo, brand name,",
+  "typography, writing, sign, label, garbled text, misspelled letters,",
+  "deconstruction, melting, morphing, color shift, design change, flicker, warping,",
+  "low quality, blurry, distorted, artifact, deformed, ugly, glitch",
+].join(" ");
+
+/**
+ * Build a TEXT-FREE visual prompt for the AI video model.
+ *
+ * The narrative copy (`copy.body`) routinely contains the brand name, the
+ * product name, the CTA, even prices — all things the video model will try
+ * to "burn" into the frame as garbled hallucinated text. To stop the noise
+ * we deliberately DROP `copy.body` from the video prompt and reconstruct it
+ * with purely visual cues: tone (atmosphere), category (subject), template
+ * camera preset (motion), aspect (framing). The ad's actual message is
+ * delivered separately by (a) the voiceover, and (b) the FFmpeg drawtext
+ * overlay for brand and CTA. This is the same separation Hanakaze v3 uses.
+ */
+function escapeRegexAd(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildVisualVideoPrompt(
+  input: AdCampaignInput,
+  copy: AdCopyVariant,
+  cameraLine: string,
+): string {
+  // Forbidden tokens — every brand-identifying string the operator supplied
+  // PLUS the AI-generated copy fields. We will scrub these from the subject
+  // line AND from the final prompt before it leaves this function. If any
+  // survive (developer error / new field added), we FAIL-CLOSED with a throw
+  // so the variant errors out instead of silently shipping leaked text.
+  const forbidden = [
+    input.brandName,
+    input.productTitle,
+    input.brandOverlayText,
+    input.ctaOverlayText,
+    copy.cta,
+    copy.hook,
+    copy.body,
+  ].filter((s): s is string => typeof s === "string" && s.trim().length >= 2);
+
+  // Build raw subject from category, then strip every forbidden token from it
+  // (catalogs commonly stuff "Hanakaze Sakura t-shirt" into productCategory).
+  let subject = (input.productCategory || "product").replace(/[^a-zA-Z0-9 ,.-]/g, "").slice(0, 80);
+  for (const tk of forbidden) {
+    try { subject = subject.replace(new RegExp(escapeRegexAd(tk), "gi"), " "); } catch { /* skip */ }
+  }
+  subject = subject.replace(/\s+/g, " ").trim() || "product";
+
+  const tone = (copy.tone || "premium").replace(/[^a-zA-Z0-9 ,.-]/g, "").slice(0, 40);
+  let out = [
+    `Cinematic product advertising shot of a ${subject}.`,
+    cameraLine.trim(),
+    `Professional studio lighting, ${tone} atmosphere, photorealistic.`,
+    ANTI_TEXT_AND_FIDELITY,
+  ].filter(Boolean).join(" ").trim();
+
+  // Final scrub on the assembled prompt (defense-in-depth: catches any leak
+  // we might add through cameraLine or future template edits).
+  for (const tk of forbidden) {
+    try { out = out.replace(new RegExp(escapeRegexAd(tk), "gi"), " "); } catch { /* skip */ }
+  }
+  out = out.replace(/\s+/g, " ").trim();
+
+  // Telemetry + fail-closed leak gate.
+  const head = out.replace(ANTI_TEXT_AND_FIDELITY, "").trim();
+  const lowerHead = head.toLowerCase();
+  const leakedToken = forbidden.find((tk) => {
+    const t = tk.toLowerCase().trim();
+    return t.length >= 3 && lowerHead.includes(t);
+  });
+  if (leakedToken) {
+    logger.error(
+      { videoPromptHead: head.slice(0, 200), leakedToken },
+      "adstudio: ANTI-TEXT LEAK DETECTED — refusing to send prompt to video provider",
+    );
+    throw new Error(
+      `Anti-text-leak gate: forbidden token "${leakedToken}" survived sanitization in video prompt. ` +
+      `This is a bug — please report. The variant has been refused to prevent shipping garbled IA typography.`,
+    );
+  }
+  logger.info(
+    { videoPromptHead: head.slice(0, 200), brandLeakDetected: false, forbiddenTokenCount: forbidden.length },
+    "adstudio: built visual-only video prompt",
+  );
+  return out;
+}
+
 export interface AdAssetPaths {
   copyVariantIndex: number;
   heroImagePath?: string;   // local tmp path
@@ -360,7 +451,9 @@ async function generateVideoRunway(
   const tpl = getTemplate(input.template);
   const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
   const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  const runwayPrompt = `${copy.body}. Cinematic product advertising shot.${cameraLine} Professional lighting, ${copy.tone} atmosphere. ${ANTI_TEXT_AND_FIDELITY}`;
+  // Visual-only prompt: NEVER pass copy.body / brand / product name to the
+  // video model — it would try to render them as garbled text on screen.
+  const runwayPrompt = buildVisualVideoPrompt(input, copy, cameraLine);
 
   // 1. Create task
   const createRes = await fetch(`${RUNWAY_BASE}/image_to_video`, {
@@ -431,8 +524,10 @@ async function generateVideoReplicate(
   const tpl = getTemplate(input.template);
   const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
   const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  const prompt = `${copy.body}. Cinematic product advertising,${cameraLine} professional lighting, ${copy.tone} mood, smooth camera. ${ANTI_TEXT_AND_FIDELITY}`;
-  const negativePrompt = "text, words, letters, captions, subtitles, watermark, logo, brand name, typography, writing, sign, label, garbled text, misspelled letters, deconstruction, melting, morphing, color shift, design change, flicker, warping";
+  // Visual-only prompt: NEVER pass copy.body / brand / product name to the
+  // video model — it would try to render them as garbled text on screen.
+  const prompt = buildVisualVideoPrompt(input, copy, cameraLine);
+  const negativePrompt = VIDEO_NEGATIVE_PROMPT;
 
   const input_params: any = modelId.startsWith("bytedance/")
     ? { prompt, image: dataUri, duration: input.videoDurationSec, resolution: "1080p" }
@@ -693,11 +788,20 @@ export async function applyBrandOverlay(
   // If both empty, nothing to do — return original.
   if (!brand && !cta) return videoBuffer;
 
-  // Verify font exists; fail-soft to original video if not (overlay is a
-  // nice-to-have — the user still gets a working ad MP4).
-  try { await fs.access(DEJAVU_BOLD_PATH); } catch {
-    logger.warn({ path: DEJAVU_BOLD_PATH }, "adstudio: DejaVu Bold not found, skipping brand overlay");
-    return videoBuffer;
+  // Verify font exists. FAIL LOUD (not silent): publishing an ad without
+  // brand text is unacceptable — the user explicitly relies on this layer
+  // to deliver the brand name and CTA after we forbid the AI from rendering
+  // any text. If the font is missing the deployment is broken and must be
+  // fixed at the system level (apt install fonts-dejavu-core).
+  try {
+    await fs.access(DEJAVU_BOLD_PATH);
+  } catch {
+    logger.error({ path: DEJAVU_BOLD_PATH }, "adstudio: DejaVu Bold MISSING — cannot burn deterministic brand/CTA overlay");
+    throw new Error(
+      `Brand overlay font not installed: ${DEJAVU_BOLD_PATH}. ` +
+      `Install with: apt-get install -y fonts-dejavu-core. ` +
+      `Refusing to ship an ad without legible brand/CTA typography.`,
+    );
   }
 
   const tmp = await makeTmpDir("overlay");
@@ -874,34 +978,34 @@ export async function runAdCampaign(
       // STEP 6.5 (always-on by default): Burn deterministic brand + CTA overlay
       // with FFmpeg drawtext. This replaces the AI-rendered text that the video
       // model used to hallucinate (misspelled brand names, garbled captions).
-      // Default ON because publishing ads with broken text is unacceptable.
+      // FAIL-LOUD policy: when overlay is requested explicitly we refuse to
+      // ship a video without legible brand/CTA — that's the entire point of
+      // the deterministic typography layer. The AI was instructed NOT to
+      // render text, so without the overlay the ad has no brand on screen.
       const wantBrandOverlay = input.renderBrandOverlay !== false;
       if (wantBrandOverlay) {
-        try {
-          onProgress?.({ stage: "overlay", variantIndex: i, message: `[${i + 1}/${copies.length}] Sobreimponiendo marca y CTA con tipografía nítida...` });
-          const brandText = (input.brandOverlayText ?? input.brandName ?? input.productTitle ?? "").toString();
-          const ctaText = (input.ctaOverlayText ?? copy.cta ?? "").toString();
-          const before = finalMp4;
-          finalMp4 = await applyBrandOverlay(finalMp4, {
-            brandText,
-            ctaText,
-            aspect: input.aspect,
-          });
-          // applyBrandOverlay() returns the original buffer when there's no
-          // text or when the font is missing — only count as "applied" when
-          // the buffer actually changed.
-          assets.overlayApplied = finalMp4 !== before;
-          if (!assets.overlayApplied) {
-            assets.overlayError = "overlay produced no change (empty text or missing font)";
-          }
-        } catch (overlayErr: any) {
-          // Non-fatal: ad still ships without overlay rather than failing the
-          // whole campaign for a typography step. We surface overlayApplied=false
-          // and overlayError so the UI / admin can detect silent fallback.
-          assets.overlayApplied = false;
-          assets.overlayError = overlayErr?.message || "unknown";
-          logger.warn({ err: overlayErr, variant: i }, "adstudio: brand overlay failed, continuing without it");
-          errors.push(`Variant ${i + 1} overlay: ${overlayErr?.message || "unknown"}`);
+        onProgress?.({ stage: "overlay", variantIndex: i, message: `[${i + 1}/${copies.length}] Sobreimponiendo marca y CTA con tipografía nítida...` });
+        const brandText = (input.brandOverlayText ?? input.brandName ?? input.productTitle ?? "").toString();
+        const ctaText = (input.ctaOverlayText ?? copy.cta ?? "").toString();
+        const before = finalMp4;
+        // Throws on missing font or drawtext failure. We let it propagate
+        // so the variant fails cleanly and the UI surfaces the real error
+        // ("Brand overlay font not installed: ...") instead of silently
+        // shipping an unbranded ad.
+        finalMp4 = await applyBrandOverlay(finalMp4, {
+          brandText,
+          ctaText,
+          aspect: input.aspect,
+        });
+        assets.overlayApplied = finalMp4 !== before;
+        if (!assets.overlayApplied) {
+          // Returned same buffer — both texts were empty after sanitization.
+          // This is a configuration problem (no brand and no CTA). Fail loud
+          // so the operator notices instead of shipping a naked video.
+          throw new Error(
+            "Brand overlay produced no change: both brandOverlayText and ctaOverlayText sanitized to empty. " +
+            "Set input.brandOverlayText (or input.brandName) and/or input.ctaOverlayText.",
+          );
         }
       }
 

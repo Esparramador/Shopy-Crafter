@@ -11,6 +11,7 @@ import {
   generateMusicLong,
   composeAd,
   concatVideos,
+  sanitizeVideoPrompt,
   CAMERA_PRESETS,
   type VideoModel,
   type ImageGenModel,
@@ -507,8 +508,8 @@ Devuelve este JSON exacto:
       "timeEndSec": ${_sceneDurations[0]},
       "sceneDescription": "Qué se ve en la escena (descripción narrativa de la acción/composición/ambiente)",
       "cameraMovement": "Movimiento de cámara concreto: dolly-in lento, orbit 360, push-in macro, whip-pan, etc.",
-      "keyframePrompt": "Prompt PROFESIONAL en INGLÉS para generar el FRAME inicial de esta escena con un modelo image (>=80 palabras). Debe describir, en este orden: subject → composition → camera framing & lens (e.g. 35mm, 85mm, macro) → lighting setup (key/fill/rim, color temp) → color palette (3 colores hex aproximados) → mood & texture → integración del producto (siempre visible, foto-realista, consistente con la imagen de referencia). Termina con descriptores técnicos (e.g. 'shot on RED, 8k, photorealistic, ultra detailed'). ${styleHint}",
-      "videoPrompt": "Prompt en INGLÉS para animar el frame con un modelo video (40-80 palabras). Estructura: 1) movimiento de cámara con velocidad y easing (e.g. 'slow dolly-in over 4 seconds, ease-out'); 2) movimiento DENTRO del plano (subject motion, particles, light shifts); 3) atmósfera (humo, polvo, reflejos). NO redescribas la composición — confía en el keyframe.",
+      "keyframePrompt": "Prompt PROFESIONAL en INGLÉS para generar el FRAME inicial de esta escena con un modelo image (>=80 palabras). Debe describir, en este orden: subject → composition → camera framing & lens (e.g. 35mm, 85mm, macro) → lighting setup (key/fill/rim, color temp) → color palette (3 colores hex aproximados) → mood & texture → integración del producto (siempre visible, foto-realista, consistente con la imagen de referencia). Termina con descriptores técnicos (e.g. 'shot on RED, 8k, photorealistic, ultra detailed'). PROHIBIDO mencionar nombres de marca, palabras concretas a renderizar, números, letras, signos, logos identificables o textos: el modelo los pintará deformados. Termina SIEMPRE con: 'absolutely no text, no words, no letters, no logos, no brand names, no captions, no watermarks, no typography of any kind on any surface'. ${styleHint}",
+      "videoPrompt": "Prompt en INGLÉS para animar el frame con un modelo video (40-80 palabras). Estructura: 1) movimiento de cámara con velocidad y easing (e.g. 'slow dolly-in over 4 seconds, ease-out'); 2) movimiento DENTRO del plano (subject motion, particles, light shifts); 3) atmósfera (humo, polvo, reflejos). NO redescribas la composición — confía en el keyframe. PROHIBIDO incluir nombres, letras, números o textos. Termina SIEMPRE con: 'no text, no letters, no logos, no captions, no typography; strict design fidelity, the product never deconstructs morphs or recolors mid-frame'.",
       "voiceoverLine": "Frase de voiceover en ${req.language} sincronizada con esta escena (máx ${Math.max(8, _sceneDurations[0] * 3)} palabras), tono coherente con el brand voice si se ha indicado."
     }
     // ... una entrada por escena, exactamente ${_scenesCount} escenas
@@ -524,7 +525,15 @@ REGLAS DURAS:
 - NO inventes características físicas que no veas en la imagen del producto
 - Los voiceoverLine concatenados deben durar aproximadamente ${totalSec}s a 2.5 palabras/segundo
 - Vocabulario directo, frases cortas, pensado para anuncio de social media
-- NUNCA uses placeholders ni "lorem ipsum"`;
+- NUNCA uses placeholders ni "lorem ipsum"
+- ANTI-TEXTO ESTRICTO: NUNCA incluyas en keyframePrompt ni videoPrompt los nombres de marca,
+  los nombres del producto, el CTA, precios, ni palabras que el modelo pueda intentar pintar
+  como texto en la imagen. Los modelos de imagen y vídeo pintan texto deformado. La marca y el
+  CTA se sobreimprimen DETERMINISTAMENTE después con FFmpeg drawtext. Tu trabajo aquí es
+  describir la escena VISUALMENTE, sin un solo carácter alfanumérico que el modelo pueda usar.
+- TRANSICIONES: la escena n+1 debe heredar la composición visual de la escena n (mismo sujeto
+  visible, mismo ángulo aproximado, mismo lighting key) para que el corte sea continuo. NO
+  cambies de set ni de paleta entre escenas consecutivas a menos que el style lo exija.`;
 
   const script = await askClaudeJson<CinematicScript>(req.projectId, prompt, sys, 4096, 120_000);
 
@@ -659,12 +668,31 @@ export async function generateCinematicMultiShot(
     : undefined;
   const identityPrefix = req.character ? `${req.character.identityPrompt}\n\n` : "";
 
+  // Forbidden tokens for the runtime sanitization gate — these strings will be
+  // surgically removed from any keyframe/video prompt before reaching the
+  // provider. Belt-and-suspenders against Claude leaking brand/product/CTA
+  // text that the image/video model would burn as garbled typography.
+  // CRITICAL: include req.productName and req.ctaText in addition to the
+  // script-derived tokens — the non-director path (saved/preset scripts) only
+  // populates a subset of script.* fields, so without these two the leak
+  // surface stays open.
+  const forbiddenTokens = [
+    req.brand,
+    req.productName,
+    req.ctaText,
+    script.title,
+    script.cta,
+    script.hook,
+    script.closingLine,
+  ].filter((s): s is string => typeof s === "string" && s.trim().length >= 2);
+
   // Concurrency: 4 keyframes en paralelo (image-gen es ligero ~3-10s).
   const KF_CONCURRENCY = Math.min(4, script.scenes.length);
   const keyframes: Array<{ idx: number; buffer: Buffer; mime: string }> = await runWithConcurrency(
     script.scenes.map((scene) => async () => {
+      const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
       const { buffer, mimeType } = await retry(
-        () => generateImage(imageModel, identityPrefix + scene.keyframePrompt, {
+        () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
           aspectRatio: req.aspect,
           referenceImage: req.productImage,
           referenceMime: req.productMime,
@@ -673,7 +701,7 @@ export async function generateCinematicMultiShot(
         2,
         `keyframe scene ${scene.idx}`,
       );
-      logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character) }, "🎬 keyframe generated");
+      logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character), keyframePromptHead: cleanKeyframe.slice(0, 200) }, "🎬 keyframe generated");
       return { idx: scene.idx, buffer, mime: mimeType };
     }),
     KF_CONCURRENCY,
@@ -688,8 +716,9 @@ export async function generateCinematicMultiShot(
     script.scenes.map((scene, i) => async () => {
       const dur = sceneDurations[i];
       const kf = keyframes[i];
+      const cleanVideoPrompt = sanitizeVideoPrompt(scene.videoPrompt, forbiddenTokens);
       const buf = await retry(
-        () => generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, scene.videoPrompt, {
+        () => generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, cleanVideoPrompt, {
           duration: dur,
           aspect: req.aspect,
           cameraPreset: scene.cameraPreset || cameraPreset,
@@ -697,7 +726,7 @@ export async function generateCinematicMultiShot(
         2,
         `video scene ${scene.idx}`,
       );
-      logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 clip generated");
+      logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur, videoPromptHead: cleanVideoPrompt.slice(0, 200) }, "🎬 clip generated");
       return { idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur };
     }),
     VIDEO_CONCURRENCY,
