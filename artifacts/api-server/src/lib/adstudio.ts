@@ -716,12 +716,19 @@ export async function composeFinalAd(
       if (sfxPath) cmd.input(sfxPath);
 
       if (sfxPath) {
-        // Mix voice (louder) + sfx (background) over video
+        // Mix voice (louder) + sfx (background) over video.
+        // FIX CRÍTICO (audio-only bug): la versión anterior mapeaba SOLO
+        // ["aout"] al usar complexFilter, lo que hacía que FFmpeg dropease
+        // el video stream y exportase un MP4 sin video.
+        // Como fluent-ffmpeg envuelve los labels del map con brackets,
+        // añadimos un `null` passthrough sobre [0:v] (coste cero, no
+        // recodifica) para poder mapearlo como [vpass].
         cmd.complexFilter([
+          "[0:v]null[vpass]",
           "[1:a]volume=1.0[voice]",
           "[2:a]volume=0.25[music]",
           "[voice][music]amix=inputs=2:duration=longest:dropout_transition=0[aout]",
-        ], ["aout"]);
+        ], ["vpass", "aout"]);
       } else {
         // Just voice
         cmd.audioCodec("aac");

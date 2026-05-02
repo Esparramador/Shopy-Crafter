@@ -857,7 +857,26 @@ export async function composeAd(opts: ComposeOptions): Promise<Buffer> {
       }
 
       if (filters.length) {
-        cmd.complexFilter(filters, audioOut ? (opts.overlayText ? ["vout", audioOut] : [audioOut]) : (opts.overlayText ? ["vout"] : []));
+        // FIX CRÍTICO (audio-only bug): la versión anterior mapeaba SOLO
+        // [audioOut] cuando había voz/música pero no overlayText, lo que hacía
+        // que FFmpeg dropease silenciosamente el video stream y produjera un
+        // MP4 sin video (síntoma reportado: "el anuncio sale solo con audio").
+        //
+        // Nota técnica: fluent-ffmpeg envuelve cualquier label del map con
+        // brackets, así que no podemos pasar "0:v" en el map (FFmpeg lo
+        // interpretaría como un label inexistente). Por eso, cuando no hay
+        // overlayText, añadimos un `null` passthrough filter que reetiqueta
+        // [0:v] como [vpass] (coste cero, no recodifica) y lo incluimos en
+        // el map para garantizar la pista de video en el output.
+        let videoLabel: string;
+        if (opts.overlayText) {
+          videoLabel = "vout";
+        } else {
+          filters.push(`[0:v]null[vpass]`);
+          videoLabel = "vpass";
+        }
+        const map: string[] = audioOut ? [videoLabel, audioOut] : [videoLabel];
+        cmd.complexFilter(filters, map);
       }
 
       cmd.videoCodec("libx264")
