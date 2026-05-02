@@ -18,6 +18,7 @@ import multer from "multer";
 import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
+import { readFile } from "node:fs/promises";
 import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
@@ -174,10 +175,57 @@ router.post(
       const { variants, errors } = await runAdCampaign(input, replicateToken);
       const v0 = variants[0];
 
-      if (!v0 || (!v0.assets.finalMp4Url && !v0.assets.videoUrl)) {
+      // FIX: runAdCampaign only writes the MP4 to a local /tmp path
+      // (`finalMp4Path`). It NEVER populates `finalMp4Url`/`videoUrl` on its
+      // own, so the previous guard always returned 503 — making smart-quick
+      // permanently broken. We now persist the MP4 to the vault here and
+      // expose a stable URL the frontend can play/download.
+      if (!v0 || !v0.assets.finalMp4Path) {
         res.status(503).json({
           error: "No se pudo generar el anuncio rápido (todos los proveedores de video sin saldo o error).",
           code: "AD_QUICK_FAILED",
+          details: errors?.slice(0, 3),
+        });
+        return;
+      }
+
+      let quickVaultId: number | null = null;
+      try {
+        const finalMp4 = await readFile(v0.assets.finalMp4Path);
+        quickVaultId = await saveToVault({
+          projectId,
+          fileType: "video",
+          category: "smart_quick_ad",
+          title: `Anuncio rápido — ${product.title}`,
+          mimeType: "video/mp4",
+          productId: product.shopifyProductId,
+          productTitle: product.title || undefined,
+          generatedBy: `smart-quick:${input.videoProvider}`,
+          content: finalMp4.toString("base64"),
+          metadata: {
+            durationSec: durationSec,
+            voiceId: finalVoiceId,
+            voiceName: voice.voiceName,
+            language,
+            aspect,
+            overlayApplied: v0.assets.overlayApplied ?? null,
+            heroImageProvider: v0.assets.heroImageProvider ?? null,
+            generatedAt: new Date().toISOString(),
+            tags: ["ad", "smart", "quick", project.storeNiche || "general"],
+          },
+        });
+      } catch (e) {
+        logger.warn({ err: (e as Error)?.message }, "smart-quick: no se pudo persistir en vault (no fatal)");
+      }
+
+      if (quickVaultId) {
+        v0.assets.finalMp4Url = `/api/projects/${projectId}/vault/${quickVaultId}/raw`;
+      } else {
+        // Vault save failed — fail loud so the user does not get a useless
+        // response with only local /tmp paths the frontend cannot reach.
+        res.status(500).json({
+          error: "El anuncio se generó pero no se pudo guardar en la bóveda.",
+          code: "AD_QUICK_VAULT_FAILED",
           details: errors?.slice(0, 3),
         });
         return;

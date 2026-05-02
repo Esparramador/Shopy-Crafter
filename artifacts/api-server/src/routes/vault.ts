@@ -8,7 +8,7 @@ import { canAccessProject } from "../lib/access.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { setupZipStream, isBinaryMime, isAlreadyCompressed, extForMime, sniffMimeFromMagic } from "../lib/zip-stream.js";
-import { sanitizeHtml } from "../lib/html-escape.js";
+import { sanitizeHtml, renderHtmlOrText } from "../lib/html-escape.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { readFile, stat, realpath } from "fs/promises";
 import path from "path";
@@ -1347,9 +1347,12 @@ async function buildBrandedHtmlFromMetadata(file: {
       : `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;background:${B.redBg};border:1px solid rgba(244,63,94,.2);border-radius:6px;font-size:12px;color:${B.red};font-weight:600;">&#10007; No</span>`;
     if (typeof val === "number") return `<span style="color:${B.gold};font-weight:700;font-size:14px;">${val.toLocaleString("es-ES")}</span>`;
     if (typeof val === "string") {
-      if (val.length > 300) return `<div style="white-space:pre-wrap;line-height:1.8;color:${B.white};font-size:13px;padding:12px 16px;background:${B.surface};border:1px solid ${B.border};border-radius:10px;margin:6px 0;">${sanitizeHtml(val)}</div>`;
+      // FIX: detect rich HTML (e.g. AI-generated bodyHtml/suggestedDescription)
+      // and render the safe subset instead of escaping it as raw text. Plain
+      // text strings still get full HTML-escape via renderHtmlOrText().
+      if (val.length > 300) return `<div style="white-space:pre-wrap;line-height:1.8;color:${B.white};font-size:13px;padding:12px 16px;background:${B.surface};border:1px solid ${B.border};border-radius:10px;margin:6px 0;">${renderHtmlOrText(val)}</div>`;
       if (val.startsWith("http")) return `<a href="${sanitizeHtml(val)}" style="color:${B.gold};text-decoration:underline;font-weight:500;" target="_blank" rel="noopener">${sanitizeHtml(val.length > 80 ? val.slice(0, 77) + "..." : val)}</a>`;
-      return `<span style="color:${B.white};">${sanitizeHtml(val)}</span>`;
+      return `<span style="color:${B.white};">${renderHtmlOrText(val)}</span>`;
     }
     if (Array.isArray(val)) {
       if (val.length === 0) return `<span style="color:${B.muted};font-style:italic;">vac&iacute;o</span>`;

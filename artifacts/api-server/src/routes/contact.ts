@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { renderHtmlOrText } from "../lib/html-escape.js";
 import { db, auditLogTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
@@ -778,7 +779,7 @@ async function buildReportHtml(
 
             <div class="ai-field" style="margin-bottom:20px;">
               <div class="ai-field-label">Descripcion de Venta</div>
-              <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${escN(ps.description)}</div>
+              <div class="ai-field-value" style="line-height:1.8;font-size:13px;">${renderHtmlOrText(ps.description)}</div>
             </div>
 
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
