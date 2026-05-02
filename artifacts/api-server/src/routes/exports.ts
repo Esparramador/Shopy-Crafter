@@ -3166,19 +3166,17 @@ router.get("/projects/:projectId/exports/complete-report", requireProjectAccess,
         vendor: p.vendor,
       };
     });
-    const catalogCardsHtml = buildProductCardsSection(catalogCardsList, "Catalogo Completo");
-    // FIX VOLUMEN PDF: el complete-audit incluía TODAS las product cards en una
-    // sola .report-page, generando PDFs de 150+ páginas en catálogos grandes.
-    // Limitamos a TOP-50 priorizando los productos con peor score SEO (los que
-    // más necesitan atención del usuario). El catálogo íntegro sigue
-    // disponible en el endpoint dedicado /exports/product-catalog.
-    const catalogCardsListPriority = [...catalogCardsList]
-      .sort((a, b) => (a.auditScore ?? 0) - (b.auditScore ?? 0))
-      .slice(0, 50);
-    const catalogCardsHtmlLimited = buildProductCardsSection(
-      catalogCardsListPriority,
-      catalogCardsList.length > 50
-        ? `Productos prioritarios (top 50 por score SEO de ${catalogCardsList.length})`
+    // AUDITORÍA COMPLETA = TODOS los productos, sin límites. El usuario debe
+    // poder conocer el estado de la totalidad del catálogo (peores Y mejores).
+    // Solo ORDENAMOS por peor score SEO primero para que la lectura sea útil:
+    // el usuario ve antes lo que más necesita acción, sin perder nada del set.
+    // Antes había un slice(0,50) que recortaba — se ha eliminado.
+    const catalogCardsListOrdered = [...catalogCardsList]
+      .sort((a, b) => (a.auditScore ?? 0) - (b.auditScore ?? 0));
+    const catalogCardsHtml = buildProductCardsSection(
+      catalogCardsListOrdered,
+      catalogCardsListOrdered.length > 0
+        ? `Catalogo Completo — ${catalogCardsListOrdered.length} productos (ordenados por prioridad SEO: peor primero)`
         : "Catalogo Completo"
     );
   
@@ -3668,14 +3666,14 @@ router.get("/projects/:projectId/exports/complete-report", requireProjectAccess,
         </div>
       </div>
   
-      <!-- PAGE 9: TOP PRODUCT CARDS (limitado a 50 para evitar PDFs de 150+ páginas) -->
+      <!-- PAGE 9: TODOS los productos, ordenados por peor SEO primero (auditoría = completa) -->
       <div class="report-page">
         ${pageHdr(reportTitle, totalShopifyOrders > 0 ? 9 : 8)}
         <div class="section">
-          ${catalogCardsHtmlLimited || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
-          ${products.length > 50 ? `<div class="card" style="margin-top:18px;border:1px dashed ${BRAND.gold};background:rgba(200,168,75,.06);text-align:center;">
-            <p class="text-muted" style="font-size:13px;line-height:1.6;margin:0;">Mostrando los <strong style="color:${BRAND.gold};">50 productos prioritarios</strong> (peor score SEO primero) de un total de <strong style="color:${BRAND.white};">${products.length}</strong>. Para el catálogo completo, descarga el informe específico <em>"Catálogo de Productos"</em> desde el Centro de Exportación.</p>
+          ${catalogCardsListOrdered.length > 0 ? `<div class="card" style="margin-bottom:18px;border:1px solid ${BRAND.gold}33;background:rgba(200,168,75,.05);">
+            <p class="text-muted" style="font-size:12px;line-height:1.6;margin:0;">Esta sección incluye <strong style="color:${BRAND.gold};">los ${catalogCardsListOrdered.length} productos del catálogo</strong>, ordenados de peor a mejor score SEO. Lee de arriba abajo para priorizar acciones: los primeros son los que más impacto generarán al optimizar.</p>
           </div>` : ""}
+          ${catalogCardsHtml || '<div class="card"><p class="text-muted" style="text-align:center;">Sin productos importados</p></div>'}
         </div>
       </div>`;
   

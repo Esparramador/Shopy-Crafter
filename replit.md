@@ -36,7 +36,7 @@ Reports follow a "PRODUCE, NOT RECOMMEND" philosophy, delivering complete, ready
 **PDF Rendering Pipeline (May 2026 hardening):**
 - All PDF endpoints share the contract: viewport `794×1123` (A4 @ 96dpi), `page.emulateMediaType("screen")`, `printBackground:true`, zero margins. This preserves the dark-luxury theme (charcoal #120e0a + copper #c4956a) end-to-end and prevents the legacy `@media print → background:white` rules in classic/elegance/prestige/custom shells from inverting the visual.
 - Report shells (`getReportShell`) use `.page { max-width: 794px }` (was 960px) and `.body-content { padding: 32px 28px 40px }` (was 40px 56px 48px) to fit A4 width without horizontal clipping.
-- `complete-audit` caps the inline product cards page at the **top-50 worst SEO scores** with a CTA to download the dedicated `/exports/product-catalog` for the full set — prevents 150+ page PDFs.
+- `complete-audit` includes **the full product catalog** (no caps — "complete" means complete) sorted from worst to best SEO score so the reader prioritises action items first. A small dorado note above the cards explains the ordering. Page count scales with catalog size by design.
 - `lib/product-card.ts` uses 120px square images (was 140px) so badge grids never overflow A4 width.
 - `lib/brand-css-generator.ts` (Brand Guide PDF) and `routes/vault.ts` (Vault PDF export) both inherit the same A4 + screen-media contract.
 - `lib/card-studio.ts` (printable business-card sheet) is intentionally light-themed and uses A4 landscape with print-ready crop marks — does NOT inherit the dark-shell pipeline.
