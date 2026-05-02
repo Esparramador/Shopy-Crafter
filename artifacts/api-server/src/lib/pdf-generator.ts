@@ -37,6 +37,14 @@ export async function generatePdfFromHtml(
 
     page = await browser.newPage();
 
+    // FIX A4: viewport explícito a A4 @ 96dpi (794x1123 px) para que `100vh`,
+    // `min-height: 100vh` y demás unidades viewport equivalgan EXACTAMENTE a
+    // la altura de la página A4. Sin esto, Puppeteer usa el viewport default
+    // (800x600) y `100vh = 600px`, por lo que portadas con `min-height:100vh`
+    // se quedan cortas y el contenido se desborda a una segunda página
+    // (efecto "portada partida en dos hojas" al imprimir el PDF).
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+
     await page.setRequestInterception(true);
     page.on("request", (r: any) => {
       const t = r.resourceType();

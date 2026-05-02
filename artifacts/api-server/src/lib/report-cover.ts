@@ -9,6 +9,13 @@ export interface CoverPageOptions {
   date?: string;
   badgeLabel?: string;
   template?: CoverTemplate;
+  /**
+   * Si true (default), `buildCoverPage` ya incluye la contraportada de marca
+   * como SEGUNDA hoja del PDF (orden: portada → contraportada → info-page).
+   * Los callers que ya añadían `buildBackCover(...)` al final del body deben
+   * pasar `includeBackCover: false` para evitar duplicación.
+   */
+  includeBackCover?: boolean;
 }
 
 // FIX: HTML escape to prevent XSS in PDF cover pages
@@ -21,21 +28,31 @@ function escHtml(s: string): string {
 }
 
 export function buildCoverPage(opts: CoverPageOptions): string {
-  const { template = "prestige" } = opts;
+  const { template = "prestige", includeBackCover = true } = opts;
   const companyName = escHtml(opts.companyName);
   const reportTitle = escHtml(opts.reportTitle || "Informe Profesional");
   const reportSubtitle = escHtml(opts.reportSubtitle || "");
   const date = escHtml(opts.date || new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" }));
   const badgeLabel = escHtml(opts.badgeLabel || "Fecha del informe");
 
-  // Portada minimalista (logo + Shopy Crafter + cliente abajo izquierda)
-  // + página interior con la información detallada del informe.
+  // ORDEN DE PÁGINAS DEL PDF (DIN-A4):
+  //   1. Portada minimalista (logo + Shopy Crafter + cliente)
+  //   2. Contraportada de marca (tagline + datos contacto + CONFIDENCIAL)
+  //   3. Página de información detallada del informe (título, subtítulo, fecha)
+  //   4+ Resto del contenido del informe
+  //
+  // La contraportada se mueve a 2ª hoja (en lugar de la última) para que el
+  // documento abra como un dossier corporativo: portada visual → cierre de
+  // marca → info del informe → contenido. Si `includeBackCover` es false,
+  // se respeta el orden legacy front+info y el caller debe insertar la
+  // contraportada manualmente al final con `buildBackCover(template)`.
   const front = buildFrontCover(template, companyName);
+  const back = includeBackCover ? buildBackCover(template) : "";
   const info =
     template === "classic" ? buildClassicInfoPage({ companyName, reportTitle, reportSubtitle, date, badgeLabel })
     : template === "elegance" ? buildEleganceInfoPage({ companyName, reportTitle, reportSubtitle, date })
     : buildPrestigeInfoPage({ companyName, reportTitle, reportSubtitle, date });
-  return front + info;
+  return front + back + info;
 }
 
 interface CoverArgs {

@@ -491,3 +491,9 @@ id = "VghOLYYUqB3j-e7VzeO1F"
 uri = "file://exports/hanakaze-deconstruccion-extendida-24s-light.mp4"
 type = "video"
 title = "Vídeo Deconstrucción Extendido — Sudadera Royal (front + back mariposa + hero, 23s, 28MB)"
+
+[[outputs]]
+id = "DX1hiHo0ZhJoAcUiZbQkv"
+uri = "file://.local/validation/PDF_ORDER_VALIDATED.pdf"
+type = "pdf"
+title = "PDF validado — 4 hojas: Portada → Contraportada → Info → Contenido"
