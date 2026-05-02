@@ -48,6 +48,15 @@ Employs AES-256-GCM encryption, audit logging, database-backed rate limiting, AI
 ### Database
 PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` for platform specificity.
 
+### Virtual Try-On (Fashion + Accessories)
+`POST /api/fusion-studio/generate-photos` (modes `tryon-front`, `tryon-back`, `tryon-lifestyle`) routes by product type:
+- **Fashion** (camisetas, jeans, vestidos, hoodies…): `cuuupid/idm-vton` on Replicate (state-of-the-art garment transfer with categories `upper_body`/`lower_body`/`dresses`).
+- **Accessories** (relojes, gafas, joyería, sombreros, calzado, bolsos, bufandas, cinturones, maquillaje, perfume…): `google/nano-banana` (Gemini 2.5 Flash Image) **multi-image fusion** with the model and product as `image_input` references. The prompt builder (`buildAccessoryTryonPrompt` in `routes/fusion-studio.ts`) selects the right placement vocabulary per category (watch on wrist, glasses on face, necklace on neck, ring on finger, shoes on feet, bag on shoulder…).
+- Auto model: if the user does NOT upload a model photo, FLUX 1.1 Pro (`generateModelPerson`) creates a 28y/o ${gender hint from audience} model on a clean studio background; that PNG is fetched into a Buffer and passed to Nano Banana along with the product Buffer.
+- Output is persisted to vault (`category: fusion-{mode}`, `generatedBy: fusion-studio-tryon-nb`) plus returned inline as a data URI.
+- E2E validated: Replicate `google/nano-banana` produced a watch try-on in 11.5s (1.1 MB PNG) preserving model identity (face, beard, hair, white tee) and product fidelity (silver case, brown leather strap, white dial).
+- Single-shot quick path: `POST /images/tryon-quick` already used Nano Banana directly for any product; the new code unifies the same fusion engine inside the multi-step Fusion Studio pipeline.
+
 ### Super Ad Studio
 A feature for generic brand ad creation, porting the `hanakaze-v2-super` script. It includes an async worker pipeline for video clips (image-to-video/text-to-video), ElevenLabs TTS and music integration, and MP4 concatenation. The UI provides a 5-step wizard for brief, references, editable storyboard generation (Claude), voice/music selection, and final generation with live polling and download. It supports cinematic long-form ads up to 30 minutes with parallel processing, multi-block music, and a Cinematic Director for narrative planning. Product DNA extraction ensures consistent branding across scenes.
 

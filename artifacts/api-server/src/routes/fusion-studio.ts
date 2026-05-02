@@ -11,6 +11,8 @@ import { MODEL_MAP, COST_MAP, NEGATIVE_PROMPT } from "./images.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { generateVideoFromImage, type RunwayModel, type RunwayDuration, type RunwayRatio } from "../lib/runway.js";
+import { generateNanoBanana } from "../lib/nano-banana.js";
+import { fetchToBuffer } from "../lib/fusion-studio-pro.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
 const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
@@ -167,6 +169,129 @@ async function applyVirtualTryon(
   if (!url?.startsWith("http")) throw new Error(`Invalid try-on URL: ${String(raw).slice(0, 200)}`);
   logger.info({ url: url.slice(0, 80) }, "Fusion Studio TryOn: Virtual try-on complete");
   return url;
+}
+
+/**
+ * REAL try-on for accessories (watches, glasses, jewelry, hats, shoes, bags…)
+ * via Gemini Nano Banana (gemini-2.5-flash-image) multi-image fusion.
+ *
+ * IDM-VTON only supports tops/bottoms/dresses. For everything else we use
+ * Nano Banana, which understands spatial relationships and can convincingly
+ * place a watch on a wrist, glasses on a face, a necklace on a neck, etc.
+ *
+ * Inputs are buffers (model + product) so we can call Gemini directly.
+ * Output is a public Replicate-hosted URL (we upload via vault) or a data URI.
+ */
+function buildAccessoryTryonPrompt(
+  productCategory: string,
+  productSubcategory: string,
+  componentsList: string,
+  materialsList: string,
+  colorsList: string,
+  mode: string,
+  extraPrompt?: string,
+): string {
+  const cat = `${productCategory} ${productSubcategory}`.toLowerCase();
+  let placement = `the model wears or uses the product (image 2) naturally as it would be worn in real life`;
+  let bodyPart = "the appropriate body part";
+
+  if (cat.match(/watch|reloj|smartwatch/)) {
+    placement = `The model wears the watch from image 2 on their LEFT wrist. The watch strap is fastened naturally and the dial faces the camera. The wrist is slightly raised in a casual, elegant pose so the watch is the focal point.`;
+    bodyPart = "wrist";
+  } else if (cat.match(/glasses|sunglasses|gafas|lentes|eyewear|spectacle/)) {
+    placement = `The model wears the glasses from image 2 on their face. The frames sit correctly on the bridge of the nose, the temples extend behind the ears, the lenses align with the eyes. Front-facing portrait so the glasses are clearly visible.`;
+    bodyPart = "face";
+  } else if (cat.match(/necklace|collar|pendant|chain|cadena|colgante/)) {
+    placement = `The model wears the necklace from image 2 around their neck. The pendant or chain hangs naturally on the chest, perfectly centered. Slight neckline visible.`;
+    bodyPart = "neck";
+  } else if (cat.match(/earring|pendiente|aro/)) {
+    placement = `The model wears the earrings from image 2. Show a 3/4 portrait so at least one earring is clearly visible on the earlobe. The other features remain natural.`;
+    bodyPart = "ears";
+  } else if (cat.match(/ring|anillo|sortija/)) {
+    placement = `The model wears the ring from image 2 on the appropriate finger (typically ring finger or index). Hand pose elegant, fingers slightly relaxed, ring clearly visible to camera.`;
+    bodyPart = "finger";
+  } else if (cat.match(/bracelet|pulsera|bangle|brazalete/)) {
+    placement = `The model wears the bracelet from image 2 on their wrist. Wrist slightly raised in a natural elegant pose so the bracelet is fully visible.`;
+    bodyPart = "wrist";
+  } else if (cat.match(/hat|cap|gorra|sombrero|beanie/)) {
+    placement = `The model wears the hat from image 2 on their head, fitted naturally over the hair, brim or shape correctly oriented.`;
+    bodyPart = "head";
+  } else if (cat.match(/shoe|sneaker|boot|zapato|zapatilla|botas/)) {
+    placement = `The model wears the shoes from image 2 on their feet. Show full body or leg-down composition so the shoes are clearly visible. Laces tied and shoes worn naturally.`;
+    bodyPart = "feet";
+  } else if (cat.match(/bag|bolso|backpack|mochila|purse|cartera|handbag/)) {
+    placement = `The model carries the bag from image 2 — over the shoulder, in hand, or on the back as appropriate for the bag type. The bag is clearly visible and worn naturally.`;
+    bodyPart = "shoulder/hand";
+  } else if (cat.match(/scarf|bufanda|fular|tie|corbata/)) {
+    placement = `The model wears the scarf/tie from image 2 around their neck, draped naturally with realistic fabric folds.`;
+    bodyPart = "neck";
+  } else if (cat.match(/belt|cintur/)) {
+    placement = `The model wears the belt from image 2 around their waist, fastened naturally through belt loops. Composition shows the waist clearly.`;
+    bodyPart = "waist";
+  } else if (cat.match(/makeup|lipstick|maquillaje|perfume|fragrance|cosmetic/)) {
+    placement = `The model holds the product from image 2 elegantly, applying it or showcasing it naturally next to their face. Beauty editorial composition.`;
+    bodyPart = "hand near face";
+  }
+
+  const sceneMod = mode === "tryon-back"
+    ? "Capture from a 3/4 BACK angle so the product is still visible from behind."
+    : mode === "tryon-lifestyle"
+      ? "Lifestyle setting (urban street, café, outdoor) with golden-hour natural light, candid pose."
+      : "Studio portrait composition, soft professional lighting, clean neutral background.";
+
+  return `Photorealistic virtual try-on / product placement.
+
+Image 1 = MODEL (the person).
+Image 2 = PRODUCT (${productCategory}${productSubcategory ? ` — ${productSubcategory}` : ""}).
+
+Task: ${placement}
+
+ABSOLUTE RULES:
+- Preserve the MODEL's identity, face, skin tone, hair and body proportions from image 1 EXACTLY.
+- Preserve the PRODUCT's exact shape, materials (${materialsList}), colors (${colorsList}), components (${componentsList}) from image 2.
+- Anatomically correct: 5 fingers per hand, natural proportions, realistic skin and shadows.
+- The product is placed/worn on ${bodyPart} — never fused into the body, never floating, never deformed.
+- Realistic contact shadows where the product touches the model.
+- ${sceneMod}
+- Output: ultra-high resolution, sharp focus, commercial fashion/lifestyle photography quality, professional color grading.
+- No text, no logos overlays, no watermarks added.${extraPrompt ? `\n- Additional direction: ${extraPrompt}` : ""}`;
+}
+
+async function applyAccessoryTryon(
+  modelImageBuffer: Buffer,
+  modelMimeType: string,
+  productImageBuffer: Buffer,
+  productMimeType: string,
+  productCategory: string,
+  productSubcategory: string,
+  componentsList: string,
+  materialsList: string,
+  colorsList: string,
+  mode: string,
+  replicateToken: string,
+  extraPrompt?: string,
+  aspectRatio: string = "3:4",
+): Promise<{ buffer: Buffer; mimeType: string; provider: string }> {
+  const prompt = buildAccessoryTryonPrompt(productCategory, productSubcategory, componentsList, materialsList, colorsList, mode, extraPrompt);
+
+  logger.info({
+    category: productCategory,
+    promptLen: prompt.length,
+    aspectRatio,
+  }, "Fusion Studio TryOn: Applying REAL accessory try-on via Nano Banana multi-image fusion");
+
+  const result = await generateNanoBanana(prompt, {
+    aspectRatio,
+    references: [
+      { buffer: modelImageBuffer, mimeType: modelMimeType },
+      { buffer: productImageBuffer, mimeType: productMimeType },
+    ],
+    replicateToken,
+    outputFormat: "png",
+  });
+
+  logger.info({ provider: result.provider, bytes: result.buffer.length }, "Fusion Studio TryOn: Accessory try-on complete");
+  return result;
 }
 
 const router = Router();
@@ -653,17 +778,117 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
         }
       }
     } else if (tryonPlan.length > 0) {
-      logger.warn("Fusion Studio: Try-on modes selected but product is not fashion — skipping try-on");
+      logger.info({ tryonModes: tryonModesSelected, tryonCount: tryonPlan.length, category: analysis.product?.category }, "Fusion Studio TryOn: Starting REAL accessory try-on via Nano Banana (non-fashion product)");
+
+      const productFile = productFiles[0];
+      const productMimeType = productFile.mimetype;
+      const productBuffer = productFile.buffer;
+
+      const modelFile = hasModel === "true" && files.length > productFiles.length
+        ? files[files.length - 1] : null;
+
+      const componentsListNB = (analysis.componentBreakdown || []).slice(0, 8).map(c => `${c.partName} (${c.material})`).join(", ");
+      const materialsListNB = (analysis.textures || []).map(t => `${t.material}/${t.finish}`).join(", ") || analysis.product?.estimatedMaterials?.join(", ") || "";
+      const colorsListNB = (analysis.colors?.dominant || []).join(", ");
+      const productCategoryNB = analysis.product?.category || "accessory";
+      const productSubcategoryNB = analysis.product?.subcategory || "";
+
+      const aspectRatioMap: Record<string, string> = {
+        "1024x1024": "1:1", "1080x1080": "1:1",
+        "1024x1536": "2:3", "1080x1350": "4:5",
+        "1080x1920": "9:16", "1536x1024": "3:2", "1920x1080": "16:9",
+      };
+      const aspectRatioNB = aspectRatioMap[outputFormat || ""] || "3:4";
+
       for (const item of tryonPlan) {
-        generatedImages.push({
-          mode: item.mode,
-          index: item.index,
-          imageUrl: null,
-          prompt: "",
-          model: "cuuupid/idm-vton",
-          cost: 0,
-          error: "Virtual try-on solo funciona con productos de moda/ropa. Sube una prenda y selecciona estos modos.",
-        });
+        try {
+          let modelImageBuffer: Buffer;
+          let modelImageMimeType: string;
+
+          if (modelFile) {
+            modelImageBuffer = modelFile.buffer;
+            modelImageMimeType = modelFile.mimetype;
+            logger.info("Fusion Studio TryOn (NB): Using uploaded model photo");
+          } else {
+            const modelPrompt = buildModelPersonPrompt(item.mode, analysis, parsedBrandDna, extraPrompt || undefined);
+            const size = getOutputSize(item.mode, outputFormat || "");
+            const modelUrl = await generateModelPerson(replicate, modelPrompt, size.width, size.height);
+            modelImageBuffer = await fetchToBuffer(modelUrl);
+            modelImageMimeType = "image/png";
+            logger.info({ bytes: modelImageBuffer.length }, "Fusion Studio TryOn (NB): Generated AI model person");
+          }
+
+          const tryonResult = await applyAccessoryTryon(
+            modelImageBuffer,
+            modelImageMimeType,
+            productBuffer,
+            productMimeType,
+            productCategoryNB,
+            productSubcategoryNB,
+            componentsListNB,
+            materialsListNB,
+            colorsListNB,
+            item.mode,
+            replicateToken,
+            extraPrompt || undefined,
+            aspectRatioNB,
+          );
+
+          const pngBase64 = tryonResult.buffer.toString("base64");
+          const dataUri = `data:${tryonResult.mimeType};base64,${pngBase64}`;
+          const finalUrl = dataUri;
+
+          const totalItemCost = (modelFile ? 0 : TRYON_MODEL_COST) + 0.04;
+
+          if (pid > 0) {
+            try {
+              await saveToVault({
+                projectId: pid,
+                fileType: "image",
+                category: `fusion-${item.mode}`,
+                title: `Fusion ${item.mode} — ${productCategoryNB} (Real Try-On Nano Banana)`,
+                content: pngBase64,
+                mimeType: tryonResult.mimeType,
+                generatedBy: "fusion-studio-tryon-nb",
+                metadata: {
+                  model: `gemini-2.5-flash-image (${tryonResult.provider})`,
+                  productCategory: productCategoryNB,
+                  productSubcategory: productSubcategoryNB,
+                  cost: totalItemCost,
+                  mode: item.mode,
+                  pipeline: "real-accessory-tryon-nano-banana",
+                  tags: ["fusion-studio", "tryon", "nano-banana", "accessory"],
+                },
+              });
+            } catch (e) {
+              logger.warn({ err: e instanceof Error ? e.message : String(e) }, "Fusion Studio TryOn (NB): vault save failed (non-fatal)");
+            }
+          }
+
+          generatedImages.push({
+            mode: item.mode,
+            index: item.index,
+            imageUrl: finalUrl,
+            prompt: `REAL accessory try-on (${productCategoryNB} on model)`,
+            model: `gemini-2.5-flash-image (${tryonResult.provider})`,
+            cost: totalItemCost,
+            tryonPipeline: true,
+          });
+
+          logger.info({ mode: item.mode, index: item.index, provider: tryonResult.provider }, "Fusion Studio TryOn (NB): Real accessory try-on complete");
+        } catch (err) {
+          logger.error({ mode: item.mode, err: err instanceof Error ? err.message : String(err) }, "Fusion Studio TryOn (NB): Accessory try-on failed");
+          generatedImages.push({
+            mode: item.mode,
+            index: item.index,
+            imageUrl: null,
+            prompt: "",
+            model: "gemini-2.5-flash-image",
+            cost: 0,
+            error: err instanceof Error ? err.message : String(err),
+            tryonPipeline: true,
+          });
+        }
       }
     }
 
