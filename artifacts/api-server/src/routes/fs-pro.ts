@@ -35,6 +35,16 @@ import {
   seedCinematicAdTemplates,
   type ComposeVariables,
 } from "../lib/cinematic-ad-templates.js";
+import {
+  getKnowledgeBaseSummary,
+  getFullKnowledgeBase,
+  composeProfessionalPromptFragment,
+  PRESENTER_STYLES,
+  type CinematographyIntent,
+  type IndustrySegment,
+  type ActionToken as KBActionToken,
+  type PresenterArchetype,
+} from "../lib/cinematic-knowledge-base.js";
 import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
@@ -535,6 +545,62 @@ router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req,
     res.status(500).json({ error: e?.message || "cinematic-templates compose failed" });
   }
 });
+
+// ─── Cinematic Knowledge Base (read-only library + composer) ───────────────
+//   GET  /api/fs-pro/cinematic-knowledge          → catálogo completo
+//   GET  /api/fs-pro/cinematic-knowledge/summary  → contadores rápidos
+//   POST /api/fs-pro/cinematic-knowledge/compose  → genera fragment + neg.prompt
+// ───────────────────────────────────────────────────────────────────────────
+
+router.get("/fs-pro/cinematic-knowledge", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getFullKnowledgeBase(), summary: getKnowledgeBaseSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "knowledge base read failed" });
+  }
+});
+
+router.get("/fs-pro/cinematic-knowledge/summary", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, summary: getKnowledgeBaseSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "knowledge base summary failed" });
+  }
+});
+
+router.post("/fs-pro/cinematic-knowledge/compose", requireAdmin, (req, res) => {
+  try {
+    const {
+      intent, industry, opticalTechniqueIds, continuityTokenIds, actionTokens,
+    } = (req.body || {}) as {
+      intent?: CinematographyIntent;
+      industry?: IndustrySegment;
+      opticalTechniqueIds?: string[];
+      continuityTokenIds?: string[];
+      actionTokens?: KBActionToken[];
+    };
+    if (!intent) { res.status(400).json({ error: "intent requerido (luxury|tech|sport|documentary|fashion|automotive|beauty|scientific)" }); return; }
+    if (!industry) { res.status(400).json({ error: "industry requerido (watches|jewelry|electronics|fragrance|beauty|fashion|automotive|lifestyle|general)" }); return; }
+    const out = composeProfessionalPromptFragment({
+      intent, industry,
+      opticalTechniqueIds: Array.isArray(opticalTechniqueIds) ? opticalTechniqueIds : undefined,
+      continuityTokenIds: Array.isArray(continuityTokenIds) ? continuityTokenIds : undefined,
+      actionTokens: Array.isArray(actionTokens) ? actionTokens : undefined,
+    });
+    res.json({ ok: true, ...out });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "knowledge base compose failed" });
+  }
+});
+
+// Helper used by the cinematic-multishot route to pre-fill the
+// character.identityPrompt from a presenter archetype if the user uploads a
+// presenter image but does not provide their own custom identity description.
+export function getPresenterIdentityPrompt(archetype: string | undefined): string | undefined {
+  if (!archetype) return undefined;
+  const a = archetype as PresenterArchetype;
+  return PRESENTER_STYLES[a]?.identityPrompt;
+}
 
 // POST /api/fs-pro/prompt/build → combina presets en un prompt cinematográfico
 //   body: BuildPromptOptions  →  { prompt, negativePrompt, breakdown }
@@ -1670,11 +1736,19 @@ router.post(
 router.post(
   "/fs-pro/cinematic-multishot",
   requireAdmin,
-  upload.single("product"),
+  // Accept BOTH product (mandatory) and character (optional, for hybrid
+  // presenter templates). Multer's `.fields()` is the canonical way to handle
+  // multiple named file inputs in a single multipart request.
+  upload.fields([
+    { name: "product", maxCount: 1 },
+    { name: "character", maxCount: 1 },
+  ]),
   async (req, res) => {
     enableLongRunning(res);
     try {
-      const f = req.file;
+      const filesByField = (req.files as Record<string, Express.Multer.File[]> | undefined) || {};
+      const f = filesByField["product"]?.[0];
+      const characterFile = filesByField["character"]?.[0];
       const {
         projectId: pidStr, brand, productName, niche, audience, language,
         scenesCount: scStr, totalDurationSec: durStr, aspect, videoModel,
@@ -1682,6 +1756,7 @@ router.post(
         narrationVoiceModel, narrationVolume, musicEnabled, musicPrompt,
         musicVolume, productVaultId,
         savedPromptId, script: scriptJsonStr,
+        characterName, characterIdentityPrompt,
       } = req.body;
       const projectId = parseInt(pidStr || "0", 10);
       if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
@@ -1752,6 +1827,18 @@ router.post(
         } : undefined,
         presetScript,
         savedPromptId: savedPromptId ? String(savedPromptId) : undefined,
+        // Character lock — only attached when the client uploads a presenter
+        // photo (presenter-hybrid templates) or any other character-driven ad.
+        // The renderer per-scene logic (cinematic-multishot.ts) will skip the
+        // lock on b_roll/product scenes automatically.
+        character: characterFile ? {
+          name: characterName ? String(characterName).trim().slice(0, 80) : "Presentador",
+          image: characterFile.buffer,
+          mime: characterFile.mimetype,
+          identityPrompt: characterIdentityPrompt
+            ? String(characterIdentityPrompt).trim().slice(0, 1500)
+            : "Photorealistic 8K detail, natural skin textures with visible pores, looking directly at camera with confident calm authority",
+        } : undefined,
       });
 
       const vaultId = await saveToVaultSmart({

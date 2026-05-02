@@ -2736,7 +2736,7 @@ function UploadConcatTab({
 // ═══════════════════════════════════════════════════════════════════════════
 interface CinematicTplListItem {
   id: string;
-  category: "anatomy" | "deconstruction" | "construction" | "exploded_view" | "apple_porsche";
+  category: "anatomy" | "deconstruction" | "construction" | "exploded_view" | "apple_porsche" | "presenter_hybrid";
   name: string;
   shortDescription: string;
   longDescription: string;
@@ -2752,6 +2752,8 @@ interface CinematicTplListItem {
     motionScore: number;
     negativePrompt: string;
     styleTag: string;
+    requiresPresenter?: boolean;
+    defaultPresenterPrompt?: string;
   };
   variables: string[];
   segmentsPreview: Array<{
@@ -2762,6 +2764,7 @@ interface CinematicTplListItem {
     effectDescription: string;
     screenText: string;
     audioCue: string;
+    shotType?: "presenter" | "b_roll" | "product";
   }>;
 }
 
@@ -2776,6 +2779,8 @@ interface ComposedScript {
   motionScore: number;
   negativePrompt: string;
   styleTag: string;
+  requiresPresenter?: boolean;
+  defaultPresenterPrompt?: string;
   segments: Array<{
     idx: number;
     name: string;
@@ -2786,14 +2791,17 @@ interface ComposedScript {
     videoPrompt: string;
     screenText: string;
     audioCue: string;
+    shotType?: "presenter" | "b_roll" | "product";
+    voiceoverLine?: string;
   }>;
   cinematicScriptForRenderer: any;
 }
 
 const CINEMATIC_CATEGORY_BADGE: Record<CinematicTplListItem["category"], { label: string; color: string }> = {
-  anatomy:        { label: "Anatomía",        color: "#c8a84b" },
-  deconstruction: { label: "Deconstrucción",  color: "#e2664f" },
-  construction:   { label: "Construcción",    color: "#4fa3e2" },
+  anatomy:          { label: "Anatomía",          color: "#c8a84b" },
+  deconstruction:   { label: "Deconstrucción",    color: "#e2664f" },
+  construction:     { label: "Construcción",      color: "#4fa3e2" },
+  presenter_hybrid: { label: "Presentador",       color: "#c8a84b" },
   exploded_view:  { label: "Exploded View",   color: "#7e6dd6" },
   apple_porsche:  { label: "Apple/Porsche",   color: "#9aa0a6" },
 };
@@ -2824,7 +2832,30 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
   const [rendering, setRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<{ vaultId: number; durationSec: number; scenesCount: number } | null>(null);
 
+  // Presenter (host avatar) — solo se usa cuando la plantilla tiene requiresPresenter=true
+  const [presenterFile, setPresenterFile] = useState<File | null>(null);
+  const [presenterIdentity, setPresenterIdentity] = useState("");
+  const [narrationVoiceId, setNarrationVoiceId] = useState("");
+  const [enableNarration, setEnableNarration] = useState(true);
+
   const selected = useMemo(() => templates.find(t => t.id === selectedId) || null, [templates, selectedId]);
+  const requiresPresenter = Boolean(selected?.masterConfig?.requiresPresenter);
+
+  // Pre-rellena identityPrompt cuando la plantilla tiene defaultPresenterPrompt.
+  // Se ejecuta cuando cambia la plantilla seleccionada (no cuando cambia
+  // presenterIdentity, para no luchar contra ediciones del usuario).
+  useEffect(() => {
+    if (selected?.masterConfig?.defaultPresenterPrompt) {
+      setPresenterIdentity(selected.masterConfig.defaultPresenterPrompt);
+    } else {
+      setPresenterIdentity("");
+    }
+    if (selected?.masterConfig?.requiresPresenter) setEnableNarration(true);
+    // Reset presenter file when changing template — the previous presenter
+    // photo may not match the new template's needs.
+    setPresenterFile(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // Carga inicial del catálogo
   useEffect(() => {
@@ -2896,6 +2927,14 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
     if (!composed) { onError("Componer el guion primero"); return; }
     if (!selected) return;
     if (!productFile) { onError("Sube una imagen del producto para renderizar"); return; }
+    if (requiresPresenter && !presenterFile) {
+      onError("Esta plantilla requiere un presentador: sube una foto del host antes de generar");
+      return;
+    }
+    if (requiresPresenter && presenterIdentity.trim().length < 10) {
+      onError("Describe brevemente al presentador (mín 10 caracteres) para el character lock");
+      return;
+    }
     const credits = selected.estimatedCreditsHint ?? (2 + composed.segments.length * 3);
     const ok = window.confirm(
       `Vas a generar un anuncio cinematográfico real:\n\n` +
@@ -2903,7 +2942,9 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
       `• Producto: ${productName} (${brand})\n` +
       `• Duración: ${composed.totalDurationSec}s · ${composed.segments.length} segmentos\n` +
       `• Modelo: ${composed.recommendedVideoModel}\n` +
-      `• Coste estimado: ${credits} créditos\n\n` +
+      (requiresPresenter ? `• Presentador: ${presenterFile?.name} (${(presenterFile!.size / 1024).toFixed(1)} KB)\n` : ``) +
+      (enableNarration ? `• Narración: ElevenLabs${narrationVoiceId ? ` (voz ${narrationVoiceId})` : " (Rachel default)"}\n` : ``) +
+      `• Coste estimado: ${credits} créditos${enableNarration ? " + ~0.5 narración" : ""}\n\n` +
       `¿Continuar?`,
     );
     if (!ok) return;
@@ -2921,9 +2962,16 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
       fd.append("imageModel", composed.recommendedImageModel);
       fd.append("style", composed.styleTag);
       if (industry.trim()) fd.append("niche", industry.trim());
-      fd.append("narrationEnabled", "false");
+      fd.append("narrationEnabled", String(enableNarration));
+      if (enableNarration && narrationVoiceId.trim()) fd.append("narrationVoiceId", narrationVoiceId.trim());
       fd.append("musicEnabled", "false");
       fd.append("product", productFile);
+      // Presenter (character lock) — sólo cuando la plantilla lo requiere
+      if (requiresPresenter && presenterFile) {
+        fd.append("character", presenterFile);
+        fd.append("characterName", "Presentador");
+        fd.append("characterIdentityPrompt", presenterIdentity.trim());
+      }
       // Pasamos el guion compuesto como presetScript — el motor saltará la generación con Claude
       fd.append("script", JSON.stringify(composed.cinematicScriptForRenderer));
       const r = await fetch(`${API_BASE}/api/fs-pro/cinematic-multishot`, {
@@ -3049,13 +3097,25 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
 
             <Section title="🧬 Estructura de segmentos (sin rellenar)">
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {selected.segmentsPreview.map(seg => (
+                {selected.segmentsPreview.map((seg: any) => (
                   <div key={seg.idx} style={{
                     padding: 10, background: "var(--ink2)", borderRadius: 8,
                     border: "1px solid var(--bdr)", fontSize: 12,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                      <strong style={{ color: "var(--gold)" }}>Segmento {seg.idx}: {seg.name}</strong>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <strong style={{ color: "var(--gold)" }}>Segmento {seg.idx}: {seg.name}</strong>
+                        {seg.shotType && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                            textTransform: "uppercase", letterSpacing: 0.4,
+                            background: seg.shotType === "presenter" ? "rgba(200,168,75,0.18)" : "rgba(120,140,200,0.15)",
+                            color: seg.shotType === "presenter" ? "var(--gold, #c8a84b)" : "#8aa4ff",
+                          }}>
+                            {seg.shotType === "presenter" ? "Presentador" : seg.shotType === "b_roll" ? "B-Roll" : "Producto"}
+                          </span>
+                        )}
+                      </span>
                       <span style={{ fontSize: 10, color: "var(--t3)" }}>{seg.startSec}s → {seg.endSec}s</span>
                     </div>
                     <div style={{ color: "var(--t2)", marginBottom: 4 }}>{seg.effectDescription}</div>
@@ -3176,6 +3236,60 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
               </Section>
             )}
 
+            {composed && requiresPresenter && (
+              <Section title="🎙️ Presentador (host avatar) — requerido por esta plantilla">
+                <div style={{ padding: 10, background: "rgba(200,168,75,0.08)",
+                  border: "1px solid rgba(200,168,75,0.25)", borderRadius: 8, marginBottom: 12, fontSize: 11, color: "var(--t2)", lineHeight: 1.5,
+                }}>
+                  Esta plantilla combina escenas con presentador (idx 1, 5) y B-roll del producto (idx 2-4).
+                  El motor aplica <strong>character lock</strong> SÓLO en los planos del presentador; las B-roll
+                  son del producto puro sin la cara del host. Sube una foto frontal nítida del presentador.
+                </div>
+                <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>
+                  Foto del presentador * (frontal, buena iluminación, fondo neutro recomendado)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setPresenterFile(e.target.files?.[0] || null)}
+                  style={{ marginBottom: 10, color: "var(--t2)" }}
+                />
+                {presenterFile && (
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10 }}>
+                    Foto lista: <strong>{presenterFile.name}</strong> ({(presenterFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+                <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>
+                  Descripción del presentador (identity-lock — el motor lo concatenará a cada keyframe del host)
+                </label>
+                <textarea
+                  value={presenterIdentity}
+                  onChange={e => setPresenterIdentity(e.target.value)}
+                  placeholder="Ej. A charismatic 30-year-old male executive in tailored charcoal suit, intelligent confident gaze..."
+                  rows={3}
+                  style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical", marginBottom: 12 }}
+                />
+                <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "center", marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, color: "var(--t2)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={enableNarration} onChange={e => setEnableNarration(e.target.checked)} />
+                    Narrar voiceover con ElevenLabs
+                  </label>
+                  <input
+                    type="text"
+                    value={narrationVoiceId}
+                    onChange={e => setNarrationVoiceId(e.target.value)}
+                    placeholder="VoiceID (opcional · default Rachel)"
+                    style={inputStyle}
+                    disabled={!enableNarration}
+                  />
+                </div>
+                <div style={{ fontSize: 10, color: "var(--t3)", fontStyle: "italic" }}>
+                  El motor concatenará todas las líneas <code>voiceoverLine</code> del guion en un solo TTS
+                  alineado con la duración total. Las escenas sin línea quedan como pausas naturales.
+                </div>
+              </Section>
+            )}
+
             {composed && (
               <Section title="🎬 Lanzar generación real">
                 <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 0, lineHeight: 1.5, marginBottom: 10 }}>
@@ -3196,7 +3310,7 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
                 )}
                 <button
                   onClick={launchRender}
-                  disabled={rendering || !productFile}
+                  disabled={rendering || !productFile || (requiresPresenter && !presenterFile)}
                   className="btn btn-gold"
                   style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
                   {rendering ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}

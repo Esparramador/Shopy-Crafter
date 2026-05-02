@@ -30,7 +30,8 @@ export type CinematicTemplateCategory =
   | "construction"
   | "anatomy"
   | "exploded_view"
-  | "apple_porsche";
+  | "apple_porsche"
+  | "presenter_hybrid";
 
 export interface CinematicTemplateSegment {
   /** Position in the timeline (1..N) */
@@ -56,6 +57,19 @@ export interface CinematicTemplateSegment {
   screenText: string;
   /** Brief audio direction (sound design + music). */
   audioCue: string;
+  /**
+   * Optional shot type. "presenter" = host on camera; "b_roll"/"product" =
+   * product-only. Used by the engine to decide whether to apply the
+   * character (presenter) lock for this specific scene.
+   */
+  shotType?: "presenter" | "b_roll" | "product";
+  /**
+   * Optional voiceover line (the long sentence the presenter actually says).
+   * Distinct from screenText (which is a short overlay/CTA). When the
+   * template is rendered with narration enabled, this string is used as the
+   * scene's voiceoverLine.
+   */
+  voiceoverLine?: string;
 }
 
 export interface CinematicTemplateMasterConfig {
@@ -71,6 +85,18 @@ export interface CinematicTemplateMasterConfig {
   negativePrompt: string;
   /** "luxury" | "cinematic" | "editorial" | etc. */
   styleTag: string;
+  /**
+   * When true, this template needs a presenter (host avatar) image + a
+   * narration voice to render correctly. The UI will show the presenter
+   * upload + voice config block. Default false (product-only template).
+   */
+  requiresPresenter?: boolean;
+  /**
+   * Optional default presenter description used as identityPrompt when no
+   * custom presenter is uploaded. The platform always lets the user
+   * override this with their own face/style.
+   */
+  defaultPresenterPrompt?: string;
 }
 
 export interface CinematicAdTemplate {
@@ -450,12 +476,108 @@ const TPL_APPLE_PORSCHE: CinematicAdTemplate = {
   variables: ["PRODUCT_NAME", "BRAND", "PRODUCT_MATERIALS", "PRODUCT_COLORS"],
 };
 
+// ─── 6) Presenter Hybrid — Luxury Watch (5 segmentos = 22s)
+//      Guion exacto: 3 planos presentador (medio + medio + primer plano) +
+//      2 B-roll producto (deconstrucción + construcción/try-on). El motor
+//      aplica character lock SOLO en escenas presenter; las B-roll son
+//      producto puro.
+const TPL_PRESENTER_HYBRID: CinematicAdTemplate = {
+  id: "seed:cinematic_ad_presenter_hybrid",
+  category: "presenter_hybrid",
+  name: "🎙️ Presentador Híbrido — Luxury Watch (22s)",
+  shortDescription: "5 segmentos: presentador medio → B-roll deconstrucción → B-roll construcción → presentador detalle/try-on → primer plano CTA. Inspirado en Omneky / Apple keynote / Rolex.",
+  longDescription: "Formato Tier-1 para anuncios de relojería de lujo. Combina la autoridad de un presentador (host avatar) hablando a cámara con B-roll técnico cinematográfico del producto. Cada segmento tiene su voiceoverLine sincronizado con el motor TTS de ElevenLabs. El character lock se aplica SOLO a las escenas de presentador (idx 1, 4, 5); las B-roll (idx 2, 3) son producto puro sin la cara del host. Diseñado para Rolex Datejust 41mm pero parametrizado por variables Shopify.",
+  conceptName: "{{PRODUCT_NAME}} — Presentado por {{BRAND}}",
+  totalDurationSec: 22,
+  inspirationReference: "Rolex Datejust 41mm Presenter Hybrid (Omneky/Apple keynote style)",
+  estimatedCreditsHint: 17,
+  segments: [
+    {
+      idx: 1,
+      name: "Presentador (Medio) — Hook",
+      startSec: 0,
+      endSec: 3,
+      shotType: "presenter",
+      effectDescription: "Plano medio del presentador en boutique de lujo desenfocada, mirando a cámara con autoridad y sutil sonrisa. Apertura del anuncio.",
+      keyframePrompt: "Medium shot of a charismatic 30-year-old male executive in a tailored charcoal grey suit and crisp white shirt, standing inside a softly blurred luxury watch boutique with warm amber boutique lighting in the background, looking directly into camera with confident calm authority and a subtle warm smile. Shot on 85mm at f/2, shallow depth of field separating presenter from boutique bokeh, Rembrandt 45-degree key light + soft rim, photorealistic 8K skin textures with natural pores, cinematic warm gold grade with crushed shadows, museum-quality portrait lighting, no on-screen text",
+      videoPrompt: "The executive maintains a steady confident gaze at camera; subtle natural micro-gestures only — slight head tilt, gentle blink, micro smile shift. Camera locked-off on tripod, no movement at all. Subject performs only intimate breathing-level micro-motion within the frame. Boutique bokeh in background remains static. Cinematic warm gold grade preserved",
+      voiceoverLine: "Hay objetos que miden el tiempo... y otros que definen quién eres.",
+      screenText: "",
+      audioCue: "Cinematic warm pad rises subtly under the voiceover; no music peaks until the next segment.",
+    },
+    {
+      idx: 2,
+      name: "B-Roll — Deconstrucción Producto",
+      startSec: 3,
+      endSec: 8,
+      shotType: "b_roll",
+      effectDescription: "El {{PRODUCT_NAME}} flota en negro absoluto y se deconstruye elegantemente en 200+ piezas microscópicas que orbitan suspendidas en el aire.",
+      keyframePrompt: "Ultra-macro hero shot of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} floating in absolute pitch-black void, beginning to deconstruct into 200+ precision-machined micro-components that hang suspended in mid-air around the product like an exploded watchmaker diagram, individual gears bridges and screws visible at jewel-level detail, single hard top-down studio key light creating sharp specular highlights on metal surfaces, Phase One IQ4 medium-format 8K aesthetic, shot on 100mm macro at f/8, deep DOF, neutral analytical grade with warm gold accents, subtle floating dust motes catching backlight, no on-screen text",
+      videoPrompt: "Smooth slow-motion deconstruction: components separate radially outward from center in choreographed sequence over 5 seconds, each piece slowly orbiting on its own axis as it drifts, gravity zero, surface tension preserved, Phantom Flex 4K 4000fps slow-motion aesthetic. Camera performs an ultra-slow micro push-in with cinematic inertia, anamorphic streaks crossing highlights. Maintain identical lighting and gold grade for visual continuity",
+      voiceoverLine: "El {{PRODUCT_NAME}} no es solo ingeniería; es una sinfonía de 200 piezas en perfecta armonía.",
+      screenText: "",
+      audioCue: "Deep mechanical micro-tick layered over orchestral pad; subtle glass-shimmer on each component reveal.",
+    },
+    {
+      idx: 3,
+      name: "B-Roll — Construcción / Detalle",
+      startSec: 8,
+      endSec: 13,
+      shotType: "b_roll",
+      effectDescription: "Los componentes se reensamblan magnéticamente; revelación del bisel estriado en {{PRODUCT_MATERIALS}} y la esfera con detalles {{PRODUCT_COLORS}}.",
+      keyframePrompt: "Ultra-macro hero shot of {{PRODUCT_NAME}} in {{PRODUCT_MATERIALS}} reassembling: scattered components magnetically snap back into position, final piece locking into place with a satisfying metallic click, fully formed product hero on absolute black void with the {{PRODUCT_COLORS}} dial fully visible, fluted bezel catching warm gold rim-light, jewel-level macro detail on every facet, hexagonal bokeh of distant rim-lights softly behind, shot on 100mm macro at f/2.8, shallow DOF on the dial center, warm gold luxury grade with crushed shadows, single beauty-dish key + amber rim, photorealistic Phase One IQ4 medium-format aesthetic, no on-screen text",
+      videoPrompt: "Components fly back inward from the periphery in reverse-deconstruction choreography over 5 seconds, magnetically snapping into final assembled position with satisfying linear interpolation; final piece clicks into place with a micro shock-ring of light radiating outward; camera performs a slow elegant 90-degree macro orbit revealing the fluted bezel and the {{PRODUCT_COLORS}} dial in succession, subtle anamorphic horizontal flare sweeps across the bezel at apex. Maintain identical warm gold grade and lighting setup",
+      voiceoverLine: "Desde el bisel estriado en {{PRODUCT_MATERIALS}} hasta su esfera {{PRODUCT_COLORS}}...",
+      screenText: "",
+      audioCue: "Magnetic snap-clicks rise to a single satisfying chime at the moment of full assembly; orchestral pad swells gently.",
+    },
+    {
+      idx: 4,
+      name: "Try-on / Detalle Humano",
+      startSec: 13,
+      endSec: 18,
+      shotType: "b_roll",
+      effectDescription: "Plano detalle del {{PRODUCT_NAME}} ya en una muñeca real (try-on lifestyle), bajo luz natural cálida.",
+      keyframePrompt: "Extreme close-up insert shot of {{PRODUCT_NAME}} now worn on the wrist of an elegant adult, wrist resting naturally on a dark walnut surface with warm boutique ambient light spilling from the side, fluted bezel catching the warm directional key light, {{PRODUCT_COLORS}} dial perfectly readable, skin texture and fine wrist hair photographically rendered with natural realism, no face visible (hand and wrist only), shot on 100mm macro at f/2.8 shallow DOF, warm gold luxury grade with crushed shadows, soft caustic light highlights dancing across the bezel, no on-screen text",
+      videoPrompt: "The wrist remains naturally still with imperceptible breathing micro-motion; camera performs an ultra-slow probe-lens push-in toward the {{PRODUCT_COLORS}} dial, ending on a perfectly framed extreme close-up of the dial center; warm gold grade preserved; subtle anamorphic flare sweeps once across the bezel as the camera reaches its final position",
+      voiceoverLine: "...es el equilibrio exacto entre el legado y la modernidad.",
+      screenText: "",
+      audioCue: "Soft ambient room-tone with a single warm string sustain; orchestral pad continues underneath.",
+    },
+    {
+      idx: 5,
+      name: "Presentador (Primer Plano) — CTA",
+      startSec: 18,
+      endSec: 22,
+      shotType: "presenter",
+      effectDescription: "Primer plano del presentador con autoridad calmada cerrando con el llamado a la acción del {{BRAND}}.",
+      keyframePrompt: "Tight close-up of the same charismatic 30-year-old male executive in tailored charcoal grey suit, the luxury watch boutique softly blurred behind him with warm amber boutique lighting, looking directly into camera with calm authority and the subtle warm smile of a brand spokesperson making a definitive statement, perfectly groomed dark hair, photorealistic 8K skin textures with natural pores. Shot on 105mm at f/1.8, extreme shallow depth of field, Rembrandt 45-degree key light producing the signature triangle highlight on his cheek + soft rim from behind separating him from the bokeh, warm gold luxury grade with crushed shadows, museum-quality portrait lighting, no on-screen text",
+      videoPrompt: "The executive holds a steady confident gaze at camera and delivers the closing line with calm authority; subtle natural micro-gestures only — a single confident nod at the very end, gentle blink. Camera locked-off on tripod, no movement at all. Subject performs only intimate breathing-level micro-motion. Boutique bokeh in background remains static. Warm gold grade preserved with consistent lighting from segment 1",
+      voiceoverLine: "{{BRAND}} {{PRODUCT_NAME}}. El icono, ahora en tu muñeca. Hazlo tuyo hoy.",
+      screenText: "{{BRAND}}",
+      audioCue: "Orchestral pad reaches its full warm sustain, then resolves into a clean single chord on the final word; brand chime closes the spot.",
+    },
+  ],
+  masterConfig: {
+    recommendedVideoModel: "kling-2.1",
+    recommendedImageModel: "nano-banana",
+    defaultAspect: "16:9",
+    motionScore: 4,
+    negativePrompt: "deformed dial, distorted hands, missing numerals, crooked bezel, plastic-looking metal, blurry crown, double face, asymmetric lugs, deformed face, asymmetric face, unnatural skin, plastic skin, garbled typography, text artifacts, watermark, low-resolution, cartoon, anime, illustration, double exposure",
+    styleTag: "luxury",
+    requiresPresenter: true,
+    defaultPresenterPrompt: "A charismatic 30-year-old male executive, intelligent confident gaze, subtle warm smile, perfectly groomed dark hair, tailored charcoal grey suit and crisp white shirt, photorealistic 8K skin textures with natural pores, looking directly at camera with the calm authority of a luxury brand spokesperson",
+  },
+  variables: ["PRODUCT_NAME", "BRAND", "PRODUCT_MATERIALS", "PRODUCT_COLORS"],
+};
+
 export const CINEMATIC_AD_TEMPLATES: CinematicAdTemplate[] = [
   TPL_ANATOMY,
   TPL_DECONSTRUCTION,
   TPL_CONSTRUCTION,
   TPL_EXPLODED_VIEW,
   TPL_APPLE_PORSCHE,
+  TPL_PRESENTER_HYBRID,
 ];
 
 const CINEMATIC_TEMPLATE_USECASE = "cinematic_ad_template";
@@ -616,6 +738,10 @@ export interface ComposedCinematicScript {
   motionScore: number;
   negativePrompt: string;
   styleTag: string;
+  /** When true, the UI must show the presenter (host) upload + voice block. */
+  requiresPresenter: boolean;
+  /** Default presenter description (identityPrompt) used when none is uploaded. */
+  defaultPresenterPrompt?: string;
   segments: Array<{
     idx: number;
     name: string;
@@ -626,6 +752,8 @@ export interface ComposedCinematicScript {
     videoPrompt: string;          // ← variables already substituted
     screenText: string;           // ← variables already substituted
     audioCue: string;
+    shotType?: "presenter" | "b_roll" | "product";
+    voiceoverLine?: string;       // ← variables already substituted (long line)
   }>;
   /**
    * A CinematicScript object directly compatible with `presetScript` of
@@ -646,6 +774,8 @@ export interface ComposedCinematicScript {
       keyframePrompt: string;
       videoPrompt: string;
       voiceoverLine: string;
+      shotType?: "presenter" | "b_roll" | "product";
+      useCharacter?: boolean;
     }>;
   };
 }
@@ -703,6 +833,8 @@ export function composeCinematicScript(
     videoPrompt: substituteVariables(seg.videoPrompt, subVars),
     screenText: substituteVariables(seg.screenText, subVars),
     audioCue: seg.audioCue,
+    shotType: seg.shotType,
+    voiceoverLine: seg.voiceoverLine ? substituteVariables(seg.voiceoverLine, subVars) : undefined,
   }));
 
   const composedTitle = substituteVariables(template.conceptName, subVars);
@@ -750,9 +882,17 @@ export function composeCinematicScript(
           "soft pull-back with shallow focus",
         keyframePrompt: seg.keyframePrompt,
         videoPrompt: seg.videoPrompt,
-        voiceoverLine: seg.screenText || "",
+        // Long presenter line wins; otherwise fall back to the on-screen text
+        // so the engine still has something to read for non-presenter ads.
+        voiceoverLine: seg.voiceoverLine || seg.screenText || "",
+        shotType: seg.shotType,
+        // Hint for the renderer: skip character lock on B-roll / product-only
+        // scenes even when a presenter image is supplied.
+        useCharacter: seg.shotType === "b_roll" || seg.shotType === "product" ? false : undefined,
       })),
     },
+    requiresPresenter: Boolean(template.masterConfig.requiresPresenter),
+    defaultPresenterPrompt: template.masterConfig.defaultPresenterPrompt,
   };
 }
 

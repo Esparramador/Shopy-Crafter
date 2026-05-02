@@ -38,6 +38,20 @@ export interface CinematicScene {
   keyframePrompt: string;
   videoPrompt: string;
   voiceoverLine: string;
+  /**
+   * Type of shot. "presenter" → host face on camera, requires character lock.
+   * "b_roll" / "product" → product-only shot, character lock should be DISABLED
+   * for that scene so the product can be the only subject.
+   * Default (undefined) preserves legacy behavior (apply character globally).
+   */
+  shotType?: "presenter" | "b_roll" | "product";
+  /**
+   * Per-scene override for character lock injection. When false, both the
+   * identity prefix and the character image reference are skipped for this
+   * scene only. When undefined, falls back to global behavior (character is
+   * applied if req.character is provided).
+   */
+  useCharacter?: boolean;
 }
 
 export interface CinematicScript {
@@ -736,6 +750,25 @@ export async function generateCinematicMultiShot(
   let keyframes: Array<{ idx: number; buffer: Buffer; mime: string }>;
   let clips: Array<{ idx: number; buffer: Buffer; mime: string; durationSec: number }>;
 
+  // Helper: decide per-scene whether to apply character lock. When the scene
+  // explicitly opts out (useCharacter === false) OR is a non-presenter shot
+  // type (b_roll/product), we skip both the identity prefix and the character
+  // image reference. This is what allows hybrid templates (presenter +
+  // B-roll) to render correctly: the host appears only in presenter scenes,
+  // and the product is the sole subject in B-roll scenes.
+  const sceneCharacterRefs = (scene: CinematicScene) => {
+    if (!req.character) return undefined;
+    if (scene.useCharacter === false) return undefined;
+    if (scene.shotType === "b_roll" || scene.shotType === "product") return undefined;
+    return characterRefExtras;
+  };
+  const sceneIdentityPrefix = (scene: CinematicScene) => {
+    if (!req.character) return "";
+    if (scene.useCharacter === false) return "";
+    if (scene.shotType === "b_roll" || scene.shotType === "product") return "";
+    return identityPrefix;
+  };
+
   if (req.compositionMode === "locked-shot") {
     keyframes = [];
     clips = [];
@@ -745,6 +778,8 @@ export async function generateCinematicMultiShot(
       const scene = script.scenes[i];
       const dur = sceneDurations[i];
       const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
+      const refsForScene = sceneCharacterRefs(scene);
+      const prefixForScene = sceneIdentityPrefix(scene);
 
       // 1) Source image: chain from previous last-frame, OR generate the
       //    very first keyframe normally.
@@ -754,18 +789,18 @@ export async function generateCinematicMultiShot(
         logger.info({ sceneIdx: scene.idx, chained: true }, "🎬 locked-shot: chained from prev clip last-frame");
       } else {
         const { buffer, mimeType } = await retry(
-          () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
+          () => generateImage(imageModel, prefixForScene + cleanKeyframe, {
             aspectRatio: req.aspect,
             referenceImage: req.productImage,
             referenceMime: req.productMime,
-            extraReferences: characterRefExtras,
+            extraReferences: refsForScene,
             negativePrompt: script.negativePrompt,
           }),
           2,
           `keyframe scene ${scene.idx} (locked-shot)`,
         );
         kf = { buffer, mime: mimeType };
-        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length }, "🎬 locked-shot: anchor keyframe generated");
+        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(refsForScene), shotType: scene.shotType ?? null }, "🎬 locked-shot: anchor keyframe generated");
       }
       keyframes.push({ idx: scene.idx, buffer: kf.buffer, mime: kf.mime });
 
@@ -784,12 +819,33 @@ export async function generateCinematicMultiShot(
       logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 locked-shot: clip generated");
 
       // 3) Extract last frame for the next iteration.
+      //    CONTINUITY GUARD: only chain when the next scene shares the same
+      //    character-lock state. A presenter→B-roll transition must NOT
+      //    inherit the host's last frame (the product scene would then animate
+      //    from a frame containing a person — "ghosting"). In that case we
+      //    force `chainSource = null` so the next iteration generates a fresh
+      //    product-only keyframe.
       if (i < script.scenes.length - 1) {
-        try {
-          chainSource = await extractLastFrame(buf);
-        } catch (e: any) {
-          logger.warn({ sceneIdx: scene.idx, err: e?.message }, "🎬 locked-shot: extractLastFrame failed; falling back to fresh keyframe for next scene");
+        const nextScene = script.scenes[i + 1];
+        const currentLocked = Boolean(refsForScene);
+        const nextLocked = Boolean(sceneCharacterRefs(nextScene));
+        if (currentLocked !== nextLocked) {
           chainSource = null;
+          logger.info({
+            sceneIdx: scene.idx,
+            nextSceneIdx: nextScene.idx,
+            currentShotType: scene.shotType ?? null,
+            nextShotType: nextScene.shotType ?? null,
+            currentLocked,
+            nextLocked,
+          }, "🎬 locked-shot: continuity guard — character-lock state change, chainSource cleared (will generate fresh keyframe for next scene)");
+        } else {
+          try {
+            chainSource = await extractLastFrame(buf);
+          } catch (e: any) {
+            logger.warn({ sceneIdx: scene.idx, err: e?.message }, "🎬 locked-shot: extractLastFrame failed; falling back to fresh keyframe for next scene");
+            chainSource = null;
+          }
         }
       }
     }
@@ -799,18 +855,20 @@ export async function generateCinematicMultiShot(
     keyframes = await runWithConcurrency(
       script.scenes.map((scene) => async () => {
         const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
+        const refsForScene = sceneCharacterRefs(scene);
+        const prefixForScene = sceneIdentityPrefix(scene);
         const { buffer, mimeType } = await retry(
-          () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
+          () => generateImage(imageModel, prefixForScene + cleanKeyframe, {
             aspectRatio: req.aspect,
             referenceImage: req.productImage,
             referenceMime: req.productMime,
-            extraReferences: characterRefExtras,
+            extraReferences: refsForScene,
             negativePrompt: script.negativePrompt,
           }),
           2,
           `keyframe scene ${scene.idx}`,
         );
-        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character), keyframePromptHead: cleanKeyframe.slice(0, 200) }, "🎬 keyframe generated");
+        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(refsForScene), shotType: scene.shotType ?? null, keyframePromptHead: cleanKeyframe.slice(0, 200) }, "🎬 keyframe generated");
         return { idx: scene.idx, buffer, mime: mimeType };
       }),
       KF_CONCURRENCY,
