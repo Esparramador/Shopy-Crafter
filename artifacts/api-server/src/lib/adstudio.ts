@@ -673,13 +673,6 @@ export async function composeFinalAd(
     const voicePath = path.join(tmp, "voice.mp3");
     const outPath = path.join(tmp, "final.mp4");
     await fs.writeFile(videoPath, videoBuffer);
-    await fs.writeFile(voicePath, voiceBuffer);
-
-    let sfxPath: string | null = null;
-    if (sfxBuffer) {
-      sfxPath = path.join(tmp, "sfx.mp3");
-      await fs.writeFile(sfxPath, sfxBuffer);
-    }
 
     // Lazy-load fluent-ffmpeg so the server still starts if it's missing
     let ffmpeg: any;
@@ -688,6 +681,31 @@ export async function composeFinalAd(
       ffmpeg.setFfmpegPath(await resolveFfmpegPath());
     } catch (err) {
       throw new Error("FFmpeg not installed. Run: pnpm add fluent-ffmpeg ffmpeg-static @types/fluent-ffmpeg");
+    }
+
+    // Probe the video duration and refit the voice so speech ends 1s
+    // BEFORE the video does (audio total length == video length, padded
+    // with silence). This eliminates the "voice cut off at end" symptom.
+    const { fitVoiceToVideo } = await import("./fusion-studio-pro.js");
+    let videoDurSec = 30;
+    try {
+      videoDurSec = await new Promise<number>((res, rej) => {
+        ffmpeg.ffprobe(videoPath, (err: Error | null, data: any) => {
+          if (err) return rej(err);
+          const d = data?.format?.duration;
+          const n = typeof d === "number" ? d : parseFloat(String(d));
+          if (!isFinite(n) || n <= 0) return rej(new Error("ffprobe: bad duration"));
+          res(n);
+        });
+      });
+    } catch { /* fallback to 30 */ }
+    const fittedVoice = await fitVoiceToVideo(voiceBuffer, videoDurSec);
+    await fs.writeFile(voicePath, fittedVoice);
+
+    let sfxPath: string | null = null;
+    if (sfxBuffer) {
+      sfxPath = path.join(tmp, "sfx.mp3");
+      await fs.writeFile(sfxPath, sfxBuffer);
     }
 
     return await new Promise<Buffer>((resolve, reject) => {
@@ -713,7 +731,10 @@ export async function composeFinalAd(
         .outputOptions([
           "-pix_fmt yuv420p",
           "-movflags +faststart",
-          "-shortest",
+          // No -shortest: voice was pre-fitted to videoDurSec exactly so
+          // the muxer should track the video stream length to ensure we
+          // never truncate either.
+          `-t ${videoDurSec.toFixed(3)}`,
         ])
         .on("end", async () => {
           try {

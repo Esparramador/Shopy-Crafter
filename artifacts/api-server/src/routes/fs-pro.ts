@@ -220,7 +220,7 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       description: "Anuncios largos 60s-30min (3-20 min recomendado) con director cinematográfico inteligente, arco narrativo y Character Lock. productId opcional (anuncios brand admiten solo customNotes + characterId).",
       scenesRange: { min: 3, max: 240 },
       durationRange: { min: 60, max: 1800 },
-      compositionModes: ["narrative", "explainer-locked", "composite-pro"],
+      compositionModes: ["narrative", "explainer-locked", "composite-pro", "locked-shot"],
       aspects: ["9:16", "16:9", "1:1"],
     },
     avatarStudio: {

@@ -12,6 +12,7 @@ import {
   composeAd,
   concatVideos,
   sanitizeVideoPrompt,
+  extractLastFrame,
   CAMERA_PRESETS,
   type VideoModel,
   type ImageGenModel,
@@ -94,7 +95,7 @@ export interface CinematicMultiShotRequest {
    *  - "explainer-locked":  host fixed center-frame, only background changes
    *  - "composite-pro":     two layers (host + bg) for FFmpeg chroma-key compose
    */
-  compositionMode?: "narrative" | "explainer-locked" | "composite-pro";
+  compositionMode?: "narrative" | "explainer-locked" | "composite-pro" | "locked-shot";
   /** Optional CTA text injected into the director prompt. */
   ctaText?: string;
   /**
@@ -508,8 +509,8 @@ Devuelve este JSON exacto:
       "timeEndSec": ${_sceneDurations[0]},
       "sceneDescription": "Qué se ve en la escena (descripción narrativa de la acción/composición/ambiente)",
       "cameraMovement": "Movimiento de cámara concreto: dolly-in lento, orbit 360, push-in macro, whip-pan, etc.",
-      "keyframePrompt": "Prompt PROFESIONAL en INGLÉS para generar el FRAME inicial de esta escena con un modelo image (>=80 palabras). Debe describir, en este orden: subject → composition → camera framing & lens (e.g. 35mm, 85mm, macro) → lighting setup (key/fill/rim, color temp) → color palette (3 colores hex aproximados) → mood & texture → integración del producto (siempre visible, foto-realista, consistente con la imagen de referencia). Termina con descriptores técnicos (e.g. 'shot on RED, 8k, photorealistic, ultra detailed'). PROHIBIDO mencionar nombres de marca, palabras concretas a renderizar, números, letras, signos, logos identificables o textos: el modelo los pintará deformados. Termina SIEMPRE con: 'absolutely no text, no words, no letters, no logos, no brand names, no captions, no watermarks, no typography of any kind on any surface'. ${styleHint}",
-      "videoPrompt": "Prompt en INGLÉS para animar el frame con un modelo video (40-80 palabras). Estructura: 1) movimiento de cámara con velocidad y easing (e.g. 'slow dolly-in over 4 seconds, ease-out'); 2) movimiento DENTRO del plano (subject motion, particles, light shifts); 3) atmósfera (humo, polvo, reflejos). NO redescribas la composición — confía en el keyframe. PROHIBIDO incluir nombres, letras, números o textos. Termina SIEMPRE con: 'no text, no letters, no logos, no captions, no typography; strict design fidelity, the product never deconstructs morphs or recolors mid-frame'.",
+      "keyframePrompt": "Prompt PROFESIONAL en INGLÉS para generar el FRAME inicial de esta escena con un modelo image (>=80 palabras). Debe describir, en este orden: subject → composition → camera framing & lens (e.g. 35mm, 85mm, macro) → lighting setup (key/fill/rim, color temp) → color palette (3 colores hex aproximados) → mood & texture → integración del producto (siempre visible, foto-realista, consistente con la imagen de referencia). Termina con descriptores técnicos (e.g. 'shot on RED, 8k, photorealistic, ultra detailed'). REGLA SOBRE TEXTO: NO inventes texto/letras/números/logos NUEVOS que no existan en la imagen de referencia del producto. Las etiquetas, marcas, dial markings o cualquier texto físicamente impreso en el producto DEBEN preservarse EXACTAMENTE como aparecen en la referencia — refiérete a ellos por su forma, posición y material ('engraved logo plate at center of dial', 'embroidered woven label at inner collar'), NUNCA transcribas el texto literal. Termina SIEMPRE con: 'preserve all existing printed text, logos and brand markings on the product exactly as in the reference image; do NOT add any new text, captions, watermarks, subtitles or typography to the scene; do NOT distort or alter any letter or symbol that is part of the product's physical design'. ${styleHint}",
+      "videoPrompt": "Prompt en INGLÉS para animar el frame con un modelo video (40-80 palabras). Estructura: 1) movimiento de cámara con velocidad y easing (e.g. 'slow dolly-in over 4 seconds, ease-out'); 2) movimiento DENTRO del plano (subject motion, particles, light shifts); 3) atmósfera (humo, polvo, reflejos). NO redescribas la composición — confía en el keyframe. REGLA SOBRE TEXTO: no inventes texto NUEVO; el texto/logo/etiquetas existentes en el producto deben permanecer perfectamente legibles e idénticos al keyframe durante toda la animación. Termina SIEMPRE con: 'preserve every existing letter, logo and brand marking on the product exactly as in the source frame, no warping, no morphing of letters; do NOT add any new text, captions or typography; strict design fidelity, the product never deconstructs morphs or recolors mid-frame'.",
       "voiceoverLine": "Frase de voiceover en ${req.language} sincronizada con esta escena (máx ${Math.max(8, _sceneDurations[0] * 3)} palabras), tono coherente con el brand voice si se ha indicado."
     }
     // ... una entrada por escena, exactamente ${_scenesCount} escenas
@@ -523,7 +524,7 @@ REGLAS DURAS:
 - Cada escena cuenta una micro-historia: hook → demostración → beneficio emocional → CTA
 - El producto siempre visible, integrado, foto-realista y reconocible respecto a la imagen de referencia
 - NO inventes características físicas que no veas en la imagen del producto
-- Los voiceoverLine concatenados deben durar aproximadamente ${totalSec}s a 2.5 palabras/segundo
+- AUDIO BUDGET: los voiceoverLine concatenados, leídos en orden, deben durar EXACTAMENTE ${Math.max(2, totalSec - 2)}s a 2.5 palabras/segundo (= máximo ${Math.floor(Math.max(2, totalSec - 2) * 2.5)} palabras totales). NUNCA superes este límite — si te sobra espacio, déjalo: el último segundo del vídeo va EN SILENCIO para que la voz no se corte.
 - Vocabulario directo, frases cortas, pensado para anuncio de social media
 - NUNCA uses placeholders ni "lorem ipsum"
 - ANTI-TEXTO ESTRICTO: NUNCA incluyas en keyframePrompt ni videoPrompt los nombres de marca,
@@ -686,66 +687,139 @@ export async function generateCinematicMultiShot(
     script.closingLine,
   ].filter((s): s is string => typeof s === "string" && s.trim().length >= 2);
 
-  // Concurrency: 4 keyframes en paralelo (image-gen es ligero ~3-10s).
-  const KF_CONCURRENCY = Math.min(4, script.scenes.length);
-  const keyframes: Array<{ idx: number; buffer: Buffer; mime: string }> = await runWithConcurrency(
-    script.scenes.map((scene) => async () => {
-      const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
-      const { buffer, mimeType } = await retry(
-        () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
-          aspectRatio: req.aspect,
-          referenceImage: req.productImage,
-          referenceMime: req.productMime,
-          extraReferences: characterRefExtras,
-        }),
-        2,
-        `keyframe scene ${scene.idx}`,
-      );
-      logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character), keyframePromptHead: cleanKeyframe.slice(0, 200) }, "🎬 keyframe generated");
-      return { idx: scene.idx, buffer, mime: mimeType };
-    }),
-    KF_CONCURRENCY,
-  ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
+  // ── LOCKED-SHOT branch: sequential last-frame chaining for "single take" feel ──
+  // The user wants product-presentation videos to look like ONE continuous shot
+  // (model in same pose/frame, only micro-gestures change). To achieve that we
+  // generate clips SEQUENTIALLY: each new clip uses the PREVIOUS clip's last
+  // frame as its source image (instead of a freshly-generated keyframe). The
+  // result is byte-perfect visual continuity at clip boundaries.
+  let keyframes: Array<{ idx: number; buffer: Buffer; mime: string }>;
+  let clips: Array<{ idx: number; buffer: Buffer; mime: string; durationSec: number }>;
 
-  // ── 3. Per-scene videos (PARALLEL with concurrency limit + retry) ───────
-  // Concurrency: 5 vídeos en paralelo (cada uno tarda 60-180s en provider).
-  // Para 30 escenas: ~9 min wall-clock vs ~45 min secuencial.
-  // Provider rate-limits: kling permite ~5-10 paralelos; runway 3; veo 5.
-  const VIDEO_CONCURRENCY = req.videoModel.startsWith("runway") ? 3 : 5;
-  const clips = await runWithConcurrency(
-    script.scenes.map((scene, i) => async () => {
+  if (req.compositionMode === "locked-shot") {
+    keyframes = [];
+    clips = [];
+    let chainSource: { buffer: Buffer; mime: string } | null = null;
+    const lockedCameraSuffix = ". Camera fully static lock-off, fixed tripod, no camera movement at all; only the model performs subtle natural micro-gestures within the frame";
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
       const dur = sceneDurations[i];
-      const kf = keyframes[i];
-      const cleanVideoPrompt = sanitizeVideoPrompt(scene.videoPrompt, forbiddenTokens);
+      const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
+
+      // 1) Source image: chain from previous last-frame, OR generate the
+      //    very first keyframe normally.
+      let kf: { buffer: Buffer; mime: string };
+      if (chainSource) {
+        kf = chainSource;
+        logger.info({ sceneIdx: scene.idx, chained: true }, "🎬 locked-shot: chained from prev clip last-frame");
+      } else {
+        const { buffer, mimeType } = await retry(
+          () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
+            aspectRatio: req.aspect,
+            referenceImage: req.productImage,
+            referenceMime: req.productMime,
+            extraReferences: characterRefExtras,
+          }),
+          2,
+          `keyframe scene ${scene.idx} (locked-shot)`,
+        );
+        kf = { buffer, mime: mimeType };
+        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length }, "🎬 locked-shot: anchor keyframe generated");
+      }
+      keyframes.push({ idx: scene.idx, buffer: kf.buffer, mime: kf.mime });
+
+      // 2) Animate the locked frame.
+      const cleanVideoPrompt = sanitizeVideoPrompt(scene.videoPrompt, forbiddenTokens) + lockedCameraSuffix;
       const buf = await retry(
         () => generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, cleanVideoPrompt, {
           duration: dur,
           aspect: req.aspect,
-          cameraPreset: scene.cameraPreset || cameraPreset,
+          cameraPreset: "static_lockoff",
         }),
         2,
-        `video scene ${scene.idx}`,
+        `video scene ${scene.idx} (locked-shot)`,
       );
-      logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur, videoPromptHead: cleanVideoPrompt.slice(0, 200) }, "🎬 clip generated");
-      return { idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur };
-    }),
-    VIDEO_CONCURRENCY,
-  ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
+      clips.push({ idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur });
+      logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 locked-shot: clip generated");
 
-  // ── 4. Concat with cinematic crossfade ──────────────────────────────────
+      // 3) Extract last frame for the next iteration.
+      if (i < script.scenes.length - 1) {
+        try {
+          chainSource = await extractLastFrame(buf);
+        } catch (e: any) {
+          logger.warn({ sceneIdx: scene.idx, err: e?.message }, "🎬 locked-shot: extractLastFrame failed; falling back to fresh keyframe for next scene");
+          chainSource = null;
+        }
+      }
+    }
+  } else {
+    // Concurrency: 4 keyframes en paralelo (image-gen es ligero ~3-10s).
+    const KF_CONCURRENCY = Math.min(4, script.scenes.length);
+    keyframes = await runWithConcurrency(
+      script.scenes.map((scene) => async () => {
+        const cleanKeyframe = sanitizeVideoPrompt(scene.keyframePrompt, forbiddenTokens);
+        const { buffer, mimeType } = await retry(
+          () => generateImage(imageModel, identityPrefix + cleanKeyframe, {
+            aspectRatio: req.aspect,
+            referenceImage: req.productImage,
+            referenceMime: req.productMime,
+            extraReferences: characterRefExtras,
+          }),
+          2,
+          `keyframe scene ${scene.idx}`,
+        );
+        logger.info({ sceneIdx: scene.idx, kfBytes: buffer.length, characterLocked: Boolean(req.character), keyframePromptHead: cleanKeyframe.slice(0, 200) }, "🎬 keyframe generated");
+        return { idx: scene.idx, buffer, mime: mimeType };
+      }),
+      KF_CONCURRENCY,
+    ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
+
+    // ── 3. Per-scene videos (PARALLEL with concurrency limit + retry) ───────
+    // Concurrency: 5 vídeos en paralelo (cada uno tarda 60-180s en provider).
+    // Para 30 escenas: ~9 min wall-clock vs ~45 min secuencial.
+    // Provider rate-limits: kling permite ~5-10 paralelos; runway 3; veo 5.
+    const VIDEO_CONCURRENCY = req.videoModel.startsWith("runway") ? 3 : 5;
+    clips = await runWithConcurrency(
+      script.scenes.map((scene, i) => async () => {
+        const dur = sceneDurations[i];
+        const kf = keyframes[i];
+        const cleanVideoPrompt = sanitizeVideoPrompt(scene.videoPrompt, forbiddenTokens);
+        const buf = await retry(
+          () => generateVideoFromImage(req.videoModel, kf.buffer, kf.mime, cleanVideoPrompt, {
+            duration: dur,
+            aspect: req.aspect,
+            cameraPreset: scene.cameraPreset || cameraPreset,
+          }),
+          2,
+          `video scene ${scene.idx}`,
+        );
+        logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur, videoPromptHead: cleanVideoPrompt.slice(0, 200) }, "🎬 clip generated");
+        return { idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur };
+      }),
+      VIDEO_CONCURRENCY,
+    ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
+  }
+
+  // ── 4. Concat with cinematic crossfade (or hard cut for locked-shot) ────
+  // locked-shot: crossfade=0 because last-frame chaining means clip[N].first ==
+  // clip[N-1].last byte-for-byte → a hard cut is INVISIBLE; a crossfade would
+  // actually break the illusion by blending the same frame with itself.
+  const lockedShot = req.compositionMode === "locked-shot";
   const concatenated = await concatVideos({
     videoBuffers: clips.map((c) => c.buffer),
     width,
     height,
     fps: 30,
-    crossfadeSec: clips.length > 1 ? 0.4 : 0,
-    transitionPreset: req.style === "energetic"
+    crossfadeSec: lockedShot ? 0 : (clips.length > 1 ? 0.4 : 0),
+    transitionPreset: lockedShot
       ? "hard_cut"
-      : req.style === "luxury"
-        ? "fade_to_black"
-        : req.style === "tech"
-          ? "glitch_pixel"
-          : "cross_dissolve",
+      : req.style === "energetic"
+        ? "hard_cut"
+        : req.style === "luxury"
+          ? "fade_to_black"
+          : req.style === "tech"
+            ? "glitch_pixel"
+            : "cross_dissolve",
     clipDurationsSec: clips.map((c) => c.durationSec),
   });
   logger.info({ concatBytes: concatenated.length }, "🎬 concat ready");

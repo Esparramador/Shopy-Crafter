@@ -31,7 +31,7 @@ import type {
   CinematicStyle,
 } from "./cinematic-multishot.js";
 
-export type CompositionMode = "narrative" | "explainer-locked" | "composite-pro";
+export type CompositionMode = "narrative" | "explainer-locked" | "composite-pro" | "locked-shot";
 
 export interface DirectorRequest {
   projectId: number;
@@ -162,6 +162,7 @@ const COMPOSITION_DIRECTIVES: Record<CompositionMode, string> = {
   "narrative": "Estilo narrativo libre: la cámara y la escena cambian con cada plano, pero la identidad del personaje y del producto se preserva en cada escena (usa el bloque de identidad).",
   "explainer-locked": "MUY IMPORTANTE: el personaje (host/presenter) DEBE permanecer ANCLADO en la composición — misma posición, misma pose general, mirando a cámara o al producto. SOLO el FONDO y los ELEMENTOS DETRÁS del personaje cambian dinámicamente entre escenas (deconstrucciones, infografías, exploded views, partículas, transiciones gráficas). El personaje nunca desaparece. Cuando el guion muestra deconstrucción del producto: el host queda fijo en primer plano, y el producto deconstruido orbita/flota en el plano de fondo con etiquetas blueprint estilo Apple Product Page.",
   "composite-pro": "El personaje se renderiza en una capa separada con fondo NEUTRO PLANO (chroma-key compatible: cyclorama gris medio sin sombras duras, o fondo verde croma puro #00B140). En 'sceneDescription' incluye DOS sub-bloques: [FOREGROUND]: descripción del host con fondo croma; [BACKGROUND]: descripción independiente del fondo dinámico (deconstrucciones, escenarios). El renderer compondrá ambas capas en post.",
+  "locked-shot": "MODO PLANO FIJO ÚNICO (presentación de producto continua): TODAS las escenas comparten EL MISMO PLANO — misma cámara, mismo encuadre, mismo escenario, misma iluminación, mismo modelo en la misma posición. La cámara está bloqueada en TRÍPODE FIJO sin movimiento (static lock-off, no dolly, no orbit, no zoom, no pan, no tilt). Lo único que cambia entre escenas son los micro-gestos del modelo y los micro-movimientos del producto (rotarlo en la mano, acercarlo a cámara unos cm, cambio sutil de pose). El renderer encadena los clips usando el ÚLTIMO FRAME del clip anterior como FRAME INICIAL del siguiente, así que el resultado debe verse como UN SOLO TAKE continuo de ${30}s, no como 3 vídeos pegados. cameraMovement debe decir EXACTAMENTE 'static lock-off, fixed tripod, no camera movement'. keyframePrompt y videoPrompt deben repetir el MISMO ENCUADRE, MISMO FONDO, MISMA ROPA del modelo en cada escena.",
 };
 
 /** Builds the master prompt for Claude that returns the full script. */
@@ -211,7 +212,7 @@ REGLAS DE CONTINUIDAD (críticas):
 - Cada escena hereda paleta, iluminación e intención del acto anterior. NO saltos arbitrarios.
 - El personaje mantiene su identidad EXACTA (ver Character Lock arriba).
 - El producto mantiene su identidad EXACTA (ver Product DNA arriba).
-- El "voiceoverLine" de cada escena CONTINÚA la frase de la escena anterior — leído en orden, suena como UN discurso humano fluido. Debe sumar ~${Math.round(req.totalDurationSec * 2.5)} palabras totales.
+- El "voiceoverLine" de cada escena CONTINÚA la frase de la escena anterior — leído en orden, suena como UN discurso humano fluido. AUDIO BUDGET (no negociable): la suma de todos los voiceoverLine, leída a 2.5 palabras/segundo, debe durar EXACTAMENTE ${Math.max(2, req.totalDurationSec - 2)}s — máximo ${Math.floor(Math.max(2, req.totalDurationSec - 2) * 2.5)} palabras TOTALES. El último 1-2s del vídeo va EN SILENCIO a propósito (cola limpia, no cortar la voz). Si te sobra texto, recórtalo, no superes el budget.
 - En el modo "explainer-locked": el HOST está siempre en primer plano y nunca se mueve significativamente; las transiciones entre escenas se notan SOLO en el fondo.
 - En el modo "composite-pro": cada sceneDescription tiene formato "[FOREGROUND] ... [BACKGROUND] ..." con dos descripciones independientes.
 
@@ -243,12 +244,17 @@ REGLAS DURAS:
 - timeStartSec/timeEndSec respetan exactamente las duraciones indicadas arriba.
 - voiceoverLine en ${req.language}; keyframePrompt y videoPrompt en INGLÉS.
 - NUNCA cambies la identidad del personaje ni del producto (usa los bloques de identidad).
-- ANTI-TEXTO ESTRICTO: keyframePrompt y videoPrompt NUNCA contienen el nombre de la marca,
-  el nombre del producto, el CTA, el precio, ni ninguna palabra entre comillas. Los modelos de
-  imagen y vídeo pintan ese texto deformado. La marca y el CTA se sobreimprimen DETERMINISTAMENTE
-  después con FFmpeg drawtext; tu trabajo es describir solo el contenido VISUAL de la escena.
-  Termina cada keyframePrompt y cada videoPrompt con: "no text, no letters, no logos, no
-  brand names, no captions, no typography of any kind on any surface".
+- ANTI-TEXTO NUEVO (regla matizada): keyframePrompt y videoPrompt NUNCA contienen el nombre
+  de la marca, del producto, el CTA, el precio, ni ninguna palabra que el modelo deba RENDERIZAR
+  como texto NUEVO en la escena. La marca verbal y el CTA se sobreimprimen después con FFmpeg
+  drawtext. PERO el texto, logo, etiquetas o marcas YA IMPRESAS físicamente en el producto
+  (dial markings, woven labels, engraved plates, embossed brand mark) DEBEN PRESERVARSE EXACTAMENTE
+  como aparecen en la imagen de referencia — refiérete a esos elementos por su forma y posición
+  ('engraved logo plate at center of dial', 'woven brand label at inner collar') sin transcribir
+  el texto. Termina cada keyframePrompt y cada videoPrompt con: "preserve all existing printed
+  text, logos and brand markings on the product exactly as in the reference image; do NOT add
+  any new text, captions, watermarks, subtitles or typography to the scene; do NOT distort,
+  warp or morph any letter or symbol that is part of the product's physical design".
 - TRANSICIONES: cada escena hereda paleta, sujeto y ángulo aproximado de la anterior — el corte
   debe sentirse continuo (no saltes de set ni de paleta sin justificación del style/act).
 - NO devuelvas Markdown, NO devuelvas explicaciones — solo el JSON.`;
@@ -347,7 +353,7 @@ export async function generateDirectedScript(req: DirectorRequest): Promise<Cine
       }).join("\n");
       const repairPrompt = `Repara SOLO las escenas marcadas (idx ${idsList}) del anuncio "${script.title}". Devuelve JSON: { "scenes": [ { "idx": <id>, "keyframePrompt": "...EN INGLÉS >=90 palabras...", "videoPrompt": "...EN INGLÉS 40-90 palabras...", "voiceoverLine": "...frase en ${lang}, encadenada..." } ] }. Anchor character + product DNA en cada keyframePrompt.
 
-ANTI-TEXTO ESTRICTO (regla absoluta): keyframePrompt y videoPrompt NUNCA contienen el nombre de la marca "${req.brand}", el nombre del producto "${req.productDNA.productName}", precios, CTA, ni ninguna palabra entre comillas. Refiere etiquetas/logos del producto por su forma y posición, no por el texto que llevan. Termina cada keyframePrompt y videoPrompt con: "no text, no letters, no logos, no brand names, no captions, no typography of any kind on any surface".
+ANTI-TEXTO NUEVO (regla matizada): keyframePrompt y videoPrompt NUNCA contienen el nombre de la marca "${req.brand}", el nombre del producto "${req.productDNA.productName}", precios, CTA, ni ninguna palabra entre comillas que el modelo deba renderizar como texto NUEVO. Refiere etiquetas/logos del producto por su forma y posición, no por el texto que llevan, PERO preserva el texto físicamente impreso en el producto exactamente como aparece. Termina cada keyframePrompt y videoPrompt con: "preserve every existing letter, logo and brand marking on the product exactly as in the reference image; do NOT add any new text, captions or typography to the scene; do NOT distort or alter any letter that is part of the product's physical design".
 
 Contexto:\n${ctx}\n\nProduct DNA:\n${req.productDNA.identityLockBlock}`;
       const repaired = await askClaudeJson<{ scenes: Array<{ idx: number; keyframePrompt?: string; videoPrompt?: string; voiceoverLine?: string }> }>(

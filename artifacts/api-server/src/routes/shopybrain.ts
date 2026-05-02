@@ -9947,8 +9947,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           }
           const totalDurationSec = Math.max(60, Math.min(1800, Number(params?.totalDurationSec) || Number(params?.durationSec) || 180));
           const scenesCount = Math.max(2, Math.min(240, Number(params?.scenesCount) || Math.round(totalDurationSec / 6)));
-          const compositionMode: "narrative" | "explainer-locked" | "composite-pro" =
-            params?.compositionMode === "explainer-locked" || params?.compositionMode === "composite-pro"
+          const compositionMode: "narrative" | "explainer-locked" | "composite-pro" | "locked-shot" =
+            params?.compositionMode === "explainer-locked" || params?.compositionMode === "composite-pro" || params?.compositionMode === "locked-shot"
               ? params.compositionMode
               : "narrative";
           const characterId = params?.characterId ? parseInt(String(params.characterId), 10) : undefined;

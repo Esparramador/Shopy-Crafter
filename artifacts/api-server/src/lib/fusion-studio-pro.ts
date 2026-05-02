@@ -951,6 +951,111 @@ async function probeDurationSec(filePath: string): Promise<number> {
 }
 
 /**
+ * Adjust a voiceover Buffer so the speech ends at LEAST 1s before the target
+ * video duration — and the audio stream's TOTAL length equals the video's
+ * length exactly (padded with silence). This eliminates the "voice cut off
+ * at the end" artifact in Sakura/AdStudio renders.
+ *
+ *  - If voice is shorter than (target - 1s): keep it, append silence so
+ *    audio total length == target.
+ *  - If voice is longer than (target - 1s): apply `atempo` speed-up
+ *    (capped at 1.12x, transparent to the ear, preserves pitch). If that
+ *    is still not enough, hard-trim with a 0.4s fade-out, then pad 1s of
+ *    silence so the audio stream is exactly `target` seconds long.
+ *
+ * Always returns an mp3 of EXACTLY `targetVideoSec` seconds.
+ */
+export async function fitVoiceToVideo(
+  voiceBuffer: Buffer,
+  targetVideoSec: number,
+): Promise<Buffer> {
+  const tailSilenceSec = 1.0;
+  const speechBudget = Math.max(2, targetVideoSec - tailSilenceSec);
+  const tmp = await makeTmpDir("voicefit");
+  try {
+    const inPath = path.join(tmp, "in.mp3");
+    const outPath = path.join(tmp, "out.mp3");
+    await fs.writeFile(inPath, voiceBuffer);
+    const ffmpeg: any = await loadFfmpeg();
+    const inDur = await probeDurationSec(inPath).catch(() => speechBudget);
+
+    const atempo = inDur > speechBudget
+      ? Math.min(1.12, inDur / speechBudget)
+      : 1.0;
+    const adjustedDur = inDur / atempo;
+    const needsTrim = adjustedDur > speechBudget + 0.05;
+
+    return await new Promise<Buffer>((resolve, reject) => {
+      const cmd = ffmpeg(inPath);
+      const filters: string[] = [];
+      if (atempo !== 1.0) filters.push(`atempo=${atempo.toFixed(4)}`);
+      if (needsTrim) {
+        const trimAt = Math.max(0.5, speechBudget);
+        const fadeStart = Math.max(0, trimAt - 0.4);
+        filters.push(`atrim=duration=${trimAt.toFixed(3)}`);
+        filters.push(`asetpts=PTS-STARTPTS`);
+        filters.push(`afade=t=out:st=${fadeStart.toFixed(3)}:d=0.4`);
+      }
+      // Pad with silence so total stream length == targetVideoSec exactly.
+      // apad with whole_dur fills up to the requested total length.
+      filters.push(`apad=whole_dur=${targetVideoSec.toFixed(3)}`);
+
+      cmd.audioFilter(filters.join(","));
+      cmd.audioCodec("libmp3lame")
+        .audioBitrate("192k")
+        .outputOptions([`-t ${targetVideoSec.toFixed(3)}`])
+        .on("end", async () => {
+          try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        })
+        .on("error", (err: Error) => reject(new Error(`fitVoiceToVideo error: ${err.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Extract the last visible frame of a video as a PNG image. Used by the
+ * "locked-shot" composition mode so the next clip can be image-to-video
+ * generated FROM the previous clip's last frame, producing a seamless
+ * single-take feel (no camera/composition jump between clips).
+ */
+export async function extractLastFrame(videoBuffer: Buffer): Promise<{ buffer: Buffer; mime: string }> {
+  const tmp = await makeTmpDir("lastframe");
+  try {
+    const inPath = path.join(tmp, "in.mp4");
+    const outPath = path.join(tmp, "lastframe.png");
+    await fs.writeFile(inPath, videoBuffer);
+    const ffmpeg: any = await loadFfmpeg();
+    const dur = await probeDurationSec(inPath).catch(() => 5);
+    const seekTo = Math.max(0, dur - 0.08);
+    return await new Promise<{ buffer: Buffer; mime: string }>((resolve, reject) => {
+      ffmpeg(inPath)
+        .seekInput(seekTo.toFixed(3))
+        .frames(1)
+        // Lock the PNG to the source video's native dims (scale=iw:ih is a
+        // no-op on dimensions but forces a clean rescale path so the PNG
+        // pixel grid matches the video stream byte-for-byte; some image-to-
+        // video providers reject sources whose aspect doesn't match the
+        // requested aspect to the pixel).
+        .videoFilter("scale=iw:ih")
+        .outputOptions(["-update 1", "-q:v 2"])
+        .on("end", async () => {
+          try {
+            const buf = await fs.readFile(outPath);
+            resolve({ buffer: buf, mime: "image/png" });
+          } catch (e) { reject(e); }
+        })
+        .on("error", (err: Error) => reject(new Error(`extractLastFrame error: ${err.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Concatenate N video clips into a single MP4. Re-encodes for compatibility
  * (different sources can have different codecs/resolutions). Optional crossfade
  * between clips and optional audio overlay (voice + music).
@@ -985,8 +1090,25 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
 
     const ffmpeg: any = await loadFfmpeg();
 
-    // Pre-write voice/music to disk if present (we'll add them as inputs below)
-    if (opts.voiceBuffer) await fs.writeFile(path.join(tmp, "voice.mp3"), opts.voiceBuffer);
+    // Compute the EXACT final video duration (after crossfade overlap removal)
+    // so we can fit the voice to it (audio must end ~1s BEFORE video to avoid
+    // the "voice cut off" symptom in Sakura/AdStudio renders).
+    const probedDurations = opts.clipDurationsSec && opts.clipDurationsSec.length === inputPaths.length
+      ? opts.clipDurationsSec.map(d => Math.max(0.5, Number(d) || 5))
+      : await Promise.all(inputPaths.map(p => probeDurationSec(p).catch(() => 5)));
+    const totalRaw = probedDurations.reduce((s, d) => s + d, 0);
+    const finalVideoSec = useCrossfade && inputPaths.length > 1
+      ? Math.max(0.5, totalRaw - crossfade * (inputPaths.length - 1))
+      : totalRaw;
+
+    // Pre-write voice/music to disk. Voice is ALWAYS run through fitVoiceToVideo
+    // so the speech ends 1s before video end, and the audio total length equals
+    // video length exactly (padded with silence).
+    if (opts.voiceBuffer) {
+      const fittedVoice = await fitVoiceToVideo(opts.voiceBuffer, finalVideoSec);
+      await fs.writeFile(path.join(tmp, "voice.mp3"), fittedVoice);
+      opts = { ...opts, voiceBuffer: fittedVoice };
+    }
     if (opts.musicBuffer) await fs.writeFile(path.join(tmp, "music.mp3"), opts.musicBuffer);
 
     // If crossfade is requested, we need accurate per-clip durations to compute
@@ -1054,9 +1176,12 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
         filters.push(`[${audioInputs[0]}:a]volume=${(isVoice ? opts.voiceVolume : opts.musicVolume) ?? 1.0}[aout]`);
         outputMaps.push("aout");
       } else if (audioInputs.length === 2) {
+        // Trim music to the EXACT video length (with 0.4s fade-out tail) so
+        // it can never extend past the video — `amix=duration=first` then
+        // anchors the mix to the voice (which is already exactly finalVideoSec).
         filters.push(`[${audioInputs[0]}:a]volume=${opts.voiceVolume ?? 1.0}[av]`);
-        filters.push(`[${audioInputs[1]}:a]volume=${opts.musicVolume ?? 0.25}[am]`);
-        filters.push(`[av][am]amix=inputs=2:duration=longest:dropout_transition=0[aout]`);
+        filters.push(`[${audioInputs[1]}:a]volume=${opts.musicVolume ?? 0.25},atrim=duration=${finalVideoSec.toFixed(3)},afade=t=out:st=${Math.max(0, finalVideoSec - 0.4).toFixed(3)}:d=0.4[am]`);
+        filters.push(`[av][am]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
         outputMaps.push("aout");
       }
 
@@ -1066,7 +1191,10 @@ export async function concatVideos(opts: ConcatOptions): Promise<Buffer> {
         .outputOptions([
           "-pix_fmt yuv420p",
           "-movflags +faststart",
-          ...(audioInputs.length ? ["-shortest"] : []),
+          // No -shortest: the voice has been pre-fitted to exactly match
+          // finalVideoSec (with 1s tail of silence), so the video stream
+          // governs the output length and the voiceover never gets cut off.
+          ...(audioInputs.length ? [`-t ${finalVideoSec.toFixed(3)}`] : []),
         ])
         .on("end", async () => {
           try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }

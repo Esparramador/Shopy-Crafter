@@ -226,7 +226,7 @@ router.post(
         characterId?: string | number;
         totalDurationSec?: number;
         longForm?: boolean;
-        compositionMode?: "narrative" | "explainer-locked" | "composite-pro";
+        compositionMode?: "narrative" | "explainer-locked" | "composite-pro" | "locked-shot";
         savedPromptId?: string;
       };
       const savedPromptId = typeof body.savedPromptId === "string" && body.savedPromptId.trim()
@@ -325,8 +325,8 @@ router.post(
       // todavía no aplica un compositor real (chroma-key FFmpeg dual-layer).
       // Mientras esa pieza no esté en producción, degradamos a "explainer-locked"
       // que SÍ produce vídeo final coherente (host fijo, BG dinámico vía prompt).
-      let compositionMode: "narrative" | "explainer-locked" | "composite-pro" =
-        body.compositionMode === "explainer-locked" || body.compositionMode === "composite-pro"
+      let compositionMode: "narrative" | "explainer-locked" | "composite-pro" | "locked-shot" =
+        body.compositionMode === "explainer-locked" || body.compositionMode === "composite-pro" || body.compositionMode === "locked-shot"
           ? body.compositionMode
           : "narrative";
       if (compositionMode === "composite-pro") {

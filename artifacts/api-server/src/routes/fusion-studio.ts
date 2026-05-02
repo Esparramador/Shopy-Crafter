@@ -254,7 +254,7 @@ ABSOLUTE RULES:
 - Realistic contact shadows where the product touches the model.
 - ${sceneMod}
 - Output: ultra-high resolution, sharp focus, commercial fashion/lifestyle photography quality, professional color grading.
-- No text, no logos overlays, no watermarks added.${extraPrompt ? `\n- Additional direction: ${extraPrompt}` : ""}`;
+- Preserve EVERY existing letter, logo, dial marking and brand printed on the product (image 2) EXACTLY as visible — do not warp, morph or alter them. Do NOT add any new text, new logos, captions or watermarks to the scene.${extraPrompt ? `\n- Additional direction: ${extraPrompt}` : ""}`;
 }
 
 async function applyAccessoryTryon(
