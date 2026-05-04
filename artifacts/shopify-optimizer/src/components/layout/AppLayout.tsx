@@ -92,13 +92,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   // mostraba duplicados. Garantizamos un único item por destino.
   const seenKeys = new Set<string>();
   const shopybrainNav = rawShopybrainNav
-    .map((item: any) => {
-      if (!item.href.includes("/projects/2/")) return item;
-      if (firstProjectId === null) return { ...item, disabled: true, href: "#" };
-      return { ...item, href: item.href.replace("/projects/2/", `/projects/${firstProjectId}/`) };
-    })
+    .filter((item: any) => !item.href.includes("/projects/"))
     .filter((item: any) => {
-      if (item.disabled && !isLoading) return false;
       const key = `${item.href}::${item.label}`;
       if (seenKeys.has(key)) return false;
       seenKeys.add(key);
