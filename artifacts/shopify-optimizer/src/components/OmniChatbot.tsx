@@ -917,8 +917,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
+  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only">("auto");
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachFiles, setAttachFiles] = useState<File[]>([]);
   const [attachUrl, setAttachUrl] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -975,15 +977,21 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const handleDragLeave = () => setIsDragging(false);
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      setAttachFile(file); setAttachUrl(""); setShowAttach(true);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      setAttachFile(files[0]);
+      setAttachFiles(Array.from(files));
+      setAttachUrl(""); setShowAttach(true);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) { setAttachFile(file); setAttachUrl(""); setShowAttach(true); }
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setAttachFile(files[0]);
+      setAttachFiles(Array.from(files));
+      setAttachUrl(""); setShowAttach(true);
+    }
   };
 
   const handleUrlAdd = () => {
@@ -1591,8 +1599,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       attachmentName: hasAttach ? attachName : undefined,
     };
     const thinkingId = uuid();
-    setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: "gemini+claude+brain" }]);
-    setInput(""); setAttachFile(null); setAttachUrl(""); setShowAttach(false);
+    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: "claude", gemini: "gemini+search", brain_only: "brain" };
+    setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain" }]);
+    setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
 
     const fetchWithTimeout = (url: string, opts: RequestInit, timeoutMs = 120000): Promise<Response> => {
@@ -1691,16 +1700,45 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           setMessages(m => [...m, { id: uuid(), role: "assistant", content: absorbingMsg, timestamp: new Date(), model: "gemini+claude+brain" }]);
 
           let result: AbsorbResult;
-          if (attachFile) {
+          const filesToProcess = attachFiles.length > 0 ? attachFiles : (attachFile ? [attachFile] : []);
+          if (filesToProcess.length > 1) {
+            const fileResults: Array<{ file: File; result?: AbsorbResult; error?: string }> = [];
+            for (const f of filesToProcess) {
+              try {
+                const r = await absorbFile(f, undefined, controller.signal);
+                fileResults.push({ file: f, result: r });
+              } catch (e) {
+                fileResults.push({ file: f, error: e instanceof Error ? e.message : String(e) });
+              }
+            }
+            const successFiles = fileResults.filter(fr => fr.result);
+            const failedFiles = fileResults.filter(fr => fr.error);
+            result = successFiles[0]?.result || { memoryId: "", analysis: {}, entity: "" };
+            if (successFiles.length === 0) {
+              assistantContent = `❌ **0/${filesToProcess.length} archivos procesados** — todos fallaron.\n\n`;
+            } else if (failedFiles.length > 0) {
+              assistantContent = `⚠️ **${successFiles.length}/${filesToProcess.length} archivos absorbidos** (${failedFiles.length} con error)\n\n`;
+            } else {
+              assistantContent = `✅ **${successFiles.length}/${filesToProcess.length} archivos absorbidos a Shopy Crafter**\n\n`;
+            }
+            for (const fr of fileResults) {
+              if (fr.result) {
+                assistantContent += `✅ **${fr.file.name}** ${fr.result.memoryId ? `(memoria #${fr.result.memoryId.slice(0, 8)})` : ""}\n`;
+              } else {
+                assistantContent += `❌ **${fr.file.name}** — ${fr.error}\n`;
+              }
+            }
+            assistantContent += "\n";
+          } else if (attachFile) {
             result = await absorbFile(attachFile, undefined, controller.signal);
+            assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
           } else {
             result = await absorbUrl(attachUrl, undefined, controller.signal);
+            assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
           }
 
           const isDocument = attachType === "document";
           const isImage = attachType === "image";
-
-          assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
 
           if (isDocument) {
             const docAnalysis = typeof result.analysis === "string" ? result.analysis : JSON.stringify(result.analysis, null, 2);
@@ -1727,7 +1765,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             const followUp = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
               method: "POST", credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
+              body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location, engineMode }),
             });
             if (followUp.ok) {
               const d = await followUp.json();
@@ -1797,7 +1835,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           const followUp = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location }),
+            body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, currentRoute: location, engineMode }),
           });
           if (followUp.ok) { const d = await followUp.json(); assistantContent += d.answer ?? ""; }
         }
@@ -1812,7 +1850,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode }),
         });
         if (res.ok) {
           const d = await res.json();
@@ -1885,7 +1923,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       setMessages(m => {
         const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA", "Analizando tu solicitud"];
         const filtered = m.filter(msg => msg.id !== thinkingId && !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
-        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: "gemini+claude+brain", action }];
+        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action }];
       });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Fallo de conexión";
@@ -1902,7 +1940,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages, attachFile, attachUrl]);
+  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, location]);
 
   useEffect(() => {
     if (!isListening && pendingTranscriptRef.current) {
@@ -2109,7 +2147,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
                 {/* Attachment preview */}
                 {(attachFile || attachUrl) && (
-                  <AttachmentPreview file={attachFile} url={attachUrl} onRemove={() => { setAttachFile(null); setAttachUrl(""); }} />
+                  <AttachmentPreview file={attachFile} url={attachUrl} onRemove={() => { setAttachFile(null); setAttachFiles([]); setAttachUrl(""); }} />
+                )}
+                {attachFiles.length > 1 && (
+                  <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 4, textAlign: "center" }}>
+                    +{attachFiles.length - 1} archivo{attachFiles.length > 2 ? "s" : ""} más seleccionado{attachFiles.length > 2 ? "s" : ""}
+                  </div>
                 )}
 
                 {/* Text input row */}
@@ -2147,10 +2190,24 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   </button>
                 </div>
 
-                {/* Footer badges */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, justifyContent: "center" }}>
-                  {[["🔬", "Gemini"], ["🧠", "Claude"], ["💾", "Brain"], ["👁", "Visión"]].map(([icon, label]) => (
-                    <span key={label} style={{ fontSize: 9, color: "var(--t4)", display: "flex", alignItems: "center", gap: 3 }}>{icon} {label}</span>
+                {/* Engine selector */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, justifyContent: "center" }}>
+                  {([
+                    { key: "auto", icon: "⚡", label: "Auto" },
+                    { key: "claude", icon: "🧠", label: "Claude" },
+                    { key: "gemini", icon: "🔬", label: "Gemini" },
+                    { key: "brain_only", icon: "💾", label: "Brain" },
+                  ] as const).map(({ key, icon, label }) => (
+                    <button key={key} onClick={() => setEngineMode(key)}
+                      style={{
+                        fontSize: 9, padding: "2px 7px", borderRadius: 4, cursor: "pointer",
+                        border: engineMode === key ? "1px solid var(--gold)" : "1px solid transparent",
+                        background: engineMode === key ? "rgba(200,168,75,0.15)" : "transparent",
+                        color: engineMode === key ? "var(--gold)" : "var(--t4)",
+                        display: "flex", alignItems: "center", gap: 3, transition: "all 0.2s",
+                      }}>
+                      {icon} {label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -2160,7 +2217,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       )}
 
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*,video/*,.txt,.md,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} onChange={handleFileSelect} />
+      <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.txt,.md,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} onChange={handleFileSelect} />
 
       <style>{`
         @keyframes pulseGold {

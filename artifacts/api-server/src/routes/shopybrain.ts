@@ -450,7 +450,10 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
-    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute } = req.body;
+    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode } = req.body;
+    const validEngines = ["auto", "claude", "gemini", "brain_only"] as const;
+    type EngineMode = typeof validEngines[number];
+    const engine: EngineMode = validEngines.includes(engineMode) ? engineMode : "auto";
     if (!query) {
       res.status(400).json({ error: "query es requerido" });
       return;
@@ -1219,14 +1222,53 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
         }
       }
       const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContextInfo;
-  
-      const answer = await askClaude(
-        resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
-        [{ role: "user", content: userContent }],
-        sysPrompt,
-        16000,
-      );
-  
+
+      let answer = "";
+      let engineUsed = "claude+omnicore";
+
+      if (engine === "brain_only") {
+        const queryWords = query.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+        const brainConditions = [gte(omnicoreMemoriesTable.confidence, 0.3)];
+        if (niche) brainConditions.push(eq(omnicoreMemoriesTable.niche, niche));
+        let brainMemories = await db.select()
+          .from(omnicoreMemoriesTable)
+          .where(and(...brainConditions))
+          .orderBy(desc(omnicoreMemoriesTable.updatedAt))
+          .limit(50);
+        if (queryWords.length > 0) {
+          brainMemories = brainMemories
+            .filter(m => {
+              const text = `${m.title ?? ""} ${(m.content ?? "").slice(0, 2000)}`.toLowerCase();
+              return queryWords.some((w: string) => text.includes(w));
+            })
+            .slice(0, 10);
+        } else {
+          brainMemories = brainMemories.slice(0, 10);
+        }
+        if (brainMemories.length === 0) {
+          answer = "No encontré memorias relevantes en ShopyBrain para esta consulta. Prueba con el modo Auto o Claude para obtener una respuesta generada por IA.";
+        } else {
+          answer = `🧠 **Respuesta desde ShopyBrain** (${brainMemories.length} memorias):\n\n${brainMemories.map(m => `**${m.title}**\n${(m.content ?? "").slice(0, 600)}`).join("\n\n---\n\n")}`;
+        }
+        engineUsed = "brain_only";
+      } else if (engine === "gemini") {
+        const { askGeminiWithSearch } = await import("../lib/gemini.js");
+        const geminiRes = await askGeminiWithSearch(
+          `${sysPrompt}\n\n${userContent}`,
+          "Eres Shopy Crafter, asistente experto de eCommerce Shopify. Responde SIEMPRE en español. Sé directo y accionable."
+        );
+        answer = geminiRes.text || "Gemini no pudo generar una respuesta. Prueba con otro motor.";
+        engineUsed = "gemini+search";
+      } else {
+        answer = await askClaude(
+          resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
+          [{ role: "user", content: userContent }],
+          sysPrompt,
+          16000,
+        );
+        engineUsed = engine === "claude" ? "claude" : "claude+omnicore";
+      }
+
       let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
       const detectedActions: { action: string; params: Record<string, unknown> }[] = [];
       const actionRegex = /:::ACTION:::([\s\S]*?):::END_ACTION:::/g;
@@ -1246,7 +1288,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   
       res.json({
         answer: cleanAnswer,
-        source: "claude+omnicore",
+        source: engineUsed,
+        engine,
         entityKnowledgeUsed: !!entityKnowledgeContext,
         potentialEntity: potentialEntity ?? null,
         detectedAction,
@@ -10468,22 +10511,36 @@ router.post("/shopybrain/run/self-evaluation", requireAdmin, async (_req, res): 
   }
 });
 
-router.post("/shopybrain/upload", requireAdmin, upload.single("file"), async (req, res): Promise<void> => {
+router.post("/shopybrain/upload", requireAdmin, upload.array("file", 10), async (req, res): Promise<void> => {
   try {
-    const file = req.file;
-    if (!file) {
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) {
       res.status(400).json({ success: false, error: "No se recibió ningún archivo" });
       return;
     }
-    const buffer = file.buffer;
-    const processed = await processUploadedFile(buffer, file.originalname, file.mimetype);
-    res.json({
-      success: true,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      processed,
-    });
+    const settled = await Promise.allSettled(
+      files.map(async (file) => {
+        const processed = await processUploadedFile(file.buffer, file.originalname, file.mimetype);
+        return {
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          processed,
+        };
+      })
+    );
+    const results = settled.map((s, i) =>
+      s.status === "fulfilled"
+        ? { ...s.value, success: true }
+        : { fileName: files[i].originalname, mimeType: files[i].mimetype, size: files[i].size, success: false, error: s.reason?.message || "Error procesando archivo" }
+    );
+    const successCount = results.filter(r => r.success).length;
+    if (files.length === 1 && results[0].success) {
+      const r = results[0] as { fileName: string; mimeType: string; size: number; processed: unknown; success: boolean };
+      res.json({ success: true, fileName: r.fileName, mimeType: r.mimeType, size: r.size, processed: r.processed });
+    } else {
+      res.json({ success: successCount > 0, count: results.length, successCount, files: results });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err instanceof Error ? err.message : String(err) });
   }
