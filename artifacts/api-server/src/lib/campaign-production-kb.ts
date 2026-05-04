@@ -697,8 +697,75 @@ export function getFullCampaignProduction() {
     deliverablesChecklist: DELIVERABLES_CHECKLIST,
     aiVideoTools: AI_VIDEO_TOOLS,
     storyboardSlides: STORYBOARD_SLIDES,
+    platformAdaptationTemplates: PLATFORM_ADAPTATION_TEMPLATES,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// 11. PLATFORM-SPECIFIC PROMPT ADAPTATION — Optimized per AI video engine
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface PlatformAdaptationTemplate {
+  id: string;
+  platform: string;
+  spanishLabel: string;
+  promptPrefix: string;
+  promptSuffix: string;
+  cameraLock: string;
+  physicsTokens: string[];
+  identityLock: string;
+  maxClipDuration: number;
+  chainingMethod: string;
+  negativeTokens: string[];
+}
+
+export const PLATFORM_ADAPTATION_TEMPLATES: PlatformAdaptationTemplate[] = [
+  { id: "adapt:runway", platform: "Runway Gen-3/4", spanishLabel: "Adaptación Runway",
+    promptPrefix: "",
+    promptSuffix: "cinematic quality, smooth camera motion, photorealistic materials, professional advertising production",
+    cameraLock: "STATIC LOCK-OFF CAMERA, zero camera movement, zero drift, fixed focal point",
+    physicsTokens: ["no morphing", "rigid mechanical parts", "precise physics", "accurate material properties"],
+    identityLock: "Use image-to-video with product reference frame. Last frame of clip N = first frame input of clip N+1.",
+    maxClipDuration: 10,
+    chainingMethod: "Sequential image-to-video: extract last frame of previous clip, use as input for next clip generation",
+    negativeTokens: ["no text", "no watermark", "no UI elements", "no morphing between objects"] },
+  { id: "adapt:seedance", platform: "Seedance 2.0", spanishLabel: "Adaptación Seedance",
+    promptPrefix: "",
+    promptSuffix: "rigid body physics, precise mechanical motion, no morphing, studio-quality render",
+    cameraLock: "static locked-off camera, zero camera drift, fixed angle throughout entire generation",
+    physicsTokens: ["rigid body physics", "precise mechanical motion", "no morphing", "accurate gravity and inertia", "natural material deformation only"],
+    identityLock: "Use omni_reference mode with up to 12 mixed references (images + videos). Provide product reference images for 100% identity lock.",
+    maxClipDuration: 10,
+    chainingMethod: "first_last_frames mode: provide first frame + last frame, model interpolates all intermediate frames with 98% frame-match rate",
+    negativeTokens: ["no morphing", "no object transformation", "no teleportation", "no floating artifacts"] },
+  { id: "adapt:kling", platform: "Kling 3.0", spanishLabel: "Adaptación Kling",
+    promptPrefix: "",
+    promptSuffix: "4K resolution, cinematic quality, precise mechanical motion, studio lighting",
+    cameraLock: "Use dedicated camera control API: set pan=0, tilt=0, zoom=0, roll=0 for static shot",
+    physicsTokens: ["ease-in/ease-out kinetic curve", "smooth mechanical detachment", "zero-gravity suspension", "absolute structural stability"],
+    identityLock: "Element Binding: upload product reference image, system locks appearance across all generated clips in multi-shot sequence.",
+    maxClipDuration: 15,
+    chainingMethod: "Multi-shot mode with Element Binding for consistency. Motion Control transfers precise movements between clips.",
+    negativeTokens: ["no face deformation", "no object blending", "no color shift between clips"] },
+  { id: "adapt:pollo", platform: "Pollo.ai 2.0", spanishLabel: "Adaptación Pollo.ai",
+    promptPrefix: "",
+    promptSuffix: "professional advertising quality, consistent visual style, smooth transitions",
+    cameraLock: "Select 'Static' camera preset in Camera Control panel, or write 'static locked camera' in prompt",
+    physicsTokens: ["natural physics", "realistic motion", "consistent lighting", "smooth movement curves"],
+    identityLock: "Multi-Shot mode preserves object/character consistency across sequential clips automatically.",
+    maxClipDuration: 10,
+    chainingMethod: "Multi-Shot mode + Pollo Transitions for seamless clip-to-clip flow. Video Agent (Beta) can automate entire pipeline.",
+    negativeTokens: ["no watermark", "no morphing", "no style drift between clips"] },
+  { id: "adapt:veo", platform: "Veo 3.1", spanishLabel: "Adaptación Veo",
+    promptPrefix: "",
+    promptSuffix: "dramatic volumetric shadows, octane render style, physics-accurate motion, studio-grade lighting",
+    cameraLock: "Use First+Last Frame mode for strongest spatial anchoring. Specify 'static camera, no movement' in text prompt.",
+    physicsTokens: ["accurate gravity", "magnetic attraction", "mechanical precision", "fluid dynamics", "realistic material interaction"],
+    identityLock: "Upload up to 3 reference images as 'asset' type. System locks product identity across generation.",
+    maxClipDuration: 8,
+    chainingMethod: "Video extension mode: extend each clip from the end of the previous clip for temporal continuity",
+    negativeTokens: ["no text generation", "no UI overlay", "no unrealistic physics"] },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AI-POWERED COMPOSE HELPERS — use Claude to adapt for any brand

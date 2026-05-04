@@ -1,0 +1,80 @@
+SI YO TE DIJERA QUE ME HICIERAS UN A/B TESTING REAL DE COMPETIDORES PRODUCTOS VISIBILIDAD DEL PRODUCTO, DEL PRECIO, DE LOS COSTES SEGÚN PROVEEDORES SABRÍAS COMO REALIZARLO?? TOMA DE EJEMPLO ALGÚN PRODUCTO DE ALGUNA TIENDA DE SHOPIFY EXISTENTE REAL Y HAZ UN EJEMPLO POR FAVOR PARA DARLE ESA LOGICA Y CONOCIMIENTO A MI APLICACION POR FAVOR
+
+¡Por supuesto que sé cómo estructurarlo! Y me encanta la dirección que estás tomando. Añadir una lógica de A/B Testing Estratégico (Simulación de Escenarios) convierte a Shopy Crafter de una simple herramienta de análisis en un verdadero Director de Estrategia (CSO) virtual.
+
+Aquí viene mi dosis de candor y realidad: Un A/B test tradicional suele probar si un botón rojo convierte más que uno verde. Lo que tú me estás pidiendo es mucho más avanzado: es un Test Multivariable de Modelo de Negocio. Estás enfrentando Costes de Proveedor (COGS) vs. Estrategia de Precios (Pricing) vs. Canal de Visibilidad (CAC).
+
+Para que la IA de tu plataforma aprenda esta lógica, vamos a utilizar un ejemplo basado en un producto real y muy famoso del ecosistema Shopify: La botella de agua inteligente con purificación UV-C (la marca de referencia real que usa Shopify para esto es LARQ).
+
+Aquí tienes la radiografía exacta de cómo debe procesar y presentar este informe tu aplicación.
+
+1. Contexto del Mercado (El Diagnóstico Base)
+Antes de hacer el Test A/B, tu aplicación debe mapear el terreno de juego.
+
+Producto a analizar: Botella de Agua Inteligente UV-C (500ml, Acero Inoxidable).
+
+Competidor Principal (Referencia Real): LARQ (Shopify).
+
+Precio de Venta al Público (PVP): 99,00 €
+
+Visibilidad: Alta. SEO dominante en "botellas de agua autolimpiantes". Tráfico pesado desde Meta Ads (Instagram) enfocado en estilo de vida premium y sostenibilidad.
+
+Percepción de Valor: Lujo accesible, diseño minimalista, tecnología.
+
+2. Análisis de Proveedores (El Backend)
+Tu aplicación ("Shopy Crafter") busca en su base de datos y encuentra dos proveedores viables para que el usuario compita contra LARQ:
+
+Métrica	Proveedor 1 (OEM Premium Shenzhen)	Proveedor 2 (Mayorista Estándar Global)
+Calidad / Acabado	Alta (Acero 316 médico, batería 30 días)	Estándar (Acero 304, batería 15 días)
+COGS Unitario (Producto + Envío)	24,50 €	15,20 €
+Pedido Mínimo (MOQ)	1.000 unidades	100 unidades
+Packaging	Caja rígida premium imantada	Caja de cartón corrugado simple
+3. El A/B Testing Estratégico (El Motor de Shopy Crafter)
+Aquí es donde tu aplicación brilla. En lugar de decirle al usuario "elige uno", Shopy Crafter simula dos escenarios de mercado (A y B) y proyecta los resultados financieros basados en el coste de visibilidad (CAC - Coste de Adquisición de Cliente).
+
+🎯 Variante A: Estrategia "Premium Challenger" (Atacar a LARQ frente a frente)
+Proveedor Elegido: Proveedor 1 (COGS: 24,50 €)
+
+PVP Sugerido: 89,00 € (Un 10% más barato que LARQ para robar cuota de mercado).
+
+Canal de Visibilidad: Google Search (SEO / SEM) + Instagram Ads.
+
+Hipótesis de Tráfico: El tráfico será más caro (mayor CPC), pero el cliente busca calidad a largo plazo.
+
+🎯 Variante B: Estrategia "Impulso Masivo" (Océano Azul / Volumen)
+Proveedor Elegido: Proveedor 2 (COGS: 15,20 €)
+
+PVP Sugerido: 49,00 € (La mitad de precio que LARQ, rompiendo la barrera psicológica de los 50€).
+
+Canal de Visibilidad: TikTok Ads (UGC - Contenido Generado por Usuarios mostrando cómo funciona la luz UV-C).
+
+Hipótesis de Tráfico: El tráfico es mucho más barato. Compra compulsiva, menor fidelización, pero altísimo volumen.
+
+4. Proyección Financiera y Resultados del Test A/B (La Magia Matemática)
+Shopy Crafter genera esta tabla asumiendo un presupuesto de marketing inicial de 5.000 € para probar ambas variantes. (Estos son los datos hiperdetallados que tu IA debe calcular usando matemáticas estrictas).
+
+Métrica de la Simulación	Variante A (Premium)	Variante B (Volumen)
+PVP (Precio de Venta)	89,00 €	49,00 €
+COGS (Coste Producto)	24,50 € (27% del PVP)	15,20 € (31% del PVP)
+Margen Bruto Unitario	64,50 €	33,80 €
+CAC Estimado (Coste Adquisición)	28,00 € (Tráfico Caro/Premium)	12,00 € (Tráfico TikTok Viral)
+Margen Neto Unitario (Beneficio)	36,50 €	21,80 €
+Ventas con 5.000€ de Marketing	178 unidades	416 unidades
+REVENUE TOTAL (Ingresos)	15.842 €	20.384 €
+BENEFICIO TOTAL PROYECTADO	6.497 €	9.068 €
+5. El Veredicto de la IA (El Resumen Ejecutivo para el Usuario)
+Tu aplicación no debe darle solo la tabla, debe darle una conclusión estratégica clara y accionable:
+
+Veredicto Shopy Crafter:
+A corto plazo, la Variante B (Estrategia de Volumen) es la ganadora indiscutible para el lanzamiento. Genera un mayor Revenue (20.384 €) y un mayor beneficio neto generalizado, ya que el bajo Coste de Adquisición (CAC) en TikTok compensa el menor margen de beneficio por botella.
+
+Sin embargo [Alerta de Escalabilidad]: Para mantener la Variante B, estarás atrapado en una guerra de precios de baja calidad. Se recomienda empezar con la Variante B para capitalizar la empresa rápidamente y, tras 6 meses, reinvertir los beneficios para transicionar hacia la Variante A creando una marca a largo plazo más robusta, similar a LARQ.
+
+¿Cómo inyectas esta lógica en tu backend de Replit?
+Para que Claude o Gemini hagan esto en tu plataforma sin alucinar, tienes que estructurar el prompt de tu financialAgent.js así:
+
+Input: Pásale a la IA el producto, 2 proveedores reales (o simulados por tu base de datos) y el precio del competidor top.
+
+Instrucción de Modelado: "Crea un Test A/B simulando dos estrategias de Pricing y Adquisición (Premium vs Volumen). Debes calcular matemáticamente el Margen Bruto, estimar un CAC lógico para cada red social, y deducir el Beneficio Neto."
+
+Output: Exígele un JSON que contenga los arrays para llenar las tablas de arriba, para que tu frontend lo pinte con barras gráficas comparativas.

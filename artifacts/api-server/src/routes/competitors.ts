@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
+import { logger } from "../lib/logger.js";
 import net from "net";
 import { enableLongRunning } from "../lib/long-running.js";
 import { getReportShell } from "./exports.js";
@@ -307,8 +308,12 @@ router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
-      res.status(500).json({ error: `Error descubriendo competidores: ${msg}` });
-      return;
+      const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED");
+      if (!is403) {
+        res.status(500).json({ error: `Error descubriendo competidores: ${msg}` });
+        return;
+      }
+      logger.warn("Competitor auto-discover: Gemini search blocked (403), returning empty list");
     }
   
     const added: Array<{ id: string; name: string; url: string; type: string; reason: string }> = [];

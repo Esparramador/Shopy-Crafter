@@ -677,6 +677,108 @@ export const LIP_SYNC_RULES: LipSyncRule[] = [
 ];
 
 // ───────────────────────────────────────────────────────────────────────────
+// 14. VIRTUAL TRY-ON PROMPT RECIPES — Best practices for AI garment fitting.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface TryOnRecipe {
+  id: string;
+  category: "front" | "back" | "lifestyle" | "detail" | "editorial";
+  spanishLabel: string;
+  promptTemplate: string;
+  modelDescription: string;
+  lightingSetup: string;
+  bestFor: string[];
+  qualityTokens: string[];
+}
+
+export const TRYON_RECIPES: TryOnRecipe[] = [
+  { id: "tryon:front_hero", category: "front", spanishLabel: "Frontal Hero Shot",
+    promptTemplate: "{MODEL_DESC} wearing {GARMENT}, standing naturally facing camera, {LIGHTING}, full body visible from head to mid-calf, clean studio backdrop, {QUALITY}",
+    modelDescription: "confident 28-year-old model, athletic build, natural expression",
+    lightingSetup: "soft 3-point studio lighting with subtle rim light separating subject from background",
+    bestFor: ["camisetas", "vestidos", "chaquetas", "pantalones"],
+    qualityTokens: ["natural fabric drape and wrinkle patterns", "accurate body proportion", "no garment floating or clipping", "realistic skin texture"] },
+  { id: "tryon:back_detail", category: "back", spanishLabel: "Vista Posterior",
+    promptTemplate: "{MODEL_DESC} seen from behind wearing {GARMENT}, slight 3/4 turn showing back detail, {LIGHTING}, clean background, {QUALITY}",
+    modelDescription: "same model as front shot, consistent appearance",
+    lightingSetup: "broad key light from front-right revealing back texture and construction details",
+    bestFor: ["chaquetas", "mochilas", "vestidos_espalda"],
+    qualityTokens: ["visible stitching and construction", "accurate back drape", "natural shoulder sit", "consistent with front view"] },
+  { id: "tryon:lifestyle_urban", category: "lifestyle", spanishLabel: "Lifestyle Urbano",
+    promptTemplate: "{MODEL_DESC} wearing {GARMENT}, walking through modern urban setting, candid natural movement, {LIGHTING}, street photography style, {QUALITY}",
+    modelDescription: "approachable 25-35 year-old, relaxed confident posture",
+    lightingSetup: "golden hour natural light with soft shadows, slight backlight rim",
+    bestFor: ["streetwear", "casual", "athleisure", "sneakers"],
+    qualityTokens: ["natural motion blur on extremities", "environmental interaction", "authentic fabric movement during walk", "depth of field isolating subject"] },
+  { id: "tryon:editorial_premium", category: "editorial", spanishLabel: "Editorial Premium",
+    promptTemplate: "{MODEL_DESC} wearing {GARMENT}, editorial fashion pose, dramatic {LIGHTING}, minimalist set design, Vogue-quality composition, {QUALITY}",
+    modelDescription: "striking model with strong bone structure, fashion-forward presence",
+    lightingSetup: "dramatic single-source lighting with deep shadows, butterfly or split pattern",
+    bestFor: ["luxury", "haute_couture", "accessories", "watches"],
+    qualityTokens: ["magazine-cover quality", "intentional negative space", "dramatic shadow play", "fabric texture hero", "editorial color grading"] },
+  { id: "tryon:detail_texture", category: "detail", spanishLabel: "Detalle de Textura",
+    promptTemplate: "extreme close-up of {GARMENT} being worn, showing fabric texture, stitching quality, and material hand-feel, macro photography style, {LIGHTING}, {QUALITY}",
+    modelDescription: "cropped to garment detail only, model body partially visible",
+    lightingSetup: "raking light at 15-degree angle to reveal surface texture and weave pattern",
+    bestFor: ["denim", "leather", "knit", "silk", "linen"],
+    qualityTokens: ["individual thread visibility", "accurate material sheen", "micro-texture detail", "shallow DOF macro lens character"] },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// 15. PRODUCT PHOTOGRAPHY MASTER PROMPTS — Category-specific hero shots.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface ProductPhotoRecipe {
+  id: string;
+  category: string;
+  spanishLabel: string;
+  promptTemplate: string;
+  surfaceSetup: string;
+  lightingKey: string;
+  cameraAngle: string;
+  postProduction: string;
+}
+
+export const PRODUCT_PHOTO_RECIPES: ProductPhotoRecipe[] = [
+  { id: "photo:watch_hero", category: "watches", spanishLabel: "Reloj Hero Shot",
+    promptTemplate: "Luxury timepiece {PRODUCT} on dark brushed steel surface, 45-degree angle, macro detail on dial complications, {LIGHTING}, anamorphic bokeh in background, 8K resolution",
+    surfaceSetup: "dark brushed titanium or slate surface with subtle reflection",
+    lightingKey: "dual rim lights at 10 and 2 o'clock, soft fill from below for dial legibility",
+    cameraAngle: "45-degree overhead, slight Dutch tilt for dynamism, Hasselblad-quality",
+    postProduction: "teal-orange grade, micro-contrast enhancement on dial, selective sharpening on indices" },
+  { id: "photo:fragrance_hero", category: "fragrance", spanishLabel: "Perfume Hero Shot",
+    promptTemplate: "Premium fragrance bottle {PRODUCT} on reflective black surface, liquid visible through glass, golden light accents, volumetric mist, {LIGHTING}, luxury advertising quality",
+    surfaceSetup: "high-gloss black acrylic with mirror-perfect reflection",
+    lightingKey: "backlight through liquid for glow, gobo-patterned key light for drama",
+    cameraAngle: "eye-level or slightly below, emphasizing bottle height and stature",
+    postProduction: "warm gold grade, enhanced glass caustics, subtle lens flare on highlights" },
+  { id: "photo:sneaker_hero", category: "sneakers", spanishLabel: "Sneaker Hero Shot",
+    promptTemplate: "Premium sneaker {PRODUCT} floating at dynamic angle, exploded lace detail, {LIGHTING}, urban concrete environment blurred behind, Nike/Adidas campaign quality",
+    surfaceSetup: "levitation rig (removed in post) or suspended angle",
+    lightingKey: "hard directional key for material contrast, soft fill for shadow detail",
+    cameraAngle: "low angle 3/4 view emphasizing sole architecture and silhouette",
+    postProduction: "high contrast, crushed blacks, selective color on brand accent" },
+  { id: "photo:electronics_hero", category: "electronics", spanishLabel: "Electrónica Hero Shot",
+    promptTemplate: "Sleek electronic device {PRODUCT} on gradient dark surface, screen illuminated, subtle blue-cyan ambient glow, {LIGHTING}, Apple-level product photography",
+    surfaceSetup: "seamless gradient backdrop, matte to gloss transition",
+    lightingKey: "edge-lit rim lighting revealing form factor, screen as practical fill light",
+    cameraAngle: "3/4 overhead revealing screen and form simultaneously, f/4 for slight depth",
+    postProduction: "cool-neutral grade, micro-reflection enhancement, screen composited at full brightness" },
+  { id: "photo:food_hero", category: "food", spanishLabel: "Gastronomía Hero Shot",
+    promptTemplate: "Gourmet dish {PRODUCT} on artisanal ceramic plate, fresh herb garnish, steam rising naturally, {LIGHTING}, Michelin-star restaurant photography quality",
+    surfaceSetup: "reclaimed wood or marble surface with complementary props (linen, cutlery)",
+    lightingKey: "soft directional window light from 10 o'clock, negative fill opposite for depth",
+    cameraAngle: "overhead flat-lay or 45-degree hero angle depending on dish height",
+    postProduction: "warm inviting grade, enhanced steam/vapor, selective saturation on ingredients" },
+  { id: "photo:jewelry_hero", category: "jewelry", spanishLabel: "Joyería Hero Shot",
+    promptTemplate: "Exquisite jewelry piece {PRODUCT} on dark velvet surface, individual gemstone facets catching light, {LIGHTING}, Cartier/Tiffany campaign quality, extreme macro detail",
+    surfaceSetup: "deep navy or black velvet with micro-fiber texture visible at macro scale",
+    lightingKey: "point-source hard light for gemstone fire, large soft source for metal sheen, light tent for even coverage",
+    cameraAngle: "45-degree macro with selective focus on hero stone, f/2.8 for bokeh separation",
+    postProduction: "neutral-cool grade, enhanced specular highlights on facets, focus stacking for critical sharpness" },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
 // PUBLIC ACCESS API — used by REST endpoints and templates.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -696,7 +798,7 @@ export interface KnowledgeBaseSummary {
   industrySegments: IndustrySegment[];
 }
 
-export function getKnowledgeBaseSummary(): KnowledgeBaseSummary {
+export function getKnowledgeBaseSummary(): KnowledgeBaseSummary & { tryOnRecipeCount: number; productPhotoRecipeCount: number } {
   return {
     opticalTechniqueCount: OPTICAL_TECHNIQUES.length,
     actionTokenCount: Object.keys(ACTION_TOKENS).length,
@@ -711,6 +813,8 @@ export function getKnowledgeBaseSummary(): KnowledgeBaseSummary {
     textOverlayPatternCount: Object.keys(TEXT_OVERLAY_PATTERNS).length,
     lipSyncRuleCount: LIP_SYNC_RULES.length,
     industrySegments: Object.keys(NEGATIVE_PROMPT_LIBRARY) as IndustrySegment[],
+    tryOnRecipeCount: TRYON_RECIPES.length,
+    productPhotoRecipeCount: PRODUCT_PHOTO_RECIPES.length,
   };
 }
 
@@ -729,6 +833,8 @@ export function getFullKnowledgeBase() {
     physicsVocabulary: PHYSICS_VOCABULARY,
     textOverlayPatterns: TEXT_OVERLAY_PATTERNS,
     lipSyncRules: LIP_SYNC_RULES,
+    tryOnRecipes: TRYON_RECIPES,
+    productPhotoRecipes: PRODUCT_PHOTO_RECIPES,
   };
 }
 

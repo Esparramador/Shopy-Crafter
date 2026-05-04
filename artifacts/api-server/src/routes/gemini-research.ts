@@ -64,13 +64,16 @@ router.post("/research/business", async (req: Request, res: Response): Promise<v
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "La investigación tardó demasiado. Intenta de nuevo en unos segundos."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos e intenta de nuevo."
+        : is403
+        ? "Motor de investigación no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en la investigación de negocio. Verifica la conexión con Gemini.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });
@@ -105,13 +108,16 @@ router.post("/research/competitor", async (req: Request, res: Response): Promise
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "El análisis de competencia tardó demasiado. Intenta de nuevo."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : is403
+        ? "Motor de análisis no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en el análisis de competencia.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });
@@ -173,13 +179,16 @@ router.post("/research/market", async (req: Request, res: Response): Promise<voi
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "La inteligencia de mercado tardó demasiado. Intenta de nuevo."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : is403
+        ? "Motor de inteligencia no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en la inteligencia de mercado.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });
@@ -220,13 +229,16 @@ router.post("/research/product-trends", async (req: Request, res: Response): Pro
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "El análisis de tendencias tardó demasiado. Intenta de nuevo."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : is403
+        ? "Motor de análisis no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en el análisis de tendencias.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });
@@ -244,13 +256,16 @@ router.post("/research/person-brand", async (req: Request, res: Response): Promi
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "La investigación tardó demasiado. Intenta de nuevo."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos."
+        : is403
+        ? "Motor de investigación no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en la investigación de persona/marca.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });
@@ -316,13 +331,16 @@ router.post("/research/full-audit", async (req: Request, res: Response): Promise
     const msg = err instanceof Error ? err.message : String(err);
     const isTimeout = msg.includes("Timeout") || msg.includes("timeout");
     const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-    res.status(isTimeout ? 504 : isQuota ? 429 : 500).json({
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("denied access");
+    res.status(isTimeout ? 504 : isQuota ? 429 : is403 ? 503 : 500).json({
       error: isTimeout
         ? "La auditoría completa tardó demasiado. Intenta de nuevo en unos segundos."
         : isQuota
         ? "Límite de uso de Gemini alcanzado. Espera unos minutos e intenta de nuevo."
+        : is403
+        ? "Motor de auditoría no disponible temporalmente. Intenta de nuevo en unos minutos."
         : "Error en la auditoría completa.",
-      retryable: isTimeout || isQuota,
+      retryable: isTimeout || isQuota || is403,
     });
   }
 });

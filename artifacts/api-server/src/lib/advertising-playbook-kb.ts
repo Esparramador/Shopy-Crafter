@@ -551,6 +551,107 @@ export function compose6SecClipPrompt(opts: {
   return parts.filter(Boolean).join(", ") + ".";
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// 11. MULTI-PLATFORM VIDEO PROMPT RECIPES — Platform-specific optimizations
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface PlatformPromptRecipe {
+  id: string;
+  platform: string;
+  adFormat: string;
+  spanishLabel: string;
+  durationSec: number;
+  aspectRatio: string;
+  hookStrategy: string;
+  promptTemplate: string;
+  audioStrategy: string;
+  captionRules: string[];
+  kpis: string[];
+}
+
+export const PLATFORM_PROMPT_RECIPES: PlatformPromptRecipe[] = [
+  { id: "ppr:ig_reels_product", platform: "Instagram Reels", adFormat: "Product Showcase", spanishLabel: "Reel de Producto",
+    durationSec: 15, aspectRatio: "9:16",
+    hookStrategy: "Visual hook in first 0.5s — product enters frame dramatically (drop, slide, or magnetic assembly)",
+    promptTemplate: "9:16 vertical video, {PRODUCT} enters frame from top with satisfying drop onto matte surface, slight bounce, camera slowly pushes in revealing texture detail, {LIGHTING}, premium advertising quality, smooth 30fps, no text overlays in generation",
+    audioStrategy: "Trending audio or ASMR-style product sounds (tap, click, swoosh). Voice-over optional, captions mandatory.",
+    captionRules: ["Hook text in first 2 seconds (bold, center-screen)", "Feature callouts at 5s and 10s", "CTA at 13-15s with arrow pointing to profile link"],
+    kpis: ["Watch-through rate > 50%", "Save rate > 3%", "Share rate > 1%"] },
+  { id: "ppr:tiktok_ugc", platform: "TikTok", adFormat: "UGC-Style Ad", spanishLabel: "Anuncio Estilo UGC",
+    durationSec: 15, aspectRatio: "9:16",
+    hookStrategy: "POV or 'storytime' opening — relatable problem statement in first 2 seconds",
+    promptTemplate: "9:16 vertical UGC-style video, real person speaking directly to camera smartphone selfie style, natural indoor lighting, slight handheld shake, authentic vlog aesthetic, {PRESENTER} holding {PRODUCT} and demonstrating it, enthusiastic but genuine expression, perfect lip sync",
+    audioStrategy: "Original voice-over is primary. Background music low (20% volume). Native TikTok audio trends optional.",
+    captionRules: ["Auto-captions enabled always", "Bold yellow/white text for hook", "Problem → Solution → CTA arc in captions"],
+    kpis: ["6-second view rate > 40%", "CTR > 1.5%", "Comment engagement > 0.5%"] },
+  { id: "ppr:youtube_pre_roll", platform: "YouTube", adFormat: "Pre-Roll (Skippable)", spanishLabel: "Pre-Roll YouTube",
+    durationSec: 15, aspectRatio: "16:9",
+    hookStrategy: "Brand logo flash (0.5s) + immediate value proposition — must hook before 5s skip button",
+    promptTemplate: "16:9 horizontal cinematic video, opening with dramatic product reveal in first 2 seconds, {PRODUCT} on premium surface with {LIGHTING}, camera pulls back revealing full scene, professional color grading, broadcast quality, clean composition for text-safe zones",
+    audioStrategy: "Professional voice-over from second 0. Background score at 40% volume. Branded audio logo at end.",
+    captionRules: ["Value prop text at 2-4s", "Feature highlight at 7-10s", "CTA + URL at 13-15s", "All text within title-safe zone"],
+    kpis: ["View rate > 30%", "CPV < $0.03", "Brand lift > 5%"] },
+  { id: "ppr:meta_feed", platform: "Meta (Feed)", adFormat: "In-Feed Video Ad", spanishLabel: "Anuncio Feed Meta",
+    durationSec: 15, aspectRatio: "1:1",
+    hookStrategy: "Movement in first frame — product animation, color shift, or unexpected visual catches thumb-scroll",
+    promptTemplate: "1:1 square format video, {PRODUCT} centered on clean gradient background, slow 360-degree rotation revealing all angles, {LIGHTING}, premium e-commerce photography quality brought to life, smooth continuous motion, no jarring cuts",
+    audioStrategy: "Design for sound-off first. Add music and VO as enhancement. Captions carry the full message.",
+    captionRules: ["Large readable captions (minimum 24px equivalent)", "Benefit-first messaging", "Social proof number at 8-10s", "Swipe-up CTA with urgency"],
+    kpis: ["Thumb-stop rate > 25%", "ROAS > 3x", "Cost per purchase < target CAC"] },
+  { id: "ppr:pinterest_idea", platform: "Pinterest", adFormat: "Idea Pin (Product)", spanishLabel: "Idea Pin Pinterest",
+    durationSec: 10, aspectRatio: "9:16",
+    hookStrategy: "Aesthetic-first approach — beautiful composition that inspires saves and clicks",
+    promptTemplate: "9:16 vertical aesthetic video, {PRODUCT} in beautifully styled flat-lay arrangement, hands entering frame to interact with product, warm natural lighting, lifestyle context visible, Pinterest-worthy composition, soft camera movement",
+    audioStrategy: "Gentle ambient music. No voice-over. Let visuals tell the story. Text overlays for key info.",
+    captionRules: ["Minimal text — aesthetic-first", "Product name + price at end", "Lifestyle context captions", "SEO-optimized description separately"],
+    kpis: ["Save rate > 5%", "Outbound click rate > 2%", "Pin engagement rate > 8%"] },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// 12. REAL-WORLD CAMPAIGN EXAMPLES — Professional reference campaigns
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface CampaignExample {
+  id: string;
+  brandName: string;
+  industry: string;
+  campaignName: string;
+  objective: string;
+  videoCount: number;
+  totalDurationSec: number;
+  platforms: string[];
+  keyInsight: string;
+  promptExcerpt: string;
+  resultMetrics: string;
+}
+
+export const CAMPAIGN_EXAMPLES: CampaignExample[] = [
+  { id: "ex:luxury_watch_launch", brandName: "Marca Premium Relojería", industry: "watches",
+    campaignName: "The Art of Time", objective: "brand_awareness",
+    videoCount: 6, totalDurationSec: 90, platforms: ["Instagram", "YouTube", "TikTok"],
+    keyInsight: "Macro probe lens shots of movement mechanism generated 3x more saves than standard product shots",
+    promptExcerpt: "Ultra-macro interior of Swiss automatic movement, Laowa probe lens perspective, visible escapement wheel oscillating at 28,800 vph, golden bridges catching light, dust motes floating in DOF transition, anamorphic 2.39:1",
+    resultMetrics: "4.2M impressions, 12% engagement rate, 340% increase in brand search volume" },
+  { id: "ex:skincare_ugc", brandName: "Marca Cosmética Natural", industry: "skincare",
+    campaignName: "Real Skin Diaries", objective: "conversion",
+    videoCount: 12, totalDurationSec: 72, platforms: ["TikTok", "Instagram Reels"],
+    keyInsight: "6-second UGC clips with lip sync outperformed polished studio content by 2.8x on ROAS",
+    promptExcerpt: "Real woman 25yo, natural skin with freckles, morning bathroom light, applying serum drop to cheek, speaking to camera: 'esto cambió mi piel en 2 semanas', authentic selfie angle, perfect lip sync",
+    resultMetrics: "2.1x ROAS, 45% view-through, $8.50 CPA (vs $24 for studio content)" },
+  { id: "ex:tech_exploded_view", brandName: "Marca Auriculares Premium", industry: "tech",
+    campaignName: "Inside the Sound", objective: "product_launch",
+    videoCount: 5, totalDurationSec: 50, platforms: ["YouTube", "Instagram", "LinkedIn"],
+    keyInsight: "Exploded view sequence showing internal components increased purchase intent by 67% in A/B test",
+    promptExcerpt: "Premium wireless earbuds floating against dark background, components begin separating along precise axes, driver unit lifts revealing neodymium magnet, silicone ear tip detaches upward, battery cell slides out, all components suspended in zero gravity, static locked-off camera",
+    resultMetrics: "67% higher purchase intent, 5.2M views, 890K earned impressions from shares" },
+  { id: "ex:fashion_tryon", brandName: "Marca Streetwear DTC", industry: "fashion",
+    campaignName: "Worn by You", objective: "conversion",
+    videoCount: 20, totalDurationSec: 120, platforms: ["TikTok", "Instagram", "Pinterest"],
+    keyInsight: "AI try-on videos showing same garment on 4 different body types increased AOV by 23%",
+    promptExcerpt: "Confident 30yo woman, athletic build, walking through minimalist loft, wearing oversized hoodie in sage green, natural movement showing fabric drape, golden hour window light, candid street photography style",
+    resultMetrics: "23% higher AOV, 38% lower return rate, 4.1x ROAS across all platforms" },
+];
+
 export function getPlaybookSummary() {
   return {
     brandDnaPillarCount: BRAND_DNA_FRAMEWORK.length,
@@ -563,6 +664,8 @@ export function getPlaybookSummary() {
     videoSpecCount: VIDEO_TECH_SPECS.length,
     aiVideoToolCount: AI_VIDEO_TOOLS.length,
     quickResearchStepCount: QUICK_RESEARCH_METHOD.length,
+    platformPromptRecipeCount: PLATFORM_PROMPT_RECIPES.length,
+    campaignExampleCount: CAMPAIGN_EXAMPLES.length,
   };
 }
 
@@ -578,5 +681,7 @@ export function getFullPlaybook() {
     concatenationTransitions: CONCATENATION_TRANSITIONS,
     videoTechSpecs: VIDEO_TECH_SPECS,
     aiVideoTools: AI_VIDEO_TOOLS,
+    platformPromptRecipes: PLATFORM_PROMPT_RECIPES,
+    campaignExamples: CAMPAIGN_EXAMPLES,
   };
 }

@@ -189,8 +189,8 @@ export default function FusionStudio() {
   }, [projectId, productFiles, generatedPhotos]);
 
   // ─── Generate advertising video (uses /api/fusion-studio/generate-video) ─
-  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string; provider?: string }>>([]);
-  const [videoRatios, setVideoRatios] = useState<Array<{ key: string; label: string; runway: string }>>([
+  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string; provider?: string; integrated?: boolean; externalUrl?: string; strengths?: string[]; promptTips?: string[]; maxDuration?: number; maxResolution?: string }>>([]);
+  const [videoRatios, setVideoRatios] = useState<Array<{ key: string; label: string; runway: string; resolution?: string }>>([
     { key: "9:16", label: "9:16 vertical (Reels/TikTok)", runway: "768:1280" },
     { key: "16:9", label: "16:9 horizontal (YouTube)", runway: "1280:768" },
     { key: "1:1", label: "1:1 cuadrado (feed)", runway: "960:960" },
@@ -217,16 +217,23 @@ export default function FusionStudio() {
 
   const generateVideo = useCallback(async () => {
     if (!projectId) { setVideoResult({ error: "projectId requerido" }); return; }
-    // Backend Runway requiere URL HTTPS pública (no acepta upload directo).
-    // El usuario debe seleccionar una imagen YA generada de la galería.
+    const selectedModel = videoModels.find(m => m.key === videoModel);
+    if (selectedModel && !selectedModel.integrated) {
+      const promptText = (videoPrompt && videoPrompt.trim().length >= 3)
+        ? videoPrompt.trim()
+        : `Cinematic product video, ${productAnalysis?.product?.category || "premium product"}, soft studio lighting, slow camera movement, professional advertising style`;
+      navigator.clipboard.writeText(promptText).then(() => {
+        setVideoResult({ error: `Prompt copiado al portapapeles. Genera el video en ${selectedModel.label} → ${selectedModel.externalUrl || selectedModel.provider}` });
+      });
+      return;
+    }
     if (!videoSourceUrl) {
-      setVideoResult({ error: "Selecciona una imagen origen de la galería generada (Runway necesita una URL pública)." });
+      setVideoResult({ error: "Selecciona una imagen origen de la galería generada." });
       return;
     }
     setVideoGenerating(true);
     setVideoResult(null);
     try {
-      // Mapear aspect ratio (UI) → ratio Runway (backend)
       const ratioMap = new Map(videoRatios.map(r => [r.key, r.runway]));
       const runwayRatio = ratioMap.get(videoAspectRatio) || "768:1280";
       const promptText = (videoPrompt && videoPrompt.trim().length >= 3)
@@ -257,7 +264,7 @@ export default function FusionStudio() {
     } finally {
       setVideoGenerating(false);
     }
-  }, [projectId, videoModel, videoDuration, videoAspectRatio, videoPrompt, videoSourceUrl, productAnalysis, videoRatios]);
+  }, [projectId, videoModel, videoDuration, videoAspectRatio, videoPrompt, videoSourceUrl, productAnalysis, videoRatios, videoModels]);
 
   const fetchBrandDNA = useCallback(async () => {
     if (!brandUrl && !instagram && !companyName) return;
@@ -1132,7 +1139,7 @@ export default function FusionStudio() {
                           🎬 Generar video publicitario IA
                         </h3>
                         <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>
-                          Image-to-video con Runway Gen-3/Gen-4 Turbo. Para Reels, TikTok, anuncios. Cuesta 6 créditos (5s) o 12 créditos (10s).
+                          Multi-plataforma: Runway (integrado), Seedance, Kling, Pollo.ai, Veo. Para Reels, TikTok, anuncios.
                         </p>
                       </div>
                     </div>
@@ -1141,7 +1148,15 @@ export default function FusionStudio() {
                     <div style={{ marginBottom: 12 }}>
                       <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Modelo IA</label>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 6 }}>
-                        {videoModels.map(m => (
+                        {videoModels.map(m => {
+                          const isIntegrated = m.integrated !== false;
+                          const badgeColor = isIntegrated
+                            ? (m.badge === "PREMIUM" ? "rgba(168,85,247,0.2)" : "rgba(45,212,159,0.15)")
+                            : "rgba(251,191,36,0.15)";
+                          const badgeTextColor = isIntegrated
+                            ? (m.badge === "PREMIUM" ? "#c084fc" : "#2dd49f")
+                            : "#fbbf24";
+                          return (
                           <button key={m.key} onClick={() => setVideoModel(m.key)}
                             style={{
                               padding: "10px 12px", borderRadius: 8, fontSize: 11, cursor: "pointer", textAlign: "left", lineHeight: 1.3,
@@ -1151,12 +1166,16 @@ export default function FusionStudio() {
                             }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
                               <strong style={{ fontSize: 12 }}>{m.label}</strong>
-                              {m.badge && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 8, background: "rgba(45,212,159,0.15)", color: "#2dd49f", fontWeight: 700 }}>{m.badge}</span>}
+                              {m.badge && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 8, background: badgeColor, color: badgeTextColor, fontWeight: 700 }}>{m.badge}</span>}
                             </div>
                             <div style={{ fontSize: 10, color: "#666" }}>{m.description}</div>
-                            <div style={{ fontSize: 9, color: "#555", marginTop: 3 }}>${m.costPerSec}/seg</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
+                              <span style={{ fontSize: 9, color: "#555" }}>${m.costPerSec}/seg · {m.maxResolution || "1080p"}</span>
+                              {!isIntegrated && <span style={{ fontSize: 8, color: "#fbbf24" }}>externo</span>}
+                            </div>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1212,16 +1231,46 @@ export default function FusionStudio() {
                       </div>
                     </div>
 
+                    {/* PROMPT TIPS for external models */}
+                    {(() => {
+                      const sel = videoModels.find(m => m.key === videoModel);
+                      if (!sel || sel.integrated !== false || !sel.promptTips?.length) return null;
+                      return (
+                        <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#fbbf24", marginBottom: 6 }}>Tips para {sel.label}:</div>
+                          {sel.promptTips.map((tip: string, i: number) => (
+                            <div key={i} style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>• {tip}</div>
+                          ))}
+                          {sel.externalUrl && (
+                            <a href={sel.externalUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#818cf8", marginTop: 4, display: "inline-block" }}>
+                              Abrir {sel.label} →
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* GENERATE BUTTON */}
-                    <button onClick={generateVideo} disabled={videoGenerating || !videoSourceUrl} data-testid="button-generate-video"
-                      style={{
-                        width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: videoGenerating ? "not-allowed" : "pointer",
-                        background: videoGenerating ? "#1f1f3a" : "linear-gradient(135deg, #6366f1, #a855f7)",
-                        color: "#fff", border: "none",
-                        opacity: !videoSourceUrl ? 0.5 : 1,
-                      }}>
-                      {videoGenerating ? "🎥 Generando video... esto tarda 1-3 minutos" : `🎬 Generar video con ${videoModels.find(m => m.key === videoModel)?.label || videoModel}`}
-                    </button>
+                    {(() => {
+                      const sel = videoModels.find(m => m.key === videoModel);
+                      const isExternal = sel && sel.integrated === false;
+                      const btnDisabled = videoGenerating || (!isExternal && !videoSourceUrl);
+                      return (
+                        <button onClick={generateVideo} disabled={btnDisabled} data-testid="button-generate-video"
+                          style={{
+                            width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: btnDisabled ? "not-allowed" : "pointer",
+                            background: videoGenerating ? "#1f1f3a" : isExternal ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #6366f1, #a855f7)",
+                            color: "#fff", border: "none",
+                            opacity: btnDisabled ? 0.5 : 1,
+                          }}>
+                          {videoGenerating
+                            ? "🎥 Generando video... esto tarda 1-3 minutos"
+                            : isExternal
+                              ? `📋 Copiar prompt para ${sel?.label || videoModel}`
+                              : `🎬 Generar video con ${sel?.label || videoModel}`}
+                        </button>
+                      );
+                    })()}
 
                     <div style={{ marginTop: 12 }}>
                       <LiveOperation

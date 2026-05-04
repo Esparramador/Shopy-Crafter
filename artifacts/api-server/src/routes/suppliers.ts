@@ -156,10 +156,18 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
       const suppliers = Array.isArray(parsed?.suppliers) ? parsed!.suppliers : [];
 
       if (suppliers.length === 0) {
-        res.status(502).json({
-          error: "Gemini no devolvió proveedores válidos. Intenta una búsqueda más específica.",
-          rawPreview: aiText.slice(0, 400),
-        });
+        const { isGeminiSearchBlocked } = await import("../lib/gemini.js");
+        if (isGeminiSearchBlocked()) {
+          res.status(503).json({
+            error: "El motor de búsqueda de proveedores no está disponible temporalmente. Intenta de nuevo en unos minutos.",
+            retryable: true,
+          });
+        } else {
+          res.status(502).json({
+            error: "No se encontraron proveedores válidos. Intenta una búsqueda más específica.",
+            rawPreview: aiText.slice(0, 400),
+          });
+        }
         return;
       }
 

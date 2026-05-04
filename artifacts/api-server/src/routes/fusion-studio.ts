@@ -1045,14 +1045,12 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
 });
 
 // ============================================================
-// VIDEO GENERATION (Runway Gen-3 / Gen-4 Turbo)
+// VIDEO GENERATION — Multi-platform (Runway integrado + plataformas externas)
 // ============================================================
 const ALLOWED_RATIOS: RunwayRatio[] = [
   "1280:768", "768:1280", "1104:832", "832:1104", "960:960", "1584:672",
 ];
 
-// Catálogo público de modelos de vídeo expuesto al frontend.
-// Mantener alineado con `RunwayModel` en lib/runway.ts.
 router.get("/fusion-studio/video-models", (_req: Request, res: Response): void => {
   res.json({
     models: [
@@ -1062,22 +1060,102 @@ router.get("/fusion-studio/video-models", (_req: Request, res: Response): void =
         description: "Image-to-video rápido y económico (5–10s, óptimo para Reels).",
         costPerSec: 0.05,
         provider: "runway",
-        badge: "RÁPIDO",
+        badge: "INTEGRADO",
+        integrated: true,
+        maxDuration: 10,
+        maxResolution: "1080p",
+        strengths: ["Rapidez", "Coherencia temporal", "Prompt-driven camera"],
       },
       {
         key: "gen4_turbo",
         label: "Runway Gen-4 Turbo",
-        description: "Modelo más reciente, mayor coherencia y físicas más realistas.",
+        description: "Modelo más reciente de Runway. Mayor coherencia, físicas realistas, control de cámara por prompt.",
         costPerSec: 0.05,
         provider: "runway",
         badge: "PREMIUM",
+        integrated: true,
+        maxDuration: 10,
+        maxResolution: "1080p",
+        strengths: ["#1 Artificial Analysis", "Materiales fotorrealistas", "Estabilidad excepcional"],
+      },
+      {
+        key: "seedance_2",
+        label: "Seedance 2.0 (ByteDance)",
+        description: "Física de clase mundial, modo First-Last-Frame para encadenamiento, audio nativo sincronizado.",
+        costPerSec: 0.30,
+        provider: "seedance",
+        badge: "EXTERNO",
+        integrated: false,
+        externalUrl: "https://fal.ai/models/seedance",
+        maxDuration: 10,
+        maxResolution: "1080p",
+        strengths: ["Mejor física", "FLF chaining 98%", "Audio nativo", "12 referencias mixtas"],
+        promptTips: [
+          "Usar modo first_last_frames para chaining secuencial",
+          "Incluir 'no morphing, rigid body physics, precise mechanical motion'",
+          "Especificar coordenadas espaciales exactas para posicionamiento",
+        ],
+      },
+      {
+        key: "kling_3",
+        label: "Kling 3.0 (Kuaishou)",
+        description: "Salida nativa 4K, Element Binding para identidad de producto, Motion Control para movimiento preciso.",
+        costPerSec: 0.25,
+        provider: "kling",
+        badge: "EXTERNO",
+        integrated: false,
+        externalUrl: "https://klingai.com",
+        maxDuration: 15,
+        maxResolution: "4K",
+        strengths: ["4K nativo", "Element Binding", "Motion Control", "Multi-shot consistency"],
+        promptTips: [
+          "Usar Element Binding para lock de producto entre clips",
+          "Motion Control: definir posición inicio/fin de cada componente",
+          "Especificar 'ease-in/ease-out kinetic curve' para movimiento mecánico",
+        ],
+      },
+      {
+        key: "pollo_2",
+        label: "Pollo.ai 2.0 (Agregador)",
+        description: "Acceso a Kling, Seedance, Runway, Hailuo, Pika desde UNA interfaz. Multi-Shot y transiciones integradas.",
+        costPerSec: 0.20,
+        provider: "pollo",
+        badge: "EXTERNO",
+        integrated: false,
+        externalUrl: "https://pollo.ai",
+        maxDuration: 10,
+        maxResolution: "1080p",
+        strengths: ["Agregador multi-modelo", "Multi-Shot mode", "Transiciones integradas", "Video Agent (Beta)"],
+        promptTips: [
+          "Fórmula universal: [Sujeto] + [Acción] + [Estilo] + [Cámara] + [Iluminación] + [Mood]",
+          "Usar Multi-Shot para secuencias consistentes de 5 clips",
+          "Video Agent automatiza el pipeline completo de generación",
+        ],
+      },
+      {
+        key: "veo_31",
+        label: "Veo 3.1 (Google DeepMind)",
+        description: "Simulación de física líder, audio nativo ambiental, modo First+Last Frame, hasta 3 assets de referencia.",
+        costPerSec: 0.35,
+        provider: "veo",
+        badge: "EXTERNO",
+        integrated: false,
+        externalUrl: "https://deepmind.google/technologies/veo/",
+        maxDuration: 8,
+        maxResolution: "4K",
+        strengths: ["Mejor física de fluidos", "Audio ambiental nativo", "3 assets de referencia", "Video extension"],
+        promptTips: [
+          "Especificar 'dramatic volumetric shadows, octane render style' para look studio",
+          "Usar 'asset' type references (hasta 3) para lock de identidad de producto",
+          "Modo video extension: extender cada clip desde el anterior para continuidad",
+        ],
       },
     ],
     ratios: [
-      { key: "9:16", label: "9:16 vertical (Reels/TikTok)", runway: "768:1280" },
-      { key: "16:9", label: "16:9 horizontal (YouTube)", runway: "1280:768" },
-      { key: "1:1", label: "1:1 cuadrado (feed)", runway: "960:960" },
-      { key: "4:3", label: "4:3 retrato", runway: "832:1104" },
+      { key: "9:16", label: "9:16 vertical (Reels/TikTok)", resolution: "768:1280", runway: "768:1280" },
+      { key: "16:9", label: "16:9 horizontal (YouTube)", resolution: "1280:768", runway: "1280:768" },
+      { key: "1:1", label: "1:1 cuadrado (feed)", resolution: "960:960", runway: "960:960" },
+      { key: "4:3", label: "4:3 retrato", resolution: "832:1104", runway: "832:1104" },
     ],
     durations: [5, 10],
   });

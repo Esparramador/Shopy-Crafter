@@ -801,11 +801,28 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
   
     } catch (err) {
       logger.error(err, "Entity research failed");
-      res.status(500).json({ error: String(err), researchId });
+      const errMsg = String(err);
+      const is403 = errMsg.includes("403") || errMsg.includes("PERMISSION_DENIED") || errMsg.includes("denied access");
+      const isTimeout = errMsg.includes("Timeout") || errMsg.includes("timeout");
+      res.status(is403 ? 503 : isTimeout ? 504 : 500).json({
+        error: is403
+          ? "El motor de búsqueda Gemini no está disponible temporalmente. El análisis se realizará con datos limitados."
+          : isTimeout
+          ? "La investigación tardó demasiado. Intenta de nuevo en unos segundos."
+          : errMsg,
+        researchId,
+        retryable: true,
+      });
     }
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED");
+    res.status(is403 ? 503 : 500).json({
+      error: is403
+        ? "Motor de búsqueda Gemini no disponible temporalmente. Intenta de nuevo en unos minutos."
+        : msg,
+      retryable: is403,
+    });
   }
 });
 

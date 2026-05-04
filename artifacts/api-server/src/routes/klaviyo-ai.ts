@@ -337,7 +337,7 @@ router.post("/klaviyo-ai/push-flow", requireAdmin, async (req: Request, res: Res
 // ─── GET WORKFLOW STATUS ───────────────────────────────────────────────────────
 router.get("/klaviyo-ai/status", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
-    const flows = await kGet<{ data: Array<{ id: string; attributes: { name: string; status: string } }> }>("/flows/?page[size]=100&fields[flow]=name,status");
+    const flows = await kGet<{ data: Array<{ id: string; attributes: { name: string; status: string } }> }>("/flows/?page[size]=50&fields[flow]=name,status");
     res.json({
       flowCount: flows.data?.length ?? 0,
       flows: flows.data?.map(f => ({ id: f.id, name: f.attributes.name, status: f.attributes.status })) ?? [],

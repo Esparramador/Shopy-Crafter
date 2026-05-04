@@ -38,6 +38,33 @@ export function isGeminiAvailable(): boolean {
   return !!(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY));
 }
 
+const CIRCUIT_BREAKER_COOLDOWN_MS = 600_000;
+let _searchCircuitOpen = 0;
+let _generationCircuitOpen = 0;
+
+function isPermissionDenied(err: unknown): boolean {
+  const s = String(err);
+  return s.includes("403") || s.includes("PERMISSION_DENIED") || s.includes("denied access") || s.includes("PermissionDenied");
+}
+
+export function isGeminiSearchBlocked(): boolean {
+  return _searchCircuitOpen > 0 && Date.now() - _searchCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
+}
+
+function isGeminiGenerationBlocked(): boolean {
+  return _generationCircuitOpen > 0 && Date.now() - _generationCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
+}
+
+function tripSearchCircuit(): void {
+  _searchCircuitOpen = Date.now();
+  logger.error("[Gemini Circuit Breaker] Search grounding BLOCKED (403). Returning empty results for 10 min.");
+}
+
+function tripGenerationCircuit(): void {
+  _generationCircuitOpen = Date.now();
+  logger.error("[Gemini Circuit Breaker] Generation BLOCKED (403). Falling back to Claude for 10 min.");
+}
+
 // ─── Model selection (resolved through the AI registry) ──────────────────────
 // IMPORTANT: do NOT hardcode model names here. The registry (`lib/ai-models.ts`)
 // resolves the active model via override → DB (`platform_settings`) → ENV →
@@ -84,6 +111,10 @@ async function withRetry<T>(
     try {
       return await fn();
     } catch (err) {
+      if (isPermissionDenied(err)) {
+        logger.error({ label }, `[withRetry] 403 PERMISSION_DENIED on ${label} — not retrying`);
+        throw err;
+      }
       if (attempt < retries) {
         const errStr = String(err);
         const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("rate");
@@ -102,99 +133,145 @@ async function withRetry<T>(
 
 // ─── Base generation (no search) ─────────────────────────────────────────────
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
-  const ai    = getGeminiClient();
-  const model = useProModel ? geminiPro() : geminiFast();
-
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.",
-        maxOutputTokens: 65_536,
-        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
-      },
-    }),
-    GEMINI_CALL_TIMEOUT_MS,
-    `askGemini(${model})`
-  );
-
-  const candidate = response.candidates?.[0];
-  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
-    logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  if (isGeminiGenerationBlocked()) {
+    logger.warn("[askGemini] Circuit breaker open — falling back to Claude");
+    try {
+      const { askClaudeWithBrain } = await import("./claude.js");
+      return await askClaudeWithBrain(0, [{ role: "user" as const, content: prompt }], systemInstruction ?? "You are a precise business intelligence analyst.", "general");
+    } catch (claudeErr) {
+      logger.error({ err: String(claudeErr) }, "[askGemini] Claude fallback also failed");
+      return "";
+    }
   }
 
   try {
-    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-    const usage = (response as any).usageMetadata ?? {};
-    const inTok = Number(usage.promptTokenCount) || 0;
-    const outTok = Number(usage.candidatesTokenCount) || 0;
-    void recordApiUsage({
-      provider: "gemini",
-      operation: "askGemini",
-      model,
-      inputUnits: inTok,
-      outputUnits: outTok,
-      unitsLabel: "tokens",
-      costUsd: calcGeminiCost(model, inTok, outTok),
-    });
-  } catch { /* nunca bloquea */ }
+    const ai    = getGeminiClient();
+    const model = useProModel ? geminiPro() : geminiFast();
 
-  return response.text ?? "";
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.",
+          maxOutputTokens: 65_536,
+          ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+        },
+      }),
+      GEMINI_CALL_TIMEOUT_MS,
+      `askGemini(${model})`
+    );
+
+    const candidate = response.candidates?.[0];
+    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+    }
+
+    try {
+      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+      const usage = (response as any).usageMetadata ?? {};
+      const inTok = Number(usage.promptTokenCount) || 0;
+      const outTok = Number(usage.candidatesTokenCount) || 0;
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "askGemini",
+        model,
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd: calcGeminiCost(model, inTok, outTok),
+      });
+    } catch { /* nunca bloquea */ }
+
+    return response.text ?? "";
+  } catch (err) {
+    if (isPermissionDenied(err)) {
+      tripGenerationCircuit();
+      logger.warn("[askGemini] 403 detected — falling back to Claude");
+      try {
+        const { askClaudeWithBrain } = await import("./claude.js");
+        return await askClaudeWithBrain(0, [{ role: "user" as const, content: prompt }], systemInstruction ?? "You are a precise business intelligence analyst.", "general");
+      } catch { return ""; }
+    }
+    throw err;
+  }
 }
 
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
-  const ai    = getGeminiClient();
-  const model = useProModel ? geminiPro() : geminiFast();
-
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
-        responseMimeType: "application/json",
-        maxOutputTokens: 65_536,
-        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
-      },
-    }),
-    GEMINI_CALL_TIMEOUT_MS,
-    `askGeminiJson(${model})`
-  );
-
-  const jsonCandidate = response.candidates?.[0];
-  if ((jsonCandidate as any)?.finishReason === "MAX_TOKENS") {
-    logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  if (isGeminiGenerationBlocked()) {
+    logger.warn("[askGeminiJson] Circuit breaker open — falling back to Claude");
+    try {
+      const { askClaudeJson } = await import("./claude.js");
+      return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.");
+    } catch (claudeErr) {
+      logger.error({ err: String(claudeErr) }, "[askGeminiJson] Claude fallback also failed");
+      return {} as T;
+    }
   }
 
   try {
-    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-    const usage = (response as any).usageMetadata ?? {};
-    const inTok = Number(usage.promptTokenCount) || 0;
-    const outTok = Number(usage.candidatesTokenCount) || 0;
-    void recordApiUsage({
-      provider: "gemini",
-      operation: "askGeminiJson",
-      model,
-      inputUnits: inTok,
-      outputUnits: outTok,
-      unitsLabel: "tokens",
-      costUsd: calcGeminiCost(model, inTok, outTok),
-    });
-  } catch { /* nunca bloquea */ }
+    const ai    = getGeminiClient();
+    const model = useProModel ? geminiPro() : geminiFast();
 
-  const text = response.text ?? "{}";
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    try {
-      const match = text.match(/```json\s*([\s\S]*?)```/);
-      return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
-    } catch {
-      logger.error({ textPreview: text.slice(0, 300) }, "[Gemini JSON] Double parse failure");
-      throw new Error("Gemini returned invalid JSON even after cleanup");
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
+          responseMimeType: "application/json",
+          maxOutputTokens: 65_536,
+          ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+        },
+      }),
+      GEMINI_CALL_TIMEOUT_MS,
+      `askGeminiJson(${model})`
+    );
+
+    const jsonCandidate = response.candidates?.[0];
+    if ((jsonCandidate as any)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
     }
+
+    try {
+      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+      const usage = (response as any).usageMetadata ?? {};
+      const inTok = Number(usage.promptTokenCount) || 0;
+      const outTok = Number(usage.candidatesTokenCount) || 0;
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "askGeminiJson",
+        model,
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd: calcGeminiCost(model, inTok, outTok),
+      });
+    } catch { /* nunca bloquea */ }
+
+    const text = response.text ?? "{}";
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      try {
+        const match = text.match(/```json\s*([\s\S]*?)```/);
+        return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+      } catch {
+        logger.error({ textPreview: text.slice(0, 300) }, "[Gemini JSON] Double parse failure");
+        throw new Error("Gemini returned invalid JSON even after cleanup");
+      }
+    }
+  } catch (err) {
+    if (isPermissionDenied(err)) {
+      tripGenerationCircuit();
+      logger.warn("[askGeminiJson] 403 detected — falling back to Claude");
+      try {
+        const { askClaudeJson } = await import("./claude.js");
+        return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst.");
+      } catch { return {} as T; }
+    }
+    throw err;
   }
 }
 
@@ -348,73 +425,86 @@ export async function multiModelAnalysis(
 export async function askGeminiWithSearch(
   prompt: string,
   systemInstruction?: string,
-  urlsToRead?: string[],  // optional: pass URLs for Gemini to fetch directly
+  urlsToRead?: string[],
 ): Promise<{ text: string; sources: string[]; queries: string[] }> {
-  const ai = getGeminiClient();
+  const EMPTY = { text: "", sources: [] as string[], queries: [] as string[] };
 
-  // Build prompt: if URLs provided, inject them for urlContext
-  const fullPrompt = urlsToRead && urlsToRead.length > 0
-    ? `${prompt}\n\nURLs to read and analyze:\n${urlsToRead.slice(0, 10).join("\n")}`
-    : prompt;
-
-  // Tools: always googleSearch + optionally urlContext when URLs provided
-  const tools: Record<string, unknown>[] = [
-    {
-      googleSearch: {
-        dynamicRetrievalConfig: {
-          dynamicRetrievalThreshold: 0.0,  // 0.0 = ALWAYS use Google Search (never skip)
-        },
-      },
-    },
-  ];
-  if (urlsToRead && urlsToRead.length > 0) {
-    tools.push({ urlContext: {} }); // Gemini fetches & reads the provided URLs directly
+  if (isGeminiSearchBlocked()) {
+    logger.debug("[askGeminiWithSearch] Circuit breaker open — returning empty");
+    return EMPTY;
   }
-
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model: geminiFast(),
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-      config: {
-        systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
-        tools,
-        maxOutputTokens: 65_536,
-        thinkingConfig: { thinkingBudget: 8_000 },  // deeper reasoning per search
-      },
-    }),
-    GEMINI_SEARCH_TIMEOUT,
-    `askGeminiWithSearch`
-  );
-
-  const candidate        = response.candidates?.[0];
-  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
-    logger.warn({ maxOutputTokens: 65536 }, "[Gemini Search] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
-  }
-
-  const groundingMeta    = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
-  const groundingChunks  = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
-  const searchQueries    = groundingMeta?.webSearchQueries as string[] | undefined;
-
-  const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
 
   try {
-    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-    const usage = (response as any).usageMetadata ?? {};
-    const inTok = Number(usage.promptTokenCount) || 0;
-    const outTok = Number(usage.candidatesTokenCount) || 0;
-    void recordApiUsage({
-      provider: "gemini",
-      operation: "askGeminiWithSearch",
-      model: geminiFast(),
-      inputUnits: inTok,
-      outputUnits: outTok,
-      unitsLabel: "tokens",
-      costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
-      metadata: { sources: sources.length, queries: (searchQueries ?? []).length },
-    });
-  } catch { /* nunca bloquea */ }
+    const ai = getGeminiClient();
 
-  return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
+    const fullPrompt = urlsToRead && urlsToRead.length > 0
+      ? `${prompt}\n\nURLs to read and analyze:\n${urlsToRead.slice(0, 10).join("\n")}`
+      : prompt;
+
+    const tools: Record<string, unknown>[] = [
+      {
+        googleSearch: {
+          dynamicRetrievalConfig: {
+            dynamicRetrievalThreshold: 0.0,
+          },
+        },
+      },
+    ];
+    if (urlsToRead && urlsToRead.length > 0) {
+      tools.push({ urlContext: {} });
+    }
+
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model: geminiFast(),
+        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+        config: {
+          systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
+          tools,
+          maxOutputTokens: 65_536,
+          thinkingConfig: { thinkingBudget: 8_000 },
+        },
+      }),
+      GEMINI_SEARCH_TIMEOUT,
+      `askGeminiWithSearch`
+    );
+
+    const candidate        = response.candidates?.[0];
+    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ maxOutputTokens: 65536 }, "[Gemini Search] RESPONSE TRUNCATED — hit maxOutputTokens limit");
+    }
+
+    const groundingMeta    = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+    const groundingChunks  = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
+    const searchQueries    = groundingMeta?.webSearchQueries as string[] | undefined;
+
+    const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+    try {
+      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+      const usage = (response as any).usageMetadata ?? {};
+      const inTok = Number(usage.promptTokenCount) || 0;
+      const outTok = Number(usage.candidatesTokenCount) || 0;
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "askGeminiWithSearch",
+        model: geminiFast(),
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
+        metadata: { sources: sources.length, queries: (searchQueries ?? []).length },
+      });
+    } catch { /* nunca bloquea */ }
+
+    return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
+  } catch (err) {
+    if (isPermissionDenied(err)) {
+      tripSearchCircuit();
+      return EMPTY;
+    }
+    throw err;
+  }
 }
 
 // ─── URL DEEP-DIVE — Gemini reads a batch of URLs and synthesizes them ─────────
@@ -424,55 +514,70 @@ export async function askGeminiWithUrls(
   urls: string[],
   systemInstruction?: string,
 ): Promise<{ text: string; sources: string[] }> {
-  const ai = getGeminiClient();
+  const EMPTY = { text: "", sources: [] as string[] };
 
-  const fullPrompt = `${prompt}\n\nRead and analyze these URLs thoroughly:\n${urls.slice(0, 15).join("\n")}`;
-
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model: geminiFast(),
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-      config: {
-        systemInstruction: systemInstruction ?? "You are a deep web intelligence analyst. Read each URL thoroughly and extract all relevant business intelligence, product info, pricing, contact details, social links, and marketing strategies.",
-        tools: [
-          { urlContext: {} },          // Gemini fetches each URL directly
-          { googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.3 } } } as any,
-        ],
-        maxOutputTokens: 65_536,
-        thinkingConfig: { thinkingBudget: 6_000 },
-      },
-    }),
-    GEMINI_URL_CTX_TIMEOUT,
-    "askGeminiWithUrls"
-  );
-
-  const candidate       = response.candidates?.[0];
-  if ((candidate as any)?.finishReason === "MAX_TOKENS") {
-    logger.warn({ maxOutputTokens: 65536 }, "[Gemini URLs] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+  if (isGeminiSearchBlocked()) {
+    logger.debug("[askGeminiWithUrls] Circuit breaker open — returning empty");
+    return EMPTY;
   }
 
-  const groundingMeta   = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
-  const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
-  const sources         = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
-
   try {
-    const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-    const usage = (response as any).usageMetadata ?? {};
-    const inTok = Number(usage.promptTokenCount) || 0;
-    const outTok = Number(usage.candidatesTokenCount) || 0;
-    void recordApiUsage({
-      provider: "gemini",
-      operation: "askGeminiWithUrls",
-      model: geminiFast(),
-      inputUnits: inTok,
-      outputUnits: outTok,
-      unitsLabel: "tokens",
-      costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
-      metadata: { urls: urls.length, sources: sources.length },
-    });
-  } catch { /* nunca bloquea */ }
+    const ai = getGeminiClient();
 
-  return { text: response.text ?? "", sources };
+    const fullPrompt = `${prompt}\n\nRead and analyze these URLs thoroughly:\n${urls.slice(0, 15).join("\n")}`;
+
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model: geminiFast(),
+        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+        config: {
+          systemInstruction: systemInstruction ?? "You are a deep web intelligence analyst. Read each URL thoroughly and extract all relevant business intelligence, product info, pricing, contact details, social links, and marketing strategies.",
+          tools: [
+            { urlContext: {} },
+            { googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.3 } } } as any,
+          ],
+          maxOutputTokens: 65_536,
+          thinkingConfig: { thinkingBudget: 6_000 },
+        },
+      }),
+      GEMINI_URL_CTX_TIMEOUT,
+      "askGeminiWithUrls"
+    );
+
+    const candidate       = response.candidates?.[0];
+    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ maxOutputTokens: 65536 }, "[Gemini URLs] RESPONSE TRUNCATED — hit maxOutputTokens limit");
+    }
+
+    const groundingMeta   = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+    const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
+    const sources         = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+    try {
+      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+      const usage = (response as any).usageMetadata ?? {};
+      const inTok = Number(usage.promptTokenCount) || 0;
+      const outTok = Number(usage.candidatesTokenCount) || 0;
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "askGeminiWithUrls",
+        model: geminiFast(),
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
+        metadata: { urls: urls.length, sources: sources.length },
+      });
+    } catch { /* nunca bloquea */ }
+
+    return { text: response.text ?? "", sources };
+  } catch (err) {
+    if (isPermissionDenied(err)) {
+      tripSearchCircuit();
+      return EMPTY;
+    }
+    throw err;
+  }
 }
 
 // ─── DEEP ENTITY RESEARCH ─────────────────────────────────────────────────────
