@@ -38,7 +38,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
   { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
   { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
-  { label: "Flujos de Email", icon: "🔄", href: "/admin/email-flows" },
+  { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
   { label: "Proveedores Reales", icon: "🏭", href: "/projects/2/suppliers" },
