@@ -43,7 +43,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
   { label: "Proveedores Reales", icon: "🏭", href: "/projects/2/suppliers" },
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
-  { label: "Informes y Auditorias", icon: "📋", href: "/projects/2/exports" },
+
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
   { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
   { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
