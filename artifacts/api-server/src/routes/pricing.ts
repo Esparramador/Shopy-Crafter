@@ -430,8 +430,14 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
   8. Proyección de revenue mensual estimado
   9. Análisis comparativo: tu precio actual vs mediana de mercado vs precio sugerido
   10. Impacto estimado del cambio de precio en ventas
+  11. INTELIGENCIA AVANZADA — calcula estos KPIs financieros críticos:
+      a) Punto de equilibrio en unidades: ¿cuántas unidades hay que vender al precio óptimo para cubrir TODOS los costes fijos mensuales estimados?
+      b) LTV estimado 12 meses: valor de vida del cliente a 12 meses asumiendo frecuencia de recompra típica del nicho "${niche}" (ej: moda = 2.5x/año, electrónica = 1.2x/año, consumibles = 6x/año). Multiplica AOV × frecuencia × 12/12.
+      c) Ratio LTV/CAC: divide el LTV entre el CAC (${cogs ? `CAC actual: €${cogs.cac ?? 0}` : "estima un CAC razonable para el nicho"}). REGLA CRÍTICA: si el ratio es INFERIOR a 3.0, es una ALERTA ROJA — el negocio está quemando dinero en adquisición y debe optimizar urgentemente retención o reducir CAC.
+      d) Riesgo cadena de suministro: evalúa Alto/Medio/Bajo basándote en: dependencia de un solo proveedor, origen geográfico, volatilidad de materias primas, MOQ, lead times.
+      e) Estrategia foso defensivo (Economic Moat): describe cómo este producto/marca puede evitar ser copiado en 6 meses. Considera: marca, patentes, comunidad, coste de cambio, network effects, datos propietarios.
   
-  Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español detallado), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null), competitorAnalysis (string — resumen de datos encontrados), supplierAnalysis (string — resumen de costes proveedor), priceImpactEstimate (objeto con: currentPrice, suggestedPrice, expectedSalesChange (string), expectedRevenueChange (string), confidenceLevel (string)).`;
+  Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español detallado), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null), competitorAnalysis (string — resumen de datos encontrados), supplierAnalysis (string — resumen de costes proveedor), priceImpactEstimate (objeto con: currentPrice, suggestedPrice, expectedSalesChange (string), expectedRevenueChange (string), confidenceLevel (string)), inteligencia_avanzada (objeto con: punto_de_equilibrio_unidades (number), ltv_estimado_12_meses (number), ratio_ltv_cac (number), riesgo_cadena_suministro (string — "Alto|Medio|Bajo - explicación detallada"), estrategia_foso_defensivo (string — texto estratégico sobre cómo evitar ser copiado a los 6 meses)).`;
   
     let result;
     try {
@@ -443,6 +449,13 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
         monthlyRevenueProjection: number | null;
         competitorAnalysis: string; supplierAnalysis: string;
         priceImpactEstimate: { currentPrice: number; suggestedPrice: number; expectedSalesChange: string; expectedRevenueChange: string; confidenceLevel: string };
+        inteligencia_avanzada: {
+          punto_de_equilibrio_unidades: number;
+          ltv_estimado_12_meses: number;
+          ratio_ltv_cac: number;
+          riesgo_cadena_suministro: string;
+          estrategia_foso_defensivo: string;
+        };
       }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", niche, 8192);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -459,20 +472,29 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
       avgSupplierCost: supplierResearch.avgSupplierCost,
     };
   
+    if (!result.marginWarnings) result.marginWarnings = [];
+    if (!result.bundleSuggestions) result.bundleSuggestions = [];
+
+    const ia = result.inteligencia_avanzada;
+    const ltvCacAlert = ia?.ratio_ltv_cac != null && ia.ratio_ltv_cac < 3.0;
+    if (ltvCacAlert) {
+      result.marginWarnings.push(`ALERTA ROJA LTV/CAC: Ratio ${ia.ratio_ltv_cac.toFixed(1)}x (< 3.0). El coste de adquisición de cliente es demasiado alto respecto al valor que genera. Optimiza retención o reduce CAC urgentemente.`);
+    }
+
     if (cogs) {
       await db.update(cogsTable)
         .set({ lastPricingRecommendation: result as Record<string, unknown>, lastCompetitorAnalysis: lastCompetitorAnalysis as Record<string, unknown> })
         .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
     }
-  
+
     learnFromOperation({
       operationType: "pricing_analysis",
       niche: niche,
       productType: product.productType ?? null,
       title: `Análisis pricing: ${product.title}`,
-      content: `Precio actual: €${currentPrice}. Óptimo: €${result.optimalPrice}. Psicológico: €${result.psychologicalPrice}. Mediana mercado: €${competitorResearch.marketPriceRange.median}. Competidores: ${competitorResearch.competitorPrices.length} encontrados. Proveedores: coste medio €${supplierResearch.avgSupplierCost}. Estrategia: ${result.recommendedStrategy}. Margen neto: ${result.marginWaterfall?.netMarginPct ?? "?"}%.`,
+      content: `Precio actual: €${currentPrice}. Óptimo: €${result.optimalPrice}. Psicológico: €${result.psychologicalPrice}. Mediana mercado: €${competitorResearch.marketPriceRange.median}. Competidores: ${competitorResearch.competitorPrices.length} encontrados. Proveedores: coste medio €${supplierResearch.avgSupplierCost}. Estrategia: ${result.recommendedStrategy}. Margen neto: ${result.marginWaterfall?.netMarginPct ?? "?"}%. LTV 12m: €${ia?.ltv_estimado_12_meses ?? "?"}, LTV/CAC: ${ia?.ratio_ltv_cac ?? "?"}, Break-even: ${ia?.punto_de_equilibrio_unidades ?? "?"} uds, Riesgo cadena: ${ia?.riesgo_cadena_suministro ?? "?"}, Foso: ${ia?.estrategia_foso_defensivo?.slice(0, 80) ?? "?"}`,
       confidence: competitorResearch.competitorPrices.length >= 5 ? 0.85 : 0.6,
-      tags: ["pricing", "optimal_price", "competitor_analysis", product.productType ?? "general"],
+      tags: ["pricing", "optimal_price", "competitor_analysis", "inteligencia_avanzada", product.productType ?? "general"],
     });
   
     res.json({
@@ -598,11 +620,33 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
     const grossProfit = grossRevenue - totalCogsAgg;
     const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
   
+    const cogsWithCac = allCogs.filter((c) => c.cac != null && c.cac > 0);
+    const avgCac = cogsWithCac.length > 0
+      ? cogsWithCac.reduce((sum, c) => sum + (c.cac ?? 0), 0) / cogsWithCac.length
+      : null;
+
+    let ltv12m: number | null = null;
+    let ltvCacRatio: number | null = null;
+    if (aov > 0) {
+      const repurchaseRate = 2.5;
+      ltv12m = Math.round(aov * repurchaseRate * 100) / 100;
+      if (avgCac && avgCac > 0) {
+        ltvCacRatio = Math.round((ltv12m / avgCac) * 100) / 100;
+      }
+    }
+
     const alerts: string[] = [];
-    if (grossMarginPct < 20) alerts.push("⚠️ Margen bruto global por debajo del 20% — revisar estructura de costes");
+    if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes");
     const lowMarginProducts = productProfitability.filter((p) => p.marginPct < 15);
     if (lowMarginProducts.length > 0) alerts.push(`${lowMarginProducts.length} productos con margen < 15% — riesgo de pérdida con devoluciones`);
-  
+    if (ltvCacRatio !== null && ltvCacRatio < 3.0) {
+      alerts.push(`ALERTA ROJA LTV/CAC: Ratio ${ltvCacRatio.toFixed(1)}x (< 3.0). El coste de adquisición de cliente (€${avgCac?.toFixed(2)}) es demasiado alto respecto al valor de vida del cliente (€${ltv12m?.toFixed(2)}). Optimiza retención o reduce CAC urgentemente.`);
+    }
+
+    const breakEvenUnits = avgCac && aov > 0 && grossMarginPct > 0
+      ? Math.ceil(avgCac / (aov * (grossMarginPct / 100)))
+      : null;
+
     res.json({
       grossRevenue: Math.round(grossRevenue * 100) / 100,
       totalCogs: Math.round(totalCogsAgg * 100) / 100,
@@ -610,8 +654,10 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
       grossMarginPct: Math.round(grossMarginPct * 10) / 10,
       netMarginPct: Math.round((grossMarginPct - 10) * 10) / 10,
       aov: Math.round(aov * 100) / 100,
-      cac: null,
-      ltvCacRatio: null,
+      cac: avgCac ? Math.round(avgCac * 100) / 100 : null,
+      ltvCacRatio,
+      ltv12m,
+      breakEvenUnits,
       productProfitability,
       alerts,
     });

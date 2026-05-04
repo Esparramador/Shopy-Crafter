@@ -118,32 +118,38 @@ router.get("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
       tests = tests.filter((t) => t.status === statusFilter);
     }
   
-    res.json(tests.map((t) => ({
-      id: String(t.id),
-      projectId: t.projectId,
-      productId: t.shopifyProductId,
-      productTitle: t.productTitle,
-      testType: t.testType,
-      imageType: t.imageType,
-      hypothesis: t.hypothesis,
-      variantAUrl: t.variantAUrl,
-      variantBUrl: t.variantBUrl,
-      variantAPrice: t.variantAPrice,
-      variantBPrice: t.variantBPrice,
-      aiPrediction: t.aiPrediction,
-      variantAVisitors: t.variantAVisitors,
-      variantBVisitors: t.variantBVisitors,
-      variantAConversions: t.variantAConversions,
-      variantBConversions: t.variantBConversions,
-      variantARevenue: t.variantARevenue,
-      variantBRevenue: t.variantBRevenue,
-      confidence: t.confidence,
-      winner: t.winner,
-      status: t.status,
-      targetMetric: t.targetMetric,
-      startDate: t.startDate.toISOString(),
-      endDate: t.endDate?.toISOString() ?? null,
-    })));
+    res.json(tests.map((t) => {
+      const { confidence: liveConfidence, winner: calcWinner } = calculateSignificance(
+        t.variantAConversions, t.variantAVisitors,
+        t.variantBConversions, t.variantBVisitors
+      );
+      return {
+        id: String(t.id),
+        projectId: t.projectId,
+        productId: t.shopifyProductId,
+        productTitle: t.productTitle,
+        testType: t.testType,
+        imageType: t.imageType,
+        hypothesis: t.hypothesis,
+        variantAUrl: t.variantAUrl,
+        variantBUrl: t.variantBUrl,
+        variantAPrice: t.variantAPrice,
+        variantBPrice: t.variantBPrice,
+        aiPrediction: t.aiPrediction,
+        variantAVisitors: t.variantAVisitors,
+        variantBVisitors: t.variantBVisitors,
+        variantAConversions: t.variantAConversions,
+        variantBConversions: t.variantBConversions,
+        variantARevenue: t.variantARevenue,
+        variantBRevenue: t.variantBRevenue,
+        confidence: liveConfidence,
+        winner: t.winner ?? (liveConfidence >= 95 ? calcWinner : null),
+        status: t.status,
+        targetMetric: t.targetMetric,
+        startDate: t.startDate.toISOString(),
+        endDate: t.endDate?.toISOString() ?? null,
+      };
+    }));
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
@@ -512,24 +518,32 @@ router.post("/track", async (req, res): Promise<void> => {
       revenue: revenue ?? null,
     });
   
-    if (eventType === "conversion" || eventType === "add_to_cart") {
-      const testIdNum = parseInt(String(testId), 10);
-      if (!isNaN(testIdNum)) {
-        const [test] = await db.select().from(abTestsTable).where(eq(abTestsTable.id, testIdNum));
-        if (test) {
-          if (variant === "A") {
-            await db.update(abTestsTable).set({
-              variantAVisitors: test.variantAVisitors + 1,
-              variantAConversions: eventType === "conversion" ? test.variantAConversions + 1 : test.variantAConversions,
-              variantARevenue: test.variantARevenue + (revenue ?? 0),
-            }).where(eq(abTestsTable.id, testIdNum));
-          } else {
-            await db.update(abTestsTable).set({
-              variantBVisitors: test.variantBVisitors + 1,
-              variantBConversions: eventType === "conversion" ? test.variantBConversions + 1 : test.variantBConversions,
-              variantBRevenue: test.variantBRevenue + (revenue ?? 0),
-            }).where(eq(abTestsTable.id, testIdNum));
-          }
+    const testIdNum = parseInt(String(testId), 10);
+    if (!isNaN(testIdNum)) {
+      const [test] = await db.select().from(abTestsTable).where(eq(abTestsTable.id, testIdNum));
+      if (test && test.status === "running") {
+        const isVisit = eventType === "visit";
+        const isConversion = eventType === "conversion";
+        if (variant === "A") {
+          await db.update(abTestsTable).set({
+            variantAVisitors: isVisit ? test.variantAVisitors + 1 : test.variantAVisitors,
+            variantAConversions: isConversion ? test.variantAConversions + 1 : test.variantAConversions,
+            variantARevenue: isConversion ? test.variantARevenue + (revenue ?? 0) : test.variantARevenue,
+          }).where(eq(abTestsTable.id, testIdNum));
+        } else {
+          await db.update(abTestsTable).set({
+            variantBVisitors: isVisit ? test.variantBVisitors + 1 : test.variantBVisitors,
+            variantBConversions: isConversion ? test.variantBConversions + 1 : test.variantBConversions,
+            variantBRevenue: isConversion ? test.variantBRevenue + (revenue ?? 0) : test.variantBRevenue,
+          }).where(eq(abTestsTable.id, testIdNum));
+        }
+        const updatedA = variant === "A" ? test.variantAConversions + (isConversion ? 1 : 0) : test.variantAConversions;
+        const updatedAv = variant === "A" && isVisit ? test.variantAVisitors + 1 : test.variantAVisitors;
+        const updatedB = variant === "B" ? test.variantBConversions + (isConversion ? 1 : 0) : test.variantBConversions;
+        const updatedBv = variant === "B" && isVisit ? test.variantBVisitors + 1 : test.variantBVisitors;
+        const sig = calculateSignificance(updatedA, updatedAv, updatedB, updatedBv);
+        if (sig.confidence > (test.confidence ?? 0)) {
+          await db.update(abTestsTable).set({ confidence: sig.confidence }).where(eq(abTestsTable.id, testIdNum));
         }
       }
     }

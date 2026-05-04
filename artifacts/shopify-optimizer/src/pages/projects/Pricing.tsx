@@ -151,6 +151,8 @@ function CogsModal({
     competitorAnalysis?: string;
     supplierAnalysis?: string;
     marginWaterfall?: { revenue: number; platformFees: number; cogs: number; packaging: number; shipping: number; returns: number; marketing: number; overhead: number; netMargin: number; netMarginPct: number };
+    marginWarnings?: string[];
+    bundleSuggestions?: string[];
     priceImpactEstimate?: { currentPrice: number; suggestedPrice: number; expectedSalesChange: string; expectedRevenueChange: string; confidenceLevel: string };
     marketResearch?: {
       competitorPrices: Array<{ source: string; price: string; productName?: string }>;
@@ -158,6 +160,13 @@ function CogsModal({
       marketPosition: string;
       avgSupplierCost: number;
       supplierInsight: string;
+    };
+    inteligencia_avanzada?: {
+      punto_de_equilibrio_unidades: number;
+      ltv_estimado_12_meses: number;
+      ratio_ltv_cac: number;
+      riesgo_cadena_suministro: string;
+      estrategia_foso_defensivo: string;
     };
   } | null>(null);
 
@@ -627,6 +636,80 @@ function CogsModal({
                     <div><span className="text-muted-foreground">Revenue: </span><span className="text-foreground">{optimalData.priceImpactEstimate.expectedRevenueChange}</span></div>
                     <div className="col-span-2"><span className="text-muted-foreground">Confianza: </span><span className="text-purple-300">{optimalData.priceImpactEstimate.confidenceLevel}</span></div>
                   </div>
+                </div>
+              )}
+
+              {optimalData.marginWarnings && optimalData.marginWarnings.length > 0 && (
+                <div className="space-y-2">
+                  {optimalData.marginWarnings.map((w, i) => {
+                    const isRedAlert = w.includes("ALERTA ROJA");
+                    return (
+                      <div key={i} className={`text-xs rounded-lg p-2.5 border flex items-start gap-2 ${isRedAlert ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"}`}>
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                        <span>{w}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {optimalData.inteligencia_avanzada && (
+                <div className="bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 rounded-xl p-4 space-y-3">
+                  <h5 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Brain className="w-3.5 h-3.5" /> Inteligencia Financiera Avanzada
+                  </h5>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-black/20 rounded-lg p-2.5 border border-white/5 text-center">
+                      <div className="text-[10px] text-muted-foreground mb-0.5">Break-even</div>
+                      <div className="text-lg font-bold text-foreground">{optimalData.inteligencia_avanzada.punto_de_equilibrio_unidades}</div>
+                      <div className="text-[10px] text-muted-foreground">unidades</div>
+                    </div>
+                    <div className="bg-black/20 rounded-lg p-2.5 border border-white/5 text-center">
+                      <div className="text-[10px] text-muted-foreground mb-0.5">LTV 12 meses</div>
+                      <div className="text-lg font-bold text-foreground">{formatCurrency(optimalData.inteligencia_avanzada.ltv_estimado_12_meses)}</div>
+                      <div className="text-[10px] text-muted-foreground">por cliente</div>
+                    </div>
+                    <div className={`bg-black/20 rounded-lg p-2.5 border text-center ${optimalData.inteligencia_avanzada.ratio_ltv_cac < 3 ? "border-red-500/30" : "border-green-500/30"}`}>
+                      <div className="text-[10px] text-muted-foreground mb-0.5">LTV / CAC</div>
+                      <div className={`text-lg font-bold ${optimalData.inteligencia_avanzada.ratio_ltv_cac < 3 ? "text-red-400" : "text-green-400"}`}>
+                        {optimalData.inteligencia_avanzada.ratio_ltv_cac.toFixed(1)}x
+                      </div>
+                      <div className={`text-[10px] ${optimalData.inteligencia_avanzada.ratio_ltv_cac < 3 ? "text-red-400" : "text-green-400"}`}>
+                        {optimalData.inteligencia_avanzada.ratio_ltv_cac < 3 ? "ALERTA" : "Saludable"}
+                      </div>
+                    </div>
+                  </div>
+                  {optimalData.inteligencia_avanzada.riesgo_cadena_suministro && (
+                    <div className={`rounded-lg p-2.5 border text-xs ${
+                      optimalData.inteligencia_avanzada.riesgo_cadena_suministro.toLowerCase().startsWith("alto")
+                        ? "bg-red-500/10 border-red-500/20"
+                        : optimalData.inteligencia_avanzada.riesgo_cadena_suministro.toLowerCase().startsWith("medio")
+                        ? "bg-yellow-500/10 border-yellow-500/20"
+                        : "bg-green-500/10 border-green-500/20"
+                    }`}>
+                      <span className="font-medium text-foreground">Riesgo Cadena Suministro: </span>
+                      <span className="text-muted-foreground">{optimalData.inteligencia_avanzada.riesgo_cadena_suministro}</span>
+                    </div>
+                  )}
+                  {optimalData.inteligencia_avanzada.estrategia_foso_defensivo && (
+                    <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-2.5 text-xs">
+                      <span className="font-medium text-indigo-400">Foso Defensivo: </span>
+                      <span className="text-muted-foreground">{optimalData.inteligencia_avanzada.estrategia_foso_defensivo}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {optimalData.bundleSuggestions && optimalData.bundleSuggestions.length > 0 && (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-400 mb-1.5">Sugerencias de Bundle / AOV</p>
+                  <ul className="space-y-1">
+                    {optimalData.bundleSuggestions.map((s, i) => (
+                      <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <span className="text-amber-400 mt-0.5">+</span> {s}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
