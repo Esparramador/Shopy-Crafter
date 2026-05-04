@@ -4,7 +4,7 @@ import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, proj
 import { eq, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
-import { askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import net from "net";
@@ -19,15 +19,20 @@ function isSafePublicUrl(rawUrl: string): boolean {
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
     const host = u.hostname.toLowerCase();
     if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return false;
-    if (host.endsWith(".local") || host.endsWith(".internal")) return false;
+    if (host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".onion")) return false;
+    if (host.startsWith("[")) return false;
     if (net.isIP(host)) {
+      if (net.isIPv6(host)) return false;
       const parts = host.split(".").map(Number);
       if (parts[0] === 10) return false;
       if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
       if (parts[0] === 192 && parts[1] === 168) return false;
       if (parts[0] === 169 && parts[1] === 254) return false;
       if (parts[0] === 0) return false;
+      if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return false;
+      if (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19)) return false;
     }
+    if (!host.includes(".")) return false;
     return true;
   } catch { return false; }
 }
@@ -114,12 +119,20 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
       fetchError = e.message ?? "fetch failed";
     }
   
+    const previousSnaps = await db.select().from(competitorSnapshotsTable)
+      .where(eq(competitorSnapshotsTable.competitorId, competitorId))
+      .orderBy(desc(competitorSnapshotsTable.scannedAt)).limit(3);
+    const historyBlock = previousSnaps.length > 0
+      ? `\n\nHISTORIAL DE ESCANEOS PREVIOS (usa esto para detectar CAMBIOS):\n${previousSnaps.map(s => `- ${new Date(s.scannedAt!).toLocaleDateString("es-ES")}: ${s.productsFound ?? "?"} productos, precios ${s.priceMin ?? "?"}–${s.priceMax ?? "?"}€, promos: ${s.promotionsDetected ?? "[]"}`).join("\n")}\n\nIMPORTANTE: Compara con los datos previos y destaca CAMBIOS (nuevos productos, bajadas de precio, nuevas promociones, productos descatalogados). Busca información NUEVA que no apareciera en escaneos anteriores.`
+      : "\n\nEste es el PRIMER escaneo de este competidor. Sé lo más exhaustivo posible.";
+
     const prompt = `You are a competitive intelligence analyst for a Shopify store.
   Store: ${project?.name || "Store"}
   Competitor: ${competitor.name} (${competitor.url})
   ${htmlContent ? `\nActual page content scraped:\n${htmlContent}` : `\nNote: Could not fetch page (${fetchError}). Use publicly known info about this URL/brand.`}
+  ${historyBlock}
   
-  Analyze the competitor and return competitive intelligence. Extract real prices, products, and promotions from the scraped content where available. Return JSON:
+  Analyze the competitor and return competitive intelligence. Extract real prices, products, and promotions from the scraped content where available. Focus on finding NEW information not in previous scans. Return JSON:
   {
     "productsFound": 0,
     "priceMin": null,
@@ -255,65 +268,105 @@ router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
     const existingUrls = existingCompetitors.map(c => c.url?.toLowerCase()).filter(Boolean);
   
     let discovered: Array<{ name: string; url: string; type: string; reason: string }> = [];
-  
-    try {
-      const result = await askGeminiWithSearch(
-        `BUSCA COMPETIDORES REALES para esta tienda online Shopify:
-  
-  Tienda: "${storeName}"
-  Dominio: ${shopDomain}
-  Nicho: ${niche}
-  Productos principales: ${topProducts || "no especificados"}
-  
-  INSTRUCCIONES:
-  1. Busca en Google tiendas online que vendan productos similares en España y Europa
-  2. Busca competidores DIRECTOS (mismo tipo de producto, mismo mercado)
-  3. Busca competidores INDIRECTOS (productos sustitutivos o plataformas con funciones similares)
-  4. Incluye tiendas Shopify, WooCommerce, PrestaShop, Amazon sellers, Etsy sellers, y tiendas propias
-  5. Para cada competidor, proporciona la URL REAL de su tienda (no la página de Amazon/Etsy genérica)
-  6. Busca al menos 8-12 competidores reales
-  7. NO incluyas la propia tienda "${shopDomain}" como competidor
-  
-  ${existingUrls.length > 0 ? `EXCLUIR estos competidores ya registrados:\n${existingUrls.join("\n")}` : ""}
-  
-  RESPONDE con JSON exacto:
-  {
-    "competitors": [
-      {
-        "name": "Nombre de la tienda/marca",
-        "url": "https://...",
-        "type": "direct|indirect|substitute",
-        "reason": "Por qué es competidor (qué venden similar, rango de precios, mercado objetivo)"
+
+    const discoverPrompt = `BUSCA COMPETIDORES REALES para esta tienda online Shopify:
+
+Tienda: "${storeName}"
+Dominio: ${shopDomain}
+Nicho: ${niche}
+Productos principales: ${topProducts || "no especificados"}
+
+INSTRUCCIONES:
+1. Busca tiendas online que vendan productos similares en España y Europa
+2. Busca competidores DIRECTOS (mismo tipo de producto, mismo mercado)
+3. Busca competidores INDIRECTOS (productos sustitutivos o plataformas con funciones similares)
+4. Incluye tiendas Shopify, WooCommerce, PrestaShop, Amazon sellers, Etsy sellers, y tiendas propias
+5. Para cada competidor, proporciona la URL REAL de su tienda (no la página de Amazon/Etsy genérica)
+6. Busca al menos 8-12 competidores reales
+7. NO incluyas la propia tienda "${shopDomain}" como competidor
+
+${existingUrls.length > 0 ? `EXCLUIR estos competidores ya registrados:\n${existingUrls.join("\n")}` : ""}
+
+RESPONDE con JSON exacto:
+{
+  "competitors": [
+    {
+      "name": "Nombre de la tienda/marca",
+      "url": "https://...",
+      "type": "direct|indirect|substitute",
+      "reason": "Por qué es competidor (qué venden similar, rango de precios, mercado objetivo)"
+    }
+  ],
+  "marketOverview": "Resumen del panorama competitivo del nicho",
+  "threatAssessment": "Nivel de competencia general: bajo/medio/alto/muy_alto"
+}`;
+
+    const parseDiscovered = (rawText: string) => {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return [];
+      let parsed: any = {};
+      try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = { competitors: [] }; }
+      return (parsed.competitors || []).filter((c: { url?: string }) => {
+        if (!c.url || !isSafePublicUrl(c.url)) return false;
+        try {
+          const u = new URL(c.url);
+          const origin = u.origin.toLowerCase();
+          if (shopDomain && origin.includes(shopDomain.toLowerCase().replace(/^https?:\/\//, ""))) return false;
+          return !existingUrls.includes(origin) && !existingUrls.includes(c.url.toLowerCase());
+        } catch { return false; }
+      });
+    };
+
+    if (isGeminiSearchBlocked()) {
+      logger.info("Competitor auto-discover: Gemini blocked, using Claude directly");
+      try {
+        const claudeText = await askClaudeWithBrain(
+          pid,
+          [{ role: "user", content: discoverPrompt }],
+          `${SHOPIFY_EXPERT_SYSTEM} You are a competitive intelligence analyst specializing in e-commerce. Return ONLY valid JSON with real competitor stores. Focus on ${niche} in Spain and Europe. Include real URLs you know from your training data.`,
+          "competitors",
+          niche,
+        );
+        discovered = parseDiscovered(claudeText);
+      } catch (claudeErr) {
+        logger.warn({ err: claudeErr }, "Competitor auto-discover: Claude failed");
       }
-    ],
-    "marketOverview": "Resumen del panorama competitivo del nicho",
-    "threatAssessment": "Nivel de competencia general: bajo/medio/alto/muy_alto"
-  }`,
-        `You are a competitive intelligence analyst specializing in e-commerce. Search Google thoroughly to find REAL competitor stores and marketplaces selling similar products. Focus on Spanish and European markets. Return ONLY valid JSON with real, verified URLs.`
-      );
-  
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        let parsed: any = {};
-        try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = { competitors: [] }; }
-        discovered = (parsed.competitors || []).filter((c: { url?: string }) => {
-          if (!c.url || !isSafePublicUrl(c.url)) return false;
-          try {
-            const u = new URL(c.url);
-            const origin = u.origin.toLowerCase();
-            if (shopDomain && origin.includes(shopDomain.toLowerCase().replace(/^https?:\/\//, ""))) return false;
-            return !existingUrls.includes(origin) && !existingUrls.includes(c.url.toLowerCase());
-          } catch { return false; }
-        });
+    } else {
+      try {
+        const result = await askGeminiWithSearch(
+          discoverPrompt,
+          `You are a competitive intelligence analyst specializing in e-commerce. Search Google thoroughly to find REAL competitor stores and marketplaces selling similar products. Focus on Spanish and European markets. Return ONLY valid JSON with real, verified URLs.`
+        );
+        if (result.text) {
+          discovered = parseDiscovered(result.text);
+        }
+        if (discovered.length === 0) {
+          logger.info("Competitor auto-discover: Gemini returned empty, falling back to Claude");
+          const claudeText = await askClaudeWithBrain(
+            pid,
+            [{ role: "user", content: discoverPrompt }],
+            `${SHOPIFY_EXPERT_SYSTEM} You are a competitive intelligence analyst. Return ONLY valid JSON with real competitor stores you know. Focus on ${niche} in Spain and Europe.`,
+            "competitors",
+            niche,
+          );
+          discovered = parseDiscovered(claudeText);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Error desconocido";
+        logger.warn({ err: msg }, "Competitor auto-discover: Gemini failed, trying Claude");
+        try {
+          const claudeText = await askClaudeWithBrain(
+            pid,
+            [{ role: "user", content: discoverPrompt }],
+            `${SHOPIFY_EXPERT_SYSTEM} You are a competitive intelligence analyst. Return ONLY valid JSON with real competitor stores. Focus on ${niche} in Spain and Europe.`,
+            "competitors",
+            niche,
+          );
+          discovered = parseDiscovered(claudeText);
+        } catch (claudeErr) {
+          logger.warn({ err: claudeErr }, "Competitor auto-discover: Both AI providers failed");
+        }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      const is403 = msg.includes("403") || msg.includes("PERMISSION_DENIED");
-      if (!is403) {
-        res.status(500).json({ error: `Error descubriendo competidores: ${msg}` });
-        return;
-      }
-      logger.warn("Competitor auto-discover: Gemini search blocked (403), returning empty list");
     }
   
     const added: Array<{ id: string; name: string; url: string; type: string; reason: string }> = [];
@@ -457,26 +510,66 @@ DEVUELVE SOLO un JSON válido:
   "recommendations": ["...", "..."]
 }`;
 
+    const safeParseJson = (raw: string): any => {
+      try {
+        const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const candidate = fence ? fence[1].trim() : raw.trim();
+        try { return JSON.parse(candidate); } catch {
+          const obj = candidate.match(/\{[\s\S]*\}/);
+          if (obj) return JSON.parse(obj[0]);
+        }
+      } catch { /* */ }
+      return null;
+    };
+
     const t0 = Date.now();
-    const { text: aiText, sources } = await askGeminiWithSearch(
-      aiPrompt,
-      "Eres un investigador competitivo. Verifica todo con Google. Responde SIEMPRE con JSON estricto, sin texto fuera del JSON. Si un dato no existe, omite el campo.",
-    );
+    let parsed: any = null;
+    let sources: string[] = [];
+
+    if (isGeminiSearchBlocked()) {
+      logger.info("Comparative report: Gemini blocked, using Claude directly");
+      try {
+        const claudeText = await askClaudeWithBrain(
+          projectIdNum,
+          [{ role: "user", content: aiPrompt }],
+          `${SHOPIFY_EXPERT_SYSTEM} You are a world-class competitive intelligence consultant. Respond ONLY with valid JSON. Use your knowledge to provide realistic competitive analysis.`,
+          "competitors",
+          niche,
+        );
+        parsed = safeParseJson(claudeText);
+        sources = ["Claude AI analysis"];
+      } catch { /* parsed stays null */ }
+    } else {
+      try {
+        const { text: aiText, sources: gemSources } = await askGeminiWithSearch(
+          aiPrompt,
+          "Eres un investigador competitivo. Verifica todo con Google. Responde SIEMPRE con JSON estricto, sin texto fuera del JSON. Si un dato no existe, omite el campo.",
+        );
+        sources = gemSources;
+        parsed = safeParseJson(aiText);
+      } catch (gemErr) {
+        logger.warn({ err: String(gemErr) }, "Comparative report: Gemini threw, falling back to Claude");
+      }
+
+      if (!parsed || !Array.isArray(parsed.competitors)) {
+        logger.warn("Comparative report: Gemini failed/empty, falling back to Claude");
+        try {
+          const claudeText = await askClaudeWithBrain(
+            projectIdNum,
+            [{ role: "user", content: aiPrompt }],
+            `${SHOPIFY_EXPERT_SYSTEM} You are a world-class competitive intelligence consultant. Respond ONLY with valid JSON. Use your knowledge to estimate realistic data when needed.`,
+            "competitors",
+            niche,
+          );
+          parsed = safeParseJson(claudeText);
+          sources = ["Claude AI analysis"];
+        } catch { /* parsed stays null */ }
+      }
+    }
     const elapsedMs = Date.now() - t0;
 
-    // safe JSON parse
-    let parsed: any = null;
-    try {
-      const fence = aiText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const candidate = fence ? fence[1].trim() : aiText.trim();
-      try { parsed = JSON.parse(candidate); } catch {
-        const obj = candidate.match(/\{[\s\S]*\}/);
-        if (obj) parsed = JSON.parse(obj[0]);
-      }
-    } catch { /* parsed stays null */ }
-
     if (!parsed || !Array.isArray(parsed.competitors)) {
-      res.status(502).json({ error: "Gemini no devolvió un JSON comparativo válido", rawPreview: aiText.slice(0, 400) });
+      res.status(502).json({ error: "No se pudo generar el informe comparativo. Intenta de nuevo." });
       return;
     }
 

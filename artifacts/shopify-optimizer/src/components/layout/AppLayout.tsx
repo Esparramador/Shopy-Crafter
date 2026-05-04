@@ -27,6 +27,8 @@ const DEFAULT_MODULE_NAV = [
   { id: "cards", label: "Card Studio", icon: "💳" },
   { id: "campaign-kit", label: "Campaign Kit", icon: "🎬" },
   { id: "exploded-view", label: "Exploded View", icon: "💥" },
+  { id: "ad-studio", label: "Ad Studio", icon: "📺" },
+  { id: "suppliers", label: "Proveedores", icon: "🏭" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [

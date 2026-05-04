@@ -552,10 +552,12 @@ router.post("/intelligence/analyze", async (req, res): Promise<void> => {
   
     try {
       const { dualAI: dualRevenue } = await import("../lib/dual-ai.js");
+      const { isGeminiSearchBlocked } = await import("../lib/gemini.js");
+      const aiMode = isGeminiSearchBlocked() ? "claude_only" as const : "gemini_research_claude_redact" as const;
       const dualResult = await dualRevenue(parseInt(projectId), prompt, {
-        mode: "parallel_synthesis",
+        mode: aiMode,
         claudeSystemPrompt: `${SHOPIFY_EXPERT_SYSTEM} You are also a revenue attribution expert and growth analyst. Identify which AI optimizations generated the most measurable revenue impact and provide specific, data-backed recommendations.`,
-        geminiUseSearch: true,
+        geminiUseSearch: !isGeminiSearchBlocked(),
         useCase: "intelligence",
         niche: project?.storeNiche ?? undefined,
       });

@@ -84,6 +84,18 @@ Provides a backend for business card generation with 6 templates, QR code genera
 ### Vault & Web Lab Hardening
 Ensures reliable storage and download of content in the vault. The Web Lab module allows users to edit and generate HTML/CSS from scratch with secure iframe previews and enriched design signal extraction.
 
+### Gemini 403 Circuit Breaker & Claude Fallback
+All AI endpoints that use Gemini Search grounding check `isGeminiSearchBlocked()` before calling Gemini. When blocked (403 cooldown, 10 min), they automatically switch to Claude-only mode. Affected endpoints: Competitor Auto-Discover, Comparative Reports, Intelligence Analyze. The comparative report Gemini call is wrapped in try/catch to ensure Claude fallback fires on any Gemini error (not just empty results).
+
+### SSRF Protection (isSafePublicUrl)
+URL validation in `competitors.ts` blocks: private IPv4 (RFC1918), link-local (169.254.x.x), CGN (100.64-127.x.x), benchmarking (198.18-19.x.x), all IPv6 addresses, bracket-wrapped hosts, `.onion` domains, and single-label hostnames.
+
+### Progressive Competitor Knowledge
+Competitor scan endpoints inject `previousSnaps` history from prior snapshots into AI prompts, enabling progressive knowledge accumulation across scans.
+
+### Navigation Completeness
+All project module routes have visible nav tabs in `DEFAULT_MODULE_NAV`: Auditoría, Rediseño IA, Imágenes, Consistencia, A/B Testing, Pricing, SEO Engine, Repositorio, Exportar, Generador IA, Lab Web, Fusion Studio, Card Studio, Campaign Kit, Exploded View, Ad Studio, Proveedores. Routes without tabs by design: `settings` (gear icon), `fusion-studio-pro` (alias redirecting to Fusion Studio).
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.

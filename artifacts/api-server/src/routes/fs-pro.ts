@@ -1230,6 +1230,7 @@ router.get("/fs-pro/exploded-view/quality-rules/:category", requireAdmin, (req, 
 });
 
 router.post("/fs-pro/exploded-view/generate-sequence", requireAdmin, async (req: Request, res: Response) => {
+  enableLongRunning(res);
   try {
     const { productName, productCategory, materialDescription, components, format, generationMode, globalStateId, projectId } = req.body;
 
@@ -1306,14 +1307,12 @@ GLOBAL STATE: ${gsId}
 Genera los 5 clips con prompts listos para producción.`;
 
     const numericProjectId = projectId ? Number(projectId) : 0;
-    const claudeRes = await askClaudeWithBrain(
+    const claudeRes = await askClaude(
       numericProjectId,
       [{ role: "user", content: userPrompt }],
       systemPrompt,
-      "exploded_view",
-      productCategory as string,
       8000,
-      90000,
+      120000,
     );
 
     const jsonMatch = claudeRes.match(/\{[\s\S]*\}/);

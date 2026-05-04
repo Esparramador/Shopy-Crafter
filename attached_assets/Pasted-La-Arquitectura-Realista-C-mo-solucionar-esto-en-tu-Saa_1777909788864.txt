@@ -1,0 +1,54 @@
+La Arquitectura Realista (Cómo solucionar esto en tu SaaS)
+Si tu objetivo es que Shopy Crafter esté siempre a la vanguardia absoluta y utilice los últimos motores a medida que van saliendo al mercado, no puedes depender de que el código esté "quemado" (hardcoded) con nombres de modelos específicos.
+
+Tienes que implementar una Arquitectura de Modelos Agnóstica (Model-Agnostic Routing) en tu backend de Replit.
+
+Aquí tienes el prompt arquitectónico que debes darle a Replit para que la aplicación no dependa de versiones antiguas y sea a prueba de futuro:
+
+Misión Crítica: Arquitectura "Agnóstica de Modelos" a prueba del Futuro (Mayo 2026+)
+Actúa como Arquitecto de Software Senior. No podemos "quemar" los nombres de los modelos de IA (ej. claude-3-opus, gen-3-alpha) directamente en nuestra lógica de negocio (/agents/). Las empresas como Anthropic, OpenAI y Runway lanzan versiones nuevas constantemente.
+
+FASE 1: Centralización del Registro de Modelos (Model Registry)
+
+Crea un archivo en la raíz llamado /config/model_registry.json.
+
+Este archivo contendrá las "variables de entorno dinámicas" para cada tarea. Nuestro backend consultará este archivo antes de hacer cualquier llamada.
+
+Estructura el JSON así:
+
+JSON
+{
+  "tasks": {
+    "heavy_reasoning": {
+      "provider": "anthropic",
+      "model_id": "claude-3-opus-20240229", 
+      "endpoint": "https://api.anthropic.com/v1/messages"
+    },
+    "fast_logic": {
+      "provider": "anthropic",
+      "model_id": "claude-3-haiku-20240307"
+    },
+    "video_generation": {
+      "provider": "runway",
+      "model_id": "gen3a_turbo"
+    },
+    "image_generation": {
+       "provider": "google",
+       "model_id": "gemini-3-flash-image"
+    }
+  }
+}
+(Nota para el Agente Replit: Utiliza los IDs de modelos actuales reales que conozcas. El CTO actualizará estos strings manualmente en el futuro).
+
+FASE 2: El Enrutador Dinámico (Dynamic Router)
+
+Crea un servicio apiRouter.js.
+
+En lugar de que strategyAgent.js llame directamente a Claude, llamará a apiRouter.route('heavy_reasoning', payload).
+
+El enrutador leerá el model_registry.json, construirá la cabecera correcta (Headers) según el proveedor, inyectará el model_id activo, y hará la llamada a la API.
+
+Tu tarea: Configura esta arquitectura. Escribe el código del apiRouter.js. La ventaja de esto es que cuando el proveedor lance su modelo "Gen-4" o "Claude 4.7", el dueño de Shopy Crafter solo tendrá que cambiar UNA línea de texto en el model_registry.json, y toda la aplicación pasará a usar el nuevo modelo sin tocar ni una sola línea de la lógica de programación.
+
+Tu trabajo como CTO
+Esta arquitectura te protege de la obsolescencia. Cuando veas las noticias de que ha salido un nuevo motor hiperpotente, solo tendrás que ir a tu archivo model_registry.json en Replit, cambiar el string "claude-3-opus..." por "claude-4.5-opus..." (o el nombre oficial que le pongan), y toda tu aplicación se actualizará al instante usando el nuevo motor
