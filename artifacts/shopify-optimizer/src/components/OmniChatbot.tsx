@@ -1720,7 +1720,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             }
             const successFiles = fileResults.filter(fr => fr.result);
             const failedFiles = fileResults.filter(fr => fr.error);
-            result = successFiles[0]?.result || { memoryId: "", analysis: {}, entity: "" };
+            result = successFiles[0]?.result || { success: false, sourceType: "", title: "", analysis: {} } as AbsorbResult;
             if (successFiles.length === 0) {
               assistantContent = `❌ **0/${filesToProcess.length} archivos procesados** — todos fallaron.\n\n`;
             } else if (failedFiles.length > 0) {
