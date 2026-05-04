@@ -217,7 +217,7 @@ function ProductCardsGrid({ products }: { products: ProductCardItem[] }) {
 
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 8 }}>
         {visible.map((p, i) => {
           const grade = p.auditGrade || p.grade || "D";
           const score = p.auditScore ?? p.score ?? 0;
@@ -781,52 +781,57 @@ function KlaviyoResultCard({ data, onViewFlow }: {
 function FlowModal({ flow, onClose }: { flow: KlaviyoWorkflowResult["plan"]["flows"][0]; onClose: () => void }) {
   const [activeEmail, setActiveEmail] = useState(0);
   const [copied, setCopied] = useState(false);
+  const fmIsMobile = useIsMobile();
   const copyHtml = async () => {
     await navigator.clipboard.writeText(flow.emails?.[activeEmail]?.html_body ?? "");
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 14, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{flow.name}</h3>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--t3)" }}>Trigger: {flow.trigger} · {flow.emails?.length} emails</p>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: fmIsMobile ? 8 : 20 }}>
+      <div style={{ background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: fmIsMobile ? 10 : 14, width: "100%", maxWidth: fmIsMobile ? "100%" : 900, maxHeight: fmIsMobile ? "calc(100dvh - 16px)" : "90vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: fmIsMobile ? "10px 12px" : "14px 20px", borderBottom: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: fmIsMobile ? 13 : 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{flow.name}</h3>
+            <p style={{ margin: "2px 0 0", fontSize: fmIsMobile ? 10 : 11, color: "var(--t3)" }}>Trigger: {flow.trigger} · {flow.emails?.length} emails</p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={copyHtml} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--ink3)", background: copied ? "var(--jade)" : "var(--ink2)", color: copied ? "var(--ink)" : "var(--t)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button onClick={copyHtml} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--ink3)", background: copied ? "var(--jade)" : "var(--ink2)", color: copied ? "var(--ink)" : "var(--t)", fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
               {copied ? "✓ Copiado" : "📋 Copiar HTML"}
             </button>
-            <button onClick={onClose} aria-label="Cerrar detalle del flujo" style={{ width: 36, height: 36, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}><X size={14} /></button>
+            <button onClick={onClose} aria-label="Cerrar detalle del flujo" style={{ width: 44, height: 44, minWidth: 44, borderRadius: 6, border: "1px solid var(--ink3)", background: "var(--ink2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}><X size={16} /></button>
           </div>
         </div>
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          <div style={{ width: 180, borderRight: "1px solid var(--ink3)", padding: 12, overflowY: "auto", flexShrink: 0 }}>
+        <div style={{ display: "flex", flexDirection: fmIsMobile ? "column" : "row", flex: 1, overflow: "hidden", minHeight: 0 }}>
+          <div style={{
+            ...(fmIsMobile
+              ? { display: "flex", gap: 4, padding: 8, overflowX: "auto", borderBottom: "1px solid var(--ink3)", flexShrink: 0 }
+              : { width: 180, borderRight: "1px solid var(--ink3)", padding: 12, overflowY: "auto", flexShrink: 0 }),
+          }}>
             {flow.emails?.map((email, i) => (
               <button key={i} onClick={() => setActiveEmail(i)}
-                style={{ width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 6, marginBottom: 4, border: "none", cursor: "pointer", background: activeEmail === i ? "rgba(200,168,75,0.12)" : "transparent", color: activeEmail === i ? "var(--gold)" : "var(--t3)" }}>
+                style={{ ...(fmIsMobile ? { flexShrink: 0, whiteSpace: "nowrap" } : { width: "100%" }), textAlign: "left", padding: "8px 10px", borderRadius: 6, marginBottom: fmIsMobile ? 0 : 4, border: "none", cursor: "pointer", background: activeEmail === i ? "rgba(200,168,75,0.12)" : "transparent", color: activeEmail === i ? "var(--gold)" : "var(--t3)" }}>
                 <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>Email {email.position}</p>
                 <p style={{ margin: "2px 0 0", fontSize: 9, opacity: 0.7 }}>⏱ {email.delay}</p>
               </button>
             ))}
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: fmIsMobile ? 12 : 16, minHeight: 0 }}>
             {flow.emails?.[activeEmail] && (() => {
               const email = flow.emails[activeEmail];
               return (
                 <>
                   <div style={{ marginBottom: 12 }}>
                     <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Asunto</p>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", margin: 0, background: "var(--ink2)", padding: "8px 12px", borderRadius: 6 }}>{email.subject}</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", margin: 0, background: "var(--ink2)", padding: "8px 12px", borderRadius: 6, wordBreak: "break-word" }}>{email.subject}</p>
                   </div>
                   <div style={{ marginBottom: 12 }}>
                     <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Preview Text</p>
-                    <p style={{ fontSize: 11, color: "var(--t2)", margin: 0, background: "var(--ink2)", padding: "6px 12px", borderRadius: 6 }}>{email.preview_text}</p>
+                    <p style={{ fontSize: 11, color: "var(--t2)", margin: 0, background: "var(--ink2)", padding: "6px 12px", borderRadius: 6, wordBreak: "break-word" }}>{email.preview_text}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: 9, color: "var(--t3)", fontWeight: 700, textTransform: "uppercase", margin: "0 0 6px" }}>HTML Template</p>
                     <textarea readOnly value={email.html_body}
-                      style={{ width: "100%", minHeight: 200, padding: "10px 12px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t3)", fontSize: 10, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box" }} />
+                      style={{ width: "100%", minHeight: fmIsMobile ? 150 : 200, padding: "10px 12px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 8, color: "var(--t3)", fontSize: 10, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box" }} />
                   </div>
                 </>
               );
@@ -1963,7 +1968,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       {/* Floating button */}
       {!open && (
         <button onClick={() => setOpen(true)} aria-label="Abrir asistente Shopy Crafter" style={{
-          position: "fixed", bottom: isMobile ? 12 : 24, right: isMobile ? 12 : 24, width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
+          position: "fixed",
+          bottom: `max(${isMobile ? 12 : 24}px, env(safe-area-inset-bottom, 0px))`,
+          right: `max(${isMobile ? 12 : 24}px, env(safe-area-inset-right, 0px))`,
+          width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
           borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
           border: "none", cursor: "pointer", zIndex: 9990,
           boxShadow: "0 4px 24px rgba(200,168,75,0.45), 0 0 0 0 rgba(200,168,75,0.3)",
@@ -1983,10 +1991,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           onDrop={handleDrop}
           style={{
             position: "fixed",
-            bottom: isMobile ? 0 : 24, right: isMobile ? 0 : 24,
-            width: isMobile ? "100%" : (minimized ? 290 : 440),
-            height: isMobile ? (minimized ? 52 : "100dvh") : (minimized ? 52 : 640),
-            ...(isMobile ? { left: 0 } : {}),
+            bottom: isMobile ? 0 : 24,
+            right: isMobile ? 0 : 24,
+            width: isMobile ? "100%" : (minimized ? 290 : "min(440px, calc(100vw - 48px))"),
+            height: isMobile
+              ? (minimized ? 52 : "calc(100dvh - env(safe-area-inset-top, 0px))")
+              : (minimized ? 52 : "min(640px, calc(100dvh - 48px))"),
+            ...(isMobile && !minimized ? { left: 0, top: "env(safe-area-inset-top, 0px)" } : {}),
+            ...(isMobile && minimized ? { left: 0, bottom: 0 } : {}),
             background: "var(--ink)",
             border: isMobile ? "none" : `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
             borderRadius: isMobile ? 0 : 16, zIndex: 9990, display: "flex", flexDirection: "column",
@@ -1995,20 +2007,20 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           }}>
 
           {/* Header */}
-          <div style={{ padding: "12px 14px", borderBottom: minimized ? "none" : "1px solid var(--ink3)", background: "linear-gradient(135deg, rgba(200,168,75,0.07), rgba(200,168,75,0.03))", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{ padding: isMobile ? "10px max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px))" : "12px 14px", borderBottom: minimized ? "none" : "1px solid var(--ink3)", background: "linear-gradient(135deg, rgba(200,168,75,0.07), rgba(200,168,75,0.03))", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, var(--gold), #a07830)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Brain size={16} style={{ color: "#fff" }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)" }}>Shopy Crafter · Asistente</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Shopy Crafter · Asistente</p>
               {!minimized && <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>🔬 Gemini · 🧠 Claude · 💾 Brain — Listo</p>}
             </div>
-            <div style={{ display: "flex", gap: isMobile ? 8 : 4 }}>
-              <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 36 : 24, height: isMobile ? 36 : 24, borderRadius: isMobile ? 8 : 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {minimized ? <Maximize2 size={isMobile ? 16 : 11} /> : <Minimize2 size={isMobile ? 16 : 11} />}
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {minimized ? <Maximize2 size={isMobile ? 18 : 14} /> : <Minimize2 size={isMobile ? 18 : 14} />}
               </button>
-              <button onClick={() => setOpen(false)} aria-label="Cerrar chat" style={{ width: isMobile ? 36 : 24, height: isMobile ? 36 : 24, borderRadius: isMobile ? 8 : 5, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <X size={isMobile ? 16 : 11} />
+              <button onClick={() => setOpen(false)} aria-label="Cerrar chat" style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={isMobile ? 18 : 14} />
               </button>
             </div>
           </div>
@@ -2026,7 +2038,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               )}
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "14px max(12px, env(safe-area-inset-left, 0px)) 14px max(12px, env(safe-area-inset-right, 0px))" : "14px 12px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
                 {messages.map(msg => (
                   <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
                     <div style={{
@@ -2086,7 +2098,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               </div>
 
               {/* Input area */}
-              <div style={{ padding: "8px 12px 10px", borderTop: "1px solid var(--ink3)", flexShrink: 0 }}>
+              <div style={{ padding: isMobile ? "8px max(12px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-right, 0px))" : "8px 12px 10px", borderTop: "1px solid var(--ink3)", flexShrink: 0 }}>
                 {/* Quick actions */}
                 <button onClick={() => setShowActions(!showActions)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--t3)", fontSize: 10, cursor: "pointer", marginBottom: 5, padding: "2px 0" }}>
                   <Sparkles size={10} />
@@ -2156,42 +2168,42 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 )}
 
                 {/* Text input row */}
-                <div style={{ display: "flex", gap: isMobile ? 8 : 6, alignItems: "flex-end" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
                   <button onClick={() => setShowAttach(!showAttach)} aria-label="Adjuntar archivo"
-                    style={{ width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: isMobile ? 18 : 14 }}>
+                    style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: isMobile ? 18 : 15 }}>
                     📎
                   </button>
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading}
                     placeholder={isListening ? "🎙 Escuchando..." : attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
                     rows={1}
-                    style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: isListening ? "rgba(232,69,88,0.08)" : "var(--ink2)", border: `1px solid ${isListening ? "var(--crim)" : "var(--ink3)"}`, borderRadius: isMobile ? 10 : 8, color: "var(--t)", fontSize: isMobile ? 16 : 12, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto", transition: "border-color 0.2s, background 0.2s" }}
+                    style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: isListening ? "rgba(232,69,88,0.08)" : "var(--ink2)", border: `1px solid ${isListening ? "var(--crim)" : "var(--ink3)"}`, borderRadius: 8, color: "var(--t)", fontSize: isMobile ? 16 : 13, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto", transition: "border-color 0.2s, background 0.2s", minHeight: isMobile ? 44 : 36 }}
                     onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, isMobile ? 100 : 80)}px`; }}
                   />
                   <button onClick={toggleMic} disabled={loading} aria-label={isListening ? "Detener micrófono" : "Activar micrófono"}
                     style={{
-                      width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: "none", flexShrink: 0,
+                      width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", flexShrink: 0,
                       background: isListening ? "var(--crim)" : "var(--ink2)",
                       color: isListening ? "#fff" : "var(--t3)",
                       cursor: loading ? "not-allowed" : "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                       animation: isListening ? "pulseGold 1.5s ease-in-out infinite" : "none",
                     }}>
-                    {isListening ? <MicOff size={isMobile ? 18 : 14} /> : <Mic size={isMobile ? 18 : 14} />}
+                    {isListening ? <MicOff size={isMobile ? 18 : 15} /> : <Mic size={isMobile ? 18 : 15} />}
                   </button>
                   <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)} aria-label="Enviar mensaje"
                     style={{
-                      width: isMobile ? 44 : 32, height: isMobile ? 44 : 32, borderRadius: isMobile ? 10 : 8, border: "none", flexShrink: 0,
+                      width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", flexShrink: 0,
                       background: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--ink3)" : "var(--gold)",
                       color: loading || (!input.trim() && !attachFile && !attachUrl) ? "var(--t4)" : "var(--ink)",
                       cursor: loading || (!input.trim() && !attachFile && !attachUrl) ? "not-allowed" : "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
                     }}>
-                    {loading ? <Loader2 size={isMobile ? 18 : 14} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={isMobile ? 18 : 14} />}
+                    {loading ? <Loader2 size={isMobile ? 18 : 15} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={isMobile ? 18 : 15} />}
                   </button>
                 </div>
 
                 {/* Engine selector */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, justifyContent: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, justifyContent: "center", flexWrap: "wrap" }}>
                   {([
                     { key: "auto", icon: "⚡", label: "Auto" },
                     { key: "claude", icon: "🧠", label: "Claude" },
@@ -2200,11 +2212,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   ] as const).map(({ key, icon, label }) => (
                     <button key={key} onClick={() => setEngineMode(key)}
                       style={{
-                        fontSize: 9, padding: "2px 7px", borderRadius: 4, cursor: "pointer",
+                        fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
                         border: engineMode === key ? "1px solid var(--gold)" : "1px solid transparent",
                         background: engineMode === key ? "rgba(200,168,75,0.15)" : "transparent",
                         color: engineMode === key ? "var(--gold)" : "var(--t4)",
                         display: "flex", alignItems: "center", gap: 3, transition: "all 0.2s",
+                        minHeight: 28,
                       }}>
                       {icon} {label}
                     </button>
