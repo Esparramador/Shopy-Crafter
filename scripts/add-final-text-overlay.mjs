@@ -19,7 +19,7 @@ import { request } from "node:http";
 
 const BASE = "http://127.0.0.1:8080";
 const PROJECT_ID = parseInt(process.env.HANAKAZE_PROJECT_ID || "7", 10);
-const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
 if (!PASSWORD) { console.error("ERROR: falta HANAKAZE_ADMIN_PASSWORD"); process.exit(2); }
 

@@ -1,0 +1,109 @@
+import PublicLayout from "@/components/PublicLayout";
+import { useState } from "react";
+
+const FAQS = [
+  {
+    category: "General",
+    items: [
+      { q: "¿Qué es Shopy Crafter?", a: "Shopy Crafter es una plataforma SaaS de agencia eCommerce con 17 motores de IA que automatizan tareas como auditorías de producto, generación de imágenes, optimización SEO, A/B testing, pricing y mucho más." },
+      { q: "¿Necesito conocimientos técnicos?", a: "No. La plataforma está diseñada para que cualquier persona pueda usarla sin ser técnico. Todo funciona con un clic o a través de nuestro chatbot de IA." },
+      { q: "¿Con qué plataformas de eCommerce funciona?", a: "Actualmente optimizamos para Shopify, WooCommerce y cualquier tienda online con acceso a sus datos. La integración es directa con Shopify y manual para el resto." },
+      { q: "¿Cuánto tarda en verse resultados?", a: "Depende del estado actual de tu tienda, pero la mayoría de clientes ven mejoras medibles (SEO, conversión, calidad de imágenes) en las primeras 2-4 semanas." },
+    ],
+  },
+  {
+    category: "Precios y planes",
+    items: [
+      { q: "¿Puedo probar gratis?", a: "Sí. Ofrecemos un trial de 14 días sin tarjeta de crédito. Puedes usar todos los motores de IA durante ese periodo." },
+      { q: "¿Puedo cancelar en cualquier momento?", a: "Sí. No hay permanencia ni penalización. Puedes cancelar desde tu panel de billing en cualquier momento." },
+      { q: "¿Qué incluye cada plan?", a: "Cada plan incluye acceso a los 17 motores de IA con diferentes límites de uso. Los planes superiores incluyen más proyectos, más generaciones al mes y soporte prioritario." },
+      { q: "¿Los precios incluyen IVA?", a: "Los precios mostrados no incluyen IVA. El IVA se calcula según tu país de residencia en el momento de la facturación." },
+    ],
+  },
+  {
+    category: "Motores de IA",
+    items: [
+      { q: "¿Qué modelos de IA utilizáis?", a: "Usamos una combinación de Claude (Anthropic), Gemini (Google) y modelos de imagen propios (Replicate). Cada motor selecciona el modelo óptimo automáticamente." },
+      { q: "¿Las imágenes generadas son únicas?", a: "Sí. Cada imagen se genera específicamente para tu producto y marca. No usamos bancos de imágenes ni plantillas predefinidas." },
+      { q: "¿Puedo usar el contenido generado comercialmente?", a: "Sí. Todo el contenido que generas con Shopy Crafter (textos, imágenes, informes) es tuyo para uso comercial sin restricciones." },
+      { q: "¿Los audits son automáticos?", a: "Sí. Puedes configurar auditorías automáticas periódicas o lanzarlas manualmente cuando quieras. El sistema analiza tu tienda completa y genera recomendaciones accionables." },
+    ],
+  },
+  {
+    category: "Seguridad y privacidad",
+    items: [
+      { q: "¿Mis datos están seguros?", a: "Sí. Usamos cifrado en tránsito (TLS) y en reposo (AES-256), control de accesos por rol y copias de seguridad diarias. Cumplimos con RGPD." },
+      { q: "¿Compartís mis datos con terceros?", a: "No. Tus datos nunca se venden ni se ceden. Los proveedores tecnológicos que usamos (hosting, IA) actúan como encargados del tratamiento bajo contratos RGPD." },
+      { q: "¿Dónde se almacenan mis datos?", a: "Los datos se almacenan en servidores dentro de la UE/EEE siempre que es posible. Para los servicios de IA, aseguramos garantías adecuadas según el RGPD." },
+    ],
+  },
+];
+
+export default function FAQ() {
+  const [openItems, setOpenItems] = useState<Set<string>>(new Set());
+
+  const toggle = (key: string) => {
+    setOpenItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <PublicLayout>
+      <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
+        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>FAQ</div>
+        <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
+          Preguntas frecuentes
+        </h1>
+        <p style={{ fontSize: 16, color: "var(--t3, #999)", lineHeight: 1.7, marginBottom: 48 }}>
+          Todo lo que necesitas saber sobre Shopy Crafter. Si no encuentras tu respuesta, escríbenos.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+          {FAQS.map(section => (
+            <div key={section.category}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#e6c668", marginBottom: 16, paddingBottom: 8, borderBottom: "1px solid var(--ink3, #1e1e22)" }}>{section.category}</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {section.items.map(faq => {
+                  const key = `${section.category}-${faq.q}`;
+                  const isOpen = openItems.has(key);
+                  return (
+                    <div key={key} style={{
+                      background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)",
+                      borderRadius: 12, overflow: "hidden", cursor: "pointer",
+                    }} onClick={() => toggle(key)}>
+                      <div style={{
+                        padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--t, #eee)", flex: 1 }}>{faq.q}</span>
+                        <span style={{ fontSize: 18, color: "var(--t4, #666)", transition: "transform 0.2s", transform: isOpen ? "rotate(45deg)" : "rotate(0)" }}>+</span>
+                      </div>
+                      {isOpen && (
+                        <div style={{ padding: "0 20px 16px", fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.7 }}>
+                          {faq.a}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 48, padding: 32, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 16, textAlign: "center" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 8 }}>¿No encuentras lo que buscas?</h3>
+          <p style={{ fontSize: 14, color: "var(--t3, #999)", marginBottom: 16 }}>Escríbenos y te respondemos en menos de 24h.</p>
+          <a href="/contacto" style={{
+            display: "inline-block", padding: "12px 28px", borderRadius: 10,
+            background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
+            fontWeight: 700, fontSize: 14, textDecoration: "none",
+          }}>Contactar →</a>
+        </div>
+      </div>
+    </PublicLayout>
+  );
+}

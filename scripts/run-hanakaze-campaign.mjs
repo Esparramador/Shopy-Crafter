@@ -100,7 +100,7 @@ function rawRequestBinary({ host = "localhost", port = 8080, path: urlPath, meth
 console.log("[boot] cliente HTTP raw activo (sin timeouts) + sistema reanudable");
 
 const BASE = "http://localhost:8080";
-const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
 if (!PASSWORD) {
   console.error("[FATAL] Falta HANAKAZE_ADMIN_PASSWORD en el entorno. Aborto para no exponer credenciales en código.");

@@ -39,7 +39,7 @@ router.post("/users", async (req, res): Promise<void> => {
       clientId?: string; password?: string;
     };
   
-    // Solo se puede crear el rol "client" desde aquí — el único admin es sadiagiljoan@gmail.com
+    // Solo se puede crear el rol "client" desde aquí — el único admin es craftershopy@gmail.com
     const safeRole: "admin" | "client" = role === "admin" ? "client" : role;
   
     const id = randomBytes(16).toString("hex");

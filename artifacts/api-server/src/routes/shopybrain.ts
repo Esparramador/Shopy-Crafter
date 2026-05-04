@@ -799,7 +799,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   
   CONOCIMIENTO DE NEGOCIO — CATÁLOGO COMPLETO DE SERVICIOS Shopy Crafter:
   
-  IDENTIDAD: Nombre público "Shopy Crafter" (shopycrafter.com). Motor IA interno "ShopyBrain". Admin: sadiagiljoan@gmail.com. Email: craftershopy@gmail.com.
+  IDENTIDAD: Nombre público "Shopy Crafter" (shopycrafter.com). Motor IA interno "ShopyBrain". Admin: craftershopy@gmail.com. Email: craftershopy@gmail.com.
   MODELO DE NEGOCIO: Shopy Crafter es una agencia de optimización IA para tiendas Shopify + estudio creativo Comic Crafter. Servicios puntuales (one-time) + retainers mensuales + créditos IA. Pagos por Shopify Billing (NO Stripe). 130+ acciones chatbot. 46,000+ insights.
   
   ═══════════════════════════════════════════════════

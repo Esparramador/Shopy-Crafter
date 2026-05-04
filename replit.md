@@ -4,7 +4,7 @@
 Shopy Crafter is a multi-user Shopify AI optimization agency platform utilizing a Dual AI Engine (Gemini + Claude) named "ShopyBrain." It delivers AI-driven insights, automation, product and image creation, SEO, financial analysis, and a Universal Web Audit system. The platform aims to be a leading AI-driven e-commerce solution, expanding to various platforms to offer extensive agency-level services that enhance client ROI and drive business growth through advanced AI capabilities.
 
 ## User Preferences
-- Admin email: via `ADMIN_EMAIL` env var (default: sadiagiljoan@gmail.com)
+- Admin email: via `ADMIN_EMAIL` env var (default: craftershopy@gmail.com)
 - Admin password: via `ADMIN_PASSWORD` secret (no hardcoded fallback; generates random in dev if unset)
 - Design: gold/black/jade premium dark theme
 - Language: Spanish (UI), code in English

@@ -320,7 +320,7 @@ router.post("/projects/:projectId/actions/send", async (req, res): Promise<void>
     const emailTitle = title || `${label} — ${projectName}`;
     const htmlBody = buildProfessionalHtml(emailTitle, content, label, rawData, projectName, tplAction);
   
-    const to = recipientEmail || "sadiagiljoan@gmail.com";
+    const to = recipientEmail || "craftershopy@gmail.com";
     const subject = `📊 ${emailTitle} | Shopy Crafter`;
   
     const sent = await sendEmail(to, subject, htmlBody);

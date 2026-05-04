@@ -92,7 +92,7 @@ console.log("[boot] Hanakaze v3 CASCADA — virtual try-on + deconstrucción + p
 
 const PROJECT_ID = parseInt(process.env.HANAKAZE_PROJECT_ID || "7", 10);
 const BASE = "http://localhost:8080";
-const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "sadiagiljoan@gmail.com";
+const EMAIL = process.env.HANAKAZE_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.HANAKAZE_ADMIN_PASSWORD;
 if (!PASSWORD) {
   console.error("[FATAL] Falta HANAKAZE_ADMIN_PASSWORD en el entorno. Aborto para no exponer credenciales en código.");

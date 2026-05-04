@@ -56,6 +56,17 @@ const BrainSync = lazy(() => import("@/pages/admin/BrainSync"));
 const AdStudio = lazy(() => import("@/pages/projects/AdStudio"));
 const AvatarStudio = lazy(() => import("@/pages/admin/AvatarStudio"));
 
+const SobreNosotros = lazy(() => import("@/pages/public/SobreNosotros"));
+const CasosDeExito = lazy(() => import("@/pages/public/CasosDeExito"));
+const ProgramaAfiliados = lazy(() => import("@/pages/public/ProgramaAfiliados"));
+const FAQPage = lazy(() => import("@/pages/public/FAQ"));
+const BlogPage = lazy(() => import("@/pages/public/Blog"));
+const ChangelogPage = lazy(() => import("@/pages/public/Changelog"));
+const PrivacidadPage = lazy(() => import("@/pages/public/Privacidad"));
+const TerminosPage = lazy(() => import("@/pages/public/Terminos"));
+const CookiesPage = lazy(() => import("@/pages/public/Cookies"));
+const ContactoPage = lazy(() => import("@/pages/public/Contacto"));
+
 const AuditPage = lazy(() => import("@/pages/projects/Audit"));
 const RedesignPage = lazy(() => import("@/pages/projects/Redesign"));
 const ImagesPage = lazy(() => import("@/pages/projects/Images"));
@@ -248,6 +259,18 @@ function Router() {
 
         {/* Landing */}
         <Route path="/landing">{() => <S><Landing /></S>}</Route>
+
+        {/* Public pages */}
+        <Route path="/sobre-nosotros">{() => <S><SobreNosotros /></S>}</Route>
+        <Route path="/casos-de-exito">{() => <S><CasosDeExito /></S>}</Route>
+        <Route path="/programa-de-afiliados">{() => <S><ProgramaAfiliados /></S>}</Route>
+        <Route path="/faq">{() => <S><FAQPage /></S>}</Route>
+        <Route path="/blog">{() => <S><BlogPage /></S>}</Route>
+        <Route path="/changelog">{() => <S><ChangelogPage /></S>}</Route>
+        <Route path="/privacidad">{() => <S><PrivacidadPage /></S>}</Route>
+        <Route path="/terminos">{() => <S><TerminosPage /></S>}</Route>
+        <Route path="/cookies">{() => <S><CookiesPage /></S>}</Route>
+        <Route path="/contacto">{() => <S><ContactoPage /></S>}</Route>
 
         {/* Root — redirects by role */}
         <Route path="/">
