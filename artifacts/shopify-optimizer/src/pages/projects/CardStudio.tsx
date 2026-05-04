@@ -67,11 +67,14 @@ interface BusinessCard {
 }
 
 const BG_MODELS = [
-  { id: "recraft-v3",          label: "Recraft v3 ($0.04)",      tier: "best" },
-  { id: "ideogram-v3-turbo",   label: "Ideogram v3 Turbo ($0.03)", tier: "fast" },
-  { id: "imagen-4-ultra",      label: "Imagen 4 Ultra ($0.06)",  tier: "premium" },
-  { id: "google-nano-banana",  label: "Nano Banana ($0.04)",     tier: "fast" },
-  { id: "gpt-image-1",         label: "GPT-Image-1 ($0.04)",     tier: "balanced" },
+  { id: "recraft-v3",          label: "Recraft v3 ($0.04)",          tier: "best" },
+  { id: "ideogram-v3-turbo",   label: "Ideogram v3 Turbo ($0.03)",  tier: "fast" },
+  { id: "imagen-4-ultra",      label: "Imagen 4 Ultra ($0.06)",     tier: "premium" },
+  { id: "nano-banana",         label: "Gemini Flash Image ($0.04)", tier: "fast" },
+  { id: "flux-1.1-pro-ultra",  label: "Flux Pro Ultra ($0.06)",     tier: "premium" },
+  { id: "flux-1.1-pro",        label: "Flux Pro ($0.04)",           tier: "balanced" },
+  { id: "flux-schnell",        label: "Flux Schnell ($0.003)",      tier: "economy" },
+  { id: "flux-kontext-pro",    label: "Flux Kontext ($0.05)",       tier: "balanced" },
 ];
 
 const LAYOUTS: Array<{ id: "centered" | "left" | "grid"; label: string; desc: string }> = [

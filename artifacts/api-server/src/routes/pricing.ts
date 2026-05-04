@@ -5,7 +5,7 @@ import { projectsTable, productsTable, cogsTable, priceHistoryTable, abTestsTabl
 import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
-import { askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
 import { enableLongRunning } from "../lib/long-running.js";
 
@@ -322,68 +322,107 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
     let competitorResearch = { competitorPrices: [] as Array<{ source: string; price: string; url?: string; productName?: string }>, marketPriceRange: { min: 0, max: 0, median: 0 }, marketPosition: "", pricingStrategy: "" };
     let supplierResearch = { supplierPrices: [] as Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>, avgSupplierCost: 0, supplierInsight: "" };
   
-    try {
-      const [compResult, suppResult] = await Promise.allSettled([
-        askGeminiWithSearch(
-          `BUSCA PRECIOS REALES en tiendas online para este tipo de producto:
-  
-  Producto: "${product.title}"
-  Tipo: ${product.productType || "no especificado"}
-  Nicho/industria: ${niche}
-  Precio actual: ${currentPrice}€
-  
-  INSTRUCCIONES:
-  1. Busca en Google Shopping, Amazon España, tiendas especializadas del nicho "${niche}"
-  2. Encuentra AL MENOS 5-10 precios REALES de productos similares o competidores directos
-  3. Extrae precios concretos con decimales y la URL/fuente de cada uno
-  4. Calcula el rango de mercado real (mínimo, máximo, mediana)
-  5. Determina la posición de mercado del precio actual €${currentPrice}
-  
-  RESPONDE con este formato JSON exacto (sin texto adicional):
-  {
-    "competitorPrices": [{"source": "nombre tienda", "price": "XX.XX", "url": "URL", "productName": "nombre encontrado"}],
-    "marketPriceRange": {"min": XX.XX, "max": XX.XX, "median": XX.XX},
-    "marketPosition": "budget|mid-range|premium|luxury",
-    "pricingStrategy": "Explicación de la estrategia recomendada basada en datos reales"
-  }`,
-          `You are a pricing analyst. Search for REAL current prices of similar products online in Spain and Europe. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
-        ),
-        askGeminiWithSearch(
-          `BUSCA PRECIOS REALES DE PROVEEDORES/MAYORISTAS para fabricar o comprar al por mayor este producto:
-  
-  Producto: "${product.title}"
-  Tipo: ${product.productType || "no especificado"}
-  Nicho: ${niche}
-  
-  INSTRUCCIONES:
-  1. Busca en Alibaba, AliExpress mayorista, proveedores europeos, fabricantes del sector "${niche}"
-  2. Encuentra precios de coste/proveedor REALES para productos similares
-  3. Incluye MOQ (cantidad mínima de pedido) si está disponible
-  4. Indica el país de origen del proveedor
-  
-  RESPONDE con este formato JSON exacto:
-  {
-    "supplierPrices": [{"supplier": "nombre", "priceRange": "X.XX - X.XX €/ud", "moq": "50 unidades", "origin": "China/España/etc"}],
-    "avgSupplierCost": XX.XX,
-    "supplierInsight": "Análisis del coste de aprovisionamiento y recomendación"
-  }`,
-          `You are a supply chain analyst. Search for REAL wholesale/supplier prices for this type of product. Use Google Search to find actual B2B prices. Return ONLY valid JSON.`
-        ),
-      ]);
-  
-      if (compResult.status === "fulfilled") {
-        const jsonMatch = compResult.value.text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try { competitorResearch = { ...competitorResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
+    let researchEngine: "gemini-search" | "claude-fallback" = "gemini-search";
+
+    if (!isGeminiSearchBlocked()) {
+      try {
+        const [compResult, suppResult] = await Promise.allSettled([
+          askGeminiWithSearch(
+            `BUSCA PRECIOS REALES en tiendas online para este tipo de producto:
+
+Producto: "${product.title}"
+Tipo: ${product.productType || "no especificado"}
+Nicho/industria: ${niche}
+Precio actual: ${currentPrice}€
+
+INSTRUCCIONES:
+1. Busca en Google Shopping, Amazon España, tiendas especializadas del nicho "${niche}"
+2. Encuentra AL MENOS 5-10 precios REALES de productos similares o competidores directos
+3. Extrae precios concretos con decimales y la URL/fuente de cada uno
+4. Calcula el rango de mercado real (mínimo, máximo, mediana)
+5. Determina la posición de mercado del precio actual €${currentPrice}
+
+RESPONDE con este formato JSON exacto (sin texto adicional):
+{
+  "competitorPrices": [{"source": "nombre tienda", "price": "XX.XX", "url": "URL", "productName": "nombre encontrado"}],
+  "marketPriceRange": {"min": XX.XX, "max": XX.XX, "median": XX.XX},
+  "marketPosition": "budget|mid-range|premium|luxury",
+  "pricingStrategy": "Explicación de la estrategia recomendada basada en datos reales"
+}`,
+            `You are a pricing analyst. Search for REAL current prices of similar products online in Spain and Europe. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
+          ),
+          askGeminiWithSearch(
+            `BUSCA PRECIOS REALES DE PROVEEDORES/MAYORISTAS para fabricar o comprar al por mayor este producto:
+
+Producto: "${product.title}"
+Tipo: ${product.productType || "no especificado"}
+Nicho: ${niche}
+
+INSTRUCCIONES:
+1. Busca en Alibaba, AliExpress mayorista, proveedores europeos, fabricantes del sector "${niche}"
+2. Encuentra precios de coste/proveedor REALES para productos similares
+3. Incluye MOQ (cantidad mínima de pedido) si está disponible
+4. Indica el país de origen del proveedor
+
+RESPONDE con este formato JSON exacto:
+{
+  "supplierPrices": [{"supplier": "nombre", "priceRange": "X.XX - X.XX €/ud", "moq": "50 unidades", "origin": "China/España/etc"}],
+  "avgSupplierCost": XX.XX,
+  "supplierInsight": "Análisis del coste de aprovisionamiento y recomendación"
+}`,
+            `You are a supply chain analyst. Search for REAL wholesale/supplier prices for this type of product. Use Google Search to find actual B2B prices. Return ONLY valid JSON.`
+          ),
+        ]);
+
+        if (compResult.status === "fulfilled") {
+          const jsonMatch = compResult.value.text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { competitorResearch = { ...competitorResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
+          }
         }
-      }
-      if (suppResult.status === "fulfilled") {
-        const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try { supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
+        if (suppResult.status === "fulfilled") {
+          const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
+          }
         }
+      } catch {}
+    }
+
+    if (competitorResearch.competitorPrices.length === 0 && supplierResearch.supplierPrices.length === 0) {
+      researchEngine = "claude-fallback";
+      try {
+        const claudeResearch = await askClaudeJsonWithBrain<{
+          competitorPrices?: Array<{ source: string; price: string; url?: string; productName?: string }>;
+          marketPriceRange?: { min: number; max: number; median: number };
+          marketPosition?: string;
+          pricingStrategy?: string;
+          supplierPrices?: Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>;
+          avgSupplierCost?: number;
+          supplierInsight?: string;
+        }>(
+          projectId,
+          `Analiza precios de mercado y proveedores para: "${product.title}" (${product.productType || "no especificado"}) en el nicho "${niche}". Precio actual: €${currentPrice}. Proporciona datos REALES de competidores (al menos 5) y proveedores (al menos 3) que conozcas del sector. Incluye precios concretos y fuentes verificables.
+
+Responde con JSON: {"competitorPrices":[{"source":"tienda","price":"XX.XX","productName":"nombre"}],"marketPriceRange":{"min":X,"max":X,"median":X},"marketPosition":"mid-range","pricingStrategy":"...","supplierPrices":[{"supplier":"nombre","priceRange":"X-X €/ud","moq":"50 uds","origin":"España"}],"avgSupplierCost":X,"supplierInsight":"..."}`,
+          "Eres un analista de precios y cadena de suministro con 15 años de experiencia. Responde SOLO con JSON válido.",
+          "pricing",
+          niche,
+          8192,
+          120_000
+        );
+        if (claudeResearch) {
+          if (claudeResearch.competitorPrices?.length) {
+            competitorResearch = { ...competitorResearch, ...claudeResearch };
+          }
+          if (claudeResearch.supplierPrices?.length) {
+            supplierResearch = { ...supplierResearch, ...claudeResearch };
+          }
+        }
+      } catch (err: any) {
+        req.log?.warn?.({ err: err?.message }, "[Pricing] Claude research fallback failed");
       }
-    } catch {}
+    }
   
     const cogsTotal = cogs?.totalCogs ?? 0;
     const cogsInfo = cogs ? `COGS total calculado: €${cogsTotal}, Precio mínimo viable: €${cogs.minimumViablePrice}, Break-even: €${cogs.breakEvenPrice}` : "COGS: no configurado — usa los datos de proveedores para estimar";
@@ -476,6 +515,13 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
     if (!result.marginWarnings) result.marginWarnings = [];
     if (!result.bundleSuggestions) result.bundleSuggestions = [];
 
+    const hasRealCompetitorData = competitorResearch.competitorPrices.length > 0;
+    const hasRealSupplierData = supplierResearch.supplierPrices.length > 0;
+    const searchDataQuality: "real" | "partial" | "estimated" =
+      hasRealCompetitorData && hasRealSupplierData ? "real"
+      : hasRealCompetitorData || hasRealSupplierData ? "partial"
+      : "estimated";
+
     const ia = result.inteligencia_avanzada;
     const ltvCacAlert = ia?.ratio_ltv_cac != null && ia.ratio_ltv_cac < 3.0;
     if (ltvCacAlert) {
@@ -487,6 +533,16 @@ router.post("/projects/:projectId/products/:productId/calculate-optimal-price", 
         .set({ lastPricingRecommendation: result as Record<string, unknown>, lastCompetitorAnalysis: lastCompetitorAnalysis as Record<string, unknown> })
         .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
     }
+
+    (result as any).searchDataQuality = searchDataQuality;
+    (result as any).marketResearch = {
+      competitorPrices: competitorResearch.competitorPrices,
+      marketPriceRange: competitorResearch.marketPriceRange,
+      marketPosition: competitorResearch.marketPosition,
+      supplierPrices: supplierResearch.supplierPrices,
+      avgSupplierCost: supplierResearch.avgSupplierCost,
+      supplierInsight: supplierResearch.supplierInsight,
+    };
 
     learnFromOperation({
       operationType: "pricing_analysis",

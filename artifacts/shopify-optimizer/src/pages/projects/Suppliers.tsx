@@ -84,15 +84,9 @@ type Research = {
   createdAt: string | null;
 };
 
-const SOURCES = [
-  { label: "Google", active: true },
-  { label: "Bing", active: true },
-  { label: "DuckDuckGo", active: true },
-  { label: "Instagram", active: true },
-  { label: "Shopify Stores", active: true },
-  { label: "LinkedIn", active: false },
-  { label: "Yellow Pages", active: false },
-  { label: "URL directa", active: false },
+const SEARCH_ENGINES = [
+  { label: "Google Search (Gemini)", active: true },
+  { label: "Claude IA (fallback)", active: true },
 ];
 
 export default function Suppliers() {
@@ -114,6 +108,8 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(false);
   const [lastSummary, setLastSummary] = useState<string | null>(null);
   const [lastSources, setLastSources] = useState<string[]>([]);
+  const [lastEngine, setLastEngine] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const load = async () => {
     if (!projectId) return;
@@ -142,6 +138,8 @@ export default function Suppliers() {
     setRunning(true);
     setLastSummary(null);
     setLastSources([]);
+    setLastEngine(null);
+    setSearchError(null);
     try {
       const r = await fetch(`${API_BASE}/api/projects/${projectId}/suppliers/research`, {
         method: "POST",
@@ -153,9 +151,12 @@ export default function Suppliers() {
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       setLastSummary(j.summary ?? null);
       setLastSources(j.sources ?? []);
-      toast({ title: `${j.totalFound} proveedores reales encontrados`, description: `Búsqueda completada en ${Math.round((j.elapsedMs ?? 0) / 1000)}s` });
+      setLastEngine(j.engine ?? null);
+      const engineLabel = j.engine === "claude-fallback" ? " (vía Claude IA)" : " (vía Google Search)";
+      toast({ title: `${j.totalFound} proveedores encontrados${engineLabel}`, description: `Búsqueda completada en ${Math.round((j.elapsedMs ?? 0) / 1000)}s` });
       await load();
     } catch (err: any) {
+      setSearchError(err.message);
       toast({ title: "Error en la búsqueda", description: err.message, variant: "destructive" });
     } finally {
       setRunning(false);
@@ -337,8 +338,8 @@ export default function Suppliers() {
             {running ? "Buscando…" : "Buscar →"}
           </button>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {SOURCES.map(s => (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          {SEARCH_ENGINES.map(s => (
             <span key={s.label} style={{
               background: s.active ? "#14b8a620" : "#1e293b",
               color: s.active ? "#14b8a6" : "#64748b",
@@ -346,10 +347,26 @@ export default function Suppliers() {
               border: s.active ? "1px solid #14b8a640" : "1px solid #334155",
               fontWeight: 500,
             }}>
-              {s.active ? "✓" : "+"} {s.label}
+              {s.active ? "\u2713" : "+"} {s.label}
             </span>
           ))}
+          {lastEngine && (
+            <span style={{
+              background: lastEngine === "gemini-search" ? "#14b8a615" : "#f59e0b15",
+              color: lastEngine === "gemini-search" ? "#14b8a6" : "#f59e0b",
+              padding: "4px 10px", borderRadius: 4, fontSize: 11,
+              border: `1px solid ${lastEngine === "gemini-search" ? "#14b8a640" : "#f59e0b40"}`,
+              fontWeight: 600,
+            }}>
+              Motor usado: {lastEngine === "gemini-search" ? "Google Search" : "Claude IA"}
+            </span>
+          )}
         </div>
+        {searchError && (
+          <div style={{ marginTop: 8, padding: 10, background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, fontSize: 12, color: "#fca5a5" }}>
+            {searchError}
+          </div>
+        )}
         <LiveOperation
           active={running}
           title="Buscando proveedores reales en internet"

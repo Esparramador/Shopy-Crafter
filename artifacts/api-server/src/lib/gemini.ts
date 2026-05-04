@@ -16,6 +16,7 @@ import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
 
 let _ai: GoogleGenAI | null = null;
+let _aiDirect: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!_ai) {
@@ -24,7 +25,14 @@ function getGeminiClient(): GoogleGenAI {
     const proxyUrl  = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
 
     if (directKey) {
+      const savedGoogleKey = process.env.GOOGLE_API_KEY;
+      if (savedGoogleKey && savedGoogleKey !== directKey) {
+        delete process.env.GOOGLE_API_KEY;
+      }
       _ai = new GoogleGenAI({ apiKey: directKey });
+      if (savedGoogleKey) {
+        process.env.GOOGLE_API_KEY = savedGoogleKey;
+      }
     } else if (proxyKey && proxyUrl) {
       _ai = new GoogleGenAI({ apiKey: proxyKey, httpOptions: { apiVersion: "", baseUrl: proxyUrl } });
     } else {
@@ -34,11 +42,23 @@ function getGeminiClient(): GoogleGenAI {
   return _ai;
 }
 
+function getGeminiDirectClient(): GoogleGenAI | null {
+  const directKey = process.env.GEMINI_API_KEY;
+  if (!directKey) return null;
+  if (!_aiDirect) {
+    const savedGoogleKey = process.env.GOOGLE_API_KEY;
+    if (savedGoogleKey) delete process.env.GOOGLE_API_KEY;
+    _aiDirect = new GoogleGenAI({ apiKey: directKey });
+    if (savedGoogleKey) process.env.GOOGLE_API_KEY = savedGoogleKey;
+  }
+  return _aiDirect;
+}
+
 export function isGeminiAvailable(): boolean {
   return !!(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY));
 }
 
-const CIRCUIT_BREAKER_COOLDOWN_MS = 600_000;
+const CIRCUIT_BREAKER_COOLDOWN_MS = 60_000;
 let _searchCircuitOpen = 0;
 let _generationCircuitOpen = 0;
 
@@ -55,14 +75,34 @@ function isGeminiGenerationBlocked(): boolean {
   return _generationCircuitOpen > 0 && Date.now() - _generationCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
 }
 
+export function resetGeminiCircuitBreakers(): { search: boolean; generation: boolean } {
+  const searchWasOpen = _searchCircuitOpen > 0;
+  const genWasOpen = _generationCircuitOpen > 0;
+  _searchCircuitOpen = 0;
+  _generationCircuitOpen = 0;
+  _ai = null;
+  logger.info("[Gemini Circuit Breaker] RESET manual — search & generation desbloqueados, cliente recreado");
+  return { search: searchWasOpen, generation: genWasOpen };
+}
+
+export function getGeminiStatus(): { searchBlocked: boolean; generationBlocked: boolean; cooldownMs: number; searchBlockedSecsAgo: number; generationBlockedSecsAgo: number } {
+  return {
+    searchBlocked: isGeminiSearchBlocked(),
+    generationBlocked: isGeminiGenerationBlocked(),
+    cooldownMs: CIRCUIT_BREAKER_COOLDOWN_MS,
+    searchBlockedSecsAgo: _searchCircuitOpen > 0 ? Math.round((Date.now() - _searchCircuitOpen) / 1000) : 0,
+    generationBlockedSecsAgo: _generationCircuitOpen > 0 ? Math.round((Date.now() - _generationCircuitOpen) / 1000) : 0,
+  };
+}
+
 function tripSearchCircuit(): void {
   _searchCircuitOpen = Date.now();
-  logger.error("[Gemini Circuit Breaker] Search grounding BLOCKED (403). Returning empty results for 10 min.");
+  logger.error(`[Gemini Circuit Breaker] Search grounding BLOCKED (403). Cooldown ${CIRCUIT_BREAKER_COOLDOWN_MS / 1000}s.`);
 }
 
 function tripGenerationCircuit(): void {
   _generationCircuitOpen = Date.now();
-  logger.error("[Gemini Circuit Breaker] Generation BLOCKED (403). Falling back to Claude for 10 min.");
+  logger.error(`[Gemini Circuit Breaker] Generation BLOCKED (403). Cooldown ${CIRCUIT_BREAKER_COOLDOWN_MS / 1000}s.`);
 }
 
 // ─── Model selection (resolved through the AI registry) ──────────────────────
@@ -430,81 +470,99 @@ export async function askGeminiWithSearch(
   const EMPTY = { text: "", sources: [] as string[], queries: [] as string[] };
 
   if (isGeminiSearchBlocked()) {
-    logger.debug("[askGeminiWithSearch] Circuit breaker open — returning empty");
-    return EMPTY;
-  }
-
-  try {
-    const ai = getGeminiClient();
-
-    const fullPrompt = urlsToRead && urlsToRead.length > 0
-      ? `${prompt}\n\nURLs to read and analyze:\n${urlsToRead.slice(0, 10).join("\n")}`
-      : prompt;
-
-    const tools: Record<string, unknown>[] = [
-      {
-        googleSearch: {
-          dynamicRetrievalConfig: {
-            dynamicRetrievalThreshold: 0.0,
-          },
-        },
-      },
-    ];
-    if (urlsToRead && urlsToRead.length > 0) {
-      tools.push({ urlContext: {} });
-    }
-
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model: geminiFast(),
-        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-        config: {
-          systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
-          tools,
-          maxOutputTokens: 65_536,
-          thinkingConfig: { thinkingBudget: 8_000 },
-        },
-      }),
-      GEMINI_SEARCH_TIMEOUT,
-      `askGeminiWithSearch`
-    );
-
-    const candidate        = response.candidates?.[0];
-    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
-      logger.warn({ maxOutputTokens: 65536 }, "[Gemini Search] RESPONSE TRUNCATED — hit maxOutputTokens limit");
-    }
-
-    const groundingMeta    = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
-    const groundingChunks  = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
-    const searchQueries    = groundingMeta?.webSearchQueries as string[] | undefined;
-
-    const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
-
-    try {
-      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-      const usage = (response as any).usageMetadata ?? {};
-      const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = Number(usage.candidatesTokenCount) || 0;
-      void recordApiUsage({
-        provider: "gemini",
-        operation: "askGeminiWithSearch",
-        model: geminiFast(),
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
-        metadata: { sources: sources.length, queries: (searchQueries ?? []).length },
-      });
-    } catch { /* nunca bloquea */ }
-
-    return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
-  } catch (err) {
-    if (isPermissionDenied(err)) {
-      tripSearchCircuit();
+    const directClient = getGeminiDirectClient();
+    if (directClient) {
+      logger.info("[askGeminiWithSearch] Circuit breaker open but direct API key available — retrying with direct key");
+      _searchCircuitOpen = 0;
+    } else {
+      logger.debug("[askGeminiWithSearch] Circuit breaker open — returning empty");
       return EMPTY;
     }
-    throw err;
   }
+
+  const fullPrompt = urlsToRead && urlsToRead.length > 0
+    ? `${prompt}\n\nURLs to read and analyze:\n${urlsToRead.slice(0, 10).join("\n")}`
+    : prompt;
+
+  const tools: Record<string, unknown>[] = [
+    {
+      googleSearch: {
+        dynamicRetrievalConfig: {
+          dynamicRetrievalThreshold: 0.0,
+        },
+      },
+    },
+  ];
+  if (urlsToRead && urlsToRead.length > 0) {
+    tools.push({ urlContext: {} });
+  }
+
+  const clientsToTry: Array<{ ai: GoogleGenAI; label: string }> = [];
+  const directClient = getGeminiDirectClient();
+  if (directClient) clientsToTry.push({ ai: directClient, label: "direct-api-key" });
+  try { clientsToTry.push({ ai: getGeminiClient(), label: "default-client" }); } catch {}
+  const seen = new Set<GoogleGenAI>();
+  const uniqueClients = clientsToTry.filter(c => { if (seen.has(c.ai)) return false; seen.add(c.ai); return true; });
+
+  for (const { ai, label } of uniqueClients) {
+    try {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: geminiFast(),
+          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+          config: {
+            systemInstruction: systemInstruction ?? "You are a deep intelligence research analyst. Use Google Search to find real, current information. Read all provided URLs thoroughly. Return comprehensive, factual findings with specific data points.",
+            tools,
+            maxOutputTokens: 65_536,
+            thinkingConfig: { thinkingBudget: 8_000 },
+          },
+        }),
+        GEMINI_SEARCH_TIMEOUT,
+        `askGeminiWithSearch(${label})`
+      );
+
+      const candidate = response.candidates?.[0];
+      if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+        logger.warn({ maxOutputTokens: 65536 }, "[Gemini Search] RESPONSE TRUNCATED — hit maxOutputTokens limit");
+      }
+
+      const groundingMeta = (candidate as Record<string, unknown>)?.groundingMetadata as Record<string, unknown> | undefined;
+      const groundingChunks = groundingMeta?.groundingChunks as Array<{ web?: { uri?: string; title?: string } }> | undefined;
+      const searchQueries = groundingMeta?.webSearchQueries as string[] | undefined;
+
+      const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
+
+      try {
+        const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+        const usage = (response as any).usageMetadata ?? {};
+        const inTok = Number(usage.promptTokenCount) || 0;
+        const outTok = Number(usage.candidatesTokenCount) || 0;
+        void recordApiUsage({
+          provider: "gemini",
+          operation: "askGeminiWithSearch",
+          model: geminiFast(),
+          inputUnits: inTok,
+          outputUnits: outTok,
+          unitsLabel: "tokens",
+          costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
+          metadata: { sources: sources.length, queries: (searchQueries ?? []).length, client: label },
+        });
+      } catch {}
+
+      _searchCircuitOpen = 0;
+      logger.info({ label, sources: sources.length }, "[askGeminiWithSearch] Success");
+      return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
+    } catch (err) {
+      if (isPermissionDenied(err)) {
+        logger.warn({ label }, `[askGeminiWithSearch] 403 on ${label} — trying next client`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  tripSearchCircuit();
+  return EMPTY;
 }
 
 // ─── URL DEEP-DIVE — Gemini reads a batch of URLs and synthesizes them ─────────

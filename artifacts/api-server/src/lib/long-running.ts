@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
@@ -29,11 +29,26 @@ function isBinaryContentType(value: string | number | string[] | undefined): boo
  * every 25s to keep the connection alive — JSON parsers ignore leading
  * whitespace so the final response is unaffected.
  *
- * Skipped automatically when the handler sets a binary Content-Type
- * (PDF, ZIP, XLSX, images, etc.) — for those, only the no-buffering and
- * no-compression headers are applied so the bytes flow through unchanged.
+ * DUAL MODE: Works as both direct call `enableLongRunning(res)` AND as
+ * Express middleware `router.post("/path", enableLongRunning, handler)`.
+ * Detects which mode by checking if the first argument has `setHeader`.
  */
-export function enableLongRunning(res: Response): LongRunningHandle {
+export function enableLongRunning(resOrReq: Response | Request, resOrNext?: Response | NextFunction, next?: NextFunction): LongRunningHandle {
+  let res: Response;
+  if (typeof (resOrReq as any).setHeader === "function" && !resOrNext) {
+    res = resOrReq as Response;
+  } else if (resOrNext && typeof (resOrNext as any).setHeader === "function") {
+    res = resOrNext as Response;
+    const handle = _applyLongRunning(res);
+    if (typeof next === "function") next();
+    return handle;
+  } else {
+    res = resOrReq as Response;
+  }
+  return _applyLongRunning(res);
+}
+
+function _applyLongRunning(res: Response): LongRunningHandle {
   // Disable gzip/brotli for this response so heartbeat whitespace is not
   // buffered by the compression middleware (the upstream proxy needs to see
   // bytes within ~60s or it kills the socket and the client gets a 502).

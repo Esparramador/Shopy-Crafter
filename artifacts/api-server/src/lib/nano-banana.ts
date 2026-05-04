@@ -23,7 +23,7 @@ const MODEL_REPLICATE = "google/nano-banana";
 // (invalid key, no permission), all subsequent requests skip Gemini for
 // `GEMINI_COOLDOWN_MS` to avoid wasting latency on every call. Quota / 5xx
 // failures are NOT cached because they're transient.
-const GEMINI_COOLDOWN_MS = 10 * 60_000;
+const GEMINI_COOLDOWN_MS = 60_000;
 let _geminiCooldownUntil = 0;
 let _geminiCooldownReason = "";
 

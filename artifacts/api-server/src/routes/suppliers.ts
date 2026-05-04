@@ -2,12 +2,12 @@ import { Router } from "express";
 import { db, projectsTable, suppliersResearchTable, supplierEntriesTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiWithSearch, isGeminiSearchBlocked, resetGeminiCircuitBreakers, getGeminiStatus } from "../lib/gemini.js";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { recordApiUsage } from "../lib/api-usage.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { requireProjectAccess } from "../lib/access.js";
 import { getReportShell } from "./exports.js";
-import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -147,28 +147,62 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
 }`;
 
       const t0 = Date.now();
-      const { text: aiText, sources, queries } = await askGeminiWithSearch(
-        userPrompt,
-        "Eres un investigador B2B. Responde SIEMPRE con JSON estricto y datos verificables. Si no encuentras un dato, omite el campo en lugar de inventarlo.",
-      );
+      let aiText = "";
+      let sources: string[] = [];
+      let queries: string[] = [];
+      let searchEngine: "gemini-search" | "claude-fallback" = "gemini-search";
+
+      if (!isGeminiSearchBlocked()) {
+        const geminiResult = await askGeminiWithSearch(
+          userPrompt,
+          "Eres un investigador B2B. Responde SIEMPRE con JSON estricto y datos verificables. Si no encuentras un dato, omite el campo en lugar de inventarlo.",
+        );
+        aiText = geminiResult.text;
+        sources = geminiResult.sources;
+        queries = geminiResult.queries;
+      }
+
+      const geminiParsed = safeJsonParse<{ summary?: string; suppliers?: SupplierJson[] }>(aiText);
+      const geminiSuppliers = Array.isArray(geminiParsed?.suppliers) ? geminiParsed!.suppliers : [];
+
+      if (geminiSuppliers.length === 0) {
+        searchEngine = "claude-fallback";
+        try {
+          req.log.info("[Suppliers] Gemini sin resultados — fallback a Claude");
+          const claudeResult = await askClaudeJsonWithBrain<{ summary?: string; suppliers?: SupplierJson[] }>(
+            projectIdNum,
+            userPrompt + `\n\nIMPORTANTE: Proporciona proveedores REALES que conozcas. Incluye empresas verificables con webs reales. Marca en "notes" que la info debe verificarse. Prioriza proveedores establecidos y conocidos del sector.`,
+            "Eres un consultor B2B experto con 15 años de experiencia. Responde SOLO con JSON válido con la estructura exacta: {\"summary\":\"...\",\"suppliers\":[...]}. Proporciona proveedores reales conocidos, priorizando los más establecidos y verificables.",
+            "supplier_research",
+            effectiveNiche || undefined,
+            8192,
+            120_000
+          );
+          req.log.info({ claudeResultType: typeof claudeResult, hasSuppliers: !!(claudeResult as any)?.suppliers }, "[Suppliers] Claude respondió");
+          aiText = JSON.stringify(claudeResult);
+          sources = [];
+          queries = [];
+        } catch (claudeErr: any) {
+          req.log.error({ err: claudeErr?.message || claudeErr }, "[Suppliers] Claude fallback falló");
+          res.status(502).json({
+            error: "Gemini bloqueado (403) y Claude también falló. Reintenta en unos segundos.",
+            engine: searchEngine,
+            detail: claudeErr?.message?.slice(0, 200) || "unknown",
+          });
+          return;
+        }
+      }
       const elapsedMs = Date.now() - t0;
 
       const parsed = safeJsonParse<{ summary?: string; suppliers?: SupplierJson[] }>(aiText);
       const suppliers = Array.isArray(parsed?.suppliers) ? parsed!.suppliers : [];
 
       if (suppliers.length === 0) {
-        const { isGeminiSearchBlocked } = await import("../lib/gemini.js");
-        if (isGeminiSearchBlocked()) {
-          res.status(503).json({
-            error: "El motor de búsqueda de proveedores no está disponible temporalmente. Intenta de nuevo en unos minutos.",
-            retryable: true,
-          });
-        } else {
-          res.status(502).json({
-            error: "No se encontraron proveedores válidos. Intenta una búsqueda más específica.",
-            rawPreview: aiText.slice(0, 400),
-          });
-        }
+        res.status(502).json({
+          error: "No se encontraron proveedores válidos. Intenta una búsqueda más específica.",
+          rawPreview: aiText.slice(0, 400),
+          engine: searchEngine,
+        });
         return;
       }
 
@@ -193,30 +227,34 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
           const productsOffered = Array.isArray(s.productsOffered)
             ? s.productsOffered.join(" | ")
             : (typeof s.productsOffered === "string" ? s.productsOffered : null);
+          const str = (v: unknown, max: number): string | null => {
+            if (v == null) return null;
+            return String(v).slice(0, max) || null;
+          };
           return {
             id: randomUUID(),
             researchId,
             projectId: projectIdText,
-            name: s.name.slice(0, 180),
-            category: s.category?.slice(0, 100) ?? null,
-            country: s.country?.slice(0, 80) ?? null,
-            region: s.region?.slice(0, 80) ?? null,
+            name: String(s.name).slice(0, 180),
+            category: str(s.category, 100),
+            country: str(s.country, 80),
+            region: str(s.region, 80),
             website: safeHttpUrl(s.website)?.slice(0, 400) ?? null,
-            contactEmail: s.contactEmail?.slice(0, 200) ?? null,
-            contactPhone: s.contactPhone?.slice(0, 80) ?? null,
+            contactEmail: str(s.contactEmail, 200),
+            contactPhone: str(s.contactPhone, 80),
             productsOffered: productsOffered?.slice(0, 1000) ?? null,
-            priceRangeMin: typeof s.priceRangeMin === "number" ? s.priceRangeMin : null,
-            priceRangeMax: typeof s.priceRangeMax === "number" ? s.priceRangeMax : null,
-            currency: s.currency?.slice(0, 8) ?? "EUR",
-            moq: s.moq?.slice(0, 80) ?? null,
-            leadDays: s.leadDays?.slice(0, 80) ?? null,
-            paymentTerms: s.paymentTerms?.slice(0, 200) ?? null,
+            priceRangeMin: typeof s.priceRangeMin === "number" ? s.priceRangeMin : (typeof s.priceRangeMin === "string" ? parseFloat(s.priceRangeMin) || null : null),
+            priceRangeMax: typeof s.priceRangeMax === "number" ? s.priceRangeMax : (typeof s.priceRangeMax === "string" ? parseFloat(s.priceRangeMax) || null : null),
+            currency: str(s.currency, 8) ?? "EUR",
+            moq: str(s.moq, 80),
+            leadDays: str(s.leadDays, 80),
+            paymentTerms: str(s.paymentTerms, 200),
             shipsInternationally: s.shipsInternationally ? 1 : 0,
-            certifications: s.certifications?.slice(0, 200) ?? null,
+            certifications: str(s.certifications, 200),
             score: typeof s.score === "number" ? Math.max(0, Math.min(100, Math.round(s.score))) : null,
-            source: "gemini-search",
+            source: searchEngine,
             sourceUrl: safeHttpUrl(s.sourceUrl)?.slice(0, 400) ?? null,
-            notes: s.notes?.slice(0, 600) ?? null,
+            notes: str(s.notes, 600),
             starred: 0,
           };
         });
@@ -255,6 +293,7 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
         sources,
         queries,
         elapsedMs,
+        engine: searchEngine,
       });
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : "Internal server error";
@@ -435,5 +474,14 @@ router.post(
     }
   },
 );
+
+router.get("/gemini/status", async (_req, res): Promise<void> => {
+  res.json(getGeminiStatus());
+});
+
+router.post("/gemini/reset", async (_req, res): Promise<void> => {
+  const result = resetGeminiCircuitBreakers();
+  res.json({ ok: true, ...result, message: "Circuit breakers reseteados. Gemini desbloqueado." });
+});
 
 export default router;

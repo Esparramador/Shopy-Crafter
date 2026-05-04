@@ -322,7 +322,8 @@ router.post(
 );
 
 // ─── Generate (pipeline completo, long-running) ─────────────────────────────
-router.post("/cards/:id/generate", requireAdmin, enableLongRunning, async (req: Request, res: Response) => {
+router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Response) => {
+  enableLongRunning(res);
   const id = parseInt(String(req.params.id), 10);
   const overrideBgModel = s(req.body?.backgroundModel);
 

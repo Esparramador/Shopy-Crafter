@@ -918,8 +918,11 @@ function ForecastSection({ projectId }: { projectId: number }) {
   const [loading, setLoading] = useState(false);
   const [months, setMonths] = useState(12);
 
+  const [forecastError, setForecastError] = useState<string | null>(null);
+
   const loadForecast = async () => {
     setLoading(true);
+    setForecastError(null);
     try {
       const res = await fetch(`${API_BASE}/api/projects/${projectId}/financial-forecast`, {
         method: "POST",
@@ -927,7 +930,13 @@ function ForecastSection({ projectId }: { projectId: number }) {
         credentials: "include",
         body: JSON.stringify({ months }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
       setForecast(await res.json());
+    } catch (err: any) {
+      setForecastError(err.message || "Error generando forecast");
     } finally {
       setLoading(false);
     }
@@ -966,6 +975,13 @@ function ForecastSection({ projectId }: { projectId: number }) {
         ]}
         estimatedSec={30}
       />
+
+      {forecastError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-300 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          {forecastError}
+        </div>
+      )}
 
       {forecast && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
