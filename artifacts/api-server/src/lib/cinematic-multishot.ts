@@ -519,7 +519,13 @@ export async function generateCinematicScript(
   // ── Real project context (brand voice, niche, recent vault assets) ─────
   const projectCtx = await buildProjectContextSnippet(req.projectId);
 
-  const sys = `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.`;
+  let narrativeFlowHint = "";
+  try {
+    const { getNarrativeFlowSummary } = await import("./advertising-playbook-kb.js");
+    narrativeFlowHint = `\n\nFLUJO NARRATIVO IDEAL PARA VÍDEOS DE PRODUCTO (úsalo como guía para la estructura de escenas cuando el número de escenas lo permita):\n${getNarrativeFlowSummary()}\nAdapta este flujo al número de escenas solicitado — si hay menos de 7 escenas, combina o prioriza los pasos más impactantes (hook, exploded/deconstruction, try-on, CTA).`;
+  } catch { /* not critical */ }
+
+  const sys = `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.${narrativeFlowHint}`;
 
   const prompt = `Genera el guion multi-shot para un anuncio de ${totalSec} segundos del producto "${req.productName}" de la marca "${req.brand}".
 

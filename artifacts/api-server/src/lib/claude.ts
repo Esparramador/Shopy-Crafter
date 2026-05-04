@@ -638,6 +638,32 @@ export async function buildShopyBrainContext(
       }
     }
 
+    const isVideoTask = useCase === "images" || useCase === "campaign_production" || useCase === "redesign" || useCase === "exploded_view" || useCase === "generator";
+    if (isVideoTask) {
+      try {
+        const { getPlaybookSummary, getNarrativeFlowSummary } = await import("./advertising-playbook-kb.js");
+        const { getCampaignProductionSummary } = await import("./campaign-production-kb.js");
+        const { getExplodedViewSummary } = await import("./exploded-view-kb.js");
+        const pbSummary = getPlaybookSummary();
+        const cpSummary = getCampaignProductionSummary();
+        const evSummary = getExplodedViewSummary();
+        lines.push("\n🎬 KNOWLEDGE BASES ESTÁTICAS DISPONIBLES (producción de video profesional):");
+        lines.push(`  Advertising Playbook: ${pbSummary.campaignTypeCount} tipos de campaña, ${pbSummary.ugcArchetypeCount} arquetipos UGC, ${pbSummary.masterFormulaComponentCount} componentes Master Formula, ${pbSummary.narrativeStepCount} pasos narrativos, ${pbSummary.clipTypeTemplateCount} templates por tipo de clip, ${pbSummary.platformPromptRecipeCount} recetas por plataforma`);
+        lines.push(`  Campaign Production: ${cpSummary.totalVideos} vídeos, ${cpSummary.totalUgcClips} micro-clips UGC, ${cpSummary.characterVariants} variantes de personaje, ${cpSummary.deliverables} entregables`);
+        lines.push(`  Exploded View Studio: ${evSummary.totalGlobalStates} GLOBAL STATE templates, ${evSummary.totalSequences} secuencias de prompt, ${evSummary.totalProductPresets} presets de producto`);
+        lines.push(`  Flujo narrativo ideal: ${getNarrativeFlowSummary()}`);
+      } catch { /* static KBs not critical — continue */ }
+    }
+
+    if (useCase === "pricing" || useCase === "cogs_estimation" || useCase === "financial") {
+      try {
+        const { getCogsMethodologySummary } = await import("./cogs-methodology-kb.js");
+        const cogsSummary = getCogsMethodologySummary();
+        lines.push("\n📊 COGS METHODOLOGY KB:");
+        lines.push(`  ${cogsSummary.pillarCount} pilares, ${cogsSummary.hiddenCostCategoryCount} categorías de costes ocultos, ${cogsSummary.tcoComponentCount} componentes TCO, ${cogsSummary.calculationStepCount} pasos de cálculo`);
+      } catch { /* not critical */ }
+    }
+
     lines.push("━━━ FIN CONTEXTO SHOPYBRAIN (base: 46,000+ insights OmniCore) ━━━");
     return lines.join("\n");
   } catch {

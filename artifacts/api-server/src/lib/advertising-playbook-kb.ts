@@ -652,6 +652,162 @@ export const CAMPAIGN_EXAMPLES: CampaignExample[] = [
     resultMetrics: "23% higher AOV, 38% lower return rate, 4.1x ROAS across all platforms" },
 ];
 
+// ───────────────────────────────────────────────────────────────────────────
+// 13. PRODUCT VIDEO NARRATIVE FLOW — 7-step ideal video structure
+// ───────────────────────────────────────────────────────────────────────────
+// Crystallized from: UGC Style Philosophy, Pollo.ai Production Flow,
+// Omneky/Seedance 2.0 best practices, and professional ad deconstruction.
+//
+// This defines the NARRATIVE ARC for a complete product video ad — each step
+// is a clip TYPE with its own visual language, camera work, and prompt DNA.
+// Different from PRODUCTION_WORKFLOW (which is the process you follow);
+// this is the STORY STRUCTURE the final video follows on screen.
+
+export type ClipType = "ugc_intro" | "deconstruction" | "exploded_view" | "assembly" | "virtual_tryon" | "macro_closeup" | "cta";
+
+export interface NarrativeStep {
+  step: number;
+  clipType: ClipType;
+  name: string;
+  spanishName: string;
+  purpose: string;
+  durationSecRange: [number, number];
+  cameraLanguage: string;
+  lightingProfile: string;
+  promptDna: string;
+  transitionIn: string;
+  audioStrategy: string;
+}
+
+export const PRODUCT_VIDEO_NARRATIVE: NarrativeStep[] = [
+  { step: 1, clipType: "ugc_intro", name: "UGC Hook Intro", spanishName: "Intro UGC con gancho",
+    purpose: "Presenter introduces the product with authentic energy — grabs attention in first 2 seconds",
+    durationSecRange: [5, 8],
+    cameraLanguage: "handheld smartphone selfie angle, slight natural shake, eye-level framing",
+    lightingProfile: "natural window light, warm 5600K, no artificial setup visible",
+    promptDna: "6-second vertical video in realistic UGC vlog style, natural lighting, slight handheld camera feel. [PRESENTER] speaking directly to camera with perfect lip sync, authentic excited expression, holding [PRODUCT] visible in frame. Warm, trustworthy energy. High quality, natural skin texture.",
+    transitionIn: "cold open (no transition)",
+    audioStrategy: "direct voice-over, no music, raw authentic feel" },
+  { step: 2, clipType: "deconstruction", name: "Product Deconstruction", spanishName: "Deconstrucción del producto",
+    purpose: "Product breaks apart revealing materials, layers, and engineering — builds credibility through transparency",
+    durationSecRange: [6, 10],
+    cameraLanguage: "static locked-off camera, zero drift, fixed focal point on product center of mass",
+    lightingProfile: "dark studio, single key light 45° above, rim light from behind, volumetric haze",
+    promptDna: "Product centered on dark matte surface, components begin separating along precise vertical and horizontal axes, each layer lifts revealing internal materials and construction. Dramatic volumetric lighting, slow controlled separation, rigid body physics — no morphing, no melting. Static locked-off camera. Studio-grade render, 8K photorealistic detail on every component surface.",
+    transitionIn: "golden_light_wipe or particle_burst",
+    audioStrategy: "subtle mechanical ASMR sounds (clicks, snaps), deep bass undertone" },
+  { step: 3, clipType: "exploded_view", name: "Exploded View Suspension", spanishName: "Vista explosionada en suspensión",
+    purpose: "All components float in zero-gravity showing internal engineering — the 'wow' moment that drives shares",
+    durationSecRange: [6, 10],
+    cameraLanguage: "slow orbit 15°/sec around product center, or probe lens push-through between components",
+    lightingProfile: "dark void background, edge-lit components with colored rim lights matching brand palette, subtle caustics",
+    promptDna: "All product components suspended in zero-gravity arrangement, each piece floating at precise distances showing internal engineering and material quality. Slow orbital camera revealing hidden details between layers. Edge lighting on each component, dark void background, dust motes catching light between pieces. Ultra-macro detail on material textures. Laowa probe lens aesthetic. No morphing, rigid mechanical precision.",
+    transitionIn: "continuous from deconstruction (same camera, components drift apart further)",
+    audioStrategy: "ethereal ambient pad, sparse metallic resonance, builds tension" },
+  { step: 4, clipType: "assembly", name: "Satisfying Assembly", spanishName: "Ensamblaje satisfactorio",
+    purpose: "Components magnetically reassemble — creates satisfying 'click' moment and demonstrates build quality",
+    durationSecRange: [5, 8],
+    cameraLanguage: "reverse orbit or static wide, components converge toward center with easing",
+    lightingProfile: "transitioning from dark studio to warmer product-hero lighting, golden key light emerging",
+    promptDna: "All floating components begin converging back toward center with magnetic precision, each piece snapping into exact position with satisfying mechanical accuracy. Reverse of exploded view — assembly follows precise engineering order (internal first, shell last). Golden light burst on final click. Smooth ease-in-out kinetic curves, rigid body physics. Camera slowly pushes in as product becomes whole.",
+    transitionIn: "continuous from exploded view (reverse motion)",
+    audioStrategy: "rising tonal sweep, satisfying mechanical clicks on each snap, musical resolution on final assembly" },
+  { step: 5, clipType: "virtual_tryon", name: "Virtual Try-On / In-Context", spanishName: "Prueba virtual / En contexto",
+    purpose: "Product shown on a person or in its natural use environment — bridges the gap between desire and ownership",
+    durationSecRange: [5, 8],
+    cameraLanguage: "tracking shot following model, or slow push-in on product in lifestyle setting",
+    lightingProfile: "golden hour natural light, warm and aspirational, soft shadows",
+    promptDna: "Product worn/used by [MODEL DESCRIPTION] in aspirational lifestyle context. Natural movement showing fit, drape, texture, and real-world scale. Golden hour lighting through windows, candid documentary style. Same product from previous scenes — consistent colors, materials, and proportions. IP-Adapter character lock for model consistency. Authentic but elevated lifestyle photography aesthetic.",
+    transitionIn: "soft_dissolve or golden_beam",
+    audioStrategy: "warm lifestyle music enters, voice-over describes transformation/benefit" },
+  { step: 6, clipType: "macro_closeup", name: "Macro Detail Close-Up", spanishName: "Macro detalle primer plano",
+    purpose: "Ultra-close textures, stitching, materials — proves premium quality at microscopic level",
+    durationSecRange: [4, 6],
+    cameraLanguage: "macro probe lens, extreme close-up pulling focus across surface details, 1:1 to 5:1 magnification",
+    lightingProfile: "directional raking light revealing surface texture, shallow DOF, bokeh background",
+    promptDna: "Extreme macro close-up of product surface details — visible material grain, stitching precision, finish quality, hardware weight. Laowa probe lens perspective at 2:1 magnification. Shallow depth of field with creamy bokeh. Raking light from 15° angle revealing every texture fiber and surface imperfection that proves authenticity. Slow rack focus across multiple detail zones. Shot on RED Komodo, 8K.",
+    transitionIn: "push-in from previous scene continues into macro",
+    audioStrategy: "ASMR texture sounds (fabric rustle, metal tap), voice-over highlights craftsmanship" },
+  { step: 7, clipType: "cta", name: "Brand CTA Finale", spanishName: "CTA final de marca",
+    purpose: "Clean brand moment with call to action — converts attention into action",
+    durationSecRange: [4, 6],
+    cameraLanguage: "slow pull-back to hero wide shot, or gentle orbit settling to rest",
+    lightingProfile: "premium product-hero lighting, clean background, brand colors in accent lights",
+    promptDna: "Product hero shot on clean premium surface, perfect lighting revealing the complete assembled product in its best angle. Slow gentle camera settle to final resting position. Clean composition with space for text overlay zones (top 20% and bottom 20% kept clear). Premium advertising quality, studio-grade color science. No text in generation — brand overlays added in post.",
+    transitionIn: "orbit_fade or golden_beam",
+    audioStrategy: "music resolves to final chord, voice-over delivers CTA line, 1-second silence at end" },
+];
+
+export interface ClipTypePromptTemplate {
+  clipType: ClipType;
+  name: string;
+  spanishName: string;
+  universalTemplate: string;
+  requiredTokens: string[];
+  forbiddenTokens: string[];
+  qualityBoosters: string[];
+  productPlaceholder: string;
+}
+
+export const CLIP_TYPE_PROMPT_TEMPLATES: ClipTypePromptTemplate[] = [
+  { clipType: "ugc_intro", name: "UGC Style Intro", spanishName: "Intro estilo UGC",
+    universalTemplate: "6-second vertical video in realistic UGC vlog style, natural lighting, slight handheld camera feel, authentic talking-head aesthetic. {PRESENTER_DESCRIPTION} speaking directly to camera with perfect lip sync, mouth moves naturally and exactly in sync with the voice. Holding {PRODUCT_NAME} visible in frame. {EMOTION} tone, {BACKGROUND}. High quality, natural skin texture, photorealistic.",
+    requiredTokens: ["perfect lip sync", "natural lighting", "UGC vlog style", "speaking directly to camera"],
+    forbiddenTokens: ["text overlay", "logo generation", "watermark", "cinematic studio"],
+    qualityBoosters: ["natural skin texture", "photorealistic", "high quality", "authentic vlog feel"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "deconstruction", name: "Hyper-Detailed Deconstruction", spanishName: "Deconstrucción hiper-detallada",
+    universalTemplate: "{PRODUCT_NAME} centered on dark matte surface under dramatic studio lighting, components begin separating along precise axes revealing {MATERIAL_COUNT} internal layers. {LAYER_1_DESC} lifts first, then {LAYER_2_DESC} detaches laterally, revealing {INTERNAL_DESC}. Static locked-off camera, zero drift. Rigid body physics — no morphing, no melting, no organic deformation. Each component maintains exact original proportions. Volumetric light rays between separating pieces. 8K photorealistic, shot on RED, studio-grade product photography.",
+    requiredTokens: ["static locked-off camera", "rigid body physics", "no morphing", "precise axes"],
+    forbiddenTokens: ["morphing", "melting", "organic deformation", "text", "watermark"],
+    qualityBoosters: ["8K photorealistic", "volumetric light", "studio-grade", "shot on RED"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "exploded_view", name: "Zero-Gravity Exploded View", spanishName: "Vista explosionada gravedad cero",
+    universalTemplate: "All components of {PRODUCT_NAME} suspended in zero-gravity arrangement against dark void background. {COMPONENT_COUNT} pieces floating at calibrated distances showing internal engineering. Slow orbital camera at 15°/sec. Edge lighting on each component with {BRAND_COLOR_1} and {BRAND_COLOR_2} rim accents. Dust motes and micro-particles catching light between floating pieces. Laowa probe lens aesthetic. No morphing, absolute structural stability. Ultra-macro detail on material surfaces. 8K, octane render quality.",
+    requiredTokens: ["zero-gravity", "static or slow orbit", "no morphing", "edge lighting", "probe lens"],
+    forbiddenTokens: ["morphing", "text", "UI overlay", "organic blending"],
+    qualityBoosters: ["octane render", "8K", "Laowa probe lens", "dust motes", "volumetric shadows"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "assembly", name: "Magnetic Assembly Sequence", spanishName: "Secuencia de ensamblaje magnético",
+    universalTemplate: "All {COMPONENT_COUNT} floating components of {PRODUCT_NAME} begin converging back toward center with magnetic precision. Internal components snap first ({INTERNAL_DESC}), then structural shell assembles ({SHELL_DESC}), final exterior click ({FINAL_CLICK_DESC}). Reverse engineering order. Golden light burst on each snap point. Smooth ease-in-out kinetic curves, rigid body physics. Camera slowly pushes in as product becomes whole. Satisfying mechanical precision. Studio lighting transitions from cold edge-lit to warm hero lighting.",
+    requiredTokens: ["magnetic precision", "rigid body physics", "ease-in-out", "snap", "golden light burst"],
+    forbiddenTokens: ["morphing", "melting", "text generation", "watermark"],
+    qualityBoosters: ["satisfying mechanical", "golden light burst", "studio-grade", "engineering precision"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "virtual_tryon", name: "Virtual Try-On / Lifestyle", spanishName: "Prueba virtual / Estilo de vida",
+    universalTemplate: "6-second vertical video, {MODEL_DESCRIPTION} wearing/using {PRODUCT_NAME} in {LIFESTYLE_CONTEXT}. Natural movement showing fit, drape, texture, and real-world scale. Golden hour lighting, {BACKGROUND}. Same product identity from previous scenes — consistent colors, materials, proportions. Candid street photography aesthetic, authentic but elevated. IP-Adapter character lock for model consistency. High quality, natural skin texture.",
+    requiredTokens: ["natural movement", "golden hour", "character lock", "consistent identity"],
+    forbiddenTokens: ["text overlay", "logo generation", "watermark", "studio backdrop"],
+    qualityBoosters: ["candid photography", "natural skin texture", "golden hour", "lifestyle context"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "macro_closeup", name: "Macro Texture Detail", spanishName: "Detalle macro de textura",
+    universalTemplate: "Extreme macro close-up of {PRODUCT_NAME} surface details at 2:1 magnification. Visible {TEXTURE_DESC}: material grain, stitching precision, finish quality, hardware weight. Laowa probe lens perspective. Shallow depth of field f/2.8, creamy bokeh background. Raking light from 15° angle revealing every texture fiber. Slow rack focus across {DETAIL_ZONE_1} to {DETAIL_ZONE_2}. Shot on RED Komodo, 8K resolution, photorealistic material rendering.",
+    requiredTokens: ["macro", "probe lens", "shallow depth of field", "raking light", "rack focus"],
+    forbiddenTokens: ["text", "watermark", "wide shot", "full product visible"],
+    qualityBoosters: ["RED Komodo", "8K", "Laowa probe lens", "2:1 magnification", "photorealistic"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+  { clipType: "cta", name: "Brand CTA Finale", spanishName: "Finale CTA de marca",
+    universalTemplate: "{PRODUCT_NAME} in hero position on clean {SURFACE_DESC} surface, {HERO_LIGHTING}. Slow gentle camera settle to final resting position. Clean composition — top 20% and bottom 20% of frame kept clear for post-production text overlays. Premium advertising quality, {BRAND_COLOR_1} accent lighting. No text in generation. Studio-grade color science, broadcast-ready.",
+    requiredTokens: ["hero position", "clean composition", "no text in generation", "text-safe zones"],
+    forbiddenTokens: ["generated text", "logo generation", "watermark", "busy background"],
+    qualityBoosters: ["broadcast-ready", "studio-grade color science", "premium advertising", "clean composition"],
+    productPlaceholder: "{PRODUCT_NAME}" },
+];
+
+export function composeNarrativePrompt(clipType: ClipType, vars: Record<string, string>): string {
+  const tpl = CLIP_TYPE_PROMPT_TEMPLATES.find(t => t.clipType === clipType);
+  if (!tpl) return "";
+  let result = tpl.universalTemplate;
+  for (const [key, val] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), val);
+  }
+  return result;
+}
+
+export function getNarrativeFlowSummary() {
+  return PRODUCT_VIDEO_NARRATIVE.map(s => `${s.step}. ${s.name} (${s.spanishName}) — ${s.durationSecRange[0]}-${s.durationSecRange[1]}s — ${s.purpose.slice(0, 80)}`).join("\n");
+}
+
 export function getPlaybookSummary() {
   return {
     brandDnaPillarCount: BRAND_DNA_FRAMEWORK.length,
@@ -666,6 +822,8 @@ export function getPlaybookSummary() {
     quickResearchStepCount: QUICK_RESEARCH_METHOD.length,
     platformPromptRecipeCount: PLATFORM_PROMPT_RECIPES.length,
     campaignExampleCount: CAMPAIGN_EXAMPLES.length,
+    narrativeStepCount: PRODUCT_VIDEO_NARRATIVE.length,
+    clipTypeTemplateCount: CLIP_TYPE_PROMPT_TEMPLATES.length,
   };
 }
 
@@ -683,5 +841,7 @@ export function getFullPlaybook() {
     aiVideoTools: AI_VIDEO_TOOLS,
     platformPromptRecipes: PLATFORM_PROMPT_RECIPES,
     campaignExamples: CAMPAIGN_EXAMPLES,
+    productVideoNarrative: PRODUCT_VIDEO_NARRATIVE,
+    clipTypePromptTemplates: CLIP_TYPE_PROMPT_TEMPLATES,
   };
 }

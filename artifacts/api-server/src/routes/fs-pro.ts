@@ -50,14 +50,19 @@ import {
   getFullPlaybook,
   composeCampaignBrief,
   compose6SecClipPrompt,
+  composeNarrativePrompt,
+  getNarrativeFlowSummary,
   BRAND_DNA_FRAMEWORK,
   CAMPAIGN_TYPES,
   UGC_ARCHETYPES,
   MASTER_PROMPT_FORMULA,
   MICRO_CLIP_METHOD,
   PRODUCTION_WORKFLOW,
+  PRODUCT_VIDEO_NARRATIVE,
+  CLIP_TYPE_PROMPT_TEMPLATES,
   type CampaignObjective,
   type UgcIndustry,
+  type ClipType,
 } from "../lib/advertising-playbook-kb.js";
 import {
   getCogsMethodologySummary,
@@ -795,6 +800,44 @@ router.post("/fs-pro/advertising-playbook/compose-clip", requireAdmin, (req, res
     res.json({ ok: true, prompt });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "compose clip failed" });
+  }
+});
+
+// ─── Narrative Flow + Clip-Type Templates ────────────────────────────────
+//   GET  /api/fs-pro/advertising-playbook/narrative-flow     → 7-step video narrative
+//   GET  /api/fs-pro/advertising-playbook/clip-templates     → prompt templates per clip type
+//   POST /api/fs-pro/advertising-playbook/compose-narrative  → compose prompt for clip type
+// ───────────────────────────────────────────────────────────────────────────
+
+router.get("/fs-pro/advertising-playbook/narrative-flow", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, narrativeFlow: PRODUCT_VIDEO_NARRATIVE, summary: getNarrativeFlowSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "narrative flow read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/clip-templates", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, clipTemplates: CLIP_TYPE_PROMPT_TEMPLATES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "clip templates read failed" });
+  }
+});
+
+router.post("/fs-pro/advertising-playbook/compose-narrative", requireAdmin, (req, res) => {
+  try {
+    const { clipType, variables } = (req.body || {}) as { clipType?: ClipType; variables?: Record<string, string> };
+    if (!clipType) {
+      res.status(400).json({ error: "clipType requerido (ugc_intro|deconstruction|exploded_view|assembly|virtual_tryon|macro_closeup|cta)" }); return;
+    }
+    const prompt = composeNarrativePrompt(clipType, variables || {});
+    if (!prompt) {
+      res.status(404).json({ error: `clipType '${clipType}' no encontrado` }); return;
+    }
+    res.json({ ok: true, clipType, prompt });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "compose narrative failed" });
   }
 });
 
