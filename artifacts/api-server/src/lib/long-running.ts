@@ -32,6 +32,9 @@ function isBinaryContentType(value: string | number | string[] | undefined): boo
  * DUAL MODE: Works as both direct call `enableLongRunning(res)` AND as
  * Express middleware `router.post("/path", enableLongRunning, handler)`.
  * Detects which mode by checking if the first argument has `setHeader`.
+ *
+ * IMPORTANT: Patches res.json/res.status so they work correctly even after
+ * heartbeat has already sent headers (status 200 + Content-Type: application/json).
  */
 export function enableLongRunning(resOrReq: Response | Request, resOrNext?: Response | NextFunction, next?: NextFunction): LongRunningHandle {
   let res: Response;
@@ -49,35 +52,66 @@ export function enableLongRunning(resOrReq: Response | Request, resOrNext?: Resp
 }
 
 function _applyLongRunning(res: Response): LongRunningHandle {
-  // Disable gzip/brotli for this response so heartbeat whitespace is not
-  // buffered by the compression middleware (the upstream proxy needs to see
-  // bytes within ~60s or it kills the socket and the client gets a 502).
   res.setHeader("X-No-Compression", "1");
   res.setHeader("X-Accel-Buffering", "no");
   res.setHeader("Connection", "keep-alive");
 
+  // Pre-set JSON Content-Type so heartbeat can flush " " bytes safely.
+  // Routes that produce binary output MUST set their Content-Type BEFORE
+  // calling enableLongRunning() so this guard skips the JSON default.
+  if (!res.getHeader("Content-Type")) {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+  }
+
   let stopped = false;
+
+  const originalJson = res.json.bind(res);
+  const originalStatus = res.status.bind(res);
+
+  (res as any).json = function patchedJson(body: any) {
+    if (res.headersSent) {
+      try {
+        const payload = JSON.stringify(body);
+        res.write(payload);
+        res.end();
+      } catch {
+        res.end();
+      }
+      return res;
+    }
+    return originalJson(body);
+  };
+
+  (res as any).status = function patchedStatus(code: number) {
+    if (res.headersSent) {
+      return res;
+    }
+    return originalStatus(code);
+  };
 
   const interval = setInterval(() => {
     if (stopped || res.writableEnded || res.destroyed || !res.writable) {
       clearInterval(interval);
       return;
     }
-    // Skip heartbeat if the handler is sending binary content — a stray space
-    // would corrupt PDFs/ZIPs/images. The proxy timeout still resets on the
-    // first real chunk written, so binaries up to the proxy's idle limit work.
-    if (isBinaryContentType(res.getHeader("Content-Type"))) {
+    const ct = res.getHeader("Content-Type");
+    // Skip heartbeat for binary responses entirely (corrupts download).
+    if (isBinaryContentType(ct)) {
       clearInterval(interval);
       return;
     }
-    if (res.headersSent) {
-      try {
-        res.write(" ");
-        const flushFn = (res as unknown as { flush?: () => void }).flush;
-        if (typeof flushFn === "function") flushFn.call(res);
-      } catch {
-        clearInterval(interval);
-      }
+    // Defer heartbeat if Content-Type isn't set yet — sending " " would
+    // commit headers without proper content type. Wait for the route to
+    // either set JSON CT or finish naturally.
+    if (!ct) {
+      return;
+    }
+    try {
+      res.write(" ");
+      const flushFn = (res as unknown as { flush?: () => void }).flush;
+      if (typeof flushFn === "function") flushFn.call(res);
+    } catch {
+      clearInterval(interval);
     }
   }, HEARTBEAT_INTERVAL_MS);
 

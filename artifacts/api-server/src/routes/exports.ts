@@ -5211,6 +5211,7 @@ PRESTASHOP:
 
 import { generateCogsXlsx, generateSupplierComparisonXlsx, generateFinancialSummaryXlsx } from "../lib/xlsx-generator.js";
 import { generateExecutivePptx } from "../lib/pptx-generator.js";
+import { generateExecutiveDocx } from "../lib/docx-generator.js";
 import { analyzeDeadCosts } from "../lib/dead-costs.js";
 
 router.get("/projects/:projectId/exports/cogs-xlsx", async (req, res) => {
@@ -5389,6 +5390,9 @@ router.get("/projects/:projectId/exports/financial-xlsx", async (req, res) => {
 });
 
 router.get("/projects/:projectId/exports/executive-pptx", async (req, res) => {
+  // Pre-set binary Content-Type BEFORE enableLongRunning so heartbeat skips
+  // (sending " " bytes would corrupt the .pptx download).
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
   enableLongRunning(res);
   try {
     const projectId = parseInt(req.params.projectId, 10);
@@ -5476,6 +5480,98 @@ router.get("/projects/:projectId/exports/executive-pptx", async (req, res) => {
     res.send(buf);
   } catch (e: any) {
     logger.error({ err: e }, "Error generating executive PPTX");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/projects/:projectId/exports/executive-docx", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(String(c.shopifyProductId), c);
+
+    let totalRevenue = 0, totalCogs = 0, totalOrders = 0;
+    const productList: Array<{ title: string; price: number; totalCogs: number; marginPct: number }> = [];
+
+    for (const p of products) {
+      const price = Number(p.price) || 0;
+      totalRevenue += price;
+      const c = cogsMap.get(String(p.shopifyProductId));
+      let cd: Record<string, any> = {};
+      try { cd = c?.costData ? (typeof c.costData === "string" ? JSON.parse(c.costData) : c.costData) : {}; } catch { cd = {}; }
+      const n = (k: string) => parseFloat(cd[k]) || 0;
+      const cogs = n("unitCost") + n("materialCost") + n("packagingCost") + n("shippingCostDomestic") + n("shippingCostInternational") + n("fulfillmentFee") + (price * n("shopifyPaymentFee")) + n("cac");
+      totalCogs += cogs;
+      const margin = price > 0 ? ((price - cogs) / price) * 100 : 0;
+      productList.push({ title: p.title || "Sin título", price, totalCogs: cogs, marginPct: margin });
+    }
+
+    try {
+      const snapResult = await db.execute(sql`
+        SELECT total_orders FROM revenue_snapshots 
+        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+      `);
+      const rows = (snapResult as any).rows || [];
+      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
+    } catch { totalOrders = products.length; }
+
+    const grossProfit = totalRevenue - totalCogs;
+    const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
+    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+
+    const alerts: string[] = [];
+    if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes urgente");
+    const lowMarginProducts = productList.filter(p => p.marginPct < 15);
+    if (lowMarginProducts.length > 0) alerts.push(`${lowMarginProducts.length} productos con margen < 15% — riesgo de pérdida con devoluciones`);
+    if (aov < 20) alerts.push("Ticket medio (AOV) muy bajo — considerar bundles o upselling");
+
+    let deadCosts: { totalDeadCost: number; items: Array<{ title: string; cost: number; reason: string }> } | undefined;
+    try {
+      const dc = await analyzeDeadCosts(projectId);
+      if (dc.items.length > 0) {
+        deadCosts = {
+          totalDeadCost: dc.totalDeadCost,
+          items: dc.items.map(i => ({ title: i.title, cost: i.cost, reason: i.reason })),
+        };
+      }
+    } catch {}
+
+    const recommendations: string[] = [];
+    if (grossMarginPct < 40) recommendations.push("Renegociar contratos con proveedores principales para reducir COGS mínimo un 5%");
+    if (lowMarginProducts.length > 0) recommendations.push(`Revisar precios de ${lowMarginProducts.length} productos con margen inferior al 15%`);
+    if (deadCosts && deadCosts.totalDeadCost > 100) recommendations.push(`Eliminar €${deadCosts.totalDeadCost} en costes muertos identificados`);
+    recommendations.push("Implementar pricing dinámico basado en estacionalidad y demanda");
+    recommendations.push("Diversificar canales de adquisición para reducir CAC");
+
+    const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
+    const buf = await generateExecutiveDocx({
+      projectName,
+      domain: project.shopDomain || "—",
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalCogs: Math.round(totalCogs * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      grossMarginPct,
+      totalOrders,
+      aov,
+      productCount: products.length,
+      products: productList,
+      alerts,
+      recommendations,
+      deadCosts,
+    });
+
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="Ejecutivo_${safeName}.docx"`);
+    res.send(buf);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating executive DOCX");
     if (!res.headersSent) res.status(500).json({ error: e.message });
   }
 });

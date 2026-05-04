@@ -27,6 +27,14 @@ An extensible `IPlatformConnector` abstraction layer supports Shopify, PrestaSho
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Advanced Financial Intelligence provides break-even units, LTV 12-month estimation, LTV/CAC ratio, supply chain risk assessment, and defensive moat strategy, all powered by Claude. A/B Testing tracks visitors only on visit events. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, Gallery, and Multi-Platform Video Generation (11 models).
 
+### Long-Running Endpoint Heartbeat (`lib/long-running.ts`)
+`enableLongRunning(res)` keeps the Replit proxy connection alive on slow AI calls (>60s) by writing a single space character every 25 seconds. It pre-sets `Content-Type: application/json` so heartbeat bytes are safely ignored by JSON parsers (leading whitespace), and patches `res.json()`/`res.status()` to gracefully fall back to `res.write()`+`res.end()` when headers have already been sent by the heartbeat. **Binary download routes (PPTX/XLSX/DOCX/ZIP/PDF) MUST set their binary `Content-Type` BEFORE calling `enableLongRunning(res)`** — the helper detects the binary CT and skips heartbeat entirely (otherwise " " bytes would corrupt the download). Currently only `/exports/executive-pptx` uses this pattern; other binary exports complete fast enough to not need the helper.
+
+### Pricing Endpoints (Optimized for Speed + Resilience)
+Both AI-pricing endpoints minimize Claude calls to fit within heartbeat-protected windows:
+- **`/products/:id/ai-estimate-cogs`**: When all COGS fields are empty (typical first-run), Gemini Search is attempted; on 403/failure, a SINGLE unified Claude call performs classification + supplier research + cost estimation. Result: ~95s end-to-end with `unitCost`, `confidence`, `dataQuality`, and `productClassification`.
+- **`/products/:id/calculate-optimal-price`**: Embeds market research instructions directly in the main pricing prompt (eliminating a separate Claude research call). Uses `max_tokens: 6144` with explicit "máx N chars" hints on string fields to prevent JSON truncation. Result: ~37–60s with full margin waterfall, LTV, breakeven units, and bundle suggestions.
+
 ### Cinematic Ad Templates & Knowledge Bases
 A permanent in-platform library of 6 master cinematic ad templates with structured segments and configuration. Five knowledge base modules cover Cinematic, Advertising Playbook, Campaign Production, Exploded View, and COGS Methodology. All KB data is exposed via REST endpoints and injected into `buildShopyBrainContext` for relevant AI tasks, with query-aware injection.
 

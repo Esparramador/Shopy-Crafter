@@ -10,7 +10,7 @@ import {
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX" | "CSS" | "PPTX";
+type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX" | "CSS" | "PPTX" | "DOCX";
 
 interface ExportOption {
   id: string;
@@ -323,6 +323,16 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       endpoint: `/api/projects/${projectId}/exports/executive-pptx`,
       format: "PPTX" as ExportFormat,
       color: "#B71C1C",
+      category: "reports" as const,
+    },
+    {
+      id: "executive-docx",
+      title: "Informe Ejecutivo (Word)",
+      description: "Documento Word profesional con portada, KPIs financieros, tabla COGS por producto, costes muertos, alertas y recomendaciones. Listo para editar y personalizar.",
+      icon: <FileText className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/executive-docx`,
+      format: "DOCX" as ExportFormat,
+      color: "#2B579A",
       category: "reports" as const,
     },
     {

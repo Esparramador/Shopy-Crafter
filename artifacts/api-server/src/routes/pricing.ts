@@ -389,96 +389,44 @@ RESPONDE con este formato JSON exacto:
       } catch {}
     }
 
+    const cogsTotal = cogs?.totalCogs ?? 0;
+    const cogsInfo = cogs ? `COGS total calculado: €${cogsTotal}, Precio mínimo viable: €${cogs.minimumViablePrice}, Break-even: €${cogs.breakEvenPrice}` : "COGS: no configurado — estima basándote en tu conocimiento del nicho";
+
     if (competitorResearch.competitorPrices.length === 0 && supplierResearch.supplierPrices.length === 0) {
       researchEngine = "claude-fallback";
-      try {
-        const claudeResearch = await askClaudeJsonWithBrain<{
-          competitorPrices?: Array<{ source: string; price: string; url?: string; productName?: string }>;
-          marketPriceRange?: { min: number; max: number; median: number };
-          marketPosition?: string;
-          pricingStrategy?: string;
-          supplierPrices?: Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>;
-          avgSupplierCost?: number;
-          supplierInsight?: string;
-        }>(
-          projectId,
-          `Analiza precios de mercado y proveedores para: "${product.title}" (${product.productType || "no especificado"}) en el nicho "${niche}". Precio actual: €${currentPrice}. Proporciona datos REALES de competidores (al menos 5) y proveedores (al menos 3) que conozcas del sector. Incluye precios concretos y fuentes verificables.
-
-Responde con JSON: {"competitorPrices":[{"source":"tienda","price":"XX.XX","productName":"nombre"}],"marketPriceRange":{"min":X,"max":X,"median":X},"marketPosition":"mid-range","pricingStrategy":"...","supplierPrices":[{"supplier":"nombre","priceRange":"X-X €/ud","moq":"50 uds","origin":"España"}],"avgSupplierCost":X,"supplierInsight":"..."}`,
-          "Eres un analista de precios y cadena de suministro con 15 años de experiencia. Responde SOLO con JSON válido.",
-          "pricing",
-          niche,
-          8192,
-          120_000
-        );
-        if (claudeResearch) {
-          if (claudeResearch.competitorPrices?.length) {
-            competitorResearch = { ...competitorResearch, ...claudeResearch };
-          }
-          if (claudeResearch.supplierPrices?.length) {
-            supplierResearch = { ...supplierResearch, ...claudeResearch };
-          }
-        }
-      } catch (err: any) {
-        req.log?.warn?.({ err: err?.message }, "[Pricing] Claude research fallback failed");
-      }
     }
-  
-    const cogsTotal = cogs?.totalCogs ?? 0;
-    const cogsInfo = cogs ? `COGS total calculado: €${cogsTotal}, Precio mínimo viable: €${cogs.minimumViablePrice}, Break-even: €${cogs.breakEvenPrice}` : "COGS: no configurado — usa los datos de proveedores para estimar";
-  
+
     const competitorDataStr = competitorResearch.competitorPrices.length > 0
-      ? `PRECIOS REALES DE COMPETIDORES (datos de mercado actual):\n${competitorResearch.competitorPrices.map(c => `  - ${c.source}: €${c.price} ${c.productName ? `(${c.productName})` : ""} ${c.url ? `[${c.url}]` : ""}`).join("\n")}\n  Rango de mercado: €${competitorResearch.marketPriceRange.min} - €${competitorResearch.marketPriceRange.max} (mediana: €${competitorResearch.marketPriceRange.median})\n  Posición actual en mercado: ${competitorResearch.marketPosition}`
-      : "Sin datos de competidores disponibles — estima basándote en tu conocimiento del nicho";
-  
+      ? `PRECIOS REALES DE COMPETIDORES:\n${competitorResearch.competitorPrices.map(c => `  - ${c.source}: €${c.price} ${c.productName ? `(${c.productName})` : ""}`).join("\n")}\n  Rango: €${competitorResearch.marketPriceRange.min}-${competitorResearch.marketPriceRange.max} (mediana: €${competitorResearch.marketPriceRange.median})`
+      : "";
+
     const supplierDataStr = supplierResearch.supplierPrices.length > 0
-      ? `PRECIOS REALES DE PROVEEDORES:\n${supplierResearch.supplierPrices.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""} ${s.origin ? `[${s.origin}]` : ""}`).join("\n")}\n  Coste medio proveedor: €${supplierResearch.avgSupplierCost}\n  Insight: ${supplierResearch.supplierInsight}`
-      : "Sin datos de proveedores disponibles";
-  
-    const prompt = `Calcula el precio óptimo para el producto "${product.title}" de la tienda "${project.name}".
-  
-  ${cogsInfo}
-  
-  ${competitorDataStr}
-  
-  ${supplierDataStr}
-  
-  CONTEXTO DE LA TIENDA:
-  Nicho: ${niche}
-  Audiencia: ${project.targetAudience ?? "adultos"}
-  Tono de marca: ${project.brandTone ?? "profesional"}
-  Mercados: ${project.storeMarkets ?? "España"}
-  Precio actual: €${currentPrice}
-  
-  REGLAS CRÍTICAS DE PRICING:
-  - El precio DEBE ser COHERENTE con los datos reales de mercado encontrados
-  - NO pongas precios irrisorios (demasiado bajos destruyen percepción de valor)
-  - NO pongas precios inflados sin justificación (mata conversión)
-  - El precio debe posicionar el producto correctamente según la calidad y el nicho
-  - Si la mediana de mercado es €X, el precio óptimo debe estar justificado respecto a esa mediana
-  - Margen mínimo viable: 30% sobre COGS para cubrir operaciones
-  - Si el precio actual difiere mucho del mercado, explica POR QUÉ y sugiere cambio gradual
-  
-  Calcula:
-  1. Precio matemáticamente óptimo para máximo profit (basado en datos REALES)
-  2. Precio psicológico para máxima conversión (charm pricing: .99, .95, etc.)
-  3. Compare_at_price (30% más alto mínimo, psicológico para anclar)
-  4. Estrategia recomendada (posicionamiento vs competencia)
-  5. Waterfall de márgenes (desglose de cada €1 de revenue)
-  6. Advertencias de margen si hay riesgo
-  7. Sugerencias de bundle para aumentar AOV
-  8. Proyección de revenue mensual estimado
-  9. Análisis comparativo: tu precio actual vs mediana de mercado vs precio sugerido
-  10. Impacto estimado del cambio de precio en ventas
-  11. INTELIGENCIA AVANZADA — calcula estos KPIs financieros críticos:
-      a) Punto de equilibrio en unidades: ¿cuántas unidades hay que vender al precio óptimo para cubrir TODOS los costes fijos mensuales estimados?
-      b) LTV estimado 12 meses: valor de vida del cliente a 12 meses asumiendo frecuencia de recompra típica del nicho "${niche}" (ej: moda = 2.5x/año, electrónica = 1.2x/año, consumibles = 6x/año). Multiplica AOV × frecuencia × 12/12.
-      c) Ratio LTV/CAC: divide el LTV entre el CAC (${cogs ? `CAC actual: €${cogs.cac ?? 0}` : "estima un CAC razonable para el nicho"}). REGLA CRÍTICA: si el ratio es INFERIOR a 3.0, es una ALERTA ROJA — el negocio está quemando dinero en adquisición y debe optimizar urgentemente retención o reducir CAC.
-      d) Riesgo cadena de suministro: evalúa Alto/Medio/Bajo basándote en: dependencia de un solo proveedor, origen geográfico, volatilidad de materias primas, MOQ, lead times.
-      e) Estrategia foso defensivo (Economic Moat): describe cómo este producto/marca puede evitar ser copiado en 6 meses. Considera: marca, patentes, comunidad, coste de cambio, network effects, datos propietarios.
-  
-  Devuelve JSON con: optimalPrice (number), psychologicalPrice (number), compareAtPrice (number), recommendedStrategy (string), marginWaterfall (objeto con: revenue, platformFees, cogs, packaging, shipping, returns, marketing, overhead, netMargin, netMarginPct), reasoning (string en español detallado), marginWarnings (array strings), bundleSuggestions (array strings), monthlyRevenueProjection (number|null), competitorAnalysis (string — resumen de datos encontrados), supplierAnalysis (string — resumen de costes proveedor), priceImpactEstimate (objeto con: currentPrice, suggestedPrice, expectedSalesChange (string), expectedRevenueChange (string), confidenceLevel (string)), inteligencia_avanzada (objeto con: punto_de_equilibrio_unidades (number), ltv_estimado_12_meses (number), ratio_ltv_cac (number), riesgo_cadena_suministro (string — "Alto|Medio|Bajo - explicación detallada"), estrategia_foso_defensivo (string — texto estratégico sobre cómo evitar ser copiado a los 6 meses)).`;
-  
+      ? `PROVEEDORES:\n${supplierResearch.supplierPrices.map(s => `  - ${s.supplier}: ${s.priceRange}`).join("\n")}\n  Coste medio: €${supplierResearch.avgSupplierCost}`
+      : "";
+
+    const researchBlock = researchEngine === "claude-fallback"
+      ? `NO hay datos de búsqueda en tiempo real disponibles. USA tu conocimiento experto del nicho "${niche}" para:
+1. Estimar al menos 5 precios de competidores similares que conozcas
+2. Estimar costes de proveedores del sector
+3. Indicar fuentes verificables cuando sea posible`
+      : `${competitorDataStr}\n${supplierDataStr}`;
+
+    const prompt = `Calcula el precio óptimo para "${product.title}" de "${project.name}".
+
+${cogsInfo}
+
+${researchBlock}
+
+CONTEXTO: Nicho: ${niche}, Audiencia: ${project.targetAudience ?? "adultos"}, Tono: ${project.brandTone ?? "profesional"}, Mercados: ${project.storeMarkets ?? "España"}, Precio actual: €${currentPrice}
+
+REGLAS: Precio coherente con mercado. No irrisorio ni inflado. Margen mín 30% sobre COGS.
+
+Calcula: 1) Precio óptimo 2) Psicológico (.99/.95) 3) Compare_at_price (+30% mín) 4) Estrategia 5) Waterfall márgenes 6) Warnings 7) Bundles 8) Revenue proyectado 9) Comparativa 10) Impacto 11) Inteligencia avanzada: punto equilibrio, LTV 12m (recompra típica nicho ${niche}), LTV/CAC (${cogs ? `CAC: €${cogs.cac ?? 0}` : "estima CAC"}), riesgo cadena suministro, foso defensivo.
+
+JSON: {optimalPrice, psychologicalPrice, compareAtPrice, recommendedStrategy(máx 200 chars), marginWaterfall:{revenue,platformFees,cogs,packaging,shipping,returns,marketing,overhead,netMargin,netMarginPct}, reasoning(máx 500 chars español), marginWarnings:[], bundleSuggestions:[], monthlyRevenueProjection, competitorAnalysis(máx 300 chars), supplierAnalysis(máx 200 chars), priceImpactEstimate:{currentPrice,suggestedPrice,expectedSalesChange,expectedRevenueChange,confidenceLevel}, inteligencia_avanzada:{punto_de_equilibrio_unidades,ltv_estimado_12_meses,ratio_ltv_cac,riesgo_cadena_suministro:"Alto|Medio|Bajo - breve",estrategia_foso_defensivo:"máx 200 chars"}}
+
+CRÍTICO: Mantén TODOS los strings cortos y concisos. Responde SOLO JSON válido.`;
+
     let result;
     try {
       result = await askClaudeJsonWithBrain<{
@@ -496,7 +444,7 @@ Responde con JSON: {"competitorPrices":[{"source":"tienda","price":"XX.XX","prod
           riesgo_cadena_suministro: string;
           estrategia_foso_defensivo: string;
         };
-      }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", niche, 8192);
+      }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", niche, 6144);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       res.status(500).json({ error: `Error calculando precio óptimo: ${msg}` });
@@ -759,254 +707,189 @@ router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (
     const productType = product.productType || "producto general";
     const niche = project.storeNiche || "e-commerce";
   
+    const researchWarnings: string[] = [];
     let productClassification = {
       category: "physical" as string,
       manufacturingMethod: "unknown" as string,
       estimatedWeight: "500g" as string,
       materialComposition: [] as string[],
       shippingCategory: "standard" as string,
-      searchTerms: {
-        material: product.title,
-        shipping: "paquete pequeño",
-        supplier: product.title,
-        packaging: `Packaging ecommerce para ${productType} España precios`,
-      },
     };
-  
-    try {
-      const classResult = await askClaudeJsonWithBrain<{
-        category: string;
-        manufacturingMethod: string;
-        estimatedWeight: string;
-        estimatedDimensions: string;
-        materialComposition: string[];
-        complexityLevel: string;
-        isFragile: boolean;
-        shippingCategory: string;
-        specificSearchQueries: {
-          materialSearch: string;
-          shippingSearch: string;
-          supplierSearch: string;
-          packagingSearch: string;
-        };
-      }>(projectId,
-        `Clasifica este producto para estimar costes de producción:
-         Título: "${product.title}"
-         Descripción: "${(product.bodyHtml ?? "").replace(/<[^>]+>/g, " ").slice(0, 1500)}"
-         Tipo: "${productType}"
-         Vendor: "${product.vendor}"
-         Precio: €${product.price}
-         ${shopifyDetails}
-         
-         RESPONDE con JSON:
-         {
-           "category": "physical|digital|service|subscription",
-           "manufacturingMethod": "handmade|3d_printed|injection_molded|textile|assembled|wholesale_resale|dropship|print_on_demand|food|cosmetic|electronic|artisan|jewellery|paper_print",
-           "estimatedWeight": "Xg o Xkg",
-           "estimatedDimensions": "largo x ancho x alto cm",
-           "materialComposition": ["material1", "material2"],
-           "complexityLevel": "simple|medium|complex|very_complex",
-           "isFragile": false,
-           "shippingCategory": "standard|oversized|fragile|hazmat|cold_chain",
-           "specificSearchQueries": {
-             "materialSearch": "la query EXACTA para buscar en Google los materiales de este producto con precios",
-             "shippingSearch": "la query EXACTA para buscar tarifas de envío para este tipo/peso de producto",
-             "supplierSearch": "la query EXACTA para buscar proveedores/fabricantes de este tipo de producto",
-             "packagingSearch": "la query EXACTA para buscar packaging específico para este producto"
-           }
-         }`,
-        "You are a manufacturing and supply chain expert. Classify this product for cost estimation. Return ONLY valid JSON.",
-        "cogs_estimation",
-        niche,
-        2048, 30_000
-      );
-  
-      productClassification = {
-        ...productClassification,
-        ...classResult,
-        searchTerms: {
-          material: classResult.specificSearchQueries?.materialSearch ?? product.title,
-          shipping: classResult.specificSearchQueries?.shippingSearch ?? "envío paquete ecommerce",
-          supplier: classResult.specificSearchQueries?.supplierSearch ?? product.title,
-          packaging: classResult.specificSearchQueries?.packagingSearch ?? `Packaging ecommerce para ${productType} España precios`,
-        },
-      };
-    } catch (err) {
-      // Classification failed — use defaults
-    }
-  
+
     let materialResearch = { materials: [] as Array<{ material: string; priceRange: string; source: string; url?: string }>, avgMaterialCost: 0, insight: "" };
     let shippingResearch = { carriers: [] as Array<{ carrier: string; domestic: string; international: string; source: string }>, insight: "" };
     let supplierResearch = { suppliers: [] as Array<{ supplier: string; priceRange: string; moq?: string; origin?: string; url?: string }>, avgCost: 0, insight: "" };
     let packagingResearch = { items: [] as Array<{ item: string; pricePerUnit: number; source: string }>, totalPackagingCost: 0, insight: "" };
-    const researchWarnings: string[] = [];
-  
-    if (!isGeminiSearchBlocked()) {
+
+    const geminiBlocked = isGeminiSearchBlocked();
+
+    if (!geminiBlocked) {
       try {
+        const searchTitle = `${product.title} ${productType}`;
         const [matResult, shipResult, suppResult, packResult] = await Promise.allSettled([
-          askGeminiWithSearch(
-            `${productClassification.searchTerms.material}\n\nBusca PRECIOS REALES en: AliExpress, Amazon, proveedores industriales España.\nMateriales necesarios: ${productClassification.materialComposition.join(", ") || "detectar del tipo de producto"}.\nMétodo fabricación: ${productClassification.manufacturingMethod}.\n\nJSON: { "materials": [{"material": "", "priceRange": "€", "source": "", "url": ""}], \n"avgMaterialCost": 0, "insight": "" }`,
-            "Supply chain cost analyst. Search for REAL prices. ONLY JSON."
-          ),
-          askGeminiWithSearch(
-            `${productClassification.searchTerms.shipping}\n\nPeso estimado: ${productClassification.estimatedWeight}.\nCategoría envío: ${productClassification.shippingCategory}.\nBusca tarifas 2025-2026 de: Correos Express, SEUR, MRW, Nacex, GLS, DHL.\nPara envío NACIONAL España y a EUROPA.\n\nJSON: { "carriers": [{"carrier": "", "domestic": "€", "international": "€", "source": ""}], \n"insight": "", "recommendedCarrier": "" }`,
-            "Logistics analyst. Current Spanish carrier rates. ONLY JSON."
-          ),
-          askGeminiWithSearch(
-            `${productClassification.searchTerms.supplier}\n\nBusca en Alibaba, AliExpress mayorista, fabricantes españoles de ${niche}.\nMétodo: ${productClassification.manufacturingMethod}.\n\nJSON: { "suppliers": [{"supplier": "", "priceRange": "€/ud", "moq": "", "origin": "", "url": ""}], \n"avgCost": 0, "insight": "" }`,
-            "Manufacturing sourcing analyst. REAL supplier prices. ONLY JSON."
-          ),
-          askGeminiWithSearch(
-            `${productClassification.searchTerms.packaging}\n\nBusca en: rajapack.es, uline, amazon.es cajas envío, kartox.com.\nIncluir: caja, relleno protector, cinta, etiqueta, bolsa.\nProducto: ${productClassification.shippingCategory === "fragile" ? "FRÁGIL — necesita protección extra" : "estándar"}.\n\nJSON: { "items": [{"item": "", "pricePerUnit": 0, "source": ""}], \n"totalPackagingCost": 0, "insight": "" }`,
-            "Packaging procurement analyst. ONLY JSON."
-          ),
+          askGeminiWithSearch(`"${searchTitle}" materiales coste producción precios España\n\nJSON: {"materials":[{"material":"","priceRange":"€","source":""}],"avgMaterialCost":0,"insight":""}`, "Supply chain cost analyst. ONLY JSON."),
+          askGeminiWithSearch(`envío ecommerce España paquete tarifas SEUR Correos MRW 2025\n\nJSON: {"carriers":[{"carrier":"","domestic":"€","international":"€","source":""}],"insight":""}`, "Logistics analyst. ONLY JSON."),
+          askGeminiWithSearch(`"${searchTitle}" proveedor mayorista fabricante precio\n\nJSON: {"suppliers":[{"supplier":"","priceRange":"€/ud","moq":"","origin":""}],"avgCost":0,"insight":""}`, "Sourcing analyst. ONLY JSON."),
+          askGeminiWithSearch(`packaging ecommerce caja envío España precio\n\nJSON: {"items":[{"item":"","pricePerUnit":0,"source":""}],"totalPackagingCost":0,"insight":""}`, "Packaging analyst. ONLY JSON."),
         ]);
 
-        if (matResult.status === "fulfilled") {
-          try {
-            const jsonMatch = matResult.value.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) materialResearch = { ...materialResearch, ...JSON.parse(jsonMatch[0]) };
-          } catch { researchWarnings.push("Error parseando datos de materiales de Google Search"); }
-        } else { researchWarnings.push("Búsqueda de materiales falló: " + (matResult.status === "rejected" ? String(matResult.reason) : "desconocido")); }
-
-        if (shipResult.status === "fulfilled") {
-          try {
-            const jsonMatch = shipResult.value.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) shippingResearch = { ...shippingResearch, ...JSON.parse(jsonMatch[0]) };
-          } catch { researchWarnings.push("Error parseando datos de envío de Google Search"); }
-        } else { researchWarnings.push("Búsqueda de tarifas de envío falló"); }
-
-        if (suppResult.status === "fulfilled") {
-          try {
-            const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) };
-          } catch { researchWarnings.push("Error parseando datos de proveedores de Google Search"); }
-        } else { researchWarnings.push("Búsqueda de proveedores falló"); }
-
-        if (packResult.status === "fulfilled") {
-          try {
-            const jsonMatch = packResult.value.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) packagingResearch = { ...packagingResearch, ...JSON.parse(jsonMatch[0]) };
-          } catch { researchWarnings.push("Error parseando datos de packaging de Google Search"); }
-        } else { researchWarnings.push("Búsqueda de packaging falló"); }
-      } catch (e) { researchWarnings.push("Error general en investigación de mercado: " + (e instanceof Error ? e.message : "desconocido")); }
+        const parseGemini = (r: PromiseSettledResult<{ text: string }>) => {
+          if (r.status !== "fulfilled") return null;
+          const m = r.value.text.match(/\{[\s\S]*\}/);
+          return m ? JSON.parse(m[0]) : null;
+        };
+        try { const d = parseGemini(matResult); if (d) materialResearch = { ...materialResearch, ...d }; } catch {}
+        try { const d = parseGemini(shipResult); if (d) shippingResearch = { ...shippingResearch, ...d }; } catch {}
+        try { const d = parseGemini(suppResult); if (d) supplierResearch = { ...supplierResearch, ...d }; } catch {}
+        try { const d = parseGemini(packResult); if (d) packagingResearch = { ...packagingResearch, ...d }; } catch {}
+      } catch {}
     }
 
     const allCogsEmpty = materialResearch.materials.length === 0 && shippingResearch.carriers.length === 0 && supplierResearch.suppliers.length === 0 && packagingResearch.items.length === 0;
-    if (allCogsEmpty) {
-      researchWarnings.push("Gemini Search no disponible — usando Claude como motor de investigación");
-      try {
-        const cogsClaudeRes = await askClaudeJsonWithBrain<{
-          materials?: Array<{ material: string; priceRange: string; source: string }>;
-          avgMaterialCost?: number;
-          carriers?: Array<{ carrier: string; domestic: string; international: string; source: string }>;
-          shippingInsight?: string;
-          suppliers?: Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>;
-          avgSupplierCost?: number;
-          packaging?: Array<{ item: string; pricePerUnit: number; source: string }>;
-          totalPackagingCost?: number;
-        }>(
-          projectId,
-          `Estima costes de producción para "${product.title}" (${product.productType || "producto"}, nicho: ${niche}).
-Fabricación: ${productClassification.manufacturingMethod}. Materiales: ${productClassification.materialComposition.join(", ") || "estándar"}.
-Peso: ${productClassification.estimatedWeight}. Envío: ${productClassification.shippingCategory}.
 
-Responde JSON: {"materials":[{"material":"x","priceRange":"€X-Y","source":"proveedor"}],"avgMaterialCost":X,"carriers":[{"carrier":"SEUR","domestic":"€X","international":"€X","source":"web"}],"shippingInsight":"...","suppliers":[{"supplier":"x","priceRange":"€X/ud","moq":"50","origin":"España"}],"avgSupplierCost":X,"packaging":[{"item":"caja","pricePerUnit":X,"source":"rajapack"}],"totalPackagingCost":X}`,
-          "Experto en costes de producción, logística y sourcing con 15 años de experiencia. Responde SOLO JSON válido.",
-          "pricing",
-          niche,
-          8192,
-          120_000
-        );
-        if (cogsClaudeRes) {
-          if (cogsClaudeRes.materials?.length) materialResearch = { ...materialResearch, materials: cogsClaudeRes.materials, avgMaterialCost: cogsClaudeRes.avgMaterialCost ?? 0, insight: "Datos estimados vía Claude" };
-          if (cogsClaudeRes.carriers?.length) shippingResearch = { ...shippingResearch, carriers: cogsClaudeRes.carriers, insight: cogsClaudeRes.shippingInsight ?? "Datos estimados vía Claude" };
-          if (cogsClaudeRes.suppliers?.length) supplierResearch = { ...supplierResearch, suppliers: cogsClaudeRes.suppliers, avgCost: cogsClaudeRes.avgSupplierCost ?? 0, insight: "Datos estimados vía Claude" };
-          if (cogsClaudeRes.packaging?.length) packagingResearch = { ...packagingResearch, items: cogsClaudeRes.packaging, totalPackagingCost: cogsClaudeRes.totalPackagingCost ?? 0, insight: "Datos estimados vía Claude" };
-        }
-      } catch (err: any) {
-        researchWarnings.push("Claude COGS fallback también falló: " + (err?.message ?? "desconocido"));
+    if (allCogsEmpty) {
+      researchWarnings.push(geminiBlocked ? "Modo rápido — clasificación + investigación + estimación unificada vía Claude" : "Gemini Search falló — usando estimación unificada vía Claude");
+
+      const unifiedPrompt = `Eres un experto en costes de producción, logística, fabricación, materiales, envíos e impuestos con 20 años de experiencia.
+
+PRODUCTO A ANALIZAR:
+- Título: "${product.title}"
+- Descripción: "${(product.bodyHtml ?? "").replace(/<[^>]+>/g, " ").slice(0, 800)}"
+- Precio de venta: €${product.price || "sin configurar"}
+- Tipo: ${productType}
+- Vendor: ${product.vendor || "sin definir"}
+- Tags: ${product.tags || "ninguno"}
+- Tienda: "${project.name}" (Nicho: ${niche})
+- Mercados: ${project.storeMarkets || "España"}
+${shopifyDetails}
+
+TAREA: Clasifica el producto Y calcula TODOS los costes en UNA sola respuesta.
+
+Proporciona DOS escenarios:
+1. "ownEquipment" — Producción propia (taller/equipos propios)
+2. "externalService" — Servicio externo (fabricación externalizada)
+
+Para CADA escenario estima (€/unidad): unitCost, materialCost, fabricCost, printingCost, screenPrintingCost, moldAmortization, assemblyCost, laborCostPerUnit, qualityControlCost, packagingCost, labelCost, shippingCostDomestic, shippingCostInternational, fulfillmentFee, warehouseCostPerUnit, customsDuty, insuranceCost, returnRate (decimal), returnProcessingCost, shopifyPaymentFee (decimal 0.029), shopifyPlanCostPerOrder, paymentProcessingFee, platformCommission, cac, affiliateFee, digitalMarketingCost, influencerCostPerUnit, seoCostPerUnit, vatRate (0.21), corporateTaxRate (0.25), consultingFee, legalCostPerUnit, aiApiCostPerUnit, designCostPerUnit, overheadPerUnit
+
+JSON: {
+  "classification": {"category":"physical|digital|service","manufacturingMethod":"...","estimatedWeight":"Xg","materialComposition":["mat1"],"shippingCategory":"standard|fragile"},
+  "ownEquipment": {todos los campos numéricos},
+  "externalService": {todos los campos numéricos},
+  "reasoning": "explicación detallada en español",
+  "shippingBreakdown": [{"carrier":"SEUR","domestic":4.5,"international":12,"estimatedWeight":"500g"}],
+  "materialBreakdown": [{"material":"x","costPerUnit":1.5,"notes":"...","source":"estimación experta"}],
+  "supplierOptions": [{"name":"x","unitCost":5,"moq":"50","origin":"España"}],
+  "productionMethod": "...",
+  "colorComplexity": "simple|medium|complex",
+  "confidenceLevel": "high|medium|low",
+  "dataQuality": "estimated",
+  "realSourcesCount": 0
+}
+
+Responde SOLO el JSON válido.`;
+
+      let estimated;
+      try {
+        estimated = await askClaudeJsonWithBrain<{
+          classification?: { category: string; manufacturingMethod: string; estimatedWeight: string; materialComposition: string[]; shippingCategory: string };
+          ownEquipment: Record<string, number>;
+          externalService: Record<string, number>;
+          reasoning: string;
+          shippingBreakdown: Array<{ carrier: string; domestic: number; international: number; estimatedWeight: string }>;
+          materialBreakdown: Array<{ material: string; costPerUnit: number; notes: string; source?: string }>;
+          supplierOptions: Array<{ name: string; unitCost: number; moq?: string; origin?: string }>;
+          productionMethod: string;
+          colorComplexity: string;
+          confidenceLevel: string;
+          dataQuality: string;
+          realSourcesCount: number;
+        }>(projectId, unifiedPrompt, FINANCIAL_ANALYST_SYSTEM, "cogs_estimation", project.storeNiche ?? undefined, 8192);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Error desconocido";
+        res.status(500).json({ error: `Error al estimar costes con IA: ${msg}` });
+        return;
       }
+
+      if (estimated.classification) {
+        productClassification = { ...productClassification, ...estimated.classification };
+      }
+
+      learnFromOperation({
+        operationType: "cogs_estimation",
+        niche: project.storeNiche ?? null,
+        productType: product.productType ?? null,
+        title: `COGS estimado IA (unificado): ${product.title}`,
+        content: `Estimación COGS unificada para "${product.title}" (${estimated.productionMethod ?? "desconocido"}): Propio €${estimated.ownEquipment?.unitCost ?? "?"}, Externo €${estimated.externalService?.unitCost ?? "?"}. Confianza: ${estimated.confidenceLevel ?? "N/A"}.`,
+        confidence: estimated.confidenceLevel === "high" ? 0.9 : estimated.confidenceLevel === "medium" ? 0.7 : 0.5,
+        tags: ["cogs", "estimation", "ai", "unified", product.productType ?? "general"],
+      });
+
+      const ownEq = estimated.ownEquipment ?? {};
+      updateCogsBenchmark({
+        productCategory: productClassification.category,
+        manufacturingMethod: productClassification.manufacturingMethod,
+        niche, materialCost: ownEq.materialCost ?? 0,
+        shippingDomestic: ownEq.shippingCostDomestic ?? 0, shippingInternational: ownEq.shippingCostInternational ?? 0,
+        packagingCost: ownEq.packagingCost ?? 0, fulfillmentCost: ownEq.fulfillmentFee ?? 0,
+        platformFeePct: ownEq.shopifyPaymentFee ?? 0.015, returnRate: ownEq.returnRate ?? 0.08, cac: ownEq.cac ?? 0,
+      }).catch(() => {});
+
+      res.json({
+        productId: shopifyProductId, productTitle: product.title,
+        productClassification: {
+          category: productClassification.category, manufacturingMethod: productClassification.manufacturingMethod,
+          estimatedWeight: productClassification.estimatedWeight, materialComposition: productClassification.materialComposition,
+          shippingCategory: productClassification.shippingCategory,
+        },
+        ...estimated,
+        marketResearch: { materials: estimated.materialBreakdown?.map(m => ({ material: m.material, priceRange: `€${m.costPerUnit}`, source: m.source ?? "Claude" })) ?? [], carriers: estimated.shippingBreakdown ?? [], suppliers: estimated.supplierOptions?.map(s => ({ supplier: s.name, priceRange: `€${s.unitCost}`, moq: s.moq, origin: s.origin })) ?? [], packaging: [] },
+        researchWarnings,
+      });
+      return;
     }
-  
+
+    if (allCogsEmpty && !geminiBlocked) {
+      researchWarnings.push("Gemini Search no devolvió resultados — usando estimaciones de Claude");
+    }
+
     const materialDataStr = materialResearch.materials.length > 0
-      ? `PRECIOS REALES DE MATERIALES (investigados via Google Search):\n${materialResearch.materials.map(m => `  - ${m.material}: ${m.priceRange} [${m.source}] ${m.url ? `(${m.url})` : ""}`).join("\n")}\n  Coste medio material: €${materialResearch.avgMaterialCost}\n  Insight: ${materialResearch.insight}`
-      : "Sin datos de materiales encontrados en búsqueda — estima basándote en conocimiento del sector";
-  
+      ? `PRECIOS REALES DE MATERIALES:\n${materialResearch.materials.map(m => `  - ${m.material}: ${m.priceRange} [${m.source}]`).join("\n")}\n  Coste medio: €${materialResearch.avgMaterialCost}`
+      : "Sin datos de materiales — estima basándote en conocimiento del sector";
+
     const shippingDataStr = shippingResearch.carriers.length > 0
-      ? `TARIFAS REALES DE ENVÍO (investigadas via Google Search):\n${shippingResearch.carriers.map(c => `  - ${c.carrier}: Nacional ${c.domestic}, Internacional ${c.international} [${c.source}]`).join("\n")}\n  Insight: ${shippingResearch.insight}`
-      : "Sin datos de envío encontrados — usa tarifas estándar españolas";
-  
-    const supplierDataStr = supplierResearch.suppliers.length > 0
-      ? `PRECIOS REALES DE PROVEEDORES/FABRICANTES (investigados via Google Search):\n${supplierResearch.suppliers.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""} ${s.origin ? `[${s.origin}]` : ""} ${s.url ? `(${s.url})` : ""}`).join("\n")}\n  Coste medio proveedor: €${supplierResearch.avgCost}\n  Insight: ${supplierResearch.insight}`
-      : "Sin datos de proveedores encontrados";
-  
+      ? `TARIFAS DE ENVÍO:\n${shippingResearch.carriers.map(c => `  - ${c.carrier}: Nacional ${c.domestic}, Intl ${c.international}`).join("\n")}`
+      : "Sin datos de envío — usa tarifas estándar españolas";
+
+    const supplierDataStr2 = supplierResearch.suppliers.length > 0
+      ? `PROVEEDORES:\n${supplierResearch.suppliers.map(s => `  - ${s.supplier}: ${s.priceRange} ${s.moq ? `(MOQ: ${s.moq})` : ""}`).join("\n")}`
+      : "Sin datos de proveedores";
+
     const packagingDataStr = packagingResearch.items.length > 0
-      ? `PRECIOS REALES DE PACKAGING (investigados via Google Search):\n${packagingResearch.items.map(p => `  - ${p.item}: €${p.pricePerUnit}/ud [${p.source}]`).join("\n")}\n  Coste packaging total: €${packagingResearch.totalPackagingCost}\n  Insight: ${packagingResearch.insight}`
-      : "Sin datos de packaging encontrados";
-  
+      ? `PACKAGING:\n${packagingResearch.items.map(p => `  - ${p.item}: €${p.pricePerUnit}/ud`).join("\n")}`
+      : "Sin datos de packaging";
+
     const classificationStr = productClassification.manufacturingMethod !== "unknown"
-      ? `\nCLASIFICACIÓN DEL PRODUCTO (pre-análisis IA):
-    - Categoría: ${productClassification.category}
-    - Método fabricación: ${productClassification.manufacturingMethod}
-    - Peso estimado: ${productClassification.estimatedWeight}
-    - Materiales: ${productClassification.materialComposition.join(", ") || "no clasificados"}
-    - Categoría envío: ${productClassification.shippingCategory}`
+      ? `\nCLASIFICACIÓN: ${productClassification.category}, ${productClassification.manufacturingMethod}, ${productClassification.estimatedWeight}, envío: ${productClassification.shippingCategory}`
       : "";
   
     const prompt = `Eres un experto en costes de producción, logística, fabricación, materiales, envíos e impuestos con 20 años de experiencia.
-  
-  PRODUCTO A ANALIZAR:
-  - Título: "${product.title}"
-  - Precio de venta: €${product.price || "sin configurar"}
-  - Tipo: ${product.productType || "sin definir"}
-  - Vendor: ${product.vendor || "sin definir"}
-  - Imágenes: ${product.imageCount || 0}
-  - Tags: ${product.tags || "ninguno"}
-  - Tienda: "${project.name}" (Nicho: ${niche})
-  - Mercados: ${project.storeMarkets || "España"}
-  ${shopifyDetails}
-  
-  === DATOS REALES DE MERCADO (investigados con Google Search en tiempo real) ===
-  ${classificationStr}
-  
-  ${materialDataStr}
-  
-  ${shippingDataStr}
-  
-  ${supplierDataStr}
-  
-  ${packagingDataStr}
-  
-  === FIN DATOS REALES ===
-  
-  Tu tarea es CALCULAR todos los costes de producción y operación basándote en los DATOS REALES anteriores.
-  REGLAS CRÍTICAS:
-  1. USA los precios REALES de materiales/proveedores/envío encontrados arriba como BASE de tu estimación
-  2. Si hay datos reales, NO los ignores ni los sustituyas por estimaciones genéricas
-  3. Complementa con tu conocimiento SOLO los campos donde no hay datos reales
-  4. Los costes de plataforma Shopify son fijos: 2.9% + 0.30€ por transacción en plan Basic
-  5. IVA España 21%, impuesto sociedades 25%
-  
-  IMPORTANTE: Proporciona DOS escenarios:
-  1. "ownEquipment" — Producción propia (taller/equipos propios, amortización incluida)
-  2. "externalService" — Servicio externo (fabricación/producción externalizada)
-  
-  Para CADA escenario, estima estos campos (en euros, por unidad):
-  unitCost, materialCost, fabricCost, printingCost, screenPrintingCost, moldAmortization, assemblyCost, laborCostPerUnit, qualityControlCost, packagingCost, labelCost, shippingCostDomestic, shippingCostInternational, fulfillmentFee, warehouseCostPerUnit, customsDuty, insuranceCost, returnRate (decimal), returnProcessingCost, shopifyPaymentFee (decimal), shopifyPlanCostPerOrder, paymentProcessingFee, platformCommission, cac, affiliateFee, digitalMarketingCost, influencerCostPerUnit, seoCostPerUnit, vatRate (decimal), corporateTaxRate (decimal), consultingFee, legalCostPerUnit, aiApiCostPerUnit, designCostPerUnit, overheadPerUnit
-  
-  También incluye:
-  - reasoning: explicación detallada citando las FUENTES REALES de cada dato
-  - shippingBreakdown: desglose por transportista { carrier, domestic, international, estimatedWeight }[]
-  - materialBreakdown: desglose de materiales { material, costPerUnit, notes, source }[]
-  - supplierOptions: opciones de proveedor encontradas { name, unitCost, moq, origin }[]
-  - productionMethod: método de producción identificado
-  - colorComplexity: complejidad de color
-  - dataQuality: "real" si usaste datos de Google Search, "partial" si mezclaste, "estimated" si no había datos
-  
-  Devuelve JSON: { ownEquipment: {...}, externalService: {...}, reasoning, shippingBreakdown, materialBreakdown, supplierOptions, productionMethod, colorComplexity, confidenceLevel: "high"|"medium"|"low", dataQuality, realSourcesCount }
-  
-  IMPORTANTE: Cita las fuentes reales en el reasoning. Responde SOLO el JSON.`;
+
+PRODUCTO: "${product.title}" — €${product.price || "sin configurar"} — ${productType} — ${product.vendor || "sin definir"}
+Tienda: "${project.name}" (Nicho: ${niche}) — Mercados: ${project.storeMarkets || "España"}
+${shopifyDetails}${classificationStr}
+
+DATOS DE MERCADO:
+${materialDataStr}
+${shippingDataStr}
+${supplierDataStr2}
+${packagingDataStr}
+
+Proporciona DOS escenarios: "ownEquipment" (producción propia) y "externalService" (externalizada).
+Para CADA uno estima (€/unidad): unitCost, materialCost, fabricCost, printingCost, screenPrintingCost, moldAmortization, assemblyCost, laborCostPerUnit, qualityControlCost, packagingCost, labelCost, shippingCostDomestic, shippingCostInternational, fulfillmentFee, warehouseCostPerUnit, customsDuty, insuranceCost, returnRate, returnProcessingCost, shopifyPaymentFee (0.029), shopifyPlanCostPerOrder, paymentProcessingFee, platformCommission, cac, affiliateFee, digitalMarketingCost, influencerCostPerUnit, seoCostPerUnit, vatRate (0.21), corporateTaxRate (0.25), consultingFee, legalCostPerUnit, aiApiCostPerUnit, designCostPerUnit, overheadPerUnit
+
+JSON: { ownEquipment:{...}, externalService:{...}, reasoning:"...", shippingBreakdown:[{carrier,domestic,international,estimatedWeight}], materialBreakdown:[{material,costPerUnit,notes,source}], supplierOptions:[{name,unitCost,moq,origin}], productionMethod:"...", colorComplexity:"...", confidenceLevel:"high|medium|low", dataQuality:"real|partial|estimated", realSourcesCount:N }
+
+Responde SOLO JSON.`;
   
     let estimated;
     try {
