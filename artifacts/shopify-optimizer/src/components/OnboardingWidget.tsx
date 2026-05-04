@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronDown, ChevronUp, CheckCircle, Circle, ExternalLink } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
+import { useDraggable } from "@/hooks/use-draggable";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -75,6 +76,7 @@ export function OnboardingWidget() {
   const [dismissed, setDismissed] = useState(false);
   const [location, navigate] = useLocation();
   const [routeMatch, routeParams] = useRoute("/projects/:id/*");
+  const { position: dragPos, dragHandlers: widgetDragHandlers } = useDraggable({ storageKey: "onboarding", defaultBottom: 16, defaultRight: 16, dragFromAnywhere: false });
 
   const urlProjectId = routeMatch ? parseInt(routeParams.id) : null;
 
@@ -112,21 +114,24 @@ export function OnboardingWidget() {
   };
 
   return (
-    <div style={{
-      position: "fixed", bottom: 16, right: 16, zIndex: 800,
-      background: "var(--ink2, #111113)", border: "1px solid var(--gold, #c8a84b)",
-      borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(200,168,75,0.1)",
-      width: "min(320px, calc(100vw - 32px))",
-      maxHeight: "calc(100vh - 32px)",
-      overflow: "hidden",
-      display: "flex", flexDirection: "column",
-    }}>
+    <div
+      style={{
+        position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 800,
+        background: "var(--ink2, #111113)", border: "1px solid var(--gold, #c8a84b)",
+        borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(200,168,75,0.1)",
+        width: "min(320px, calc(100vw - 32px))",
+        maxHeight: "calc(100vh - 32px)",
+        overflow: "hidden",
+        display: "flex", flexDirection: "column",
+      }}>
       <div
+        {...widgetDragHandlers}
         style={{
           padding: "12px 14px",
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          cursor: "pointer", borderBottom: collapsed ? "none" : "1px solid var(--ink3, #1e1e22)",
+          cursor: "grab", borderBottom: collapsed ? "none" : "1px solid var(--ink3, #1e1e22)",
           flexShrink: 0,
+          touchAction: "none", userSelect: "none",
         }}
         onClick={() => setCollapsed(c => !c)}
       >

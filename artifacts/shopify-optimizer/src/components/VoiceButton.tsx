@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { useDraggable } from "@/hooks/use-draggable";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -50,6 +51,7 @@ export function VoiceButton() {
   const [location, navigate] = useLocation();
   const locationRef = useRef(location);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { position: dragPos, dragHandlers: voiceDragHandlers, wasDragged: voiceWasDragged } = useDraggable({ storageKey: "voicebtn", defaultBottom: 88, defaultRight: 24, dragFromAnywhere: true });
 
   useEffect(() => { listeningRef.current = listening; }, [listening]);
   useEffect(() => { locationRef.current = location; }, [location]);
@@ -204,48 +206,62 @@ export function VoiceButton() {
 
   if (!supported) {
     return (
-      <button
-        title="Comando de voz no disponible en este navegador. Usa Chrome o Edge."
-        disabled
+      <div
+        {...voiceDragHandlers}
         style={{
-          position: "fixed", bottom: 88, right: 24, zIndex: 900,
-          width: 52, height: 52, borderRadius: "50%",
-          background: "var(--ink3)", border: "none",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 22, opacity: 0.3, cursor: "not-allowed",
+          position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
+          touchAction: "none", userSelect: "none",
         }}
-      >🎙</button>
+      >
+        <button
+          title="Comando de voz no disponible en este navegador. Usa Chrome o Edge."
+          disabled
+          style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: "var(--ink3)", border: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 22, opacity: 0.3, cursor: "not-allowed",
+          }}
+        >🎙</button>
+      </div>
     );
   }
 
   return (
     <>
-      <button
-        onClick={toggleVoice}
-        title="Comando de voz (Alt+V)"
-        aria-label="Activar comando de voz"
+      <div
+        {...voiceDragHandlers}
         style={{
-          position: "fixed", bottom: 88, right: 24, zIndex: 900,
-          width: 52, height: 52, borderRadius: "50%",
-          background: listening
-            ? "var(--crim)"
-            : "linear-gradient(135deg, var(--gold), var(--gold2))",
-          border: "none", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 22, color: "#000",
-          boxShadow: listening
-            ? "0 0 0 4px rgba(220,53,69,0.3), 0 4px 16px rgba(0,0,0,0.4)"
-            : "0 4px 16px rgba(200,168,75,0.4)",
-          transition: "all 0.2s",
-          animation: listening ? "pulseGold 1.5s ease-in-out infinite" : "none",
+          position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
+          touchAction: "none", userSelect: "none",
         }}
       >
-        {listening ? "🔴" : "🎙"}
-      </button>
+        <button
+          onClick={() => { if (!voiceWasDragged) toggleVoice(); }}
+          title="Comando de voz (Alt+V)"
+          aria-label="Activar comando de voz"
+          style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: listening
+              ? "var(--crim)"
+              : "linear-gradient(135deg, var(--gold), var(--gold2))",
+            border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 22, color: "#000",
+            boxShadow: listening
+              ? "0 0 0 4px rgba(220,53,69,0.3), 0 4px 16px rgba(0,0,0,0.4)"
+              : "0 4px 16px rgba(200,168,75,0.4)",
+            transition: "all 0.2s",
+            animation: listening ? "pulseGold 1.5s ease-in-out infinite" : "none",
+          }}
+        >
+          {listening ? "🔴" : "🎙"}
+        </button>
+      </div>
 
       {showBubble && (
         <div style={{
-          position: "fixed", bottom: 152, right: 24, zIndex: 901,
+          position: "fixed", bottom: dragPos.bottom + 64, right: dragPos.right, zIndex: 901,
           background: "var(--ink2)", border: "1px solid var(--ink3)",
           borderRadius: 14, padding: "14px 18px",
           maxWidth: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",

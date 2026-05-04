@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSafeTimeout } from "@/hooks/useSafeTimeout";
+import { useDraggable } from "@/hooks/use-draggable";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -896,6 +897,7 @@ export default function OmniChatbot() {
   const { user } = useAuth();
   const [location] = useLocation();
   const isMobile = useIsMobile();
+  const { position: dragPos, dragHandlers: chatDragHandlers, wasDragged: chatWasDragged } = useDraggable({ storageKey: "chatbot", defaultBottom: isMobile ? 12 : 24, defaultRight: isMobile ? 12 : 24, dragFromAnywhere: true });
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
@@ -1967,19 +1969,28 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       {/* Floating button */}
       {!open && (
-        <button onClick={() => setOpen(true)} aria-label="Abrir asistente Shopy Crafter" style={{
-          position: "fixed",
-          bottom: `max(${isMobile ? 12 : 24}px, env(safe-area-inset-bottom, 0px))`,
-          right: `max(${isMobile ? 12 : 24}px, env(safe-area-inset-right, 0px))`,
-          width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
-          borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
-          border: "none", cursor: "pointer", zIndex: 9990,
-          boxShadow: "0 4px 24px rgba(200,168,75,0.45), 0 0 0 0 rgba(200,168,75,0.3)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          animation: "pulseGold 3s ease-in-out infinite",
-        }}>
-          <Brain size={isMobile ? 22 : 26} style={{ color: "#0a0a0f" }} />
-        </button>
+        <div
+          {...chatDragHandlers}
+          style={{
+            position: "fixed",
+            bottom: dragPos.bottom,
+            right: dragPos.right,
+            zIndex: 9990,
+            touchAction: "none",
+            userSelect: "none",
+          }}
+        >
+          <button onClick={() => { if (!chatWasDragged) setOpen(true); }} aria-label="Abrir asistente Shopy Crafter" style={{
+            width: isMobile ? 52 : 58, height: isMobile ? 52 : 58,
+            borderRadius: "50%", background: "linear-gradient(135deg, #c8a84b, #e6c668)",
+            border: "none", cursor: "pointer", zIndex: 9990,
+            boxShadow: "0 4px 24px rgba(200,168,75,0.45), 0 0 0 0 rgba(200,168,75,0.3)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "pulseGold 3s ease-in-out infinite",
+          }}>
+            <Brain size={isMobile ? 22 : 26} style={{ color: "#0a0a0f" }} />
+          </button>
+        </div>
       )}
 
       {/* Chat window */}

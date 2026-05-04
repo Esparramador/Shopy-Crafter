@@ -1241,15 +1241,30 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
               const text = `${m.title ?? ""} ${(m.content ?? "").slice(0, 2000)}`.toLowerCase();
               return queryWords.some((w: string) => text.includes(w));
             })
-            .slice(0, 10);
+            .slice(0, 15);
         } else {
-          brainMemories = brainMemories.slice(0, 10);
+          brainMemories = brainMemories.slice(0, 15);
         }
-        if (brainMemories.length === 0) {
-          answer = "No encontré memorias relevantes en ShopyBrain para esta consulta. Prueba con el modo Auto o Claude para obtener una respuesta generada por IA.";
-        } else {
-          answer = `🧠 **Respuesta desde ShopyBrain** (${brainMemories.length} memorias):\n\n${brainMemories.map(m => `**${m.title}**\n${(m.content ?? "").slice(0, 600)}`).join("\n\n---\n\n")}`;
-        }
+
+        const brainSynthesisPrompt = `${sysPrompt}
+
+MODO BRAIN: Eres ShopyBrain, el cerebro con memoria persistente de Shopy Crafter.
+Responde de forma INTELIGENTE, conversacional y experta — como un consultor senior de eCommerce.
+${brainMemories.length > 0 ? `Tienes ${brainMemories.length} memorias relevantes para esta consulta. Úsalas como contexto para dar una respuesta precisa, sintetizada y accionable. NO copies las memorias tal cual — interprétalas, combínalas y genera una respuesta natural e inteligente.` : "No hay memorias específicas para esta consulta, pero responde con tu conocimiento experto en eCommerce, Shopify, marketing digital, SEO, pricing, y todo lo que un profesional del sector necesita saber."}
+Responde SIEMPRE en español. Sé directo, profesional y útil.`;
+
+        const memoriesContext = brainMemories.length > 0
+          ? `\n\nMEMORIAS DE SHOPYBRAIN (conocimiento acumulado):\n${brainMemories.map(m => `[${m.title}] (confianza: ${m.confidence ?? "N/A"}, dominio: ${m.domain ?? "general"})\n${(m.content ?? "").slice(0, 800)}`).join("\n\n")}`
+          : "";
+
+        const brainUserContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + memoriesContext;
+
+        answer = await askClaude(
+          0,
+          [{ role: "user", content: brainUserContent }],
+          brainSynthesisPrompt,
+          8000,
+        );
         engineUsed = "brain_only";
       } else if (engine === "gemini") {
         const { askGeminiWithSearch } = await import("../lib/gemini.js");
