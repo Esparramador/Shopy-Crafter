@@ -86,20 +86,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const cmsNav = cmsContent?.adminNav ?? null;
   const cmsPanel = cmsContent?.adminPanel ?? null;
 
-  function mergeWithDefaults<T extends Record<string, any>>(
-    defaults: T[], cms: T[] | undefined, keyField: string
-  ): T[] {
-    if (!Array.isArray(cms) || cms.length === 0) return defaults;
-    const result = [...cms];
-    const existing = new Set(cms.map(item => item[keyField]));
-    for (const item of defaults) {
-      if (!existing.has(item[keyField])) result.push(item);
-    }
-    return result;
-  }
-
-  const moduleNav = mergeWithDefaults(DEFAULT_MODULE_NAV, cmsNav?.modules, "id");
-  const rawShopybrainNav = mergeWithDefaults(DEFAULT_SHOPYBRAIN_NAV, cmsNav?.shopybrain, "href");
+  const moduleNav = Array.isArray(cmsNav?.modules)
+    ? cmsNav.modules : DEFAULT_MODULE_NAV;
+  const rawShopybrainNav = Array.isArray(cmsNav?.shopybrain)
+    ? cmsNav.shopybrain : DEFAULT_SHOPYBRAIN_NAV;
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
   const seenKeys = new Set<string>();
   const shopybrainNav = rawShopybrainNav
@@ -111,7 +101,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       return true;
     });
   const seenAdminKeys = new Set<string>();
-  const adminNav: any[] = mergeWithDefaults(DEFAULT_ADMIN_NAV, cmsNav?.admin, "href").filter((item: any) => {
+  const rawAdminNav = Array.isArray(cmsNav?.admin)
+    ? cmsNav.admin : DEFAULT_ADMIN_NAV;
+  const adminNav: any[] = rawAdminNav.filter((item: any) => {
     const key = `${item.href}::${item.label}`;
     if (seenAdminKeys.has(key)) return false;
     seenAdminKeys.add(key);
@@ -123,7 +115,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   moduleNav.forEach((m: any) => { pageLabels[m.id] = m.label; });
   pageLabels["settings"] = "Configuración";
 
-  const currentPage = (params as Record<string, string> | null)?.["*"] ?? "";
+  const standaloneModule = !match ? location.replace(/^\//, "").split("/")[0] : "";
+  const currentPage = match ? ((params as Record<string, string> | null)?.["*"] ?? "") : standaloneModule;
   const pageLabel = pageLabels[currentPage] ?? "Dashboard";
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
@@ -511,44 +504,45 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </div>
 
-        {/* Module tab nav (only when a project is active) */}
-        {activeProject && (
-          <div className="module-tabs-wrap">
-            <button
-              className="module-tabs-arrow module-tabs-arrow-left"
-              aria-label="Scroll tabs left"
-              onClick={() => {
-                const el = document.querySelector('.module-tabs');
-                if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
-              }}
-            >‹</button>
-            <div className="module-tabs" role="tablist">
-              {moduleNav.map((item: any) => {
-                const isActive = currentPage === item.id;
-                return (
-                  <Link key={item.id} href={`/projects/${activeProjectId}/${item.id}`}>
-                    <div
-                      className={`module-tab${isActive ? " active" : ""}`}
-                      role="tab"
-                      aria-selected={isActive}
-                    >
-                      <span style={{ fontSize: 13 }}>{item.icon}</span>
-                      <span className="module-tab-label">{item.label}</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-            <button
-              className="module-tabs-arrow module-tabs-arrow-right"
-              aria-label="Scroll tabs right"
-              onClick={() => {
-                const el = document.querySelector('.module-tabs');
-                if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
-              }}
-            >›</button>
+        {/* Module tab nav */}
+        <div className="module-tabs-wrap">
+          <button
+            className="module-tabs-arrow module-tabs-arrow-left"
+            aria-label="Scroll tabs left"
+            onClick={() => {
+              const el = document.querySelector('.module-tabs');
+              if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
+            }}
+          >‹</button>
+          <div className="module-tabs" role="tablist">
+            {moduleNav.map((item: any) => {
+              const isActive = currentPage === item.id;
+              const tabHref = activeProjectId
+                ? `/projects/${activeProjectId}/${item.id}`
+                : `/${item.id}`;
+              return (
+                <Link key={item.id} href={tabHref}>
+                  <div
+                    className={`module-tab${isActive ? " active" : ""}`}
+                    role="tab"
+                    aria-selected={isActive}
+                  >
+                    <span style={{ fontSize: 13 }}>{item.icon}</span>
+                    <span className="module-tab-label">{item.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        )}
+          <button
+            className="module-tabs-arrow module-tabs-arrow-right"
+            aria-label="Scroll tabs right"
+            onClick={() => {
+              const el = document.querySelector('.module-tabs');
+              if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
+            }}
+          >›</button>
+        </div>
 
         {/* Page content */}
         <div className="main-content" role="main">

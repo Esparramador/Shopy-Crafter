@@ -365,8 +365,8 @@ router.post("/fusion-studio/create-product", upload.array("images", 5), async (r
       return;
     }
 
-    const projectId = parseInt(req.body.projectId || "0");
-    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    const projectId = parseInt(req.body.projectId ?? "", 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: "projectId requerido" }); return; }
 
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
@@ -1249,7 +1249,7 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
     } = req.body ?? {};
 
     const pid = Number.parseInt(String(projectId ?? ""), 10);
-    if (!Number.isFinite(pid) || pid <= 0) {
+    if (!Number.isFinite(pid) || pid < 0) {
       res.status(400).json({ error: "projectId inválido" });
       return;
     }

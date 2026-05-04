@@ -60,7 +60,7 @@ type Research = {
 
 export default function Suppliers() {
   const [, params] = useRoute<{ id: string }>("/projects/:id/suppliers");
-  const projectId = params?.id ?? "";
+  const projectId = params?.id ?? "0";
   const { toast } = useToast();
 
   const [niche, setNiche] = useState("");

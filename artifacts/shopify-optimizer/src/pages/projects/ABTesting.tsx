@@ -476,8 +476,11 @@ function TestCard({
                 }}
               />
             </div>
-            {(test.confidence ?? 0) >= 95 && (
-              <p className="text-xs text-green-400 mt-1">¡Estadísticamente significativo! Listo para declarar ganador.</p>
+            {(test.confidence ?? 0) >= 95 && test.status === "running" && (
+              <p className="text-xs text-green-400 mt-1">¡Estadísticamente significativo! El ganador se declarará automáticamente.</p>
+            )}
+            {(test.confidence ?? 0) >= 95 && test.status === "completed" && (
+              <p className="text-xs text-green-400 mt-1">Ganador declarado automáticamente con {test.confidence}% de confianza.</p>
             )}
           </div>
         )}
@@ -542,7 +545,7 @@ export default function ABTestingPage() {
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">A/B Testing Automático</h1>
-          <p className="text-muted-foreground mt-1">Pruebas de imágenes y precios con datos reales y predicción IA.</p>
+          <p className="text-muted-foreground mt-1">Compara variantes con datos reales. El ganador se declara automáticamente al alcanzar 95% de confianza estadística.</p>
         </div>
         <div className="flex gap-3 items-center flex-wrap">
           <SaveReportButton
@@ -644,7 +647,11 @@ ${tests.length > 0 ? `<h2>Historial de Tests</h2><table><tr><th>Producto</th><th
           {tests.length === 0 && (
             <div className="py-20 text-center">
               <SplitSquareHorizontal className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">No hay tests activos.</p>
+              <p className="text-muted-foreground mb-2">No hay tests activos.</p>
+              <p className="text-xs text-muted-foreground/70 mb-6 max-w-md mx-auto">
+                Crea un test de imagen o precio. El tracking se realiza automáticamente mediante el pixel instalado en tu tienda.
+                Cuando la confianza estadística alcanza el 95%, el ganador se declara automáticamente y ShopyBrain aprende del resultado.
+              </p>
               <button
                 onClick={() => setShowNewTestModal(true)}
                 className="bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors"

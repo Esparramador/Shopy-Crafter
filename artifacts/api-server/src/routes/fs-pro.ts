@@ -1420,12 +1420,12 @@ router.post("/fs-pro/generate-image", requireAdmin, async (req: Request, res: Re
       projectId: number; model: ImageGenModel; prompt: string; aspectRatio?: string;
       seed?: number; negativePrompt?: string; referenceImageUrl?: string;
     };
-    if (!projectId || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
+    if (isNaN(projectId) || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
     const limit = await checkProductionLimit(projectId, "image", 1);
     if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
 
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    const [project] = projectId > 0 ? await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)) : [null];
+    if (projectId > 0 && !project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
     let referenceImage: Buffer | undefined;
     let referenceMime: string | undefined;
@@ -1467,12 +1467,12 @@ router.post("/fs-pro/edit-image", requireAdmin, upload.single("image"), async (r
     const f = req.file;
     const { projectId: pidStr, model, prompt, aspectRatio, sourceImageUrl } = req.body;
     const projectId = parseInt(pidStr || "0", 10);
-    if (!projectId || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
+    if (isNaN(projectId) || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
     const limit = await checkProductionLimit(projectId, "image", 1);
     if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
 
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    const [project] = projectId > 0 ? await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)) : [null];
+    if (projectId > 0 && !project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
     let imgBuf: Buffer; let imgMime: string;
     if (f) { imgBuf = f.buffer; imgMime = f.mimetype; }
@@ -1505,11 +1505,11 @@ router.post("/fs-pro/remove-bg", requireAdmin, upload.single("image"), async (re
     const f = req.file;
     const { projectId: pidStr, sourceImageUrl } = req.body;
     const projectId = parseInt(pidStr || "0", 10);
-    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (isNaN(projectId)) { res.status(400).json({ error: "projectId requerido" }); return; }
     const limit = await checkProductionLimit(projectId, "image", 1);
     if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    const [project] = projectId > 0 ? await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)) : [null];
+    if (projectId > 0 && !project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
     let buf: Buffer; let mime: string;
     if (f) { buf = f.buffer; mime = f.mimetype; }

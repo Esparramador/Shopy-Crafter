@@ -67,6 +67,7 @@ router.use("/cms", (req, res, next) => {
   //   GET /pages                  → listado de páginas publicadas (para nav)
   //   GET /pages/:slug            → renderiza una página publicada
   if (req.method === "GET" && req.path === "/content") return next();
+  if (req.method === "GET" && req.path === "/events") return next();
   if (req.method === "GET" && req.path === "/pages") return next();
   if (req.method === "GET" && /^\/pages\/[a-z0-9-]+$/i.test(req.path)) return next();
   return requireAdmin(req, res, next);

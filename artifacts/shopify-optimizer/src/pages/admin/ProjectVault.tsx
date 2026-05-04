@@ -649,8 +649,12 @@ export default function ProjectVault() {
                         </p>
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
-                        {isReportFile(file) && file.previewUrl && (
-                          <button onClick={() => window.open(`${API_BASE}${file.previewUrl}`, "_blank")} title="Vista previa" style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                        {(file.previewUrl || file.downloadUrl || file.originalUrl) && (
+                          <button onClick={() => window.open(
+                            file.previewUrl ? `${API_BASE}${file.previewUrl}` :
+                            file.downloadUrl ? `${API_BASE}${file.downloadUrl}` :
+                            file.originalUrl!, "_blank"
+                          )} title="Vista previa" style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center" }}>
                             <Eye size={12} />
                           </button>
                         )}

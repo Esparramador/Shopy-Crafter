@@ -102,7 +102,7 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso a este proyecto" }); return;
     }
   
@@ -163,7 +163,7 @@ router.get("/projects/:projectId/vault/stats", requireAuth, async (req, res): Pr
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -198,7 +198,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -326,7 +326,7 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const session = req.session as any;
-  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -426,7 +426,7 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const session = req.session as any;
-  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -578,12 +578,12 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
-  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
-  const [project] = await db.select({ name: projectsTable.name }).from(projectsTable)
-    .where(eq(projectsTable.id, projectId)).limit(1);
+  const [project] = projectId > 0 ? await db.select({ name: projectsTable.name }).from(projectsTable)
+    .where(eq(projectsTable.id, projectId)).limit(1) : [{ name: "Bóveda Universal" }];
   const files = await db.select().from(projectFilesTable)
     .where(eq(projectFilesTable.projectId, projectId))
     .orderBy(projectFilesTable.fileType, projectFilesTable.createdAt);
@@ -713,7 +713,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
-  if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -929,7 +929,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
   
     const session = req.session as any;
-    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -1130,12 +1130,12 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
-    const [project] = await db.select({ name: projectsTable.name }).from(projectsTable)
-      .where(eq(projectsTable.id, projectId)).limit(1);
+    const [project] = projectId > 0 ? await db.select({ name: projectsTable.name }).from(projectsTable)
+      .where(eq(projectsTable.id, projectId)).limit(1) : [{ name: "Bóveda Universal" }];
   
     const imageFiles = await db.select().from(projectFilesTable)
       .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, "image")))

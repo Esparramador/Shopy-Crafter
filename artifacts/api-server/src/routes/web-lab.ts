@@ -656,7 +656,8 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
 router.get("/web-lab/history/:projectId", async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId));
-    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (isNaN(projectId)) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (projectId === 0) { res.json({ items: [] }); return; }
 
     const items = await db
       .select()
@@ -1611,7 +1612,7 @@ router.post("/web-lab/save-edit", async (req: Request, res: Response): Promise<v
       label?: string;
       parentVaultId?: number;
     };
-    if (!projectId || (!html && !css)) {
+    if (projectId === undefined || projectId === null || (!html && !css)) {
       res.status(400).json({ error: "projectId y al menos html o css son requeridos" });
       return;
     }
@@ -1671,7 +1672,7 @@ router.post("/web-lab/generate-from-scratch", async (req: Request, res: Response
       sections?: string[];
       language?: string;
     };
-    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (projectId === undefined || projectId === null) { res.status(400).json({ error: "projectId requerido" }); return; }
 
     // Comprobación de créditos ANTES de flushHeaders.
     // Generar una página completa desde cero consume 1 crédito tipo "image"

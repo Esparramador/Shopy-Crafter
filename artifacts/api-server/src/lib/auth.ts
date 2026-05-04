@@ -30,6 +30,10 @@ export async function requireProjectAccess(req: Request, res: Response, next: Ne
     res.status(400).json({ error: "Invalid project ID" });
     return;
   }
+  if (projectId === 0) {
+    next();
+    return;
+  }
   try {
     const [project] = await db.select({ clientId: projectsTable.clientId })
       .from(projectsTable)

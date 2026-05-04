@@ -80,7 +80,7 @@ export default function AvatarStudio() {
     e.preventDefault();
     setError("");
     setResult(null);
-    if (!projectId) { setError("Selecciona un proyecto"); return; }
+    if (projectId === null || projectId === undefined) { setError("Selecciona un proyecto"); return; }
     if (!script.trim()) { setError("Escribe el guion (script)"); return; }
     if (!avatarId && !(mode === "talking" ? customAvatar : customPresenter)) {
       setError("Selecciona un avatar o sube una foto personalizada");

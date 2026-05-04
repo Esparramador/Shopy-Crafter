@@ -70,8 +70,8 @@ router.post("/ad-studio/generate-campaign", requireAdmin, async (req: Request, r
   enableLongRunning(res);
 
   const body = req.body as Partial<AdCampaignInput>;
-  const projectId = typeof body.projectId === "number" ? body.projectId : parseInt(String(body.projectId ?? "0"), 10);
-  if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+  const projectId = typeof body.projectId === "number" ? body.projectId : parseInt(String(body.projectId ?? ""), 10);
+  if (isNaN(projectId)) { res.status(400).json({ error: "projectId requerido" }); return; }
 
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }

@@ -3,7 +3,7 @@ import {
   Monitor, Tablet, Smartphone, Save, Loader2, Sparkles,
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
   PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon, WifiOff,
-  GripVertical, ArrowUp, ArrowDown, Film, Images, Atom,
+  GripVertical, ArrowUp, ArrowDown, Film, Images, Atom, Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
@@ -577,76 +577,7 @@ const SECTIONS: SectionDef[] = [
   },
   {
     id: "adminNav", icon: "🛠", label: "Nav Admin Panel",
-    fields: [
-      { label: "Módulo 1 — Label", path: "adminNav.modules.0.label", type: "text" },
-      { label: "Módulo 1 — Icono", path: "adminNav.modules.0.icon", type: "text" },
-      { label: "Módulo 2 — Label", path: "adminNav.modules.1.label", type: "text" },
-      { label: "Módulo 2 — Icono", path: "adminNav.modules.1.icon", type: "text" },
-      { label: "Módulo 3 — Label", path: "adminNav.modules.2.label", type: "text" },
-      { label: "Módulo 3 — Icono", path: "adminNav.modules.2.icon", type: "text" },
-      { label: "Módulo 4 — Label", path: "adminNav.modules.3.label", type: "text" },
-      { label: "Módulo 4 — Icono", path: "adminNav.modules.3.icon", type: "text" },
-      { label: "Módulo 5 — Label", path: "adminNav.modules.4.label", type: "text" },
-      { label: "Módulo 5 — Icono", path: "adminNav.modules.4.icon", type: "text" },
-      { label: "Módulo 6 — Label", path: "adminNav.modules.5.label", type: "text" },
-      { label: "Módulo 6 — Icono", path: "adminNav.modules.5.icon", type: "text" },
-      { label: "Módulo 7 — Label", path: "adminNav.modules.6.label", type: "text" },
-      { label: "Módulo 7 — Icono", path: "adminNav.modules.6.icon", type: "text" },
-      { label: "Módulo 8 — Label", path: "adminNav.modules.7.label", type: "text" },
-      { label: "Módulo 8 — Icono", path: "adminNav.modules.7.icon", type: "text" },
-      { label: "Módulo 9 — Label", path: "adminNav.modules.8.label", type: "text" },
-      { label: "Módulo 9 — Icono", path: "adminNav.modules.8.icon", type: "text" },
-      { label: "IA Brain 1 — Label", path: "adminNav.shopybrain.0.label", type: "text" },
-      { label: "IA Brain 1 — Icono", path: "adminNav.shopybrain.0.icon", type: "text" },
-      { label: "IA Brain 2 — Label", path: "adminNav.shopybrain.1.label", type: "text" },
-      { label: "IA Brain 2 — Icono", path: "adminNav.shopybrain.1.icon", type: "text" },
-      { label: "IA Brain 3 — Label", path: "adminNav.shopybrain.2.label", type: "text" },
-      { label: "IA Brain 3 — Icono", path: "adminNav.shopybrain.2.icon", type: "text" },
-      { label: "IA Brain 4 — Label", path: "adminNav.shopybrain.3.label", type: "text" },
-      { label: "IA Brain 4 — Icono", path: "adminNav.shopybrain.3.icon", type: "text" },
-      { label: "IA Brain 5 — Label", path: "adminNav.shopybrain.4.label", type: "text" },
-      { label: "IA Brain 5 — Icono", path: "adminNav.shopybrain.4.icon", type: "text" },
-      { label: "IA Brain 6 — Label", path: "adminNav.shopybrain.5.label", type: "text" },
-      { label: "IA Brain 6 — Icono", path: "adminNav.shopybrain.5.icon", type: "text" },
-      { label: "IA Brain 7 — Label", path: "adminNav.shopybrain.6.label", type: "text" },
-      { label: "IA Brain 7 — Icono", path: "adminNav.shopybrain.6.icon", type: "text" },
-      { label: "IA Brain 8 — Label", path: "adminNav.shopybrain.7.label", type: "text" },
-      { label: "IA Brain 8 — Icono", path: "adminNav.shopybrain.7.icon", type: "text" },
-      { label: "IA Brain 9 — Label", path: "adminNav.shopybrain.8.label", type: "text" },
-      { label: "IA Brain 9 — Icono", path: "adminNav.shopybrain.8.icon", type: "text" },
-      { label: "IA Brain 10 — Label", path: "adminNav.shopybrain.9.label", type: "text" },
-      { label: "IA Brain 10 — Icono", path: "adminNav.shopybrain.9.icon", type: "text" },
-      { label: "Admin 1 — Label", path: "adminNav.admin.0.label", type: "text" },
-      { label: "Admin 1 — Icono", path: "adminNav.admin.0.icon", type: "text" },
-      { label: "Admin 2 — Label", path: "adminNav.admin.1.label", type: "text" },
-      { label: "Admin 2 — Icono", path: "adminNav.admin.1.icon", type: "text" },
-      { label: "Admin 3 — Label", path: "adminNav.admin.2.label", type: "text" },
-      { label: "Admin 3 — Icono", path: "adminNav.admin.2.icon", type: "text" },
-      { label: "Admin 4 — Label", path: "adminNav.admin.3.label", type: "text" },
-      { label: "Admin 4 — Icono", path: "adminNav.admin.3.icon", type: "text" },
-      { label: "Admin 5 — Label", path: "adminNav.admin.4.label", type: "text" },
-      { label: "Admin 5 — Icono", path: "adminNav.admin.4.icon", type: "text" },
-      { label: "Admin 6 — Label", path: "adminNav.admin.5.label", type: "text" },
-      { label: "Admin 6 — Icono", path: "adminNav.admin.5.icon", type: "text" },
-      { label: "Admin 7 — Label", path: "adminNav.admin.6.label", type: "text" },
-      { label: "Admin 7 — Icono", path: "adminNav.admin.6.icon", type: "text" },
-      { label: "Admin 8 — Label", path: "adminNav.admin.7.label", type: "text" },
-      { label: "Admin 8 — Icono", path: "adminNav.admin.7.icon", type: "text" },
-      { label: "Admin 9 — Label", path: "adminNav.admin.8.label", type: "text" },
-      { label: "Admin 9 — Icono", path: "adminNav.admin.8.icon", type: "text" },
-      { label: "Admin 10 — Label", path: "adminNav.admin.9.label", type: "text" },
-      { label: "Admin 10 — Icono", path: "adminNav.admin.9.icon", type: "text" },
-      { label: "Admin 11 — Label", path: "adminNav.admin.10.label", type: "text" },
-      { label: "Admin 11 — Icono", path: "adminNav.admin.10.icon", type: "text" },
-      { label: "Admin 12 — Label", path: "adminNav.admin.11.label", type: "text" },
-      { label: "Admin 12 — Icono", path: "adminNav.admin.11.icon", type: "text" },
-      { label: "Admin 13 — Label", path: "adminNav.admin.12.label", type: "text" },
-      { label: "Admin 13 — Icono", path: "adminNav.admin.12.icon", type: "text" },
-      { label: "Admin 14 — Label", path: "adminNav.admin.13.label", type: "text" },
-      { label: "Admin 14 — Icono", path: "adminNav.admin.13.icon", type: "text" },
-      { label: "Admin 15 — Label", path: "adminNav.admin.14.label", type: "text" },
-      { label: "Admin 15 — Icono", path: "adminNav.admin.14.icon", type: "text" },
-    ],
+    fields: [],
   },
   {
     id: "footer", icon: "🔗", label: "Footer",
@@ -771,6 +702,182 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     else return "";
   }
   return cur;
+}
+
+/* ── NAV SECTION EDITOR (dynamic, no hardcoded indices) ─────────────────── */
+function NavArrayEditor({
+  title, items, basePath, fieldDefs, onChange,
+}: {
+  title: string;
+  items: any[];
+  basePath: string;
+  fieldDefs: { key: string; label: string; placeholder?: string }[];
+  onChange: (path: string, value: unknown) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+
+  const updateField = (idx: number, key: string, val: string) => {
+    const updated = items.map((it: any, i: number) => i === idx ? { ...it, [key]: val } : it);
+    onChange(basePath, updated);
+  };
+
+  const addItem = () => {
+    const newItem: Record<string, string> = {};
+    for (const f of fieldDefs) newItem[f.key] = "";
+    onChange(basePath, [...items, newItem]);
+  };
+
+  const removeItem = (idx: number) => {
+    const item = items[idx];
+    const name = item?.label || item?.id || `Item ${idx + 1}`;
+    if (!confirm(`¿Eliminar "${name}" de ${title}?`)) return;
+    onChange(basePath, items.filter((_: any, i: number) => i !== idx));
+  };
+
+  const moveItem = (from: number, to: number) => {
+    if (to < 0 || to >= items.length) return;
+    const arr = [...items];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    onChange(basePath, arr);
+  };
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 12px", background: "var(--ink2)", border: "1px solid var(--bdr)",
+          borderRadius: collapsed ? 10 : "10px 10px 0 0", cursor: "pointer", transition: "all .15s",
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--t)" }}>{title}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, color: "var(--t3)", background: "var(--ink3)", padding: "2px 8px", borderRadius: 8 }}>
+            {items.length}
+          </span>
+          {collapsed ? <ChevronRight size={13} style={{ color: "var(--t4)" }} /> : <ChevronDown size={13} style={{ color: "var(--gold)" }} />}
+        </span>
+      </button>
+      {!collapsed && (
+        <div style={{ border: "1px solid var(--bdr)", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
+          {items.map((item: any, idx: number) => (
+            <div key={idx} style={{
+              padding: "10px 12px", background: idx % 2 === 0 ? "var(--ink)" : "var(--ink2)",
+              borderBottom: idx < items.length - 1 ? "1px solid var(--bdr)" : "none",
+              display: "flex", gap: 8, alignItems: "flex-start",
+            }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 4 }}>
+                <button onClick={() => moveItem(idx, idx - 1)} disabled={idx === 0}
+                  style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--ink3)" : "var(--t3)", padding: 1, lineHeight: 1 }}>
+                  <ArrowUp size={11} />
+                </button>
+                <span style={{ fontSize: 9, color: "var(--t4)", textAlign: "center", fontWeight: 700 }}>{idx + 1}</span>
+                <button onClick={() => moveItem(idx, idx + 1)} disabled={idx === items.length - 1}
+                  style={{ background: "none", border: "none", cursor: idx === items.length - 1 ? "default" : "pointer", color: idx === items.length - 1 ? "var(--ink3)" : "var(--t3)", padding: 1, lineHeight: 1 }}>
+                  <ArrowDown size={11} />
+                </button>
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                {fieldDefs.map(fd => (
+                  <div key={fd.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <label style={{ fontSize: 10, color: "var(--t3)", minWidth: 40, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                      {fd.label}
+                    </label>
+                    <input
+                      value={item[fd.key] ?? ""}
+                      placeholder={fd.placeholder}
+                      onChange={e => updateField(idx, fd.key, e.target.value)}
+                      style={{
+                        flex: 1, padding: "5px 8px", fontSize: 12, background: "var(--ink3)",
+                        border: "1px solid var(--bdr)", borderRadius: 6, color: "var(--t)",
+                        outline: "none", boxSizing: "border-box",
+                      }}
+                      onFocus={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                      onBlur={e => (e.currentTarget.style.borderColor = "var(--bdr)")}
+                    />
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => removeItem(idx)} title="Eliminar"
+                style={{
+                  padding: 4, background: "none", border: "none", cursor: "pointer",
+                  color: "var(--t4)", transition: "color .15s", marginTop: 4,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#e84558")}
+                onMouseLeave={e => (e.currentTarget.style.color = "var(--t4)")}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+          <button onClick={addItem}
+            style={{
+              width: "100%", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              background: "rgba(200,168,75,0.06)", border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, color: "var(--gold)", transition: "background .15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(200,168,75,0.12)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "rgba(200,168,75,0.06)")}
+          >
+            <Plus size={13} /> Añadir item
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavSectionEditor({ content, onChange }: {
+  content: Record<string, unknown>;
+  onChange: (path: string, value: unknown) => void;
+}) {
+  const adminNav = (content as any)?.adminNav ?? {};
+  const modules = Array.isArray(adminNav.modules) ? adminNav.modules : [];
+  const shopybrain = Array.isArray(adminNav.shopybrain) ? adminNav.shopybrain : [];
+  const admin = Array.isArray(adminNav.admin) ? adminNav.admin : [];
+
+  return (
+    <div>
+      <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 12, lineHeight: 1.5 }}>
+        Editor dinámico de navegación. Añade, elimina, reordena y edita items libremente. Los cambios se aplican al guardar.
+      </p>
+      <NavArrayEditor
+        title="Módulos (sidebar principal)"
+        items={modules}
+        basePath="adminNav.modules"
+        fieldDefs={[
+          { key: "id", label: "ID", placeholder: "audit" },
+          { key: "label", label: "Label", placeholder: "Auditoría" },
+          { key: "icon", label: "Icono", placeholder: "📊" },
+        ]}
+        onChange={onChange}
+      />
+      <NavArrayEditor
+        title="Shopy Brain (IA & herramientas)"
+        items={shopybrain}
+        basePath="adminNav.shopybrain"
+        fieldDefs={[
+          { key: "label", label: "Label", placeholder: "Centro Shopy Crafter" },
+          { key: "icon", label: "Icono", placeholder: "🧠" },
+          { key: "href", label: "Ruta", placeholder: "/admin/shopybrain" },
+        ]}
+        onChange={onChange}
+      />
+      <NavArrayEditor
+        title="Admin (gestión & herramientas)"
+        items={admin}
+        basePath="adminNav.admin"
+        fieldDefs={[
+          { key: "label", label: "Label", placeholder: "CRM Clientes" },
+          { key: "icon", label: "Icono", placeholder: "👥" },
+          { key: "href", label: "Ruta", placeholder: "/admin/clients" },
+        ]}
+        onChange={onChange}
+      />
+    </div>
+  );
 }
 
 /* ── AI POPOVER ─────────────────────────────────────────────────────────── */
@@ -1281,7 +1388,7 @@ export default function CMSEditor() {
     };
   }, [loadContent]);
 
-  const handleFieldChange = useCallback((path: string, value: string) => {
+  const handleFieldChange = useCallback((path: string, value: unknown) => {
     setPending(prev => { const n = new Map(prev); n.set(path, value); return n; });
     setContent(prev => {
       if (!prev) return prev;
@@ -1566,7 +1673,9 @@ export default function CMSEditor() {
                       {["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
                         <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
                       )}
-                      {section.fields.map(field => {
+                      {section.id === "adminNav" ? (
+                        <NavSectionEditor content={content} onChange={handleFieldChange} />
+                      ) : section.fields.map(field => {
                         const raw   = getNestedValue(content, field.path);
                         const value = typeof raw === "string" ? raw
                           : typeof raw === "number" ? String(raw)

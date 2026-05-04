@@ -47,15 +47,6 @@ function deepMergeDefaults(defaults: Record<string, unknown>, stored: Record<str
   for (const key of Object.keys(defaults)) {
     if (!(key in result) || result[key] == null) {
       result[key] = defaults[key];
-    } else if (key === "adminNav" && typeof defaults[key] === "object" && typeof result[key] === "object") {
-      const defNav = defaults[key] as Record<string, any>;
-      const storedNav = result[key] as Record<string, any>;
-      result[key] = {
-        ...storedNav,
-        modules: mergeNavArrays(defNav.modules ?? [], storedNav.modules ?? [], "id"),
-        shopybrain: mergeNavArrays(defNav.shopybrain ?? [], storedNav.shopybrain ?? [], "href"),
-        admin: mergeNavArrays(defNav.admin ?? [], storedNav.admin ?? [], "href"),
-      };
     } else if (
       defaults[key] && typeof defaults[key] === "object" && !Array.isArray(defaults[key]) &&
       result[key] && typeof result[key] === "object" && !Array.isArray(result[key])

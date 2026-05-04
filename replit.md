@@ -87,8 +87,13 @@ URL validation blocks private IPv4, link-local, CGN, benchmarking, all IPv6 addr
 ### Progressive Competitor Knowledge
 Competitor scan endpoints inject `previousSnaps` history from prior snapshots into AI prompts, enabling progressive knowledge accumulation across scans.
 
-### Navigation Completeness & CMS-Safe Sidebar
-All project module routes have visible nav tabs in `DEFAULT_MODULE_NAV` (17 total): Auditoría, Rediseño IA, Imágenes, Consistencia, A/B Testing, Pricing, SEO Engine, Repositorio, Exportar, Generador IA, Lab Web, Fusion Studio, Card Studio, Campaign Kit, Exploded View, Ad Studio, Proveedores. Routes without tabs by design: `settings` (gear icon), `fusion-studio-pro` (alias redirecting to Fusion Studio). The sidebar uses a **merge-with-defaults** pattern: CMS-stored nav arrays are merged with hardcoded defaults using `mergeWithDefaults()` (frontend) and `mergeNavArrays()` (backend), ensuring items can never disappear even if CMS data is incomplete or restored from old snapshots. Both functions include `Array.isArray` guards against malformed payloads.
+### Navigation & CMS-Driven Sidebar (NO HARDCODES)
+The CMS is the **sole source of truth** for all navigation. No merge-with-defaults or force-injection of hardcoded items. Three nav arrays in CMS (`adminNav.modules`, `adminNav.shopybrain`, `adminNav.admin`) are rendered as-is. Hardcoded defaults in `AppLayout.tsx` are used ONLY as pre-load fallbacks (before CMS data arrives); once CMS loads, its arrays are used verbatim — even empty arrays are respected. The CMSEditor provides full CRUD for all nav items (add/remove/reorder/edit) via `NavSectionEditor` components. SSE live updates via `/api/cms/events` push changes in real-time. The SSE connection is gated on `ready` state to avoid reconnect loops for unauthenticated users.
+
+### Standalone Module Routes (Project-Independent)
+ALL 17 modules have standalone routes (`/audit`, `/redesign`, `/images`, `/web-lab`, `/ad-studio`, `/campaign-kit`, etc.) that work without an active project (projectId=0). The module tabs bar is always visible — when a project is active, tabs link to `/projects/:id/{module}`, otherwise to `/{module}`. This allows full content generation, analysis, video creation, and campaign building independently of any project.
+
+**Backend projectId=0 support**: Both `requireProjectAccess` middlewares (`lib/access.ts` and `lib/auth.ts`) allow projectId=0 through without access checks. GET/load endpoints return empty data for projectId=0 (e.g., web-lab history returns `{items:[]}`, suppliers returns `{researches:[],entries:[]}`, products returns empty list). POST action endpoints that genuinely need a project context (vault saves, Shopify operations) will return "Proyecto no encontrado" for projectId=0, which is expected behavior. Frontend guards in WebLab, FusionStudio, and Suppliers use `=== undefined || === null` checks instead of falsy checks to allow 0 as a valid value.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.

@@ -148,7 +148,7 @@ export default function FusionStudio() {
   const [createdProductResult, setCreatedProductResult] = useState<{ id?: string; title?: string; url?: string; error?: string; refCount?: number; genCount?: number } | null>(null);
 
   const createProductInShopify = useCallback(async () => {
-    if (!projectId || productFiles.length === 0) {
+    if (productFiles.length === 0) {
       setCreatedProductResult({ error: "Necesitas haber subido al menos 1 imagen de producto." });
       return;
     }
@@ -274,7 +274,7 @@ export default function FusionStudio() {
   }, [videoPrompt, productAnalysis, companyName, projectId]);
 
   const generateVideo = useCallback(async () => {
-    if (!projectId) { setVideoResult({ error: "projectId requerido" }); return; }
+    if (projectId === undefined || projectId === null) { setVideoResult({ error: "projectId requerido" }); return; }
     const selectedModel = videoModels.find(m => m.key === videoModel);
     const supportsT2V = selectedModel?.supportsT2V === true;
     if (!videoSourceUrl && !supportsT2V) {

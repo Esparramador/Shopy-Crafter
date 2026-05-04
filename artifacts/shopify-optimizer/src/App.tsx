@@ -68,7 +68,6 @@ const ExportCenter = lazy(() => import("@/pages/projects/ExportCenter"));
 const UniversalGenerator = lazy(() => import("@/pages/projects/UniversalGenerator"));
 const Suppliers = lazy(() => import("@/pages/projects/Suppliers"));
 const WebLab = lazy(() => import("@/pages/projects/WebLab"));
-const WebLabStandalone = lazy(() => import("@/pages/projects/WebLab").then(m => ({ default: m.WebLabStandalone })));
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
@@ -445,8 +444,57 @@ function Router() {
         <Route path="/projects/:id/exploded-view">
           <RequireAdmin><AdminWrapper><AppLayout><S><ExplodedViewStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
+        {/* Standalone module routes (sin proyecto) */}
+        <Route path="/audit">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AuditPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/redesign">
+          <RequireAdmin><AdminWrapper><AppLayout><S><RedesignPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/images">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ImagesPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/consistency">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ConsistencyPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/ab-testing">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ABTestingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/pricing">
+          <RequireAdmin><AdminWrapper><AppLayout><S><PricingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/seo">
+          <RequireAdmin><AdminWrapper><AppLayout><S><SEOPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/vault">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ProjectVault /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/exports">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ExportCenter projectId={0} /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/generator">
+          <RequireAdmin><AdminWrapper><AppLayout><S><UniversalGenerator /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/suppliers">
+          <RequireAdmin><AdminWrapper><AppLayout><S><Suppliers /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
         <Route path="/web-lab">
-          <RequireAdmin><AdminWrapper><AppLayout><S><WebLabStandalone /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><WebLab /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/fusion-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/cards">
+          <RequireAdmin><AdminWrapper><AppLayout><S><CardStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/campaign-kit">
+          <RequireAdmin><AdminWrapper><AppLayout><S><CampaignKit /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/exploded-view">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ExplodedViewStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/ad-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Client routes */}

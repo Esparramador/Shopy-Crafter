@@ -545,6 +545,28 @@ router.post("/track", async (req, res): Promise<void> => {
         if (sig.confidence > (test.confidence ?? 0)) {
           await db.update(abTestsTable).set({ confidence: sig.confidence }).where(eq(abTestsTable.id, testIdNum));
         }
+        if (sig.confidence >= 95 && !test.winner && test.status === "running") {
+          const autoWinner = sig.winner;
+          if (autoWinner) {
+            await db.update(abTestsTable).set({
+              winner: autoWinner,
+              status: "completed",
+              endDate: new Date(),
+              confidence: sig.confidence,
+            }).where(eq(abTestsTable.id, testIdNum));
+            try {
+              const [abProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, test.projectId));
+              learnFromOperation({
+                operationType: "ab_winner",
+                niche: abProj?.storeNiche ?? null,
+                title: `A/B Auto-Winner: Variante ${autoWinner} · ${test.productTitle}`,
+                content: `Producto: ${test.productTitle}\nHipótesis: ${test.hypothesis}\nVariante ganadora (auto): ${autoWinner}\nConfianza: ${sig.confidence}%\nConversiones A: ${updatedA}/${updatedAv} · B: ${updatedB}/${updatedBv}`,
+                confidence: Math.min(0.95, sig.confidence / 100),
+                tags: ["ab_test", "auto_winner", `winner_${autoWinner.toLowerCase()}`],
+              });
+            } catch {}
+          }
+        }
       }
     }
   

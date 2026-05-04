@@ -53,8 +53,12 @@ export const requireProjectAccess: RequestHandler = async (
     return;
   }
   const projectId = parseInt(String(raw), 10);
-  if (isNaN(projectId) || projectId <= 0) {
+  if (isNaN(projectId) || projectId < 0) {
     res.status(400).json({ error: "projectId inválido" });
+    return;
+  }
+  if (projectId === 0) {
+    next();
     return;
   }
   const ok = await canAccessProject(session.role, session.clientId, projectId);

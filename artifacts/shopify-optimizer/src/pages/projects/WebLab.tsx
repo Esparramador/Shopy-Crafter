@@ -136,7 +136,6 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [scratchMsg, setScratchMsg] = useState("");
 
   const loadHistory = useCallback(async () => {
-    if (!projectId) return;
     try {
       const res = await fetch(`${API_BASE}/api/web-lab/history/${projectId}`, { credentials: "include" });
       const data = await res.json();
@@ -171,7 +170,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
   }, [result?.url, result?.analysis?.improvedCss, result?.analysis?.improvedHtmlFragments]);
 
   const saveEdit = useCallback(async () => {
-    if (!projectId) { setSavedEditMsg("⚠ No hay proyecto seleccionado"); return; }
+    if (projectId === undefined || projectId === null) { setSavedEditMsg("⚠ No hay proyecto seleccionado"); return; }
     if (!editHtml.trim() && !editCss.trim()) { setSavedEditMsg("⚠ Nada que guardar"); return; }
     setSavingEdit(true); setSavedEditMsg("");
     try {
@@ -200,7 +199,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
   }, [projectId, url, result, editHtml, editCss, editLabel, loadHistory]);
 
   const generateFromScratch = useCallback(async () => {
-    if (!projectId) { setScratchMsg("⚠ Selecciona un proyecto"); return; }
+    if (projectId === undefined || projectId === null) { setScratchMsg("⚠ Selecciona un proyecto"); return; }
     setScratchLoading(true); setScratchMsg("");
     try {
       const r = await fetch(`${API_BASE}/api/web-lab/generate-from-scratch`, {

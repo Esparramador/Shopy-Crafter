@@ -41,7 +41,7 @@ function safeHttpUrl(raw: string | null | undefined): string | null {
 function parseProjectId(raw: unknown): number | null {
   if (typeof raw !== "string" || !/^\d+$/.test(raw)) return null;
   const n = Number(raw);
-  if (!Number.isSafeInteger(n) || n <= 0) return null;
+  if (!Number.isSafeInteger(n) || n < 0) return null;
   return n;
 }
 
