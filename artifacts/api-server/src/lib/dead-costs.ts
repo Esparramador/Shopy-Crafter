@@ -152,16 +152,18 @@ export async function analyzeDeadCosts(projectId: number): Promise<DeadCostAnaly
       });
     }
 
-    if (p.inventoryQuantity > 10 && (p.avgDailySales === null || p.avgDailySales < 0.05)) {
-      const daysToSell = (p.avgDailySales && p.avgDailySales > 0) ? Math.round(p.inventoryQuantity / p.avgDailySales) : 999;
-      const storageCost = (p.warehouseCostPerUnit || 0.5) * p.inventoryQuantity * (daysToSell / 30);
+    const inv = p.inventoryQuantity ?? 0;
+
+    if (inv > 10 && (p.avgDailySales === null || p.avgDailySales < 0.05)) {
+      const daysToSell = (p.avgDailySales && p.avgDailySales > 0) ? Math.round(inv / p.avgDailySales) : 999;
+      const storageCost = (p.warehouseCostPerUnit || 0.5) * inv * (daysToSell / 30);
       items.push({
         productId: p.shopifyProductId,
         title: p.title,
         cost: Math.round(storageCost * 100) / 100,
         reason: p.avgDailySales === null
-          ? `Sin datos de ventas y ${p.inventoryQuantity} uds en stock. Coste almacén estimado: €${Math.round(storageCost * 100) / 100}/mes`
-          : `Slow-moving: ${p.inventoryQuantity} uds en stock, ${daysToSell} días para vender. Coste almacén acumulado: €${Math.round(storageCost * 100) / 100}`,
+          ? `Sin datos de ventas y ${inv} uds en stock. Coste almacén estimado: €${Math.round(storageCost * 100) / 100}/mes`
+          : `Slow-moving: ${inv} uds en stock, ${daysToSell} días para vender. Coste almacén acumulado: €${Math.round(storageCost * 100) / 100}`,
         category: "slow_moving",
         severity: daysToSell > 365 ? "critical" : daysToSell > 180 ? "high" : "medium",
         recommendation: daysToSell > 365
@@ -170,14 +172,14 @@ export async function analyzeDeadCosts(projectId: number): Promise<DeadCostAnaly
       });
     }
 
-    if (p.inventoryQuantity > 0 && p.warehouseCostPerUnit > 0) {
-      const monthlyStorageCost = p.warehouseCostPerUnit * p.inventoryQuantity;
+    if (inv > 0 && p.warehouseCostPerUnit > 0) {
+      const monthlyStorageCost = p.warehouseCostPerUnit * inv;
       if (monthlyStorageCost > 50) {
         items.push({
           productId: p.shopifyProductId,
           title: p.title,
           cost: Math.round(monthlyStorageCost * 100) / 100,
-          reason: `Coste almacén: ${p.inventoryQuantity} uds × €${p.warehouseCostPerUnit}/ud = €${Math.round(monthlyStorageCost * 100) / 100}/mes`,
+          reason: `Coste almacén: ${inv} uds × €${p.warehouseCostPerUnit}/ud = €${Math.round(monthlyStorageCost * 100) / 100}/mes`,
           category: "storage",
           severity: monthlyStorageCost > 200 ? "high" : "medium",
           recommendation: "Optimizar rotación de inventario o negociar tarifa almacén. Considerar dropshipping para este producto",
@@ -185,16 +187,16 @@ export async function analyzeDeadCosts(projectId: number): Promise<DeadCostAnaly
       }
     }
 
-    if (p.inventoryQuantity > 0 && p.avgDailySales && p.avgDailySales > 0) {
+    if (inv > 0 && p.avgDailySales && p.avgDailySales > 0) {
       const optimalStock = Math.ceil(p.avgDailySales * 45);
-      if (p.inventoryQuantity > optimalStock * 3) {
-        const excessUnits = p.inventoryQuantity - optimalStock;
+      if (inv > optimalStock * 3) {
+        const excessUnits = inv - optimalStock;
         const capitalMuerto = excessUnits * p.totalCogs;
         items.push({
           productId: p.shopifyProductId,
           title: p.title,
           cost: Math.round(capitalMuerto * 100) / 100,
-          reason: `Overstock: ${p.inventoryQuantity} uds (óptimo: ${optimalStock}). Capital inmovilizado: €${Math.round(capitalMuerto)}`,
+          reason: `Overstock: ${inv} uds (óptimo: ${optimalStock}). Capital inmovilizado: €${Math.round(capitalMuerto)}`,
           category: "overstock",
           severity: capitalMuerto > 500 ? "high" : "medium",
           recommendation: `Reducir próximo pedido. Stock óptimo: ${optimalStock} uds (45 días de cobertura)`,

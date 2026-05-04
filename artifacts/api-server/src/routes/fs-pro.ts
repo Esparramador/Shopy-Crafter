@@ -45,6 +45,24 @@ import {
   type ActionToken as KBActionToken,
   type PresenterArchetype,
 } from "../lib/cinematic-knowledge-base.js";
+import {
+  getPlaybookSummary,
+  getFullPlaybook,
+  composeCampaignBrief,
+  compose6SecClipPrompt,
+  BRAND_DNA_FRAMEWORK,
+  CAMPAIGN_TYPES,
+  UGC_ARCHETYPES,
+  MASTER_PROMPT_FORMULA,
+  MICRO_CLIP_METHOD,
+  PRODUCTION_WORKFLOW,
+  type CampaignObjective,
+  type UgcIndustry,
+} from "../lib/advertising-playbook-kb.js";
+import {
+  getCogsMethodologySummary,
+  getFullCogsMethodology,
+} from "../lib/cogs-methodology-kb.js";
 import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
@@ -595,6 +613,168 @@ router.post("/fs-pro/cinematic-knowledge/compose", requireAdmin, (req, res) => {
     res.json({ ok: true, ...out });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "knowledge base compose failed" });
+  }
+});
+
+// ─── Advertising Playbook (read-only library + composers) ────────────────
+//   GET  /api/fs-pro/advertising-playbook              → full playbook
+//   GET  /api/fs-pro/advertising-playbook/summary      → quick counts
+//   GET  /api/fs-pro/advertising-playbook/campaign-types → 6 campaign objectives
+//   GET  /api/fs-pro/advertising-playbook/ugc-archetypes → UGC styles by industry
+//   GET  /api/fs-pro/advertising-playbook/brand-dna     → 5-Pillar framework
+//   GET  /api/fs-pro/advertising-playbook/master-formula → Master Prompt Formula
+//   GET  /api/fs-pro/advertising-playbook/micro-clip    → 6-second method
+//   GET  /api/fs-pro/advertising-playbook/workflow      → 7-step production
+//   POST /api/fs-pro/advertising-playbook/compose-brief → campaign brief composer
+//   POST /api/fs-pro/advertising-playbook/compose-clip  → 6-sec clip prompt
+// ───────────────────────────────────────────────────────────────────────────
+
+router.get("/fs-pro/advertising-playbook", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getFullPlaybook(), summary: getPlaybookSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "playbook read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/summary", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, summary: getPlaybookSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "playbook summary failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/campaign-types", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, campaignTypes: CAMPAIGN_TYPES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "campaign types read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/ugc-archetypes", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ugcArchetypes: UGC_ARCHETYPES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "UGC archetypes read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/brand-dna", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, brandDnaFramework: BRAND_DNA_FRAMEWORK });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "brand DNA read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/master-formula", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, masterPromptFormula: MASTER_PROMPT_FORMULA });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "master formula read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/micro-clip", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, microClipMethod: MICRO_CLIP_METHOD });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "micro-clip method read failed" });
+  }
+});
+
+router.get("/fs-pro/advertising-playbook/workflow", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, productionWorkflow: PRODUCTION_WORKFLOW });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "production workflow read failed" });
+  }
+});
+
+router.post("/fs-pro/advertising-playbook/compose-brief", requireAdmin, (req, res) => {
+  try {
+    const { brandName, industry, objective, brandDna } = (req.body || {}) as {
+      brandName?: string;
+      industry?: UgcIndustry;
+      objective?: CampaignObjective;
+      brandDna?: Partial<Record<string, string>>;
+    };
+    if (!brandName || typeof brandName !== "string") {
+      res.status(400).json({ error: "brandName requerido" }); return;
+    }
+    if (!industry || !UGC_ARCHETYPES[industry]) {
+      res.status(400).json({ error: `industry requerido (${Object.keys(UGC_ARCHETYPES).join("|")})` }); return;
+    }
+    if (!objective || !CAMPAIGN_TYPES[objective]) {
+      res.status(400).json({ error: `objective requerido (${Object.keys(CAMPAIGN_TYPES).join("|")})` }); return;
+    }
+    const brief = composeCampaignBrief({ brandName, industry, objective, brandDna });
+    res.json({ ok: true, brief });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "compose brief failed" });
+  }
+});
+
+router.post("/fs-pro/advertising-playbook/compose-clip", requireAdmin, (req, res) => {
+  try {
+    const { clipIndex, totalClips, presenterDescription, scriptLine, emotion, background, cameraMovement, lighting, style } = (req.body || {}) as {
+      clipIndex?: number;
+      totalClips?: number;
+      presenterDescription?: string;
+      scriptLine?: string;
+      emotion?: string;
+      background?: string;
+      cameraMovement?: string;
+      lighting?: string;
+      style?: string;
+    };
+    if (typeof clipIndex !== "number" || typeof totalClips !== "number" || !Number.isFinite(clipIndex) || !Number.isFinite(totalClips)) {
+      res.status(400).json({ error: "clipIndex y totalClips requeridos (number finito)" }); return;
+    }
+    if (clipIndex < 0 || totalClips < 1 || clipIndex >= totalClips) {
+      res.status(400).json({ error: "clipIndex debe ser >= 0 y < totalClips, totalClips >= 1" }); return;
+    }
+    const trim = (s: unknown) => typeof s === "string" ? s.trim() : "";
+    const pDesc = trim(presenterDescription);
+    const sLine = trim(scriptLine);
+    const emo = trim(emotion);
+    const bg = trim(background);
+    if (!pDesc || !sLine || !emo || !bg) {
+      res.status(400).json({ error: "presenterDescription, scriptLine, emotion, background requeridos (no vacíos)" }); return;
+    }
+    if (pDesc.length > 2000 || sLine.length > 2000 || emo.length > 500 || bg.length > 2000) {
+      res.status(400).json({ error: "Campos exceden longitud máxima permitida" }); return;
+    }
+    const prompt = compose6SecClipPrompt({
+      clipIndex, totalClips, presenterDescription: pDesc, scriptLine: sLine, emotion: emo, background: bg,
+      cameraMovement, lighting, style,
+    });
+    res.json({ ok: true, prompt });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "compose clip failed" });
+  }
+});
+
+// ─── COGS Methodology (read-only methodology library) ───────────────────
+//   GET /api/fs-pro/cogs-methodology          → full methodology
+//   GET /api/fs-pro/cogs-methodology/summary  → quick counts
+// ───────────────────────────────────────────────────────────────────────────
+
+router.get("/fs-pro/cogs-methodology", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getFullCogsMethodology(), summary: getCogsMethodologySummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cogs methodology read failed" });
+  }
+});
+
+router.get("/fs-pro/cogs-methodology/summary", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, summary: getCogsMethodologySummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "cogs methodology summary failed" });
   }
 });
 

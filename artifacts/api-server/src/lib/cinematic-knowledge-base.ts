@@ -426,6 +426,257 @@ export const CONTINUITY_TOKENS: ContinuityToken[] = [
 ];
 
 // ───────────────────────────────────────────────────────────────────────────
+// 8. TIMELINE LAYERS — The 7-layer professional prompt system.
+//    (Source: Ultimate Prompt System 2026 / Pollo.ai / Omneky / Seedance 2.0)
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface TimelineLayer {
+  layer: number;
+  id: string;
+  name: string;
+  spanishName: string;
+  description: string;
+  promptInstructions: string;
+  exampleFragment: string;
+}
+
+export const TIMELINE_LAYERS: TimelineLayer[] = [
+  { layer: 1, id: "tl:general", name: "Timeline General", spanishName: "Línea temporal general",
+    description: "Divide the video into time blocks (0-4s, 4-8s, 8-12s, etc.)",
+    promptInstructions: "Always specify exact second ranges for each block. Each block should have a distinct visual action.",
+    exampleFragment: "0-4s: Medium tracking shot. 4-8s: Slow orbit reveal. 8-12s: Extreme close-up product detail." },
+  { layer: 2, id: "tl:speed", name: "Speed Control", spanishName: "Control de velocidad",
+    description: "Normal (100%) / Slow Motion (50-70%) / Timelapse (2x-4x) / Reverse per block",
+    promptInstructions: "Specify speed percentage or multiplier for each time block. Use slow-motion for hero moments and timelapse for process/assembly sequences.",
+    exampleFragment: "0-4s (Normal speed 100%). 4-7s (Slow motion 50%). 7-10s (Timelapse 2.8x speed)." },
+  { layer: 3, id: "tl:camera", name: "Camera Movement", spanishName: "Movimiento de cámara",
+    description: "Tracking / Orbit / Push-in / Dolly / Handheld / Parallax / Crane / Drone per block",
+    promptInstructions: "Assign a specific camera movement to each time block. Never leave camera static for more than 2 seconds in professional ads.",
+    exampleFragment: "Camera follows smoothly. Camera orbits 25 degrees. Camera pushes in slightly." },
+  { layer: 4, id: "tl:subject", name: "Subject Action", spanishName: "Acción del sujeto",
+    description: "What the model/person/object does in each time block",
+    promptInstructions: "Describe the exact physical action, emotion, and positioning of the subject per block. Include gestures, expressions, and body language.",
+    exampleFragment: "He stops, turns slightly. He adjusts watch on right wrist naturally. Final pose looking directly at camera with confident smile." },
+  { layer: 5, id: "tl:text", name: "Text/Infographic", spanishName: "Texto/Infografía",
+    description: "When text appears, how it appears, how long it stays, how it disappears",
+    promptInstructions: "Specify exact second for text entrance, animation style (pop, fade, slide), duration, and exit. Never overlap more than 2 text elements.",
+    exampleFragment: "3s: Elegant gold text pops in left with soft glow. 12s: All texts fade out elegantly. 14s: Final CTA appears with cinematic fade." },
+  { layer: 6, id: "tl:physics", name: "Physics & Details", spanishName: "Física y detalles",
+    description: "Fabric physics, metal reflections, shadows, adhesion, micro-details",
+    promptInstructions: "Always specify material-specific physics: fabric flow, metal reflections, surface adhesion, shadow behavior, skin texture, wrist curvature for wearables.",
+    exampleFragment: "Perfect body adhesion, realistic metal reflections, accurate wrist curvature, natural shadows, photorealistic textures." },
+  { layer: 7, id: "tl:quality", name: "Quality Boosters", spanishName: "Potenciadores de calidad",
+    description: "8K, photorealistic, natural skin, realistic lighting, film grain, etc.",
+    promptInstructions: "Always close the prompt with quality boosters. These are non-negotiable for professional output.",
+    exampleFragment: "Natural skin, realistic fabric movement, premium lighting, 8K, high-end advertisement quality." },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// 9. SPEED CONTROL VOCABULARY — Precise speed modifiers for timeline blocks.
+// ───────────────────────────────────────────────────────────────────────────
+
+export type SpeedMode = "normal" | "slow_motion" | "timelapse" | "reverse" | "speed_ramp";
+
+export interface SpeedControlDefinition {
+  mode: SpeedMode;
+  spanishLabel: string;
+  parameterRange: string;
+  promptFragment: string;
+  bestFor: string[];
+  technicalNote: string;
+}
+
+export const SPEED_CONTROL: Record<SpeedMode, SpeedControlDefinition> = {
+  normal: { mode: "normal", spanishLabel: "Velocidad normal", parameterRange: "100%",
+    promptFragment: "Normal speed 100%, real-time motion",
+    bestFor: ["establishing_shots", "dialogue", "walking", "natural_movement"],
+    technicalNote: "24fps or 30fps playback, standard motion blur" },
+  slow_motion: { mode: "slow_motion", spanishLabel: "Cámara lenta", parameterRange: "25-70%",
+    promptFragment: "Slow motion at {{SPEED}}% speed, hyper-detailed micro-movements visible",
+    bestFor: ["hero_reveal", "product_detail", "emotional_moment", "impact_moment", "fabric_flow"],
+    technicalNote: "Capture at 120-240fps, playback at 24fps. 50% = most natural slow-mo. Below 30% feels dreamlike." },
+  timelapse: { mode: "timelapse", spanishLabel: "Timelapse", parameterRange: "2x-8x",
+    promptFragment: "Timelapse at {{SPEED}}x speed, compressed time showing process progression",
+    bestFor: ["assembly", "construction", "deconstruction", "transformation", "process_reveal"],
+    technicalNote: "2-3x = subtle acceleration. 4-8x = clear timelapse. Above 8x becomes abstract." },
+  reverse: { mode: "reverse", spanishLabel: "Reversa", parameterRange: "100% reversed",
+    promptFragment: "Reverse playback, motion flows backward in time, satisfying reverse-physics",
+    bestFor: ["deconstruction_reveal", "dramatic_effect", "reconstruction", "unbreaking"],
+    technicalNote: "Works best with clean, predictable motion paths. Avoid with complex particle systems." },
+  speed_ramp: { mode: "speed_ramp", spanishLabel: "Rampa de velocidad", parameterRange: "variable",
+    promptFragment: "Speed ramp from real-time into extreme slow-motion at the apex moment, then back to normal",
+    bestFor: ["impact_hero", "catch_reveal", "transition_between_blocks"],
+    technicalNote: "Edgar Wright / Zack Snyder pacing. Ramp point should align with the key visual moment." },
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 10. QUALITY BOOSTERS — Non-negotiable quality descriptors.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface QualityBooster {
+  id: string;
+  category: "resolution" | "realism" | "lighting" | "texture" | "aesthetic" | "technical";
+  promptFragment: string;
+  tier: 1 | 2 | 3;
+}
+
+export const QUALITY_BOOSTERS: QualityBooster[] = [
+  { id: "qb:8k", category: "resolution", promptFragment: "8K ultra-high resolution", tier: 1 },
+  { id: "qb:photorealistic", category: "realism", promptFragment: "photorealistic, indistinguishable from real photography", tier: 1 },
+  { id: "qb:natural_skin", category: "texture", promptFragment: "natural skin texture with visible pores and subsurface scattering", tier: 1 },
+  { id: "qb:realistic_lighting", category: "lighting", promptFragment: "realistic cinematic lighting with accurate shadow falloff", tier: 1 },
+  { id: "qb:film_grain", category: "aesthetic", promptFragment: "subtle film grain for organic cinematic feel, never digital-clean", tier: 2 },
+  { id: "qb:high_end_ad", category: "aesthetic", promptFragment: "high-end advertisement quality, premium brand standard", tier: 1 },
+  { id: "qb:natural_fabric", category: "texture", promptFragment: "realistic fabric movement and draping with accurate material physics", tier: 2 },
+  { id: "qb:metal_reflections", category: "texture", promptFragment: "accurate metal reflections with environment mapping and specular highlights", tier: 2 },
+  { id: "qb:hair_detail", category: "texture", promptFragment: "individual hair strand detail, natural movement and light interaction", tier: 2 },
+  { id: "qb:depth_atmosphere", category: "aesthetic", promptFragment: "atmospheric depth with subtle haze, volumetric light interaction", tier: 2 },
+  { id: "qb:color_science", category: "technical", promptFragment: "professional color science, accurate white balance, ACES workflow tonality", tier: 3 },
+  { id: "qb:motion_blur_natural", category: "technical", promptFragment: "natural 180-degree shutter motion blur, no strobing", tier: 2 },
+  { id: "qb:eye_catchlight", category: "realism", promptFragment: "accurate eye catchlights reflecting the key light setup", tier: 3 },
+  { id: "qb:micro_detail", category: "texture", promptFragment: "micro-level surface detail: stitching, grain, engravings, serial numbers legible", tier: 3 },
+  { id: "qb:golden_hour", category: "lighting", promptFragment: "golden hour warm natural lighting with long soft shadows", tier: 1 },
+  { id: "qb:studio_premium", category: "lighting", promptFragment: "controlled studio lighting with key, fill, and rim separation", tier: 1 },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// 11. PHYSICS DETAIL VOCABULARY — Material-specific physics for prompts.
+// ───────────────────────────────────────────────────────────────────────────
+
+export type PhysicsCategory = "fabric" | "metal" | "liquid" | "glass" | "skin" | "mechanical" | "adhesion";
+
+export interface PhysicsDetail {
+  id: string;
+  category: PhysicsCategory;
+  spanishLabel: string;
+  promptFragment: string;
+  applicableTo: string[];
+}
+
+export const PHYSICS_VOCABULARY: PhysicsDetail[] = [
+  { id: "phys:fabric_drape", category: "fabric", spanishLabel: "Caída de tejido",
+    promptFragment: "realistic fabric draping with accurate gravity response, natural fold patterns based on material weight",
+    applicableTo: ["fashion", "clothing", "textile"] },
+  { id: "phys:fabric_flow", category: "fabric", spanishLabel: "Flujo de tela en movimiento",
+    promptFragment: "fabric flows naturally with body movement, delayed inertia response, realistic wrinkle formation",
+    applicableTo: ["fashion", "clothing", "textile"] },
+  { id: "phys:metal_specular", category: "metal", spanishLabel: "Reflejo metálico especular",
+    promptFragment: "accurate specular highlights on metal surfaces, environment reflections with correct Fresnel falloff",
+    applicableTo: ["watches", "jewelry", "tech", "automotive"] },
+  { id: "phys:metal_brushed", category: "metal", spanishLabel: "Metal cepillado",
+    promptFragment: "brushed metal surface with directional micro-scratches, anisotropic reflections along grain direction",
+    applicableTo: ["watches", "tech", "appliances"] },
+  { id: "phys:liquid_surface_tension", category: "liquid", spanishLabel: "Tensión superficial",
+    promptFragment: "visible surface tension on liquid drops, accurate meniscus formation, realistic refraction through droplets",
+    applicableTo: ["fragrance", "beverages", "skincare"] },
+  { id: "phys:liquid_viscosity", category: "liquid", spanishLabel: "Viscosidad realista",
+    promptFragment: "fluid viscosity matching the real product: water-thin for toners, honey-thick for serums, accurate flow rate",
+    applicableTo: ["skincare", "food", "fragrance"] },
+  { id: "phys:glass_refraction", category: "glass", spanishLabel: "Refracción del cristal",
+    promptFragment: "accurate glass refraction with chromatic dispersion, visible distortion through curved surfaces, caustic patterns",
+    applicableTo: ["watches", "fragrance", "eyewear"] },
+  { id: "phys:skin_subsurface", category: "skin", spanishLabel: "Subsurface scattering piel",
+    promptFragment: "realistic skin subsurface scattering, light penetrating and diffusing through ear tips and thin areas, natural translucency",
+    applicableTo: ["presenter", "beauty", "fashion"] },
+  { id: "phys:mechanical_precision", category: "mechanical", spanishLabel: "Precisión mecánica",
+    promptFragment: "mechanical components moving with Swiss watchmaking precision, zero slop in gear mesh, perfect axis alignment",
+    applicableTo: ["watches", "tech", "industrial"] },
+  { id: "phys:mechanical_haptic", category: "mechanical", spanishLabel: "Feedback háptico",
+    promptFragment: "satisfying haptic click on component engagement, micro-vibration on snap, tactile precision feedback",
+    applicableTo: ["watches", "tech", "luxury"] },
+  { id: "phys:wrist_adhesion", category: "adhesion", spanishLabel: "Adhesión a muñeca",
+    promptFragment: "perfect body adhesion on wrist with accurate curvature follow, no floating or gap, skin indentation from bracelet weight",
+    applicableTo: ["watches", "wearables"] },
+  { id: "phys:body_adhesion", category: "adhesion", spanishLabel: "Adhesión corporal",
+    promptFragment: "garment follows body contour naturally, no hovering, accurate pressure points where fabric contacts skin",
+    applicableTo: ["fashion", "fitness", "wearables"] },
+  { id: "phys:shadow_contact", category: "adhesion", spanishLabel: "Sombra de contacto",
+    promptFragment: "accurate contact shadow where object meets surface, soft ambient occlusion in crevices, no floating appearance",
+    applicableTo: ["product_hero", "lifestyle"] },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// 12. TEXT OVERLAY PATTERNS — Timing and animation for on-screen text.
+// ───────────────────────────────────────────────────────────────────────────
+
+export type TextAnimation = "pop_in" | "fade_in" | "slide_up" | "typewriter" | "counter_animation" | "particle_reveal" | "cinematic_fade";
+
+export interface TextOverlayPattern {
+  animation: TextAnimation;
+  spanishLabel: string;
+  promptFragment: string;
+  bestFor: string[];
+  durationSec: [number, number];
+}
+
+export const TEXT_OVERLAY_PATTERNS: Record<TextAnimation, TextOverlayPattern> = {
+  pop_in: { animation: "pop_in", spanishLabel: "Aparición instantánea", durationSec: [0.3, 0.5],
+    promptFragment: "text pops in with subtle scale overshoot and soft glow",
+    bestFor: ["product_label", "feature_callout", "quick_stat"] },
+  fade_in: { animation: "fade_in", spanishLabel: "Fundido suave", durationSec: [0.5, 1.0],
+    promptFragment: "text fades in elegantly with soft opacity transition",
+    bestFor: ["headline", "tagline", "emotional_message"] },
+  slide_up: { animation: "slide_up", spanishLabel: "Deslizar hacia arriba", durationSec: [0.4, 0.8],
+    promptFragment: "text slides up from below frame with deceleration ease",
+    bestFor: ["stat_reveal", "benefit_list", "sequential_points"] },
+  typewriter: { animation: "typewriter", spanishLabel: "Máquina de escribir", durationSec: [1.0, 3.0],
+    promptFragment: "text appears character by character in typewriter rhythm",
+    bestFor: ["quote", "testimonial", "dramatic_statement"] },
+  counter_animation: { animation: "counter_animation", spanishLabel: "Contador animado", durationSec: [1.0, 2.0],
+    promptFragment: "number counts up rapidly from 0 to final value with smooth deceleration",
+    bestFor: ["statistics", "results", "conversion_rate", "revenue"] },
+  particle_reveal: { animation: "particle_reveal", spanishLabel: "Revelación con partículas", durationSec: [0.8, 1.5],
+    promptFragment: "text materializes from golden particles coalescing into letterforms",
+    bestFor: ["premium_headline", "brand_name", "hero_stat"] },
+  cinematic_fade: { animation: "cinematic_fade", spanishLabel: "Fundido cinematográfico", durationSec: [0.8, 1.5],
+    promptFragment: "text appears with cinematic fade and subtle lens flare accent",
+    bestFor: ["cta", "final_message", "logo_reveal"] },
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 13. LIP SYNC RULES — Universal best practices for talking-head video.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface LipSyncRule {
+  id: string;
+  rule: string;
+  spanishRule: string;
+  promptInjection: string;
+  priority: "critical" | "important" | "recommended";
+}
+
+export const LIP_SYNC_RULES: LipSyncRule[] = [
+  { id: "ls:perfect_sync", priority: "critical",
+    rule: "Always include perfect lip sync instruction in every talking-head prompt",
+    spanishRule: "Siempre incluir instrucción de lip sync perfecto",
+    promptInjection: "perfect lip sync — mouth moves naturally and exactly in sync with the voice, realistic mouth movements, natural speaking rhythm" },
+  { id: "ls:short_sentences", priority: "critical",
+    rule: "Keep sentences short: maximum 12-15 words per breath",
+    spanishRule: "Frases cortas: máximo 12-15 palabras por respiración",
+    promptInjection: "speaking with natural breathing pauses between sentences, conversational rhythm" },
+  { id: "ls:real_human", priority: "important",
+    rule: "Use real human presenters (not AI avatars) for highest trust",
+    spanishRule: "Usar presentadores humanos reales para máxima confianza",
+    promptInjection: "real human presenter, not AI avatar, authentic natural appearance" },
+  { id: "ls:voice_first", priority: "important",
+    rule: "Record voice first, then generate video with exact script",
+    spanishRule: "Grabar voz primero, luego generar vídeo con script exacto",
+    promptInjection: "speaking the exact scripted line with natural intonation" },
+  { id: "ls:natural_gestures", priority: "recommended",
+    rule: "Include natural hand gestures and head movements",
+    spanishRule: "Incluir gestos naturales de manos y movimientos de cabeza",
+    promptInjection: "natural hand gestures and subtle head movements while speaking, not stiff" },
+  { id: "ls:eye_contact", priority: "recommended",
+    rule: "Maintain direct camera eye contact for trust and engagement",
+    spanishRule: "Mantener contacto visual directo con cámara",
+    promptInjection: "looking directly at camera with warm confident eye contact throughout" },
+  { id: "ls:expression_match", priority: "recommended",
+    rule: "Facial expression must match the emotional tone of the script",
+    spanishRule: "Expresión facial debe coincidir con tono emocional del guión",
+    promptInjection: "facial expression matching the emotional content of the words" },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
 // PUBLIC ACCESS API — used by REST endpoints and templates.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -436,6 +687,12 @@ export interface KnowledgeBaseSummary {
   presenterStyleCount: number;
   shotVocabularyCount: number;
   continuityTokenCount: number;
+  timelineLayerCount: number;
+  speedControlModeCount: number;
+  qualityBoosterCount: number;
+  physicsVocabularyCount: number;
+  textOverlayPatternCount: number;
+  lipSyncRuleCount: number;
   industrySegments: IndustrySegment[];
 }
 
@@ -447,6 +704,12 @@ export function getKnowledgeBaseSummary(): KnowledgeBaseSummary {
     presenterStyleCount: Object.keys(PRESENTER_STYLES).length,
     shotVocabularyCount: Object.keys(SHOT_VOCABULARY).length,
     continuityTokenCount: CONTINUITY_TOKENS.length,
+    timelineLayerCount: TIMELINE_LAYERS.length,
+    speedControlModeCount: Object.keys(SPEED_CONTROL).length,
+    qualityBoosterCount: QUALITY_BOOSTERS.length,
+    physicsVocabularyCount: PHYSICS_VOCABULARY.length,
+    textOverlayPatternCount: Object.keys(TEXT_OVERLAY_PATTERNS).length,
+    lipSyncRuleCount: LIP_SYNC_RULES.length,
     industrySegments: Object.keys(NEGATIVE_PROMPT_LIBRARY) as IndustrySegment[],
   };
 }
@@ -460,6 +723,12 @@ export function getFullKnowledgeBase() {
     presenterStyles: PRESENTER_STYLES,
     shotVocabulary: SHOT_VOCABULARY,
     continuityTokens: CONTINUITY_TOKENS,
+    timelineLayers: TIMELINE_LAYERS,
+    speedControl: SPEED_CONTROL,
+    qualityBoosters: QUALITY_BOOSTERS,
+    physicsVocabulary: PHYSICS_VOCABULARY,
+    textOverlayPatterns: TEXT_OVERLAY_PATTERNS,
+    lipSyncRules: LIP_SYNC_RULES,
   };
 }
 
