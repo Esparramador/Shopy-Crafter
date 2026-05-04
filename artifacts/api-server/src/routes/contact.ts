@@ -599,7 +599,7 @@ function buildCapabilitiesSection(lead: LeadData): string {
   const services = (lead.services || []).filter((s): s is string => typeof s === "string");
   const niche = (lead.niche || "").toLowerCase();
   const capabilities: { icon: string; title: string; desc: string }[] = [
-    { icon: "🤖", title: "Motor IA Claude (Anthropic)", desc: "Investigación de mercado con datos reales, optimización SEO 100/100, y generación de contenido profesional" },
+    { icon: "🤖", title: "Dual AI Engine (Gemini + Claude)", desc: "Gemini investiga y busca datos reales en paralelo, Claude los compacta y genera informes profesionales — doble IA para máxima precisión" },
     { icon: "📊", title: "Inteligencia Financiera Avanzada", desc: "COGS, LTV/CAC, break-even, simulación de precios, y alertas de rentabilidad automáticas" },
     { icon: "🎬", title: "Producción de Vídeo Cinematográfico", desc: "Anuncios profesionales con 11 modelos de IA, voz en off ElevenLabs, música generativa, y narrativa de 7 pasos" },
   ];
