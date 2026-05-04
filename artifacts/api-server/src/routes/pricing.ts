@@ -1,6 +1,7 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
-import { projectsTable, productsTable, cogsTable, priceHistoryTable } from "@workspace/db";
+import { projectsTable, productsTable, cogsTable, priceHistoryTable, abTestsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
@@ -1270,6 +1271,1084 @@ router.post("/projects/:projectId/financial-forecast", async (req, res): Promise
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW FLAT PRICING MODULE ENDPOINTS — /pricing/*
+// Frontend expects these at /api/pricing/* (API_BASE = '/api/pricing')
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BatchJobState {
+  status: "idle" | "running" | "completed" | "error" | "cancelled";
+  current: number;
+  total: number;
+  message: string;
+  errors: number;
+  startedAt?: string;
+  completedAt?: string;
+  cancelled?: boolean;
+}
+
+const batchJobs = new Map<string, BatchJobState>();
+
+async function resolveProjectId(req: any): Promise<number> {
+  const qp = req.query?.projectId;
+  if (qp) {
+    const pid = parseInt(String(qp), 10);
+    if (!isNaN(pid) && pid > 0) return pid;
+  }
+  const [first] = await db
+    .select({ id: projectsTable.id })
+    .from(projectsTable)
+    .orderBy(projectsTable.id)
+    .limit(1);
+  if (!first) throw new Error("No hay proyectos configurados");
+  return first.id;
+}
+
+function cogsRowToFrontend(cogs: any, product: any): Record<string, any> {
+  const currentPrice = parseFloat(product?.price ?? "0");
+  const totalCogs = cogs?.totalCogs ?? 0;
+  const margenBruto = currentPrice - totalCogs;
+  const margenPct =
+    currentPrice > 0 ? (margenBruto / currentPrice) * 100 : 0;
+
+  return {
+    costeUnitario: cogs?.unitCost ?? 0,
+    materiales: cogs?.materialCost ?? 0,
+    tejidos: cogs?.fabricCost ?? 0,
+    impresionDigital: cogs?.printingCost ?? 0,
+    serigrafia: cogs?.screenPrintingCost ?? 0,
+    amortizacionMoldes: cogs?.moldAmortization ?? 0,
+    montaje: cogs?.assemblyCost ?? 0,
+    manoObra: cogs?.laborCostPerUnit ?? 0,
+    controlCalidad: cogs?.qualityControlCost ?? 0,
+    embalaje: cogs?.packagingCost ?? 0,
+    etiquetado: cogs?.labelCost ?? 0,
+    envioNacional: cogs?.shippingCostDomestic ?? 0,
+    envioInternacional: cogs?.shippingCostInternational ?? 0,
+    fulfillment: cogs?.fulfillmentFee ?? 0,
+    almacenamiento: cogs?.warehouseCostPerUnit ?? 0,
+    creditosIA: cogs?.aiApiCostPerUnit ?? 0,
+    storageBandwidth: 0,
+    paymentFees: cogs?.paymentProcessingFee ?? 0,
+    rotura: cogs?.returnProcessingCost ?? 0,
+    marketing: cogs?.digitalMarketingCost ?? 0,
+    cogsTotal: totalCogs,
+    cogsLow: Math.round(totalCogs * 0.85 * 100) / 100,
+    cogsHigh: Math.round(totalCogs * 1.15 * 100) / 100,
+    margenBruto: Math.round(margenBruto * 100) / 100,
+    margenPct: Math.round(margenPct * 10) / 10,
+    confidence: 0.7,
+    warnings: [],
+    assumptions: [],
+    estimatedAt: cogs?.updatedAt?.toISOString() ?? new Date().toISOString(),
+  };
+}
+
+function frontendToCogsValues(data: any): Record<string, any> {
+  const vals: Record<string, any> = {};
+  if (data.costeUnitario != null) vals.unitCost = data.costeUnitario;
+  if (data.materiales != null) vals.materialCost = data.materiales;
+  if (data.tejidos != null) vals.fabricCost = data.tejidos;
+  if (data.impresionDigital != null) vals.printingCost = data.impresionDigital;
+  if (data.serigrafia != null) vals.screenPrintingCost = data.serigrafia;
+  if (data.amortizacionMoldes != null) vals.moldAmortization = data.amortizacionMoldes;
+  if (data.montaje != null) vals.assemblyCost = data.montaje;
+  if (data.manoObra != null) vals.laborCostPerUnit = data.manoObra;
+  if (data.controlCalidad != null) vals.qualityControlCost = data.controlCalidad;
+  if (data.embalaje != null) vals.packagingCost = data.embalaje;
+  if (data.etiquetado != null) vals.labelCost = data.etiquetado;
+  if (data.envioNacional != null) vals.shippingCostDomestic = data.envioNacional;
+  if (data.envioInternacional != null) vals.shippingCostInternational = data.envioInternacional;
+  if (data.fulfillment != null) vals.fulfillmentFee = data.fulfillment;
+  if (data.almacenamiento != null) vals.warehouseCostPerUnit = data.almacenamiento;
+  if (data.creditosIA != null) vals.aiApiCostPerUnit = data.creditosIA;
+  if (data.paymentFees != null) vals.paymentProcessingFee = data.paymentFees;
+  if (data.rotura != null) vals.returnProcessingCost = data.rotura;
+  if (data.marketing != null) vals.digitalMarketingCost = data.marketing;
+  if (data.cogsTotal != null) vals.totalCogs = data.cogsTotal;
+  return vals;
+}
+
+function sumCogsFields(e: Record<string, number>): number {
+  return (
+    (e.costeUnitario ?? 0) + (e.materiales ?? 0) + (e.tejidos ?? 0) +
+    (e.impresionDigital ?? 0) + (e.serigrafia ?? 0) + (e.amortizacionMoldes ?? 0) +
+    (e.montaje ?? 0) + (e.manoObra ?? 0) + (e.controlCalidad ?? 0) +
+    (e.embalaje ?? 0) + (e.etiquetado ?? 0) + (e.envioNacional ?? 0) +
+    (e.envioInternacional ?? 0) + (e.fulfillment ?? 0) + (e.almacenamiento ?? 0) +
+    (e.creditosIA ?? 0) + (e.storageBandwidth ?? 0) + (e.paymentFees ?? 0) +
+    (e.rotura ?? 0) + (e.marketing ?? 0)
+  );
+}
+
+function estimatedToCogsRow(est: Record<string, any>, projectId: number, shopifyProductId: string) {
+  const cogsTotal = sumCogsFields(est);
+  const finalTotal = cogsTotal > 0 ? Math.round(cogsTotal * 100) / 100 : (est.cogsTotal ?? 0);
+  return {
+    projectId,
+    shopifyProductId,
+    unitCost: est.costeUnitario ?? 0,
+    materialCost: est.materiales ?? 0,
+    fabricCost: est.tejidos ?? 0,
+    printingCost: est.impresionDigital ?? 0,
+    screenPrintingCost: est.serigrafia ?? 0,
+    moldAmortization: est.amortizacionMoldes ?? 0,
+    assemblyCost: est.montaje ?? 0,
+    laborCostPerUnit: est.manoObra ?? 0,
+    qualityControlCost: est.controlCalidad ?? 0,
+    packagingCost: est.embalaje ?? 0,
+    labelCost: est.etiquetado ?? 0,
+    shippingCostDomestic: est.envioNacional ?? 0,
+    shippingCostInternational: est.envioInternacional ?? 0,
+    fulfillmentFee: est.fulfillment ?? 0,
+    warehouseCostPerUnit: est.almacenamiento ?? 0,
+    aiApiCostPerUnit: est.creditosIA ?? 0,
+    paymentProcessingFee: est.paymentFees ?? 0,
+    digitalMarketingCost: est.marketing ?? 0,
+    returnProcessingCost: est.rotura ?? 0,
+    totalCogs: finalTotal,
+    totalCogsWithVat: Math.round(finalTotal * 1.21 * 100) / 100,
+    breakEvenPrice: finalTotal,
+    breakEvenPriceWithVat: Math.round(finalTotal * 1.21 * 100) / 100,
+    minimumViablePrice: Math.round(finalTotal * 1.15 * 100) / 100,
+  };
+}
+
+async function upsertCogsRow(values: Record<string, any>, projectId: number, shopifyProductId: string) {
+  const [existing] = await db
+    .select({ id: cogsTable.id })
+    .from(cogsTable)
+    .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
+
+  if (existing) {
+    await db.update(cogsTable).set(values).where(eq(cogsTable.id, existing.id));
+  } else {
+    await db.insert(cogsTable).values(values);
+  }
+}
+
+// ── 1. GET /pricing/products ─────────────────────────────────────────────────
+router.get("/pricing/products", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+
+    const products = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.projectId, projectId));
+
+    const allCogs = await db
+      .select()
+      .from(cogsTable)
+      .where(eq(cogsTable.projectId, projectId));
+
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(c.shopifyProductId, c);
+
+    const result = products.map((p) => {
+      const cogs = cogsMap.get(p.shopifyProductId);
+      const currentPrice = parseFloat(p.price ?? "0");
+      const images = p.imagesJson as any;
+      const imageUrl =
+        Array.isArray(images) && images.length > 0
+          ? images[0]?.src ?? images[0]
+          : undefined;
+
+      return {
+        id: p.shopifyProductId,
+        shopifyId: parseInt(p.shopifyProductId, 10) || 0,
+        title: p.title,
+        imageUrl,
+        currentPrice,
+        compareAtPrice: p.compareAtPrice
+          ? parseFloat(p.compareAtPrice)
+          : undefined,
+        currency: "EUR",
+        imageScore: p.imageScore ?? undefined,
+        grade: (p.auditGrade as any) ?? undefined,
+        category: (p.productType as any) ?? undefined,
+        cogsData: cogs ? cogsRowToFrontend(cogs, p) : undefined,
+        lastEstimatedAt: cogs?.updatedAt?.toISOString() ?? undefined,
+        hasOptimizedPrice: cogs?.lastPricingRecommendation != null,
+      };
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 2. GET /pricing/kpis ─────────────────────────────────────────────────────
+router.get("/pricing/kpis", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+
+    const products = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.projectId, projectId));
+
+    const allCogs = await db
+      .select()
+      .from(cogsTable)
+      .where(eq(cogsTable.projectId, projectId));
+
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(c.shopifyProductId, c);
+
+    let totalMargin = 0;
+    let productsWithCOGS = 0;
+    let productsLowMargin = 0;
+    let productsCriticalMargin = 0;
+    let totalEstimatedRevenue = 0;
+    let potentialSavings = 0;
+
+    for (const p of products) {
+      const currentPrice = parseFloat(p.price ?? "0");
+      totalEstimatedRevenue += currentPrice * 30;
+
+      const cogs = cogsMap.get(p.shopifyProductId);
+      if (cogs && cogs.totalCogs > 0) {
+        productsWithCOGS++;
+        const marginPct =
+          currentPrice > 0
+            ? ((currentPrice - cogs.totalCogs) / currentPrice) * 100
+            : 0;
+        totalMargin += marginPct;
+        if (marginPct < 20) productsLowMargin++;
+        if (marginPct < 15) productsCriticalMargin++;
+
+        if (cogs.lastPricingRecommendation) {
+          const rec = cogs.lastPricingRecommendation as any;
+          const recPrice = rec.precioOptimo ?? rec.optimalPrice ?? 0;
+          if (recPrice > currentPrice) {
+            potentialSavings += (recPrice - currentPrice) * 30;
+          }
+        }
+      }
+    }
+
+    res.json({
+      totalProducts: products.length,
+      productsWithCOGS,
+      avgMarginPct:
+        productsWithCOGS > 0
+          ? Math.round((totalMargin / productsWithCOGS) * 10) / 10
+          : 0,
+      productsLowMargin,
+      productsCriticalMargin,
+      totalEstimatedRevenue: Math.round(totalEstimatedRevenue * 100) / 100,
+      potentialSavings: Math.round(potentialSavings * 100) / 100,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 3. POST /pricing/classify-product ────────────────────────────────────────
+router.post("/pricing/classify-product", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productId } = req.body as { productId: string };
+    if (!productId) {
+      res.status(400).json({ error: "productId requerido" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+
+    const result = await askClaudeJsonWithBrain<{
+      category: string;
+      confidence: number;
+    }>(
+      projectId,
+      `Clasifica este producto en una de estas categorías:
+- digital_puro (software, NFTs, downloads, audiobooks, packs digitales)
+- fisico (productos tangibles, envío requerido: ropa, pósters, lienzos, gadgets)
+- servicio (consultoría, sesiones, coaching, cursos en vivo)
+- hibrido (producto físico + digital, ej: libro + ebook)
+- digital_hibrido (digital con componente físico menor, ej: curso online + material impreso)
+
+Producto: "${product.title}"
+Descripción: "${(product.bodyHtml ?? "").replace(/<[^>]+>/g, " ").slice(0, 800)}"
+Tipo Shopify: "${product.productType ?? "sin tipo"}"
+Vendor: "${product.vendor ?? "sin vendor"}"
+Tags: "${product.tags ?? ""}"
+Precio: €${product.price ?? "0"}
+
+Responde JSON: { "category": "...", "confidence": 0.0-1.0 }`,
+      "You are a product classification expert. Classify products accurately. Return ONLY valid JSON.",
+      "cogs_estimation",
+      project?.storeNiche ?? undefined,
+      1024,
+      30_000,
+    );
+
+    res.json({ category: result.category, confidence: result.confidence });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 4. POST /pricing/estimate-cogs ───────────────────────────────────────────
+router.post("/pricing/estimate-cogs", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productId } = req.body as { productId: string };
+    if (!productId) {
+      res.status(400).json({ error: "productId requerido" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+
+    if (!product || !project) {
+      res.status(404).json({ error: "Producto o proyecto no encontrado" });
+      return;
+    }
+
+    const niche = project.storeNiche ?? "e-commerce";
+    const currentPrice = parseFloat(product.price ?? "0");
+
+    let shopifyDetails = "";
+    try {
+      const { getProjectConnector } = await import("../lib/platform-helper.js");
+      const connector = await getProjectConnector(projectId);
+      if (connector && connector.supportsFeature("products")) {
+        const liveProduct = await connector.getProduct(productId);
+        shopifyDetails = `
+Vendor: ${liveProduct.vendor || "desconocido"}
+Tipo: ${liveProduct.productType || "sin tipo"}
+Variantes: ${liveProduct.variants?.length ?? 1}
+Peso: ${liveProduct.variants?.[0]?.weight ? `${liveProduct.variants[0].weight}g` : "desconocido"}
+Requiere envío: ${liveProduct.variants?.[0]?.requires_shipping !== false ? "sí" : "no"}`;
+      }
+    } catch {}
+
+    const prompt = `Estima los costes de producción (COGS) para este producto de e-commerce.
+
+PRODUCTO:
+- Título: "${product.title}"
+- Precio actual: €${currentPrice}
+- Tipo: "${product.productType ?? "sin definir"}"
+- Vendor: "${product.vendor ?? "sin definir"}"
+- Tags: "${product.tags ?? ""}"
+- Descripción: "${(product.bodyHtml ?? "").replace(/<[^>]+>/g, " ").slice(0, 1000)}"
+${shopifyDetails}
+
+TIENDA:
+- Nombre: "${project.name}"
+- Nicho: "${niche}"
+- Mercados: "${project.storeMarkets ?? "España"}"
+
+INSTRUCCIONES:
+Estima TODOS estos campos en euros por unidad. Sé realista y usa datos de mercado 2025-2026 para España/Europa.
+Para productos digitales, los costes físicos serán 0 y los digitales (creditosIA, storageBandwidth, paymentFees) serán los relevantes.
+Para productos físicos, estima materiales, envío, embalaje, etc. basándote en el tipo de producto y nicho.
+
+Calcula:
+- cogsTotal: suma de todos los costes
+- cogsLow: estimación baja (-15%)
+- cogsHigh: estimación alta (+15%)
+- margenBruto: precio actual (€${currentPrice}) - cogsTotal
+- margenPct: (margenBruto / precio actual) * 100
+- confidence: 0-1 tu confianza en la estimación
+- warnings: advertencias si hay riesgos
+- assumptions: suposiciones que has hecho
+
+Responde SOLO JSON con estos campos exactos:
+{
+  "costeUnitario": 0, "materiales": 0, "tejidos": 0, "impresionDigital": 0,
+  "serigrafia": 0, "amortizacionMoldes": 0, "montaje": 0, "manoObra": 0,
+  "controlCalidad": 0, "embalaje": 0, "etiquetado": 0, "envioNacional": 0,
+  "envioInternacional": 0, "fulfillment": 0, "almacenamiento": 0,
+  "creditosIA": 0, "storageBandwidth": 0, "paymentFees": 0,
+  "rotura": 0, "marketing": 0,
+  "cogsTotal": 0, "cogsLow": 0, "cogsHigh": 0,
+  "margenBruto": 0, "margenPct": 0,
+  "confidence": 0.7, "warnings": [], "assumptions": []
+}`;
+
+    const estimated = await askClaudeJsonWithBrain<Record<string, any>>(
+      projectId,
+      prompt,
+      FINANCIAL_ANALYST_SYSTEM,
+      "cogs_estimation",
+      niche,
+      4096,
+      120_000,
+    );
+
+    const cogsTotal = sumCogsFields(estimated);
+    const finalCogsTotal =
+      cogsTotal > 0
+        ? Math.round(cogsTotal * 100) / 100
+        : (estimated.cogsTotal ?? 0);
+    const margenBruto = Math.round((currentPrice - finalCogsTotal) * 100) / 100;
+    const margenPct =
+      currentPrice > 0
+        ? Math.round(((currentPrice - finalCogsTotal) / currentPrice) * 1000) / 10
+        : 0;
+
+    const result = {
+      ...estimated,
+      cogsTotal: finalCogsTotal,
+      cogsLow: Math.round(finalCogsTotal * 0.85 * 100) / 100,
+      cogsHigh: Math.round(finalCogsTotal * 1.15 * 100) / 100,
+      margenBruto,
+      margenPct,
+      estimatedAt: new Date().toISOString(),
+    };
+
+    const cogsValues = estimatedToCogsRow(estimated, projectId, productId);
+    await upsertCogsRow(cogsValues, projectId, productId);
+
+    learnFromOperation({
+      operationType: "cogs_estimation",
+      niche,
+      title: `COGS estimado (flat): ${product.title}`,
+      content: `Estimación COGS para "${product.title}": Total €${finalCogsTotal}, Margen ${margenPct}%. Confianza: ${result.confidence}`,
+      confidence: typeof result.confidence === "number" ? result.confidence : 0.7,
+      tags: ["cogs", "estimation", "flat_pricing"],
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 5. POST /pricing/estimate-cogs/batch ─────────────────────────────────────
+router.post("/pricing/estimate-cogs/batch", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productIds } = req.body as { productIds?: string[] };
+
+    let targetProducts = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.projectId, projectId));
+
+    if (productIds && productIds.length > 0) {
+      targetProducts = targetProducts.filter((p) =>
+        productIds.includes(p.shopifyProductId),
+      );
+    }
+
+    if (targetProducts.length === 0) {
+      res.status(400).json({ error: "No hay productos para estimar" });
+      return;
+    }
+
+    const jobId = randomUUID();
+    const estimatedCost = targetProducts.length * 0.03;
+
+    const jobState: BatchJobState = {
+      status: "running",
+      current: 0,
+      total: targetProducts.length,
+      message: "Iniciando estimación batch...",
+      errors: 0,
+      startedAt: new Date().toISOString(),
+    };
+    batchJobs.set(jobId, jobState);
+
+    (async () => {
+      try {
+        const [project] = await db
+          .select()
+          .from(projectsTable)
+          .where(eq(projectsTable.id, projectId));
+        const niche = project?.storeNiche ?? "e-commerce";
+
+        for (let i = 0; i < targetProducts.length; i++) {
+          const job = batchJobs.get(jobId);
+          if (!job || job.cancelled) {
+            if (job) {
+              job.status = "cancelled";
+              job.message = `Cancelado en ${i}/${targetProducts.length}`;
+              job.completedAt = new Date().toISOString();
+            }
+            return;
+          }
+
+          const product = targetProducts[i];
+          job.current = i;
+          job.message = `Estimando: ${product.title.slice(0, 40)}... (${i + 1}/${targetProducts.length})`;
+
+          try {
+            const currentPrice = parseFloat(product.price ?? "0");
+            const prompt = `Estima COGS para: "${product.title}" (€${currentPrice}), tipo "${product.productType ?? "general"}", nicho "${niche}", mercado España/Europa.
+
+Responde SOLO JSON: { "costeUnitario": 0, "materiales": 0, "tejidos": 0, "impresionDigital": 0, "serigrafia": 0, "amortizacionMoldes": 0, "montaje": 0, "manoObra": 0, "controlCalidad": 0, "embalaje": 0, "etiquetado": 0, "envioNacional": 0, "envioInternacional": 0, "fulfillment": 0, "almacenamiento": 0, "creditosIA": 0, "storageBandwidth": 0, "paymentFees": 0, "rotura": 0, "marketing": 0, "cogsTotal": 0, "confidence": 0.7, "warnings": [], "assumptions": [] }`;
+
+            const estimated = await askClaudeJsonWithBrain<Record<string, any>>(
+              projectId,
+              prompt,
+              FINANCIAL_ANALYST_SYSTEM,
+              "cogs_estimation",
+              niche,
+              2048,
+              60_000,
+            );
+
+            const cogsValues = estimatedToCogsRow(
+              estimated,
+              projectId,
+              product.shopifyProductId,
+            );
+            await upsertCogsRow(
+              cogsValues,
+              projectId,
+              product.shopifyProductId,
+            );
+          } catch {
+            const job = batchJobs.get(jobId);
+            if (job) job.errors++;
+          }
+
+          const jobAfter = batchJobs.get(jobId);
+          if (jobAfter) jobAfter.current = i + 1;
+        }
+
+        const job = batchJobs.get(jobId);
+        if (job && job.status !== "cancelled") {
+          job.status =
+            job.errors > 0 && job.errors >= job.total ? "error" : "completed";
+          job.message =
+            job.errors > 0
+              ? `Completado con ${job.errors} errores de ${job.total}`
+              : `${job.total} productos estimados correctamente`;
+          job.completedAt = new Date().toISOString();
+        }
+      } finally {
+        setTimeout(() => batchJobs.delete(jobId), 10 * 60 * 1000);
+      }
+    })();
+
+    res.json({
+      jobId,
+      estimatedCost: Math.round(estimatedCost * 100) / 100,
+      total: targetProducts.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 6. GET /pricing/batch-progress/:jobId ────────────────────────────────────
+router.get("/pricing/batch-progress/:jobId", async (req, res): Promise<void> => {
+  try {
+    const jobId = req.params.jobId;
+    const job = batchJobs.get(jobId);
+
+    if (!job) {
+      res.json({
+        status: "idle",
+        current: 0,
+        total: 0,
+        message: "Job no encontrado o expirado",
+        errors: 0,
+      });
+      return;
+    }
+
+    res.json({
+      status: job.status,
+      current: job.current,
+      total: job.total,
+      message: job.message,
+      errors: job.errors,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 7. POST /pricing/batch-cancel/:jobId ─────────────────────────────────────
+router.post("/pricing/batch-cancel/:jobId", async (req, res): Promise<void> => {
+  try {
+    const jobId = req.params.jobId;
+    const job = batchJobs.get(jobId);
+
+    if (!job) {
+      res.json({ cancelled: false });
+      return;
+    }
+
+    job.cancelled = true;
+    job.status = "cancelled";
+    job.message = "Cancelación solicitada...";
+
+    res.json({ cancelled: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 8. PATCH /pricing/cogs/:productId ────────────────────────────────────────
+router.patch("/pricing/cogs/:productId", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const shopifyProductId = req.params.productId;
+    const data = req.body;
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, shopifyProductId),
+        ),
+      );
+
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const cogsVals = frontendToCogsValues(data);
+    const total = cogsVals.totalCogs ?? 0;
+    cogsVals.totalCogsWithVat = Math.round(total * 1.21 * 100) / 100;
+    cogsVals.breakEvenPrice = total;
+    cogsVals.breakEvenPriceWithVat = cogsVals.totalCogsWithVat;
+    cogsVals.minimumViablePrice = Math.round(total * 1.15 * 100) / 100;
+
+    await upsertCogsRow(
+      { projectId, shopifyProductId, ...cogsVals },
+      projectId,
+      shopifyProductId,
+    );
+
+    const [updatedCogs] = await db
+      .select()
+      .from(cogsTable)
+      .where(
+        and(
+          eq(cogsTable.projectId, projectId),
+          eq(cogsTable.shopifyProductId, shopifyProductId),
+        ),
+      );
+
+    res.json(cogsRowToFrontend(updatedCogs, product));
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 9. POST /pricing/simulate ────────────────────────────────────────────────
+router.post("/pricing/simulate", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const {
+      productId,
+      priceVariation,
+      monthlyVolume,
+      conversionRate,
+      customerAcquisitionCost,
+    } = req.body as {
+      productId: string;
+      priceVariation: number;
+      monthlyVolume: number;
+      conversionRate: number;
+      customerAcquisitionCost: number;
+    };
+
+    if (!productId) {
+      res.status(400).json({ error: "productId requerido" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+    const [cogs] = await db
+      .select()
+      .from(cogsTable)
+      .where(
+        and(
+          eq(cogsTable.projectId, projectId),
+          eq(cogsTable.shopifyProductId, productId),
+        ),
+      );
+
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const currentPrice = parseFloat(product.price ?? "0");
+    const priceFactor = 1 + ((priceVariation ?? 0) / 100);
+    const simulatedPrice = Math.round(currentPrice * priceFactor * 100) / 100;
+    const totalCogs = cogs?.totalCogs ?? 0;
+    const volume = monthlyVolume || 30;
+    const cac = customerAcquisitionCost || 0;
+
+    const projectedRevenue = Math.round(simulatedPrice * volume * 100) / 100;
+    const projectedCOGS = Math.round(totalCogs * volume * 100) / 100;
+    const grossProfit = Math.round((projectedRevenue - projectedCOGS) * 100) / 100;
+    const totalCAC = Math.round(cac * volume * 100) / 100;
+    const netProfit = Math.round((grossProfit - totalCAC) * 100) / 100;
+    const breakEvenUnits =
+      totalCogs > 0 && simulatedPrice > totalCogs
+        ? Math.ceil(projectedCOGS / (simulatedPrice - totalCogs))
+        : 0;
+    const marginPct =
+      projectedRevenue > 0
+        ? Math.round((grossProfit / projectedRevenue) * 1000) / 10
+        : 0;
+
+    const sensitivityCurve = [];
+    for (let pctChange = -30; pctChange <= 30; pctChange += 5) {
+      const adjPrice = currentPrice * (1 + pctChange / 100);
+      const adjRevenue = adjPrice * volume;
+      const adjCogs = totalCogs * volume;
+      const adjProfit = Math.round((adjRevenue - adjCogs - totalCAC) * 100) / 100;
+      sensitivityCurve.push({ priceChange: pctChange, netProfit: adjProfit });
+    }
+
+    res.json({
+      projectedRevenue,
+      projectedCOGS,
+      grossProfit,
+      netProfit,
+      breakEvenUnits,
+      marginPct,
+      sensitivityCurve,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 10. POST /pricing/optimize ───────────────────────────────────────────────
+router.post("/pricing/optimize", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productId } = req.body as { productId: string };
+    if (!productId) {
+      res.status(400).json({ error: "productId requerido" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+    const [cogs] = await db
+      .select()
+      .from(cogsTable)
+      .where(
+        and(
+          eq(cogsTable.projectId, projectId),
+          eq(cogsTable.shopifyProductId, productId),
+        ),
+      );
+
+    if (!product || !project) {
+      res.status(404).json({ error: "Producto o proyecto no encontrado" });
+      return;
+    }
+
+    const niche = project.storeNiche ?? "e-commerce";
+    const currentPrice = parseFloat(product.price ?? "0");
+    const totalCogs = cogs?.totalCogs ?? 0;
+
+    const prompt = `Optimiza el precio del producto "${product.title}" para la tienda "${project.name}".
+
+DATOS:
+- Precio actual: €${currentPrice}
+- COGS total: €${totalCogs}
+- Margen actual: ${currentPrice > 0 ? Math.round(((currentPrice - totalCogs) / currentPrice) * 100) : 0}%
+- Tipo: "${product.productType ?? "general"}"
+- Nicho: "${niche}"
+- Mercados: "${project.storeMarkets ?? "España"}"
+- Audiencia: "${project.targetAudience ?? "adultos"}"
+- Tono marca: "${project.brandTone ?? "profesional"}"
+- Break-even: €${cogs?.breakEvenPrice ?? totalCogs}
+
+REGLAS:
+1. El precio óptimo DEBE ser > COGS + 30% mínimo
+2. Usa psicología de precios (charm pricing, anclas, etc.)
+3. Considera elasticidad típica del nicho "${niche}"
+4. Precio conservador = seguro, bajo riesgo
+5. Precio agresivo = máximo margen, riesgo aceptable
+
+Responde SOLO JSON:
+{
+  "precioOptimo": 0,
+  "precioConservador": 0,
+  "precioAgresivo": 0,
+  "margenObjetivo": 0,
+  "justificacion": "texto en español con razonamiento detallado",
+  "riesgos": ["riesgo1", "riesgo2"],
+  "abTestSugerido": {
+    "variantA": 0,
+    "variantB": 0,
+    "duracionDias": 14,
+    "traficoMinimo": 500
+  },
+  "upsellOportunidades": ["oportunidad1", "oportunidad2"]
+}`;
+
+    const result = await askClaudeJsonWithBrain<{
+      precioOptimo: number;
+      precioConservador: number;
+      precioAgresivo: number;
+      margenObjetivo: number;
+      justificacion: string;
+      riesgos: string[];
+      abTestSugerido: {
+        variantA: number;
+        variantB: number;
+        duracionDias: number;
+        traficoMinimo: number;
+      };
+      upsellOportunidades: string[];
+    }>(projectId, prompt, FINANCIAL_ANALYST_SYSTEM, "pricing", niche, 4096, 120_000);
+
+    if (!result.riesgos) result.riesgos = [];
+    if (!result.upsellOportunidades) result.upsellOportunidades = [];
+    if (!result.abTestSugerido) {
+      result.abTestSugerido = {
+        variantA: result.precioConservador ?? currentPrice,
+        variantB: result.precioOptimo ?? currentPrice,
+        duracionDias: 14,
+        traficoMinimo: 500,
+      };
+    }
+
+    if (cogs) {
+      await db
+        .update(cogsTable)
+        .set({
+          lastPricingRecommendation: result as Record<string, unknown>,
+        })
+        .where(
+          and(
+            eq(cogsTable.projectId, projectId),
+            eq(cogsTable.shopifyProductId, productId),
+          ),
+        );
+    }
+
+    learnFromOperation({
+      operationType: "pricing_optimization",
+      niche,
+      title: `Optimización precio: ${product.title}`,
+      content: `Precio actual €${currentPrice} → Óptimo €${result.precioOptimo}, Conservador €${result.precioConservador}, Agresivo €${result.precioAgresivo}. Margen objetivo: ${result.margenObjetivo}%`,
+      confidence: 0.8,
+      tags: ["pricing", "optimization", niche],
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 11. PATCH /pricing/apply ─────────────────────────────────────────────────
+router.patch("/pricing/apply", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productId, newPrice } = req.body as {
+      productId: string;
+      newPrice: number;
+    };
+
+    if (!productId || newPrice == null || isNaN(Number(newPrice)) || Number(newPrice) <= 0) {
+      res.status(400).json({ error: "productId y newPrice requeridos (newPrice debe ser un número > 0)" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+
+    if (!product || !project) {
+      res.status(404).json({ error: "Producto o proyecto no encontrado" });
+      return;
+    }
+
+    const oldPrice = parseFloat(product.price ?? "0");
+    const priceStr = String(newPrice);
+
+    try {
+      const { updateStoreProduct } = await import("../lib/platform-helper.js");
+      const updateResult = await updateStoreProduct(projectId, productId, {
+        price: priceStr,
+        compareAtPrice: null,
+        variants: [
+          {
+            platformId: "",
+            title: "",
+            price: priceStr,
+            compareAtPrice: undefined,
+          },
+        ],
+      });
+      if (!updateResult.ok) {
+        res.status(400).json({ error: updateResult.error });
+        return;
+      }
+    } catch (shopifyErr: any) {
+      res.status(500).json({
+        error: `Error actualizando en la plataforma: ${shopifyErr.message}`,
+      });
+      return;
+    }
+
+    await db
+      .update(productsTable)
+      .set({ price: priceStr })
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+
+    await db.insert(priceHistoryTable).values({
+      projectId,
+      shopifyProductId: productId,
+      oldPrice,
+      newPrice,
+      changeSource: "pricing_module",
+    });
+
+    learnFromOperation({
+      operationType: "price_change",
+      title: `Precio aplicado: ${product.title}`,
+      content: `Cambio de precio: €${oldPrice} → €${newPrice} para "${product.title}"`,
+      confidence: 1.0,
+      tags: ["pricing", "price_change"],
+    });
+
+    res.json({ success: true, productId });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
+  }
+});
+
+// ── 12. POST /pricing/ab-test ────────────────────────────────────────────────
+router.post("/pricing/ab-test", async (req, res): Promise<void> => {
+  try {
+    const projectId = await resolveProjectId(req);
+    const { productId, priceA, priceB, durationDays } = req.body as {
+      productId: string;
+      priceA: number;
+      priceB: number;
+      durationDays: number;
+    };
+
+    if (!productId || priceA == null || priceB == null || isNaN(Number(priceA)) || isNaN(Number(priceB)) || Number(priceA) < 0 || Number(priceB) < 0) {
+      res.status(400).json({ error: "productId, priceA y priceB requeridos (valores numéricos >= 0)" });
+      return;
+    }
+
+    const [product] = await db
+      .select()
+      .from(productsTable)
+      .where(
+        and(
+          eq(productsTable.projectId, projectId),
+          eq(productsTable.shopifyProductId, productId),
+        ),
+      );
+
+    if (!product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + (durationDays || 14));
+
+    const [inserted] = await db
+      .insert(abTestsTable)
+      .values({
+        projectId,
+        shopifyProductId: productId,
+        productTitle: product.title,
+        testType: "price",
+        imageType: "price_test",
+        hypothesis: `Test A/B de precios: €${priceA} vs €${priceB} durante ${durationDays || 14} días`,
+        variantAPrice: String(priceA),
+        variantBPrice: String(priceB),
+        status: "running",
+        targetMetric: "revenue",
+        minimumSampleSize: 100,
+        endDate,
+      })
+      .returning({ id: abTestsTable.id });
+
+    res.json({ testId: String(inserted?.id ?? randomUUID()) });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error interno" });
   }
 });
 
