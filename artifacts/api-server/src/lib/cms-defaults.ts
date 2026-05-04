@@ -439,6 +439,8 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "cards", label: "Card Studio", icon: "💳" },
       { id: "campaign-kit", label: "Campaign Kit", icon: "🎬" },
       { id: "exploded-view", label: "Exploded View", icon: "💥" },
+      { id: "ad-studio", label: "Ad Studio", icon: "📺" },
+      { id: "suppliers", label: "Proveedores", icon: "🏭" },
     ],
     shopybrain: [
       { label: "IA Brain", icon: "🧠", href: "/admin/shopybrain" },

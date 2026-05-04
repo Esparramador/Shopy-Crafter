@@ -30,6 +30,8 @@ function broadcast(event: string, data: unknown) {
 }
 
 function mergeNavArrays(defaults: any[], stored: any[], keyField: string): any[] {
+  if (!Array.isArray(stored) || stored.length === 0) return Array.isArray(defaults) ? defaults : [];
+  if (!Array.isArray(defaults)) return stored;
   const result = [...stored];
   const existingKeys = new Set(stored.map((item: any) => item[keyField]));
   for (const item of defaults) {

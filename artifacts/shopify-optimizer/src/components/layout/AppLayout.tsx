@@ -86,12 +86,21 @@ export function AppLayout({ children }: AppLayoutProps) {
   const cmsNav = cmsContent?.adminNav ?? null;
   const cmsPanel = cmsContent?.adminPanel ?? null;
 
-  const moduleNav = cmsNav?.modules ?? DEFAULT_MODULE_NAV;
-  const rawShopybrainNav = cmsNav?.shopybrain ?? DEFAULT_SHOPYBRAIN_NAV;
+  function mergeWithDefaults<T extends Record<string, any>>(
+    defaults: T[], cms: T[] | undefined, keyField: string
+  ): T[] {
+    if (!Array.isArray(cms) || cms.length === 0) return defaults;
+    const result = [...cms];
+    const existing = new Set(cms.map(item => item[keyField]));
+    for (const item of defaults) {
+      if (!existing.has(item[keyField])) result.push(item);
+    }
+    return result;
+  }
+
+  const moduleNav = mergeWithDefaults(DEFAULT_MODULE_NAV, cmsNav?.modules, "id");
+  const rawShopybrainNav = mergeWithDefaults(DEFAULT_SHOPYBRAIN_NAV, cmsNav?.shopybrain, "href");
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
-  // FIX: dedup por href + label. Algunos snapshots de CMS guardaron entradas
-  // repetidas (ej: 3 × "Generador Universal IA") y al renderizar el menú
-  // mostraba duplicados. Garantizamos un único item por destino.
   const seenKeys = new Set<string>();
   const shopybrainNav = rawShopybrainNav
     .filter((item: any) => !item.href.includes("/projects/"))
@@ -102,7 +111,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       return true;
     });
   const seenAdminKeys = new Set<string>();
-  const adminNav: any[] = (cmsNav?.admin ?? DEFAULT_ADMIN_NAV).filter((item: any) => {
+  const adminNav: any[] = mergeWithDefaults(DEFAULT_ADMIN_NAV, cmsNav?.admin, "href").filter((item: any) => {
     const key = `${item.href}::${item.label}`;
     if (seenAdminKeys.has(key)) return false;
     seenAdminKeys.add(key);

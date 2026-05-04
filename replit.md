@@ -87,8 +87,8 @@ URL validation blocks private IPv4, link-local, CGN, benchmarking, all IPv6 addr
 ### Progressive Competitor Knowledge
 Competitor scan endpoints inject `previousSnaps` history from prior snapshots into AI prompts, enabling progressive knowledge accumulation across scans.
 
-### Navigation Completeness
-All project module routes have visible nav tabs in `DEFAULT_MODULE_NAV`.
+### Navigation Completeness & CMS-Safe Sidebar
+All project module routes have visible nav tabs in `DEFAULT_MODULE_NAV` (17 total): Auditoría, Rediseño IA, Imágenes, Consistencia, A/B Testing, Pricing, SEO Engine, Repositorio, Exportar, Generador IA, Lab Web, Fusion Studio, Card Studio, Campaign Kit, Exploded View, Ad Studio, Proveedores. Routes without tabs by design: `settings` (gear icon), `fusion-studio-pro` (alias redirecting to Fusion Studio). The sidebar uses a **merge-with-defaults** pattern: CMS-stored nav arrays are merged with hardcoded defaults using `mergeWithDefaults()` (frontend) and `mergeNavArrays()` (backend), ensuring items can never disappear even if CMS data is incomplete or restored from old snapshots. Both functions include `Array.isArray` guards against malformed payloads.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
