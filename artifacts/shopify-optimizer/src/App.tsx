@@ -71,6 +71,7 @@ const WebLab = lazy(() => import("@/pages/projects/WebLab"));
 const WebLabStandalone = lazy(() => import("@/pages/projects/WebLab").then(m => ({ default: m.WebLabStandalone })));
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
+const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -436,6 +437,9 @@ function Router() {
         </Route>
         <Route path="/projects/:id/cards">
           <RequireAdmin><AdminWrapper><AppLayout><S><CardStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/campaign-kit">
+          <RequireAdmin><AdminWrapper><AppLayout><S><CampaignKit /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/web-lab">
           <RequireAdmin><AdminWrapper><AppLayout><S><WebLabStandalone /></S></AppLayout></AdminWrapper></RequireAdmin>

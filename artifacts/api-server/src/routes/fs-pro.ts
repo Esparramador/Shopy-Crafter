@@ -7,7 +7,8 @@ import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { saveToVault } from "../lib/vault.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
-import { learnFromOperation } from "../lib/claude.js";
+import { learnFromOperation, askClaude } from "../lib/claude.js";
+import { safeJsonParse } from "../lib/claude.js";
 import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib/objectStorage.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
@@ -63,6 +64,26 @@ import {
   getCogsMethodologySummary,
   getFullCogsMethodology,
 } from "../lib/cogs-methodology-kb.js";
+import {
+  getCampaignProductionSummary,
+  getFullCampaignProduction,
+  VIDEO_CAMPAIGNS,
+  UGC_MICRO_CLIPS,
+  CHARACTER_LOCKS,
+  MASTER_CUT_TIMELINE,
+  SUBTITLE_TRACKS,
+  PRODUCTION_TIPS,
+  TECH_SPECS,
+  DELIVERABLES_CHECKLIST,
+  AI_VIDEO_TOOLS,
+  STORYBOARD_SLIDES,
+  getVideoBySlug,
+  getClipsByVideo,
+  exportSrt,
+  buildAdaptationSystemPrompt,
+  buildAdaptationUserPrompt,
+  type BrandAdaptationInput,
+} from "../lib/campaign-production-kb.js";
 import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
@@ -775,6 +796,209 @@ router.get("/fs-pro/cogs-methodology/summary", requireAdmin, (_req, res) => {
     res.json({ ok: true, summary: getCogsMethodologySummary() });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "cogs methodology summary failed" });
+  }
+});
+
+// ─── Campaign Production KB (read-only + AI adaptation) ─────────────────
+//   GET  /api/fs-pro/campaign-production/summary       → quick counts
+//   GET  /api/fs-pro/campaign-production/full           → entire KB
+//   GET  /api/fs-pro/campaign-production/character-locks→ character variants
+//   GET  /api/fs-pro/campaign-production/videos         → 6 video campaigns
+//   GET  /api/fs-pro/campaign-production/videos/:slug   → single video
+//   GET  /api/fs-pro/campaign-production/ugc-clips      → all 22 UGC clips
+//   GET  /api/fs-pro/campaign-production/ugc-clips/:videoRef → clips by video
+//   GET  /api/fs-pro/campaign-production/master-timeline→ concatenation table
+//   GET  /api/fs-pro/campaign-production/subtitles/:trackId → SRT track
+//   GET  /api/fs-pro/campaign-production/subtitles/:trackId/srt → raw SRT file
+//   GET  /api/fs-pro/campaign-production/deliverables   → checklist
+//   GET  /api/fs-pro/campaign-production/storyboard     → 10-slide flow
+//   GET  /api/fs-pro/campaign-production/tools          → AI video tools
+//   GET  /api/fs-pro/campaign-production/tips           → production tips
+//   GET  /api/fs-pro/campaign-production/tech-specs     → delivery specs
+//   POST /api/fs-pro/campaign-production/adapt-for-brand→ Claude adapts prompts
+// ───────────────────────────────────────────────────────────────────────────
+
+router.get("/fs-pro/campaign-production/summary", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, summary: getCampaignProductionSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "campaign production summary failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/full", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getFullCampaignProduction(), summary: getCampaignProductionSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "campaign production full read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/character-locks", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, characterLocks: CHARACTER_LOCKS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "character locks read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/videos", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, videos: VIDEO_CAMPAIGNS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "video campaigns read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/videos/:slug", requireAdmin, (req, res) => {
+  try {
+    const slug = String(req.params.slug);
+    const video = getVideoBySlug(slug);
+    if (!video) { res.status(404).json({ error: `Video '${slug}' not found` }); return; }
+    const clips = getClipsByVideo(slug);
+    res.json({ ok: true, video, ugcClips: clips });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "video campaign read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/ugc-clips", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, clips: UGC_MICRO_CLIPS, total: UGC_MICRO_CLIPS.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "ugc clips read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/ugc-clips/:videoRef", requireAdmin, (req, res) => {
+  try {
+    const vRef = String(req.params.videoRef);
+    const clips = getClipsByVideo(vRef);
+    res.json({ ok: true, videoRef: vRef, clips, total: clips.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "ugc clips by video read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/master-timeline", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, timeline: MASTER_CUT_TIMELINE, totalDuration: "2:10", totalSegments: MASTER_CUT_TIMELINE.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "master timeline read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/subtitles/:trackId", requireAdmin, (req, res) => {
+  try {
+    const tId = String(req.params.trackId);
+    const track = SUBTITLE_TRACKS.find(t => t.id === tId);
+    if (!track) { res.status(404).json({ error: `Track '${tId}' not found` }); return; }
+    res.json({ ok: true, track });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "subtitle track read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/subtitles/:trackId/srt", requireAdmin, (req, res) => {
+  try {
+    const tId = String(req.params.trackId);
+    const srt = exportSrt(tId);
+    if (!srt) { res.status(404).json({ error: `Track '${tId}' not found` }); return; }
+    res.setHeader("Content-Type", "text/srt; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${tId}.srt"`);
+    res.send(srt);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "srt export failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/deliverables", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, deliverables: DELIVERABLES_CHECKLIST });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "deliverables read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/storyboard", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, slides: STORYBOARD_SLIDES, totalSlides: STORYBOARD_SLIDES.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "storyboard read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/tools", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, tools: AI_VIDEO_TOOLS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "ai tools read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/tips", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, tips: PRODUCTION_TIPS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "production tips read failed" });
+  }
+});
+
+router.get("/fs-pro/campaign-production/tech-specs", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, specs: TECH_SPECS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "tech specs read failed" });
+  }
+});
+
+router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const body = req.body || {};
+    const str = (v: unknown): string => (typeof v === "string" ? v : "").trim();
+
+    const brandName = str(body.brandName);
+    const industry = str(body.industry);
+    const coreOffering = str(body.coreOffering);
+    const targetAudience = str(body.targetAudience);
+    const toneOfVoice = str(body.toneOfVoice);
+
+    const missing: string[] = [];
+    if (!brandName) missing.push("brandName");
+    if (!industry) missing.push("industry");
+    if (!coreOffering) missing.push("coreOffering");
+    if (!targetAudience) missing.push("targetAudience");
+    if (!toneOfVoice) missing.push("toneOfVoice");
+    if (missing.length) { res.status(400).json({ error: `Campos requeridos: ${missing.join(", ")}` }); return; }
+
+    const input: BrandAdaptationInput = {
+      brandName: brandName.slice(0, 200),
+      industry: industry.slice(0, 200),
+      coreOffering: coreOffering.slice(0, 500),
+      targetAudience: targetAudience.slice(0, 500),
+      toneOfVoice: toneOfVoice.slice(0, 200),
+      visualIdentity: str(body.visualIdentity).slice(0, 500),
+      emotionalBenefit: str(body.emotionalBenefit).slice(0, 500),
+      primaryColor: (str(body.primaryColor) || "#000000").slice(0, 20),
+      accentColor: (str(body.accentColor) || "#FFD700").slice(0, 20),
+    };
+
+    const systemPrompt = buildAdaptationSystemPrompt();
+    const userPrompt = buildAdaptationUserPrompt(input);
+
+    const raw = await askClaude(0, [{ role: "user", content: userPrompt }], systemPrompt, 8192, 120_000);
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) { res.status(500).json({ error: "Claude no devolvió JSON válido" }); return; }
+
+    const parsed = safeJsonParse<Record<string, unknown>>(jsonMatch[0], "adapt-for-brand");
+    if (!parsed || typeof parsed !== "object" || !parsed.brandName || !Array.isArray(parsed.videos)) {
+      res.status(500).json({ error: "Respuesta de Claude con estructura inválida" }); return;
+    }
+    res.json({ ok: true, adapted: parsed, inputBrand: input.brandName });
+  } catch (e: any) {
+    logger.error({ err: e?.message }, "campaign-production adapt-for-brand failed");
+    res.status(500).json({ error: e?.message || "Error al adaptar campaña para la marca" });
   }
 });
 
