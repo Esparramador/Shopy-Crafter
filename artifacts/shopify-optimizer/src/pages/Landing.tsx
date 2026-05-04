@@ -146,7 +146,7 @@ export default function Landing() {
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
   const pricingRowRef = useRef<HTMLDivElement>(null);
   const [pricingIdx, setPricingIdx] = useState(0);
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "" });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
@@ -1296,11 +1296,27 @@ export default function Landing() {
                     <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Información extra sobre tu negocio"}</label>
                     <textarea
                       rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
-                      placeholder={"Numero de productos, tipos (tallas, colores, materiales...), proveedores, plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
+                      placeholder={"Numero de productos, tipos (tallas, colores, materiales...), plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
                       style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
                       onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
                       onBlur={e => e.target.style.borderColor = "var(--ink3)"}
                     />
+                  </div>
+
+                  {/* Proveedores (opcional) */}
+                  <div>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>
+                      {"Proveedores actuales"}
+                      <span style={{ fontWeight: 400, color: "var(--t4)", marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(opcional)</span>
+                    </label>
+                    <textarea
+                      rows={2} value={contactForm.suppliers} onChange={CF("suppliers")}
+                      placeholder={"Ej: Alibaba, BigBuy, Printful, proveedor local de Barcelona... Separa con comas si son varios"}
+                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
+                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                    />
+                    <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Si nos indicas tus proveedores, compararemos sus precios con alternativas y estimaremos el revenue potencial</p>
                   </div>
 
                   {/* Product image: URL or file upload */}

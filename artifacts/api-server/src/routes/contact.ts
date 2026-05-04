@@ -7,7 +7,6 @@ import { randomBytes } from "crypto";
 import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
-import { askGeminiWithSearch, isGeminiAvailable } from "../lib/gemini.js";
 import { askClaudeJsonWithBrain, askClaudeWithBrain, askClaudeVisionWithBrain } from "../lib/claude.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
@@ -18,6 +17,8 @@ import { generatePdfFromHtml } from "../lib/pdf-generator.js";
 import juice from "juice";
 import { enableLongRunning } from "../lib/long-running.js";
 import { safeDownloadReplicateImageAsDataUri } from "../lib/safe-image-fetch.js";
+import { scrapeWebsite, formatScrapingForPrompt } from "../lib/web-scraper.js";
+import type { WebScrapingResult } from "../lib/web-scraper.js";
 
 const router = Router();
 const contactUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
@@ -49,6 +50,7 @@ interface LeadData {
   message: string | null;
   extraInfo: string | null;
   productImageUrl: string | null;
+  suppliers: string | null;
   submittedAt: string;
   company?: string;
 }
@@ -316,6 +318,73 @@ REGLAS:
   };
 }
 
+async function structureSupplierResearch(lead: LeadData, rawText: string): Promise<string> {
+  const niche = lead.niche || "ecommerce general";
+  const entityName = lead.storeUrl || lead.name;
+  const hasOwnSuppliers = !!lead.suppliers;
+
+  const result = await askClaudeWithBrain(
+    0,
+    [{ role: "user", content: `Eres el consultor estratégico senior de Shopy Crafter, agencia de optimización IA para e-commerce.
+
+TIENES datos de investigación REALES sobre proveedores para el negocio "${entityName}" (nicho: ${niche}).
+Tu trabajo es REESTRUCTURAR estos datos en un informe de consultoría PROFESIONAL con HTML formateado.
+
+DATOS DE INVESTIGACIÓN EN BRUTO:
+${rawText.slice(0, 25000)}
+
+${hasOwnSuppliers ? `IMPORTANTE: El cliente proporcionó sus proveedores actuales: ${lead.suppliers}. La comparativa DEBE incluir estos proveedores específicos vs alternativas.` : "El cliente NO proporcionó proveedores. Genera un landscape general del sector."}
+
+GENERA HTML profesional con EXACTAMENTE esta estructura (NO JSON, devuelve HTML directo):
+
+<div class="ai-analysis">
+  <div class="ai-diagnosis">
+    <h3>📦 Análisis de Proveedores${hasOwnSuppliers ? " y Comparativa" : ""} — Resumen Ejecutivo</h3>
+    <p>[2-3 párrafos resumiendo hallazgos clave sobre proveedores, márgenes, y oportunidades]</p>
+  </div>
+
+  <div class="ai-actions">
+    <h3>💰 ${hasOwnSuppliers ? "Comparativa: Tus Proveedores vs Alternativas" : "Proveedores Recomendados y Revenue Estimado"}</h3>
+    [GENERA 4-6 hallazgos, cada uno así:]
+    <div class="action-item">
+      <div class="action-header">
+        <strong>[Nombre del proveedor + tipo + margen estimado]</strong>
+        <span class="action-impact">[Revenue estimado mensual]</span>
+      </div>
+      <p>[Análisis detallado: precios, MOQ, tiempos, ventajas/desventajas]</p>
+      <div class="ai-deliverable">
+        [Recomendación: usar/cambiar/complementar con este proveedor]
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-quick-wins">
+    <h3>⚡ Oportunidades de Mejora en Supply Chain</h3>
+    <ol>
+      <li><strong>[Oportunidad 1]:</strong> [Ahorro o mejora concreta con datos]</li>
+      <li><strong>[Oportunidad 2]:</strong> [Ahorro o mejora concreta con datos]</li>
+      <li><strong>[Oportunidad 3]:</strong> [Ahorro o mejora concreta con datos]</li>
+    </ol>
+  </div>
+</div>
+
+REGLAS:
+- Usa proveedores REALES que existan — NO inventes nombres de empresas
+- Los revenue estimados deben ser cálculos realistas basados en márgenes del sector
+- Usa las clases CSS exactas indicadas
+- Responde en español
+- NO incluyas texto fuera de las etiquetas HTML` }],
+    "Eres un experto en supply chain y proveedores de Shopy Crafter. Reestructuras datos de investigación en informes profesionales con HTML formateado. Responde SOLO con HTML usando las clases CSS indicadas.",
+    "general",
+    niche,
+    16000,
+  );
+
+  const sanitized = sanitizeAiHtml(result);
+  const match = sanitized.match(/<div class="ai-analysis">[\s\S]*$/);
+  return match ? match[0] : `<div class="ai-analysis">${sanitized}</div>`;
+}
+
 async function analyzeProductImageWithVision(imageDataUrl: string, niche: string): Promise<string> {
   try {
     const match = imageDataUrl.match(/^data:image\/([\w+]+);base64,(.+)$/);
@@ -530,7 +599,7 @@ function buildCapabilitiesSection(lead: LeadData): string {
   const services = (lead.services || []).filter((s): s is string => typeof s === "string");
   const niche = (lead.niche || "").toLowerCase();
   const capabilities: { icon: string; title: string; desc: string }[] = [
-    { icon: "🤖", title: "Dual AI Engine (Gemini + Claude)", desc: "Investigación de mercado en tiempo real, optimización SEO 100/100, y generación de contenido profesional" },
+    { icon: "🤖", title: "Motor IA Claude (Anthropic)", desc: "Investigación de mercado con datos reales, optimización SEO 100/100, y generación de contenido profesional" },
     { icon: "📊", title: "Inteligencia Financiera Avanzada", desc: "COGS, LTV/CAC, break-even, simulación de precios, y alertas de rentabilidad automáticas" },
     { icon: "🎬", title: "Producción de Vídeo Cinematográfico", desc: "Anuncios profesionales con 11 modelos de IA, voz en off ElevenLabs, música generativa, y narrativa de 7 pasos" },
   ];
@@ -545,116 +614,277 @@ function buildCapabilitiesSection(lead: LeadData): string {
   }
   capabilities.push({ icon: "🧠", title: "ShopyBrain — 46,000+ Insights", desc: "Cerebro IA que aprende de cada operación y acumula inteligencia de mercado, competencia, y tendencias" });
   capabilities.push({ icon: "📦", title: "140+ Acciones Automatizadas", desc: "Desde crear productos hasta auditorías completas, gestión de inventario, y propuestas comerciales — todo desde el chatbot" });
-  const items = capabilities.slice(0, 6).map(c =>
-    `<div style="flex:1 1 45%;min-width:240px;background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:10px;padding:16px;">` +
-    `<div style="font-size:24px;margin-bottom:8px;">${c.icon}</div>` +
-    `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px;">${c.title}</div>` +
-    `<div style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;">${c.desc}</div></div>`
-  ).join("");
+  const selected = capabilities.slice(0, 6);
+  const rows: string[] = [];
+  for (let i = 0; i < selected.length; i += 2) {
+    const c1 = selected[i];
+    const c2 = selected[i + 1];
+    const cell = (c: { icon: string; title: string; desc: string }) =>
+      `<td width="50%" style="padding:6px;vertical-align:top;">` +
+      `<div style="background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:10px;padding:16px;">` +
+      `<div style="font-size:24px;margin-bottom:8px;">${c.icon}</div>` +
+      `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px;">${c.title}</div>` +
+      `<div style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;">${c.desc}</div>` +
+      `</div></td>`;
+    rows.push(`<tr>${cell(c1)}${c2 ? cell(c2) : '<td width="50%"></td>'}</tr>`);
+  }
   return `<div class="section" style="page-break-before:always;">` +
     `<div class="section-title">Capacidades IA de Shopy Crafter para Tu Negocio</div>` +
     `<div class="card" style="padding:24px;">` +
-    `<div style="display:flex;flex-wrap:wrap;gap:12px;">${items}</div>` +
-    `<div style="margin-top:20px;text-align:center;padding:16px;background:linear-gradient(135deg,rgba(196,149,106,.1),rgba(52,211,153,.05));border-radius:10px;border:1px solid rgba(196,149,106,.2);">` +
+    `<table width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join("")}</table>` +
+    `<div style="margin-top:20px;text-align:center;padding:16px;background-color:rgba(196,149,106,.08);border-radius:10px;border:1px solid rgba(196,149,106,.2);">` +
     `<div style="font-size:14px;font-weight:700;color:#c4956a;">Todo esto trabajando para TU negocio, 24/7, con datos REALES.</div>` +
     `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:4px;">Sin plantillas genéricas — cada análisis y cada pieza de contenido está personalizada para tu nicho y tu marca.</div>` +
     `</div></div></div>`;
 }
 
+async function scrapeLeadUrl(lead: LeadData): Promise<WebScrapingResult | null> {
+  if (!lead.storeUrl) return null;
+  try {
+    const url = lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`;
+    return await scrapeWebsite(url);
+  } catch (err) {
+    logger.warn({ err, url: lead.storeUrl }, "Failed to scrape lead URL (non-critical)");
+    return null;
+  }
+}
+
+async function researchWithClaude(
+  lead: LeadData,
+  scrapedData: WebScrapingResult | null,
+): Promise<{ business: string; market: string; seo: string; suppliers: string }> {
+  const entityName = lead.storeUrl || lead.name;
+  const nicheInfo = lead.niche || "ecommerce general";
+  const extraContext = lead.extraInfo ? `\nInformación adicional del negocio: ${lead.extraInfo}` : "";
+  const suppliersContext = lead.suppliers ? `\nProveedores actuales del cliente: ${lead.suppliers}` : "";
+
+  const scrapedContext = scrapedData
+    ? `\n\nDATOS REALES EXTRAÍDOS DE LA WEB DEL CLIENTE (${scrapedData.url}):\n${formatScrapingForPrompt(scrapedData)}\n\nCONTENIDO DE TEXTO DE LA PÁGINA (primeros 8000 chars):\n${scrapedData.textContent?.slice(0, 8000) || "No disponible"}`
+    : `\n\n[No se proporcionó URL o no se pudo acceder a la web del cliente]`;
+
+  const [businessResult, marketResult, seoResult, supplierResult] = await Promise.allSettled([
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: `Realiza un análisis EXHAUSTIVO del negocio "${entityName}" en el nicho "${nicheInfo}".
+${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
+${lead.socialMedia ? `Redes sociales: ${lead.socialMedia}` : ""}${extraContext}
+${scrapedContext}
+
+ANALIZA CON DATOS REALES:
+1. **Productos y catálogo**: Qué vende exactamente, rangos de precio, categorías, número de productos visible
+2. **Tecnología**: Plataforma (Shopify, WooCommerce, PrestaShop...), tema, apps/plugins detectados, velocidad
+3. **Marca y posicionamiento**: Propuesta de valor, público objetivo, tono de comunicación
+4. **Fortalezas**: Qué hace bien la tienda
+5. **Debilidades críticas**: Qué le falta o hace mal (basado en datos REALES del scraping)
+6. **Presencia en redes sociales**: Análisis de sus perfiles si los proporcionó
+
+REGLAS:
+- Usa SOLO datos reales del scraping proporcionado — NO inventes datos que no estén en el análisis
+- Si el scraping muestra datos concretos (título, meta description, headings, imágenes sin alt, etc.), CÍTALOS textualmente
+- Incluye la URL del cliente como fuente verificada
+- Responde en español con formato estructurado` }],
+      "Eres un consultor senior de inteligencia empresarial de Shopy Crafter. Analizas datos REALES extraídos de la web del cliente. NUNCA inventas datos — solo usas lo que encuentras en el scraping y tu conocimiento del sector. Responde en español.",
+      "general",
+      nicheInfo,
+      16000,
+    ),
+
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: `Análisis de mercado y competencia para el nicho "${nicheInfo}" en España y mercados hispanohablantes.
+${lead.storeUrl ? `La tienda del cliente es: ${lead.storeUrl}` : ""}${extraContext}
+${scrapedContext}
+
+GENERA UN ANÁLISIS DE MERCADO REAL:
+1. **Competidores principales**: Nombra 5-8 competidores REALES conocidos en este nicho (tiendas que existan de verdad)
+2. **Pricing del sector**: Rangos de precio típicos para productos similares
+3. **Métricas financieras del sector**: 
+   - CAC (Coste de Adquisición de Cliente) típico del nicho
+   - LTV (Lifetime Value) estimado
+   - Tasa de conversión media del sector eCommerce
+   - Ticket medio
+   - Margen bruto típico
+4. **Tendencias**: Qué está creciendo en este nicho, estacionalidad
+5. **Oportunidades sin explotar**: Nichos dentro del nicho, gaps de mercado
+6. **Barreras de entrada**: Inversión necesaria, competencia, regulación
+
+REGLAS:
+- Basa tus competidores en marcas REALES y CONOCIDAS del sector
+- Las métricas financieras deben ser estimaciones realistas basadas en datos del sector eCommerce
+- Si el cliente proporcionó datos de facturación (${lead.revenue || "no proporcionó"}), compáralos con el sector
+- Responde en español` }],
+      "Eres un analista senior de mercado y competencia de Shopy Crafter. Proporcionas datos de mercado realistas basados en tu conocimiento profundo del sector eCommerce. Responde en español.",
+      "general",
+      nicheInfo,
+      16000,
+    ),
+
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: `Auditoría SEO técnica y de presencia digital para "${entityName}" en el nicho "${nicheInfo}".
+${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
+${scrapedContext}
+
+GENERA UNA AUDITORÍA SEO REAL BASADA EN LOS DATOS SCRAPEADOS:
+1. **Title tag**: Analiza el título actual (${scrapedData?.title ? `"${scrapedData.title}" — ${scrapedData.titleLength} chars` : "no disponible"}). ¿Es óptimo? ¿Longitud correcta (50-60 chars)?
+2. **Meta description**: Analiza (${scrapedData?.metaDescription ? `"${scrapedData.metaDescription.slice(0, 80)}..." — ${scrapedData.metaDescriptionLength} chars` : "NO TIENE — CRÍTICO"}). ¿Longitud correcta (150-160 chars)?
+3. **Headings (H1-H6)**: ${scrapedData ? `H1: ${scrapedData.headings.h1Count} (${scrapedData.headings.h1.join(", ") || "ninguno"}), H2: ${scrapedData.headings.h2.length}` : "no disponible"}
+4. **Imágenes sin alt text**: ${scrapedData ? `${scrapedData.images.withoutAlt} de ${scrapedData.images.total} sin alt` : "no analizado"} — impacto en accesibilidad y SEO
+5. **Open Graph y Twitter Cards**: ${scrapedData ? `OG title: ${scrapedData.ogTags.title ? "✅" : "❌"}, OG image: ${scrapedData.ogTags.image ? "✅" : "❌"}, Twitter card: ${scrapedData.twitterCard.card ? "✅" : "❌"}` : "no analizado"}
+6. **Schema JSON-LD**: ${scrapedData ? `${scrapedData.jsonLdSchemas.length > 0 ? `${scrapedData.jsonLdSchemas.length} esquemas` : "❌ SIN datos estructurados — OPORTUNIDAD CRÍTICA"}` : "no analizado"}
+7. **robots.txt y sitemap**: ${scrapedData ? `robots.txt: ${scrapedData.robotsTxt.exists ? "✅" : "❌"}, sitemap: ${scrapedData.sitemapXml.exists ? "✅" : "❌"}` : "no analizado"}
+8. **SSL**: ${scrapedData ? (scrapedData.ssl ? "✅ Activo" : "❌ NO — CRÍTICO") : "no verificado"}
+9. **Keywords objetivo**: Recomienda 10-15 keywords de cola larga relevantes para el nicho con volumen estimado
+10. **Oportunidades de contenido**: Blog, landing pages, FAQs que debería crear
+
+REGLAS:
+- Usa EXCLUSIVAMENTE los datos del scraping — no inventes valores que no estén ahí
+- Si un dato no está disponible, di "No detectado" en vez de inventar
+- Cada hallazgo debe tener impacto (CRÍTICO/ALTO/MEDIO/BAJO)
+- Responde en español` }],
+      "Eres un experto SEO técnico senior de Shopy Crafter. Auditas con datos REALES del scraping. No inventas métricas. Responde en español.",
+      "seo",
+      nicheInfo,
+      16000,
+    ),
+
+    askClaudeWithBrain(
+      0,
+      [{ role: "user", content: `Análisis de proveedores y revenue estimado para el nicho "${nicheInfo}".
+${lead.storeUrl ? `Tienda del cliente: ${lead.storeUrl}` : ""}
+${lead.revenue ? `Facturación actual declarada: ${lead.revenue}` : ""}${extraContext}${suppliersContext}
+${scrapedContext}
+
+${lead.suppliers ? `El cliente usa estos proveedores: ${lead.suppliers}
+
+GENERA UN ANÁLISIS COMPARATIVO:
+1. **Análisis de los proveedores actuales del cliente** (${lead.suppliers}):
+   - Tipo de proveedor (dropshipping, mayorista, fabricante, marketplace)
+   - Rango de precios típico y márgenes que ofrecen
+   - Ventajas y desventajas de cada uno
+   - Tiempos de envío habituales
+   - MOQ (Minimum Order Quantity) si aplica
+
+2. **Proveedores alternativos recomendados** (5-8 proveedores REALES):
+   - Nombre del proveedor (que exista de verdad)
+   - Tipo y especialidad
+   - Rango de precios y comparativa con los actuales
+   - Ventajas competitivas vs los proveedores actuales del cliente
+
+3. **Estimación de revenue por proveedor**:
+   - Revenue estimado mensual si usa cada proveedor con márgenes típicos
+   - Ahorro potencial al cambiar de proveedor
+   - ROI estimado del cambio` : `No se proporcionaron proveedores específicos.
+
+GENERA UN ANÁLISIS GENERAL DE PROVEEDORES PARA EL NICHO:
+1. **Landscape de proveedores** para "${nicheInfo}":
+   - Top 5-8 proveedores REALES y conocidos para este nicho
+   - Tipo de cada uno (dropshipping, mayorista, fabricante, marketplace B2B)
+   - Rango de precios típico y márgenes que ofrecen
+
+2. **Comparativa entre proveedores**:
+   - Tabla comparativa de precio, calidad, tiempos de envío, MOQ
+   - Cuál es más rentable según volumen
+
+3. **Revenue estimado por proveedor**:
+   - Revenue mensual estimado con cada proveedor (asumiendo ${lead.revenue || "facturación media del nicho"})
+   - Margen bruto estimado por proveedor
+   - Punto de equilibrio (break-even units) estimado`}
+
+REGLAS:
+- Usa proveedores REALES que existan — no inventes nombres
+- Los márgenes y precios deben ser estimaciones realistas del sector
+- Incluye siempre la fuente del dato (conocimiento del sector, datos públicos, etc.)
+- Responde en español con formato estructurado` }],
+      "Eres un experto en supply chain y proveedores eCommerce de Shopy Crafter. Conoces proveedores reales de cada nicho. Proporcionas estimaciones de revenue realistas. Responde en español.",
+      "general",
+      nicheInfo,
+      16000,
+    ),
+  ]);
+
+  const extractText = (r: PromiseSettledResult<string>, fallback: string): string =>
+    r.status === "fulfilled" && r.value ? r.value : fallback;
+
+  return {
+    business: extractText(businessResult, "No se pudo analizar el negocio."),
+    market: extractText(marketResult, "No se pudo analizar el mercado."),
+    seo: extractText(seoResult, "No se pudo realizar la auditoría SEO."),
+    suppliers: extractText(supplierResult, "No se pudo analizar los proveedores."),
+  };
+}
+
 async function generateAIPreReport(lead: LeadData): Promise<string> {
   const entityName = lead.storeUrl || lead.name;
   const nicheInfo = lead.niche || "ecommerce general";
-  const extraContext = lead.extraInfo ? `\nInformacion adicional del negocio: ${lead.extraInfo}` : "";
 
-  const searches = await Promise.allSettled([
-    askGeminiWithSearch(
-      `Investiga a fondo esta empresa/tienda online: "${entityName}".
-Busca: que vende, productos principales, precios, aspecto de la web, tecnologia que usa, presencia en redes sociales, reputacion online, resenas de clientes, trafico estimado, posicion SEO.
-${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
-${lead.socialMedia ? `Redes: ${lead.socialMedia}` : ""}${extraContext}
-Si es una tienda de ropa/moda, investiga: tallas disponibles, colores, materiales, politica de devoluciones, tabla de tallas, shipping.
-Si es alimentacion: certificaciones, ingredientes, formatos, peso, alergenos.
-Si es joyeria: materiales, piedras, certificaciones, personalizacion.
-Proporciona datos reales, concretos y verificables.`,
-      "Eres un analista de inteligencia empresarial experto en eCommerce. Investiga usando Google Search real. Devuelve datos concretos, URLs verificables, cifras reales. Analiza los atributos de producto especificos del nicho (tallas, colores, materiales, pesos, etc). Responde en espanol.",
-      lead.storeUrl ? [lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`] : undefined,
-    ),
+  logger.info({ entityName, niche: nicheInfo, hasUrl: !!lead.storeUrl, hasSuppliers: !!lead.suppliers }, "Starting Claude-powered pre-report");
 
-    askGeminiWithSearch(
-      `Analisis de competencia y mercado para el nicho "${nicheInfo}" en Espana.
-Busca: principales competidores en este nicho en Shopify y eCommerce, sus precios, estrategias, volumen de busqueda de keywords principales, tendencias del mercado, oportunidades sin explotar, barreras de entrada, estacionalidad.
-${lead.storeUrl ? `La tienda del cliente es: ${lead.storeUrl}` : ""}${extraContext}
-Dame datos concretos con fuentes verificables.
-Incluye analisis de: pricing medio del sector, margenes tipicos, coste de adquisicion de cliente (CAC), lifetime value (LTV), tasa de conversion media del sector.`,
-      "Eres un analista de mercado y competencia eCommerce. Usa Google Search real. Devuelve datos de mercado actuales, nombres de competidores reales, precios reales, tendencias verificables. Incluye metricas financieras del sector. Responde en espanol.",
-    ),
+  const scrapedData = await scrapeLeadUrl(lead);
+  if (scrapedData) {
+    logger.info({ url: scrapedData.url, title: scrapedData.title, statusCode: scrapedData.statusCode, wordCount: scrapedData.wordCount, images: scrapedData.images.total }, "Successfully scraped lead URL");
+  }
 
-    askGeminiWithSearch(
-      `Auditoria SEO y presencia digital del negocio "${entityName}" en el nicho "${nicheInfo}".
-Busca: keywords por las que posiciona, posiciones en Google, velocidad de carga, estado de indexacion, presencia en directorios, backlinks relevantes, estrategia de contenidos, blog, landing pages.
-${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
-Proporciona recomendaciones SEO concretas y practicas.
-Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de contenido, keywords de cola larga con volumen estimado.`,
-      "Eres un experto SEO tecnico y de contenidos para eCommerce. Usa Google Search para investigar la presencia real de este negocio en internet. Incluye datos tecnicos como schema markup, Core Web Vitals y oportunidades de keywords. Responde en espanol.",
-      lead.storeUrl ? [lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`] : undefined,
-    ),
-
+  const [researchResults, productSampleResult] = await Promise.allSettled([
+    researchWithClaude(lead, scrapedData),
     generateProductSample(lead),
   ]);
 
-  const businessResearch = searches[0].status === "fulfilled" ? searches[0].value : null;
-  const marketResearch = searches[1].status === "fulfilled" ? searches[1].value : null;
-  const seoResearch = searches[2].status === "fulfilled" ? searches[2].value : null;
-  const productSample = searches[3].status === "fulfilled" ? (searches[3].value as ProductSample | null) : null;
+  const research = researchResults.status === "fulfilled"
+    ? researchResults.value
+    : { business: "Error en la investigación.", market: "Error en el análisis de mercado.", seo: "Error en la auditoría SEO.", suppliers: "Error en el análisis de proveedores." };
+  const productSample = productSampleResult.status === "fulfilled" ? (productSampleResult.value as ProductSample | null) : null;
 
-  const allSources = [
-    ...((businessResearch as any)?.sources || []),
-    ...((marketResearch as any)?.sources || []),
-    ...((seoResearch as any)?.sources || []),
-  ]
-    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
-    .filter((url: string) => !url.includes("vertexaisearch.cloud.google.com") && !url.includes("grounding-api-redirect") && url.length < 300)
-    .slice(0, 15);
+  const allSources: string[] = [];
+  if (lead.storeUrl) {
+    const url = lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`;
+    allSources.push(url);
+  }
+  if (scrapedData?.canonicalUrl && !allSources.includes(scrapedData.canonicalUrl)) {
+    allSources.push(scrapedData.canonicalUrl);
+  }
+  if (scrapedData?.sitemapXml?.url) allSources.push(scrapedData.sitemapXml.url);
+  if (lead.socialMedia?.startsWith("http")) allSources.push(lead.socialMedia);
 
   try {
     learnFromOperation({
       operationType: "lead_prereport",
       title: `Pre-informe lead: ${lead.name} (${lead.niche || "general"}) - ${lead.storeUrl || "sin URL"}`,
-      content: `Lead: ${lead.name}, Email: ${lead.email}, Nicho: ${lead.niche}, Facturacion: ${lead.revenue}, Servicios: ${(lead.services || []).join(", ")}, URL: ${lead.storeUrl || "N/A"}, Redes: ${lead.socialMedia || "N/A"}, Info extra: ${lead.extraInfo || "N/A"}`,
-      confidence: 0.8,
-      tags: ["lead", "prereport", lead.niche || "general"],
+      content: `Lead: ${lead.name}, Email: ${lead.email}, Nicho: ${lead.niche}, Facturacion: ${lead.revenue}, Servicios: ${(lead.services || []).join(", ")}, URL: ${lead.storeUrl || "N/A"}, Redes: ${lead.socialMedia || "N/A"}, Proveedores: ${lead.suppliers || "N/A"}, Info extra: ${lead.extraInfo || "N/A"}. Motor: Claude (Anthropic). Scraping: ${scrapedData ? "OK" : "no disponible"}.`,
+      confidence: 0.85,
+      tags: ["lead", "prereport", "claude", lead.niche || "general"],
     });
 
-    if (businessResearch && (businessResearch as any)?.text) {
+    if (research.business && research.business.length > 100) {
       learnFromOperation({
         operationType: "lead_business_intel",
         niche: lead.niche || undefined,
-        title: `Intel empresa: ${entityName} (${lead.niche || "general"})`,
-        content: ((businessResearch as any).text as string).slice(0, 6000),
-        confidence: 0.82,
-        tags: ["lead_research", "business_intel", lead.niche || "general", entityName],
+        title: `Intel empresa (Claude): ${entityName} (${lead.niche || "general"})`,
+        content: research.business.slice(0, 6000),
+        confidence: 0.85,
+        tags: ["lead_research", "business_intel", "claude", lead.niche || "general", entityName],
       });
     }
 
-    if (marketResearch && (marketResearch as any)?.text) {
+    if (research.market && research.market.length > 100) {
       learnFromOperation({
         operationType: "lead_market_intel",
         niche: lead.niche || undefined,
-        title: `Intel mercado: nicho ${lead.niche || "general"} — fuentes lead ${lead.name}`,
-        content: ((marketResearch as any).text as string).slice(0, 6000),
-        confidence: 0.82,
-        tags: ["lead_research", "market_intel", lead.niche || "general"],
+        title: `Intel mercado (Claude): nicho ${lead.niche || "general"} — lead ${lead.name}`,
+        content: research.market.slice(0, 6000),
+        confidence: 0.85,
+        tags: ["lead_research", "market_intel", "claude", lead.niche || "general"],
       });
     }
 
-    if (seoResearch && (seoResearch as any)?.text) {
+    if (research.seo && research.seo.length > 100) {
       learnFromOperation({
         operationType: "seo",
         niche: lead.niche || undefined,
-        title: `SEO audit lead: ${entityName} (${lead.storeUrl || "sin URL"})`,
-        content: ((seoResearch as any).text as string).slice(0, 6000),
-        confidence: 0.80,
-        tags: ["lead_research", "seo_audit", lead.niche || "general"],
+        title: `SEO audit (Claude): ${entityName} (${lead.storeUrl || "sin URL"})`,
+        content: research.seo.slice(0, 6000),
+        confidence: 0.85,
+        tags: ["lead_research", "seo_audit", "claude", lead.niche || "general"],
       });
     }
 
@@ -670,44 +900,35 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     }
   } catch {};
 
-  const stripGroundingUrls = (text: string): string =>
-    text
-      .replace(/\[?\(?\s*https?:\/\/vertexaisearch\.cloud\.google\.com\/grounding-api-redirect\/[^\s)\]<>]+\s*\)?\]?/g, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-  const rawBusiness = stripGroundingUrls((businessResearch as any)?.text || "");
-  const rawMarket = stripGroundingUrls((marketResearch as any)?.text || "");
-  const rawSeo = stripGroundingUrls((seoResearch as any)?.text || "");
-
   let structuredResearch: { business: string; market: string; seo: string };
   try {
-    if (rawBusiness || rawMarket || rawSeo) {
-      structuredResearch = await structureResearchWithClaude(lead, {
-        business: rawBusiness || "No se pudo investigar la empresa.",
-        market: rawMarket || "No se pudo analizar el mercado.",
-        seo: rawSeo || "No se pudo realizar la auditoría SEO.",
-      });
-    } else {
-      structuredResearch = {
-        business: "No se pudo investigar la empresa (Gemini no disponible).",
-        market: "No se pudo analizar el mercado.",
-        seo: "No se pudo realizar la auditoría SEO.",
-      };
-    }
+    structuredResearch = await structureResearchWithClaude(lead, {
+      business: research.business,
+      market: research.market,
+      seo: research.seo,
+    });
   } catch (err) {
-    logger.warn({ err }, "Claude restructuring failed, using raw Gemini text");
+    logger.warn({ err }, "Claude structuring failed, using raw research text");
     structuredResearch = {
-      business: rawBusiness || "No se pudo investigar la empresa.",
-      market: rawMarket || "No se pudo analizar el mercado.",
-      seo: rawSeo || "No se pudo realizar la auditoría SEO.",
+      business: research.business,
+      market: research.market,
+      seo: research.seo,
     };
+  }
+
+  let supplierStructured: string;
+  try {
+    const supplierHtml = await structureSupplierResearch(lead, research.suppliers);
+    supplierStructured = supplierHtml;
+  } catch (err) {
+    logger.warn({ err }, "Supplier structuring failed, using raw text");
+    supplierStructured = research.suppliers;
   }
 
   let marketMetrics: MarketMetrics | null = null;
   try {
-    if (rawMarket || rawBusiness) {
-      marketMetrics = await extractMarketMetrics(lead, rawMarket, rawBusiness);
+    if (research.market || research.business) {
+      marketMetrics = await extractMarketMetrics(lead, research.market, research.business);
     }
   } catch (err) {
     logger.warn({ err }, "Market metrics extraction failed (non-critical)");
@@ -719,14 +940,15 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     seo: structuredResearch.seo,
     sources: allSources,
     productSample,
-    isStructuredHtml: !!(rawBusiness || rawMarket || rawSeo),
+    isStructuredHtml: true,
     marketMetrics,
+    supplierAnalysis: supplierStructured,
   });
 }
 
 async function buildReportHtml(
   lead: LeadData,
-  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean; marketMetrics?: MarketMetrics | null },
+  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean; marketMetrics?: MarketMetrics | null; supplierAnalysis?: string },
 ): Promise<string> {
   const esc = sanitizeHtml;
 
@@ -826,6 +1048,7 @@ async function buildReportHtml(
     ["Nicho", esc(lead.niche || "—")],
     ["Facturacion", esc(lead.revenue || "—")],
     ["Redes Sociales", esc(lead.socialMedia || "—")],
+    ["Proveedores actuales", esc(lead.suppliers || "No proporcionados")],
     ["Servicios Solicitados", servicesHtml],
     ["Mensaje", `<em>"${esc(lead.message || "—")}"</em>`],
   ];
@@ -1099,6 +1322,17 @@ async function buildReportHtml(
       </div>
     </div>` : ""}
 
+    ${research.supplierAnalysis ? `
+    <div class="section" style="page-break-before:always;">
+      <div class="section-title">Analisis de Proveedores y Revenue Estimado</div>
+      <div class="card" style="padding:28px;line-height:1.85;font-size:13px;">
+        ${renderContent(research.supplierAnalysis)}
+      </div>
+      <div style="margin-top:8px;padding:8px 16px;background:rgba(196,149,106,.04);border-radius:8px;font-size:11px;color:rgba(255,255,255,.35);">
+        Analisis de proveedores por Shopy Crafter AI · ${lead.suppliers ? "Comparativa con proveedores del cliente" : "Landscape general del sector"} · Revenue estimado basado en margenes reales
+      </div>
+    </div>` : ""}
+
     ${buildCapabilitiesSection(lead)}
 
     ${productSampleHtml}
@@ -1114,7 +1348,7 @@ async function buildReportHtml(
       <div class="card" style="text-align:center;padding:28px;">
         <p class="muted" style="margin:0 0 4px;font-size:11px;">Generado por</p>
         <p style="margin:0;font-weight:700;font-size:15px;">Shopy Crafter AI</p>
-        <p class="muted" style="margin:4px 0 0;font-size:11px;">Dual AI Engine (Gemini + Claude) &middot; Datos reales verificados</p>
+        <p class="muted" style="margin:4px 0 0;font-size:11px;">Claude (Anthropic) + Web Scraping Real &middot; Datos verificados de la web del cliente</p>
       </div>
     </div>`;
 
@@ -1135,12 +1369,12 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
     const body = req.body ?? {};
     const {
       name, email, phone, storeUrl, niche, customNiche, revenue,
-      socialMedia, message, extraInfo, productImageUrl,
+      socialMedia, message, extraInfo, productImageUrl, suppliers,
     } = body as {
       name: string; email: string; phone?: string; storeUrl?: string;
       niche?: string; customNiche?: string; revenue?: string;
       socialMedia?: string; message?: string; extraInfo?: string;
-      productImageUrl?: string;
+      productImageUrl?: string; suppliers?: string;
     };
     let services: string[] = [];
     try {
@@ -1186,6 +1420,7 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
       message: message?.trim() ?? null,
       extraInfo: extraInfo?.trim() ?? null,
       productImageUrl: resolvedImageUrl?.trim() ?? null,
+      suppliers: suppliers?.trim() ?? null,
       submittedAt: new Date().toISOString(),
     };
   
@@ -1204,16 +1439,7 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
         logger.info({ name: leadData.name, email: leadData.email }, "Starting AI pre-report generation for lead");
   
         let reportHtml: string;
-        if (isGeminiAvailable()) {
-          reportHtml = await generateAIPreReport(leadData);
-        } else {
-          reportHtml = await buildReportHtml(leadData, {
-            business: "Gemini no está configurado — no se pudo realizar investigación automática.",
-            market: "Gemini no está configurado.",
-            seo: "Gemini no está configurado.",
-            sources: [],
-          });
-        }
+        reportHtml = await generateAIPreReport(leadData);
   
         let savedFileId: number | null = null;
         try {
@@ -1287,7 +1513,7 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
             leadEmail: leadData.email,
             leadName: leadData.name,
             emailSent: isGmailAvailable(),
-            geminiUsed: isGeminiAvailable(),
+            aiEngine: "claude-anthropic",
             savedFileId,
             generatedAt: new Date().toISOString(),
           }),

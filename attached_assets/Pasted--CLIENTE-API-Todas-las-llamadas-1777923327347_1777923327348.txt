@@ -1,0 +1,165 @@
+// ============================================================
+// CLIENTE API - Todas las llamadas al backend
+// ============================================================
+//
+// IMPORTANTE: Estos endpoints son los que tu backend DEBE exponer.
+// Si tienes otros nombres, ajusta solo las URLs (las firmas son correctas).
+//
+// Si usas axios o react-query, este cliente es compatible — solo
+// reemplaza el fetch por tu cliente preferido manteniendo las firmas.
+// ============================================================
+
+import type {
+  ShopifyProduct,
+  COGSData,
+  SimulationParams,
+  SimulationResult,
+  OptimizationResult,
+  PricingKPIs,
+  BatchProgress,
+} from './types';
+
+const API_BASE = '/api/pricing';
+
+// Helper genérico con manejo de errores consistente
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include', // para cookies de sesión
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Error ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ============================================================
+// PRODUCTOS Y KPIs
+// ============================================================
+
+export const pricingAPI = {
+  /**
+   * Obtiene todos los productos de la tienda con sus datos de COGS si existen.
+   */
+  getProducts: (): Promise<ShopifyProduct[]> =>
+    request(`${API_BASE}/products`),
+
+  /**
+   * Obtiene KPIs agregados de pricing.
+   */
+  getKPIs: (): Promise<PricingKPIs> =>
+    request(`${API_BASE}/kpis`),
+
+  // ============================================================
+  // CLASIFICACIÓN Y ESTIMACIÓN COGS
+  // ============================================================
+
+  /**
+   * Clasifica un producto según su tipo (digital, físico, servicio, etc).
+   */
+  classifyProduct: (productId: string): Promise<{ category: string; confidence: number }> =>
+    request(`${API_BASE}/classify-product`, {
+      method: 'POST',
+      body: JSON.stringify({ productId }),
+    }),
+
+  /**
+   * Estima el COGS de UN solo producto con IA (Claude).
+   * Devuelve la estructura completa de costes.
+   */
+  estimateCOGS: (productId: string): Promise<COGSData> =>
+    request(`${API_BASE}/estimate-cogs`, {
+      method: 'POST',
+      body: JSON.stringify({ productId }),
+    }),
+
+  /**
+   * Inicia un batch de estimación COGS para todos los productos.
+   * Retorna un jobId que se usa con getBatchProgress() para hacer polling.
+   */
+  estimateCOGSBatch: (productIds?: string[]): Promise<{ jobId: string; estimatedCost: number; total: number }> =>
+    request(`${API_BASE}/estimate-cogs/batch`, {
+      method: 'POST',
+      body: JSON.stringify({ productIds }),
+    }),
+
+  /**
+   * Consulta el progreso de un batch en curso.
+   */
+  getBatchProgress: (jobId: string): Promise<BatchProgress> =>
+    request(`${API_BASE}/batch-progress/${jobId}`),
+
+  /**
+   * Cancela un batch en curso.
+   */
+  cancelBatch: (jobId: string): Promise<{ cancelled: boolean }> =>
+    request(`${API_BASE}/batch-cancel/${jobId}`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Guarda manualmente la estructura de costes editada por el usuario.
+   */
+  saveCOGS: (productId: string, cogs: Partial<COGSData>): Promise<COGSData> =>
+    request(`${API_BASE}/cogs/${productId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(cogs),
+    }),
+
+  // ============================================================
+  // SIMULACIÓN
+  // ============================================================
+
+  /**
+   * Calcula simulación de pricing (math puro, no IA, instantáneo).
+   */
+  simulate: (productId: string, params: SimulationParams): Promise<SimulationResult> =>
+    request(`${API_BASE}/simulate`, {
+      method: 'POST',
+      body: JSON.stringify({ productId, ...params }),
+    }),
+
+  // ============================================================
+  // OPTIMIZACIÓN CON IA
+  // ============================================================
+
+  /**
+   * Pide a Claude que optimice el precio del producto.
+   */
+  optimizePrice: (productId: string): Promise<OptimizationResult> =>
+    request(`${API_BASE}/optimize`, {
+      method: 'POST',
+      body: JSON.stringify({ productId }),
+    }),
+
+  /**
+   * Aplica un nuevo precio al producto en Shopify.
+   */
+  applyPrice: (productId: string, newPrice: number): Promise<{ success: boolean; productId: string }> =>
+    request(`${API_BASE}/apply`, {
+      method: 'PATCH',
+      body: JSON.stringify({ productId, newPrice }),
+    }),
+
+  /**
+   * Crea un test A/B con dos precios.
+   */
+  createABTest: (productId: string, priceA: number, priceB: number, durationDays: number): Promise<{ testId: string }> =>
+    request(`${API_BASE}/ab-test`, {
+      method: 'POST',
+      body: JSON.stringify({ productId, priceA, priceB, durationDays }),
+    }),
+};
