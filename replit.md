@@ -95,6 +95,9 @@ ALL 17 modules have standalone routes (`/audit`, `/redesign`, `/images`, `/web-l
 
 **Backend projectId=0 support**: Both `requireProjectAccess` middlewares (`lib/access.ts` and `lib/auth.ts`) allow projectId=0 through without access checks. All 9 `canAccessProject` calls in `vault.ts` have `projectId !== 0 &&` bypass. 3 image endpoints in `fs-pro.ts` use `isNaN(projectId)` instead of `!projectId`. GET/load endpoints return empty data for projectId=0. POST action endpoints (vault save-report, web-lab save-edit, generate-from-scratch) all work with projectId=0, saving to the vault with projectId=0. Frontend guards in WebLab (including "Crear desde cero" and "Historial" buttons), FusionStudio, AvatarStudio, and Suppliers use `=== undefined || === null` checks instead of falsy checks to allow 0 as a valid value.
 
+### Onboarding Widget (Dynamic, Project-Aware)
+The OnboardingWidget is fully dynamic — zero hardcoded data. The backend `GET /api/onboarding/progress` queries real tables (projects, audit_results, generation_jobs, price_history, ab_tests, seo_data, users) and returns actual counts and completion status. It accepts `?projectId=X` to scope all metrics to a specific project. The frontend detects the active project from the URL via `useRoute("/projects/:id/*")` and passes it to the backend. Each step navigates to the correct section of the active project. The widget is responsive (`min(320px, calc(100vw-32px))`), scrollable, and auto-refreshes every 30s. Store connection checks `accessToken` (not `shopDomain`). Client count is project-scoped via `clientId`. Invalid `projectId` returns 404.
+
 ### A/B Testing Auto-Declaration
 When tracking events push confidence to ≥95%, the backend (`ab-testing.ts` track endpoint) automatically declares the winner, sets status to "completed", and logs the result to ShopyBrain via `learnFromOperation`. Manual declaration via "Gana A/B" buttons remains available for tests that haven't auto-completed.
 

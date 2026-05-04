@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { onboardingProgressTable, achievementsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  onboardingProgressTable, achievementsTable,
+  projectsTable, auditResultsTable, generationJobsTable,
+  abTestsTable, seoDataTable, priceHistoryTable, usersTable,
+} from "@workspace/db";
+import { eq, sql, and, isNotNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { cached } from "../lib/cache.js";
 
@@ -24,21 +28,109 @@ router.get("/onboarding/progress", async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  
-    const [progress] = await db.select().from(onboardingProgressTable)
-      .where(eq(onboardingProgressTable.userId, userId));
-  
-    if (!progress) {
-      const [created] = await db.insert(onboardingProgressTable).values({ userId }).returning();
-      res.json({ progress: created, achievements: [] });
-      return;
+
+    const requestedProjectId = req.query.projectId ? parseInt(req.query.projectId as string, 10) : null;
+
+    const projects = await db.select({ id: projectsTable.id, name: projectsTable.name, accessToken: projectsTable.accessToken, shopDomain: projectsTable.shopDomain }).from(projectsTable);
+
+    if (requestedProjectId && !projects.find(p => p.id === requestedProjectId)) {
+      res.status(404).json({ error: "Project not found" }); return;
     }
-  
+
+    const activeProject = requestedProjectId
+      ? projects.find(p => p.id === requestedProjectId)!
+      : projects[0] ?? null;
+    const projectId = activeProject?.id ?? null;
+
+    const storeConnected = activeProject ? !!activeProject.accessToken : false;
+
+    let auditDone = false, imagesDone = false, priceDone = false, abDone = false, seoDone = false, clientDone = false;
+    let auditCount = 0, imageCount = 0, priceCount = 0, abCount = 0, seoCount = 0, clientCount = 0;
+
+    if (projectId) {
+      const [auditRow] = await db.select({ c: sql<number>`count(*)::int` }).from(auditResultsTable).where(eq(auditResultsTable.projectId, projectId));
+      auditCount = auditRow?.c ?? 0;
+      auditDone = auditCount > 0;
+
+      const [imgRow] = await db.select({ c: sql<number>`count(*)::int` }).from(generationJobsTable).where(eq(generationJobsTable.projectId, projectId));
+      imageCount = imgRow?.c ?? 0;
+      imagesDone = imageCount > 0;
+
+      const [priceRow] = await db.select({ c: sql<number>`count(*)::int` }).from(priceHistoryTable).where(eq(priceHistoryTable.projectId, projectId));
+      priceCount = priceRow?.c ?? 0;
+      priceDone = priceCount > 0;
+
+      const [abRow] = await db.select({ c: sql<number>`count(*)::int` }).from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
+      abCount = abRow?.c ?? 0;
+      abDone = abCount > 0;
+
+      const [seoRow] = await db.select({ c: sql<number>`count(*)::int` }).from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+      seoCount = seoRow?.c ?? 0;
+      seoDone = seoCount > 0;
+    }
+
+    const pidStr = projectId ? String(projectId) : null;
+    const [clientRow] = await db.select({ c: sql<number>`count(*)::int` }).from(usersTable).where(
+      pidStr
+        ? and(eq(usersTable.role, "client"), eq(usersTable.clientId, pidStr))
+        : and(eq(usersTable.role, "client"), isNotNull(usersTable.clientId))
+    );
+    clientCount = clientRow?.c ?? 0;
+    clientDone = clientCount > 0;
+
+    const stepResults: Record<string, boolean> = {
+      stepStoreConnected: storeConnected,
+      stepAuditRun: auditDone,
+      stepImageGenerated: imagesDone,
+      stepPriceOptimized: priceDone,
+      stepAbTestActive: abDone,
+      stepSeoApplied: seoDone,
+      stepClientInvited: clientDone,
+    };
+
+    const stepFields = Object.keys(stepResults);
+    const completed = stepFields.filter(k => stepResults[k]).length;
+    const completionPct = Math.round((completed / stepFields.length) * 100);
+
+    const progress = {
+      stepStoreConnected: storeConnected ? 1 : 0,
+      stepAuditRun: auditDone ? 1 : 0,
+      stepImageGenerated: imagesDone ? 1 : 0,
+      stepPriceOptimized: priceDone ? 1 : 0,
+      stepAbTestActive: abDone ? 1 : 0,
+      stepSeoApplied: seoDone ? 1 : 0,
+      stepClientInvited: clientDone ? 1 : 0,
+      completionPct,
+      onboardingCompleted: completionPct === 100 ? 1 : 0,
+    };
+
+    const details = {
+      projectId,
+      projectName: activeProject?.name ?? null,
+      projectCount: projects.length,
+      auditCount,
+      imageCount,
+      priceCount,
+      abCount,
+      seoCount,
+      clientCount,
+    };
+
     const achievements = await cached(`achievements-${userId}`, 120_000, () =>
       db.select().from(achievementsTable).where(eq(achievementsTable.userId, userId))
     );
-  
-    res.json({ progress, achievements });
+
+    const dbProgress = await db.select().from(onboardingProgressTable)
+      .where(eq(onboardingProgressTable.userId, userId));
+    if (dbProgress.length === 0) {
+      await db.insert(onboardingProgressTable).values({ userId, ...progress }).returning();
+    } else {
+      await db.update(onboardingProgressTable)
+        .set({ ...progress, updatedAt: new Date() })
+        .where(eq(onboardingProgressTable.userId, userId));
+    }
+
+    res.json({ progress, details, achievements });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
