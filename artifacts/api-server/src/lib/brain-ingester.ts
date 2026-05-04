@@ -46,6 +46,14 @@ const DOMAIN_MAP: Record<string, string[]> = {
     "seo", "keyword", "palabra clave", "metatag", "titulo", "descripcion",
     "contenido", "blog", "articulo", "trafico",
   ],
+  exploded_view: [
+    "exploded view", "vista explosionada", "deconstrucción", "deconstruction",
+    "disassembly", "assembly", "desensamblaje", "ensamblaje", "product burst",
+    "magnetic assembly", "parallel prompt", "global state", "locked camera",
+    "optical flow", "morph cut", "seedance", "pollo.ai", "omneky",
+    "kling 3", "runway gen", "veo 3", "wan flf", "first last frame",
+    "exploded", "zero gravity", "floating components", "rigid body",
+  ],
   campaign_production: [
     "campaign", "campaña", "video campaign", "ugc", "lip sync", "lip-sync",
     "storyboard", "voice over", "voice-over", "locuci", "micro-clip",
@@ -197,6 +205,10 @@ export function ingestToShopyBrain(params: IngestParams): void {
     campaign_adaptation: "prompt_template",
     video_campaign: "prompt_template",
     ugc_clip: "prompt_template",
+    exploded_view_generation: "prompt_template",
+    exploded_view: "prompt_template",
+    product_deconstruction: "prompt_template",
+    parallel_prompt: "prompt_template",
     storyboard: "prompt_template",
   };
 

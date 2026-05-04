@@ -83,6 +83,27 @@ import {
   buildAdaptationUserPrompt,
   type BrandAdaptationInput,
 } from "../lib/campaign-production-kb.js";
+import {
+  getExplodedViewSummary,
+  getFullExplodedViewKB,
+  PLATFORM_PROFILES,
+  GLOBAL_STATE_TEMPLATES,
+  PROMPT_SEQUENCES,
+  PRODUCT_PRESETS,
+  GENERATION_STRATEGIES,
+  POST_PRODUCTION_PIPELINE,
+  QUALITY_RULES,
+  getPlatformById,
+  getPlatformByName,
+  getPresetByCategory,
+  getSequenceById,
+  getGlobalStateById,
+  getStrategyByMode,
+  getRulesByCategory,
+  getRulesBySeverity,
+  buildPromptWithGlobalState,
+  getRecommendedPlatformsForCategory,
+} from "../lib/exploded-view-kb.js";
 import { db as _dbForLibrary, omnicorePromptLibraryTable } from "@workspace/db";
 import { eq as _eqLib, desc as _descLib, sql as _sqlLib } from "drizzle-orm";
 import { listTemplates } from "../lib/ad-templates.js";
@@ -1019,6 +1040,262 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
   } catch (e: any) {
     logger.error({ err: e?.message }, "campaign-production adapt-for-brand failed");
     res.status(500).json({ error: e?.message || "Error al adaptar campaña para la marca" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPLODED VIEW STUDIO — REST API
+// ═══════════════════════════════════════════════════════════════════════════
+//   GET  /api/fs-pro/exploded-view/summary           → quick counts
+//   GET  /api/fs-pro/exploded-view/full               → entire KB
+//   GET  /api/fs-pro/exploded-view/platforms          → AI video platform profiles
+//   GET  /api/fs-pro/exploded-view/platforms/:id      → single platform by ID or name
+//   GET  /api/fs-pro/exploded-view/global-states      → Global State DNA templates
+//   GET  /api/fs-pro/exploded-view/sequences          → prompt sequences (5-clip)
+//   GET  /api/fs-pro/exploded-view/sequences/:id      → single sequence
+//   GET  /api/fs-pro/exploded-view/presets            → product category presets
+//   GET  /api/fs-pro/exploded-view/presets/:category  → single preset
+//   GET  /api/fs-pro/exploded-view/strategies         → generation strategies
+//   GET  /api/fs-pro/exploded-view/post-production    → post-production pipeline
+//   GET  /api/fs-pro/exploded-view/quality-rules      → quality rules
+//   GET  /api/fs-pro/exploded-view/quality-rules/:cat → rules by category
+//   POST /api/fs-pro/exploded-view/generate-sequence  → AI generates custom sequence
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get("/fs-pro/exploded-view/summary", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, summary: getExplodedViewSummary() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener resumen" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/full", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, ...getFullExplodedViewKB() });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener KB completa" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/platforms", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, platforms: PLATFORM_PROFILES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener plataformas" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/platforms/:id", requireAdmin, (req, res) => {
+  try {
+    const param = String(req.params.id);
+    const platform = getPlatformById(param) ?? getPlatformByName(param);
+    if (!platform) { res.status(404).json({ error: `Plataforma '${param}' no encontrada` }); return; }
+    res.json({ ok: true, platform });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener plataforma" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/global-states", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, globalStates: GLOBAL_STATE_TEMPLATES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener global states" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/sequences", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, sequences: PROMPT_SEQUENCES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener secuencias" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/sequences/:id", requireAdmin, (req, res) => {
+  try {
+    const seqId = String(req.params.id);
+    const seq = getSequenceById(seqId);
+    if (!seq) { res.status(404).json({ error: `Secuencia '${seqId}' no encontrada` }); return; }
+    const clips = seq.clips.map(c => ({
+      ...c,
+      fullPrompt: buildPromptWithGlobalState(seq.globalStateId, c.prompt),
+    }));
+    res.json({ ok: true, sequence: { ...seq, clips } });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener secuencia" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/presets", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, presets: PRODUCT_PRESETS });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener presets" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/presets/:category", requireAdmin, (req, res) => {
+  try {
+    const cat = String(req.params.category);
+    const preset = getPresetByCategory(cat);
+    if (!preset) { res.status(404).json({ error: `Preset '${cat}' no encontrado` }); return; }
+    const recommended = getRecommendedPlatformsForCategory(cat);
+    res.json({ ok: true, preset, recommendedPlatforms: recommended });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener preset" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/strategies", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, strategies: GENERATION_STRATEGIES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener estrategias" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/post-production", requireAdmin, (_req, res) => {
+  try {
+    res.json({ ok: true, pipeline: POST_PRODUCTION_PIPELINE });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener pipeline" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/quality-rules", requireAdmin, (_req, res) => {
+  try {
+    const { severity } = _req.query;
+    if (severity && typeof severity === "string") {
+      res.json({ ok: true, rules: getRulesBySeverity(severity as any) });
+      return;
+    }
+    res.json({ ok: true, rules: QUALITY_RULES });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener reglas" });
+  }
+});
+
+router.get("/fs-pro/exploded-view/quality-rules/:category", requireAdmin, (req, res) => {
+  try {
+    const rules = getRulesByCategory(String(req.params.category) as any);
+    res.json({ ok: true, rules });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Error al obtener reglas por categoría" });
+  }
+});
+
+router.post("/fs-pro/exploded-view/generate-sequence", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { productName, productCategory, materialDescription, components, format, generationMode, globalStateId, projectId } = req.body;
+
+    if (!productName || typeof productName !== "string" || productName.trim().length < 2) {
+      res.status(400).json({ error: "Campo requerido: productName (nombre del producto, mín. 2 caracteres)" }); return;
+    }
+    if (!productCategory || typeof productCategory !== "string") {
+      res.status(400).json({ error: "Campo requerido: productCategory (categoría del producto)" }); return;
+    }
+
+    const mode = generationMode === "parallel" ? "parallel" : "sequential";
+    const gsId = globalStateId || "gs:studio_black";
+    const gs = getGlobalStateById(gsId);
+    const preset = getPresetByCategory(productCategory);
+    const strategy = getStrategyByMode(mode);
+
+    const presetContext = preset
+      ? `\nReferencia de preset existente para "${preset.displayName}":\n- Componentes: ${preset.components.map(c => `${c.name} (${c.material}, eje ${c.separationAxis}, ${c.separationDistance})`).join("; ")}\n- Efectos especiales sugeridos: ${preset.specialEffects.join(", ")}\n- Prompt suffix: ${preset.promptSuffix}`
+      : "";
+
+    const componentList = Array.isArray(components) && components.length > 0
+      ? `\nComponentes especificados por el usuario:\n${components.map((c: string, i: number) => `${i + 1}. ${c}`).join("\n")}`
+      : "";
+
+    const criticalRules = QUALITY_RULES.filter(r => r.severity === "critical").map(r => `- ${r.rule}: ${r.rationale}`).join("\n");
+
+    const systemPrompt = `Eres un director de producción de vídeo con IA especializado en vistas explosionadas (Exploded View) de productos. Tu expertise cubre Pollo.ai, Seedance 2.0, Kling 3.0, Runway Gen-4.5, Veo 3.1, y Wan 2.1 FLF2V.
+
+CONTEXTO DEL GLOBAL STATE:
+${gs ? gs.fullTemplate : GLOBAL_STATE_TEMPLATES[0].fullTemplate}
+
+MODO DE GENERACIÓN: ${mode === "parallel" ? "PARALELO — todos los clips se lanzan simultáneamente. Cada prompt DEBE incluir estado inicial y final explícito." : "SECUENCIAL — cada clip usa el último fotograma del anterior. Usa Image-to-Video con instrucción 'Starting exactly from the provided image'."}
+
+REGLAS CRÍTICAS DE CALIDAD:
+${criticalRules}
+
+ESTRATEGIA DE ${mode.toUpperCase()}:
+${strategy ? strategy.howItWorks.join("\n") : ""}
+${presetContext}
+${componentList}
+
+Genera una secuencia COMPLETA de 5 clips de 2 segundos cada uno (10 segundos total) para el producto especificado. Cada clip debe tener:
+- clipIndex (1-5), clipName (nombre descriptivo en español), timelineSec, phase (deconstruction/suspension/assembly)
+- logicDescription (qué ocurre en este clip y por qué)
+- startingState y endingState (descripción precisa del estado espacial)
+- motionCurve (ease-in, ease-out, linear, etc.)
+- prompt (el prompt COMPLETO listo para copiar y pegar en la plataforma de IA)
+- parallelSafe (boolean)
+
+IMPORTANTE: Los prompts deben ser HIPER-DETALLADOS con distancias exactas en pulgadas, materiales específicos, y curvas de movimiento definidas. Incluye el GLOBAL STATE en cada prompt si es modo paralelo. En modo secuencial, incluye "Starting exactly from the provided image" en clips 2-5.
+
+Responde SOLO con JSON válido:
+{
+  "productName": "...",
+  "totalDurationSec": 10,
+  "clipCount": 5,
+  "generationMode": "${mode}",
+  "globalStatePrefix": "...",
+  "clips": [ { clipIndex, clipName, timelineSec, phase, logicDescription, startingState, endingState, motionCurve, prompt, parallelSafe } ],
+  "postProductionNotes": ["..."],
+  "recommendedPlatforms": ["..."]
+}`;
+
+    const userPrompt = `Genera una secuencia de Exploded View para este producto:
+
+PRODUCTO: ${productName}
+CATEGORÍA: ${productCategory}
+${materialDescription ? `MATERIALES: ${materialDescription}` : ""}
+${componentList || ""}
+FORMATO: ${format || "16:9"}
+MODO: ${mode}
+GLOBAL STATE: ${gsId}
+
+Genera los 5 clips con prompts listos para producción.`;
+
+    const numericProjectId = projectId ? Number(projectId) : 0;
+    const claudeRes = await askClaudeWithBrain(
+      numericProjectId,
+      [{ role: "user", content: userPrompt }],
+      systemPrompt,
+      "exploded_view",
+      productCategory as string,
+      8000,
+      90000,
+    );
+
+    const jsonMatch = claudeRes.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) { res.status(500).json({ error: "Claude no devolvió JSON válido para la secuencia" }); return; }
+
+    const parsed = safeJsonParse(jsonMatch[0]) as Record<string, unknown> | null;
+    if (!parsed || !Array.isArray(parsed.clips) || parsed.clips.length === 0) {
+      res.status(500).json({ error: "Respuesta de Claude no contiene clips válidos" }); return;
+    }
+
+    learnFromOperation({
+      operationType: "exploded_view_generation",
+      niche: productCategory,
+      title: `Exploded View sequence for: ${productName}`,
+      content: `Product: ${productName} | Category: ${productCategory} | Mode: ${mode} | Clips: ${parsed.clips.length} | GlobalState: ${gsId}`,
+      confidence: 0.88,
+      tags: ["exploded_view", "product_deconstruction", "video_sequence", mode, productCategory, productName.toLowerCase()],
+      sourceProjectId: numericProjectId || undefined,
+      structuredData: { productName, productCategory, mode, clipCount: (parsed.clips as unknown[]).length, globalStateId: gsId },
+    });
+
+    res.json({ ok: true, sequence: parsed, inputProduct: productName, mode });
+  } catch (e: any) {
+    logger.error({ err: e?.message }, "exploded-view generate-sequence failed");
+    res.status(500).json({ error: e?.message || "Error al generar secuencia de vista explosionada" });
   }
 });
 

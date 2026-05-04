@@ -72,6 +72,7 @@ const WebLabStandalone = lazy(() => import("@/pages/projects/WebLab").then(m => 
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
+const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -440,6 +441,9 @@ function Router() {
         </Route>
         <Route path="/projects/:id/campaign-kit">
           <RequireAdmin><AdminWrapper><AppLayout><S><CampaignKit /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/exploded-view">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ExplodedViewStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/web-lab">
           <RequireAdmin><AdminWrapper><AppLayout><S><WebLabStandalone /></S></AppLayout></AdminWrapper></RequireAdmin>

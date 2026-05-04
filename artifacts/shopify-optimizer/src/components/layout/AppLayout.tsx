@@ -26,6 +26,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "fusion-studio", label: "Fusion Studio", icon: "🧬" },
   { id: "cards", label: "Card Studio", icon: "💳" },
   { id: "campaign-kit", label: "Campaign Kit", icon: "🎬" },
+  { id: "exploded-view", label: "Exploded View", icon: "💥" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
