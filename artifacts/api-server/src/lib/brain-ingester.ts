@@ -46,6 +46,13 @@ const DOMAIN_MAP: Record<string, string[]> = {
     "seo", "keyword", "palabra clave", "metatag", "titulo", "descripcion",
     "contenido", "blog", "articulo", "trafico",
   ],
+  campaign_production: [
+    "campaign", "campaña", "video campaign", "ugc", "lip sync", "lip-sync",
+    "storyboard", "voice over", "voice-over", "locuci", "micro-clip",
+    "master cut", "character lock", "prompt 9:16", "prompt 16:9",
+    "subtitle", "subtítulo", "srt", "deliverable", "entregable",
+    "holographic", "holográf", "6 segundo", "6-sec",
+  ],
 };
 
 function detectDomains(text: string): string[] {
@@ -186,6 +193,11 @@ export function ingestToShopyBrain(params: IngestParams): void {
     audit_result: "niche_keyword",
     competitor_scan: "competitor_intel",
     manual: "general",
+    campaign_production: "prompt_template",
+    campaign_adaptation: "prompt_template",
+    video_campaign: "prompt_template",
+    ugc_clip: "prompt_template",
+    storyboard: "prompt_template",
   };
 
   const resolvedMemType = memoryType ?? memTypeMap[sourceType] ?? "general";

@@ -85,7 +85,7 @@ export function safeJsonParse<T>(text: string, label?: string): T {
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
 
-export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ab_test_prediction" | "ecommerce" | "cogs_estimation" | "financial" | "email_content" | "brand_analysis" | "consistency" | "web_lab" | "generator";
+export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ab_test_prediction" | "ecommerce" | "cogs_estimation" | "financial" | "email_content" | "brand_analysis" | "consistency" | "web_lab" | "generator" | "campaign_production";
 
 const platformTypeCache = new Map<number, { value: string; ts: number }>();
 
@@ -828,6 +828,7 @@ async function detectAndSaveCrossConnections(
     marketing: /email|campaña|engagement|conversión|funnel|cta|newsletter/i,
     competitor: /competidor|competencia|rival|mercado|benchmark|amenaza/i,
     inventory: /stock|inventario|unidades|agotad|restock|almacén/i,
+    campaign_production: /campaign|video.?campaign|ugc|lip.?sync|storyboard|voice.?over|micro.?clip|master.?cut|character.?lock|prompt.?916|prompt.?169|9:16|16:9/i,
   };
 
   const detectedDomains: string[] = [];
@@ -990,6 +991,12 @@ export function learnFromOperation(params: {
     explicit_instruction: "general",
     strategic_learning: "general",
     conversation_insight: "general",
+    campaign_adaptation: "prompt_template",
+    campaign_production: "prompt_template",
+    video_campaign: "prompt_template",
+    ugc_clip: "prompt_template",
+    storyboard: "prompt_template",
+    brand_adaptation: "prompt_template",
   };
 
   const memoryType = memTypeMap[params.operationType] ?? "general";

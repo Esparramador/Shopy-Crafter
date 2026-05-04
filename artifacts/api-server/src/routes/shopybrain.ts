@@ -232,6 +232,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   "SEO & Product Discovery":           "SEO · Descubrimiento de Producto · Keywords · Schema · SERP",
   "Social Proof & Reviews":            "Social Proof · Reviews · Testimonios · UGC · Trust",
   "Upsell & Cross-sell Strategies":    "Upsell · Cross-sell · Bundles · Estrategias de Ticket Medio",
+  campaign_production:                 "Campaign Production · Video Campaigns · UGC · Storyboard · Lip Sync · Voice-Over · Master Cut",
 };
 
 export async function ensureAllKnowledgeDomains() {

@@ -7,8 +7,7 @@ import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { saveToVault } from "../lib/vault.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
-import { learnFromOperation, askClaude } from "../lib/claude.js";
-import { safeJsonParse } from "../lib/claude.js";
+import { learnFromOperation, askClaude, askClaudeWithBrain, safeJsonParse } from "../lib/claude.js";
 import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib/objectStorage.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
@@ -962,6 +961,7 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
     const coreOffering = str(body.coreOffering);
     const targetAudience = str(body.targetAudience);
     const toneOfVoice = str(body.toneOfVoice);
+    const projectId = parseInt(String(body.projectId || "0"), 10);
 
     const missing: string[] = [];
     if (!brandName) missing.push("brandName");
@@ -986,7 +986,15 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
     const systemPrompt = buildAdaptationSystemPrompt();
     const userPrompt = buildAdaptationUserPrompt(input);
 
-    const raw = await askClaude(0, [{ role: "user", content: userPrompt }], systemPrompt, 8192, 120_000);
+    const raw = await askClaudeWithBrain(
+      projectId,
+      [{ role: "user", content: userPrompt }],
+      systemPrompt,
+      "campaign_production",
+      industry,
+      8192,
+      120_000
+    );
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) { res.status(500).json({ error: "Claude no devolvió JSON válido" }); return; }
@@ -995,6 +1003,18 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
     if (!parsed || typeof parsed !== "object" || !parsed.brandName || !Array.isArray(parsed.videos)) {
       res.status(500).json({ error: "Respuesta de Claude con estructura inválida" }); return;
     }
+
+    learnFromOperation({
+      operationType: "campaign_adaptation",
+      niche: industry,
+      title: `Campaign Production Kit adapted for: ${input.brandName}`,
+      content: `Brand: ${input.brandName} | Industry: ${industry} | Offering: ${input.coreOffering} | Audience: ${input.targetAudience} | Tone: ${input.toneOfVoice} | Videos adapted: ${(parsed.videos as unknown[]).length}`,
+      confidence: 0.85,
+      tags: ["campaign_production", "brand_adaptation", "video_campaign", "ugc", input.brandName.toLowerCase()],
+      sourceProjectId: projectId || undefined,
+      structuredData: { brandName: input.brandName, industry, videosAdapted: (parsed.videos as unknown[]).length, toneOfVoice: input.toneOfVoice },
+    });
+
     res.json({ ok: true, adapted: parsed, inputBrand: input.brandName });
   } catch (e: any) {
     logger.error({ err: e?.message }, "campaign-production adapt-for-brand failed");

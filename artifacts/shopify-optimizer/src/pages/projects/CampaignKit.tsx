@@ -103,7 +103,7 @@ export default function CampaignKit() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(adaptForm),
+        body: JSON.stringify({ ...adaptForm, projectId }),
       });
       if (!r.ok) { const errBody = await r.json().catch(() => ({})); throw new Error(errBody.error || `Error ${r.status}`); }
       const d = await r.json();
