@@ -1,0 +1,359 @@
+Esa es la interfaz visual. Ahora aquí está el blueprint técnico completo para implementarlo en Shopy Crafter:
+
+🏗️ Arquitectura del sistema
+┌─────────────────────────────────────────────────────────────────┐
+│  FRONTEND (React + Tailwind)                                     │
+│  • SupplierIntelligenceDashboard.tsx                             │
+│  • SearchMultiSource.tsx · COGSCalculator.tsx                    │
+│  • PricingRecommender.tsx · ReportGenerator.tsx                  │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│  API LAYER (Express routes en /server/routes/)                   │
+│  • suppliers.ts    → CRUD + búsqueda                             │
+│  • supplier-search.ts → Multi-source scraping                    │
+│  • cogs-engine.ts  → Cálculo TCO                                 │
+│  • pricing-ai.ts   → Recomendación Claude/Gemini                 │
+│  • reports.ts      → Excel/PPT/Word/PDF                          │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│  SERVICES (background workers)                                   │
+│  • SerpAPI / Google CSE → Google + Bing                          │
+│  • DuckDuckGo HTML scraping                                      │
+│  • Instagram Graph API → Bodegas/marcas                          │
+│  • Firecrawl / Playwright → Scraping URLs directas               │
+│  • Claude Opus 4.7 → Extracción estructurada de proveedores     │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│  POSTGRES (Drizzle schema)                                       │
+│  • suppliers · supplier_searches · supplier_pricing              │
+│  • cogs_calculations · pricing_scenarios · reports               │
+└──────────────────────────────────────────────────────────────────┘
+
+📊 Schema de base de datos (Drizzle)
+typescript// shared/schema.ts — agrega estas tablas a tu schema actual
+
+export const suppliers = pgTable('suppliers', {
+  id: serial('id').primaryKey(),
+  shopId: integer('shop_id').notNull().references(() => shops.id),
+  name: text('name').notNull(),
+  legalName: text('legal_name'),
+  cif: text('cif'),
+  category: text('category').notNull(), // 'vinos', 'bebidas', 'carnes', etc.
+  subcategory: text('subcategory'),
+  region: text('region'),
+  country: text('country').default('ES'),
+  type: text('type'), // 'productor', 'distribuidor', 'importador', 'marketplace'
+  website: text('website'),
+  instagram: text('instagram'),
+  email: text('email'),
+  phone: text('phone'),
+  source: text('source').notNull(), // 'google', 'bing', 'duckduckgo', 'instagram', 'manual'
+  sourceUrl: text('source_url'),
+  rawData: jsonb('raw_data'), // datos crudos del scraping
+  enrichedAt: timestamp('enriched_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const supplierPricing = pgTable('supplier_pricing', {
+  id: serial('id').primaryKey(),
+  supplierId: integer('supplier_id').notNull().references(() => suppliers.id),
+  productSku: text('product_sku').notNull(),
+  productName: text('product_name').notNull(),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 4 }).notNull(),
+  currency: text('currency').default('EUR'),
+  minOrderQty: integer('min_order_qty'),
+  minOrderValue: decimal('min_order_value', { precision: 10, scale: 2 }),
+  volumeDiscounts: jsonb('volume_discounts'), // [{minQty, discountPct}, ...]
+  leadTimeDays: integer('lead_time_days'),
+  lastUpdated: timestamp('last_updated').defaultNow(),
+});
+
+export const cogsCalculations = pgTable('cogs_calculations', {
+  id: serial('id').primaryKey(),
+  shopId: integer('shop_id').notNull().references(() => shops.id),
+  supplierId: integer('supplier_id').notNull().references(() => suppliers.id),
+  productName: text('product_name').notNull(),
+  // Inputs
+  unitPrice: decimal('unit_price', { precision: 10, scale: 4 }).notNull(),
+  transportCost: decimal('transport_cost', { precision: 10, scale: 4 }),
+  specialTax: decimal('special_tax', { precision: 10, scale: 4 }),
+  breakageRatePct: decimal('breakage_rate_pct', { precision: 5, scale: 2 }),
+  coldStorageCost: decimal('cold_storage_cost', { precision: 10, scale: 4 }),
+  staffCost: decimal('staff_cost', { precision: 10, scale: 4 }),
+  marketingCost: decimal('marketing_cost', { precision: 10, scale: 4 }),
+  // Outputs
+  cogsLow: decimal('cogs_low', { precision: 10, scale: 4 }),
+  cogsAvg: decimal('cogs_avg', { precision: 10, scale: 4 }),
+  cogsHigh: decimal('cogs_high', { precision: 10, scale: 4 }),
+  recommendedPrice: decimal('recommended_price', { precision: 10, scale: 2 }),
+  marginPct: decimal('margin_pct', { precision: 5, scale: 2 }),
+  scenarios: jsonb('scenarios'), // [{volume, supplierName, totalCogs, ...}]
+  calculatedAt: timestamp('calculated_at').defaultNow(),
+});
+
+export const supplierSearches = pgTable('supplier_searches', {
+  id: serial('id').primaryKey(),
+  shopId: integer('shop_id').notNull().references(() => shops.id),
+  query: text('query').notNull(),
+  sources: text('sources').array(), // ['google', 'bing', 'instagram', ...]
+  resultsCount: integer('results_count'),
+  newSuppliersFound: integer('new_suppliers_found'),
+  status: text('status'), // 'pending', 'running', 'completed', 'failed'
+  startedAt: timestamp('started_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+});
+
+🔍 Búsqueda multi-fuente (/server/routes/supplier-search.ts)
+typescriptimport { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
+import Anthropic from '@anthropic-ai/sdk';
+
+const router = Router();
+const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// POST /api/suppliers/search
+router.post('/search', requireAuth, async (req, res) => {
+  const { query, sources, category } = req.body;
+  const { shopId } = req.user;
+
+  // 1. Crear registro de búsqueda
+  const search = await db.insert(supplierSearches).values({
+    shopId, query, sources, status: 'running'
+  }).returning();
+
+  // 2. Lanzar búsquedas en paralelo
+  const results = await Promise.all([
+    sources.includes('google') && searchGoogle(query),
+    sources.includes('bing') && searchBing(query),
+    sources.includes('duckduckgo') && searchDuckDuckGo(query),
+    sources.includes('instagram') && searchInstagram(query),
+    sources.includes('shopify') && searchShopifyStores(query),
+  ].filter(Boolean));
+
+  // 3. Combinar y deduplicar URLs
+  const allUrls = [...new Set(results.flat().map(r => r.url))];
+
+  // 4. Enriquecer con Claude (extracción estructurada)
+  const enriched = await Promise.all(
+    allUrls.slice(0, 50).map(url => extractSupplierData(url, category))
+  );
+
+  // 5. Guardar nuevos proveedores (deduplicar por website/cif)
+  const newSuppliers = await dedupeAndInsert(enriched, shopId);
+
+  res.json({
+    searchId: search[0].id,
+    totalFound: enriched.length,
+    newSuppliers: newSuppliers.length,
+    suppliers: newSuppliers
+  });
+});
+
+// Extracción inteligente con Claude
+async function extractSupplierData(url: string, category: string) {
+  // Scrape la página con Firecrawl o Playwright
+  const html = await scrapeUrl(url);
+  
+  const message = await claude.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 1500,
+    messages: [{
+      role: 'user',
+      content: `Extrae información estructurada de este proveedor de ${category}.
+      
+HTML: ${html.slice(0, 15000)}
+
+Devuelve SOLO JSON válido:
+{
+  "name": "Nombre comercial",
+  "legalName": "Razón social si aparece",
+  "cif": "CIF/NIF si aparece",
+  "type": "productor|distribuidor|importador|marketplace",
+  "region": "Región española",
+  "products": [{"name": "...", "estimatedPrice": null}],
+  "minOrderInfo": "Info sobre pedido mínimo si aparece",
+  "leadTimeInfo": "Plazos de entrega si aparece",
+  "certifications": ["ISO 9001", "..."],
+  "contact": {"email": "...", "phone": "..."}
+}
+
+Si algo no aparece, usa null. NO inventes datos.`
+    }]
+  });
+
+  return JSON.parse(message.content[0].text);
+}
+
+export default router;
+
+🧮 Motor de cálculo COGS (/server/routes/cogs-engine.ts)
+typescript// Sigue tu metodología: ASSUMPTIONS → CÁLCULOS → RESUMEN
+
+interface COGSInputs {
+  supplierId: number;
+  unitPrice: number;
+  volume: number;
+  transportPerUnit?: number;
+  specialTaxPerUnit?: number;
+  breakageRatePct?: number;     // 3-8% para vinos
+  coldStorageCostPerUnit?: number;
+  staffCostPerUnit?: number;
+  marketingCostPerUnit?: number;
+  formationCostPerUnit?: number;
+}
+
+function calculateCOGS(inputs: COGSInputs) {
+  const {
+    unitPrice, volume,
+    transportPerUnit = 0,
+    specialTaxPerUnit = 0,
+    breakageRatePct = 5,
+    coldStorageCostPerUnit = 0,
+    staffCostPerUnit = 0,
+    marketingCostPerUnit = 0,
+    formationCostPerUnit = 0,
+  } = inputs;
+
+  // COGS Unitario = Precio + Transporte + Impuestos + Rotura + Frío + Personal + Marketing
+  const breakageCost = unitPrice * (breakageRatePct / 100);
+  
+  const cogsUnit = 
+    unitPrice + 
+    transportPerUnit + 
+    specialTaxPerUnit + 
+    breakageCost + 
+    coldStorageCostPerUnit + 
+    staffCostPerUnit + 
+    marketingCostPerUnit + 
+    formationCostPerUnit;
+
+  // Rangos Bajo/Medio/Alto
+  return {
+    cogsLow: cogsUnit * 0.92,
+    cogsAvg: cogsUnit,
+    cogsHigh: cogsUnit * 1.08,
+    cogsTotal: cogsUnit * volume,
+    breakdown: {
+      price: unitPrice,
+      transport: transportPerUnit,
+      tax: specialTaxPerUnit,
+      breakage: breakageCost,
+      cold: coldStorageCostPerUnit,
+      staff: staffCostPerUnit,
+      marketing: marketingCostPerUnit,
+    }
+  };
+}
+
+// Endpoint comparativa entre proveedores
+router.post('/compare', requireAuth, async (req, res) => {
+  const { supplierIds, productName, volume } = req.body;
+  
+  const comparisons = await Promise.all(
+    supplierIds.map(async (id) => {
+      const pricing = await db.query.supplierPricing.findFirst({
+        where: and(
+          eq(supplierPricing.supplierId, id),
+          eq(supplierPricing.productName, productName)
+        )
+      });
+      
+      const cogs = calculateCOGS({
+        supplierId: id,
+        unitPrice: Number(pricing.unitPrice),
+        volume,
+        // ... resto de costes
+      });
+      
+      return { supplierId: id, ...cogs };
+    })
+  );
+
+  // Ranking por COGS
+  const ranked = comparisons.sort((a, b) => a.cogsAvg - b.cogsAvg);
+  const best = ranked[0];
+  const worst = ranked[ranked.length - 1];
+  const savingsAnnual = (worst.cogsAvg - best.cogsAvg) * volume;
+
+  res.json({ comparisons: ranked, best, savingsAnnual });
+});
+
+🤖 Recomendación de pricing con Claude (/server/routes/pricing-ai.ts)
+typescriptrouter.post('/recommend', requireAuth, async (req, res) => {
+  const { supplierId, productName, volume, marketContext } = req.body;
+  
+  const supplier = await db.query.suppliers.findFirst({ where: eq(suppliers.id, supplierId) });
+  const cogs = await calculateCOGSForSupplier(supplierId, productName, volume);
+  
+  const message = await claude.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: `Eres un consultor de pricing para hostelería. Analiza este caso:
+
+PROVEEDOR: ${supplier.name} (${supplier.region})
+PRODUCTO: ${productName}
+VOLUMEN ANUAL: ${volume} unidades
+COGS UNITARIO: €${cogs.cogsAvg}
+SECTOR: ${marketContext.sector}
+TIPO ESTABLECIMIENTO: ${marketContext.venueType}
+TICKET MEDIO: €${marketContext.avgTicket}
+
+Recomienda en JSON:
+{
+  "pricingTiers": {
+    "carta": {"price": X, "marginPct": Y, "rationale": "..."},
+    "premium": {"price": X, "marginPct": Y, "rationale": "..."},
+    "eventos": {"price": X, "marginPct": Y, "rationale": "..."}
+  },
+  "longTermStrategy": "Estrategia 12-24 meses",
+  "risks": ["riesgo 1", "riesgo 2"],
+  "projection12m": {"revenue": X, "cogs": Y, "grossProfit": Z}
+}
+
+Considera: márgenes típicos hostelería (60-75%), elasticidad precio, competencia local, volumen de descuentos.`
+    }]
+  });
+
+  res.json(JSON.parse(message.content[0].text));
+});
+
+📄 Generación de informes (/server/routes/reports.ts)
+Tienes ya la metodología perfecta en tu Guía Replit y los Excel modelo. La integración es:
+typescriptimport ExcelJS from 'exceljs';
+import PptxGenJS from 'pptxgenjs';
+import { Document, Packer, Paragraph } from 'docx';
+
+// Excel COGS siguiendo tu estructura: Assumptions → Cálculos → Resumen → Dashboard
+router.post('/excel/cogs', requireAuth, async (req, res) => {
+  const wb = new ExcelJS.Workbook();
+  
+  // Hoja 1: ASSUMPTIONS (celdas amarillas editables)
+  const assumptions = wb.addWorksheet('Assumptions');
+  assumptions.getCell('A1').value = 'INPUTS EDITABLES';
+  // ... amarillo: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } }
+  
+  // Hoja 2: CÁLCULOS (fórmulas con referencias)
+  const calc = wb.addWorksheet('Cálculos');
+  calc.getCell('B5').value = { formula: '=Assumptions!B5+Assumptions!B6+...' };
+  
+  // Hoja 3: RESUMEN EJECUTIVO
+  // Hoja 4: DASHBOARD (con gráficos)
+  
+  const buffer = await wb.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buffer);
+});
+
+// PowerPoint 12 slides según tu guía
+router.post('/pptx/executive', requireAuth, async (req, res) => {
+  const pptx = new PptxGenJS();
+  // 1. Portada · 2. Resumen · 3. Situación · 4. Metodología
+  // 5-7. Análisis Proveedores · 8. Costes Ocultos
+  // 9. Top 7 Estrategias · 10. Plan 90 días · 11. ROI · 12. Próximos pasos
+  // ...
+});

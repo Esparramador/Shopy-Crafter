@@ -1,0 +1,142 @@
+¡Perfecto! Entendido — entonces solo necesitas el prompt para Replit Agent que le diga exactamente qué interfaz construir y con qué capacidades, asumiendo que el backend ya está.
+Aquí tienes el prompt copy-paste-ready:
+
+📋 PROMPT PARA REPLIT AGENT
+Necesito que rediseñes completamente la interfaz del módulo de Análisis de 
+Proveedores (Supplier Intelligence) con un nivel visual hiper profesional. 
+El backend ya está construido, solo trabaja en el frontend.
+
+═══════════════════════════════════════════════════════════════════
+ESTÉTICA OBLIGATORIA
+═══════════════════════════════════════════════════════════════════
+
+- Tema: Dark luxury con acentos teal (#14b8a6) y cyan (#38bdf8)
+- Fondo principal: #0a0e1a · Cards: #0f172a · Bordes: #1e293b / #334155
+- Tipografía: Inter o system-ui, weights 400/500/600/700
+- Letter-spacing en labels uppercase: 0.5px-1.5px
+- NO usar gradientes morados, NO usar sombras pesadas
+- Bordes laterales coloreados (3px) en cards para jerarquía visual
+- Border-radius: 6-10px, nunca pill
+
+═══════════════════════════════════════════════════════════════════
+COMPONENTES A CONSTRUIR (en este orden)
+═══════════════════════════════════════════════════════════════════
+
+1. HEADER
+   - Badge superior con dot teal animado: "SUPPLIER INTELLIGENCE · v2.0"
+   - Título h1 (22px, weight 600, letter-spacing -0.4px)
+   - Subtítulo gris (#64748b, 13px) con contexto: sector + categoría + tienda
+   - Botones derecha: "+ Nueva búsqueda" (teal sólido) + "⚙ Config" (outline)
+
+2. PANEL BÚSQUEDA MULTI-FUENTE
+   - Card con borde sutil
+   - Input full-width + botón "Buscar →"
+   - Pills de fuentes activables con check (✓): Google, Bing, DuckDuckGo, 
+     Instagram, Shopify Stores, LinkedIn, Yellow Pages, URL directa
+   - Pills activas: bg teal-20%, color teal, border teal-40%
+   - Pills inactivas: bg #1e293b, color gris
+   - Indicador "Última ejecución: hace X min · N proveedores indexados"
+
+3. KPIs (4 cards en grid)
+   Cada card con border-left de 3px en color distinto:
+   - Proveedores indexados (teal #14b8a6)
+   - COGS promedio/ud (cyan #38bdf8)
+   - Margen óptimo (ámbar #f59e0b)
+   - Ahorro anual estimado (violeta #a78bfa)
+   
+   Estructura: label uppercase 10px → número 24px weight 600 → delta 11px
+
+4. TABLA COMPARATIVA TCO
+   Columnas: Proveedor | Precio | Transp. | Imp. Esp. | Rotura | Frío | 
+             COGS | Score | Recomendación
+   - Header bg #1e293b, labels 10px uppercase
+   - Fila ganadora: bg teal-10%, border-left teal 3px, COGS en teal bold
+   - Score badges con color por nivel: 9+ teal, 8-9 cyan, 7-8 ámbar, <7 rojo
+   - Estrella ★ en columna recomendación para el winner
+
+5. SECCIÓN DUAL (grid 1.4fr 1fr)
+   
+   IZQUIERDA - Desglose COGS:
+   - Barras horizontales apiladas por proveedor
+   - 5 segmentos: Precio (teal) | Transporte (cyan) | Imp.Esp. (violeta) | 
+     Rotura (ámbar) | Frío (rojo)
+   - Leyenda con cuadrados de color 10x10px arriba
+   - Cada barra: label izquierda + total derecha, altura 18px
+   
+   DERECHA - AI Pricing Recommender:
+   - Badge "⚡ AI PRICING · Claude Opus 4.7"
+   - Card destacada con "Proveedor óptimo" y COGS
+   - 3 sub-cards: Carta / Premium / Eventos con precio + margen %
+   - Bloque proyección 12M: Revenue / COGS total / Beneficio bruto
+
+6. ACCIONES DE EXPORTACIÓN (4 cards)
+   Botones con icono cuadrado de color:
+   - Excel COGS (verde) - "Assumptions + Cálculos + Dashboard"
+   - PowerPoint Ejec. (rojo) - "12 slides · Plan 90 días"
+   - Word Contrato (cyan) - "Modelo 2026 + Anexo I"
+   - PDF Resumen (violeta) - "Ejecutivo · 2-4 páginas"
+
+7. HISTORIAL DE BÚSQUEDAS (memoria persistente)
+   - Lista de búsquedas previas con border-left teal en la activa
+   - Cada item: query + metadata (fuentes, count, tiempo) + badge estado
+
+═══════════════════════════════════════════════════════════════════
+INTERACCIONES
+═══════════════════════════════════════════════════════════════════
+
+- Hover en cards: border más claro + leve translate Y -1px
+- Click en proveedor → modal/drawer con análisis profundo
+- Click en exportar → loading state + descarga cuando ready
+- Búsqueda en tiempo real con debounce 300ms
+- Refresh automático de KPIs cada vez que se añade proveedor
+
+═══════════════════════════════════════════════════════════════════
+REGLAS CRÍTICAS
+═══════════════════════════════════════════════════════════════════
+
+✗ NO uses shadcn/ui por defecto sin customizar - se ve genérico
+✗ NO pongas emojis por todos lados - solo iconos minimalistas
+✗ NO uses gráficos cliché tipo dashboard de admin Bootstrap
+✗ NO mezcles más de 5 colores en la UI (teal, cyan, ámbar, violeta, rojo)
+✗ NO uses font-size menor a 10px
+
+✓ SÍ usa Inter o similar como font principal
+✓ SÍ números siempre con Math.round() o toFixed() para evitar 0.30000004
+✓ SÍ todos los textos en Sentence case (no Title Case)
+✓ SÍ responsive con grid-template-columns: repeat(auto-fit, minmax(...))
+✓ SÍ todos los componentes deben funcionar con datos del backend ya 
+  existente - solo CONSUME los endpoints, no crees nada nuevo
+
+═══════════════════════════════════════════════════════════════════
+ARCHIVOS A CREAR/MODIFICAR
+═══════════════════════════════════════════════════════════════════
+
+- /client/src/pages/SupplierIntelligence.tsx (página principal)
+- /client/src/components/suppliers/SearchMultiSource.tsx
+- /client/src/components/suppliers/KPICards.tsx
+- /client/src/components/suppliers/ComparisonTable.tsx
+- /client/src/components/suppliers/COGSBreakdown.tsx
+- /client/src/components/suppliers/PricingRecommender.tsx
+- /client/src/components/suppliers/ReportExporter.tsx
+- /client/src/components/suppliers/SearchHistory.tsx
+
+Usa los endpoints del backend existente. NO toques nada del backend.
+NO crees nuevas rutas API. Solo el frontend.
+
+Antes de empezar, muéstrame el plan de implementación en orden de prioridad
+y confirma qué endpoints del backend vas a consumir para cada componente.
+
+💡 Tips para usar este prompt
+1. Pásaselo en partes si es muy largo — Replit Agent funciona mejor con bloques. Puedes hacer:
+
+Primer mensaje: secciones de Estética + Componentes 1-3
+Segundo mensaje: Componentes 4-7 + Reglas críticas
+
+2. Adjúntale el screenshot del widget que te mostré antes — un Agent visual con referencia construye mucho más fiel que solo con texto.
+3. Si quieres iterar después, dile cosas tipo:
+
+"La tabla TCO se ve bien pero la fila ganadora no tiene suficiente énfasis visual — añade un glow sutil teal en el border-left y un pequeño icono ★ a la izquierda del nombre"
+
+4. Para forzar que NO se invente backend, repite al final:
+
+"Recordatorio: NO modifiques /server/. NO crees rutas. Solo CONSUME los endpoints existentes que descubras leyendo el código actual"
