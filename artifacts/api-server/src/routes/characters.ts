@@ -18,6 +18,7 @@ import { saveToVault, getVaultContent } from "../lib/vault.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 let _osCharacters: ObjectStorageService | null = null;
 function getStorageForCharacters(): ObjectStorageService {
@@ -159,6 +160,14 @@ router.post(
           styleNotes: styleNotes ?? null,
         })
         .returning();
+
+      learnFromOperation({
+        operationType: "character_creation",
+        title: `Personaje: ${name} — proyecto ${projectId}`,
+        content: `Nuevo personaje creado. Nombre: "${name}". Género: ${gender || "no especificado"}. Edad: ${ageRange || "no especificada"}. Identidad: ${identityDescription.slice(0, 300)}. Voz: ${voiceId || "sin asignar"} (${voiceGender || "?"}, ${voiceLanguage || "?"}). Notas estilo: ${styleNotes || "ninguna"}`,
+        confidence: 0.85,
+        tags: ["character", "identity", name, gender, voiceLanguage].filter(Boolean) as string[],
+      });
 
       res.status(201).json({
         success: true,

@@ -7,6 +7,7 @@ import { recordApiUsage } from "../lib/api-usage.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { requireProjectAccess } from "../lib/access.js";
 import { getReportShell } from "./exports.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -236,6 +237,14 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
         unitsLabel: "tokens",
         costUsd: 0,
         metadata: { suppliers: inserts.length, elapsedMs, niche: effectiveNiche, sources: sources.length },
+      });
+
+      learnFromOperation({
+        operationType: "supplier_research",
+        title: `Proveedores: ${effectiveNiche || customQuery || "búsqueda"} — ${inserts.length} encontrados`,
+        content: `Investigación de proveedores para nicho "${effectiveNiche}". Query: "${customQuery}". ${inserts.length} proveedores encontrados. Países: ${[...new Set(inserts.map(s => s.country).filter(Boolean))].join(", ")}. Resumen: ${parsed?.summary ?? ""}. Top proveedores: ${inserts.slice(0, 5).map(s => `${s.name} (${s.country}, score ${s.score})`).join(", ")}`,
+        confidence: 0.88,
+        tags: ["suppliers", "research", effectiveNiche, country].filter(Boolean) as string[],
       });
 
       res.json({

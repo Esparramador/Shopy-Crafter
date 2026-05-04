@@ -18,6 +18,7 @@ import { logger } from "../lib/logger.js";
 import { extractBrandKitFromFiles } from "../lib/brand-kit-extractor.js";
 import { applyBrandOverlay, buildAutoBrandOverlay, type BrandOverlayConfig } from "../lib/brand-overlay.js";
 import { fetchToBuffer } from "../lib/fusion-studio-pro.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -99,6 +100,14 @@ router.post(
           dataUrl: skipDataUrl ? null : `data:${l.mimeType};base64,${l.buffer.toString("base64")}`,
           dataUrlSkipped: skipDataUrl,
         };
+      });
+
+      learnFromOperation({
+        operationType: "brand_kit_extraction",
+        title: `Brand Kit: ${kit.brandName || "marca"} — ${kit.hexColors.length} colores, ${kit.fonts.length} fuentes, ${logoCandidates.length} logos`,
+        content: `Extracción de identidad de marca. Nombre: "${kit.brandName}". Colores: ${kit.hexColors.join(", ")}. Fuentes: ${kit.fonts.join(", ")}. Taglines: ${kit.taglines.join(" | ")}. URLs: ${kit.urls.join(", ")}. Logos: ${logoCandidates.length} candidatos. Redes sociales: ${kit.socialHandles.join(", ")}`,
+        confidence: 0.9,
+        tags: ["brand_kit", "identity", "design", kit.brandName].filter(Boolean) as string[],
       });
 
       res.json({

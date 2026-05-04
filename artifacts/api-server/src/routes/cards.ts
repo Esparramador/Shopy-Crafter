@@ -30,6 +30,7 @@ import {
 import { listTemplates, getTemplate } from "../lib/card-templates.js";
 import { generateQrSvg, buildVCard } from "../lib/card-qr.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -115,6 +116,15 @@ router.post("/cards/auto-design", requireAdmin, async (req, res) => {
       brandName: s(req.body?.brandName),
     };
     const result = await autoDesignCard(input);
+
+    learnFromOperation({
+      operationType: "card_auto_design",
+      title: `Auto-diseño tarjeta: ${input.brandName || input.industry || "genérico"}`,
+      content: `Auto-diseño de tarjeta de visita. Industria: ${input.industry || "general"}. Vibe: ${input.vibe || "profesional"}. Color preferido: ${input.preferredColor || "auto"}. Marca: ${input.brandName || "sin nombre"}. Template elegido: ${(result as any)?.templateId || "auto"}`,
+      confidence: 0.8,
+      tags: ["cards", "auto_design", input.industry, input.vibe].filter(Boolean) as string[],
+    });
+
     res.json(result);
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards/auto-design failed");
@@ -436,6 +446,14 @@ router.post("/cards/:id/generate", requireAdmin, enableLongRunning, async (req: 
       })
       .where(eq(businessCardsTable.id, id))
       .returning();
+
+    learnFromOperation({
+      operationType: "card_generation",
+      title: `Tarjeta generada: ${row.name || row.fullName} — template ${row.templateId}`,
+      content: `Tarjeta de visita generada con éxito. Nombre: ${row.fullName}. Cargo: ${row.jobTitle || "N/A"}. Empresa: ${row.companyName || "N/A"}. Template: ${row.templateId}. Layout: ${row.layout || "default"}. Coste: $${result.cost.toFixed(4)}. Incluye: front PNG + back PNG${pdfVaultId ? " + PDF imprimible" : ""}. Meta: ${JSON.stringify(result.meta).slice(0, 200)}`,
+      confidence: 0.85,
+      tags: ["cards", "generation", row.templateId, row.layout].filter(Boolean) as string[],
+    });
 
     res.json({
       ok: true,

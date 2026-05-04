@@ -22,7 +22,7 @@ A premium dark theme with custom color variables, typography, and a fixed layout
 An extensible `IPlatformConnector` abstraction layer supports Shopify, PrestaShop, WooCommerce, and Universal Web Audit, with a `ConnectorFactory` for dynamic selection.
 
 ### AI Stack (Single Brain Architecture — MEGA-BRAIN)
-"ShopyBrain" is the central mega-brain, a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. A centralized model registry allows administrators to change which Claude/Gemini model powers each task tier. Critical actions validate path whitelists, block sensitive files, and require explicit confirmation.
+"ShopyBrain" is the central mega-brain, a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. A centralized model registry allows administrators to change which Claude/Gemini model powers each task tier. Critical actions validate path whitelists, block sensitive files, and require explicit confirmation. All routes with AI operations feed `learnFromOperation` — suppliers research, brand-kit extraction, card generation/auto-design, character creation, and product enrichment all teach the brain retroactively.
 
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Advanced Financial Intelligence provides break-even units, LTV 12-month estimation, LTV/CAC ratio, supply chain risk assessment, and defensive moat strategy, all powered by Claude. A/B Testing tracks visitors only on visit events. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, Gallery, and Multi-Platform Video Generation (11 models). Image generation supports 11 engines with per-generation engine selector override. AI prompt enhancement is available on all text inputs across FusionStudio and FusionStudioPro. Gemini 403 errors are handled via circuit breaker with automatic Claude fallback.
@@ -111,4 +111,4 @@ The Eye (preview) button in ProjectVault list view now shows for ALL files that 
 - **Gmail (Replit Integration)**: For sending all emails from `craftershopy@gmail.com`.
 - **@google/genai**: For direct Gemini API integration.
 - **Runway**: For video generation.
-- **ElevenLabs**: For voice synthesis and music generation.
+- **ElevenLabs**: For voice synthesis and music generation. Auto-chunks text >5000 chars at sentence boundaries, concatenates audio buffers. Content-Type validation rejects non-audio API responses.

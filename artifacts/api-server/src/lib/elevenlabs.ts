@@ -130,40 +130,23 @@ function contentTypeForFormat(fmt: ElevenOutputFormat): string {
   return "application/octet-stream";
 }
 
-export async function synthesizeSpeech(req: SynthesizeRequest): Promise<SynthesizeResult> {
-  const apiKey = getApiKey();
-  const text = (req.text ?? "").trim();
-  if (!text) throw new Error("text requerido");
-  if (text.length > MAX_TEXT_LENGTH) {
-    throw new Error(`text excede ${MAX_TEXT_LENGTH} caracteres`);
-  }
-
-  const voiceId = ((req.voiceId ?? "").trim() || (await resolveDefaultVoiceId())).trim();
-  validateVoiceId(voiceId);
-  const modelId: ElevenModel = req.modelId ?? "eleven_multilingual_v2";
-  const outputFormat: ElevenOutputFormat = req.outputFormat ?? "mp3_44100_128";
-
-  // Defaults ajustados para sonar natural en español:
-  // - stability 0.40 → variación humana sin descontrolarse
-  // - similarity_boost 0.85 → cercano al timbre de la voz original
-  // - style 0.40 → expresividad real (antes 0.0 = monótono robótico)
-  const voice_settings = {
-    stability: clamp01(req.voiceSettings?.stability, 0.40),
-    similarity_boost: clamp01(req.voiceSettings?.similarity_boost, 0.85),
-    style: clamp01(req.voiceSettings?.style, 0.40),
-    use_speaker_boost: req.voiceSettings?.use_speaker_boost ?? true,
-  };
-
+async function synthesizeSingleChunk(
+  apiKey: string,
+  text: string,
+  voiceId: string,
+  modelId: ElevenModel,
+  outputFormat: ElevenOutputFormat,
+  voice_settings: Record<string, unknown>,
+  languageCode?: string,
+): Promise<Buffer> {
   const body: Record<string, unknown> = {
     text,
     model_id: modelId,
     voice_settings,
   };
-  if (req.languageCode && /^[a-z]{2}(-[A-Z]{2})?$/.test(req.languageCode)) {
-    body.language_code = req.languageCode;
+  if (languageCode && /^[a-z]{2}(-[A-Z]{2})?$/.test(languageCode)) {
+    body.language_code = languageCode;
   }
-
-  logger.info({ voiceId, modelId, chars: text.length, outputFormat }, "ElevenLabs: TTS request");
 
   const url = `${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${encodeURIComponent(outputFormat)}`;
   const res = await fetch(url, {
@@ -182,10 +165,73 @@ export async function synthesizeSpeech(req: SynthesizeRequest): Promise<Synthesi
     throw new Error(`ElevenLabs ${res.status}: ${errText.slice(0, 300)}`);
   }
 
-  const arrayBuffer = await res.arrayBuffer();
-  const audio = Buffer.from(arrayBuffer);
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.startsWith("audio/") && !ct.startsWith("application/octet-stream")) {
+    const bodyPreview = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs devolvió Content-Type inesperado "${ct}": ${bodyPreview.slice(0, 200)}`);
+  }
 
-  logger.info({ voiceId, modelId, audioBytes: audio.length }, "ElevenLabs: audio generado");
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function splitTextIntoChunks(text: string, maxLen: number): string[] {
+  if (text.length <= maxLen) return [text];
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining);
+      break;
+    }
+    let splitAt = remaining.lastIndexOf(". ", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = remaining.lastIndexOf("? ", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = remaining.lastIndexOf("! ", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = remaining.lastIndexOf(", ", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = remaining.lastIndexOf(" ", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = maxLen;
+    else splitAt += 1;
+    chunks.push(remaining.slice(0, splitAt).trim());
+    remaining = remaining.slice(splitAt).trim();
+  }
+  return chunks.filter(c => c.length > 0);
+}
+
+export async function synthesizeSpeech(req: SynthesizeRequest): Promise<SynthesizeResult> {
+  const apiKey = getApiKey();
+  const text = (req.text ?? "").trim();
+  if (!text) throw new Error("text requerido");
+  if (text.length > MAX_TEXT_LENGTH * 10) {
+    throw new Error(`text excede ${MAX_TEXT_LENGTH * 10} caracteres (límite máximo con auto-chunking)`);
+  }
+
+  const voiceId = ((req.voiceId ?? "").trim() || (await resolveDefaultVoiceId())).trim();
+  validateVoiceId(voiceId);
+  const modelId: ElevenModel = req.modelId ?? "eleven_multilingual_v2";
+  const outputFormat: ElevenOutputFormat = req.outputFormat ?? "mp3_44100_128";
+
+  // Defaults ajustados para sonar natural en español:
+  // - stability 0.40 → variación humana sin descontrolarse
+  // - similarity_boost 0.85 → cercano al timbre de la voz original
+  // - style 0.40 → expresividad real (antes 0.0 = monótono robótico)
+  const voice_settings = {
+    stability: clamp01(req.voiceSettings?.stability, 0.40),
+    similarity_boost: clamp01(req.voiceSettings?.similarity_boost, 0.85),
+    style: clamp01(req.voiceSettings?.style, 0.40),
+    use_speaker_boost: req.voiceSettings?.use_speaker_boost ?? true,
+  };
+
+  const chunks = splitTextIntoChunks(text, MAX_TEXT_LENGTH);
+  logger.info({ voiceId, modelId, chars: text.length, chunks: chunks.length, outputFormat }, "ElevenLabs: TTS request");
+
+  const audioBuffers: Buffer[] = [];
+  for (const chunk of chunks) {
+    const buf = await synthesizeSingleChunk(apiKey, chunk, voiceId, modelId, outputFormat, voice_settings, req.languageCode);
+    audioBuffers.push(buf);
+  }
+
+  const audio = audioBuffers.length === 1 ? audioBuffers[0] : Buffer.concat(audioBuffers);
+
+  logger.info({ voiceId, modelId, audioBytes: audio.length, chunks: chunks.length }, "ElevenLabs: audio generado");
 
   try {
     const { recordApiUsage, calcElevenLabsCost } = await import("./api-usage.js");

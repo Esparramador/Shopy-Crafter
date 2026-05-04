@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -230,6 +231,16 @@ router.post("/projects/:projectId/enrich-batch", async (req, res): Promise<void>
   
     const ok = results.filter(r => r.status === "OK").length;
     const totalMf = results.reduce((s, r) => s + (r.metafields || 0), 0);
+
+    if (ok > 0) {
+      learnFromOperation({
+        operationType: "product_enrichment",
+        title: `Enriquecimiento: ${ok}/${productIds.length} productos — ${totalMf} metafields`,
+        content: `Enriquecimiento SEO de productos Shopify. ${ok} productos OK de ${productIds.length}. ${totalMf} metafields creados/actualizados. Categorías asignadas: ${results.filter(r => r.category).map(r => r.category).join(", ")}. Meta títulos: ${results.filter(r => r.meta_title).map(r => r.meta_title).join(" | ").slice(0, 300)}`,
+        confidence: 0.88,
+        tags: ["enrichment", "seo", "metafields", "shopify"],
+      });
+    }
   
     res.json({
       success: true,
