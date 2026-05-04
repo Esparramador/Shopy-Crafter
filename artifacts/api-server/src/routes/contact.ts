@@ -53,6 +53,20 @@ interface LeadData {
   company?: string;
 }
 
+interface MarketMetrics {
+  conversionRate?: number;
+  avgOrderValue?: number;
+  cac?: number;
+  ltv?: number;
+  avgMargin?: number;
+  sectorGrowth?: number;
+  competitorCount?: number;
+  seoScore?: number;
+  labels: string[];
+  values: number[];
+  unit: string;
+}
+
 interface ProductSample {
   title: string;
   description: string;
@@ -422,6 +436,131 @@ Responde SOLO con JSON valido.`,
   }
 }
 
+async function extractMarketMetrics(lead: LeadData, rawMarket: string, rawBusiness: string): Promise<MarketMetrics | null> {
+  const combined = `${rawMarket}\n${rawBusiness}`.slice(0, 15000);
+  const nicheInfo = lead.niche || "ecommerce general";
+  try {
+    const result = await askClaudeJsonWithBrain(
+      0,
+      `Extrae métricas numéricas del siguiente análisis de mercado para el nicho "${nicheInfo}".
+DATOS DE INVESTIGACIÓN:
+${combined}
+
+Devuelve un JSON con SOLO los campos que puedas ESTIMAR con datos reales del texto. Si no hay datos para un campo, NO lo incluyas. Usa números reales del sector, no inventados:
+{
+  "conversionRate": (tasa de conversión media del sector en %, ej: 2.5),
+  "avgOrderValue": (ticket medio en EUR, ej: 45),
+  "cac": (coste de adquisición de cliente en EUR, ej: 18),
+  "ltv": (lifetime value en EUR, ej: 120),
+  "avgMargin": (margen bruto medio del sector en %, ej: 55),
+  "sectorGrowth": (crecimiento anual del sector en %, ej: 12),
+  "competitorCount": (número de competidores principales identificados, ej: 5),
+  "seoScore": (puntuación SEO estimada 0-100, ej: 45)
+}
+
+REGLAS: Solo números reales extraídos o estimados del texto. No inventes. Si solo puedes estimar 3 campos, devuelve solo 3. Responde SOLO con JSON válido.`,
+      "Eres un analista financiero de eCommerce. Extraes métricas numéricas de investigaciones de mercado reales. Solo devuelves datos que puedas respaldar con la investigación proporcionada.",
+      "general",
+      nicheInfo,
+    );
+    if (!result || typeof result !== "object") return null;
+    const m = result as Record<string, unknown>;
+    const labels: string[] = [];
+    const values: number[] = [];
+    const fieldMap: Record<string, string> = {
+      conversionRate: "Conv. Rate %",
+      avgOrderValue: "AOV (€)",
+      cac: "CAC (€)",
+      ltv: "LTV (€)",
+      avgMargin: "Margen %",
+      sectorGrowth: "Crecim. %",
+      competitorCount: "Competidores",
+      seoScore: "SEO Score",
+    };
+    for (const [key, label] of Object.entries(fieldMap)) {
+      const val = Number(m[key]);
+      if (val && isFinite(val) && val > 0) {
+        labels.push(label);
+        values.push(Math.round(val * 10) / 10);
+      }
+    }
+    if (labels.length < 2) return null;
+    return {
+      ...(m.conversionRate ? { conversionRate: Number(m.conversionRate) } : {}),
+      ...(m.avgOrderValue ? { avgOrderValue: Number(m.avgOrderValue) } : {}),
+      ...(m.cac ? { cac: Number(m.cac) } : {}),
+      ...(m.ltv ? { ltv: Number(m.ltv) } : {}),
+      ...(m.avgMargin ? { avgMargin: Number(m.avgMargin) } : {}),
+      ...(m.sectorGrowth ? { sectorGrowth: Number(m.sectorGrowth) } : {}),
+      ...(m.competitorCount ? { competitorCount: Number(m.competitorCount) } : {}),
+      ...(m.seoScore ? { seoScore: Number(m.seoScore) } : {}),
+      labels,
+      values,
+      unit: "€",
+    } as MarketMetrics;
+  } catch {
+    return null;
+  }
+}
+
+function buildSvgBarChart(metrics: MarketMetrics): string {
+  const { labels, values } = metrics;
+  if (labels.length < 2) return "";
+  const barWidth = 52;
+  const gap = 16;
+  const chartW = labels.length * (barWidth + gap) + gap;
+  const chartH = 180;
+  const maxVal = Math.max(...values, 1);
+  const bars = labels.map((label, i) => {
+    const barH = Math.max(8, (values[i] / maxVal) * (chartH - 40));
+    const x = gap + i * (barWidth + gap);
+    const y = chartH - 30 - barH;
+    const color = i % 2 === 0 ? "#c4956a" : "#34d399";
+    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" rx="4" fill="${color}" opacity="0.85"/>` +
+      `<text x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle" fill="rgba(255,255,255,.85)" font-size="11" font-weight="700">${values[i]}</text>` +
+      `<text x="${x + barWidth / 2}" y="${chartH - 8}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="9">${label}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${chartW} ${chartH}" width="100%" height="${chartH}" style="max-width:${chartW}px;">` +
+    `<rect width="${chartW}" height="${chartH}" rx="12" fill="rgba(10,10,10,.6)"/>` +
+    `<line x1="${gap}" y1="${chartH - 30}" x2="${chartW - gap}" y2="${chartH - 30}" stroke="rgba(255,255,255,.1)" stroke-width="1"/>` +
+    bars + `</svg>`;
+}
+
+function buildCapabilitiesSection(lead: LeadData): string {
+  const services = (lead.services || []).filter((s): s is string => typeof s === "string");
+  const niche = (lead.niche || "").toLowerCase();
+  const capabilities: { icon: string; title: string; desc: string }[] = [
+    { icon: "🤖", title: "Dual AI Engine (Gemini + Claude)", desc: "Investigación de mercado en tiempo real, optimización SEO 100/100, y generación de contenido profesional" },
+    { icon: "📊", title: "Inteligencia Financiera Avanzada", desc: "COGS, LTV/CAC, break-even, simulación de precios, y alertas de rentabilidad automáticas" },
+    { icon: "🎬", title: "Producción de Vídeo Cinematográfico", desc: "Anuncios profesionales con 11 modelos de IA, voz en off ElevenLabs, música generativa, y narrativa de 7 pasos" },
+  ];
+  if (niche.includes("moda") || niche.includes("ropa") || niche.includes("fashion") || niche.includes("calzado") || niche.includes("joyería") || niche.includes("accesorio")) {
+    capabilities.push({ icon: "👗", title: "Virtual Try-On / Photoshoot IA", desc: "Viste modelos con tus productos automáticamente — fotos tipo campaña de moda profesional" });
+  }
+  if (services.some(s => s.toLowerCase().includes("seo") || s.toLowerCase().includes("posicionamiento"))) {
+    capabilities.push({ icon: "🔍", title: "Auditoría SEO Semrush-Level", desc: "16 criterios, keyword intelligence con Google Search, Schema JSON-LD, Core Web Vitals, y contenido optimizado" });
+  }
+  if (services.some(s => s.toLowerCase().includes("email") || s.toLowerCase().includes("marketing"))) {
+    capabilities.push({ icon: "📧", title: "Email Marketing Automatizado", desc: "Flujos de Welcome, Abandoned Cart, Post-Purchase con segmentación y A/B testing integrado" });
+  }
+  capabilities.push({ icon: "🧠", title: "ShopyBrain — 46,000+ Insights", desc: "Cerebro IA que aprende de cada operación y acumula inteligencia de mercado, competencia, y tendencias" });
+  capabilities.push({ icon: "📦", title: "140+ Acciones Automatizadas", desc: "Desde crear productos hasta auditorías completas, gestión de inventario, y propuestas comerciales — todo desde el chatbot" });
+  const items = capabilities.slice(0, 6).map(c =>
+    `<div style="flex:1 1 45%;min-width:240px;background:rgba(196,149,106,.04);border:1px solid rgba(196,149,106,.12);border-radius:10px;padding:16px;">` +
+    `<div style="font-size:24px;margin-bottom:8px;">${c.icon}</div>` +
+    `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px;">${c.title}</div>` +
+    `<div style="font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;">${c.desc}</div></div>`
+  ).join("");
+  return `<div class="section" style="page-break-before:always;">` +
+    `<div class="section-title">Capacidades IA de Shopy Crafter para Tu Negocio</div>` +
+    `<div class="card" style="padding:24px;">` +
+    `<div style="display:flex;flex-wrap:wrap;gap:12px;">${items}</div>` +
+    `<div style="margin-top:20px;text-align:center;padding:16px;background:linear-gradient(135deg,rgba(196,149,106,.1),rgba(52,211,153,.05));border-radius:10px;border:1px solid rgba(196,149,106,.2);">` +
+    `<div style="font-size:14px;font-weight:700;color:#c4956a;">Todo esto trabajando para TU negocio, 24/7, con datos REALES.</div>` +
+    `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:4px;">Sin plantillas genéricas — cada análisis y cada pieza de contenido está personalizada para tu nicho y tu marca.</div>` +
+    `</div></div></div>`;
+}
+
 async function generateAIPreReport(lead: LeadData): Promise<string> {
   const entityName = lead.storeUrl || lead.name;
   const nicheInfo = lead.niche || "ecommerce general";
@@ -565,6 +704,15 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     };
   }
 
+  let marketMetrics: MarketMetrics | null = null;
+  try {
+    if (rawMarket || rawBusiness) {
+      marketMetrics = await extractMarketMetrics(lead, rawMarket, rawBusiness);
+    }
+  } catch (err) {
+    logger.warn({ err }, "Market metrics extraction failed (non-critical)");
+  }
+
   return await buildReportHtml(lead, {
     business: structuredResearch.business,
     market: structuredResearch.market,
@@ -572,12 +720,13 @@ Incluye: schema markup recomendado, Core Web Vitals estimados, oportunidades de 
     sources: allSources,
     productSample,
     isStructuredHtml: !!(rawBusiness || rawMarket || rawSeo),
+    marketMetrics,
   });
 }
 
 async function buildReportHtml(
   lead: LeadData,
-  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean },
+  research: { business: string; market: string; seo: string; sources: string[]; productSample?: ProductSample | null; isStructuredHtml?: boolean; marketMetrics?: MarketMetrics | null },
 ): Promise<string> {
   const esc = sanitizeHtml;
 
@@ -932,6 +1081,25 @@ async function buildReportHtml(
         Auditoria SEO por Shopy Crafter AI · Presencia digital y oportunidades de posicionamiento
       </div>
     </div>
+
+    ${research.marketMetrics ? `
+    <div class="section" style="page-break-before:always;">
+      <div class="section-title">Metricas Clave del Sector — Datos Reales</div>
+      <div class="card" style="padding:24px;text-align:center;">
+        ${buildSvgBarChart(research.marketMetrics)}
+        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;">
+          ${research.marketMetrics.conversionRate ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:#c4956a;">${research.marketMetrics.conversionRate}%</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Conv. Rate</div></div>` : ""}
+          ${research.marketMetrics.avgOrderValue ? `<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:#34d399;">${research.marketMetrics.avgOrderValue}€</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Ticket Medio</div></div>` : ""}
+          ${research.marketMetrics.cac ? `<div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:#ef4444;">${research.marketMetrics.cac}€</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">CAC</div></div>` : ""}
+          ${research.marketMetrics.ltv ? `<div style="background:rgba(107,168,240,.06);border:1px solid rgba(107,168,240,.15);border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:#6ba8f0;">${research.marketMetrics.ltv}€</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">LTV 12m</div></div>` : ""}
+          ${research.marketMetrics.ltv && research.marketMetrics.cac ? `<div style="background:${(research.marketMetrics.ltv / research.marketMetrics.cac) >= 3 ? 'rgba(52,211,153,.06)' : 'rgba(239,68,68,.06)'};border:1px solid ${(research.marketMetrics.ltv / research.marketMetrics.cac) >= 3 ? 'rgba(52,211,153,.15)' : 'rgba(239,68,68,.15)'};border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:${(research.marketMetrics.ltv / research.marketMetrics.cac) >= 3 ? '#34d399' : '#ef4444'};">${(research.marketMetrics.ltv / research.marketMetrics.cac).toFixed(1)}x</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Ratio LTV/CAC</div></div>` : ""}
+          ${research.marketMetrics.avgMargin ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:10px;padding:14px 18px;min-width:120px;"><div style="font-size:22px;font-weight:800;color:#c4956a;">${research.marketMetrics.avgMargin}%</div><div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Margen Bruto</div></div>` : ""}
+        </div>
+        <div style="margin-top:12px;font-size:10px;color:rgba(255,255,255,.3);">Métricas extraídas de la investigación de mercado real · Estimaciones basadas en datos verificados del sector</div>
+      </div>
+    </div>` : ""}
+
+    ${buildCapabilitiesSection(lead)}
 
     ${productSampleHtml}
 

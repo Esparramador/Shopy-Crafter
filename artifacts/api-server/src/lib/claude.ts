@@ -638,7 +638,11 @@ export async function buildShopyBrainContext(
       }
     }
 
-    const isVideoTask = useCase === "images" || useCase === "campaign_production" || useCase === "redesign" || useCase === "exploded_view" || useCase === "generator";
+    const queryLower = (userQuery || "").toLowerCase();
+    const videoKeywords = ["video", "anuncio", "clip", "campaña", "campaign", "cinemat", "ugc", "reel", "tiktok", "youtube", "brand ad", "long ad", "multishot", "storyboard", "guion", "script", "escena", "narrativ", "deconstruc", "exploded", "explode", "try-on", "tryon", "producción visual", "produccion visual"];
+    const videoRegexKeywords = [/\bad\b/, /\bads\b/, /\bmacro\b/, /\bcta\b/, /\bfoto\b/, /\bphoto\b/, /\bimagen\b/, /\bimage\b/];
+    const queryHasVideoIntent = videoKeywords.some(kw => queryLower.includes(kw)) || videoRegexKeywords.some(re => re.test(queryLower));
+    const isVideoTask = useCase === "images" || useCase === "campaign_production" || useCase === "redesign" || useCase === "exploded_view" || useCase === "generator" || (useCase === "general" && queryHasVideoIntent);
     if (isVideoTask) {
       try {
         const { getPlaybookSummary, getNarrativeFlowSummary } = await import("./advertising-playbook-kb.js");
@@ -655,7 +659,9 @@ export async function buildShopyBrainContext(
       } catch { /* static KBs not critical — continue */ }
     }
 
-    if (useCase === "pricing" || useCase === "cogs_estimation" || useCase === "financial") {
+    const cogsKeywords = ["cogs", "coste", "costo", "margen", "margin", "precio", "price", "pricing", "financ", "ltv", "cac", "break-even", "equilibrio", "supply chain", "cadena de suministro", "proveedor", "unit economics"];
+    const queryHasCogsIntent = cogsKeywords.some(kw => queryLower.includes(kw));
+    if (useCase === "pricing" || useCase === "cogs_estimation" || useCase === "financial" || (useCase === "general" && queryHasCogsIntent)) {
       try {
         const { getCogsMethodologySummary } = await import("./cogs-methodology-kb.js");
         const cogsSummary = getCogsMethodologySummary();
