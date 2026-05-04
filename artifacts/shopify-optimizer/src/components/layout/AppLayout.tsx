@@ -41,7 +41,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
   { label: "Ver Landing", icon: "🌐", href: "/landing" },
-  { label: "Proveedores Reales", icon: "🏭", href: "/projects/2/suppliers" },
+
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
 
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
