@@ -1701,14 +1701,15 @@ router.post("/web-lab/generate-from-scratch", async (req: Request, res: Response
       (res as unknown as { flushHeaders: () => void }).flushHeaders();
     }
 
-    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [proj] = projectId > 0
+      ? await db.select().from(projectsTable).where(eq(projectsTable.id, projectId))
+      : [{ id: 0, name: brief ? "Mi Marca" : "Standalone", storeNiche: null, targetAudience: null, shopDomain: null, accessToken: null, clientId: null } as any];
     if (!proj) { res.end(JSON.stringify({ error: "Proyecto no encontrado" })); return; }
 
-    // Cargamos brand profile para inyectar paleta/fuentes/voz reales.
     const { fetchBrandProfile, generateBrandCss, buildBrandDnaContext } = await import("../lib/brand-css-generator.js");
-    const brandProfile = await fetchBrandProfile(projectId).catch(() => null);
+    const brandProfile = projectId > 0 ? await fetchBrandProfile(projectId).catch(() => null) : null;
     const brandCss = brandProfile ? generateBrandCss(brandProfile) : "";
-    const brandContext = brandProfile ? buildBrandDnaContext(brandProfile) : "Sin ADN de marca registrado.";
+    const brandContext = brandProfile ? buildBrandDnaContext(brandProfile) : "Sin ADN de marca registrado. Usa un estilo moderno, minimalista y profesional.";
 
     const lang = language || "es";
     const type = pageType || "landing";

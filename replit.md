@@ -93,7 +93,13 @@ The CMS is the **sole source of truth** for all navigation. No merge-with-defaul
 ### Standalone Module Routes (Project-Independent)
 ALL 17 modules have standalone routes (`/audit`, `/redesign`, `/images`, `/web-lab`, `/ad-studio`, `/campaign-kit`, etc.) that work without an active project (projectId=0). The module tabs bar is always visible — when a project is active, tabs link to `/projects/:id/{module}`, otherwise to `/{module}`. This allows full content generation, analysis, video creation, and campaign building independently of any project.
 
-**Backend projectId=0 support**: Both `requireProjectAccess` middlewares (`lib/access.ts` and `lib/auth.ts`) allow projectId=0 through without access checks. GET/load endpoints return empty data for projectId=0 (e.g., web-lab history returns `{items:[]}`, suppliers returns `{researches:[],entries:[]}`, products returns empty list). POST action endpoints that genuinely need a project context (vault saves, Shopify operations) will return "Proyecto no encontrado" for projectId=0, which is expected behavior. Frontend guards in WebLab, FusionStudio, and Suppliers use `=== undefined || === null` checks instead of falsy checks to allow 0 as a valid value.
+**Backend projectId=0 support**: Both `requireProjectAccess` middlewares (`lib/access.ts` and `lib/auth.ts`) allow projectId=0 through without access checks. All 9 `canAccessProject` calls in `vault.ts` have `projectId !== 0 &&` bypass. 3 image endpoints in `fs-pro.ts` use `isNaN(projectId)` instead of `!projectId`. GET/load endpoints return empty data for projectId=0. POST action endpoints (vault save-report, web-lab save-edit, generate-from-scratch) all work with projectId=0, saving to the vault with projectId=0. Frontend guards in WebLab (including "Crear desde cero" and "Historial" buttons), FusionStudio, AvatarStudio, and Suppliers use `=== undefined || === null` checks instead of falsy checks to allow 0 as a valid value.
+
+### A/B Testing Auto-Declaration
+When tracking events push confidence to ≥95%, the backend (`ab-testing.ts` track endpoint) automatically declares the winner, sets status to "completed", and logs the result to ShopyBrain via `learnFromOperation`. Manual declaration via "Gana A/B" buttons remains available for tests that haven't auto-completed.
+
+### ProjectVault Preview
+The Eye (preview) button in ProjectVault list view now shows for ALL files that have a `previewUrl`, `downloadUrl`, or `originalUrl` — not just report files. This matches GlobalVault behavior.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.

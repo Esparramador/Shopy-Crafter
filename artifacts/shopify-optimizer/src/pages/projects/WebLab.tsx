@@ -550,7 +550,7 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           >
             {loading ? "Analizando..." : "🔬 Analizar"}
           </button>
-          {projectId > 0 && <button
+          <button
             onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
             style={{
               padding: "12px 16px",
@@ -563,8 +563,8 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
             }}
           >
             📜 Historial
-          </button>}
-          {projectId > 0 && <button
+          </button>
+          <button
             onClick={() => setShowScratch(s => !s)}
             style={{
               padding: "12px 16px",
@@ -578,11 +578,11 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
             }}
           >
             ✨ Crear desde cero
-          </button>}
+          </button>
         </div>
       </div>
 
-      {showScratch && projectId > 0 && (
+      {showScratch && (
         <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 20, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
           <div style={{ marginBottom: 12 }}>
             <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>✨ Generar página profesional desde cero</h3>
