@@ -70,7 +70,7 @@ A `lib/brand-overlay.ts` engine applies branding after video muxing using FFmpeg
 Specialized endpoints offer infographic generation with AI or overlay text rendering modes, ensuring perfect spelling. A universal virtual try-on feature fuses model and product images using Gemini, preserving identity and product appearance.
 
 ### Card Studio (Tarjetas profesionales 300 DPI)
-Provides a backend for business card generation with 6 templates, QR code generation, and rendering via Puppeteer for high-DPI printable output. It includes an admin-only API for managing cards, an auto-design feature using Claude, and a frontend editor with live preview.
+Provides a backend for business card generation with 6 templates, QR code generation, and rendering via Puppeteer for high-DPI printable output. It includes an admin-only API for managing cards, an auto-design feature using Claude, and a frontend editor with live preview. Frontend supports 8 AI background engines: Recraft v3, Ideogram v3, Flux Pro Ultra, Flux Pro, Flux Schnell, Flux Kontext, Stable Diffusion XL, and Nano-Banana. `enableLongRunning` is dual-mode (works as both Express middleware and direct `enableLongRunning(res)` call).
 
 ### Standalone Module Routes (Project-Independent)
 All 17 modules have standalone routes (`/audit`, `/redesign`, `/images`, etc.) that work without an active project (projectId=0). This allows full content generation, analysis, video creation, and campaign building independently of any project. Backend and frontend logic support `projectId=0` for module operations and vault saving.

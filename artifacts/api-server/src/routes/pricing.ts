@@ -841,82 +841,93 @@ router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (
     let packagingResearch = { items: [] as Array<{ item: string; pricePerUnit: number; source: string }>, totalPackagingCost: 0, insight: "" };
     const researchWarnings: string[] = [];
   
-    try {
-      const [matResult, shipResult, suppResult, packResult] = await Promise.allSettled([
-        askGeminiWithSearch(
-          `${productClassification.searchTerms.material}
-  
-  Busca PRECIOS REALES en: AliExpress, Amazon, proveedores industriales España.
-  Materiales necesarios: ${productClassification.materialComposition.join(", ") || "detectar del tipo de producto"}.
-  Método fabricación: ${productClassification.manufacturingMethod}.
-  
-  JSON: { "materials": [{"material": "", "priceRange": "€", "source": "", "url": ""}], 
-  "avgMaterialCost": 0, "insight": "" }`,
-          "Supply chain cost analyst. Search for REAL prices. ONLY JSON."
-        ),
-        askGeminiWithSearch(
-          `${productClassification.searchTerms.shipping}
-  
-  Peso estimado: ${productClassification.estimatedWeight}.
-  Categoría envío: ${productClassification.shippingCategory}.
-  Busca tarifas 2025-2026 de: Correos Express, SEUR, MRW, Nacex, GLS, DHL.
-  Para envío NACIONAL España y a EUROPA.
-  
-  JSON: { "carriers": [{"carrier": "", "domestic": "€", "international": "€", "source": ""}], 
-  "insight": "", "recommendedCarrier": "" }`,
-          "Logistics analyst. Current Spanish carrier rates. ONLY JSON."
-        ),
-        askGeminiWithSearch(
-          `${productClassification.searchTerms.supplier}
-  
-  Busca en Alibaba, AliExpress mayorista, fabricantes españoles de ${niche}.
-  Método: ${productClassification.manufacturingMethod}.
-  
-  JSON: { "suppliers": [{"supplier": "", "priceRange": "€/ud", "moq": "", "origin": "", "url": ""}], 
-  "avgCost": 0, "insight": "" }`,
-          "Manufacturing sourcing analyst. REAL supplier prices. ONLY JSON."
-        ),
-        askGeminiWithSearch(
-          `${productClassification.searchTerms.packaging}
-  
-  Busca en: rajapack.es, uline, amazon.es cajas envío, kartox.com.
-  Incluir: caja, relleno protector, cinta, etiqueta, bolsa.
-  Producto: ${productClassification.shippingCategory === "fragile" ? "FRÁGIL — necesita protección extra" : "estándar"}.
-  
-  JSON: { "items": [{"item": "", "pricePerUnit": 0, "source": ""}], 
-  "totalPackagingCost": 0, "insight": "" }`,
-          "Packaging procurement analyst. ONLY JSON."
-        ),
-      ]);
-  
-      if (matResult.status === "fulfilled") {
-        try {
-          const jsonMatch = matResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) materialResearch = { ...materialResearch, ...JSON.parse(jsonMatch[0]) };
-        } catch { researchWarnings.push("Error parseando datos de materiales de Google Search"); }
-      } else { researchWarnings.push("Búsqueda de materiales falló: " + (matResult.status === "rejected" ? String(matResult.reason) : "desconocido")); }
-  
-      if (shipResult.status === "fulfilled") {
-        try {
-          const jsonMatch = shipResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) shippingResearch = { ...shippingResearch, ...JSON.parse(jsonMatch[0]) };
-        } catch { researchWarnings.push("Error parseando datos de envío de Google Search"); }
-      } else { researchWarnings.push("Búsqueda de tarifas de envío falló"); }
-  
-      if (suppResult.status === "fulfilled") {
-        try {
-          const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) };
-        } catch { researchWarnings.push("Error parseando datos de proveedores de Google Search"); }
-      } else { researchWarnings.push("Búsqueda de proveedores falló"); }
-  
-      if (packResult.status === "fulfilled") {
-        try {
-          const jsonMatch = packResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) packagingResearch = { ...packagingResearch, ...JSON.parse(jsonMatch[0]) };
-        } catch { researchWarnings.push("Error parseando datos de packaging de Google Search"); }
-      } else { researchWarnings.push("Búsqueda de packaging falló"); }
-    } catch (e) { researchWarnings.push("Error general en investigación de mercado: " + (e instanceof Error ? e.message : "desconocido")); }
+    if (!isGeminiSearchBlocked()) {
+      try {
+        const [matResult, shipResult, suppResult, packResult] = await Promise.allSettled([
+          askGeminiWithSearch(
+            `${productClassification.searchTerms.material}\n\nBusca PRECIOS REALES en: AliExpress, Amazon, proveedores industriales España.\nMateriales necesarios: ${productClassification.materialComposition.join(", ") || "detectar del tipo de producto"}.\nMétodo fabricación: ${productClassification.manufacturingMethod}.\n\nJSON: { "materials": [{"material": "", "priceRange": "€", "source": "", "url": ""}], \n"avgMaterialCost": 0, "insight": "" }`,
+            "Supply chain cost analyst. Search for REAL prices. ONLY JSON."
+          ),
+          askGeminiWithSearch(
+            `${productClassification.searchTerms.shipping}\n\nPeso estimado: ${productClassification.estimatedWeight}.\nCategoría envío: ${productClassification.shippingCategory}.\nBusca tarifas 2025-2026 de: Correos Express, SEUR, MRW, Nacex, GLS, DHL.\nPara envío NACIONAL España y a EUROPA.\n\nJSON: { "carriers": [{"carrier": "", "domestic": "€", "international": "€", "source": ""}], \n"insight": "", "recommendedCarrier": "" }`,
+            "Logistics analyst. Current Spanish carrier rates. ONLY JSON."
+          ),
+          askGeminiWithSearch(
+            `${productClassification.searchTerms.supplier}\n\nBusca en Alibaba, AliExpress mayorista, fabricantes españoles de ${niche}.\nMétodo: ${productClassification.manufacturingMethod}.\n\nJSON: { "suppliers": [{"supplier": "", "priceRange": "€/ud", "moq": "", "origin": "", "url": ""}], \n"avgCost": 0, "insight": "" }`,
+            "Manufacturing sourcing analyst. REAL supplier prices. ONLY JSON."
+          ),
+          askGeminiWithSearch(
+            `${productClassification.searchTerms.packaging}\n\nBusca en: rajapack.es, uline, amazon.es cajas envío, kartox.com.\nIncluir: caja, relleno protector, cinta, etiqueta, bolsa.\nProducto: ${productClassification.shippingCategory === "fragile" ? "FRÁGIL — necesita protección extra" : "estándar"}.\n\nJSON: { "items": [{"item": "", "pricePerUnit": 0, "source": ""}], \n"totalPackagingCost": 0, "insight": "" }`,
+            "Packaging procurement analyst. ONLY JSON."
+          ),
+        ]);
+
+        if (matResult.status === "fulfilled") {
+          try {
+            const jsonMatch = matResult.value.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) materialResearch = { ...materialResearch, ...JSON.parse(jsonMatch[0]) };
+          } catch { researchWarnings.push("Error parseando datos de materiales de Google Search"); }
+        } else { researchWarnings.push("Búsqueda de materiales falló: " + (matResult.status === "rejected" ? String(matResult.reason) : "desconocido")); }
+
+        if (shipResult.status === "fulfilled") {
+          try {
+            const jsonMatch = shipResult.value.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) shippingResearch = { ...shippingResearch, ...JSON.parse(jsonMatch[0]) };
+          } catch { researchWarnings.push("Error parseando datos de envío de Google Search"); }
+        } else { researchWarnings.push("Búsqueda de tarifas de envío falló"); }
+
+        if (suppResult.status === "fulfilled") {
+          try {
+            const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) };
+          } catch { researchWarnings.push("Error parseando datos de proveedores de Google Search"); }
+        } else { researchWarnings.push("Búsqueda de proveedores falló"); }
+
+        if (packResult.status === "fulfilled") {
+          try {
+            const jsonMatch = packResult.value.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) packagingResearch = { ...packagingResearch, ...JSON.parse(jsonMatch[0]) };
+          } catch { researchWarnings.push("Error parseando datos de packaging de Google Search"); }
+        } else { researchWarnings.push("Búsqueda de packaging falló"); }
+      } catch (e) { researchWarnings.push("Error general en investigación de mercado: " + (e instanceof Error ? e.message : "desconocido")); }
+    }
+
+    const allCogsEmpty = materialResearch.materials.length === 0 && shippingResearch.carriers.length === 0 && supplierResearch.suppliers.length === 0 && packagingResearch.items.length === 0;
+    if (allCogsEmpty) {
+      researchWarnings.push("Gemini Search no disponible — usando Claude como motor de investigación");
+      try {
+        const cogsClaudeRes = await askClaudeJsonWithBrain<{
+          materials?: Array<{ material: string; priceRange: string; source: string }>;
+          avgMaterialCost?: number;
+          carriers?: Array<{ carrier: string; domestic: string; international: string; source: string }>;
+          shippingInsight?: string;
+          suppliers?: Array<{ supplier: string; priceRange: string; moq?: string; origin?: string }>;
+          avgSupplierCost?: number;
+          packaging?: Array<{ item: string; pricePerUnit: number; source: string }>;
+          totalPackagingCost?: number;
+        }>(
+          projectId,
+          `Estima costes de producción para "${product.title}" (${product.productType || "producto"}, nicho: ${niche}).
+Fabricación: ${productClassification.manufacturingMethod}. Materiales: ${productClassification.materialComposition.join(", ") || "estándar"}.
+Peso: ${productClassification.estimatedWeight}. Envío: ${productClassification.shippingCategory}.
+
+Responde JSON: {"materials":[{"material":"x","priceRange":"€X-Y","source":"proveedor"}],"avgMaterialCost":X,"carriers":[{"carrier":"SEUR","domestic":"€X","international":"€X","source":"web"}],"shippingInsight":"...","suppliers":[{"supplier":"x","priceRange":"€X/ud","moq":"50","origin":"España"}],"avgSupplierCost":X,"packaging":[{"item":"caja","pricePerUnit":X,"source":"rajapack"}],"totalPackagingCost":X}`,
+          "Experto en costes de producción, logística y sourcing con 15 años de experiencia. Responde SOLO JSON válido.",
+          "pricing",
+          niche,
+          8192,
+          120_000
+        );
+        if (cogsClaudeRes) {
+          if (cogsClaudeRes.materials?.length) materialResearch = { ...materialResearch, materials: cogsClaudeRes.materials, avgMaterialCost: cogsClaudeRes.avgMaterialCost ?? 0, insight: "Datos estimados vía Claude" };
+          if (cogsClaudeRes.carriers?.length) shippingResearch = { ...shippingResearch, carriers: cogsClaudeRes.carriers, insight: cogsClaudeRes.shippingInsight ?? "Datos estimados vía Claude" };
+          if (cogsClaudeRes.suppliers?.length) supplierResearch = { ...supplierResearch, suppliers: cogsClaudeRes.suppliers, avgCost: cogsClaudeRes.avgSupplierCost ?? 0, insight: "Datos estimados vía Claude" };
+          if (cogsClaudeRes.packaging?.length) packagingResearch = { ...packagingResearch, items: cogsClaudeRes.packaging, totalPackagingCost: cogsClaudeRes.totalPackagingCost ?? 0, insight: "Datos estimados vía Claude" };
+        }
+      } catch (err: any) {
+        researchWarnings.push("Claude COGS fallback también falló: " + (err?.message ?? "desconocido"));
+      }
+    }
   
     const materialDataStr = materialResearch.materials.length > 0
       ? `PRECIOS REALES DE MATERIALES (investigados via Google Search):\n${materialResearch.materials.map(m => `  - ${m.material}: ${m.priceRange} [${m.source}] ${m.url ? `(${m.url})` : ""}`).join("\n")}\n  Coste medio material: €${materialResearch.avgMaterialCost}\n  Insight: ${materialResearch.insight}`

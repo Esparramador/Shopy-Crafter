@@ -182,7 +182,7 @@ router.post("/report-templates/ai-suggest", async (req: Request, res: Response):
 
     enableLongRunning(res);
 
-    const { askGeminiWithSearch } = await import("../lib/gemini.js");
+    const { askGeminiWithSearch, isGeminiSearchBlocked } = await import("../lib/gemini.js");
     const searchName = companyName || url || instagram;
 
     const result = await askGeminiWithSearch(

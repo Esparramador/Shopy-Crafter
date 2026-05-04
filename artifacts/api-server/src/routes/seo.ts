@@ -4,7 +4,7 @@ import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
-import { askGeminiWithSearch } from "../lib/gemini";
+import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";

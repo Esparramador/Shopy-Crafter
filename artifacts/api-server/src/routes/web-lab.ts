@@ -3,7 +3,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
-import { askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { saveToVault } from "../lib/vault.js";
 import { getReportShell, type ReportTemplate } from "./exports.js";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";

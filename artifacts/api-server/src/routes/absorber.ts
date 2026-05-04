@@ -14,7 +14,7 @@ import { sanitizeHtml } from "../lib/html-escape.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable, projectsTable } from "@workspace/db/schema";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
-import { askGeminiJson, askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiJson, askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { getClaudeClient, askClaudeWithBrain, buildShopyBrainContext, buildBrandDnaContext, learnFromOperation, CLAUDE_MODEL } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { randomUUID } from "crypto";
@@ -984,7 +984,7 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
       const materialsStr = materials?.join(", ") || "no especificado";
       const region = country || "España/Europa";
   
-      const supplierSearches = await Promise.all([
+      const supplierSearchResults = await Promise.allSettled([
         askGeminiWithSearch(
           `Busca proveedores REALES y ACTUALES de "${productName}" (categoría: ${productCategory || "general"}, materiales: ${materialsStr}).
   
@@ -1104,6 +1104,8 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
         ),
       ]);
   
+      const supplierSearches = supplierSearchResults.map(r => r.status === "fulfilled" ? r.value : { text: "", sources: [] as string[], queries: [] as string[] });
+
       let suppliersData: Record<string, unknown> = {};
       let costsData: Record<string, unknown> = {};
       let dealsData: Record<string, unknown> = {};
