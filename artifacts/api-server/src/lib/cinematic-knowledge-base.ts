@@ -298,16 +298,21 @@ export const CINEMATOGRAPHY_PRESETS: Record<CinematographyIntent, Cinematography
 
 export type IndustrySegment =
   | "watches" | "jewelry" | "electronics" | "fragrance" | "beauty"
-  | "fashion" | "automotive" | "lifestyle" | "general";
+  | "fashion" | "automotive" | "lifestyle" | "general"
+  | "tech" | "food" | "home" | "fitness";
 
 export const NEGATIVE_PROMPT_LIBRARY: Record<IndustrySegment, string> = {
   watches:    "deformed dial, distorted hands, missing numerals, crooked bezel, plastic-looking metal, blurry crown, double face, asymmetric lugs, cartoon, low-resolution, watermark, text artifacts",
   jewelry:    "deformed gemstones, asymmetric facets, missing prongs, plastic-looking metal, fake-looking diamonds, garish reflections, cartoon, low-resolution, watermark",
   electronics:"distorted screen, asymmetric body, fake buttons, plastic-looking aluminum, broken proportions, cartoon, low-resolution, watermark, text artifacts",
+  tech:       "distorted screen, asymmetric body, fake buttons, plastic-looking aluminum, broken proportions, garbled text on UI, cartoon, low-resolution, watermark, text artifacts",
   fragrance:  "deformed bottle, asymmetric cap, distorted label text, double bottle, broken proportions, cartoon, low-resolution, watermark",
   beauty:     "distorted skin texture, plastic skin, asymmetric face, deformed packaging, garish makeup, cartoon, low-resolution, watermark",
   fashion:    "distorted body proportions, deformed hands, missing fingers, asymmetric face, cartoon, low-resolution, watermark, text artifacts",
   automotive: "distorted body lines, asymmetric wheels, deformed badges, broken proportions, cartoon, low-resolution, watermark, fake reflections",
+  food:       "unappetizing colors, deformed food shapes, plastic-looking ingredients, unnatural textures, floating debris, cartoon, low-resolution, watermark",
+  home:       "distorted furniture proportions, impossible architecture, floating objects, cluttered mess, cartoon, low-resolution, watermark, text artifacts",
+  fitness:    "distorted body proportions, deformed muscles, impossible anatomy, unnatural poses, plastic skin, cartoon, low-resolution, watermark",
   lifestyle:  "distorted body proportions, deformed hands, asymmetric face, cluttered background, cartoon, low-resolution, watermark",
   general:    "deformed, distorted, asymmetric, broken proportions, cartoon, anime, illustration, low-resolution, watermark, text artifacts, double exposure, motion blur where unwanted",
 };

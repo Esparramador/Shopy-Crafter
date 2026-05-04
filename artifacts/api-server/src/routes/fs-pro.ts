@@ -520,6 +520,7 @@ router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req,
     if (!tpl) { res.status(404).json({ error: "Template no encontrado" }); return; }
     const {
       productName, brand, productMaterials, productColors, industry, aspect,
+      painPoint, coreBenefit, targetAudience, callToAction,
     } = (req.body || {}) as Partial<ComposeVariables> & { aspect?: "9:16" | "16:9" | "1:1" };
     if (!productName || String(productName).trim().length < 2) {
       res.status(400).json({ error: "productName requerido (mín 2 caracteres)" });
@@ -537,6 +538,10 @@ router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req,
         productMaterials: productMaterials ? String(productMaterials).trim().slice(0, 300) : undefined,
         productColors: productColors ? String(productColors).trim().slice(0, 200) : undefined,
         industry: industry ? String(industry).trim().slice(0, 120) : undefined,
+        painPoint: painPoint ? String(painPoint).trim().slice(0, 300) : undefined,
+        coreBenefit: coreBenefit ? String(coreBenefit).trim().slice(0, 300) : undefined,
+        targetAudience: targetAudience ? String(targetAudience).trim().slice(0, 200) : undefined,
+        callToAction: callToAction ? String(callToAction).trim().slice(0, 200) : undefined,
       },
       { aspect: aspect && ["9:16", "16:9", "1:1"].includes(aspect) ? aspect : undefined },
     );

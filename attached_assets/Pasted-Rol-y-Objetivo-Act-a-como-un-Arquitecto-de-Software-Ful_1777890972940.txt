@@ -1,0 +1,40 @@
+Rol y Objetivo:
+Actúa como un Arquitecto de Software Full-Stack Senior y experto en integraciones de IA. Vamos a construir el backend y la estructura de una plataforma SaaS omnicanal llamada "Shopy Crafter". Esta aplicación realiza auditorías financieras complejas (COGS, Revenue), análisis SEO, generación de código HTML/CSS, y análisis multimodal de imágenes para extraer materiales y texturas.
+
+Stack Tecnológico Obligatorio:
+
+Entorno: Node.js con Express (o Python con FastAPI, elige el más óptimo para manejar múltiples APIs de IA).
+
+Generación de Archivos: Integra librerías profesionales (ej. exceljs para crear archivos .xlsx reales, y pptxgenjs para presentaciones).
+
+Seguridad: Uso estricto de variables de entorno para las API Keys de Gemini y Claude.
+
+Instrucciones de Arquitectura (Genera la estructura de carpetas y los archivos base):
+
+/agents/ (El núcleo de IA): Crea submódulos aislados para cada tarea.
+
+financialAgent.js: Para cálculos estrictos de COGS, Revenue e IVA (debe forzar respuestas en JSON).
+
+visionAgent.js: Para conectarse a modelos multimodales (como Gemini) para analizar imágenes, texturas y empaques.
+
+seoAgent.js: Para auditorías técnicas web y scraping.
+
+codeAgent.js: Especializado únicamente en devolver HTML/CSS puro.
+
+/services/ (Generación de Entregables):
+
+excelService.js: Toma los JSON generados por el financialAgent y los inyecta en una plantilla de Excel viva con fórmulas.
+
+powerpointService.js: Toma los datos de auditoría y genera un .pptx descargable.
+
+/routes/ y /controllers/: Estructura de API RESTful que reciba las peticiones del frontend (ej. POST /api/audit/ecommerce, POST /api/analyze/product-image).
+
+Tu primera tarea:
+Inicializa el proyecto, crea el package.json (o requirements.txt) con todas las librerías necesarias mencionadas, y genera esta estructura de carpetas con archivos "esqueleto" (boilerplate) con comentarios sobre dónde irán las llamadas a las APIs. No implementes la lógica completa de las APIs todavía, solo la arquitectura modular.
+
+3 Pasos Clave para que Replit no falle:
+Usa los "Secrets" (Variables de Entorno): Una vez que Replit te genere esta estructura, vas a necesitar conectar tus "cerebros". Ve a la herramienta Secrets (el icono del candado en Replit) y añade tus claves privadas (por ejemplo: GEMINI_API_KEY, CLAUDE_API_KEY). NUNCA pongas estas claves directamente en el código.
+
+El Frontend por Separado: Replit es genial, pero para una interfaz UI/UX tan premium como la que buscas, te recomiendo que el código que genere Replit sea exclusivamente el Backend (API). Tu frontend (la página bonita que ven los usuarios, creada en React, Vue, o Next.js) debe llamar a este backend de Replit.
+
+Pídeselo Módulo a Módulo: Una vez que el agente de Replit te cree las carpetas, ve archivo por archivo. Dile: "Ahora vamos a programar el excelService.js. Toma este JSON de ejemplo de COGS y haz que la librería genere un Excel con la celda B2 en negrita".

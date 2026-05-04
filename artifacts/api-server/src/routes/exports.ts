@@ -5205,4 +5205,293 @@ PRESTASHOP:
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// XLSX / PPTX / DEAD COSTS — New professional export endpoints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import { generateCogsXlsx, generateSupplierComparisonXlsx, generateFinancialSummaryXlsx } from "../lib/xlsx-generator.js";
+import { generateExecutivePptx } from "../lib/pptx-generator.js";
+import { analyzeDeadCosts } from "../lib/dead-costs.js";
+
+router.get("/projects/:projectId/exports/cogs-xlsx", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(String(c.shopifyProductId), c);
+
+    const cogsProducts = products.map(p => {
+      const c = cogsMap.get(String(p.shopifyProductId));
+      let cd: Record<string, any> = {};
+      try { cd = c?.costData ? (typeof c.costData === "string" ? JSON.parse(c.costData) : c.costData) : {}; } catch { cd = {}; }
+      const n = (k: string) => parseFloat(cd[k]) || 0;
+      const price = Number(p.price) || 0;
+
+      const unitCost = n("unitCost") + n("materialCost") + n("fabricCost") + n("laborCostPerUnit");
+      const materialCost = n("materialCost");
+      const packagingCost = n("packagingCost") + n("labelCost");
+      const shippingDomestic = n("shippingCostDomestic");
+      const shippingInternational = n("shippingCostInternational");
+      const fulfillmentFee = n("fulfillmentFee") + n("warehouseCostPerUnit");
+      const platformFee = (price * n("shopifyPaymentFee")) + n("paymentProcessingFee") + n("platformCommission");
+      const marketingCost = n("cac") + n("digitalMarketingCost") + n("influencerCostPerUnit");
+      const returnRate = n("returnRate");
+      const totalCogs = unitCost + packagingCost + shippingDomestic + shippingInternational + fulfillmentFee + platformFee + marketingCost;
+      const marginPct = price > 0 ? ((price - totalCogs) / price) * 100 : 0;
+
+      return {
+        title: p.title || "Sin título",
+        price,
+        unitCost,
+        materialCost,
+        packagingCost,
+        shippingDomestic,
+        shippingInternational,
+        fulfillmentFee,
+        platformFee,
+        marketingCost,
+        returnRate,
+        totalCogs,
+        marginPct,
+      };
+    });
+
+    const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
+    const buf = generateCogsXlsx(cogsProducts, projectName);
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="COGS_${safeName}.xlsx"`);
+    res.send(buf);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating COGS XLSX");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/projects/:projectId/exports/suppliers-xlsx", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let entries: any[] = [];
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM supplier_entries WHERE research_id IN (
+          SELECT id FROM supplier_researches WHERE project_id = ${projectId}
+        ) ORDER BY score DESC NULLS LAST
+      `);
+      entries = (result as any).rows || [];
+    } catch { entries = []; }
+
+    const suppliers = entries.map((e: any) => ({
+      name: e.name || "Sin nombre",
+      category: e.category || "General",
+      country: e.country || "—",
+      priceMin: Number(e.price_range_min) || 0,
+      priceMax: Number(e.price_range_max) || 0,
+      currency: e.currency || "EUR",
+      moq: e.moq || "—",
+      leadDays: e.lead_days || "—",
+      paymentTerms: e.payment_terms || "—",
+      certifications: e.certifications || "—",
+      score: Number(e.score) || 0,
+      shipsInternationally: !!e.ships_internationally,
+    }));
+
+    const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
+    const buf = generateSupplierComparisonXlsx(suppliers, projectName);
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="Proveedores_${safeName}.xlsx"`);
+    res.send(buf);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating suppliers XLSX");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/projects/:projectId/exports/financial-xlsx", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(String(c.shopifyProductId), c);
+
+    let totalRevenue = 0, totalCogs = 0, totalOrders = 0;
+    const topProducts: Array<{ title: string; revenue: number; margin: number }> = [];
+
+    for (const p of products) {
+      const price = Number(p.price) || 0;
+      totalRevenue += price;
+      const c = cogsMap.get(String(p.shopifyProductId));
+      let cd: Record<string, any> = {};
+      try { cd = c?.costData ? (typeof c.costData === "string" ? JSON.parse(c.costData) : c.costData) : {}; } catch { cd = {}; }
+      const n = (k: string) => parseFloat(cd[k]) || 0;
+      const cogs = n("unitCost") + n("materialCost") + n("packagingCost") + n("shippingCostDomestic") + n("fulfillmentFee") + (price * n("shopifyPaymentFee")) + n("cac");
+      totalCogs += cogs;
+      const margin = price > 0 ? ((price - cogs) / price) * 100 : 0;
+      topProducts.push({ title: p.title || "Sin título", revenue: price, margin });
+    }
+
+    topProducts.sort((a, b) => b.revenue - a.revenue);
+
+    try {
+      const snapResult = await db.execute(sql`
+        SELECT total_orders FROM revenue_snapshots 
+        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+      `);
+      const rows = (snapResult as any).rows || [];
+      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
+    } catch { totalOrders = products.length; }
+
+    const grossProfit = totalRevenue - totalCogs;
+    const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
+    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+
+    const alerts: string[] = [];
+    if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20%");
+    const lowMargin = topProducts.filter(p => p.margin < 15);
+    if (lowMargin.length > 0) alerts.push(`${lowMargin.length} productos con margen < 15%`);
+
+    const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
+    const buf = generateFinancialSummaryXlsx({
+      projectName,
+      domain: project.shopDomain || "—",
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalCogs: Math.round(totalCogs * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      grossMarginPct,
+      totalOrders,
+      aov,
+      productCount: products.length,
+      topProducts: topProducts.slice(0, 15),
+      alerts,
+    });
+
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="Financiero_${safeName}.xlsx"`);
+    res.send(buf);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating financial XLSX");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/projects/:projectId/exports/executive-pptx", async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
+    const cogsMap = new Map<string, any>();
+    for (const c of allCogs) cogsMap.set(String(c.shopifyProductId), c);
+
+    let totalRevenue = 0, totalCogs = 0, totalOrders = 0;
+    const productList: Array<{ title: string; price: number; totalCogs: number; marginPct: number }> = [];
+
+    for (const p of products) {
+      const price = Number(p.price) || 0;
+      totalRevenue += price;
+      const c = cogsMap.get(String(p.shopifyProductId));
+      let cd: Record<string, any> = {};
+      try { cd = c?.costData ? (typeof c.costData === "string" ? JSON.parse(c.costData) : c.costData) : {}; } catch { cd = {}; }
+      const n = (k: string) => parseFloat(cd[k]) || 0;
+      const cogs = n("unitCost") + n("materialCost") + n("packagingCost") + n("shippingCostDomestic") + n("shippingCostInternational") + n("fulfillmentFee") + (price * n("shopifyPaymentFee")) + n("cac");
+      totalCogs += cogs;
+      const margin = price > 0 ? ((price - cogs) / price) * 100 : 0;
+      productList.push({ title: p.title || "Sin título", price, totalCogs: cogs, marginPct: margin });
+    }
+
+    try {
+      const snapResult = await db.execute(sql`
+        SELECT total_orders FROM revenue_snapshots 
+        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+      `);
+      const rows = (snapResult as any).rows || [];
+      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
+    } catch { totalOrders = products.length; }
+
+    const grossProfit = totalRevenue - totalCogs;
+    const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
+    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+
+    const alerts: string[] = [];
+    if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes urgente");
+    const lowMarginProducts = productList.filter(p => p.marginPct < 15);
+    if (lowMarginProducts.length > 0) alerts.push(`${lowMarginProducts.length} productos con margen < 15% — riesgo de pérdida con devoluciones`);
+    if (aov < 20) alerts.push("Ticket medio (AOV) muy bajo — considerar bundles o upselling");
+
+    let deadCosts: { totalDeadCost: number; items: Array<{ title: string; cost: number; reason: string }> } | undefined;
+    try {
+      const dc = await analyzeDeadCosts(projectId);
+      if (dc.items.length > 0) {
+        deadCosts = {
+          totalDeadCost: dc.totalDeadCost,
+          items: dc.items.map(i => ({ title: i.title, cost: i.cost, reason: i.reason })),
+        };
+      }
+    } catch {}
+
+    const recommendations: string[] = [];
+    if (grossMarginPct < 40) recommendations.push("Renegociar contratos con proveedores principales para reducir COGS mínimo un 5%");
+    if (lowMarginProducts.length > 0) recommendations.push(`Revisar precios de ${lowMarginProducts.length} productos con margen inferior al 15%`);
+    if (deadCosts && deadCosts.totalDeadCost > 100) recommendations.push(`Eliminar €${deadCosts.totalDeadCost} en costes muertos identificados`);
+    recommendations.push("Implementar pricing dinámico basado en estacionalidad y demanda");
+    recommendations.push("Diversificar canales de adquisición para reducir CAC");
+
+    const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
+    const buf = await generateExecutivePptx({
+      projectName,
+      domain: project.shopDomain || "—",
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalCogs: Math.round(totalCogs * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      grossMarginPct,
+      totalOrders,
+      aov,
+      productCount: products.length,
+      products: productList,
+      alerts,
+      recommendations,
+      deadCosts,
+    });
+
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    res.setHeader("Content-Disposition", `attachment; filename="Ejecutivo_${safeName}.pptx"`);
+    res.send(buf);
+  } catch (e: any) {
+    logger.error({ err: e }, "Error generating executive PPTX");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+router.get("/projects/:projectId/exports/dead-costs", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const analysis = await analyzeDeadCosts(projectId);
+    res.json({ ok: true, ...analysis });
+  } catch (e: any) {
+    logger.error({ err: e }, "Error analyzing dead costs");
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;

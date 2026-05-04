@@ -1,0 +1,33 @@
+¡Wow, vale, ahora entiendo perfectamente la magnitud de Shopy Crafter! Estamos hablando de un SaaS omnicanal absoluto, un "todo en uno" brutal diseñado para radiografiar y optimizar cualquier tipo de comercio digital. Me encanta esa visión hiper ambiciosa y el nivel de exigencia técnica.
+
+Para lograr ese nivel 100% quirúrgico y mega profesional en absolutamente cualquier sector (desde moda y cosmética hasta ferretería o servicios digitales), no puedes depender de un solo "cerebro" genérico. Tienes que estructurar tu aplicación basándote en una arquitectura de Agentes de IA Especializados.
+
+Además, quiero hacerte un apunte técnico importantísimo sobre la generación visual que mencionas: para crear esas infografías premium y realizar análisis visuales, la tecnología actual que debes tener en mente es Nano Banana 2 (cuyo nombre oficial es Gemini 3 Flash Image). Es nuestro modelo de estado del arte actual para generación y edición, y reemplaza a las versiones anteriores (Nano Banana y Nano Banana Pro). Es exactamente lo que necesitas para ese nivel de detalle en texturas, formas y materiales.
+
+Aquí tienes cómo debes estructurar el backend de Shopy Crafter para que todo esté hiper conectado y no falle en la precisión:
+
+1. Sistema Multi-Agente (El secreto para analizar CUALQUIER sector)
+No le pidas a la IA que calcule todo de golpe. Tu sistema debe clasificar primero la tienda y luego llamar al "Agente" adecuado.
+
+Agente de Clasificación: Lee la URL o el perfil de Instagram y dice: "Esto es una marca de ropa de baño sostenible".
+
+Agente Financiero Dinámico: Una vez sabe el sector, inyecta variables específicas. Si es ropa, analizará mermas de tela, costes de importación (aranceles), packaging y logística inversa (devoluciones, que en moda son altísimas). Si es software, analizará costes de servidores y pasarelas de pago.
+
+2. Visión Multimodal Quirúrgica (Análisis de Producto)
+Para analizar fibras, tejidos o componentes desde imágenes o vídeos:
+
+Debes pasarle a la API la imagen junto con un prompt de Ingeniería Inversa Visual: "Analiza esta imagen con precisión microscópica. Identifica el tipo de tejido (ej. algodón peinado, poliéster reciclado), la densidad visual, el tipo de costura y los acabados. Estima el coste de fabricación por unidad en base a la calidad percibida".
+
+3. Generación de Código Front-End (HTML/CSS y SEO Técnico)
+Para que Shopy Crafter actúe como una agencia de diseño web:
+
+Aislamiento de Código: Cuando pidas mejoras de UI/UX o código, prohíbe a la IA generar texto conversacional. El prompt debe ser: "Devuelve ÚNICAMENTE código HTML5 semántico y CSS3 puro para una landing page de alta conversión. No incluyas explicaciones". Esto permite que tu plataforma renderice el diseño en tiempo real en la pantalla del usuario.
+
+Auditorías SEO: Pídele a la IA que estructure la respuesta en formato JSON (con campos como LCP, CLS, Meta Tags Faltantes, Estrategia H1-H3). Tu plataforma coge ese JSON y lo pinta en un dashboard precioso.
+
+4. Generación de Entregables (Excel y PowerPoint)
+Una IA basada en texto no escupe un archivo .xlsx o .pptx mágico por arte de magia. Aquí es donde tu conexión Backend - API debe brillar:
+
+Para Excel: La API debe generar los datos en formato CSV estructurado o JSON. Tu backend (usando librerías de programación) toma esos datos y los convierte en un Excel descargable con celdas ya formateadas y fórmulas vivas.
+
+Para PowerPoint: Pídele a la IA que estructure el "Guion de Presentación" en formato JSON (Diapositiva 1: Título, Viñetas; Diapositiva 2: Gráfico de COGS...). Luego, tu sistema utiliza una librería para generar el PowerPoint inyectando esos textos e imágenes (creadas con Nano Banana 2) en una plantilla corporativa.

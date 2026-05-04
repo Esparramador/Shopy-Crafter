@@ -5,12 +5,12 @@ import {
   FileText, Download, BarChart3, ShoppingBag, Palette, TestTubes, Image,
   FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Package, Eye,
   Brain, Boxes, TrendingUp, Wand2, Archive, FileJson, Search, Camera, Table2,
-  X, Printer, Sparkles
+  X, Printer, Sparkles, Presentation, DollarSign, AlertOctagon, Users
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX" | "CSS";
+type ExportFormat = "HTML" | "CSV" | "JSON" | "ZIP" | "XLSX" | "CSS" | "PPTX";
 
 interface ExportOption {
   id: string;
@@ -286,6 +286,56 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       category: "data",
     },
     {
+      id: "cogs-xlsx",
+      title: "COGS Profesional (Excel)",
+      description: "Estimación COGS hiper-detallada: metodología, comparativa por producto, desglose de costes, resumen ejecutivo. Multi-hoja profesional.",
+      icon: <DollarSign className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/cogs-xlsx`,
+      format: "XLSX" as ExportFormat,
+      color: "#2E7D32",
+      category: "data" as const,
+    },
+    {
+      id: "suppliers-xlsx",
+      title: "Proveedores Comparativa (Excel)",
+      description: "Análisis y comparativa de proveedores: metodología TCO, ranking global, fichas por categoría. Listo para presentar.",
+      icon: <Users className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/suppliers-xlsx`,
+      format: "XLSX" as ExportFormat,
+      color: "#1565C0",
+      category: "data" as const,
+    },
+    {
+      id: "financial-xlsx",
+      title: "Dashboard Financiero (Excel)",
+      description: "Informe financiero completo: KPIs, top productos, escenarios conservador/realista/optimista, alertas. Datos accionables.",
+      icon: <TrendingUp className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/financial-xlsx`,
+      format: "XLSX" as ExportFormat,
+      color: "#E65100",
+      category: "data" as const,
+    },
+    {
+      id: "executive-pptx",
+      title: "Presentación Ejecutiva (PowerPoint)",
+      description: "Informe ejecutivo premium: portada, KPIs, COGS por producto, costes muertos, alertas y recomendaciones. Tema oscuro profesional.",
+      icon: <Presentation className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/executive-pptx`,
+      format: "PPTX" as ExportFormat,
+      color: "#B71C1C",
+      category: "reports" as const,
+    },
+    {
+      id: "dead-costs",
+      title: "Análisis Costes Muertos",
+      description: "Identificación inteligente de costes muertos: stock sin rotación, márgenes negativos, overstock, CAC ineficiente, obsolescencia.",
+      icon: <AlertOctagon className="w-6 h-6" />,
+      endpoint: `/api/projects/${projectId}/exports/dead-costs`,
+      format: "JSON" as ExportFormat,
+      color: "#D32F2F",
+      category: "reports" as const,
+    },
+    {
       id: "img-png",
       title: "Imágenes (PNG)",
       description: "Descarga ZIP de todas las imágenes del proyecto convertidas a PNG. Alta calidad, sin pérdida.",
@@ -416,7 +466,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   };
 
   const formatBadge = (format: ExportFormat) => {
-    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346", CSS: "#9b59b6" };
+    const colors: Record<ExportFormat, string> = { HTML: "#c8a84b", CSV: "#27ae60", JSON: "#3498db", ZIP: "#e84558", XLSX: "#217346", CSS: "#9b59b6", PPTX: "#B71C1C" };
     return (
       <span
         className="text-[10px] font-bold px-1.5 py-0.5 rounded"
