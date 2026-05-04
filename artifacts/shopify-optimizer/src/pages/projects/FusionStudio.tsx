@@ -127,6 +127,9 @@ export default function FusionStudio() {
   const [quantity, setQuantity] = useState(1);
   const [extraPrompt, setExtraPrompt] = useState("");
   const [outputFormat, setOutputFormat] = useState("1024x1024");
+  const [imageEngines, setImageEngines] = useState<Array<{ id: string; label: string; model: string; cost: number; description: string; provider: string; recommendedFor: string[] }>>([]);
+  const [selectedEngine, setSelectedEngine] = useState("");
+  const [enhancingPhotoPrompt, setEnhancingPhotoPrompt] = useState(false);
 
   const [phase, setPhase] = useState<Phase>("brand");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -189,7 +192,8 @@ export default function FusionStudio() {
   }, [projectId, productFiles, generatedPhotos]);
 
   // ─── Generate advertising video (uses /api/fusion-studio/generate-video) ─
-  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string; provider?: string; integrated?: boolean; externalUrl?: string; strengths?: string[]; promptTips?: string[]; maxDuration?: number; maxResolution?: string }>>([]);
+  const [videoModels, setVideoModels] = useState<Array<{ key: string; label: string; description: string; costPerSec: number; badge?: string; provider?: string; integrated?: boolean; externalUrl?: string; strengths?: string[]; promptTips?: string[]; maxDuration?: number; maxResolution?: string; supportsT2V?: boolean }>>([]);
+  const [enhancingVideoPrompt, setEnhancingVideoPrompt] = useState(false);
   const [videoRatios, setVideoRatios] = useState<Array<{ key: string; label: string; runway: string; resolution?: string }>>([
     { key: "9:16", label: "9:16 vertical (Reels/TikTok)", runway: "768:1280" },
     { key: "16:9", label: "16:9 horizontal (YouTube)", runway: "1280:768" },
@@ -213,22 +217,68 @@ export default function FusionStudio() {
         if (d?.durations) setVideoDurations(d.durations);
       })
       .catch(() => {});
+    fetch(`${API_BASE}/api/images/engines`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.engines) setImageEngines(d.engines); })
+      .catch(() => {});
   }, []);
+
+  const enhancePhotoPromptWithAI = useCallback(async () => {
+    if (!extraPrompt || extraPrompt.trim().length < 3) return;
+    setEnhancingPhotoPrompt(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/enhance`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent: "image",
+          baselinePrompt: extraPrompt.trim(),
+          subject: productAnalysis?.product?.category || companyName || "premium product",
+          brand: companyName || null,
+          language: "es",
+          projectId,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.ok && d.enhanced) setExtraPrompt(d.enhanced);
+      }
+    } catch {} finally { setEnhancingPhotoPrompt(false); }
+  }, [extraPrompt, productAnalysis, companyName, projectId]);
+
+  const enhanceVideoPromptWithAI = useCallback(async () => {
+    if (!videoPrompt || videoPrompt.trim().length < 3) return;
+    setEnhancingVideoPrompt(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/enhance`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent: "video",
+          baselinePrompt: videoPrompt.trim(),
+          subject: productAnalysis?.product?.category || companyName || "premium product",
+          brand: companyName || null,
+          language: "es",
+          projectId: Number(projectId) || 0,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.enhanced) {
+        setVideoPrompt(data.enhanced);
+      }
+    } catch {} finally {
+      setEnhancingVideoPrompt(false);
+    }
+  }, [videoPrompt, productAnalysis, companyName, projectId]);
 
   const generateVideo = useCallback(async () => {
     if (!projectId) { setVideoResult({ error: "projectId requerido" }); return; }
     const selectedModel = videoModels.find(m => m.key === videoModel);
-    if (selectedModel && !selectedModel.integrated) {
-      const promptText = (videoPrompt && videoPrompt.trim().length >= 3)
-        ? videoPrompt.trim()
-        : `Cinematic product video, ${productAnalysis?.product?.category || "premium product"}, soft studio lighting, slow camera movement, professional advertising style`;
-      navigator.clipboard.writeText(promptText).then(() => {
-        setVideoResult({ error: `Prompt copiado al portapapeles. Genera el video en ${selectedModel.label} → ${selectedModel.externalUrl || selectedModel.provider}` });
-      });
-      return;
-    }
-    if (!videoSourceUrl) {
-      setVideoResult({ error: "Selecciona una imagen origen de la galería generada." });
+    const supportsT2V = selectedModel?.supportsT2V === true;
+    if (!videoSourceUrl && !supportsT2V) {
+      setVideoResult({ error: "Selecciona una imagen origen de la galería generada, o elige un modelo que soporte Text-to-Video." });
       return;
     }
     setVideoGenerating(true);
@@ -246,7 +296,7 @@ export default function FusionStudio() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: Number(projectId),
-          imageUrl: videoSourceUrl,
+          imageUrl: videoSourceUrl || "",
           promptText,
           model: videoModel,
           duration: videoDuration,
@@ -405,6 +455,7 @@ export default function FusionStudio() {
       formData.append("outputFormat", outputFormat);
       if (customScene) formData.append("customScene", customScene);
       formData.append("hasModel", String(!!modelFile));
+      if (selectedEngine) formData.append("engineOverride", selectedEngine);
       if (referenceImages.length > 0) formData.append("referenceStyles", JSON.stringify(referenceImages));
 
       const res = await fetch(`${API_BASE}/api/fusion-studio/generate-photos`, {
@@ -449,7 +500,7 @@ export default function FusionStudio() {
     } finally {
       setIsGenerating(false);
     }
-  }, [productFiles, modelFile, projectId, selectedModes, lighting, background, perspective, quantity, brandDna, extraPrompt, outputFormat, customScene]);
+  }, [productFiles, modelFile, projectId, selectedModes, lighting, background, perspective, quantity, brandDna, extraPrompt, outputFormat, customScene, selectedEngine]);
 
   const toggleMode = (id: string) => setSelectedModes(p => p.includes(id) ? p.filter(m => m !== id) : [...p, id]);
   const hasModel = !!modelImage;
@@ -912,7 +963,42 @@ export default function FusionStudio() {
 
               <div style={V.sec}>
                 <div style={V.secTitle}>📝 Instrucciones adicionales</div>
-                <textarea style={V.textarea} value={extraPrompt} onChange={e => setExtraPrompt(e.target.value)} placeholder="Ej: Que la botella tenga gotas de condensación, fondo de bar premium con luces cálidas difusas..." />
+                <div style={{ position: "relative" }}>
+                  <textarea style={V.textarea} value={extraPrompt} onChange={e => setExtraPrompt(e.target.value)} placeholder="Ej: Que la botella tenga gotas de condensación, fondo de bar premium con luces cálidas difusas..." />
+                  {extraPrompt.trim().length >= 3 && (
+                    <button
+                      onClick={enhancePhotoPromptWithAI}
+                      disabled={enhancingPhotoPrompt}
+                      style={{ position: "absolute", bottom: 8, right: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid #c8a84b44", background: enhancingPhotoPrompt ? "#c8a84b22" : "linear-gradient(135deg,#c8a84b22,#c8a84b11)", color: "#f0d68a", fontSize: 9, fontWeight: 700, cursor: enhancingPhotoPrompt ? "wait" : "pointer" }}
+                    >
+                      {enhancingPhotoPrompt ? "⟳ Potenciando..." : "✦ Potenciar con IA"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={V.sec}>
+                <div style={V.secTitle}>🔧 Motor de imagen</div>
+                <select
+                  style={{ ...V.select, width: "100%", marginBottom: 4 }}
+                  value={selectedEngine}
+                  onChange={e => setSelectedEngine(e.target.value)}
+                >
+                  <option value="">Automático (IA elige según modo)</option>
+                  {imageEngines.map(eng => (
+                    <option key={eng.id} value={eng.model}>
+                      {eng.label} — ${eng.cost.toFixed(3)} · {eng.provider}
+                    </option>
+                  ))}
+                </select>
+                {selectedEngine && (() => {
+                  const eng = imageEngines.find(e => e.model === selectedEngine);
+                  return eng ? (
+                    <div style={{ fontSize: 10, color: "#888", padding: "4px 0", lineHeight: 1.4 }}>
+                      {eng.description}
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
@@ -1139,7 +1225,7 @@ export default function FusionStudio() {
                           🎬 Generar video publicitario IA
                         </h3>
                         <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>
-                          Multi-plataforma: Runway (integrado), Seedance, Kling, Pollo.ai, Veo. Para Reels, TikTok, anuncios.
+                          10 motores integrados: Runway, Kling, Seedance, Hailuo, Wan, Veo. Image-to-Video + Text-to-Video.
                         </p>
                       </div>
                     </div>
@@ -1205,19 +1291,41 @@ export default function FusionStudio() {
                       </div>
                     </div>
 
-                    {/* PROMPT */}
+                    {/* PROMPT + AI ENHANCE */}
                     <div style={{ marginBottom: 12 }}>
-                      <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Prompt creativo (opcional)</label>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Prompt creativo (opcional)</label>
+                        <button
+                          onClick={enhanceVideoPromptWithAI}
+                          disabled={enhancingVideoPrompt || !videoPrompt || videoPrompt.trim().length < 3}
+                          style={{
+                            padding: "3px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: (enhancingVideoPrompt || !videoPrompt || videoPrompt.trim().length < 3) ? "not-allowed" : "pointer",
+                            background: enhancingVideoPrompt ? "#1f1f3a" : "linear-gradient(135deg, #f59e0b, #d97706)",
+                            color: "#fff", border: "none", opacity: (!videoPrompt || videoPrompt.trim().length < 3) ? 0.4 : 1,
+                          }}>
+                          {enhancingVideoPrompt ? "Mejorando..." : "Potenciar con IA"}
+                        </button>
+                      </div>
                       <textarea value={videoPrompt} onChange={e => setVideoPrompt(e.target.value)}
-                        placeholder="Slow camera dolly-in, soft cinematic lighting, premium product reveal..."
-                        style={{ width: "100%", minHeight: 50, padding: 10, borderRadius: 8, background: "#0a0a14", border: "1px solid #22222e", color: "#fff", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
+                        placeholder="Escribe tu idea y pulsa 'Potenciar con IA' para obtener un prompt profesional..."
+                        style={{ width: "100%", minHeight: 60, padding: 10, borderRadius: 8, background: "#0a0a14", border: "1px solid #22222e", color: "#fff", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
                     </div>
 
                     {/* IMAGE SOURCE PICKER from gallery */}
                     <div style={{ marginBottom: 12 }}>
-                      <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
-                        Imagen origen {videoSourceUrl ? "(elegida de la galería)" : "(usará la primera del producto)"}
-                      </label>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <label style={{ fontSize: 10, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          Imagen origen {videoSourceUrl ? "(elegida)" : "(opcional si el modelo soporta T2V)"}
+                        </label>
+                        {(() => {
+                          const sel = videoModels.find(m => m.key === videoModel);
+                          return sel?.supportsT2V ? (
+                            <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 6, background: "rgba(45,212,159,0.15)", color: "#2dd49f", fontWeight: 700 }}>T2V disponible</span>
+                          ) : (
+                            <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 6, background: "rgba(232,69,88,0.15)", color: "#ff8a95", fontWeight: 700 }}>Requiere imagen</span>
+                          );
+                        })()}
+                      </div>
                       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
                         <div onClick={() => setVideoSourceUrl("")} style={{ flex: "0 0 60px", height: 60, borderRadius: 6, border: !videoSourceUrl ? "2px solid #6366f1" : "1px solid #22222e", background: "#0a0a14", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 9, color: "#666", textAlign: "center", padding: 4 }}>
                           Producto<br/>original
@@ -1231,20 +1339,19 @@ export default function FusionStudio() {
                       </div>
                     </div>
 
-                    {/* PROMPT TIPS for external models */}
+                    {/* MODEL INFO */}
                     {(() => {
                       const sel = videoModels.find(m => m.key === videoModel);
-                      if (!sel || sel.integrated !== false || !sel.promptTips?.length) return null;
+                      if (!sel) return null;
                       return (
-                        <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)" }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#fbbf24", marginBottom: 6 }}>Tips para {sel.label}:</div>
-                          {sel.promptTips.map((tip: string, i: number) => (
-                            <div key={i} style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>• {tip}</div>
-                          ))}
-                          {sel.externalUrl && (
-                            <a href={sel.externalUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#818cf8", marginTop: 4, display: "inline-block" }}>
-                              Abrir {sel.label} →
-                            </a>
+                        <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#a5b4fc", marginBottom: 6 }}>{sel.label} — {sel.provider}</div>
+                          {sel.strengths && sel.strengths.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {sel.strengths.map((s: string, i: number) => (
+                                <span key={i} style={{ fontSize: 8, padding: "2px 6px", borderRadius: 6, background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>{s}</span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       );
@@ -1253,21 +1360,21 @@ export default function FusionStudio() {
                     {/* GENERATE BUTTON */}
                     {(() => {
                       const sel = videoModels.find(m => m.key === videoModel);
-                      const isExternal = sel && sel.integrated === false;
-                      const btnDisabled = videoGenerating || (!isExternal && !videoSourceUrl);
+                      const supportsT2V = sel?.supportsT2V === true;
+                      const btnDisabled = videoGenerating || (!videoSourceUrl && !supportsT2V);
                       return (
                         <button onClick={generateVideo} disabled={btnDisabled} data-testid="button-generate-video"
                           style={{
                             width: "100%", padding: "12px 20px", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: btnDisabled ? "not-allowed" : "pointer",
-                            background: videoGenerating ? "#1f1f3a" : isExternal ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #6366f1, #a855f7)",
+                            background: videoGenerating ? "#1f1f3a" : "linear-gradient(135deg, #6366f1, #a855f7)",
                             color: "#fff", border: "none",
                             opacity: btnDisabled ? 0.5 : 1,
                           }}>
                           {videoGenerating
                             ? "🎥 Generando video... esto tarda 1-3 minutos"
-                            : isExternal
-                              ? `📋 Copiar prompt para ${sel?.label || videoModel}`
-                              : `🎬 Generar video con ${sel?.label || videoModel}`}
+                            : videoSourceUrl
+                              ? `🎬 Generar video (I2V) con ${sel?.label || videoModel}`
+                              : `🎬 Generar video (T2V) con ${sel?.label || videoModel}`}
                         </button>
                       );
                     })()}

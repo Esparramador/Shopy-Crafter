@@ -519,7 +519,7 @@ export async function generateCinematicScript(
   // ── Real project context (brand voice, niche, recent vault assets) ─────
   const projectCtx = await buildProjectContextSnippet(req.projectId);
 
-  const sys = `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot tipo Pollo.ai / Seedance 2.0 / Runway Gen-3. Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.`;
+  const sys = `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.`;
 
   const prompt = `Genera el guion multi-shot para un anuncio de ${totalSec} segundos del producto "${req.productName}" de la marca "${req.brand}".
 

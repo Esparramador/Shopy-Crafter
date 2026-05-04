@@ -29,7 +29,7 @@ interface Capabilities {
   voiceModels: Array<{ key: string; label: string; description: string }>;
   cameraPresets?: Array<{ key: string; label: string; description: string }>;
   transitionPresets?: Array<{ key: string; label: string; xfade: string; defaultDurationSec: number }>;
-  pollopaParity?: Array<{ key: string; label: string; description: string }>;
+  proTools?: Array<{ key: string; label: string; description: string }>;
   adTemplates?: Array<{ key: string; label: string; description: string; cameraPreset: string; transitionPreset: string; defaultAspect: string; defaultDurationSec: number }>;
 }
 
@@ -120,19 +120,63 @@ interface VaultItem {
   mimeType?: string;
 }
 
+function VideoPromptEnhanceBtn({ prompt, setPrompt, projectId, subject }: { prompt: string; setPrompt: (v: string) => void; projectId: number; subject?: string }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (busy || prompt.trim().length < 3) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/enhance`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent: "video", baselinePrompt: prompt.trim(), subject: subject || "premium product", language: "es", projectId }),
+      });
+      if (res.ok) { const d = await res.json(); if (d.ok && d.enhanced) setPrompt(d.enhanced); }
+    } catch {} finally { setBusy(false); }
+  };
+  return (
+    <button onClick={run} disabled={busy}
+      style={{ position: "absolute", bottom: 8, right: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--gold, #c8a84b44)", background: busy ? "rgba(200,168,75,0.13)" : "linear-gradient(135deg,rgba(200,168,75,0.13),rgba(200,168,75,0.06))", color: "var(--gold, #f0d68a)", fontSize: 9, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
+      {busy ? "⟳ Potenciando..." : "✦ Potenciar con IA"}
+    </button>
+  );
+}
+
+function ImagePromptEnhanceBtn({ prompt, setPrompt, projectId, subject }: { prompt: string; setPrompt: (v: string) => void; projectId: number; subject?: string }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (busy || prompt.trim().length < 3) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt/enhance`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent: "image", baselinePrompt: prompt.trim(), subject: subject || "premium product", language: "es", projectId }),
+      });
+      if (res.ok) { const d = await res.json(); if (d.ok && d.enhanced) setPrompt(d.enhanced); }
+    } catch {} finally { setBusy(false); }
+  };
+  return (
+    <button onClick={run} disabled={busy}
+      style={{ position: "absolute", bottom: 8, right: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--gold, #c8a84b44)", background: busy ? "rgba(200,168,75,0.13)" : "linear-gradient(135deg,rgba(200,168,75,0.13),rgba(200,168,75,0.06))", color: "var(--gold, #f0d68a)", fontSize: 9, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
+      {busy ? "⟳ Potenciando..." : "✦ Potenciar con IA"}
+    </button>
+  );
+}
+
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string }> = [
-  { id: "generate",   label: "Generar imagen",  icon: <Sparkles size={15} />, desc: "Flux, Recraft, Ideogram, Imagen 4, Nano Banana" },
-  { id: "edit",       label: "Editar imagen",   icon: <Wand2 size={15} />,    desc: "Nano Banana, Flux Kontext, Runway Aleph" },
-  { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional" },
-  { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Upscale 4K, mejora de caras, detalle creativo" },
-  { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling, Seedance, Hailuo" },
-  { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (orquestador propio sobre Seedance Pro / Kling / Veo)" },
+  { id: "generate",   label: "Generar imagen",  icon: <Sparkles size={15} />, desc: "Flux Ultra, Recraft, Ideogram v3, Imagen 4, Kontext, Nano Banana" },
+  { id: "edit",       label: "Editar imagen",   icon: <Wand2 size={15} />,    desc: "Nano Banana (Gemini), Flux Kontext, Runway Gen4 Edit" },
+  { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional (Bria RMBG)" },
+  { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Real-ESRGAN, Clarity Upscaler, GFPGAN caras" },
+  { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling 2.1, Seedance, Hailuo, Veo 3" },
+  { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Seedance / Kling / Veo / Runway)" },
   { id: "uploadconcat", label: "Concat propio", icon: <Film size={15} />,     desc: "Sube tus propios clips MP4 y los concatena con voz/música" },
   { id: "avatars",    label: "Avatares",        icon: <UserSquare size={15} />, desc: "Talking heads y product avatars por nicho" },
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
-  { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts cinematográficos estilo pollo.ai con presets" },
+  { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts cinematográficos profesionales con presets" },
   { id: "cinematic-templates", label: "Cinematic Templates", icon: <Film size={15} />, desc: "Plantillas masterpiece: Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
@@ -358,7 +402,12 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
       </div>
       <div>
         <Section title="Prompt">
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Hyper-realistic luxury watch on black marble, dramatic side lighting, magazine photography..." style={{ ...inputStyle, minHeight: 120 }} />
+          <div style={{ position: "relative" }}>
+            <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Hyper-realistic luxury watch on black marble, dramatic side lighting, magazine photography..." style={{ ...inputStyle, minHeight: 120 }} />
+            {prompt.trim().length >= 3 && (
+              <ImagePromptEnhanceBtn prompt={prompt} setPrompt={setPrompt} projectId={projectId} />
+            )}
+          </div>
         </Section>
         <Section title="Negative prompt (opcional)">
           <textarea value={negativePrompt} onChange={e => setNegativePrompt(e.target.value)} placeholder="blurry, low-quality, watermark, text, logo..." style={{ ...inputStyle, minHeight: 60 }} />
@@ -748,7 +797,12 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
       </div>
       <div>
         <Section title="Prompt">
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Cinematic dolly-in product reveal, soft golden lighting, slow motion at 30fps..." style={{ ...inputStyle, minHeight: 100 }} />
+          <div style={{ position: "relative" }}>
+            <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Cinematic dolly-in product reveal, soft golden lighting, slow motion at 30fps..." style={{ ...inputStyle, minHeight: 100 }} />
+            {prompt.trim().length >= 3 && (
+              <VideoPromptEnhanceBtn prompt={prompt} setPrompt={setPrompt} projectId={projectId} />
+            )}
+          </div>
         </Section>
         <Section title="Duración / Aspecto">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

@@ -10,9 +10,15 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { MODEL_MAP, COST_MAP, NEGATIVE_PROMPT } from "./images.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
-import { generateVideoFromImage, type RunwayModel, type RunwayDuration, type RunwayRatio } from "../lib/runway.js";
+import { generateVideoFromImage as runwayGenerateVideo, type RunwayModel, type RunwayDuration, type RunwayRatio } from "../lib/runway.js";
 import { generateNanoBanana } from "../lib/nano-banana.js";
-import { fetchToBuffer } from "../lib/fusion-studio-pro.js";
+import {
+  fetchToBuffer,
+  generateVideoFromImage as fspGenerateVideo,
+  VIDEO_MODELS as FSP_VIDEO_MODELS,
+  modelSupportsTextToVideo,
+  type VideoModel as FSPVideoModel,
+} from "../lib/fusion-studio-pro.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
 const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
@@ -505,6 +511,7 @@ router.post("/fusion-studio/generate-photos", upload.array("images", 10), async 
       customScene,
       hasModel,
       referenceStyles,
+      engineOverride,
     } = req.body;
 
     let parsedModes: string[];
@@ -928,7 +935,8 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
         const chunk = replicatePrompts.slice(batch, batch + MAX_PARALLEL);
         const results = await Promise.allSettled(
           chunk.map(async (item) => {
-            const model = FUSION_MODEL_MAP[item.mode] || "black-forest-labs/flux-1.1-pro";
+            const defaultModel = FUSION_MODEL_MAP[item.mode] || "black-forest-labs/flux-1.1-pro";
+            const model = (engineOverride && typeof engineOverride === "string" && COST_MAP[engineOverride]) ? engineOverride : defaultModel;
             const cost = COST_MAP[model] ?? 0.04;
             const size = getOutputSize(item.mode, outputFormat || "");
 
@@ -936,13 +944,26 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
 
             const output = await replicateWithRetry(() => {
               let runPromise: Promise<unknown>;
+              const ar = size.width >= size.height ? `${size.width}:${size.height}` : `${size.width}:${size.height}`;
               if (model.includes("flux-1.1-pro")) {
                 runPromise = replicate.run(model as `${string}/${string}`, {
                   input: { prompt: item.replicatePrompt, negative_prompt: NEGATIVE_PROMPT, width: size.width, height: size.height, num_outputs: 1, output_format: "png", output_quality: 100 },
                 });
+              } else if (model.includes("flux-kontext")) {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, aspect_ratio: ar, output_format: "png" },
+                });
               } else if (model.includes("recraft")) {
                 runPromise = replicate.run(model as `${string}/${string}`, {
                   input: { prompt: item.replicatePrompt, size: `${size.width}x${size.height}`, style: "realistic_image" },
+                });
+              } else if (model.includes("ideogram")) {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, aspect_ratio: ar, magic_prompt_option: "AUTO" },
+                });
+              } else if (model.includes("imagen")) {
+                runPromise = replicate.run(model as `${string}/${string}`, {
+                  input: { prompt: item.replicatePrompt, aspect_ratio: ar, output_format: "png" },
                 });
               } else {
                 runPromise = replicate.run(model as `${string}/${string}`, {
@@ -1064,6 +1085,7 @@ router.get("/fusion-studio/video-models", (_req: Request, res: Response): void =
         integrated: true,
         maxDuration: 10,
         maxResolution: "1080p",
+        supportsT2V: false,
         strengths: ["Rapidez", "Coherencia temporal", "Prompt-driven camera"],
       },
       {
@@ -1076,79 +1098,125 @@ router.get("/fusion-studio/video-models", (_req: Request, res: Response): void =
         integrated: true,
         maxDuration: 10,
         maxResolution: "1080p",
+        supportsT2V: false,
         strengths: ["#1 Artificial Analysis", "Materiales fotorrealistas", "Estabilidad excepcional"],
       },
       {
-        key: "seedance_2",
-        label: "Seedance 2.0 (ByteDance)",
-        description: "Física de clase mundial, modo First-Last-Frame para encadenamiento, audio nativo sincronizado.",
-        costPerSec: 0.30,
-        provider: "seedance",
-        badge: "EXTERNO",
-        integrated: false,
-        externalUrl: "https://fal.ai/models/seedance",
+        key: "kling_master",
+        label: "Kling v2.1 Master",
+        description: "Máxima calidad de movimiento, audio nativo, multi-shot consistency. Vía Replicate.",
+        costPerSec: 0.18,
+        provider: "replicate",
+        badge: "PREMIUM",
+        integrated: true,
         maxDuration: 10,
         maxResolution: "1080p",
-        strengths: ["Mejor física", "FLF chaining 98%", "Audio nativo", "12 referencias mixtas"],
-        promptTips: [
-          "Usar modo first_last_frames para chaining secuencial",
-          "Incluir 'no morphing, rigid body physics, precise mechanical motion'",
-          "Especificar coordenadas espaciales exactas para posicionamiento",
-        ],
+        supportsT2V: true,
+        strengths: ["Top motion quality", "Audio nativo", "Multi-shot", "I2V + T2V"],
       },
       {
-        key: "kling_3",
-        label: "Kling 3.0 (Kuaishou)",
-        description: "Salida nativa 4K, Element Binding para identidad de producto, Motion Control para movimiento preciso.",
-        costPerSec: 0.25,
-        provider: "kling",
-        badge: "EXTERNO",
-        integrated: false,
-        externalUrl: "https://klingai.com",
-        maxDuration: 15,
-        maxResolution: "4K",
-        strengths: ["4K nativo", "Element Binding", "Motion Control", "Multi-shot consistency"],
-        promptTips: [
-          "Usar Element Binding para lock de producto entre clips",
-          "Motion Control: definir posición inicio/fin de cada componente",
-          "Especificar 'ease-in/ease-out kinetic curve' para movimiento mecánico",
-        ],
-      },
-      {
-        key: "pollo_2",
-        label: "Pollo.ai 2.0 (Agregador)",
-        description: "Acceso a Kling, Seedance, Runway, Hailuo, Pika desde UNA interfaz. Multi-Shot y transiciones integradas.",
-        costPerSec: 0.20,
-        provider: "pollo",
-        badge: "EXTERNO",
-        integrated: false,
-        externalUrl: "https://pollo.ai",
+        key: "kling_21",
+        label: "Kling v2.1",
+        description: "1080p con movimiento realista hasta 10s. Gran relación calidad/precio. Vía Replicate.",
+        costPerSec: 0.09,
+        provider: "replicate",
+        badge: "INTEGRADO",
+        integrated: true,
         maxDuration: 10,
         maxResolution: "1080p",
-        strengths: ["Agregador multi-modelo", "Multi-Shot mode", "Transiciones integradas", "Video Agent (Beta)"],
-        promptTips: [
-          "Fórmula universal: [Sujeto] + [Acción] + [Estilo] + [Cámara] + [Iluminación] + [Mood]",
-          "Usar Multi-Shot para secuencias consistentes de 5 clips",
-          "Video Agent automatiza el pipeline completo de generación",
-        ],
+        supportsT2V: true,
+        strengths: ["1080p realista", "Buen precio", "I2V + T2V", "Hasta 10s"],
       },
       {
-        key: "veo_31",
-        label: "Veo 3.1 (Google DeepMind)",
-        description: "Simulación de física líder, audio nativo ambiental, modo First+Last Frame, hasta 3 assets de referencia.",
-        costPerSec: 0.35,
-        provider: "veo",
-        badge: "EXTERNO",
-        integrated: false,
-        externalUrl: "https://deepmind.google/technologies/veo/",
+        key: "seedance_pro",
+        label: "Seedance Pro (ByteDance)",
+        description: "Calidad cinema, soporte multi-referencia (9 imágenes). Vía Replicate.",
+        costPerSec: 0.07,
+        provider: "replicate",
+        badge: "INTEGRADO",
+        integrated: true,
+        maxDuration: 10,
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["Cinema quality", "Multi-reference", "I2V + T2V", "Física precisa"],
+      },
+      {
+        key: "seedance_fast",
+        label: "Seedance Fast (ByteDance)",
+        description: "Versión rápida y económica de Seedance. Calidad profesional. Vía Replicate.",
+        costPerSec: 0.05,
+        provider: "replicate",
+        badge: "INTEGRADO",
+        integrated: true,
+        maxDuration: 10,
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["Rápido", "Económico", "I2V + T2V", "Calidad pro"],
+      },
+      {
+        key: "hailuo_02",
+        label: "Hailuo 02 (MiniMax)",
+        description: "Buen balance velocidad/calidad, hasta 6s. Vía Replicate.",
+        costPerSec: 0.05,
+        provider: "replicate",
+        badge: "INTEGRADO",
+        integrated: true,
+        maxDuration: 6,
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["Velocidad", "Balance calidad/precio", "I2V + T2V"],
+      },
+      {
+        key: "wan_25",
+        label: "Wan 2.5 (Open Source)",
+        description: "El más económico del mercado. Open-source. Solo image-to-video. Vía Replicate.",
+        costPerSec: 0.018,
+        provider: "replicate",
+        badge: "ECONÓMICO",
+        integrated: true,
+        maxDuration: 5,
+        maxResolution: "720p",
+        supportsT2V: false,
+        strengths: ["Ultra económico", "Open-source", "$0.018/s"],
+      },
+      {
+        key: "veo_3_fast",
+        label: "Veo 3 Fast (Google DeepMind)",
+        description: "Google Veo 3 rápido con audio nativo, 16:9. Vía Gemini API directa.",
+        costPerSec: 0.40,
+        provider: "gemini",
+        badge: "INTEGRADO",
+        integrated: true,
         maxDuration: 8,
-        maxResolution: "4K",
-        strengths: ["Mejor física de fluidos", "Audio ambiental nativo", "3 assets de referencia", "Video extension"],
-        promptTips: [
-          "Especificar 'dramatic volumetric shadows, octane render style' para look studio",
-          "Usar 'asset' type references (hasta 3) para lock de identidad de producto",
-          "Modo video extension: extender cada clip desde el anterior para continuidad",
-        ],
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["Audio nativo", "Rápido", "Google quality", "I2V + T2V"],
+      },
+      {
+        key: "veo_3",
+        label: "Veo 3 (Google DeepMind)",
+        description: "Máxima calidad Google, audio nativo ambiental, 16:9. Vía Gemini API directa.",
+        costPerSec: 0.75,
+        provider: "gemini",
+        badge: "PREMIUM",
+        integrated: true,
+        maxDuration: 8,
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["Audio nativo", "Física líder", "Google quality", "I2V + T2V"],
+      },
+      {
+        key: "veo_2",
+        label: "Veo 2 (Google DeepMind)",
+        description: "Soporta 9:16 y 16:9, hasta 8s. Sin audio. Vía Gemini API directa.",
+        costPerSec: 0.35,
+        provider: "gemini",
+        badge: "INTEGRADO",
+        integrated: true,
+        maxDuration: 8,
+        maxResolution: "1080p",
+        supportsT2V: true,
+        strengths: ["9:16 + 16:9", "Buen precio Gemini", "I2V + T2V"],
       },
     ],
     ratios: [
@@ -1185,10 +1253,6 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       res.status(400).json({ error: "projectId inválido" });
       return;
     }
-    if (!imageUrl || typeof imageUrl !== "string") {
-      res.status(400).json({ error: "imageUrl requerido" });
-      return;
-    }
     if (!promptText || typeof promptText !== "string" || promptText.trim().length < 3) {
       res.status(400).json({ error: "promptText requerido (mín. 3 caracteres)" });
       return;
@@ -1210,73 +1274,149 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       }
     }
 
-    const safeModel: RunwayModel = model === "gen4_turbo" ? "gen4_turbo" : "gen3a_turbo";
-    const safeDuration: RunwayDuration = Number(duration) === 10 ? 10 : 5;
-    // Un video Runway cuesta ~6× más que una imagen → contabilizar como créditos de imagen
-    // proporcionales a la duración (5s = 6 créditos, 10s = 12 créditos)
+    const safeDuration = Math.min(Math.max(Number(duration) || 5, 5), 10);
     const videoImageCredits = safeDuration === 10 ? 12 : 6;
     const limitCheck = await checkProductionLimit(pid, "image", videoImageCredits);
     if (!limitCheck.allowed) {
       res.status(429).json({ error: limitCheck.reason || "Límite de plan alcanzado" });
       return;
     }
+
+    const FSP_MODEL_MAP: Record<string, FSPVideoModel> = {
+      kling_master: "kling-master",
+      kling_21: "kling-2.1",
+      seedance_pro: "seedance-pro",
+      seedance_fast: "seedance-fast",
+      hailuo_02: "hailuo-02",
+      wan_25: "wan-2.5-fast",
+      veo_3_fast: "veo-3-fast",
+      veo_3: "veo-3",
+      veo_2: "veo-2",
+    };
+
+    const isRunway = model === "gen3a_turbo" || model === "gen4_turbo";
+    const fspModel = FSP_MODEL_MAP[model as string];
+    const isReplicate = !!fspModel;
+
+    if (!isRunway && !isReplicate) {
+      res.status(400).json({ error: `Modelo desconocido: ${model}. Usa gen3a_turbo, gen4_turbo, kling_master, kling_21, seedance_pro, seedance_fast, hailuo_02, wan_25, veo_3_fast, veo_3, veo_2.` });
+      return;
+    }
+
     const safeRatio: RunwayRatio = ALLOWED_RATIOS.includes(ratio) ? ratio : "1280:768";
     const safeSeed = typeof seed === "number" && Number.isFinite(seed) ? Math.floor(seed) : undefined;
+    const aspectMap: Record<string, string> = { "1280:768": "16:9", "768:1280": "9:16", "960:960": "1:1", "1104:832": "4:3", "832:1104": "3:4", "1584:672": "21:9" };
+    const aspect = aspectMap[safeRatio] || "9:16";
 
-    logger.info({ pid, model: safeModel, duration: safeDuration, ratio: safeRatio }, "Fusion Studio: generando video");
+    logger.info({ pid, model, provider: isRunway ? "runway" : "replicate/gemini", duration: safeDuration, ratio: safeRatio }, "Fusion Studio: generando video");
 
-    const result = await generateVideoFromImage({
-      promptImage: imageUrl,
-      promptText: promptText.trim(),
-      model: safeModel,
-      duration: safeDuration,
-      ratio: safeRatio,
-      seed: safeSeed,
-    });
+    let videoUrl: string;
+    let finalModel: string;
+    let finalDuration: number;
+    let cost: number;
+    let taskId: string | undefined;
 
-    await saveToVault({
-      projectId: pid,
-      fileType: "video",
-      category: "fusion-video",
-      title: `Fusion Video — ${promptText.trim().slice(0, 60)}`,
-      originalUrl: result.videoUrl,
-      mimeType: "video/mp4",
-      generatedBy: "runway",
-      metadata: {
-        model: result.model,
-        durationSec: result.durationSec,
+    if (isRunway) {
+      const safeModel: RunwayModel = model === "gen4_turbo" ? "gen4_turbo" : "gen3a_turbo";
+      const rwDuration: RunwayDuration = safeDuration >= 8 ? 10 : 5;
+      const result = await runwayGenerateVideo({
+        promptImage: imageUrl,
+        promptText: promptText.trim(),
+        model: safeModel,
+        duration: rwDuration,
         ratio: safeRatio,
-        promptText: promptText.trim().slice(0, 500),
-        sourceImage: imageUrl.slice(0, 500),
-        cost: result.cost,
-        taskId: result.taskId,
-      },
-    });
+        seed: safeSeed,
+      });
+      videoUrl = result.videoUrl;
+      finalModel = result.model;
+      finalDuration = result.durationSec;
+      cost = result.cost;
+      taskId = result.taskId;
+    } else {
+      let imageBuffer: Buffer | null = null;
+      const imageMime = "image/jpeg";
+      if (imageUrl && imageUrl.startsWith("http")) {
+        try { imageBuffer = await fetchToBuffer(imageUrl); } catch (e: any) {
+          logger.warn({ err: e?.message }, "Could not fetch source image, trying T2V");
+        }
+      }
+      if (!imageBuffer && !modelSupportsTextToVideo(fspModel!)) {
+        res.status(400).json({ error: `Modelo ${model} requiere imagen origen (no soporta text-to-video puro)` });
+        return;
+      }
+      const videoBuffer = await fspGenerateVideo(fspModel!, imageBuffer, imageMime, promptText.trim(), { duration: safeDuration, aspect });
+      const b64Content = videoBuffer.toString("base64");
+      const vaultId = await saveToVault({
+        projectId: pid,
+        fileType: "video",
+        category: "fusion-video",
+        title: `Fusion Video — ${promptText.trim().slice(0, 60)}`,
+        content: b64Content,
+        mimeType: "video/mp4",
+        fileSizeBytes: videoBuffer.length,
+        generatedBy: fspModel!,
+        metadata: {
+          model: fspModel,
+          durationSec: safeDuration,
+          ratio: safeRatio,
+          promptText: promptText.trim().slice(0, 500),
+          sourceImage: imageUrl?.slice(0, 500) || "text-to-video",
+          provider: FSP_VIDEO_MODELS[fspModel!]?.provider,
+        },
+      });
+      videoUrl = "";
+      if (vaultId) {
+        videoUrl = `${req.protocol}://${req.get("host")}/api/projects/${pid}/vault/${vaultId}/download`;
+      }
+      finalModel = fspModel!;
+      finalDuration = safeDuration;
+      cost = (FSP_VIDEO_MODELS[fspModel!]?.costPerSec || 0.05) * safeDuration;
+      taskId = undefined;
+    }
 
-    // FIX HIGH: recordUsage debe ser bloqueante; si falla tras generar el video,
-    // logueamos como ERROR (no warn) para que pueda auditarse y reconciliarse.
+    if (isRunway) {
+      await saveToVault({
+        projectId: pid,
+        fileType: "video",
+        category: "fusion-video",
+        title: `Fusion Video — ${promptText.trim().slice(0, 60)}`,
+        originalUrl: videoUrl,
+        mimeType: "video/mp4",
+        generatedBy: "runway",
+        metadata: {
+          model: finalModel,
+          durationSec: finalDuration,
+          ratio: safeRatio,
+          promptText: promptText.trim().slice(0, 500),
+          sourceImage: imageUrl.slice(0, 500),
+          cost,
+          taskId,
+        },
+      });
+    }
+
     try {
       await recordUsage(pid, "image", videoImageCredits);
     } catch (err) {
-      logger.error({ err, pid, videoImageCredits, taskId: result.taskId }, "CRITICAL: recordUsage falló tras generar video — créditos NO descontados");
+      logger.error({ err, pid, videoImageCredits, taskId }, "CRITICAL: recordUsage falló tras generar video — créditos NO descontados");
     }
 
     learnFromOperation({
       operationType: "fusion_video_generated",
       title: `Video generado: ${promptText.trim().slice(0, 80)}`,
-      content: `Video Runway ${result.model} ${result.durationSec}s ${safeRatio}. Coste $${result.cost.toFixed(2)}. Prompt: ${promptText.trim().slice(0, 200)}`,
+      content: `Video ${finalModel} ${finalDuration}s ${safeRatio}. Coste $${cost.toFixed(2)}. Prompt: ${promptText.trim().slice(0, 200)}`,
       confidence: 0.9,
-      tags: ["fusion-studio", "video", result.model],
+      tags: ["fusion-studio", "video", finalModel],
     });
 
     res.json({
       success: true,
-      videoUrl: result.videoUrl,
-      durationSec: result.durationSec,
-      model: result.model,
+      videoUrl,
+      durationSec: finalDuration,
+      model: finalModel,
       ratio: safeRatio,
-      cost: result.cost,
-      taskId: result.taskId,
+      cost,
+      taskId,
     });
   } catch (err: any) {
     if (!res.headersSent) {

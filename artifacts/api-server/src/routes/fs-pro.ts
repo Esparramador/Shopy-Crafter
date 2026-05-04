@@ -272,7 +272,7 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
     transitionPresets: Object.entries(TRANSITION_PRESETS).map(([k, v]) => ({
       key: k, label: v.label, xfade: v.xfade, defaultDurationSec: v.defaultDurationSec,
     })),
-    pollopaParity: [
+    proTools: [
       { key: "lip-sync", label: "Lip-sync (video↔audio)", description: "Sincronización labial sobre video existente" },
       { key: "burn-subs", label: "Subtítulos quemados (Whisper + FFmpeg)", description: "Transcribe el audio y quema los subs en el video" },
       { key: "transcribe", label: "Transcripción a SRT", description: "Genera SRT desde audio (Whisper)" },
@@ -284,7 +284,7 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       defaultAspect: t.defaultAspect, defaultDurationSec: t.defaultDurationSec,
     })),
     cinematicMultiShot: {
-      description: "Genera anuncios multi-shot cinematográficos al estilo Pollo Seedance 2.0: guion por escenas + keyframes + clips concatenados con crossfade + voz + música.",
+      description: "Genera anuncios multi-shot cinematográficos profesionales: guion por escenas + keyframes + clips concatenados con crossfade + voz + música.",
       styles: [
         { key: "cinematic",  label: "Cinematic 35mm", description: "Look anamórfico, golden hour, slow motion" },
         { key: "ugc",        label: "UGC handheld",   description: "Estilo creador, daylight, vertical nativo" },
@@ -305,7 +305,7 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       aspects: ["9:16", "16:9", "1:1"],
     },
     avatarStudio: {
-      description: "Pollo Avatar Studio: talking heads por nicho, product avatars y mimic motion. 15+ presets stock + soporte para foto custom.",
+      description: "Avatar Studio: talking heads por nicho, product avatars y mimic motion. 15+ presets stock + soporte para foto custom.",
       niches: ["beauty", "health", "fashion", "tech", "food", "home", "fitness", "finance"],
       avatars: AVATAR_LIBRARY.map((a) => ({
         id: a.id, name: a.name, niche: a.niche, gender: a.gender,
@@ -340,7 +340,7 @@ router.post("/fs-pro/providers/refresh-cache", requireAdmin, async (_req, res) =
   res.json({ ok: true });
 });
 
-// ─── PROMPT BUILDER (estilo pollo.ai) ─────────────────────────────────────
+// ─── PROMPT BUILDER (cinematográfico profesional) ─────────────────────────
 // GET /api/fs-pro/prompt/catalog → presets disponibles (style, lens, lighting...)
 router.get("/fs-pro/prompt/catalog", requireAdmin, (_req, res) => {
   res.json(getPromptCatalog());
@@ -1213,7 +1213,7 @@ router.post("/fs-pro/exploded-view/generate-sequence", requireAdmin, async (req:
 
     const criticalRules = QUALITY_RULES.filter(r => r.severity === "critical").map(r => `- ${r.rule}: ${r.rationale}`).join("\n");
 
-    const systemPrompt = `Eres un director de producción de vídeo con IA especializado en vistas explosionadas (Exploded View) de productos. Tu expertise cubre Pollo.ai, Seedance 2.0, Kling 3.0, Runway Gen-4.5, Veo 3.1, y Wan 2.1 FLF2V.
+    const systemPrompt = `Eres un director de producción de vídeo con IA especializado en vistas explosionadas (Exploded View) de productos. Tu expertise cubre Seedance Pro, Kling v2.1 Master, Runway Gen-4 Turbo, Veo 3, Hailuo 02 y Wan 2.5.
 
 CONTEXTO DEL GLOBAL STATE:
 ${gs ? gs.fullTemplate : GLOBAL_STATE_TEMPLATES[0].fullTemplate}

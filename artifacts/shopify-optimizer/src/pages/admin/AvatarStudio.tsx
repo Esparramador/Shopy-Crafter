@@ -144,7 +144,7 @@ export default function AvatarStudio() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: "var(--gold)" }}>🎬 Avatar Studio</h1>
         <p style={{ color: "var(--t3)", fontSize: 13, marginTop: 4 }}>
-          Genera videos de avatares hablando o avatares mostrando productos. Tipo Pollo.ai / Omneky pero integrado.
+          Genera videos de avatares hablando o avatares mostrando productos. Pipeline integrado multi-motor.
           Pipeline: imagen → video → voz ElevenLabs → mux → lip-sync (Replicate cudanexus/lipsync-v2).
         </p>
       </div>

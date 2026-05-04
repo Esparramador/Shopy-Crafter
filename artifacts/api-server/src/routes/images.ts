@@ -40,32 +40,39 @@ export const MODEL_MAP: Record<string, string> = {
 
 export const COST_MAP: Record<string, number> = {
   "black-forest-labs/flux-1.1-pro": 0.04,
+  "black-forest-labs/flux-1.1-pro-ultra": 0.06,
   "black-forest-labs/flux-dev": 0.025,
   "black-forest-labs/flux-schnell": 0.003,
+  "black-forest-labs/flux-kontext-pro": 0.05,
   "recraft-ai/recraft-v3": 0.022,
   "ideogram-ai/ideogram-v2": 0.08,
+  "ideogram-ai/ideogram-v3-turbo": 0.03,
   "stability-ai/stable-diffusion-3.5-large": 0.065,
   "google/imagen-3": 0.05,
+  "google/imagen-4-ultra": 0.06,
   svg_only: 0,
 };
 
-// Catálogo público de motores expuestos en la UI. Usado por GET /images/engines
-// y por el endpoint /generate para validar el override `engine` del usuario.
 export const IMAGE_ENGINES: Array<{
   id: string;
   label: string;
   model: string;
   cost: number;
   description: string;
+  provider: string;
   recommendedFor: string[];
 }> = [
-  { id: "flux-1-1-pro", label: "Flux 1.1 Pro", model: "black-forest-labs/flux-1.1-pro", cost: 0.04, description: "Calidad fotográfica premium. El mejor para hero y lifestyle.", recommendedFor: ["hero", "lifestyle", "bundle", "process"] },
-  { id: "flux-dev",     label: "Flux Dev",     model: "black-forest-labs/flux-dev",      cost: 0.025, description: "Más rápido y barato. Bueno para detalles y variantes.", recommendedFor: ["detail", "scale", "variant"] },
-  { id: "flux-schnell", label: "Flux Schnell (rápido)", model: "black-forest-labs/flux-schnell", cost: 0.003, description: "Ultra rápido y económico. Borradores y volumen.", recommendedFor: ["bulk", "draft"] },
-  { id: "recraft-v3",   label: "Recraft v3",   model: "recraft-ai/recraft-v3",           cost: 0.022, description: "Especialista en packaging, ilustración y UGC.", recommendedFor: ["packaging", "ugc"] },
-  { id: "ideogram-v2",  label: "Ideogram v2",  model: "ideogram-ai/ideogram-v2",         cost: 0.08,  description: "El mejor para imágenes con texto legible (carteles, badges).", recommendedFor: ["poster", "text"] },
-  { id: "sd35-large",   label: "Stable Diffusion 3.5 Large", model: "stability-ai/stable-diffusion-3.5-large", cost: 0.065, description: "Calidad alta, estilo flexible. Buen comodín.", recommendedFor: ["lifestyle", "creative"] },
-  { id: "imagen-3",     label: "Google Imagen 3", model: "google/imagen-3",              cost: 0.05,  description: "Realismo de Google. Bueno para fotorealismo limpio.", recommendedFor: ["hero", "lifestyle"] },
+  { id: "flux-1-1-pro",     label: "Flux 1.1 Pro",              model: "black-forest-labs/flux-1.1-pro",            cost: 0.04,  provider: "replicate", description: "Calidad fotográfica premium. El mejor para hero y lifestyle.", recommendedFor: ["hero", "lifestyle", "bundle", "process"] },
+  { id: "flux-ultra",       label: "Flux 1.1 Pro Ultra (4MP)",  model: "black-forest-labs/flux-1.1-pro-ultra",      cost: 0.06,  provider: "replicate", description: "Máxima calidad 4MP. Fotografía de catálogo profesional.", recommendedFor: ["hero", "lifestyle", "editorial"] },
+  { id: "flux-dev",         label: "Flux Dev",                  model: "black-forest-labs/flux-dev",                cost: 0.025, provider: "replicate", description: "Más rápido y barato. Bueno para detalles y variantes.", recommendedFor: ["detail", "scale", "variant"] },
+  { id: "flux-schnell",     label: "Flux Schnell (rápido)",     model: "black-forest-labs/flux-schnell",            cost: 0.003, provider: "replicate", description: "Ultra rápido y económico. Borradores y volumen.", recommendedFor: ["bulk", "draft"] },
+  { id: "flux-kontext",     label: "Flux Kontext Pro",          model: "black-forest-labs/flux-kontext-pro",        cost: 0.05,  provider: "replicate", description: "Mantiene consistencia entre imágenes (mismo personaje/estilo).", recommendedFor: ["series", "consistency", "character"] },
+  { id: "recraft-v3",       label: "Recraft v3",                model: "recraft-ai/recraft-v3",                     cost: 0.022, provider: "replicate", description: "Especialista en packaging, ilustración y UGC.", recommendedFor: ["packaging", "ugc"] },
+  { id: "ideogram-v2",      label: "Ideogram v2",               model: "ideogram-ai/ideogram-v2",                  cost: 0.08,  provider: "replicate", description: "El mejor para imágenes con texto legible (carteles, badges).", recommendedFor: ["poster", "text"] },
+  { id: "ideogram-v3",      label: "Ideogram v3 Turbo",         model: "ideogram-ai/ideogram-v3-turbo",            cost: 0.03,  provider: "replicate", description: "Texto + fotorealismo turbo. Rápido y preciso.", recommendedFor: ["poster", "text", "marketing"] },
+  { id: "sd35-large",       label: "Stable Diffusion 3.5",      model: "stability-ai/stable-diffusion-3.5-large",  cost: 0.065, provider: "replicate", description: "Calidad alta, estilo flexible. Buen comodín.", recommendedFor: ["lifestyle", "creative"] },
+  { id: "imagen-3",         label: "Google Imagen 3",           model: "google/imagen-3",                          cost: 0.05,  provider: "replicate", description: "Realismo de Google. Bueno para fotorealismo limpio.", recommendedFor: ["hero", "lifestyle"] },
+  { id: "imagen-4-ultra",   label: "Google Imagen 4 Ultra",     model: "google/imagen-4-ultra",                    cost: 0.06,  provider: "replicate", description: "Máxima calidad Google. Premium fotorealismo.", recommendedFor: ["hero", "lifestyle", "editorial"] },
 ];
 
 // Whitelist rápido para validar el override `engine` enviado por el cliente.

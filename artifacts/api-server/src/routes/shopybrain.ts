@@ -233,7 +233,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   "Social Proof & Reviews":            "Social Proof · Reviews · Testimonios · UGC · Trust",
   "Upsell & Cross-sell Strategies":    "Upsell · Cross-sell · Bundles · Estrategias de Ticket Medio",
   campaign_production:                 "Campaign Production · Video Campaigns · UGC · Storyboard · Lip Sync · Voice-Over · Master Cut",
-  exploded_view:                       "Exploded View Studio · Product Deconstruction · Assembly · Parallel Prompts · Seedance · Kling · Runway · Pollo.ai · Omneky",
+  exploded_view:                       "Exploded View Studio · Product Deconstruction · Assembly · Parallel Prompts · Seedance Pro · Kling v2.1 · Runway Gen-4 · Veo 3 · Hailuo 02",
 };
 
 export async function ensureAllKnowledgeDomains() {

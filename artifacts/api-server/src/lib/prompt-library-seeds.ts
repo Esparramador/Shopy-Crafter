@@ -45,10 +45,10 @@ export interface PromptSeed {
 
 // ─── 1) Anuncio cinematográfico multi-shot (basado en cinematic-multishot.ts:506)
 const SEED_AD_CINEMATIC: PromptSeed = {
-  name: "🎬 Anuncio cinematográfico multi-shot (Pollo / Seedance / Runway)",
+  name: "🎬 Anuncio cinematográfico multi-shot (Seedance / Kling / Runway / Veo)",
   description: "Director creativo senior. Genera guion JSON con N escenas listas para image+video models, con anti-text gate y preservación de marca.",
   useCase: "ad_cinematic",
-  systemPrompt: `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot tipo Pollo.ai / Seedance 2.0 / Runway Gen-3. Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.`,
+  systemPrompt: `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). Tu trabajo: escribir guiones donde cada escena ya viene "lista para producción" — un modelo image + un modelo video pueden ejecutar tus prompts LITERALMENTE sin reinterpretar nada. Devuelves SIEMPRE JSON válido sin texto fuera del JSON.`,
   userTemplate: `Genera el guion multi-shot para un anuncio de {{TOTAL_SECS}} segundos del producto "{{PRODUCT}}" de la marca "{{BRAND}}".
 
 BRIEF:
