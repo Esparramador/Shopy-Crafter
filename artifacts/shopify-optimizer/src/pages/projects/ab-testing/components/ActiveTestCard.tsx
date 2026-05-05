@@ -157,7 +157,9 @@ export function ActiveTestCard({ test, api, onUpdate }: Props) {
                   loadingText="Generando..." successText="Listo"
                   onAction={async () => {
                     const { reportUrl } = await api.generateReport(test.id);
-                    if (reportUrl) window.open(reportUrl, "_blank");
+                    if (!reportUrl) throw new Error("No se generó el informe");
+                    const w = window.open(reportUrl, "_blank", "noopener");
+                    if (!w) throw new Error("Bloqueado por el navegador. Permite ventanas emergentes.");
                   }}
                 >
                   Reporte

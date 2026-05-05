@@ -103,6 +103,8 @@ Located at `/projects/:id/ab-testing` (artifacts/shopify-optimizer/src/pages/pro
 - **Security**: `isPublicHttpUrl` SSRF guard blocks loopback/private/link-local hosts and forbids redirects on every outbound image fetch.
 - **Performance**: `_active` batches product+COGS lookups into Maps to avoid N+1; `shapeABTest` accepts an optional context with the prefetched maps.
 - **Routing fix**: the prior `GET /:testId` route now calls `next()` when the param is non-numeric or starts with `_`, so `/_kpis`, `/_active`, `/_history`, `/_products` reach their intended handlers without conflict.
+- **Real HTML report generation**: `POST /:testId/report` now writes a self-contained branded HTML report to `public/reports/ab-test-<id>-<ts>.html` and returns `{ reportUrl: "/api/reports/..." }`. Uses Claude (`askClaudeJsonWithBrain`) for executive narrative with deterministic fallback if AI fails. Report is print-to-PDF ready. The "Reporte" button in `ActiveTestCard` opens the URL in a new tab and throws on empty URL or popup-block (no silent fail).
+- **Per-project report ACL**: `reportAuth` middleware in `app.ts` parses the `testId` out of `ab-test-<id>-<ts>.html`, looks up its `projectId`, and gates access via `canAccessProject`. Non-AB report files keep the original login-only check so existing audits (`comic-crafter-audit-2026.html`, etc.) still work. Validated: admin sees 200, anon 403, unknown id 404.
 
 ### Pricing Module
 A complete pricing intelligence module at `/api/pricing/*` with 12 flat endpoints for product listing, KPIs, AI classification, COGS estimation (single and batch), batch job management, manual COGS updates, pricing simulation, AI optimization, Shopify price application, and A/B test creation.

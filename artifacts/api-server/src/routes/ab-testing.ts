@@ -8,6 +8,25 @@ import { safeDecrypt } from "../lib/crypto.js";
 import { requireProjectAccess } from "../lib/access.js";
 import { generateNanoBanana } from "../lib/nano-banana.js";
 import { logger } from "../lib/logger.js";
+import { promises as fsp } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __abFilename = fileURLToPath(import.meta.url);
+const __abDirname = path.dirname(__abFilename);
+const AB_REPORTS_DIR = path.join(__abDirname, "..", "public", "reports");
+
+function escapeHtml(s: unknown): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function fmtPct(n: number): string { return `${(n * 100).toFixed(2)}%`; }
+function fmtMoney(n: number, cur = "EUR"): string {
+  try { return new Intl.NumberFormat("es-ES", { style: "currency", currency: cur }).format(n || 0); }
+  catch { return `${(n || 0).toFixed(2)} ${cur}`; }
+}
+function fmtNum(n: number): string { return new Intl.NumberFormat("es-ES").format(Math.round(n || 0)); }
 
 const router = Router();
 
@@ -1342,17 +1361,271 @@ router.get("/projects/:projectId/ab-tests/:testId/stats", async (req, res): Prom
   }
 });
 
-router.post("/projects/:projectId/ab-tests/:testId/report", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/ab-tests/:testId/report", requireProjectAccess, async (req, res): Promise<void> => {
+  enableLongRunning(res);
   try {
-    const projectId = parseInt(req.params.projectId, 10);
-    const testId = parseInt(req.params.testId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const testId = parseInt(String(req.params.testId), 10);
     if (Number.isNaN(projectId) || Number.isNaN(testId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
+
     const [test] = await db.select().from(abTestsTable)
       .where(and(eq(abTestsTable.id, testId), eq(abTestsTable.projectId, projectId)));
     if (!test) { res.status(404).json({ error: "Test no encontrado" }); return; }
-    res.json({ reportUrl: "", test: await shapeABTest(test) });
+
+    const shaped = await shapeABTest(test) as Record<string, any>;
+    const stats = shaped.stats as Record<string, any>;
+    const product = shaped.product as Record<string, any>;
+    const config = shaped.config as Record<string, any>;
+    const currency = product?.currency || "EUR";
+    const isImage = test.testType === "image";
+    const winnerLetter = (test.winner as "A" | "B" | null) ?? (stats.isSignificant ? stats.winner : null);
+    const winnerLabel = winnerLetter ? `Variante ${winnerLetter}` : "Sin ganador estadístico todavía";
+
+    // Diferencias clave para narrativa
+    const cvrDelta = stats.variantB.conversionRate - stats.variantA.conversionRate;
+    const cvrLiftPct = stats.variantA.conversionRate > 0
+      ? (cvrDelta / stats.variantA.conversionRate) * 100 : 0;
+    const revenueDelta = stats.variantB.revenue - stats.variantA.revenue;
+
+    // Narrativa Claude (con fallback robusto)
+    type Narrative = {
+      executiveSummary: string;
+      keyFindings: string[];
+      recommendation: string;
+      risks: string[];
+      nextSteps: string[];
+    };
+    let narrative: Narrative = {
+      executiveSummary: `Test ${isImage ? "de imagen" : "de precio"} sobre "${test.productTitle}". ${stats.visitorsTotal} visitantes acumulados en ${stats.daysElapsed} días con ${stats.confidence.toFixed(1)}% de confianza estadística. ${winnerLabel}.`,
+      keyFindings: [
+        `Tasa de conversión A: ${fmtPct(stats.variantA.conversionRate)} · B: ${fmtPct(stats.variantB.conversionRate)} (Δ ${cvrLiftPct >= 0 ? "+" : ""}${cvrLiftPct.toFixed(1)}%)`,
+        `Ingresos A: ${fmtMoney(stats.variantA.revenue, currency)} · B: ${fmtMoney(stats.variantB.revenue, currency)} (Δ ${fmtMoney(revenueDelta, currency)})`,
+        `Significancia estadística: ${stats.isSignificant ? "alcanzada" : "no alcanzada"} (${stats.confidence.toFixed(1)}% / objetivo 95%)`,
+      ],
+      recommendation: stats.isSignificant && winnerLetter
+        ? `Aplicar la variante ${winnerLetter} en producción y monitorizar 14 días post-lanzamiento.`
+        : `Continuar el test ${stats.daysRemaining} días más o hasta alcanzar la muestra mínima.`,
+      risks: [],
+      nextSteps: [
+        stats.isSignificant ? "Aplicar ganador a Shopify desde el panel" : "Mantener el test activo",
+        "Documentar el aprendizaje en el Brain del proyecto",
+      ],
+    };
+
+    try {
+      const prompt = `Eres analista senior de A/B testing en e-commerce. Genera narrativa ejecutiva en español, profesional y sobria, basada SOLO en estos datos reales:
+
+PRODUCTO: ${test.productTitle}
+TIPO TEST: ${isImage ? "Imagen" : "Precio"}
+HIPÓTESIS: ${test.hypothesis || "(no especificada)"}
+MÉTRICA OBJETIVO: ${test.targetMetric}
+ESTADO: ${test.status}
+DÍAS TRANSCURRIDOS: ${stats.daysElapsed}
+VARIANTE A: visitantes=${stats.variantA.visitors}, conversiones=${stats.variantA.conversions}, CVR=${fmtPct(stats.variantA.conversionRate)}, ingresos=${fmtMoney(stats.variantA.revenue, currency)}, AOV=${fmtMoney(stats.variantA.aov, currency)}
+VARIANTE B: visitantes=${stats.variantB.visitors}, conversiones=${stats.variantB.conversions}, CVR=${fmtPct(stats.variantB.conversionRate)}, ingresos=${fmtMoney(stats.variantB.revenue, currency)}, AOV=${fmtMoney(stats.variantB.aov, currency)}
+CONFIANZA: ${stats.confidence.toFixed(1)}%
+SIGNIFICATIVO: ${stats.isSignificant}
+GANADOR ACTUAL: ${winnerLabel}
+
+Devuelve JSON estricto con esta forma exacta:
+{
+  "executiveSummary": "string 2-3 frases",
+  "keyFindings": ["string", "string", "string"],
+  "recommendation": "string accionable",
+  "risks": ["string"],
+  "nextSteps": ["string", "string"]
+}
+
+Reglas: nada de inventar cifras, no usar emojis, tono ejecutivo. Si los datos son insuficientes, dilo explícitamente.`;
+      const ai = await askClaudeJsonWithBrain<Narrative>(
+        projectId,
+        prompt,
+        "Eres un analista de e-commerce que produce informes ejecutivos en español. Solo respondes JSON válido.",
+        "general",
+        undefined,
+        2000,
+        45_000,
+      );
+      if (ai && typeof ai === "object" && ai.executiveSummary) {
+        narrative = {
+          executiveSummary: String(ai.executiveSummary),
+          keyFindings: Array.isArray(ai.keyFindings) ? ai.keyFindings.map(String).slice(0, 6) : narrative.keyFindings,
+          recommendation: String(ai.recommendation || narrative.recommendation),
+          risks: Array.isArray(ai.risks) ? ai.risks.map(String).slice(0, 5) : [],
+          nextSteps: Array.isArray(ai.nextSteps) ? ai.nextSteps.map(String).slice(0, 6) : narrative.nextSteps,
+        };
+      }
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : String(e) }, "[ab-report] Claude narrative failed, using fallback");
+    }
+
+    const generatedAt = new Date();
+    const fileName = `ab-test-${test.id}-${generatedAt.getTime()}.html`;
+    const filePath = path.join(AB_REPORTS_DIR, fileName);
+    await fsp.mkdir(AB_REPORTS_DIR, { recursive: true });
+
+    const variantAImg = isImage && test.variantAUrl ? `<img src="${escapeHtml(test.variantAUrl)}" alt="Variante A" />` : "";
+    const variantBImg = isImage && test.variantBUrl ? `<img src="${escapeHtml(test.variantBUrl)}" alt="Variante B" />` : "";
+    const variantAPriceRow = !isImage ? `<tr><td>Precio</td><td><strong>${fmtMoney(parseFloat(test.variantAPrice || "0"), currency)}</strong></td></tr>` : "";
+    const variantBPriceRow = !isImage ? `<tr><td>Precio</td><td><strong>${fmtMoney(parseFloat(test.variantBPrice || "0"), currency)}</strong></td></tr>` : "";
+
+    const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Informe A/B Test #${test.id} · ${escapeHtml(test.productTitle)}</title>
+<style>
+  :root { --bg:#0b0f17; --card:#111827; --line:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#7c3aed; --good:#10b981; --bad:#ef4444; --warn:#f59e0b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { border-bottom:1px solid var(--line); padding-bottom:24px; margin-bottom:32px; }
+  .eyebrow { color:var(--muted); text-transform:uppercase; letter-spacing:.12em; font-size:11px; font-weight:600; }
+  h1 { font-size:28px; margin:8px 0 6px; font-weight:700; }
+  h2 { font-size:18px; margin:32px 0 14px; font-weight:600; border-left:3px solid var(--accent); padding-left:12px; }
+  .meta { display:flex; gap:24px; flex-wrap:wrap; color:var(--muted); font-size:13px; }
+  .meta b { color:var(--text); font-weight:500; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+  .badge.win { background:rgba(16,185,129,.15); color:var(--good); }
+  .badge.warn { background:rgba(245,158,11,.15); color:var(--warn); }
+  .badge.muted { background:rgba(156,163,175,.15); color:var(--muted); }
+  .summary { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .card h3 { margin:0 0 12px; font-size:15px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .card img { width:100%; border-radius:10px; margin-bottom:12px; max-height:280px; object-fit:cover; background:#000; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  table td { padding:8px 0; border-bottom:1px solid var(--line); }
+  table td:first-child { color:var(--muted); }
+  table td:last-child { text-align:right; }
+  table tr:last-child td { border-bottom:0; }
+  ul { margin:0; padding-left:20px; }
+  ul li { margin-bottom:6px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .kpi .lbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  .kpi .val { font-size:22px; font-weight:700; margin-top:4px; }
+  footer { margin-top:48px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; text-align:center; }
+  @media print {
+    body { background:#fff; color:#000; }
+    .wrap { max-width:none; padding:24px; }
+    .summary,.card,.kpi { background:#fafafa; border-color:#ddd; color:#000; }
+    h2 { color:#000; }
+    .meta,.kpi .lbl,table td:first-child { color:#444; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Shopy Crafter · Informe A/B Test</div>
+    <h1>${escapeHtml(test.productTitle)}</h1>
+    <div class="meta">
+      <span><b>Test #${test.id}</b></span>
+      <span>Tipo: <b>${isImage ? "Imagen" : "Precio"}</b></span>
+      <span>Estado: <b>${escapeHtml(test.status)}</b></span>
+      <span>Inicio: <b>${test.startDate.toLocaleDateString("es-ES")}</b></span>
+      <span>Días transcurridos: <b>${stats.daysElapsed}</b></span>
+      <span>${stats.isSignificant
+        ? `<span class="badge win">${escapeHtml(winnerLabel)} · ${stats.confidence.toFixed(1)}%</span>`
+        : `<span class="badge warn">Sin significancia · ${stats.confidence.toFixed(1)}%</span>`}</span>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Visitantes totales</div><div class="val">${fmtNum(stats.visitorsTotal)}</div></div>
+    <div class="kpi"><div class="lbl">Conversiones (A+B)</div><div class="val">${fmtNum(stats.variantA.conversions + stats.variantB.conversions)}</div></div>
+    <div class="kpi"><div class="lbl">Ingresos totales</div><div class="val">${fmtMoney(stats.variantA.revenue + stats.variantB.revenue, currency)}</div></div>
+    <div class="kpi"><div class="lbl">Confianza</div><div class="val">${stats.confidence.toFixed(1)}%</div></div>
+  </div>
+
+  <h2>Resumen ejecutivo</h2>
+  <div class="summary">
+    <p style="margin:0 0 14px">${escapeHtml(narrative.executiveSummary)}</p>
+    <p style="margin:0"><b>Recomendación:</b> ${escapeHtml(narrative.recommendation)}</p>
+  </div>
+
+  <h2>Comparativa de variantes</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>Variante A · Control ${winnerLetter === "A" ? '<span class="badge win">Ganador</span>' : ""}</h3>
+      ${variantAImg}
+      <table>
+        ${variantAPriceRow}
+        <tr><td>Visitantes</td><td>${fmtNum(stats.variantA.visitors)}</td></tr>
+        <tr><td>Conversiones</td><td>${fmtNum(stats.variantA.conversions)}</td></tr>
+        <tr><td>Tasa conversión</td><td><strong>${fmtPct(stats.variantA.conversionRate)}</strong></td></tr>
+        <tr><td>Ingresos</td><td>${fmtMoney(stats.variantA.revenue, currency)}</td></tr>
+        <tr><td>AOV</td><td>${fmtMoney(stats.variantA.aov, currency)}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Variante B · Challenger ${winnerLetter === "B" ? '<span class="badge win">Ganador</span>' : ""}</h3>
+      ${variantBImg}
+      <table>
+        ${variantBPriceRow}
+        <tr><td>Visitantes</td><td>${fmtNum(stats.variantB.visitors)}</td></tr>
+        <tr><td>Conversiones</td><td>${fmtNum(stats.variantB.conversions)}</td></tr>
+        <tr><td>Tasa conversión</td><td><strong>${fmtPct(stats.variantB.conversionRate)}</strong></td></tr>
+        <tr><td>Ingresos</td><td>${fmtMoney(stats.variantB.revenue, currency)}</td></tr>
+        <tr><td>AOV</td><td>${fmtMoney(stats.variantB.aov, currency)}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Hallazgos clave</h2>
+  <div class="card"><ul>${narrative.keyFindings.map(k => `<li>${escapeHtml(k)}</li>`).join("")}</ul></div>
+
+  ${narrative.risks.length ? `<h2>Riesgos</h2><div class="card"><ul>${narrative.risks.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul></div>` : ""}
+
+  <h2>Próximos pasos</h2>
+  <div class="card"><ul>${narrative.nextSteps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>
+
+  <h2>Hipótesis y configuración</h2>
+  <div class="card">
+    <table>
+      <tr><td>Hipótesis</td><td style="text-align:left;max-width:60%">${escapeHtml(test.hypothesis || "—")}</td></tr>
+      <tr><td>Métrica objetivo</td><td>${escapeHtml(test.targetMetric)}</td></tr>
+      <tr><td>Tamaño muestra mínimo</td><td>${fmtNum(test.minimumSampleSize)}</td></tr>
+      <tr><td>Duración objetivo</td><td>${isImage ? 14 : 21} días</td></tr>
+      <tr><td>Estrategia ganador</td><td>${escapeHtml((config as any).winnerStrategy)}</td></tr>
+    </table>
+  </div>
+
+  <footer>
+    Generado por Shopy Crafter · ${generatedAt.toLocaleString("es-ES")} · Proyecto #${projectId}
+    <br/>Imprime esta página (Cmd/Ctrl + P) para guardar como PDF.
+  </footer>
+</div>
+</body>
+</html>`;
+
+    await fsp.writeFile(filePath, html, "utf8");
+
+    // Registrar en Brain (no bloqueante)
+    try {
+      learnFromOperation({
+        operationType: "ab_report",
+        title: `Informe A/B Test #${test.id} · ${test.productTitle}`,
+        content: `${narrative.executiveSummary}\n\nRecomendación: ${narrative.recommendation}`,
+        tags: ["ab_test", "report", isImage ? "imagen" : "precio"],
+        sourceProjectId: projectId,
+        relatedProductId: test.shopifyProductId,
+      });
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : String(e) }, "[ab-report] learnFromOperation failed");
+    }
+
+    res.json({
+      reportUrl: `/api/reports/${fileName}`,
+      fileName,
+      generatedAt: generatedAt.toISOString(),
+      test: shaped,
+    });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, "[ab-report] failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error generando informe" });
   }
 });
 

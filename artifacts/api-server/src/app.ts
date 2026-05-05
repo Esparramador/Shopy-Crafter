@@ -171,15 +171,36 @@ app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
 const __filename2 = fileURLToPath(import.meta.url);
 const __dirname2 = path.dirname(__filename2);
 const reportsDir = path.join(__dirname2, "..", "public", "reports");
-const reportAuth = (req: Request, res: Response, next: NextFunction): void => {
-  if (!(req.session as any)?.userId) {
+const reportAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const sess = req.session as { userId?: string; role?: string; clientId?: string | number | null } | undefined;
+  if (!sess?.userId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  // Per-project ownership check for A/B test reports: filename pattern `ab-test-<testId>-<ts>.html`
+  const filePath = req.path.replace(/^\/+/, "");
+  const abMatch = filePath.match(/^ab-test-(\d+)-\d+\.html$/);
+  if (abMatch) {
+    try {
+      const { db, abTestsTable } = await import("@workspace/db");
+      const { eq } = await import("drizzle-orm");
+      const { canAccessProject } = await import("./lib/access.js");
+      const testId = parseInt(abMatch[1], 10);
+      const [t] = await db.select({ projectId: abTestsTable.projectId })
+        .from(abTestsTable).where(eq(abTestsTable.id, testId)).limit(1);
+      if (!t) { res.status(404).json({ error: "Report not found" }); return; }
+      const ok = await canAccessProject(sess.role, sess.clientId, t.projectId);
+      if (!ok) { res.status(403).json({ error: "Forbidden" }); return; }
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : String(e) }, "[reportAuth] ab-test ownership check failed");
+      res.status(500).json({ error: "Auth check failed" });
+      return;
+    }
+  }
   next();
 };
-app.use("/api/reports", reportAuth, express.static(reportsDir));
-app.use("/reports", reportAuth, express.static(reportsDir));
+app.use("/api/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
+app.use("/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
