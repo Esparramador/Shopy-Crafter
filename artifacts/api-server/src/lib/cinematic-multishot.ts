@@ -13,6 +13,7 @@ import {
   concatVideos,
   sanitizeVideoPrompt,
   extractLastFrame,
+  applyPerSceneLipSync,
   CAMERA_PRESETS,
   type VideoModel,
   type ImageGenModel,
@@ -86,6 +87,16 @@ export interface CinematicMultiShotRequest {
     voiceModel?: "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
     voiceVolume?: number;
   };
+  /**
+   * INTELLIGENT PER-SCENE LIP-SYNC (UGC contract):
+   *  - Scenes tagged shotType='presenter' → Replicate lip-sync applied (mouth
+   *    moves with the speaker's words for that scene's slot).
+   *  - Scenes tagged 'b_roll'/'product'  → clip kept as-is (the SAME continuous
+   *    voiceover plays over them as voice-over of the same speaker).
+   *  Default: ON when narration is enabled AND at least one scene is a presenter.
+   *  Set to false to disable explicitly (e.g. ad with no humans at all).
+   */
+  intelligentLipSync?: boolean;
   music?: {
     enabled: boolean;
     prompt?: string;
@@ -906,31 +917,10 @@ export async function generateCinematicMultiShot(
     ).then((arr) => arr.sort((a, b) => a.idx - b.idx));
   }
 
-  // ── 4. Concat with cinematic crossfade (or hard cut for locked-shot) ────
-  // locked-shot: crossfade=0 because last-frame chaining means clip[N].first ==
-  // clip[N-1].last byte-for-byte → a hard cut is INVISIBLE; a crossfade would
-  // actually break the illusion by blending the same frame with itself.
-  const lockedShot = req.compositionMode === "locked-shot";
-  const concatenated = await concatVideos({
-    videoBuffers: clips.map((c) => c.buffer),
-    width,
-    height,
-    fps: 30,
-    crossfadeSec: lockedShot ? 0 : (clips.length > 1 ? 0.4 : 0),
-    transitionPreset: lockedShot
-      ? "hard_cut"
-      : req.style === "energetic"
-        ? "hard_cut"
-        : req.style === "luxury"
-          ? "fade_to_black"
-          : req.style === "tech"
-            ? "glitch_pixel"
-            : "cross_dissolve",
-    clipDurationsSec: clips.map((c) => c.durationSec),
-  });
-  logger.info({ concatBytes: concatenated.length }, "🎬 concat ready");
-
-  // ── 5. Voiceover (optional) ─────────────────────────────────────────────
+  // ── 4. Voiceover (optional) — NOW RUN BEFORE CONCAT so we can slice it
+  //       per-scene for intelligent lip-sync (presenter scenes get Replicate
+  //       wav2lip on their slot of the voiceover; b-roll/product scenes keep
+  //       their original visual and the SAME continuous voice plays as VO).
   let voiceoverBuffer: Buffer | undefined;
   if (req.narration?.enabled) {
     const fullScript = script.scenes.map((s) => s.voiceoverLine).join(" ");
@@ -940,9 +930,105 @@ export async function generateCinematicMultiShot(
         modelId: req.narration.voiceModel || "eleven_multilingual_v2",
         languageCode: req.language.length === 2 ? req.language : undefined,
       });
-      logger.info({ voiceBytes: voiceoverBuffer.length }, "🎬 voiceover ready");
+      logger.info({ voiceBytes: voiceoverBuffer.length }, "🎬 voiceover ready (pre-concat)");
     }
   }
+
+  // ── 4.5. Per-scene intelligent lip-sync ─────────────────────────────────
+  // Decide hasPerson per scene from shotType:
+  //   - "presenter"          → person on screen → MUST lip-sync
+  //   - "b_roll" | "product" → NO person on screen → voice-over (skip)
+  //   - undefined (legacy)   → infer from sceneCharacterRefs (character lock
+  //                            applied → assume presenter; else b_roll).
+  // intelligentLipSync defaults to TRUE when narration enabled AND at least
+  // one scene is a presenter. Disabled if no voice (nothing to sync) or if
+  // no person ever appears (pure product ad).
+  const sceneHasPerson = (s: CinematicScene): boolean => {
+    if (s.shotType === "presenter") return true;
+    if (s.shotType === "b_roll" || s.shotType === "product") return false;
+    // Legacy fallback: presenter if character is locked into this scene.
+    return Boolean(sceneCharacterRefs(s));
+  };
+  const presenterCount = script.scenes.reduce((n, s) => n + (sceneHasPerson(s) ? 1 : 0), 0);
+  const lipSyncEnabled = (req.intelligentLipSync !== false)
+    && Boolean(voiceoverBuffer)
+    && presenterCount > 0;
+
+  // CRITICAL: pass the same crossfadeSec the concat step will use. Otherwise
+  // per-scene audio slices drift earlier than the spoken voice by i*crossfade
+  // seconds in clip i (e.g. 4s of drift after 10 shots with 0.4s xfade).
+  const lockedShotForLipSync = req.compositionMode === "locked-shot";
+  const crossfadeForLipSync = lockedShotForLipSync ? 0 : (clips.length > 1 ? 0.4 : 0);
+  // The FINAL video duration after concat removes (N-1) * crossfade seconds
+  // of overlap from the raw sum of clip durations. We must align the voice
+  // slicing to this final timeline, NOT the raw sum.
+  const rawTotalSec = clips.reduce((s, c) => s + c.durationSec, 0);
+  const finalConcatSec = clips.length > 1 && crossfadeForLipSync > 0
+    ? Math.max(0.5, rawTotalSec - crossfadeForLipSync * (clips.length - 1))
+    : rawTotalSec;
+
+  let renderClips = clips;
+  if (lipSyncEnabled && voiceoverBuffer) {
+    logger.info({
+      totalScenes: script.scenes.length,
+      presenterScenes: presenterCount,
+      voiceOverScenes: script.scenes.length - presenterCount,
+      finalConcatSec,
+      crossfadeSec: crossfadeForLipSync,
+    }, "🎙 intelligent lip-sync: starting per-scene processing (crossfade-aware)");
+    try {
+      const synced = await applyPerSceneLipSync({
+        clips: clips.map((c, i) => ({
+          idx: c.idx,
+          buffer: c.buffer,
+          mime: c.mime,
+          durationSec: c.durationSec,
+          hasPerson: sceneHasPerson(script.scenes[i]),
+        })),
+        voiceBuffer: voiceoverBuffer,
+        totalVideoSec: finalConcatSec,
+        crossfadeSec: crossfadeForLipSync,
+        concurrency: 2,
+      });
+      // Preserve scene metadata; only swap the buffer (lip-synced when applicable).
+      renderClips = clips.map((c, i) => ({
+        idx: c.idx,
+        buffer: synced[i]?.buffer ?? c.buffer,
+        mime: synced[i]?.mime ?? c.mime,
+        durationSec: c.durationSec,
+      }));
+      logger.info({ syncedClips: renderClips.length }, "🎙 intelligent lip-sync: done");
+    } catch (err: any) {
+      // FAIL-SOFT: if per-scene lip-sync orchestration crashes, ship the
+      // original clips. The voice-over will still play correctly (mux
+      // happens later); only mouth animation is lost on presenter shots.
+      logger.error({ err: err?.message }, "🎙 intelligent lip-sync FAILED — shipping original clips with voice-over only");
+    }
+  }
+
+  // ── 5. Concat with cinematic crossfade (or hard cut for locked-shot) ────
+  // locked-shot: crossfade=0 because last-frame chaining means clip[N].first ==
+  // clip[N-1].last byte-for-byte → a hard cut is INVISIBLE; a crossfade would
+  // actually break the illusion by blending the same frame with itself.
+  const lockedShot = req.compositionMode === "locked-shot";
+  const concatenated = await concatVideos({
+    videoBuffers: renderClips.map((c) => c.buffer),
+    width,
+    height,
+    fps: 30,
+    crossfadeSec: lockedShot ? 0 : (renderClips.length > 1 ? 0.4 : 0),
+    transitionPreset: lockedShot
+      ? "hard_cut"
+      : req.style === "energetic"
+        ? "hard_cut"
+        : req.style === "luxury"
+          ? "fade_to_black"
+          : req.style === "tech"
+            ? "glitch_pixel"
+            : "cross_dissolve",
+    clipDurationsSec: renderClips.map((c) => c.durationSec),
+  });
+  logger.info({ concatBytes: concatenated.length }, "🎬 concat ready");
 
   // ── 6. Music (optional) ─────────────────────────────────────────────────
   let musicBuffer: Buffer | undefined;

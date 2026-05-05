@@ -230,8 +230,9 @@ Devuelve este JSON exacto:
        { "idx": <int>, "act": "<actName>", "timeStartSec": <int>, "timeEndSec": <int>,
          "sceneDescription": "${req.compositionMode === "composite-pro" ? "[FOREGROUND] ... [BACKGROUND] ..." : "narrativa de la escena, integrando directrices de composición"}",
          "cameraMovement": "movimiento exacto (dolly-in lento, orbit, push-in macro, static lock-off, whip-pan, etc.)",
+         "shotType": "<'presenter' | 'b_roll' | 'product'> — OBLIGATORIO. Reglas: 'presenter' = la persona/host está visible EN cámara hablando o gesticulando hacia el espectador (cualquier plano donde se vea su CARA, BOCA o medio cuerpo frontal — boca visible y susceptible de lip-sync); 'b_roll' = inserto narrativo (manos usando el producto, contexto, ambiente, lifestyle) sin cara visible; 'product' = primer plano/macro de PRODUCTO solo, sin persona alguna. SI ESTÁS EN DUDA y se ve cualquier cara humana → 'presenter'. En modo explainer-locked → SIEMPRE 'presenter' (host anclado center-frame).",
          "keyframePrompt": "prompt EN INGLÉS >=90 palabras (subject+composition+camera+lighting+palette+product DNA literal+8k photoreal)${req.compositionMode === "explainer-locked" ? ". Incluir: 'host anchored center-frame, static foreground, dynamic background composition'" : ""}",
-         "videoPrompt": "prompt EN INGLÉS 40-90 palabras (cámara+easing+movimiento intra-plano+atmósfera)${req.compositionMode === "explainer-locked" ? ". Forzar 'character static, only background composition shifts'" : ""}",
+         "videoPrompt": "prompt EN INGLÉS 40-90 palabras (cámara+easing+movimiento intra-plano+atmósfera)${req.compositionMode === "explainer-locked" ? ". Forzar 'character static, only background composition shifts'" : ""}. Si shotType='presenter', el videoPrompt DEBE incluir 'subject visibly speaking to camera, natural lip movement, expressive mouth motion synchronized to speech, soft micro-gestures'. Si shotType='b_roll'/'product', el videoPrompt NO debe mostrar bocas hablando (el audio será voz en off).",
          "voiceoverLine": "frase en ${req.language} (~${Math.round(req.totalDurationSec * 2.5 / plan.length)} palabras), ENCADENADA con la anterior" }
 
        Usa estos timings EXACTOS por idx: ${plan.map((s) => `${s.idx}=[${s.startSec}-${s.endSec},act:${s.act}]`).join("; ")}
@@ -243,6 +244,7 @@ REGLAS DURAS:
 - EXACTAMENTE ${plan.length} escenas en el array.
 - timeStartSec/timeEndSec respetan exactamente las duraciones indicadas arriba.
 - voiceoverLine en ${req.language}; keyframePrompt y videoPrompt en INGLÉS.
+- shotType es OBLIGATORIO en CADA escena. Coherencia de la voz: el voiceoverLine de un plano 'presenter' será lip-synced; el de 'b_roll'/'product' sonará como VOZ EN OFF del MISMO speaker. Por tanto, la frase debe sonar natural en ambos modos (no decir "como puedes ver aquí" si la cámara está en macro de producto sin persona — usar lenguaje que funcione tanto en boca visible como en off). En anuncios UGC, alterna 'presenter' y 'b_roll' de forma realista (típicamente 60-70% presenter, 30-40% b_roll/product).
 - NUNCA cambies la identidad del personaje ni del producto (usa los bloques de identidad).
 - ANTI-TEXTO NUEVO (regla matizada): keyframePrompt y videoPrompt NUNCA contienen el nombre
   de la marca, del producto, el CTA, el precio, ni ninguna palabra que el modelo deba RENDERIZAR

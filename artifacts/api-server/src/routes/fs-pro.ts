@@ -2505,6 +2505,7 @@ router.post(
         musicVolume, productVaultId,
         savedPromptId, script: scriptJsonStr,
         characterName, characterIdentityPrompt,
+        intelligentLipSync: lipSyncStr,
       } = req.body;
       const projectId = parseInt(pidStr || "0", 10);
       if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
@@ -2573,6 +2574,10 @@ router.post(
           prompt: musicPrompt ? String(musicPrompt) : undefined,
           volume: musicVolume ? parseFloat(musicVolume) : 0.22,
         } : undefined,
+        // Intelligent per-scene lip-sync: explicit override (string "false"
+        // disables; anything else lets the engine decide — defaults to ON when
+        // narration is enabled and at least one scene has a person on camera).
+        intelligentLipSync: lipSyncStr === "false" || lipSyncStr === false ? false : undefined,
         presetScript,
         savedPromptId: savedPromptId ? String(savedPromptId) : undefined,
         // Character lock — only attached when the client uploads a presenter

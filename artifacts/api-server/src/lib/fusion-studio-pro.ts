@@ -1432,6 +1432,161 @@ export async function lipSyncVideoToAudio(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 15.5: PER-SCENE INTELLIGENT LIP-SYNC
+// ───────────────────────────────────────────────────────────────────────────
+// UGC contract: "person on screen → mouth must lip-sync; person off screen
+// (b-roll / product macro) → same speaker continues as voice-over". This
+// helper takes the FULL continuous voiceover (one ElevenLabs render — same
+// timbre, same speaker, coherent speech) and a list of scene clips with
+// their `hasPerson` flag, then:
+//   1. Slices the voiceover into per-scene segments by timeline offsets
+//   2. For each `hasPerson=true` clip → runs Replicate lip-sync against its
+//      audio segment (the lips will move EXACTLY when the speaker says those
+//      words during that scene's slot)
+//   3. For each `hasPerson=false` clip → returns the visual unchanged
+//      (the same continuous voiceover will be muxed on top in compose step
+//      → naturally becomes voice-over for that shot)
+// Result: the FINAL video has ONE continuous voice across all scenes, but
+// the lips only move when there's a person visible. Switching between
+// presenter and product shots feels organic — the speaker never "stops".
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PerSceneLipSyncClip {
+  idx: number;
+  buffer: Buffer;
+  mime: string;
+  durationSec: number;
+  hasPerson: boolean;
+}
+
+/**
+ * Slice an audio buffer into a [startSec, endSec] segment using ffmpeg atrim.
+ * Returns an mp3 buffer of exactly the requested duration.
+ */
+async function sliceAudioSegment(audioBuffer: Buffer, startSec: number, endSec: number): Promise<Buffer> {
+  const dur = Math.max(0.1, endSec - startSec);
+  const tmp = await makeTmpDir("audioslice");
+  try {
+    const inPath = path.join(tmp, "in.mp3");
+    const outPath = path.join(tmp, "out.mp3");
+    await fs.writeFile(inPath, audioBuffer);
+    const ffmpeg: any = await loadFfmpeg();
+    return await new Promise<Buffer>((resolve, reject) => {
+      ffmpeg(inPath)
+        .setStartTime(startSec.toFixed(3))
+        .duration(dur.toFixed(3))
+        .audioCodec("libmp3lame")
+        .audioBitrate("192k")
+        .outputOptions(["-ac 1", "-ar 24000"])
+        .on("end", async () => {
+          try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        })
+        .on("error", reject)
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Apply per-scene lip-sync to a list of clips using a single continuous
+ * voiceover. Only `hasPerson=true` clips are sent to Replicate (expensive);
+ * the rest are returned unchanged. Failures on individual clips fall back to
+ * the original clip (the voice-over still sounds correct over the muxed audio
+ * — only the lip animation is missing for that one shot).
+ *
+ * Concurrency: max 2 lip-sync jobs in parallel (Replicate quota friendly).
+ */
+export async function applyPerSceneLipSync(opts: {
+  clips: PerSceneLipSyncClip[];
+  voiceBuffer: Buffer;
+  totalVideoSec: number;
+  /**
+   * Crossfade duration (seconds) that the downstream concat will apply
+   * between consecutive clips. CRITICAL for sync: each clip starts in the
+   * final timeline at `cumulative_duration - i*crossfade` (xfade overlaps
+   * the tail of the previous clip with the head of the next). If we ignore
+   * this, lip movements drift earlier than the audio by `i*crossfade`
+   * seconds in clip i (e.g. 4s of drift after 10 clips with 0.4s xfade).
+   * Pass 0 for hard-cut concat (locked-shot mode).
+   */
+  crossfadeSec?: number;
+  model?: string;
+  concurrency?: number;
+}): Promise<Array<{ idx: number; buffer: Buffer; mime: string; durationSec: number }>> {
+  const { clips, voiceBuffer, totalVideoSec } = opts;
+  if (!clips.length) return [];
+  const crossfade = Math.max(0, opts.crossfadeSec ?? 0);
+
+  // Fit the voice exactly to the total FINAL video duration so per-scene
+  // offsets align perfectly with what the user will hear in the muxed result.
+  // totalVideoSec MUST already account for crossfade overlaps (the caller
+  // passes the post-concat duration, not the raw sum of clip durations).
+  const fittedVoice = await fitVoiceToVideo(voiceBuffer, totalVideoSec);
+
+  // Compute per-clip START offsets in the FINAL timeline. With crossfade,
+  // each clip after the first starts `crossfade` seconds EARLIER than the
+  // naive cumulative sum would suggest, because xfade reuses the previous
+  // clip's tail as the next clip's head. Without this correction, the lip
+  // motion drifts earlier than the spoken audio in every subsequent shot.
+  //   T_0 = 0
+  //   T_i = T_{i-1} + duration[i-1] - crossfade   (for i >= 1)
+  // The slice END is T_i + duration[i] (we lip-sync the FULL clip duration;
+  // the xfade visual blend at the head/tail handles the seam smoothly).
+  const offsets: Array<{ start: number; end: number }> = [];
+  let cursor = 0;
+  for (let i = 0; i < clips.length; i++) {
+    const c = clips[i];
+    offsets.push({ start: cursor, end: Math.min(totalVideoSec, cursor + c.durationSec) });
+    // Advance cursor: full clip duration MINUS the crossfade overlap with the
+    // next clip (no overlap after the last clip).
+    cursor += c.durationSec - (i < clips.length - 1 ? crossfade : 0);
+  }
+
+  const concurrency = Math.max(1, Math.min(4, opts.concurrency ?? 2));
+  const results: Array<{ idx: number; buffer: Buffer; mime: string; durationSec: number }> = new Array(clips.length);
+  let i = 0;
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (true) {
+      const k = i++;
+      if (k >= clips.length) return;
+      const clip = clips[k];
+      const off = offsets[k];
+      if (!clip.hasPerson) {
+        results[k] = { idx: clip.idx, buffer: clip.buffer, mime: clip.mime, durationSec: clip.durationSec };
+        logger.info({ sceneIdx: clip.idx, durationSec: clip.durationSec }, "🎙 lip-sync SKIP (no person — voice-over)");
+        continue;
+      }
+      try {
+        const segment = await sliceAudioSegment(fittedVoice, off.start, off.end);
+        const synced = await lipSyncVideoToAudio(clip.buffer, segment, {
+          model: opts.model,
+          videoMime: clip.mime,
+          audioMime: "audio/mpeg",
+        });
+        results[k] = { idx: clip.idx, buffer: synced, mime: "video/mp4", durationSec: clip.durationSec };
+        logger.info({
+          sceneIdx: clip.idx,
+          startSec: off.start.toFixed(2),
+          endSec: off.end.toFixed(2),
+          inBytes: clip.buffer.length,
+          outBytes: synced.length,
+        }, "🎙 lip-sync APPLIED (presenter scene)");
+      } catch (err: any) {
+        logger.warn({
+          sceneIdx: clip.idx,
+          err: err?.message,
+        }, "🎙 lip-sync FAILED for scene — falling back to original clip (voice-over still works)");
+        results[k] = { idx: clip.idx, buffer: clip.buffer, mime: clip.mime, durationSec: clip.durationSec };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY 16: ASR (audio → SRT subtitles via Replicate Whisper)
 // ═══════════════════════════════════════════════════════════════════════════
 
