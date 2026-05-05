@@ -24,6 +24,14 @@ An extensible `IPlatformConnector` abstraction layer supports Shopify, PrestaSho
 ### AI Stack (Single Brain Architecture — MEGA-BRAIN)
 "ShopyBrain" is the central mega-brain, a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. A centralized model registry allows administrators to change which Claude/Gemini model powers each task tier. Critical actions validate path whitelists, block sensitive files, and require explicit confirmation. All routes with AI operations feed `learnFromOperation`, enabling retroactive learning. Gemini Search Grounding 403 errors are handled via circuit breaker with automatic Claude fallback.
 
+### Generation Engine Catalog (Fusion Studio Pro)
+Centralized in `artifacts/api-server/src/lib/fusion-studio-pro.ts`, exposed automatically to the frontend via `/api/fs-pro/models` (the dropdowns iterate `Object.entries(IMAGE_MODELS)` / `VIDEO_MODELS`, so new entries appear without UI changes).
+- **IMAGE_MODELS (13):** flux-1.1-pro-ultra, flux-1.1-pro-ultra-raw (naturalistic), flux-1.1-pro, flux-schnell, recraft-v3, ideogram-v3-turbo, imagen-4-ultra, imagen-4, imagen-4-fast, **nano-banana** (Gemini 2.5 Flash Image, v1), **nano-banana-pro** (Gemini 3 Pro Image / "Nano Banana 2", 4K), seedream-4 (ByteDance), flux-kontext-pro.
+- **IMAGE_EDIT_MODELS (5):** nano-banana, nano-banana-pro, flux-kontext-pro, seedream-4, gen4-image-edit (Runway).
+- **VIDEO_MODELS (17):** runway-gen4-turbo, runway-gen3-alpha, **veo-3.1**, **veo-3.1-fast**, veo-3, veo-3-fast, veo-2, **sora-2** (OpenAI vía Replicate, 4/8/12s), kling-master, **kling-2.5-turbo** (kwaivgi/kling-v2.5-turbo-pro), kling-2.1, seedance-pro, seedance-fast, **hailuo-02-fast**, hailuo-02, **wan-2.5** (full), wan-2.5-fast.
+- Nano Banana (v1 + Pro) usa Gemini API directa con fallback automático a Replicate (`google/nano-banana` / `google/nano-banana-pro`) gestionado por circuit breaker en `nano-banana.ts` (parámetro `tier: "v1" | "pro"`).
+- Veo 3.0 fija 16:9; Veo 2 y Veo 3.1 soportan también 9:16. Sora 2 admite landscape/portrait con 4/8/12s.
+
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Advanced Financial Intelligence provides break-even units, LTV 12-month estimation, LTV/CAC ratio, supply chain risk assessment, and defensive moat strategy, powered by Claude. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, Gallery, and Multi-Platform Video Generation.
 

@@ -14,10 +14,20 @@ export type NanoBananaOpts = {
   references?: NanoBananaRef[];
   replicateToken?: string;
   outputFormat?: "png" | "jpg";
+  /** Quality tier. "v1" = Gemini 2.5 Flash Image (fast/cheap, default).
+   *  "pro" = Gemini 3 Pro Image / nano-banana-pro (4K, sharper, premium). */
+  tier?: NanoBananaTier;
 };
 
-const MODEL_GEMINI = "gemini-2.5-flash-image";
-const MODEL_REPLICATE = "google/nano-banana";
+// ── Nano Banana v1 (Gemini 2.5 Flash Image) — fast, cheap, brand-consistent
+const MODEL_GEMINI_V1 = "gemini-2.5-flash-image";
+const MODEL_REPLICATE_V1 = "google/nano-banana";
+// ── Nano Banana v2 / Pro (Gemini 3 Pro Image) — 4K, sharper text rendering,
+//    better identity lock, top-tier reasoning. Released Nov 2025.
+const MODEL_GEMINI_V2 = "gemini-3-pro-image-preview";
+const MODEL_REPLICATE_V2 = "google/nano-banana-pro";
+
+export type NanoBananaTier = "v1" | "pro";
 
 // Circuit breaker: when Gemini fails with a configuration-level error
 // (invalid key, no permission), all subsequent requests skip Gemini for
@@ -122,8 +132,9 @@ async function tryGemini(
   const config: any = { responseModalities: ["IMAGE"] };
   if (opts.aspectRatio) config.imageConfig = { aspectRatio: opts.aspectRatio };
 
+  const geminiModel = opts.tier === "pro" ? MODEL_GEMINI_V2 : MODEL_GEMINI_V1;
   const result = await ai.models.generateContent({
-    model: MODEL_GEMINI,
+    model: geminiModel,
     contents,
     config,
   });
@@ -162,7 +173,8 @@ async function tryReplicate(
     input.image_input = refs.map((r) => bufferToDataUri(r.buffer, r.mimeType || "image/png"));
   }
 
-  const output = await rep.run(MODEL_REPLICATE as `${string}/${string}`, { input });
+  const replicateModel = opts.tier === "pro" ? MODEL_REPLICATE_V2 : MODEL_REPLICATE_V1;
+  const output = await rep.run(replicateModel as `${string}/${string}`, { input });
   const raw = Array.isArray(output) ? output[0] : output;
 
   let url: any;

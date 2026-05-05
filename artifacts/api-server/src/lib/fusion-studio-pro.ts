@@ -104,32 +104,44 @@ function getElevenKey(): string {
 
 export type ImageGenModel =
   | "flux-1.1-pro-ultra"        // 4MP photoreal, best Flux
+  | "flux-1.1-pro-ultra-raw"    // 4MP raw mode (naturalistic, no AI sheen)
   | "flux-1.1-pro"              // standard pro Flux
   | "flux-schnell"              // fastest, cheap
   | "recraft-v3"                // BEST for text on image (logos, posters)
   | "ideogram-v3-turbo"         // text + photoreal
-  | "imagen-4-ultra"            // Google Imagen 4
-  | "nano-banana"               // Gemini 2.5 Flash Image
+  | "imagen-4-ultra"            // Google Imagen 4 Ultra (premium)
+  | "imagen-4"                  // Google Imagen 4 (standard)
+  | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
+  | "nano-banana"               // Gemini 2.5 Flash Image (v1)
+  | "nano-banana-pro"           // Gemini 3 Pro Image (v2, 4K, top-tier)
+  | "seedream-4"                // ByteDance Seedream 4 (text + photoreal)
   | "flux-kontext-pro";         // Flux Kontext for character consistency
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
 export type ImageProvider = "replicate" | "gemini" | "runway";
 
 export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
-  "flux-1.1-pro-ultra": { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
-  "flux-1.1-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
-  "flux-schnell":       { provider: "replicate", replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
-  "recraft-v3":         { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
-  "ideogram-v3-turbo":  { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
-  "imagen-4-ultra":     { provider: "replicate", replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra, premium", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
-  "nano-banana":        { provider: "gemini",                                                          description: "Gemini 2.5 Flash Image - rápido y consistente con marca", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "2K" },
-  "flux-kontext-pro":   { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+  "flux-1.1-pro-ultra":     { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
+  "flux-1.1-pro-ultra-raw": { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Flux Ultra modo RAW — fotografía naturalista (sin look AI)", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
+  "flux-1.1-pro":           { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
+  "flux-schnell":           { provider: "replicate", replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
+  "recraft-v3":             { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "ideogram-v3-turbo":      { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "imagen-4-ultra":         { provider: "replicate", replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra — premium 2K, máxima calidad", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "imagen-4":               { provider: "replicate", replicateId: "google/imagen-4",                      description: "Google Imagen 4 estándar — alta calidad/precio equilibrado", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "imagen-4-fast":          { provider: "replicate", replicateId: "google/imagen-4-fast",                 description: "Google Imagen 4 Fast — generación rápida y barata", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "nano-banana":            { provider: "gemini",                                                          description: "Nano Banana v1 (Gemini 2.5 Flash Image) — rápido, consistente con marca", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "2K" },
+  "nano-banana-pro":        { provider: "gemini",                                                          description: "Nano Banana 2 / Pro (Gemini 3 Pro Image) — 4K, texto nítido, identidad estable", costPerImage: 0.12, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "4K" },
+  "seedream-4":             { provider: "replicate", replicateId: "bytedance/seedream-4",                 description: "ByteDance Seedream 4 — photoreal + texto, rival de Recraft/Ideogram", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
+  "flux-kontext-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
 };
 
 // Modelos de edición de imagen mapeados a provider para el health-check.
 export const IMAGE_EDIT_MODELS: Record<ImageEditModel, { provider: ImageProvider; description: string; costPerImage: number }> = {
   "nano-banana":      { provider: "gemini",    description: "Edición rápida con instrucciones de texto, mantiene la marca",     costPerImage: 0.04 },
+  "nano-banana-pro":  { provider: "gemini",    description: "Edición premium 4K con texto nítido y identidad estable (v2)",      costPerImage: 0.12 },
   "flux-kontext-pro": { provider: "replicate", description: "Edición consistente, mantiene personajes/estilo",                  costPerImage: 0.05 },
+  "seedream-4":       { provider: "replicate", description: "Edición Seedream 4 con referencias múltiples + texto",              costPerImage: 0.04 },
   "gen4-image-edit":  { provider: "runway",    description: "Image edit con referencias estilo Runway (gen4_image)",            costPerImage: 0.08 },
 };
 
@@ -151,8 +163,8 @@ export async function generateImage(
   if (!cfg) throw new Error(`Modelo de imagen desconocido: ${model}`);
   const aspect = opts.aspectRatio && cfg.aspectRatios.includes(opts.aspectRatio) ? opts.aspectRatio : cfg.aspectRatios[0];
 
-  // ── Nano Banana (Gemini → Replicate fallback)
-  if (model === "nano-banana") {
+  // ── Nano Banana v1 / v2 (Gemini → Replicate fallback)
+  if (model === "nano-banana" || model === "nano-banana-pro") {
     const { generateNanoBanana } = await import("./nano-banana.js");
     const refs: Array<{ buffer: Buffer; mimeType: string }> = [];
     if (opts.referenceImage) refs.push({ buffer: opts.referenceImage, mimeType: opts.referenceMime || "image/png" });
@@ -161,6 +173,7 @@ export async function generateImage(
       aspectRatio: aspect,
       references: refs,
       replicateToken: opts.replicateToken,
+      tier: model === "nano-banana-pro" ? "pro" : "v1",
     });
     return { buffer: out.buffer, mimeType: out.mimeType, model };
   }
@@ -174,9 +187,21 @@ export async function generateImage(
   if (opts.negativePrompt) input.negative_prompt = opts.negativePrompt;
 
   // Per-model input shape adjustments
-  if (model === "flux-1.1-pro-ultra") input = { ...input, raw: false, output_format: "png", output_quality: 95, safety_tolerance: 2 };
+  if (model === "flux-1.1-pro-ultra")     input = { ...input, raw: false, output_format: "png", output_quality: 95, safety_tolerance: 2 };
+  if (model === "flux-1.1-pro-ultra-raw") input = { ...input, raw: true,  output_format: "png", output_quality: 95, safety_tolerance: 2 };
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
-  if (model === "imagen-4-ultra") input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
+  if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
+    input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
+  }
+  if (model === "seedream-4") {
+    // Seedream 4 acepta referencias multi-image (hasta 8) para preservar
+    // identidad de marca/personaje. Aceptamos la principal + extras.
+    const refs: string[] = [];
+    if (opts.referenceImage) refs.push(bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png"));
+    for (const r of opts.extraReferences || []) refs.push(bufferToDataUri(r.buffer, r.mime || "image/png"));
+    if (refs.length > 0) input.image_input = refs;
+    input.size = "2K";
+  }
   if (model === "flux-kontext-pro" && opts.referenceImage) {
     input.input_image = bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png");
   }
@@ -189,7 +214,7 @@ export async function generateImage(
 // CAPABILITY 2: IMAGE EDIT (modify existing images with text prompt)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ImageEditModel = "nano-banana" | "flux-kontext-pro" | "gen4-image-edit";
+export type ImageEditModel = "nano-banana" | "nano-banana-pro" | "flux-kontext-pro" | "seedream-4" | "gen4-image-edit";
 
 export async function editImage(
   model: ImageEditModel,
@@ -198,14 +223,26 @@ export async function editImage(
   editPrompt: string,
   opts: { replicateToken?: string; aspectRatio?: string },
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  if (model === "nano-banana") {
+  if (model === "nano-banana" || model === "nano-banana-pro") {
     const { generateNanoBanana } = await import("./nano-banana.js");
     const out = await generateNanoBanana(editPrompt, {
       aspectRatio: opts.aspectRatio,
       references: [{ buffer: imageBuffer, mimeType: imageMime }],
       replicateToken: opts.replicateToken,
+      tier: model === "nano-banana-pro" ? "pro" : "v1",
     });
     return { buffer: out.buffer, mimeType: out.mimeType };
+  }
+
+  if (model === "seedream-4") {
+    const token = getReplicateToken(opts.replicateToken);
+    const buf = await replicateRunBuffer("bytedance/seedream-4", {
+      prompt: editPrompt,
+      image_input: [bufferToDataUri(imageBuffer, imageMime)],
+      aspect_ratio: opts.aspectRatio || "match_input_image",
+      size: "2K",
+    }, token);
+    return { buffer: buf, mimeType: "image/png" };
   }
 
   if (model === "flux-kontext-pro") {
@@ -550,28 +587,40 @@ async function concatAudioBuffers(buffers: Buffer[], crossfadeSec: number): Prom
 export type VideoModel =
   | "runway-gen4-turbo"
   | "runway-gen3-alpha"
+  | "veo-3.1"
+  | "veo-3.1-fast"
   | "veo-3-fast"
   | "veo-3"
   | "veo-2"
+  | "sora-2"
   | "kling-master"
+  | "kling-2.5-turbo"
   | "kling-2.1"
   | "seedance-pro"
   | "seedance-fast"
+  | "hailuo-02-fast"
   | "hailuo-02"
+  | "wan-2.5"
   | "wan-2.5-fast";
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
-  "runway-gen4-turbo":  { provider: "runway",                                              description: "Runway Gen-4 — top quality, control fino, 5/10s",        costPerSec: 0.05, quality: 10, maxDuration: 10 },
-  "runway-gen3-alpha":  { provider: "runway",                                              description: "Runway Gen-3 Alpha — buena calidad, mejor precio",       costPerSec: 0.05, quality: 8,  maxDuration: 10 },
-  "veo-3-fast":         { provider: "gemini",  modelId: "veo-3.0-fast-generate-preview",  description: "Google Veo 3 Fast — rápido + audio nativo (8s, 16:9)",  costPerSec: 0.40, quality: 9,  maxDuration: 8  },
-  "veo-3":              { provider: "gemini",  modelId: "veo-3.0-generate-preview",       description: "Google Veo 3 — máxima calidad + audio nativo (8s, 16:9)",costPerSec: 0.75, quality: 10, maxDuration: 8  },
-  "veo-2":              { provider: "gemini",  modelId: "veo-2.0-generate-001",           description: "Google Veo 2 — soporta 9:16 y 16:9, hasta 8s (sin audio)",costPerSec: 0.35, quality: 8,  maxDuration: 8  },
-  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",     description: "Kling Master — top motion, audio nativo, multi-shot",   costPerSec: 0.18, quality: 10, maxDuration: 10 },
-  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-v2.1",            description: "Kling 2.1 — 1080p motion realista hasta 10s",           costPerSec: 0.09, quality: 9,  maxDuration: 10 },
-  "seedance-pro":       { provider: "replicate", modelId: "bytedance/seedance-1-pro",      description: "Seedance Pro — cinema-quality, multi-reference (9 imgs)",costPerSec: 0.07, quality: 9,  maxDuration: 10 },
-  "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast", description: "Seedance Fast — rápido y barato, calidad pro",          costPerSec: 0.05, quality: 7,  maxDuration: 10 },
-  "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",             description: "Hailuo 02 — buen balance velocidad/calidad",            costPerSec: 0.05, quality: 7,  maxDuration: 6  },
-  "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",    description: "Wan 2.5 — open-source, el más barato del mercado",      costPerSec: 0.018, quality: 6, maxDuration: 5  },
+  "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
+  "runway-gen3-alpha":  { provider: "runway",                                                description: "Runway Gen-3 Alpha — buena calidad, mejor precio",               costPerSec: 0.05, quality: 8,  maxDuration: 10 },
+  "veo-3.1":            { provider: "gemini",    modelId: "veo-3.1-generate-preview",       description: "Google Veo 3.1 — última gen + audio nativo, 16:9 / 9:16 (8s)",   costPerSec: 0.75, quality: 10, maxDuration: 8  },
+  "veo-3.1-fast":       { provider: "gemini",    modelId: "veo-3.1-fast-generate-preview",  description: "Google Veo 3.1 Fast — rápido y barato + audio nativo",          costPerSec: 0.40, quality: 9,  maxDuration: 8  },
+  "veo-3-fast":         { provider: "gemini",    modelId: "veo-3.0-fast-generate-preview",  description: "Google Veo 3 Fast — rápido + audio nativo (8s, 16:9)",          costPerSec: 0.40, quality: 9,  maxDuration: 8  },
+  "veo-3":              { provider: "gemini",    modelId: "veo-3.0-generate-preview",       description: "Google Veo 3 — máxima calidad + audio nativo (8s, 16:9)",        costPerSec: 0.75, quality: 10, maxDuration: 8  },
+  "veo-2":              { provider: "gemini",    modelId: "veo-2.0-generate-001",           description: "Google Veo 2 — soporta 9:16 y 16:9, hasta 8s (sin audio)",       costPerSec: 0.35, quality: 8,  maxDuration: 8  },
+  "sora-2":             { provider: "replicate", modelId: "openai/sora-2",                  description: "OpenAI Sora 2 — narrativa cinematográfica, hasta 12s, T2V/I2V", costPerSec: 0.30, quality: 10, maxDuration: 12 },
+  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",      description: "Kling Master — top motion, audio nativo, multi-shot",            costPerSec: 0.18, quality: 10, maxDuration: 10 },
+  "kling-2.5-turbo":    { provider: "replicate", modelId: "kwaivgi/kling-v2.5-turbo-pro",   description: "Kling 2.5 Turbo Pro — motion mejorado, 1080p, rápido",           costPerSec: 0.12, quality: 10, maxDuration: 10 },
+  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-v2.1",             description: "Kling 2.1 — 1080p motion realista hasta 10s",                    costPerSec: 0.09, quality: 9,  maxDuration: 10 },
+  "seedance-pro":       { provider: "replicate", modelId: "bytedance/seedance-1-pro",       description: "Seedance Pro — cinema-quality, multi-reference (9 imgs)",        costPerSec: 0.07, quality: 9,  maxDuration: 10 },
+  "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast",  description: "Seedance Fast — rápido y barato, calidad pro",                   costPerSec: 0.05, quality: 7,  maxDuration: 10 },
+  "hailuo-02-fast":     { provider: "replicate", modelId: "minimax/hailuo-02-fast",         description: "Hailuo 02 Fast — variante rápida y barata de MiniMax",           costPerSec: 0.03, quality: 7,  maxDuration: 6  },
+  "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",              description: "Hailuo 02 — buen balance velocidad/calidad",                     costPerSec: 0.05, quality: 7,  maxDuration: 6  },
+  "wan-2.5":            { provider: "replicate", modelId: "wan-video/wan-2.5-i2v",          description: "Wan 2.5 — open-source de calidad, mejor que la versión Fast",    costPerSec: 0.04, quality: 8,  maxDuration: 5  },
+  "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",     description: "Wan 2.5 Fast — open-source, el más barato del mercado",          costPerSec: 0.018, quality: 6, maxDuration: 5  },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -579,14 +628,20 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
 const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "runway-gen4-turbo": false,
   "runway-gen3-alpha": false,
-  "veo-3-fast": true,
-  "veo-3":      true,
-  "veo-2":      true,
-  "kling-master": true,
-  "kling-2.1":   true,
-  "seedance-pro":  true,
-  "seedance-fast": true,
-  "hailuo-02":    true,
+  "veo-3.1":      true,
+  "veo-3.1-fast": true,
+  "veo-3-fast":   true,
+  "veo-3":        true,
+  "veo-2":        true,
+  "sora-2":       true,
+  "kling-master":    true,
+  "kling-2.5-turbo": true,
+  "kling-2.1":       true,
+  "seedance-pro":    true,
+  "seedance-fast":   true,
+  "hailuo-02-fast":  true,
+  "hailuo-02":       true,
+  "wan-2.5":      false,
   "wan-2.5-fast": false,
 };
 
@@ -673,14 +728,25 @@ export async function generateVideoFromImage(
     const apiKey = getGeminiKey();
     const ai = new GoogleGenAI({ apiKey });
     const veoModel = cfg.modelId!;
-    // Veo 3 only supports 16:9; Veo 2 supports 16:9 and 9:16.
-    const isVeo3 = veoModel.startsWith("veo-3");
+    // Aspect-ratio capabilities (Google docs):
+    //   - Veo 2:    16:9 and 9:16, durationSeconds configurable (4-8s)
+    //   - Veo 3:    ONLY 16:9, fixed 8s
+    //   - Veo 3.1:  16:9 AND 9:16, fixed 8s (audio nativo, mejor identidad)
+    const isVeo31 = veoModel.startsWith("veo-3.1");
+    const isVeo3X = veoModel.startsWith("veo-3.0") || veoModel === "veo-3.0-generate-preview" || veoModel === "veo-3.0-fast-generate-preview";
     const requested = opts.aspect || "9:16";
-    const aspectRatio = isVeo3 ? "16:9" : (requested === "16:9" || requested === "9:16" ? requested : "9:16");
+    let aspectRatio: string;
+    if (isVeo3X) {
+      aspectRatio = "16:9"; // Veo 3.0 sólo permite 16:9
+    } else {
+      // Veo 2 y Veo 3.1 soportan 16:9 y 9:16
+      aspectRatio = (requested === "16:9" || requested === "9:16") ? requested : "9:16";
+    }
     const veoDur = Math.min(Math.max(opts.duration || 8, 4), 8);
 
     const config: any = { aspectRatio, numberOfVideos: 1, personGeneration: "allow_all" };
-    if (!isVeo3) config.durationSeconds = veoDur;
+    // Veo 3.0 y 3.1 tienen duración fija (8s); sólo Veo 2 acepta durationSeconds.
+    if (!isVeo3X && !isVeo31) config.durationSeconds = veoDur;
 
     const veoArgs: any = {
       model: veoModel,
@@ -782,6 +848,17 @@ export async function generateVideoFromImage(
     // Wan-2.5 i2v: requiere image
     if (!dataUri) throw new Error(`${model} requiere imagen origen`);
     input = { prompt, image: dataUri, duration };
+  } else if (cfg.modelId.startsWith("openai/sora")) {
+    // OpenAI Sora 2 (vía Replicate openai/sora-2). Schema verificado:
+    //   - prompt (string, requerido)
+    //   - seconds (4 | 8 | 12, default 4)
+    //   - aspect_ratio ("portrait" | "landscape", default "portrait")
+    //   - input_reference (URL/data-URI, OPCIONAL — primera frame para I2V;
+    //     debe matchear el aspect_ratio elegido)
+    const soraDur = duration >= 12 ? 12 : duration >= 8 ? 8 : 4;
+    const soraAspect = aspect === "16:9" ? "landscape" : "portrait";
+    input = { prompt, seconds: soraDur, aspect_ratio: soraAspect };
+    if (dataUri) input.input_reference = dataUri;
   } else {
     input = { prompt, duration };
     if (dataUri) input.image = dataUri;
