@@ -17,7 +17,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { db, businessCardsTable, projectsTable, projectFilesTable } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, ne, desc, inArray } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
@@ -38,8 +38,12 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (/^image\/(png|jpe?g|webp|svg\+xml)$/i.test(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo no permitido: ${file.mimetype}`) as any, false);
+    // SVG bloqueado en uploads de logo: el SVG se renderiza luego en Puppeteer
+    // dentro de <img src="data:image/svg+xml;base64,..."> y un SVG malicioso podría
+    // forzar fetches a recursos externos/internos (SSRF) durante el render.
+    // Solo aceptamos formatos rasterizados.
+    if (/^image\/(png|jpe?g|webp)$/i.test(file.mimetype)) cb(null, true);
+    else cb(new Error(`Tipo no permitido: ${file.mimetype}. Solo PNG, JPG o WEBP.`) as any, false);
   },
 });
 
@@ -335,10 +339,18 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
     const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
     if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
 
-    await db
+    // Lock atómico: solo arrancamos la generación si el row NO está ya en "generating".
+    // Evita doble pipeline concurrente (coste duplicado, last-write-wins en vault IDs)
+    // si el usuario hace doble click o reintentos solapados.
+    const claim = await db
       .update(businessCardsTable)
       .set({ status: "generating", lastError: null })
-      .where(eq(businessCardsTable.id, id));
+      .where(and(eq(businessCardsTable.id, id), ne(businessCardsTable.status, "generating")))
+      .returning({ id: businessCardsTable.id });
+    if (claim.length === 0) {
+      res.status(409).json({ error: "Esta tarjeta ya se está generando. Espera a que termine." });
+      return;
+    }
 
     // Logo opcional
     let logoBuffer: Buffer | undefined;

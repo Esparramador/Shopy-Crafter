@@ -235,6 +235,16 @@ export default function CardStudioEditor({
     setOverride(ds.id, { x: Math.round(ds.lastX), y: Math.round(ds.lastY) });
   }, [handleMouseMove, setOverride]);
 
+  // Cleanup defensivo: si el modal se cierra (unmount) en mitad de un drag,
+  // garantiza que los listeners globales no queden huérfanos.
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      dragState.current = null;
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
   // ── Acciones ───────────────────────────────────────────────────────────
   const addExtra = () => {
     const id = String(Date.now()).slice(-6);
