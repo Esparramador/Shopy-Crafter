@@ -15,8 +15,8 @@ import {
   renderCardSide,
   CARD_WIDTH_PX,
   CARD_HEIGHT_PX,
-  type CardData,
 } from "./card-renderer.js";
+import type { CardData, LayoutOverrides } from "./card-elements.js";
 import { generateQrPng, buildVCard } from "./card-qr.js";
 import { generateImage, type ImageGenModel } from "./fusion-studio-pro.js";
 import { generatePdfFromHtml } from "./pdf-generator.js";
@@ -45,6 +45,8 @@ export type GenerateCardInput = {
   logoMime?: string;
   /** Token Replicate (override) */
   replicateToken?: string;
+  /** Overrides del editor visual (posiciones / extras) */
+  overrides?: LayoutOverrides;
 };
 
 export type GenerateCardResult = {
@@ -89,13 +91,14 @@ export async function generateBusinessCard(
 
   if (bgConfig.kind === "ai-texture") {
     try {
-      const promptToUse = bgConfig.prompt || template.background.prompt || "premium business card background, no text, photorealistic";
-      logger.info({ model: bgModel, promptPreview: promptToUse.slice(0, 80) }, "card-studio: generating AI background");
+      const userPrompt = (bgConfig.prompt || template.background.prompt || "premium business card background").trim();
+      // Refuerzo anti-texto en el prompt mismo (algunos modelos ignoran negativePrompt)
+      const promptToUse = `${userPrompt}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
+      logger.info({ model: bgModel, promptPreview: promptToUse.slice(0, 100) }, "card-studio: generating AI background");
       const out = await generateImage(bgModel, promptToUse, {
         aspectRatio: "3:2",
         replicateToken: input.replicateToken,
-        // ANTI-TEXT: refuerzo en negative prompt
-        negativePrompt: "text, letters, words, typography, watermark, logo, signature, characters, alphabet, symbols",
+        negativePrompt: "text, letters, words, typography, watermark, logo, signature, characters, alphabet, symbols, writing, label, caption, title, lorem ipsum",
       });
       backgroundPng = await sharp(out.buffer)
         .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX, { fit: "cover", position: "center" })
@@ -149,12 +152,15 @@ export async function generateBusinessCard(
 
   // ── Renderizar capa de texto (transparente) ─────────────────────────
   const transparent = bgKindUsed === "ai-texture";
+  const isAiBackground = bgKindUsed === "ai-texture";
   const frontTextLayer = await renderCardSide(template, input.data, {
     side: "front",
     transparent,
     palette,
     fonts,
     logoDataUri,
+    overrides: input.overrides,
+    isAiBackground,
   });
   const backTextLayer = await renderCardSide(template, input.data, {
     side: "back",
@@ -162,6 +168,8 @@ export async function generateBusinessCard(
     palette,
     fonts,
     qrPngBase64,
+    overrides: input.overrides,
+    isAiBackground,
   });
 
   // ── Composición Sharp ───────────────────────────────────────────────

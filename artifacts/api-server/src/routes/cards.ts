@@ -98,6 +98,7 @@ function toCardDto(row: any) {
     logoUrl: row.logoVaultFileId
       ? `/api/projects/${row.projectId}/files/${row.logoVaultFileId}/preview`
       : null,
+    layoutOverrides: safeJson(row.layoutOverrides, {}),
   };
 }
 
@@ -244,6 +245,9 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
     }
     if (req.body?.palette && typeof req.body.palette === "object") patch.palette = JSON.stringify(req.body.palette);
     if (req.body?.fonts && typeof req.body.fonts === "object") patch.fonts = JSON.stringify(req.body.fonts);
+    if (req.body?.layoutOverrides && typeof req.body.layoutOverrides === "object") {
+      patch.layoutOverrides = JSON.stringify(req.body.layoutOverrides);
+    }
     // Acepta tanto `background` como `backgroundConfig` (FE usa el segundo)
     if (req.body?.background && typeof req.body.background === "object") {
       patch.backgroundConfig = JSON.stringify(req.body.background);
@@ -374,6 +378,7 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       qrUrl: row.qrUrl ?? undefined,
       logoBuffer,
       logoMime,
+      overrides: safeJson(row.layoutOverrides, {}) as any,
     };
 
     const result = await generateBusinessCard(input);
@@ -471,6 +476,57 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
         .where(eq(businessCardsTable.id, id));
     } catch {}
     res.status(500).json({ error: err?.message || "Error generando tarjeta" });
+  }
+});
+
+// ─── Resolved elements (defaults + overrides + extras) para el editor visual ──
+router.get("/cards/:id/elements", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const side = String(req.query.side || "front") === "back" ? "back" : "front";
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const tpl = getTemplate(row.templateId);
+    if (!tpl) { res.status(400).json({ error: "Template inválido" }); return; }
+
+    const palette = { ...tpl.palette, ...(safeJson(row.palette, {}) as any) };
+    const fonts = { ...tpl.fonts, ...(safeJson(row.fonts, {}) as any) };
+    const overrides = safeJson(row.layoutOverrides, {}) as any;
+    const layout = (row.layout === "centered" || row.layout === "left" || row.layout === "grid") ? row.layout : tpl.layout;
+    const isAiBg = (safeJson(row.backgroundConfig, {}) as any)?.kind === "ai-texture" || tpl.background.kind === "ai-texture";
+
+    const data = {
+      fullName: row.fullName,
+      jobTitle: row.jobTitle,
+      companyName: row.companyName,
+      tagline: row.tagline,
+      email: row.email,
+      phone: row.phone,
+      website: row.website,
+      socialHandle: row.socialHandle,
+      address: row.address,
+    };
+
+    const { defaultFrontElements, defaultBackElements, applyOverrides, extrasToRender } = await import("../lib/card-elements.js");
+
+    // QR placeholder (no necesitamos el bitmap exacto en el editor — usamos un cuadro visual)
+    const qrPngBase64 = side === "back" ? "PLACEHOLDER" : undefined;
+
+    const defaults = side === "front"
+      ? defaultFrontElements({ side: "front", layout, data, palette, fonts, isAiBg, logoDataUri: row.logoVaultFileId ? "x" : undefined })
+      : defaultBackElements ({ side: "back",  layout, data, palette, fonts, isAiBg, qrPngBase64 });
+    const sideOv = side === "front" ? overrides.front : overrides.back;
+    const merged = applyOverrides(defaults, sideOv);
+    const extras = extrasToRender(overrides.extras, side);
+    res.json({
+      side,
+      width: 1080,
+      height: 720,
+      elements: [...merged, ...extras],
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards elements failed");
+    res.status(500).json({ error: err?.message || "Error" });
   }
 });
 

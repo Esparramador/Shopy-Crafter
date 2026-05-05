@@ -54,6 +54,12 @@ export const businessCardsTable = pgTable("business_cards", {
   fonts: text("fonts").notNull().default("{}"),     // JSON {heading, body}
   layout: text("layout").notNull().default("centered"), // centered | left | grid
   backgroundConfig: text("background_config").notNull().default("{}"), // JSON {kind, prompt?, hex?}
+  /**
+   * Editor visual de posiciones — JSON con overrides por elemento y extras añadidos.
+   * Estructura: { front?: Record<string, ElementOverride>, back?: Record<string, ElementOverride>, extras?: ExtraElement[] }
+   * Ver artifacts/api-server/src/lib/card-elements.ts para los tipos.
+   */
+  layoutOverrides: text("layout_overrides").notNull().default("{}"),
 
   // ── Assets ──────────────────────────────────────────────────────────────
   logoVaultFileId: integer("logo_vault_file_id").references(() => projectFilesTable.id, { onDelete: "set null" }),

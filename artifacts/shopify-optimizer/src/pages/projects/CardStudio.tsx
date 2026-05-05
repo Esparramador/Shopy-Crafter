@@ -11,8 +11,9 @@ import { useRoute } from "wouter";
 import {
   Loader2, Sparkles, Plus, Trash2, Download, Wand2, Save,
   CreditCard, RefreshCw, AlertCircle, CheckCircle2, Upload,
-  Image as ImageIcon, FileText, QrCode, Palette,
+  Image as ImageIcon, FileText, QrCode, Palette, Move,
 } from "lucide-react";
+import CardStudioEditor, { type LayoutOverrides } from "./CardStudioEditor";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -63,6 +64,7 @@ interface BusinessCard {
   backImageVaultFileId?: number | null;
   pdfVaultFileId?: number | null;
   metadata?: any;
+  layoutOverrides?: LayoutOverrides;
   updatedAt: string;
 }
 
@@ -101,6 +103,9 @@ export default function CardStudio() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Editor visual de posiciones
+  const [showEditor, setShowEditor] = useState(false);
 
   // Auto-design dialog state
   const [showAutoDesign, setShowAutoDesign] = useState(false);
@@ -670,7 +675,18 @@ export default function CardStudio() {
               </div>
 
               <div style={panelStyle}>
-                <h3 style={panelTitle}>Preview · 85×55mm @ 300 DPI</h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 style={{ ...panelTitle, margin: 0 }}>Preview · 85×55mm @ 300 DPI</h3>
+                  {(selected.frontUrl || selected.backUrl) && (
+                    <button
+                      onClick={() => setShowEditor(true)}
+                      style={{ ...btnSmall, color: "var(--gold)", borderColor: "var(--gold)" }}
+                      title="Reposicionar elementos / añadir textos"
+                    >
+                      <Move size={12} /> Editor
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <PreviewSide label="Frente" url={selected.frontUrl} placeholder="Genera para ver el frente" />
                   <PreviewSide label="Reverso" url={selected.backUrl} placeholder="Genera para ver el reverso (con QR)" />
@@ -680,6 +696,26 @@ export default function CardStudio() {
           )}
         </div>
       </div>
+
+      {/* EDITOR VISUAL DE POSICIONES */}
+      {showEditor && selected && (
+        <CardStudioEditor
+          apiBase={API_BASE}
+          cardId={selected.id}
+          frontUrl={selected.frontUrl}
+          backUrl={selected.backUrl}
+          initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
+          generating={generating}
+          onSaveOverrides={async (ov) => {
+            await updateCard(selected.id, { layoutOverrides: ov } as any);
+          }}
+          onRegenerate={async () => {
+            const sel = document.getElementById("bg-model-select") as HTMLSelectElement | null;
+            await generateCard(selected.id, sel?.value || "recraft-v3");
+          }}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
 
       {/* AUTO-DESIGN MODAL */}
       {showAutoDesign && (

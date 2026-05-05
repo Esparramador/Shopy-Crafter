@@ -87,6 +87,12 @@ Specialized endpoints offer infographic generation with AI or overlay text rende
 ### Card Studio (Tarjetas profesionales 300 DPI)
 Provides a backend for business card generation with 6 templates, QR code generation, and rendering via Puppeteer for high-DPI printable output. It includes an admin-only API for managing cards, an auto-design feature using Claude, and a frontend editor with live preview supporting 8 AI background engines.
 
+**v2 — Renderer absolute-positioned + visual editor (2026-05):**
+- Pipeline rewritten around `lib/card-elements.ts` (typed `RenderElement` model with reserved IDs per side: front=`logo|company|name|title|line|tagline`, back=`qr|qrLabel|brand|email|phone|web|social|address`). Layouts (`centered|left|grid`) produce defaults at 1080×720 px (= 91×61mm with 3mm bleed @ 300 DPI), 84px (~7mm) safe inset.
+- `lib/card-renderer.ts` now positions every element absolutely; on `ai-texture` backgrounds it auto-applies a black contrast plate (50% opacity + 6px radius padding) plus text-shadow and a radial vignette for guaranteed legibility. Long text auto-shrinks via Puppeteer DOM-pass `data-autoshrink="1"`. AI background prompt hardened with `ABSOLUTELY NO TEXT…` clause + extended negative prompt.
+- DB: `business_cards.layout_overrides text NOT NULL DEFAULT '{}'` stores `{ front?, back?, extras? }`. Routes: `PATCH /cards/:id` accepts `layoutOverrides`; `GET /cards/:id/elements?side=front|back` returns the resolved element list (defaults+overrides+extras) for the editor; `POST /cards/:id/generate` re-uses overrides automatically.
+- Frontend `CardStudioEditor.tsx`: modal opened from "Editor" button on the preview panel. Drag any element on a zoomed 1080×720 stage with safe-zone outline; per-element panel for text/font-size/color/alignment/X/Y/width; "Añadir texto" creates extras; per-side reset; "Guardar" persists overrides; "Re-renderizar" saves + invokes generate.
+
 ### Standalone Module Routes
 All 17 modules have standalone routes that work without an active project (`projectId=0`), allowing full content generation, analysis, video creation, and campaign building independently of any project.
 
