@@ -86,7 +86,7 @@ interface SmartAdBody {
   addMusic?: boolean;
 }
 
-function clampDuration(d: any, def: number, max = 10): number {
+function clampDuration(d: any, def: number, max = 60): number {
   const n = Number(d);
   if (!Number.isFinite(n) || n <= 0) return def;
   return Math.max(3, Math.min(max, Math.floor(n)));
@@ -119,7 +119,22 @@ router.post(
 
       const language: VoiceLanguage = body.language || "auto";
       const aspect = (body.aspect || "9:16") as AdCampaignInput["aspect"];
-      const durationSec = clampDuration(body.durationSec, 6);
+      // smart-quick uses Runway gen4-turbo single-clip → hard cap 10s.
+      // For longer ads, the client must use /ads/smart-cinematic (multi-shot).
+      // We tell the user explicitly instead of silently truncating their script
+      // to fit a shorter video.
+      const requestedDuration = clampDuration(body.durationSec, 6, 60);
+      if (requestedDuration > 10) {
+        res.status(400).json({
+          error: `smart-quick está limitado a 10 segundos (un solo clip Runway). Para ${requestedDuration}s, usa /ads/smart-cinematic con scenesCount=${Math.ceil(requestedDuration / 5)}.`,
+          code: "DURATION_TOO_LONG_FOR_QUICK",
+          maxQuickDurationSec: 10,
+          suggestedEndpoint: "/api/projects/:projectId/products/:productId/ads/smart-cinematic",
+          suggestedBody: { totalDurationSec: requestedDuration, scenesCount: Math.ceil(requestedDuration / 5) },
+        });
+        return;
+      }
+      const durationSec = requestedDuration;
 
       // 1) Voice recommendation (coherent with niche/product/language)
       const voice = await recommendVoiceForProduct({

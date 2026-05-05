@@ -27,6 +27,14 @@ An extensible `IPlatformConnector` abstraction layer supports Shopify, PrestaSho
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Advanced Financial Intelligence provides break-even units, LTV 12-month estimation, LTV/CAC ratio, supply chain risk assessment, and defensive moat strategy, all powered by Claude. A/B Testing tracks visitors only on visit events. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, Gallery, and Multi-Platform Video Generation (11 models).
 
+### Ad Audio Pipeline (Loudness + Copy Budget)
+The voiceover for `/ads/smart-quick` and related endpoints is now broadcast-grade:
+1. **Copy length tied to duration** (`adstudio.ts:generateAdCopy`): Claude is given a strict word budget = `floor((durationSec - 1.4) * 2.5)` for Spanish. Hook/body/cta split 20/65/15. Prevents the previous "13s of speech crammed into 5s of video → trim+fade at 3s" failure.
+2. **Loudness normalization** (`adstudio.ts:composeFinalAd`): Two-stage `loudnorm` (voice → -16 LUFS, mix → -14 LUFS, TP -1.0 dBFS) brings audio from -29 LUFS to social-media standard.
+3. **Music ducking via sidechaincompress**: Music is automatically compressed when voice is present (threshold 0.05, ratio 8) so dialog cuts through cleanly. Music base lowered from 0.25 → 0.18.
+4. **FFmpeg filter graph requires `asplit`** when reusing the voice stream as both sidechain trigger and amix source — reusing the same labeled output without `asplit` produces "Invalid argument" exit 234.
+5. `clampDuration` ceiling raised from 10 → 60s, but Runway gen4-turbo single-clip remains 10s. For >10s use `/ads/smart-cinematic` (multi-shot chaining via `cinematic-multishot.ts`).
+
 ### Vault Download URLs (Smart Quick / Cinematic / Try-on Ads)
 The endpoints `/products/:id/ads/smart-quick`, `/ads/smart-cinematic`, and `/ads/tryon-video` persist final MP4s to the vault and return a playable URL. The vault file route is `/api/projects/:projectId/vault/:fileId/download` (NOT `/raw` — that path does not exist and returns 404). Always use `/download` when constructing `finalMp4Url` / `videoUrl` after `saveToVault`.
 

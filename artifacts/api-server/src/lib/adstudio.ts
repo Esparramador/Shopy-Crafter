@@ -335,6 +335,39 @@ export async function generateAdCopy(input: AdCampaignInput, variants: number): 
 
   const sys = `You are an elite advertising copywriter specialized in e-commerce video ads (Meta, TikTok, YouTube Shorts). You write hooks that stop the scroll, bodies that build desire, and CTAs that convert.${tplHint}`;
 
+  // CRITICAL: tie copy length to video duration so the voiceover fits naturally
+  // without atempo speed-up or hard-trim. Spanish narration averages ~2.5 words
+  // per second; English ~2.7. We reserve ~1s of silence at the end (CTA tail)
+  // and ~0.4s at the start (hook breath), so the speakable budget is
+  // (duration - 1.4) seconds. We split the budget across hook/body/cta with
+  // a 20/65/15 weighting. For very short ads (3-5s) the per-segment minima
+  // would exceed the total budget — we skip minima and let the proportional
+  // split handle it (preventing impossible "min sum > total" prompts).
+  // Language detection is explicit: derived from customPrompt's "Idioma del
+  // voiceover: <lang>" hint that smart-quick injects (default Spanish).
+  const langHint = (input.customPrompt || "").match(/Idioma[^:]*:\s*(\w+)/i)?.[1]?.toLowerCase() || "";
+  const isSpanish = langHint === "" || /^(es|esp|spanish|español|castellano)/i.test(langHint);
+  const wordsPerSec = isSpanish ? 2.5 : 2.7;
+  const speakableSec = Math.max(2.0, input.videoDurationSec - 1.4);
+  const totalWords = Math.max(6, Math.floor(speakableSec * wordsPerSec));
+  // Proportional allocation; minima only applied if total budget allows them
+  // (i.e. >= 10 words). Below that, we let proportions drive everything so
+  // hook+body+cta == totalWords exactly.
+  const minBudget = 10;
+  let hookWords: number;
+  let ctaWords: number;
+  let bodyWords: number;
+  if (totalWords >= minBudget) {
+    hookWords = Math.max(3, Math.min(8, Math.round(totalWords * 0.20)));
+    ctaWords = Math.max(3, Math.min(7, Math.round(totalWords * 0.15)));
+    bodyWords = Math.max(4, totalWords - hookWords - ctaWords);
+  } else {
+    // Tight budget (3-5s ads): no minima, proportional only
+    hookWords = Math.max(2, Math.round(totalWords * 0.25));
+    ctaWords = Math.max(2, Math.round(totalWords * 0.20));
+    bodyWords = Math.max(2, totalWords - hookWords - ctaWords);
+  }
+
   const prompt = `Generate ${variants} distinct ad copy variants for this product:
 
 Product: ${input.productTitle}
@@ -345,17 +378,25 @@ Objective: ${input.objective}
 Aspect: ${input.aspect} (${input.aspect === "9:16" ? "vertical Reels/TikTok" : input.aspect === "16:9" ? "horizontal YouTube" : "square feed"})
 Duration: ${input.videoDurationSec}s${toneHint}${audienceHint}${extraHint}
 
+⚠️ CRITICAL TIMING CONSTRAINT (do not violate):
+- The voiceover MUST fit in ${speakableSec.toFixed(1)} seconds at natural speaking pace.
+- Total budget: ${totalWords} words across hook + body + cta.
+- HOOK: ${hookWords} words MAX (1 short sentence, no comma).
+- BODY: ${bodyWords} words MAX (1-2 short sentences).
+- CTA: ${ctaWords} words MAX (imperative, urgent).
+- COUNT YOUR WORDS. Going over will cause the audio to be sped up or cut off mid-sentence — DO NOT exceed the budget under any circumstance.
+
 Each variant MUST be strategically different (different angle: benefit vs problem vs social proof vs curiosity vs urgency).
 
 Output JSON array of exactly ${variants} objects:
 [{
-  "hook": "3-7 word attention-grabber for first 1-2 seconds",
-  "body": "15-25 word main selling message",
-  "cta": "3-5 word call-to-action",
+  "hook": "STOP-THE-SCROLL opener, ${hookWords} words MAX",
+  "body": "Main selling message, ${bodyWords} words MAX, must flow naturally when spoken",
+  "cta": "Action verb + benefit, ${ctaWords} words MAX",
   "tone": "one word: bold|warm|luxurious|urgent|playful|authoritative"
 }]
 
-Each hook must STOP THE SCROLL. Avoid generic phrases like "check this out" or "you won't believe". Be specific and provocative.`;
+Each hook must STOP THE SCROLL. Avoid generic phrases like "check this out" or "you won't believe". Be specific and provocative. WORD COUNTS ARE NON-NEGOTIABLE — the entire ad fails if you exceed them.`;
 
   const raw = await askClaudeJsonWithBrain<AdCopyVariant[] | { variants: AdCopyVariant[] }>(
     input.projectId,
@@ -716,22 +757,39 @@ export async function composeFinalAd(
       if (sfxPath) cmd.input(sfxPath);
 
       if (sfxPath) {
-        // Mix voice (louder) + sfx (background) over video.
-        // FIX CRÍTICO (audio-only bug): la versión anterior mapeaba SOLO
-        // ["aout"] al usar complexFilter, lo que hacía que FFmpeg dropease
-        // el video stream y exportase un MP4 sin video.
-        // Como fluent-ffmpeg envuelve los labels del map con brackets,
-        // añadimos un `null` passthrough sobre [0:v] (coste cero, no
-        // recodifica) para poder mapearlo como [vpass].
+        // Mix voice (foreground, loudness-normalized) + music (background, ducked).
+        // FIX CRÍTICO (audio-only bug): la versión anterior mapeaba SOLO ["aout"]
+        // al usar complexFilter → FFmpeg dropeaba el video stream. Mantenemos el
+        // passthrough [0:v]null[vpass] para preservar el video.
+        //
+        // FIX LOUDNESS (2026-05): el voiceover salía a -29 LUFS (muy bajo para
+        // social media; estándar Reels/TikTok ≈ -14 a -16 LUFS). Aplicamos:
+        //   1) loudnorm sobre la voz → llevar a -16 LUFS, TP -1.5 dBFS, LRA 11
+        //   2) sidechaincompress en la música → "duck" automático cuando habla
+        //      la voz (la música baja sola para que la voz se entienda)
+        //   3) música base bajada de 0.25 → 0.18 (todavía audible pero menos
+        //      intrusiva). El sidechain hace el resto.
+        //   4) loudnorm final sobre el mix → garantiza nivel publicitario
+        //      consistente independientemente del volumen original de la voz.
+        // NOTE: asplit duplicates the voice stream so it can be both the
+        // sidechain trigger AND the foreground signal in amix. Reusing
+        // [voice] twice without asplit is a hard FFmpeg error ("Invalid
+        // argument", exit 234). amix `weights` must use a quoted string
+        // ("2 1") in fluent-ffmpeg's array form.
         cmd.complexFilter([
           "[0:v]null[vpass]",
-          "[1:a]volume=1.0[voice]",
-          "[2:a]volume=0.25[music]",
-          "[voice][music]amix=inputs=2:duration=longest:dropout_transition=0[aout]",
+          "[1:a]loudnorm=I=-16:LRA=11:TP=-1.5,volume=1.4,asplit=2[voice1][voice2]",
+          "[2:a]volume=0.18[musicraw]",
+          "[musicraw][voice2]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=300:makeup=1[musicducked]",
+          "[voice1][musicducked]amix=inputs=2:duration=first:dropout_transition=0:weights='2 1'[mixed]",
+          "[mixed]loudnorm=I=-14:LRA=9:TP=-1.0[aout]",
         ], ["vpass", "aout"]);
       } else {
-        // Just voice
-        cmd.audioCodec("aac");
+        // Voice only — still apply loudness normalization to hit social-media targets.
+        cmd.complexFilter([
+          "[0:v]null[vpass]",
+          "[1:a]loudnorm=I=-14:LRA=9:TP=-1.0[aout]",
+        ], ["vpass", "aout"]);
       }
 
       cmd.videoCodec("libx264")
