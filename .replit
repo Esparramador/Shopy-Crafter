@@ -15,27 +15,6 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "hanakaze-runner"
-
-[[workflows.workflow]]
-name = "hanakaze-runner"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "HANAKAZE_PROJECT_ID=7 node scripts/run-hanakaze-v3-cascada.mjs"
 
 [agent]
 stack = "PNPM_WORKSPACE"
