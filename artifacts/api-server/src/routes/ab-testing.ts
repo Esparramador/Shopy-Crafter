@@ -30,6 +30,23 @@ function fmtNum(n: number): string { return new Intl.NumberFormat("es-ES").forma
 
 const router = Router();
 
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 900, label = "claude-call"): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const remaining = attempts - i - 1;
+      logger.warn({ err: e instanceof Error ? e.message : String(e), attempt: i + 1, remaining, label }, "[ab-testing] Retry-eligible failure");
+      if (remaining > 0) {
+        await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, i)));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
 function calculateSignificance(
   aConversions: number, aVisitors: number,
   bConversions: number, bVisitors: number
@@ -1090,11 +1107,11 @@ Basándote en tu conocimiento del mercado para esta categoría, devuelve EXCLUSI
 
 NO inventes URLs ni nombres de competidores específicos. Da rangos creíbles basados en mercado real.`;
 
-    const text = await askClaudeJsonWithBrain<{
+    const text = await withRetry(() => askClaudeJsonWithBrain<{
       min: number; max: number; median: number; average: number;
       yourPosition: "underpriced" | "fair" | "premium" | "overpriced";
       percentileRank: number; reasoning: string;
-    }>(projectId, prompt, "Eres un analista de pricing senior con conocimiento profundo del mercado e-commerce europeo. Devuelves JSON estricto y honesto.", "ab_test_prediction", niche, 4096);
+    }>(projectId, prompt, "Eres un analista de pricing senior con conocimiento profundo del mercado e-commerce europeo. Devuelves JSON estricto y honesto.", "ab_test_prediction", niche, 4096), 3, 900, "competitors");
 
     res.json({
       productId,
@@ -1169,8 +1186,8 @@ router.post("/projects/:projectId/ab-tests/price/supplier-impact", async (req, r
         ));
       recentPurchases = events.filter(e => e.createdAt >= since90 && projectTestIds.has(e.testId)).length;
     }
-    const annualVolumeEstimated = recentPurchases > 0 ? recentPurchases * 4 : null;
-    const potentialSavingsAnnual = annualVolumeEstimated !== null ? savingsPerUnit * annualVolumeEstimated : null;
+    const annualVolumeEstimated = recentPurchases > 0 ? recentPurchases * 4 : 0;
+    const potentialSavingsAnnual = savingsPerUnit * annualVolumeEstimated;
 
     res.json({
       productId,
@@ -1178,9 +1195,9 @@ router.post("/projects/:projectId/ab-tests/price/supplier-impact", async (req, r
       bestAlternativeCOGS: bestCost,
       potentialSavingsPerUnit: savingsPerUnit,
       potentialSavingsAnnual,
-      annualVolumeBasis: annualVolumeEstimated !== null
+      annualVolumeBasis: annualVolumeEstimated > 0
         ? `Extrapolado de ${recentPurchases} compras en últimos 90 días`
-        : "Sin datos suficientes de ventas para anualizar",
+        : "Sin datos suficientes de ventas para anualizar (volumen=0)",
       options,
       analyzedAt: new Date().toISOString(),
     });
@@ -1229,10 +1246,10 @@ Devuelve EXCLUSIVAMENTE este JSON:
 
 Los precios deben ser realistas y respetar el break-even mínimo.`;
 
-    const result = await askClaudeJsonWithBrain<{
+    const result = await withRetry(() => askClaudeJsonWithBrain<{
       conservative: number; optimal: number; aggressive: number;
       justification: string; risks: string[];
-    }>(projectId, prompt, "Eres un consultor senior de pricing strategy. Recomendaciones data-driven, justificadas, con análisis de riesgo realista.", "ab_test_prediction", proj?.storeNiche || undefined, 4096);
+    }>(projectId, prompt, "Eres un consultor senior de pricing strategy. Recomendaciones data-driven, justificadas, con análisis de riesgo realista.", "ab_test_prediction", proj?.storeNiche || undefined, 4096), 3, 900, "recommend");
 
     res.json({
       conservative: result.conservative,
@@ -1244,6 +1261,232 @@ Los precios deben ser realistas y respetar el break-even mínimo.`;
   } catch (err) {
     logger.error({ err }, "price/recommend failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Error generando recomendación" });
+  }
+});
+
+// ─────── PRICE FORECAST (long-horizon revenue projection for Lanzar step) ───────
+router.post("/projects/:projectId/ab-tests/price/forecast", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(req.params.projectId, 10);
+    const raw = (req.body || {}) as Record<string, unknown>;
+    const productId = typeof raw.productId === "string" ? raw.productId.trim() : "";
+    const controlPrice = Number(raw.controlPrice);
+    const challengerPrice = Number(raw.challengerPrice);
+    const durationDaysIn = Number(raw.durationDays);
+    const minVisitorsIn = Number(raw.minVisitors);
+    const body = {
+      productId,
+      controlPrice,
+      challengerPrice,
+      hypothesis: typeof raw.hypothesis === "string" ? raw.hypothesis : undefined,
+      durationDays: Number.isFinite(durationDaysIn) && durationDaysIn > 0 ? durationDaysIn : undefined,
+      minVisitors: Number.isFinite(minVisitorsIn) && minVisitorsIn > 0 ? minVisitorsIn : undefined,
+      competitorContext: (raw.competitorContext as { priceStats?: { median?: number; min?: number; max?: number; yourPosition?: string; percentileRank?: number }; reasoning?: string } | null | undefined) ?? null,
+      supplierContext: (raw.supplierContext as { potentialSavingsPerUnit?: number; potentialSavingsAnnual?: number } | null | undefined) ?? null,
+    };
+    if (Number.isNaN(projectId) || !body.productId
+      || !Number.isFinite(body.controlPrice) || body.controlPrice <= 0
+      || !Number.isFinite(body.challengerPrice) || body.challengerPrice <= 0) {
+      res.status(400).json({ error: "Parámetros faltantes o inválidos: productId/controlPrice/challengerPrice deben ser válidos y >0" });
+      return;
+    }
+
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, body.productId)));
+    if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    const [cogsRow] = await db.select().from(cogsTable)
+      .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, body.productId)));
+    const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+
+    const cogs = cogsRow?.totalCogs ?? 0;
+    const niche = proj?.storeNiche ?? "e-commerce";
+    const audience = proj?.targetAudience ?? "general";
+
+    // Baseline real desde tracking events (últimos 90d, todos los tests del producto)
+    const since90 = new Date(Date.now() - 90 * 86_400_000);
+    const productTests = await db.select({ id: abTestsTable.id }).from(abTestsTable)
+      .where(and(eq(abTestsTable.projectId, projectId), eq(abTestsTable.shopifyProductId, body.productId)));
+    const productTestIds = new Set(productTests.map(t => String(t.id)));
+    let realVisits = 0; let realPurchases = 0;
+    if (productTestIds.size > 0) {
+      const events = await db.select().from(trackEventsTable)
+        .where(eq(trackEventsTable.shopifyProductId, body.productId));
+      const recent = events.filter(e => e.createdAt >= since90 && productTestIds.has(e.testId));
+      realVisits = recent.filter(e => e.eventType === "visit").length;
+      realPurchases = recent.filter(e => e.eventType === "purchase" || e.eventType === "conversion").length;
+    }
+    const baselineMonthlyVisitors = realVisits > 0 ? Math.round(realVisits / 3) : null;
+    const baselineMonthlyConversions = realPurchases > 0 ? Math.round(realPurchases / 3) : null;
+    const baselineCvr = baselineMonthlyVisitors && baselineMonthlyConversions
+      ? baselineMonthlyConversions / baselineMonthlyVisitors
+      : null;
+
+    type Forecast = {
+      monthlyVisitorsAssumed: number;
+      baselineCvr: number;
+      assumedElasticity: number;
+      variantA: { price: number; cvr: number; monthlyConversions: number; monthlyRevenue: number; monthlyMargin: number; annualRevenue: number; annualMargin: number };
+      variantB: { price: number; cvr: number; monthlyConversions: number; monthlyRevenue: number; monthlyMargin: number; annualRevenue: number; annualMargin: number };
+      delta12m: { revenueDelta: number; marginDelta: number; revenuePct: number; marginPct: number };
+      breakEvenWeeks: number | null;
+      riskLevel: "bajo" | "medio" | "alto";
+      confidence: "baja" | "media" | "alta";
+      summary: string;
+      assumptions: string[];
+      recommendation: string;
+    };
+
+    const fallbackForecast = (): Forecast => {
+      const visitors = baselineMonthlyVisitors ?? 1000;
+      const cvr = baselineCvr ?? 0.025;
+      const elasticity = -1.2;
+      const priceChange = (body.challengerPrice - body.controlPrice) / body.controlPrice;
+      const cvrB = Math.max(0.001, cvr * (1 + elasticity * priceChange));
+      const convA = visitors * cvr;
+      const convB = visitors * cvrB;
+      const revA = convA * body.controlPrice;
+      const revB = convB * body.challengerPrice;
+      const marA = convA * Math.max(0, body.controlPrice - cogs);
+      const marB = convB * Math.max(0, body.challengerPrice - cogs);
+      const revenueDelta12 = (revB - revA) * 12;
+      const marginDelta12 = (marB - marA) * 12;
+      return {
+        monthlyVisitorsAssumed: visitors,
+        baselineCvr: cvr,
+        assumedElasticity: elasticity,
+        variantA: { price: body.controlPrice, cvr, monthlyConversions: convA, monthlyRevenue: revA, monthlyMargin: marA, annualRevenue: revA * 12, annualMargin: marA * 12 },
+        variantB: { price: body.challengerPrice, cvr: cvrB, monthlyConversions: convB, monthlyRevenue: revB, monthlyMargin: marB, annualRevenue: revB * 12, annualMargin: marB * 12 },
+        delta12m: {
+          revenueDelta: revenueDelta12,
+          marginDelta: marginDelta12,
+          revenuePct: revA > 0 ? ((revB - revA) / revA) * 100 : 0,
+          marginPct: marA > 0 ? ((marB - marA) / marA) * 100 : 0,
+        },
+        breakEvenWeeks: marginDelta12 > 0 ? 0 : null,
+        riskLevel: Math.abs(priceChange) > 0.25 ? "alto" : Math.abs(priceChange) > 0.10 ? "medio" : "bajo",
+        confidence: baselineCvr ? "media" : "baja",
+        summary: `Proyección heurística: con elasticidad ${elasticity}, el cambio de €${body.controlPrice.toFixed(2)}→€${body.challengerPrice.toFixed(2)} (${(priceChange * 100).toFixed(1)}%) implicaría un delta de revenue anual estimado de ${fmtMoney(revenueDelta12, "EUR")}.`,
+        assumptions: [
+          baselineMonthlyVisitors ? `Visitantes mensuales reales: ${visitors}` : `Visitantes mensuales asumidos (sin datos): ${visitors}`,
+          baselineCvr ? `CVR baseline real: ${(cvr * 100).toFixed(2)}%` : `CVR baseline asumida (categoría): ${(cvr * 100).toFixed(2)}%`,
+          `Elasticidad-precio asumida: ${elasticity}`,
+          `Margen unitario A: ${fmtMoney(body.controlPrice - cogs, "EUR")} · B: ${fmtMoney(body.challengerPrice - cogs, "EUR")}`,
+        ],
+        recommendation: marginDelta12 > 0
+          ? `Lanzar el test. La proyección a 12 meses sugiere un margen incremental de ${fmtMoney(marginDelta12, "EUR")}.`
+          : `Lanzar con cautela. La proyección heurística indica margen incremental ≤ 0; valida con datos reales del test.`,
+      };
+    };
+
+    let forecast: Forecast;
+    try {
+      const competitorMedian = body.competitorContext?.priceStats?.median;
+      const competitorMin = body.competitorContext?.priceStats?.min;
+      const competitorMax = body.competitorContext?.priceStats?.max;
+      const supplierSavings = body.supplierContext?.potentialSavingsPerUnit ?? 0;
+
+      const prompt = `Genera una proyección financiera comparativa A/B a 12 meses para un test de PRECIO en e-commerce. Datos REALES:
+
+Producto: "${product.title}" (${product.productType || "general"})
+Nicho: ${niche} · Audiencia: ${audience}
+Precio actual (A): €${body.controlPrice.toFixed(2)}
+Precio challenger (B): €${body.challengerPrice.toFixed(2)}
+COGS por unidad: €${cogs.toFixed(2)}
+Hipótesis del test: ${body.hypothesis || "(no especificada)"}
+Duración prevista del test: ${body.durationDays ?? 21} días
+Mínimo visitantes objetivo: ${body.minVisitors ?? 1500}
+
+Tráfico real producto (últimos 90d): ${realVisits} visitas · ${realPurchases} compras${baselineMonthlyVisitors ? ` (≈${baselineMonthlyVisitors}/mes)` : " (sin tráfico observado)"}
+${competitorMedian ? `Mediana mercado: €${competitorMedian.toFixed(2)} · Rango: €${competitorMin?.toFixed(2)}–€${competitorMax?.toFixed(2)} · Posición: ${body.competitorContext?.priceStats?.yourPosition} (P${body.competitorContext?.priceStats?.percentileRank})` : "Sin contexto competitivo"}
+${supplierSavings > 0 ? `Ahorros proveedor disponibles: €${supplierSavings.toFixed(2)}/u` : ""}
+
+Proyecta usando elasticidad de precio realista para el nicho. Si no hay tráfico real, asume baseline conservador para la categoría y dilo en assumptions.
+
+Devuelve EXCLUSIVAMENTE este JSON (sin texto adicional, sin markdown):
+{
+  "monthlyVisitorsAssumed": <número>,
+  "baselineCvr": <0..1>,
+  "assumedElasticity": <número negativo típico -0.5..-2.5>,
+  "variantA": { "price": ${body.controlPrice}, "cvr": <0..1>, "monthlyConversions": <número>, "monthlyRevenue": <€>, "monthlyMargin": <€>, "annualRevenue": <€>, "annualMargin": <€> },
+  "variantB": { "price": ${body.challengerPrice}, "cvr": <0..1>, "monthlyConversions": <número>, "monthlyRevenue": <€>, "monthlyMargin": <€>, "annualRevenue": <€>, "annualMargin": <€> },
+  "delta12m": { "revenueDelta": <€>, "marginDelta": <€>, "revenuePct": <%>, "marginPct": <%> },
+  "breakEvenWeeks": <semanas hasta recuperar inversión del test, o null>,
+  "riskLevel": "bajo" | "medio" | "alto",
+  "confidence": "baja" | "media" | "alta",
+  "summary": "string 2-3 frases ejecutivo",
+  "assumptions": ["assumption 1", "assumption 2", "..."],
+  "recommendation": "string accionable: lanzar/no lanzar y por qué"
+}
+
+Reglas: matemática consistente (revenue = visitors × cvr × price; margin = visitors × cvr × (price − cogs)). Anuales = mensual × 12. Sin emojis.`;
+
+      const aiForecast = await withRetry(() => askClaudeJsonWithBrain<Forecast>(
+        projectId, prompt,
+        "Eres un analista financiero senior de e-commerce. Generas proyecciones data-driven con matemática consistente y JSON estricto. Sin texto fuera del JSON.",
+        "ab_test_prediction", niche, 3000, 60_000,
+      ), 3, 1100, "forecast");
+
+      // Sanea numéricamente y rellena huecos con fallback
+      const fb = fallbackForecast();
+      const safe = (n: unknown, def: number) => Number.isFinite(Number(n)) ? Number(n) : def;
+      forecast = {
+        monthlyVisitorsAssumed: safe(aiForecast.monthlyVisitorsAssumed, fb.monthlyVisitorsAssumed),
+        baselineCvr: safe(aiForecast.baselineCvr, fb.baselineCvr),
+        assumedElasticity: safe(aiForecast.assumedElasticity, fb.assumedElasticity),
+        variantA: {
+          price: body.controlPrice,
+          cvr: safe(aiForecast.variantA?.cvr, fb.variantA.cvr),
+          monthlyConversions: safe(aiForecast.variantA?.monthlyConversions, fb.variantA.monthlyConversions),
+          monthlyRevenue: safe(aiForecast.variantA?.monthlyRevenue, fb.variantA.monthlyRevenue),
+          monthlyMargin: safe(aiForecast.variantA?.monthlyMargin, fb.variantA.monthlyMargin),
+          annualRevenue: safe(aiForecast.variantA?.annualRevenue, fb.variantA.annualRevenue),
+          annualMargin: safe(aiForecast.variantA?.annualMargin, fb.variantA.annualMargin),
+        },
+        variantB: {
+          price: body.challengerPrice,
+          cvr: safe(aiForecast.variantB?.cvr, fb.variantB.cvr),
+          monthlyConversions: safe(aiForecast.variantB?.monthlyConversions, fb.variantB.monthlyConversions),
+          monthlyRevenue: safe(aiForecast.variantB?.monthlyRevenue, fb.variantB.monthlyRevenue),
+          monthlyMargin: safe(aiForecast.variantB?.monthlyMargin, fb.variantB.monthlyMargin),
+          annualRevenue: safe(aiForecast.variantB?.annualRevenue, fb.variantB.annualRevenue),
+          annualMargin: safe(aiForecast.variantB?.annualMargin, fb.variantB.annualMargin),
+        },
+        delta12m: {
+          revenueDelta: safe(aiForecast.delta12m?.revenueDelta, fb.delta12m.revenueDelta),
+          marginDelta: safe(aiForecast.delta12m?.marginDelta, fb.delta12m.marginDelta),
+          revenuePct: safe(aiForecast.delta12m?.revenuePct, fb.delta12m.revenuePct),
+          marginPct: safe(aiForecast.delta12m?.marginPct, fb.delta12m.marginPct),
+        },
+        breakEvenWeeks: aiForecast.breakEvenWeeks === null || aiForecast.breakEvenWeeks === undefined
+          ? fb.breakEvenWeeks
+          : safe(aiForecast.breakEvenWeeks, fb.breakEvenWeeks ?? 0),
+        riskLevel: ["bajo", "medio", "alto"].includes(String(aiForecast.riskLevel)) ? aiForecast.riskLevel : fb.riskLevel,
+        confidence: ["baja", "media", "alta"].includes(String(aiForecast.confidence)) ? aiForecast.confidence : (baselineCvr ? "media" : "baja"),
+        summary: typeof aiForecast.summary === "string" && aiForecast.summary.trim() ? aiForecast.summary : fb.summary,
+        assumptions: Array.isArray(aiForecast.assumptions) ? aiForecast.assumptions.map(String).slice(0, 8) : fb.assumptions,
+        recommendation: typeof aiForecast.recommendation === "string" && aiForecast.recommendation.trim() ? aiForecast.recommendation : fb.recommendation,
+      };
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : String(e) }, "[ab-forecast] Claude failed, using deterministic fallback");
+      forecast = fallbackForecast();
+    }
+
+    res.json({
+      productId: body.productId,
+      productTitle: product.title,
+      currency: "EUR",
+      cogsPerUnit: cogs,
+      controlPrice: body.controlPrice,
+      challengerPrice: body.challengerPrice,
+      priceChangePct: ((body.challengerPrice - body.controlPrice) / body.controlPrice) * 100,
+      baselineSource: realVisits > 0 ? "real_traffic_90d" : "category_heuristic",
+      forecast,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, "price/forecast failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error generando forecast" });
   }
 });
 

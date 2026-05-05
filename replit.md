@@ -1,7 +1,7 @@
 # Shopy Crafter Agency Platform
 
 ## Overview
-Shopy Crafter is a multi-user Shopify AI optimization agency platform utilizing a Dual AI Engine (Gemini + Claude) named "ShopyBrain." It delivers AI-driven insights, automation, product and image creation, SEO, financial analysis, and a Universal Web Audit system. The platform aims to be a leading AI-driven e-commerce solution, expanding to various platforms to offer extensive agency-level services that enhance client ROI and drive business growth through advanced AI capabilities.
+Shopy Crafter is a multi-user Shopify AI optimization agency platform that leverages a Dual AI Engine (Gemini + Claude) called "ShopyBrain." It provides AI-driven insights, automation, product and image creation, SEO, financial analysis, and a Universal Web Audit system. The platform aims to be a leading AI-driven e-commerce solution, expanding to various platforms to offer extensive agency-level services that enhance client ROI and drive business growth through advanced AI capabilities.
 
 ## User Preferences
 - Admin email: via `ADMIN_EMAIL` env var (default: craftershopy@gmail.com)
@@ -22,33 +22,25 @@ A premium dark theme with custom color variables, typography, and a fixed layout
 An extensible `IPlatformConnector` abstraction layer supports Shopify, PrestaShop, WooCommerce, and Universal Web Audit, with a `ConnectorFactory` for dynamic selection.
 
 ### AI Stack (Single Brain Architecture — MEGA-BRAIN)
-"ShopyBrain" is the central mega-brain, a Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains over 46,000 knowledge insights and 135+ chatbot actions. A centralized model registry allows administrators to change which Claude/Gemini model powers each task tier. Critical actions validate path whitelists, block sensitive files, and require explicit confirmation. All routes with AI operations feed `learnFromOperation`, enabling retroactive learning. Gemini Search Grounding 403 errors are handled via circuit breaker with automatic Claude fallback.
+"ShopyBrain" is a central Dual AI Engine (Claude, Gemini) integrating with Replicate and OpenAI gpt-image-1 for image generation. It contains extensive knowledge insights and chatbot actions. A centralized model registry allows administrators to change which Claude/Gemini model powers each task tier. Critical actions validate path whitelists, block sensitive files, and require explicit confirmation. All routes with AI operations feed `learnFromOperation` for retroactive learning. Gemini Search Grounding errors are handled via circuit breaker with automatic Claude fallback.
 
 ### Generation Engine Catalog (Fusion Studio Pro)
-Centralized in `artifacts/api-server/src/lib/fusion-studio-pro.ts`, exposed automatically to the frontend via `/api/fs-pro/models` (the dropdowns iterate `Object.entries(IMAGE_MODELS)` / `VIDEO_MODELS`, so new entries appear without UI changes).
-- **IMAGE_MODELS (13):** flux-1.1-pro-ultra, flux-1.1-pro-ultra-raw (naturalistic), flux-1.1-pro, flux-schnell, recraft-v3, ideogram-v3-turbo, imagen-4-ultra, imagen-4, imagen-4-fast, **nano-banana** (Gemini 2.5 Flash Image, v1), **nano-banana-pro** (Gemini 3 Pro Image / "Nano Banana 2", 4K), seedream-4 (ByteDance), flux-kontext-pro.
-- **IMAGE_EDIT_MODELS (5):** nano-banana, nano-banana-pro, flux-kontext-pro, seedream-4, gen4-image-edit (Runway).
-- **VIDEO_MODELS (17):** runway-gen4-turbo, runway-gen3-alpha, **veo-3.1**, **veo-3.1-fast**, veo-3, veo-3-fast, veo-2, **sora-2** (OpenAI vía Replicate, 4/8/12s), kling-master, **kling-2.5-turbo** (kwaivgi/kling-v2.5-turbo-pro), kling-2.1, seedance-pro, seedance-fast, **hailuo-02-fast**, hailuo-02, **wan-2.5** (full), wan-2.5-fast.
-- Nano Banana (v1 + Pro) usa Gemini API directa con fallback automático a Replicate (`google/nano-banana` / `google/nano-banana-pro`) gestionado por circuit breaker en `nano-banana.ts` (parámetro `tier: "v1" | "pro"`).
-- Veo 3.0 fija 16:9; Veo 2 y Veo 3.1 soportan también 9:16. Sora 2 admite landscape/portrait con 4/8/12s.
+Centralized in `artifacts/api-server/src/lib/fusion-studio-pro.ts`, this catalog exposes a variety of IMAGE_MODELS (e.g., flux-1.1-pro-ultra, ideogram-v3-turbo, nano-banana), IMAGE_EDIT_MODELS, and VIDEO_MODELS (e.g., runway-gen4-turbo, veo-3.1, sora-2, kling-master). Nano Banana models use direct Gemini API with automatic Replicate fallback.
 
 ### Product Intelligence & Optimization
 AI-driven Product Enrichment for SEO meta generation and Shopify Standard Product Taxonomy. A Comprehensive Product Audit System performs 7-criteria weighted scoring. COGS estimation and optimal pricing calculation use Gemini with Google Search. Advanced Financial Intelligence provides break-even units, LTV 12-month estimation, LTV/CAC ratio, supply chain risk assessment, and defensive moat strategy, powered by Claude. Fusion Studio provides AI-powered product photography with Brand Intelligence, Product Analysis, Generation Config, Gallery, and Multi-Platform Video Generation.
 
 ### Ad Audio Pipeline
-Voiceovers for ads are broadcast-grade, with copy length tied to duration, two-stage loudness normalization, and music ducking via sidechain compression. FFmpeg filter graphs use `asplit` for stream reuse.
+Voiceovers for ads are broadcast-grade, with copy length tied to duration, two-stage loudness normalization, and music ducking via sidechain compression, utilizing FFmpeg filter graphs.
 
-### Intelligent Per-Scene Lip-Sync (UGC Contract)
-The cinematic multishot renderer (`cinematic-multishot.ts`) tags each scene with a `shotType` field (`presenter` | `b_roll` | `product`) emitted by the director (`cinematic-director.ts`). When narration is enabled, ONE continuous voiceover is generated by ElevenLabs (preserves speaker identity, timbre and intonation across the whole ad) and then sliced per-scene by timeline offsets. Scenes with `shotType='presenter'` are sent to Replicate `cudanexus/lipsync-v2` with their corresponding voiceover slot — the lips move precisely with the words for that scene. Scenes with `shotType='b_roll'` or `'product'` are kept as-is — the same continuous voiceover plays over them as voice-over of the same speaker. Switching between presenter and product shots feels organic: when the person reappears their mouth syncs again automatically. The orchestrator (`applyPerSceneLipSync` in `fusion-studio-pro.ts`) is fail-soft per clip — a single Replicate failure falls back to the original visual, the voice still plays correctly. Default: ON when narration enabled AND at least one presenter scene exists; override via `intelligentLipSync: false`.
-
-### Vault Download URLs
-Final MP4s from various ad generation endpoints are persisted to the vault, with playable URLs returned via `/api/projects/:projectId/vault/:fileId/download`.
+### Intelligent Per-Scene Lip-Sync
+The cinematic multishot renderer tags scenes (`presenter` | `b_roll` | `product`). A continuous ElevenLabs voiceover is generated and sliced per-scene. `presenter` shots are sent to Replicate `cudanexus/lipsync-v2` for lip-sync, while `b_roll` or `product` shots play the voiceover as-is. This provides organic transitions. The orchestrator (`applyPerSceneLipSync`) is fail-soft per clip.
 
 ### Long-Running Endpoint Heartbeat
-The `enableLongRunning(res)` helper maintains connections for slow AI calls by sending heartbeat characters. It gracefully handles `Content-Type` for JSON and binary downloads.
+The `enableLongRunning(res)` helper maintains connections for slow AI calls by sending heartbeat characters and handles `Content-Type` for JSON and binary downloads.
 
 ### Pricing Endpoints
-AI-pricing endpoints (COGS estimation and optimal price calculation) are optimized for speed and resilience, minimizing Claude calls and handling Gemini fallbacks.
+AI-pricing endpoints for COGS estimation and optimal price calculation are optimized for speed and resilience, minimizing Claude calls and handling Gemini fallbacks.
 
 ### Cinematic Ad Templates & Knowledge Bases
 A permanent in-platform library of 6 master cinematic ad templates and five knowledge base modules covering Cinematic, Advertising Playbook, Campaign Production, Exploded View, and COGS Methodology. KB data is exposed via REST and injected into `buildShopyBrainContext` for AI tasks.
@@ -72,7 +64,7 @@ The Universal Generator provides a comprehensive content generation tool with 41
 A power-user tab in Fusion Studio Pro for crafting and reusing professional prompts across 12 creation intents. It allows combining deterministic presets, refining prompts via Claude, editing output, and saving to a persistent navigable library.
 
 ### Security
-Employs AES-256-GCM encryption, audit logging, database-backed rate limiting, AI API concurrency queues, admin route protection, CORS, secure session management, SVG/HTML sanitization, PostMessage origin validation, and robust input validation. ACL is project-scoped and centralized. SSRF protection is implemented via URL validation (`isSafePublicUrl`).
+Employs AES-256-GCM encryption, audit logging, database-backed rate limiting, AI API concurrency queues, admin route protection, CORS, secure session management, SVG/HTML sanitization, PostMessage origin validation, robust input validation, project-scoped ACL, and SSRF protection via URL validation.
 
 ### Database
 PostgreSQL with Drizzle ORM manages over 45 tables, including `platform_type` for platform specificity.
@@ -93,7 +85,7 @@ A `lib/brand-overlay.ts` engine applies branding after video muxing using FFmpeg
 Specialized endpoints offer infographic generation with AI or overlay text rendering modes. A universal virtual try-on feature fuses model and product images using Gemini.
 
 ### Card Studio (Tarjetas profesionales 300 DPI)
-Provides a backend for business card generation with 6 templates, QR code generation, and rendering via Puppeteer for high-DPI printable output. It includes an admin-only API for managing cards, an auto-design feature using Claude, and a frontend editor with live preview. Frontend supports 8 AI background engines.
+Provides a backend for business card generation with 6 templates, QR code generation, and rendering via Puppeteer for high-DPI printable output. It includes an admin-only API for managing cards, an auto-design feature using Claude, and a frontend editor with live preview supporting 8 AI background engines.
 
 ### Standalone Module Routes
 All 17 modules have standalone routes that work without an active project (`projectId=0`), allowing full content generation, analysis, video creation, and campaign building independently of any project.
@@ -105,20 +97,16 @@ The OnboardingWidget is fully dynamic, querying real tables for progress and com
 When tracking events push confidence to ≥95%, the backend automatically declares the winner, sets status to "completed", and logs the result to ShopyBrain via `learnFromOperation`.
 
 ### A/B Testing Module v2.0 (Redesigned)
-Located at `/projects/:id/ab-testing` (artifacts/shopify-optimizer/src/pages/projects/ab-testing/). Replaces the old hollow form with:
-- **Real KPI dashboard**: active tests, completion rate, win rate, avg confidence, 30-day revenue impact (computed from `abTestsTable`).
-- **Image Test Wizard**: Claude Vision analyzes the uploaded reference (scores 0-100, warnings/strengths/suggestions). Nano-Banana generates 4 stylistic variants (lifestyle/studio/context/detail) with `STYLE_PROMPTS`. Variants are returned as base64 dataURLs (no object-storage migration required); flagged as a known limitation for production payload size — to upgrade later, route through `objectStorage.ts` and persist URLs.
-- **Price Test Wizard**: honest competitor analysis (`source: "ai_estimate"` with reasoning, NO fake scraping/URLs), real supplier impact from `supplierEntriesTable`, Claude price recommendations (conservative/optimal/aggressive) using real COGS and break-even.
-- **Lifecycle endpoints**: start/pause/resume/cancel/stats/report on `:testId`.
-- **No hardcodes**: `targetDays` derives from testType (image=14, price=21); annual sales volume in supplier-impact is extrapolated from real `track_events` purchases for tests of this product (last 90d × 4) and returned as `null` with explanatory `annualVolumeBasis` if no data exists.
-- **Security**: `isPublicHttpUrl` SSRF guard blocks loopback/private/link-local hosts and forbids redirects on every outbound image fetch.
-- **Performance**: `_active` batches product+COGS lookups into Maps to avoid N+1; `shapeABTest` accepts an optional context with the prefetched maps.
-- **Routing fix**: the prior `GET /:testId` route now calls `next()` when the param is non-numeric or starts with `_`, so `/_kpis`, `/_active`, `/_history`, `/_products` reach their intended handlers without conflict.
-- **Real HTML report generation**: `POST /:testId/report` now writes a self-contained branded HTML report to `public/reports/ab-test-<id>-<ts>.html` and returns `{ reportUrl: "/api/reports/..." }`. Uses Claude (`askClaudeJsonWithBrain`) for executive narrative with deterministic fallback if AI fails. Report is print-to-PDF ready. The "Reporte" button in `ActiveTestCard` opens the URL in a new tab and throws on empty URL or popup-block (no silent fail).
-- **Per-project report ACL**: `reportAuth` middleware in `app.ts` parses the `testId` out of `ab-test-<id>-<ts>.html`, looks up its `projectId`, and gates access via `canAccessProject`. Non-AB report files keep the original login-only check so existing audits (`comic-crafter-audit-2026.html`, etc.) still work. Validated: admin sees 200, anon 403, unknown id 404.
+This module at `/projects/:id/ab-testing` provides a real KPI dashboard, an Image Test Wizard (Claude Vision analysis, Nano-Banana generation of 4 stylistic variants), and a Price Test Wizard (competitor analysis, supplier impact, Claude price recommendations). It includes lifecycle endpoints for tests, dynamic target days, SSRF protection, performance optimizations, and real HTML report generation. Access control for reports is project-scoped.
+
+**v2.1 hardening (forecast + first-try reliability):**
+- `withRetry(fn, attempts=3, baseDelayMs=900, label)` helper in `routes/ab-testing.ts` wraps Claude calls in `/price/competitors`, `/price/recommend`, and `/price/forecast` with exponential backoff to eliminate first-try 5xx from transient Claude failures.
+- `/price/supplier-impact` always returns `potentialSavingsAnnual` as a number (0 when no purchase volume) plus `annualVolumeBasis` string; frontend `SupplierPanel` shows "—" when 0.
+- New endpoint `POST /api/projects/:projectId/ab-tests/price/forecast`: pulls real 90d traffic from `trackEvents` (when available) or uses category heuristic, then asks Claude (with retry, label `forecast`) for a 12-month projection comparing A vs B (monthly/annual revenue+margin per variant, delta12m, breakEvenWeeks, riskLevel, confidence, summary, assumptions, recommendation). Strict numeric input validation (`Number.isFinite` + `>0`) and per-field sanitization with deterministic elasticity=-1.2 fallback guarantee no NaN/5xx.
+- PriceTestWizard step 4 ("Lanzar") auto-fetches the forecast on entry (effect gated by `!forecastError` to prevent retry loops) and renders a `ForecastBlock` card with revenue projection, margin delta, elasticity, risk/confidence badges, executive summary, recommendation, and collapsible assumptions list. All forecast hooks declared before the `if (!open) return null` early-return to comply with Rules of Hooks.
 
 ### Pricing Module
-A complete pricing intelligence module at `/api/pricing/*` with 12 flat endpoints for product listing, KPIs, AI classification, COGS estimation (single and batch), batch job management, manual COGS updates, pricing simulation, AI optimization, Shopify price application, and A/B test creation.
+A complete pricing intelligence module at `/api/pricing/*` with 12 flat endpoints for product listing, KPIs, AI classification, COGS estimation, batch job management, manual COGS updates, pricing simulation, AI optimization, Shopify price application, and A/B test creation.
 
 ### Supplier Intelligence
 The Suppliers page (`/projects/:id/suppliers`) features a premium dark luxury design with multi-source search, KPI cards, a comparison table, top suppliers ranking, and an AI Insight panel.

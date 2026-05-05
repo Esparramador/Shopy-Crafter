@@ -2,7 +2,7 @@ import { fetchApi } from "@/lib/api";
 import type {
   ABTest, ABTestingKPIs, TestHistoryEntry, TestStats,
   ShopifyProduct, ImageAnalysis, ImageVariant, ImageStyle,
-  CompetitorAnalysis, SupplierImpactAnalysis, PriceRecommendation,
+  CompetitorAnalysis, SupplierImpactAnalysis, PriceRecommendation, PriceForecast,
   ImageTestConfig, PriceTestConfig,
 } from "./types";
 
@@ -62,6 +62,22 @@ export function createABTestingAPI(projectId: number) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId }),
+      });
+    },
+    async forecastPrice(payload: {
+      productId: string;
+      controlPrice: number;
+      challengerPrice: number;
+      hypothesis?: string;
+      durationDays?: number;
+      minVisitors?: number;
+      competitorContext?: CompetitorAnalysis | null;
+      supplierContext?: SupplierImpactAnalysis | null;
+    }): Promise<PriceForecast> {
+      return fetchApi<PriceForecast>(`${base}/price/forecast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
     },
     async createImageTest(config: ImageTestConfig): Promise<ABTest> {

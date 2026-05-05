@@ -88,8 +88,35 @@ export interface SupplierImpactAnalysis {
   bestAlternativeCOGS: number;
   potentialSavingsPerUnit: number;
   potentialSavingsAnnual: number;
+  annualVolumeBasis?: string;
   options: SupplierOption[];
   analyzedAt: string;
+}
+
+export interface PriceForecast {
+  productId: string;
+  productTitle: string;
+  currency: string;
+  cogsPerUnit: number;
+  controlPrice: number;
+  challengerPrice: number;
+  priceChangePct: number;
+  baselineSource: "real_traffic_90d" | "category_heuristic";
+  forecast: {
+    monthlyVisitorsAssumed: number;
+    baselineCvr: number;
+    assumedElasticity: number;
+    variantA: { price: number; cvr: number; monthlyConversions: number; monthlyRevenue: number; monthlyMargin: number; annualRevenue: number; annualMargin: number };
+    variantB: { price: number; cvr: number; monthlyConversions: number; monthlyRevenue: number; monthlyMargin: number; annualRevenue: number; annualMargin: number };
+    delta12m: { revenueDelta: number; marginDelta: number; revenuePct: number; marginPct: number };
+    breakEvenWeeks: number | null;
+    riskLevel: "bajo" | "medio" | "alto";
+    confidence: "baja" | "media" | "alta";
+    summary: string;
+    assumptions: string[];
+    recommendation: string;
+  };
+  generatedAt: string;
 }
 
 export interface PriceRecommendation {

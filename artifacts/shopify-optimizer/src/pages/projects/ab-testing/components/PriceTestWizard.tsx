@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X, ChevronRight, ChevronLeft, DollarSign, Check, Sparkles,
   Globe, Factory, AlertTriangle,
 } from "lucide-react";
 import { ActionButton } from "./ActionButton";
 import type {
-  ShopifyProduct, CompetitorAnalysis, SupplierImpactAnalysis, PriceTestConfig, PriceRecommendation,
+  ShopifyProduct, CompetitorAnalysis, SupplierImpactAnalysis, PriceTestConfig, PriceRecommendation, PriceForecast,
 } from "../lib/types";
 import type { ABTestingAPI } from "../lib/api";
 
@@ -33,6 +33,9 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
     durationDays: 21,
     minVisitors: 1500,
   });
+  const [forecast, setForecast] = useState<PriceForecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastError, setForecastError] = useState<string>("");
 
   useEffect(() => {
     if (open && products.length === 0) {
@@ -47,9 +50,44 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
       setSupplierAnalysis(null);
       setRecommendation(null);
       setHypothesis("");
+      setForecast(null);
+      setForecastError("");
       if (!preselectedProduct) setSelectedProduct(null);
     }
   }, [open, preselectedProduct]);
+
+  const challengerPrice = recommendation
+    ? recommendation[selectedPriceTier]
+    : selectedProduct?.currentPrice || 0;
+
+  const runForecast = useCallback(async () => {
+    if (!selectedProduct || !competitorAnalysis || !recommendation) return;
+    setForecastLoading(true);
+    setForecastError("");
+    try {
+      const fc = await api.forecastPrice({
+        productId: selectedProduct.id,
+        controlPrice: selectedProduct.currentPrice,
+        challengerPrice,
+        hypothesis,
+        durationDays: config.durationDays,
+        minVisitors: config.minVisitors,
+        competitorContext: competitorAnalysis,
+        supplierContext: supplierAnalysis,
+      });
+      setForecast(fc);
+    } catch (err) {
+      setForecastError(err instanceof Error ? err.message : "Error generando forecast");
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [api, selectedProduct, competitorAnalysis, recommendation, supplierAnalysis, challengerPrice, hypothesis, config.durationDays, config.minVisitors]);
+
+  useEffect(() => {
+    if (step === 4 && open && selectedProduct && recommendation && !forecast && !forecastLoading && !forecastError) {
+      void runForecast();
+    }
+  }, [step, open, selectedProduct, recommendation, forecast, forecastLoading, forecastError, runForecast]);
 
   if (!open) return null;
 
@@ -72,10 +110,6 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
       setAnalysisLoading(false);
     }
   };
-
-  const challengerPrice = recommendation
-    ? recommendation[selectedPriceTier]
-    : selectedProduct?.currentPrice || 0;
 
   const canGoNext = (() => {
     if (step === 1) return !!selectedProduct;
@@ -347,16 +381,23 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
                 </div>
               </div>
 
-              <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-2 text-xs">
+              <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-2 text-xs mb-4">
                 <SumRow label="Producto" value={selectedProduct.title} />
                 <SumRow label="Hipótesis" value={hypothesis} />
                 <SumRow label="Split traffic" value={`${100 - config.splitTraffic}% / ${config.splitTraffic}%`} />
                 <SumRow label="Duración" value={`${config.durationDays} días`} />
                 <SumRow label="Visitas mínimas" value={config.minVisitors.toLocaleString()} />
-                {competitorAnalysis && (
+                {competitorAnalysis && competitorAnalysis.totalSourcesScraped > 0 && (
                   <SumRow label="Competidores analizados" value={`${competitorAnalysis.totalSourcesScraped} fuentes`} />
                 )}
               </div>
+
+              <ForecastBlock
+                forecast={forecast}
+                loading={forecastLoading}
+                error={forecastError}
+                onRetry={runForecast}
+              />
             </div>
           )}
         </div>
@@ -473,9 +514,18 @@ function SupplierPanel({ data }: { data: SupplierImpactAnalysis }) {
         ))}
       </div>
       <div className="bg-teal-500/10 rounded-md p-3 grid grid-cols-2 gap-2 text-center">
-        <Stat label="Ahorro/u" value={`€${data.potentialSavingsPerUnit.toFixed(2)}`} highlight />
-        <Stat label="Ahorro anual" value={`€${data.potentialSavingsAnnual.toFixed(0)}`} highlight />
+        <Stat label="Ahorro/u" value={`€${(data.potentialSavingsPerUnit ?? 0).toFixed(2)}`} highlight />
+        <Stat
+          label="Ahorro anual"
+          value={data.potentialSavingsAnnual && data.potentialSavingsAnnual > 0
+            ? `€${data.potentialSavingsAnnual.toFixed(0)}`
+            : "—"}
+          highlight
+        />
       </div>
+      {data.annualVolumeBasis && (
+        <p className="text-[10px] text-slate-500 mt-2 text-center">{data.annualVolumeBasis}</p>
+      )}
     </div>
   );
 }
@@ -535,6 +585,114 @@ function SumRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-3">
       <span className="text-slate-500 flex-shrink-0">{label}</span>
       <span className="text-slate-200 text-right truncate" title={value}>{value}</span>
+    </div>
+  );
+}
+
+function ForecastBlock({
+  forecast, loading, error, onRetry,
+}: { forecast: PriceForecast | null; loading: boolean; error: string; onRetry: () => void }) {
+  if (loading) {
+    return (
+      <div className="bg-gradient-to-br from-violet-500/5 via-slate-950 to-teal-500/5 border border-violet-500/20 rounded-lg p-6 text-center">
+        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-sm text-slate-200 font-medium">Calculando proyección de revenue a 12 meses...</p>
+        <p className="text-[11px] text-slate-500 mt-1">Cruzando precio, COGS, competencia y tráfico real</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+        <p className="text-sm text-red-300 mb-2">Error generando forecast: {error}</p>
+        <ActionButton variant="secondary" size="sm" onAction={async () => onRetry()}>Reintentar</ActionButton>
+      </div>
+    );
+  }
+  if (!forecast) return null;
+
+  const f = forecast.forecast;
+  const fmt = (n: number) => `€${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(Math.round(n))}`;
+  const winsB = f.delta12m.marginDelta > 0;
+  const riskColor = f.riskLevel === "alto" ? "text-red-400 bg-red-500/10 border-red-500/30"
+    : f.riskLevel === "medio" ? "text-amber-300 bg-amber-500/10 border-amber-500/30"
+    : "text-teal-300 bg-teal-500/10 border-teal-500/30";
+  const confColor = f.confidence === "alta" ? "text-teal-300" : f.confidence === "media" ? "text-amber-300" : "text-slate-400";
+
+  return (
+    <div className="bg-gradient-to-br from-violet-500/5 via-slate-950 to-teal-500/5 border border-violet-500/30 rounded-lg p-5">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-violet-400" />
+          <span className="text-xs text-violet-300 font-semibold uppercase tracking-wider">Proyección financiera · 12 meses</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] px-2 py-0.5 rounded border ${riskColor} uppercase tracking-wider font-semibold`}>Riesgo {f.riskLevel}</span>
+          <span className={`text-[10px] uppercase tracking-wider font-semibold ${confColor}`}>Confianza {f.confidence}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 font-semibold">Variante A (control) · €{f.variantA.price.toFixed(2)}</p>
+          <p className="text-xl font-semibold text-slate-100 tabular-nums">{fmt(f.variantA.annualRevenue)}</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Revenue anual estimado</p>
+          <div className="mt-2 pt-2 border-t border-slate-800 grid grid-cols-2 gap-1 text-[10px]">
+            <div><span className="text-slate-500">Margen 12m: </span><span className="text-slate-200 tabular-nums">{fmt(f.variantA.annualMargin)}</span></div>
+            <div><span className="text-slate-500">CVR: </span><span className="text-slate-200 tabular-nums">{(f.variantA.cvr * 100).toFixed(2)}%</span></div>
+          </div>
+        </div>
+        <div className={`border rounded-lg p-3 ${winsB ? "bg-teal-500/5 border-teal-500/40" : "bg-amber-500/5 border-amber-500/30"}`}>
+          <p className={`text-[10px] uppercase tracking-wider mb-1.5 font-semibold ${winsB ? "text-teal-400" : "text-amber-400"}`}>Variante B (challenger) · €{f.variantB.price.toFixed(2)}</p>
+          <p className={`text-xl font-semibold tabular-nums ${winsB ? "text-teal-300" : "text-amber-200"}`}>{fmt(f.variantB.annualRevenue)}</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Revenue anual estimado</p>
+          <div className="mt-2 pt-2 border-t border-slate-800 grid grid-cols-2 gap-1 text-[10px]">
+            <div><span className="text-slate-500">Margen 12m: </span><span className="text-slate-200 tabular-nums">{fmt(f.variantB.annualMargin)}</span></div>
+            <div><span className="text-slate-500">CVR: </span><span className="text-slate-200 tabular-nums">{(f.variantB.cvr * 100).toFixed(2)}%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 grid grid-cols-3 gap-2 mb-4 text-center">
+        <div>
+          <p className="text-[9px] text-slate-500 uppercase tracking-wider">Δ Revenue 12m</p>
+          <p className={`text-base font-semibold tabular-nums ${f.delta12m.revenueDelta >= 0 ? "text-teal-300" : "text-red-400"}`}>
+            {f.delta12m.revenueDelta >= 0 ? "+" : ""}{fmt(f.delta12m.revenueDelta)}
+          </p>
+          <p className="text-[10px] text-slate-500">{f.delta12m.revenuePct >= 0 ? "+" : ""}{f.delta12m.revenuePct.toFixed(1)}%</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 uppercase tracking-wider">Δ Margen 12m</p>
+          <p className={`text-base font-semibold tabular-nums ${f.delta12m.marginDelta >= 0 ? "text-teal-300" : "text-red-400"}`}>
+            {f.delta12m.marginDelta >= 0 ? "+" : ""}{fmt(f.delta12m.marginDelta)}
+          </p>
+          <p className="text-[10px] text-slate-500">{f.delta12m.marginPct >= 0 ? "+" : ""}{f.delta12m.marginPct.toFixed(1)}%</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-slate-500 uppercase tracking-wider">Elasticidad asumida</p>
+          <p className="text-base font-semibold text-slate-200 tabular-nums">{f.assumedElasticity.toFixed(2)}</p>
+          <p className="text-[10px] text-slate-500">{forecast.baselineSource === "real_traffic_90d" ? "Tráfico real" : "Heurística categoría"}</p>
+        </div>
+      </div>
+
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-md p-3 mb-3">
+        <p className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider mb-1">Resumen ejecutivo</p>
+        <p className="text-xs text-slate-200 leading-relaxed">{f.summary}</p>
+      </div>
+
+      <div className="bg-teal-500/5 border border-teal-500/20 rounded-md p-3 mb-3">
+        <p className="text-[10px] text-teal-300 font-semibold uppercase tracking-wider mb-1">Recomendación</p>
+        <p className="text-xs text-slate-200 leading-relaxed">{f.recommendation}</p>
+      </div>
+
+      {f.assumptions.length > 0 && (
+        <details className="text-[11px] text-slate-400">
+          <summary className="cursor-pointer text-slate-500 hover:text-slate-300 select-none">Ver supuestos ({f.assumptions.length})</summary>
+          <ul className="mt-2 space-y-1 pl-4 list-disc">
+            {f.assumptions.map((a, i) => <li key={i} className="text-slate-400 leading-snug">{a}</li>)}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
