@@ -108,6 +108,7 @@ export type ImageGenModel =
   | "flux-1.1-pro"              // standard pro Flux
   | "flux-schnell"              // fastest, cheap
   | "recraft-v3"                // BEST for text on image (logos, posters)
+  | "recraft-v3-svg"            // Recraft v3 SVG — vectorial real (logos, iconos)
   | "ideogram-v3-turbo"         // text + photoreal
   | "imagen-4-ultra"            // Google Imagen 4 Ultra (premium)
   | "imagen-4"                  // Google Imagen 4 (standard)
@@ -115,10 +116,11 @@ export type ImageGenModel =
   | "nano-banana"               // Gemini 2.5 Flash Image (v1)
   | "nano-banana-pro"           // Gemini 3 Pro Image (v2, 4K, top-tier)
   | "seedream-4"                // ByteDance Seedream 4 (text + photoreal)
-  | "flux-kontext-pro";         // Flux Kontext for character consistency
+  | "flux-kontext-pro"          // Flux Kontext for character consistency
+  | "gpt-image-1";              // OpenAI gpt-image-1 (vía Replit AI Integrations)
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
-export type ImageProvider = "replicate" | "gemini" | "runway";
+export type ImageProvider = "replicate" | "gemini" | "runway" | "openai";
 
 export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
   "flux-1.1-pro-ultra":     { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
@@ -126,6 +128,7 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "flux-1.1-pro":           { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
   "flux-schnell":           { provider: "replicate", replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
   "recraft-v3":             { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "recraft-v3-svg":         { provider: "replicate", replicateId: "recraft-ai/recraft-v3-svg",            description: "Recraft v3 SVG — vectorial REAL (logos, iconos, ilustración plana)", costPerImage: 0.08, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "vector" },
   "ideogram-v3-turbo":      { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
   "imagen-4-ultra":         { provider: "replicate", replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra — premium 2K, máxima calidad", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "imagen-4":               { provider: "replicate", replicateId: "google/imagen-4",                      description: "Google Imagen 4 estándar — alta calidad/precio equilibrado", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
@@ -134,6 +137,7 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "nano-banana-pro":        { provider: "gemini",                                                          description: "Nano Banana 2 / Pro (Gemini 3 Pro Image) — 4K, texto nítido, identidad estable", costPerImage: 0.12, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "4K" },
   "seedream-4":             { provider: "replicate", replicateId: "bytedance/seedream-4",                 description: "ByteDance Seedream 4 — photoreal + texto, rival de Recraft/Ideogram", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
   "flux-kontext-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+  "gpt-image-1":            { provider: "openai",                                                          description: "OpenAI gpt-image-1 — render limpio, manejo de texto, vía Replit AI Integrations", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
 };
 
 // Modelos de edición de imagen mapeados a provider para el health-check.
@@ -163,6 +167,30 @@ export async function generateImage(
   if (!cfg) throw new Error(`Modelo de imagen desconocido: ${model}`);
   const aspect = opts.aspectRatio && cfg.aspectRatios.includes(opts.aspectRatio) ? opts.aspectRatio : cfg.aspectRatios[0];
 
+  // ── OpenAI gpt-image-1 (vía Replit AI Integrations)
+  if (model === "gpt-image-1") {
+    const { openai } = await import("@workspace/integrations-openai-ai-server");
+    // gpt-image-1 sólo soporta 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait), auto
+    const sizeMap: Record<string, "1024x1024" | "1536x1024" | "1024x1536"> = {
+      "1:1":  "1024x1024",
+      "16:9": "1536x1024",
+      "3:2":  "1536x1024",
+      "4:3":  "1536x1024",
+      "9:16": "1024x1536",
+      "2:3":  "1024x1536",
+      "3:4":  "1024x1536",
+    };
+    const size = sizeMap[aspect] || "1024x1024";
+    const response = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size,
+    });
+    const base64 = response.data?.[0]?.b64_json;
+    if (!base64) throw new Error("gpt-image-1 no devolvió imagen");
+    return { buffer: Buffer.from(base64, "base64"), mimeType: "image/png", model };
+  }
+
   // ── Nano Banana v1 / v2 (Gemini → Replicate fallback)
   if (model === "nano-banana" || model === "nano-banana-pro") {
     const { generateNanoBanana } = await import("./nano-banana.js");
@@ -190,6 +218,7 @@ export async function generateImage(
   if (model === "flux-1.1-pro-ultra")     input = { ...input, raw: false, output_format: "png", output_quality: 95, safety_tolerance: 2 };
   if (model === "flux-1.1-pro-ultra-raw") input = { ...input, raw: true,  output_format: "png", output_quality: 95, safety_tolerance: 2 };
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
+  if (model === "recraft-v3-svg") input = { ...input, style: "vector_illustration", size: "1820x1024" };
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
   }
@@ -207,7 +236,8 @@ export async function generateImage(
   }
 
   const buffer = await replicateRunBuffer(cfg.replicateId, input, token);
-  return { buffer, mimeType: "image/png", model };
+  const mimeType = model === "recraft-v3-svg" ? "image/svg+xml" : "image/png";
+  return { buffer, mimeType, model };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -69,14 +69,25 @@ interface BusinessCard {
 }
 
 const BG_MODELS = [
-  { id: "recraft-v3",          label: "Recraft v3 ($0.04)",          tier: "best" },
-  { id: "ideogram-v3-turbo",   label: "Ideogram v3 Turbo ($0.03)",  tier: "fast" },
-  { id: "imagen-4-ultra",      label: "Imagen 4 Ultra ($0.06)",     tier: "premium" },
-  { id: "nano-banana",         label: "Gemini Flash Image ($0.04)", tier: "fast" },
-  { id: "flux-1.1-pro-ultra",  label: "Flux Pro Ultra ($0.06)",     tier: "premium" },
-  { id: "flux-1.1-pro",        label: "Flux Pro ($0.04)",           tier: "balanced" },
-  { id: "flux-schnell",        label: "Flux Schnell ($0.003)",      tier: "economy" },
-  { id: "flux-kontext-pro",    label: "Flux Kontext ($0.05)",       tier: "balanced" },
+  // Premium — máxima calidad
+  { id: "nano-banana-pro",        label: "Gemini 3 Pro Image · 4K ($0.12)",  tier: "premium" },
+  { id: "imagen-4-ultra",         label: "Imagen 4 Ultra · 2K ($0.06)",      tier: "premium" },
+  { id: "flux-1.1-pro-ultra",     label: "Flux 1.1 Pro Ultra · 4MP ($0.06)", tier: "premium" },
+  { id: "flux-1.1-pro-ultra-raw", label: "Flux Pro Ultra RAW · natural ($0.06)", tier: "premium" },
+  // Best — texto nítido / vector
+  { id: "recraft-v3",             label: "Recraft v3 · texto en imagen ($0.04)", tier: "best" },
+  { id: "recraft-v3-svg",         label: "Recraft v3 SVG · vectorial ($0.08)",   tier: "best" },
+  { id: "seedream-4",             label: "Seedream 4 · ByteDance ($0.04)",   tier: "best" },
+  { id: "ideogram-v3-turbo",      label: "Ideogram v3 Turbo · texto ($0.03)", tier: "best" },
+  // Balanced
+  { id: "imagen-4",               label: "Imagen 4 · estándar ($0.04)",      tier: "balanced" },
+  { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)",             tier: "balanced" },
+  { id: "flux-kontext-pro",       label: "Flux Kontext · consistencia ($0.05)", tier: "balanced" },
+  { id: "nano-banana",            label: "Gemini 2.5 Flash Image ($0.04)",   tier: "balanced" },
+  { id: "gpt-image-1",            label: "OpenAI gpt-image-1 ($0.04)",       tier: "balanced" },
+  // Economy
+  { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)",            tier: "economy" },
+  { id: "flux-schnell",           label: "Flux Schnell ($0.003)",            tier: "economy" },
 ];
 
 const LAYOUTS: Array<{ id: "centered" | "left" | "grid"; label: string; desc: string }> = [
