@@ -2709,7 +2709,7 @@ function UploadConcatTab({
       let d: any;
       try { d = JSON.parse(text); } catch { d = { error: text.slice(0, 300) }; }
       if (!res.ok) { onError(d?.error || `Error ${res.status}`); return; }
-      const url = `${API_BASE}/api/projects/${projectId}/vault/${d.vaultId}/raw`;
+      const url = `${API_BASE}/api/projects/${projectId}/vault/${d.vaultId}/download`;
       setResultUrl(url);
       onSuccess({ vaultId: d.vaultId, type: "video", label: title, dataUrl: url, mimeType: "video/mp4" });
     } catch (e: any) {

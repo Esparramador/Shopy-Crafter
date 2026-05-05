@@ -219,7 +219,7 @@ router.post(
       }
 
       if (quickVaultId) {
-        v0.assets.finalMp4Url = `/api/projects/${projectId}/vault/${quickVaultId}/raw`;
+        v0.assets.finalMp4Url = `/api/projects/${projectId}/vault/${quickVaultId}/download`;
       } else {
         // Vault save failed — fail loud so the user does not get a useless
         // response with only local /tmp paths the frontend cannot reach.
@@ -474,7 +474,7 @@ router.post(
       });
 
       const videoUrl = cineVaultId
-        ? `/api/projects/${projectId}/vault/${cineVaultId}/raw`
+        ? `/api/projects/${projectId}/vault/${cineVaultId}/download`
         : undefined;
 
       res.json({
@@ -804,7 +804,7 @@ router.post(
       });
 
       const videoUrl = vaultId
-        ? `/api/projects/${projectId}/vault/${vaultId}/raw`
+        ? `/api/projects/${projectId}/vault/${vaultId}/download`
         : undefined;
 
       res.json({

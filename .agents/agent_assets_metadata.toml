@@ -497,3 +497,9 @@ id = "DX1hiHo0ZhJoAcUiZbQkv"
 uri = "file://.local/validation/PDF_ORDER_VALIDATED.pdf"
 type = "pdf"
 title = "PDF validado — 4 hojas: Portada → Contraportada → Info → Contenido"
+
+[[outputs]]
+id = "j4h-s5WHrjvTVPinp8TB8"
+uri = "file://exports/comic_crafter_smart_quick_ad.mp4"
+type = "video"
+title = "Anuncio Comic Crafter - Smart Quick Ad (9:16, 5s, H.264)"

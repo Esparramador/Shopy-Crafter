@@ -1,0 +1,215 @@
+// ============================================================
+// TIPOS DEL MÓDULO A/B TESTING
+// ============================================================
+
+export type TestType = 'image' | 'price' | 'title' | 'description';
+export type TestStatus = 'draft' | 'running' | 'paused' | 'completed' | 'cancelled';
+export type ImageStyle = 'lifestyle' | 'studio' | 'context' | 'detail' | 'minimalist';
+export type WinnerStrategy = 'auto_winner' | 'manual_review' | 'extend_if_inconclusive';
+
+// ============================================================
+// PRODUCTO SHOPIFY (reutilizable)
+// ============================================================
+
+export interface ShopifyProduct {
+  id: string;
+  shopifyId: number;
+  title: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  currentPrice: number;
+  currency: string;
+  category?: string;
+  cogsTotal?: number;
+  marginPct?: number;
+}
+
+// ============================================================
+// ANÁLISIS DE IMAGEN
+// ============================================================
+
+export interface ImageAnalysis {
+  imageUrl: string;
+  scoreOverall: number; // 0-100
+  scoreComposition: number; // 0-10
+  scoreLighting: number;
+  scoreContext: number;
+  scoreAppeal: number;
+  scoreClarity: number;
+  warnings: string[];
+  strengths: string[];
+  improvementSuggestions: string[];
+  detectedElements: string[]; // "background blur", "subject centered", etc.
+  analyzedAt: string;
+}
+
+export interface ImageVariant {
+  id: string;
+  style: ImageStyle;
+  url: string;
+  prompt: string;
+  generationProvider: 'runway' | 'replicate' | 'dalle' | 'gemini' | 'stable_diffusion';
+  generationCost: number; // €
+  analysis: ImageAnalysis;
+  generatedAt: string;
+}
+
+// ============================================================
+// ANÁLISIS DE COMPETENCIA (para test de precio)
+// ============================================================
+
+export interface CompetitorPrice {
+  source: string; // "amazon", "shopify_store", "marketplace", etc.
+  storeName: string;
+  productTitle: string;
+  url: string;
+  price: number;
+  currency: string;
+  similarity: number; // 0-1, qué tan similar es al producto
+  scrapedAt: string;
+}
+
+export interface CompetitorAnalysis {
+  productId: string;
+  totalSourcesScraped: number;
+  competitors: CompetitorPrice[];
+  priceStats: {
+    min: number;
+    max: number;
+    median: number;
+    average: number;
+    yourPosition: 'underpriced' | 'fair' | 'premium' | 'overpriced';
+    percentileRank: number; // 0-100
+  };
+  analyzedAt: string;
+}
+
+// ============================================================
+// ANÁLISIS DE PROVEEDORES (conecta con Supplier Intelligence)
+// ============================================================
+
+export interface SupplierOption {
+  supplierId: string;
+  supplierName: string;
+  costPerUnit: number;
+  totalCOGSImpact: number;
+  qualityScore: number; // 0-10
+  leadTimeDays: number;
+  isCurrent: boolean;
+  isRecommended: boolean;
+  savingsPerUnit: number;
+}
+
+export interface SupplierImpactAnalysis {
+  productId: string;
+  currentCOGS: number;
+  bestAlternativeCOGS: number;
+  potentialSavingsPerUnit: number;
+  potentialSavingsAnnual: number;
+  options: SupplierOption[];
+  analyzedAt: string;
+}
+
+// ============================================================
+// CONFIGURACIÓN DE TEST
+// ============================================================
+
+export interface TestConfig {
+  type: TestType;
+  productId: string;
+  hypothesis: string;
+  primaryMetric: 'conversion_rate' | 'aov' | 'revenue_per_visitor' | 'ctr' | 'add_to_cart';
+  secondaryMetrics: string[];
+  splitTraffic: number; // 0-100, % al challenger
+  durationDays: number;
+  minVisitors: number;
+  minConfidence: number; // típicamente 95
+  winnerStrategy: WinnerStrategy;
+  autoApplyWinner: boolean;
+}
+
+export interface ImageTestConfig extends TestConfig {
+  type: 'image';
+  controlImageUrl: string;
+  challengerImageUrl: string;
+  challengerVariantId: string; // ID de la variante IA elegida
+}
+
+export interface PriceTestConfig extends TestConfig {
+  type: 'price';
+  controlPrice: number;
+  challengerPrice: number;
+  competitorContext: CompetitorAnalysis;
+  supplierContext?: SupplierImpactAnalysis;
+}
+
+// ============================================================
+// TEST EN EJECUCIÓN
+// ============================================================
+
+export interface TestStats {
+  variantA: VariantStats;
+  variantB: VariantStats;
+  winner?: 'A' | 'B' | null;
+  pValue: number;
+  confidence: number; // 0-100
+  isSignificant: boolean;
+  visitorsTotal: number;
+  daysElapsed: number;
+  daysRemaining: number;
+}
+
+export interface VariantStats {
+  visitors: number;
+  conversions: number;
+  conversionRate: number; // 0-1
+  revenue: number;
+  aov: number;
+  addedToCart: number;
+}
+
+export interface ABTest {
+  id: string;
+  shopId: string;
+  product: ShopifyProduct;
+  config: ImageTestConfig | PriceTestConfig;
+  status: TestStatus;
+  stats?: TestStats;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  winnerAppliedAt?: string;
+  insights?: string[]; // generados por Claude al cerrar el test
+}
+
+// ============================================================
+// KPIs GLOBALES
+// ============================================================
+
+export interface ABTestingKPIs {
+  activeTests: number;
+  completedTests: number;
+  winRate: number; // % de tests con ganador significativo
+  avgConfidence: number;
+  revenueImpact30d: number;
+  testsThisMonth: number;
+  totalLearnings: number;
+}
+
+// ============================================================
+// HISTORIAL
+// ============================================================
+
+export interface TestHistoryEntry {
+  id: string;
+  productTitle: string;
+  productImageUrl?: string;
+  type: TestType;
+  hypothesis: string;
+  status: TestStatus;
+  winnerVariant: 'A' | 'B' | null;
+  conversionLift: number; // % de mejora del ganador
+  revenueImpact: number;
+  durationDays: number;
+  completedAt: string;
+}
