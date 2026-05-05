@@ -128,3 +128,6 @@ The Suppliers page (`/projects/:id/suppliers`) features a premium dark luxury de
 - **@google/genai**: For direct Gemini API integration.
 - **Runway**: For video generation.
 - **ElevenLabs**: For voice synthesis and music generation.
+
+## Knowledge Archives
+- **`docs/knowledge/hanakaze-pipeline/`** — Curated methodology for producing premium 30–60s vertical (9:16) video ad campaigns. Distills the v1→v3 Hanakaze pipeline: 8-clip narrative structure, kling-master + seedance-pro engine mix (~$10–12 per 60s spot), hard prompting rules (identity lock, no AI typography, explicit timeline blocks), and 5 robustness patterns for resumable client↔server pipelines on Replit (raw http.request without timeouts, persistent state, vault pre-flight scan, polling fallback, public URL rehydration). The original runner scripts are archived as `*.mjs.txt` (read-only reference; the runtime workflow was removed because it required project-specific admin credentials). Shopy Brain should consult `KNOWLEDGE.md` whenever the user requests a video ad campaign.
