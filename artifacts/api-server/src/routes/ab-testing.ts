@@ -1326,8 +1326,8 @@ router.post("/projects/:projectId/ab-tests/price", async (req, res): Promise<voi
 
 // ─────── LIFECYCLE ───────
 async function setStatus(req: import("express").Request, res: import("express").Response, newStatus: string, finalize = false) {
-  const projectId = parseInt(req.params.projectId, 10);
-  const testId = parseInt(req.params.testId, 10);
+  const projectId = parseInt(String(req.params.projectId), 10);
+  const testId = parseInt(String(req.params.testId), 10);
   if (Number.isNaN(projectId) || Number.isNaN(testId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const updates: Record<string, unknown> = { status: newStatus };

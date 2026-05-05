@@ -1447,7 +1447,7 @@ router.post("/fs-pro/generate-image", requireAdmin, async (req: Request, res: Re
     });
     await recordUsage(projectId, "image", 1);
     learnFromOperation({
-      operationType: "fs_pro_generate_image", niche: project.storeNiche ?? null,
+      operationType: "fs_pro_generate_image", niche: project?.storeNiche ?? null,
       title: `FS Pro image: ${prompt.slice(0, 80)}`,
       content: `Generated image with ${model}. Prompt: ${prompt.slice(0, 200)}.`,
       confidence: 0.85, tags: ["fusion-studio-pro", "image", model],

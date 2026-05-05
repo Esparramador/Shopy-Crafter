@@ -1254,7 +1254,7 @@ ${brainMemories.length > 0 ? `Tienes ${brainMemories.length} memorias relevantes
 Responde SIEMPRE en español. Sé directo, profesional y útil.`;
 
         const memoriesContext = brainMemories.length > 0
-          ? `\n\nMEMORIAS DE SHOPYBRAIN (conocimiento acumulado):\n${brainMemories.map(m => `[${m.title}] (confianza: ${m.confidence ?? "N/A"}, dominio: ${m.domain ?? "general"})\n${(m.content ?? "").slice(0, 800)}`).join("\n\n")}`
+          ? `\n\nMEMORIAS DE SHOPYBRAIN (conocimiento acumulado):\n${brainMemories.map(m => `[${m.title}] (confianza: ${m.confidence ?? "N/A"}, dominio: ${(m as any).domain ?? "general"})\n${(m.content ?? "").slice(0, 800)}`).join("\n\n")}`
           : "";
 
         const brainUserContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + memoriesContext;

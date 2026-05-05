@@ -1374,9 +1374,9 @@ async function upsertCogsRow(values: Record<string, any>, projectId: number, sho
     .where(and(eq(cogsTable.projectId, projectId), eq(cogsTable.shopifyProductId, shopifyProductId)));
 
   if (existing) {
-    await db.update(cogsTable).set(values).where(eq(cogsTable.id, existing.id));
+    await db.update(cogsTable).set(values as any).where(eq(cogsTable.id, existing.id));
   } else {
-    await db.insert(cogsTable).values(values);
+    await db.insert(cogsTable).values(values as any);
   }
 }
 
@@ -1605,8 +1605,8 @@ router.post("/pricing/estimate-cogs", async (req, res): Promise<void> => {
 Vendor: ${liveProduct.vendor || "desconocido"}
 Tipo: ${liveProduct.productType || "sin tipo"}
 Variantes: ${liveProduct.variants?.length ?? 1}
-Peso: ${liveProduct.variants?.[0]?.weight ? `${liveProduct.variants[0].weight}g` : "desconocido"}
-Requiere envío: ${liveProduct.variants?.[0]?.requires_shipping !== false ? "sí" : "no"}`;
+Peso: ${(liveProduct.variants?.[0] as any)?.weight ? `${(liveProduct.variants[0] as any).weight}g` : "desconocido"}
+Requiere envío: ${(liveProduct.variants?.[0] as any)?.requires_shipping !== false ? "sí" : "no"}`;
       }
     } catch {}
 
@@ -1692,8 +1692,8 @@ Responde SOLO JSON con estos campos exactos:
       operationType: "cogs_estimation",
       niche,
       title: `COGS estimado (flat): ${product.title}`,
-      content: `Estimación COGS para "${product.title}": Total €${finalCogsTotal}, Margen ${margenPct}%. Confianza: ${result.confidence}`,
-      confidence: typeof result.confidence === "number" ? result.confidence : 0.7,
+      content: `Estimación COGS para "${product.title}": Total €${finalCogsTotal}, Margen ${margenPct}%. Confianza: ${(result as any).confidence ?? "n/a"}`,
+      confidence: typeof (result as any).confidence === "number" ? (result as any).confidence : 0.7,
       tags: ["cogs", "estimation", "flat_pricing"],
     });
 

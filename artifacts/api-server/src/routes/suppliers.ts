@@ -173,7 +173,7 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
             projectIdNum,
             userPrompt + `\n\nIMPORTANTE: Proporciona proveedores REALES que conozcas. Incluye empresas verificables con webs reales. Marca en "notes" que la info debe verificarse. Prioriza proveedores establecidos y conocidos del sector.`,
             "Eres un consultor B2B experto con 15 años de experiencia. Responde SOLO con JSON válido con la estructura exacta: {\"summary\":\"...\",\"suppliers\":[...]}. Proporciona proveedores reales conocidos, priorizando los más establecidos y verificables.",
-            "supplier_research",
+            "competitors",
             effectiveNiche || undefined,
             8192,
             120_000
