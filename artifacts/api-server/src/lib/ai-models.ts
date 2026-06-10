@@ -9,10 +9,10 @@
  *   4. Hard fallback (latest known June-2026 stable models).
  *
  * Tiers:
- *   - "fast"   → cheap & quick (Haiku 4.5 / Gemini 2.5 Flash)
- *   - "smart"  → balanced default (Sonnet 4.6 / Gemini 2.5 Pro)
+ *   - "fast"   → cheap & quick (Haiku 4.5 / Gemini 3.5 Flash)
+ *   - "smart"  → balanced default (Sonnet 4.6 / Gemini 3.1 Pro Preview)
  *   - "genius" → max reasoning (Opus 4.8 / Gemini 3.1 Pro Preview)
- *   - "vision" → multimodal-strong (Sonnet 4.6 vision / Gemini 2.5 Pro)
+ *   - "vision" → multimodal-strong (Sonnet 4.6 vision / Gemini 3.1 Pro Preview)
  *
  * Cached for 60s so live admin changes propagate quickly without DB hammering.
  */
@@ -34,10 +34,10 @@ const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
     vision: "claude-sonnet-4-6",
   },
   gemini: {
-    fast: "gemini-2.5-flash",
-    smart: "gemini-2.5-pro",
+    fast: "gemini-3.5-flash",
+    smart: "gemini-3.1-pro-preview",
     genius: "gemini-3.1-pro-preview",
-    vision: "gemini-2.5-pro",
+    vision: "gemini-3.1-pro-preview",
   },
 };
 
@@ -223,9 +223,13 @@ export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string;
     { id: "claude-3-5-sonnet-20241022", label: "Claude Sonnet 3.5 (legacy)", tierHint: "smart" },
   ],
   gemini: [
-    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tierHint: "fast", notes: "Cheapest, supports search+url-context" },
-    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tierHint: "smart", notes: "Multimodal, large context" },
-    { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", tierHint: "genius", notes: "Latest preview, top reasoning" },
-    { id: "gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image (Nano-Banana)", tierHint: "vision", notes: "Image generation/composition only" },
+    { id: "gemini-3.5-flash",          label: "Gemini 3.5 Flash",              tierHint: "fast",   notes: "Latest flash — fastest & cheapest, June 2026" },
+    { id: "gemini-3.1-pro-preview",    label: "Gemini 3.1 Pro Preview",        tierHint: "genius", notes: "Latest pro — top reasoning, default smart/genius" },
+    { id: "gemini-3-pro-preview",      label: "Gemini 3 Pro Preview",          tierHint: "smart",  notes: "Gemini 3 pro — solid reasoning, slightly cheaper" },
+    { id: "gemini-3.1-flash-image",    label: "Gemini 3.1 Flash Image",        tierHint: "vision", notes: "Image generation/edit — latest stable image model" },
+    { id: "gemini-3-pro-image",        label: "Gemini 3 Pro Image",            tierHint: "vision", notes: "Pro-quality image generation (Nano-Banana v2)" },
+    { id: "gemini-2.5-flash-image",    label: "Gemini 2.5 Flash Image (NB v1)",tierHint: "vision", notes: "Image generation — fast/cheap (Nano-Banana v1)" },
+    { id: "gemini-2.5-flash",          label: "Gemini 2.5 Flash (legacy)",     tierHint: "fast" },
+    { id: "gemini-2.5-pro",            label: "Gemini 2.5 Pro (legacy)",       tierHint: "smart" },
   ],
 };

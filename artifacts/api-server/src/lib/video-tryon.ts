@@ -24,7 +24,7 @@ export type CharacterGender = "female" | "male" | "neutral";
 const PROVIDER_TO_MODEL: Record<TryonProvider, { primary: VideoModel; quality: VideoModel }> = {
   kling:  { primary: "kling-2.1",         quality: "kling-master" },
   hailuo: { primary: "hailuo-02",         quality: "hailuo-02" },
-  runway: { primary: "runway-gen4-turbo", quality: "runway-gen4-turbo" },
+  runway: { primary: "runway-gen4.5", quality: "runway-gen4.5" },
 };
 
 export interface TryonVideoInput {
@@ -133,7 +133,7 @@ export async function generateTryonVideo(input: TryonVideoInput): Promise<TryonV
   const costPerSec = chosenModel === "kling-master" ? 0.18 :
                      chosenModel === "kling-2.1" ? 0.09 :
                      chosenModel === "hailuo-02" ? 0.05 :
-                     chosenModel === "runway-gen4-turbo" ? 0.05 : 0.07;
+                     chosenModel === "runway-gen4.5" ? 0.06 : 0.07;
   const costEstimateUsd = +(costPerSec * duration).toFixed(3);
 
   return { buffer, model: chosenModel, prompt: fullPrompt, durationSec: duration, costEstimateUsd };

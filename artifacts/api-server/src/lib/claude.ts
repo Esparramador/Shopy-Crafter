@@ -83,7 +83,7 @@ export function safeJsonParse<T>(text: string, label?: string): T {
   }
 }
 
-export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 
 export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ab_test_prediction" | "ecommerce" | "cogs_estimation" | "financial" | "email_content" | "brand_analysis" | "consistency" | "web_lab" | "generator" | "campaign_production" | "exploded_view";
 

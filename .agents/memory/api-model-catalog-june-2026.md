@@ -4,36 +4,43 @@ description: All AI model identifiers verified live as of June 10, 2026 — Clau
 ---
 
 ## Anthropic Claude (verified live)
-- Smart tier default: `claude-sonnet-4-6` (was claude-3-5-sonnet)
-- Genius/heavy tier default: `claude-opus-4-8` (was claude-opus-3)
+- Fast tier: `claude-haiku-4-5`
+- Smart tier default: `claude-sonnet-4-6` — set in `claude.ts` CLAUDE_MODEL, `config.ts` claude.model, `ai-models.ts` HARD_DEFAULTS
+- Genius/heavy tier: `claude-opus-4-8`
 - Fable (narrative): `claude-fable-5`
 - API version stays `anthropic-version: 2023-06-01` — unchanged
 - SDK `@anthropic-ai/sdk ^0.81.0` — newer versions blocked by pnpm minimumReleaseAge at time of update
 
 ## ElevenLabs TTS
-- New flagship: `eleven_v3` — 74 languages, most expressive. Now the default across ALL services.
+- New flagship: `eleven_v3` — 74 languages, most expressive. Default across ALL services.
 - Legacy allowed: `eleven_multilingual_v2`, `eleven_turbo_v2_5`, `eleven_flash_v2_5`
-- Files updated: `elevenlabs.ts` (type + default), `voice.ts` ALLOWED_TTS_MODELS, `fusion-studio-pro.ts` generateTTS default, `avatar-studio.ts` (2 interfaces + 2 defaults), `cinematic-multishot.ts`, `adstudio.ts`
+- Updated in: `elevenlabs.ts`, `voice.ts` ALLOWED_TTS_MODELS, `fusion-studio-pro.ts`, `avatar-studio.ts`, `cinematic-multishot.ts`, `adstudio.ts`
 
 ## Runway (verified live)
-- New models: `gen4.5`, `seedance2`, `seedance2_fast` (available in tier)
-- Endpoint: `api.dev.runwayml.com/v1` (see runway-api-config.md)
+- Gen4.5 now used as DEFAULT in `campaign-planner.ts` and `video-tryon.ts` (was gen4-turbo)
+- `runway-gen4-turbo` kept as valid VideoModel for backward compat but no longer recommended default
 - `FSP_MODEL_MAP` keys: `runway_gen45`, `runway_seedance2`, `runway_seedance2_fast`
+- Endpoint: `api.dev.runwayml.com/v1` (see runway-api-config.md)
 
 ## Replicate Image Models (all HTTP 200 confirmed)
-- `recraft-ai/recraft-v4` (replaces recraft-v3)
-- `black-forest-labs/flux-kontext-max` (premium, replaces flux-kontext-pro)
-- `black-forest-labs/flux-kontext-dev` (dev tier)
-- `ideogram-ai/ideogram-v3-quality` (replaces ideogram-v3-turbo in FSP)
+- `recraft-ai/recraft-v4`, `black-forest-labs/flux-kontext-max`, `flux-kontext-dev`, `ideogram-ai/ideogram-v3-quality`
 
 ## Replicate Video Models (all HTTP 200 confirmed)
-- `bytedance/seedance-1-lite` — added to FSP + FSP_MODEL_MAP (`seedance_1_lite`)
-- `wan-ai/wan-2.5-t2v` — text-to-video variant, added to FSP + FSP_MODEL_MAP (`wan_25_t2v`)
+- `bytedance/seedance-1-lite`, `wan-ai/wan-2.5-t2v` added to FSP + FSP_MODEL_MAP
 
-## Google Gemini
-- SDK `@google/genai ^1.46.0` (was pinned wrong; actual latest 1.x = 1.46.0)
-- Model IDs unchanged from prior session
+## Google Gemini (verified live via SDK models.list)
+- Fast tier: `gemini-3.5-flash` (new — confirmed in live models list)
+- Smart/genius/vision tier: `gemini-3.1-pro-preview` (confirmed live)
+- Nano-Banana v1: `gemini-2.5-flash-image` (confirmed live)
+- Nano-Banana v2: `gemini-3-pro-image` (stable, upgraded from -preview)
+- Also available: `gemini-3-pro-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite`
+- SDK `@google/genai ^1.46.0`
+- config.ts: `GEMINI_MODEL=gemini-3.5-flash`, `GEMINI_PRO_MODEL=gemini-3.1-pro-preview`
 
-**Why:** Verified before implementing — live API calls returned HTTP 200 for each model before adding to code. No mocks.
+## Tripo 3D
+- No `TRIPO_API_KEY` or `TRIPO3D_API_KEY` found in env as of June 2026
+- Not integrated — needs API key to add
 
-**How to apply:** When adding new AI models, always verify live via curl/fetch before updating code. Check pnpm minimumReleaseAge before bumping SDK major versions.
+**Why:** Verified before implementing — live API calls (especially `ai.models.list()`) confirmed all model IDs before use. No mocks.
+
+**How to apply:** When adding new AI models, always call `ai.models.list()` via SDK before updating code. Check pnpm minimumReleaseAge before bumping SDK major versions.

@@ -54,16 +54,16 @@ export interface CampaignEstimate {
 
 const TIER_PRIORITY: Record<QualityTier, VideoModel[]> = {
   draft:    ["wan-2.5-fast", "seedance-fast", "runway-gen3-alpha"],
-  standard: ["seedance-fast", "seedance-pro", "runway-gen4-turbo", "kling-2.1"],
-  premium:  ["seedance-pro", "kling-2.1", "runway-gen4-turbo", "kling-master"],
-  cinema:   ["kling-master", "veo-3-fast", "runway-gen4-turbo", "kling-2.1"],
+  standard: ["seedance-fast", "seedance-pro", "runway-gen4.5", "kling-2.1"],
+  premium:  ["seedance-pro", "kling-2.1", "runway-gen4.5", "kling-master"],
+  cinema:   ["kling-master", "veo-3-fast", "runway-gen4.5", "kling-2.1"],
 };
 
 const PURPOSE_TIER_BIAS: Record<ShotPurpose, Partial<Record<QualityTier, VideoModel>>> = {
   intro:      { cinema: "kling-master",      premium: "kling-master",     standard: "kling-2.1",       draft: "wan-2.5-fast" },
-  hero:       { cinema: "kling-master",      premium: "runway-gen4-turbo",standard: "runway-gen4-turbo", draft: "seedance-fast" },
+  hero:       { cinema: "kling-master",      premium: "runway-gen4.5",   standard: "runway-gen4.5",    draft: "seedance-fast" },
   model:      { cinema: "seedance-pro",      premium: "seedance-pro",     standard: "seedance-pro",    draft: "seedance-fast" },
-  product:    { cinema: "runway-gen4-turbo", premium: "runway-gen4-turbo",standard: "seedance-pro",    draft: "seedance-fast" },
+  product:    { cinema: "runway-gen4.5",     premium: "runway-gen4.5",   standard: "seedance-pro",    draft: "seedance-fast" },
   lifestyle:  { cinema: "seedance-pro",      premium: "seedance-pro",     standard: "kling-2.1",       draft: "seedance-fast" },
   transition: { cinema: "wan-2.5-fast",      premium: "wan-2.5-fast",     standard: "wan-2.5-fast",    draft: "wan-2.5-fast" },
   outro:      { cinema: "wan-2.5-fast",      premium: "wan-2.5-fast",     standard: "wan-2.5-fast",    draft: "wan-2.5-fast" },
@@ -82,7 +82,7 @@ export function pickModelForShot(
   const bias = PURPOSE_TIER_BIAS[purpose]?.[tier];
   if (bias) {
     if (ratio !== "16:9" && bias === "veo-3-fast") {
-      return tier === "cinema" ? "kling-master" : "runway-gen4-turbo";
+      return tier === "cinema" ? "kling-master" : "runway-gen4.5";
     }
     return bias;
   }
@@ -117,7 +117,7 @@ export function planCampaign(
     "Cobro por segundo: clips largos ≡ clips cortos al mismo coste, usar pocos cortes para fluidez.",
     "Preservar caras reales → seedance-pro multi-ref.",
     "Intros/outros/transiciones → wan-2.5-fast (más barato del mercado).",
-    "Hero shots / heros de producto → runway-gen4-turbo (control fino y precio razonable).",
+    "Hero shots / heros de producto → runway-gen4.5 (control fino, gen más reciente).",
     "Si hay fotos de modelo+producto, saltar virtual try-on → ahorra ~$0.04-15/img.",
   ];
 

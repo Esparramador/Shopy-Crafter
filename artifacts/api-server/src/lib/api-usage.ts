@@ -80,18 +80,21 @@ const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
 };
 
 const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
-  // USD por 1M tokens
-  "gemini-3.1-pro-preview": { input: 1.25, output: 5.0  },
-  "gemini-2.5-pro":         { input: 1.25, output: 5.0  },
-  "gemini-2.5-flash":       { input: 0.075, output: 0.30 },
-  "gemini-2.5-flash-preview":{ input: 0.075, output: 0.30 },
-  "gemini-2.0-flash":       { input: 0.075, output: 0.30 },
-  "gemini-1.5-pro":         { input: 1.25, output: 5.0  },
-  "gemini-1.5-flash":       { input: 0.075, output: 0.30 },
+  // USD por 1M tokens — June 2026 current + legacy
+  "gemini-3.5-flash":          { input: 0.075, output: 0.30 },
+  "gemini-3.1-pro-preview":    { input: 1.25,  output: 5.0  },
+  "gemini-3-pro-preview":      { input: 1.25,  output: 5.0  },
+  "gemini-3.1-flash-lite":     { input: 0.02,  output: 0.08 },
+  "gemini-2.5-pro":            { input: 1.25,  output: 5.0  },
+  "gemini-2.5-flash":          { input: 0.075, output: 0.30 },
+  "gemini-2.5-flash-preview":  { input: 0.075, output: 0.30 },
+  "gemini-2.0-flash":          { input: 0.075, output: 0.30 },
+  "gemini-1.5-pro":            { input: 1.25,  output: 5.0  },
+  "gemini-1.5-flash":          { input: 0.075, output: 0.30 },
 };
 
 export function calcClaudeCost(model: string, inputTokens: number, outputTokens: number): number {
-  const m = Object.keys(CLAUDE_PRICING).find(k => model.includes(k)) ?? "claude-sonnet-4-5";
+  const m = Object.keys(CLAUDE_PRICING).find(k => model.includes(k)) ?? "claude-sonnet-4-6";
   const p = CLAUDE_PRICING[m];
   return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
 }

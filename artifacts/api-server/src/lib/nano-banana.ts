@@ -23,8 +23,8 @@ export type NanoBananaOpts = {
 const MODEL_GEMINI_V1 = "gemini-2.5-flash-image";
 const MODEL_REPLICATE_V1 = "google/nano-banana";
 // ── Nano Banana v2 / Pro (Gemini 3 Pro Image) — 4K, sharper text rendering,
-//    better identity lock, top-tier reasoning. Released Nov 2025.
-const MODEL_GEMINI_V2 = "gemini-3-pro-image-preview";
+//    better identity lock, top-tier reasoning. Stable release (no -preview), June 2026.
+const MODEL_GEMINI_V2 = "gemini-3-pro-image";
 const MODEL_REPLICATE_V2 = "google/nano-banana-pro";
 
 export type NanoBananaTier = "v1" | "pro";
