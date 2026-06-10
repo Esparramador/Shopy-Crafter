@@ -57,6 +57,91 @@ interface HistoryItem {
   metadata: any;
 }
 
+interface DeepScanResult {
+  url: string;
+  scannedAt: string;
+  security: {
+    score: number;
+    headers: Array<{ name: string; present: boolean; value?: string; severity: string; description: string; recommendation: string }>;
+    vulnerabilities: Array<{ type: string; severity: string; description: string; recommendation: string }>;
+    https: boolean;
+    mixedContent: boolean;
+    serverInfo?: string;
+  };
+  dom: {
+    totalElements: number;
+    maxDepth: number;
+    headings: { h1: number; h2: number; h3: number; h4: number; h5: number; h6: number };
+    images: { total: number; withAlt: number; withoutAlt: number; lazy: number };
+    forms: number;
+    inputs: number;
+    links: { total: number; external: number; nofollow: number; blankTarget: number };
+    scripts: { inline: number; external: number; deferred: number; asyncLoaded: number };
+    iframes: number;
+    tables: number;
+    accessibilityIssues: Array<{ type: string; count: number; severity: string; detail: string }>;
+    domSize: string;
+  };
+  javascript: {
+    libraries: Array<{ name: string; version?: string; category: string }>;
+    hasGtm: boolean;
+    hasAnalytics: boolean;
+    hasPixel: boolean;
+    hasCookieBanner: boolean;
+    hasChat: boolean;
+    hasLazyLoad: boolean;
+    inlineScriptCount: number;
+    externalScriptCount: number;
+    renderBlockingScripts: number;
+  };
+  seo: {
+    score: number;
+    title: string;
+    titleLength: number;
+    titleStatus: string;
+    metaDescription: string;
+    metaDescriptionLength: number;
+    metaDescriptionStatus: string;
+    h1Count: number;
+    h1Status: string;
+    hasCanonical: boolean;
+    canonicalUrl?: string;
+    hasOpenGraph: boolean;
+    ogTitle?: string;
+    ogImage?: string;
+    hasTwitterCard: boolean;
+    hasStructuredData: boolean;
+    structuredDataTypes: string[];
+    hasHreflang: boolean;
+    hasViewport: boolean;
+    issues: Array<{ type: string; severity: string; detail: string }>;
+  };
+  performance: {
+    resourceCounts: { scripts: number; stylesheets: number; images: number };
+    renderBlockingCss: number;
+    renderBlockingJs: number;
+    lazyImages: number;
+    inlineCriticalCss: boolean;
+    issues: Array<{ type: string; severity: string; detail: string }>;
+  };
+}
+
+interface Effects3DResult {
+  brand: string;
+  sector: string;
+  primaryColor: string;
+  effects: Array<{
+    id: string;
+    name: string;
+    description: string;
+    complexity: string;
+    dependencies: string[];
+    code: string;
+    cssOnly: boolean;
+    installInstructions: string;
+  }>;
+}
+
 const phases = [
   { label: "Extrayendo HTML + CSS", icon: "🔬" },
   { label: "PageSpeed Insights", icon: "⚡" },
@@ -95,6 +180,359 @@ export default function WebLab() {
   return <WebLabInner projectId={projectId} />;
 }
 
+// ── Severity colors ──
+const sevC: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e", info: "#60a5fa" };
+
+function SevBadge({ s }: { s: string }) {
+  return (
+    <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: (sevC[s] || "#888") + "22", color: sevC[s] || "#888", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+      {s}
+    </span>
+  );
+}
+
+function SecurityPanel({ scan }: { scan: DeepScanResult }) {
+  const s = scan.security;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+        <div style={{ width: 80, height: 80, borderRadius: "50%", border: `4px solid ${s.score >= 70 ? "#22c55e" : s.score >= 40 ? "#eab308" : "#ef4444"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 28, fontWeight: 800, color: s.score >= 70 ? "#22c55e" : s.score >= 40 ? "#eab308" : "#ef4444" }}>{s.score}</span>
+        </div>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>🔒 Análisis de Seguridad</h3>
+          <p style={{ color: "#888", fontSize: 13, margin: "4px 0 0" }}>
+            {s.https ? "✅ HTTPS activo" : "❌ Sin HTTPS"} &nbsp;·&nbsp;
+            {s.mixedContent ? "⚠️ Contenido mixto detectado" : "✅ Sin contenido mixto"} &nbsp;·&nbsp;
+            {s.serverInfo ? `⚠️ Server expuesto: ${s.serverInfo}` : "✅ Servidor no expuesto"}
+          </p>
+        </div>
+      </div>
+
+      {s.vulnerabilities.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#ef4444", marginBottom: 12 }}>🚨 Vulnerabilidades detectadas ({s.vulnerabilities.length})</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {s.vulnerabilities.map((v, i) => (
+              <div key={i} style={{ padding: "12px 14px", background: "#0a0a14", borderRadius: 10, borderLeft: `3px solid ${sevC[v.severity] || "#888"}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <SevBadge s={v.severity} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#eee" }}>{v.type}</span>
+                </div>
+                <p style={{ color: "#aaa", fontSize: 12, margin: "0 0 4px" }}>{v.description}</p>
+                <p style={{ color: "#22c55e", fontSize: 11, margin: 0 }}>💡 {v.recommendation}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#aaa", marginBottom: 12 }}>🛡️ Headers de Seguridad HTTP</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 8 }}>
+          {s.headers.map((h, i) => (
+            <div key={i} style={{ padding: "10px 12px", background: "#0a0a14", borderRadius: 8, border: `1px solid ${h.present ? "#22c55e22" : (sevC[h.severity] || "#888") + "33"}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 14 }}>{h.present ? "✅" : "❌"}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: h.present ? "#22c55e" : sevC[h.severity] || "#888", fontFamily: "monospace" }}>{h.name}</span>
+                {!h.present && <SevBadge s={h.severity} />}
+              </div>
+              {h.present && h.value && <p style={{ color: "#888", fontSize: 10, margin: "2px 0", fontFamily: "monospace", wordBreak: "break-all" }}>{h.value.slice(0, 80)}{h.value.length > 80 ? "…" : ""}</p>}
+              {!h.present && <p style={{ color: "#666", fontSize: 11, margin: "2px 0" }}>{h.recommendation}</p>}
+              <p style={{ color: "#555", fontSize: 10, margin: "2px 0" }}>{h.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DomPanel({ scan }: { scan: DeepScanResult }) {
+  const d = scan.dom;
+  const js = scan.javascript;
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "Total Elementos", value: d.totalElements, sub: d.domSize, warn: d.totalElements > 1500 },
+          { label: "Profundidad DOM", value: d.maxDepth, sub: "niveles estimados", warn: d.maxDepth > 15 },
+          { label: "Imágenes", value: d.images.total, sub: `${d.images.withoutAlt} sin alt`, warn: d.images.withoutAlt > 0 },
+          { label: "Scripts externos", value: d.scripts.external, sub: `${d.scripts.deferred} diferidos`, warn: d.scripts.external > 10 },
+          { label: "Formularios", value: d.forms, sub: `${d.inputs} inputs`, warn: false },
+          { label: "iFrames", value: d.iframes, sub: "", warn: d.iframes > 2 },
+          { label: "Links externos", value: d.links.external, sub: `${d.links.blankTarget} _blank`, warn: false },
+          { label: "Tablas HTML", value: d.tables, sub: d.tables > 0 ? "layout por tabla" : "sin tablas", warn: d.tables > 2 },
+        ].map((stat, i) => (
+          <div key={i} style={{ padding: 14, background: "#0a0a14", borderRadius: 10, textAlign: "center", border: `1px solid ${stat.warn ? "#eab30833" : "#1a1a2e"}` }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: stat.warn ? "#eab308" : "#d4a843" }}>{stat.value}</div>
+            <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{stat.label}</div>
+            {stat.sub && <div style={{ fontSize: 10, color: stat.warn ? "#eab308" : "#666", marginTop: 1 }}>{stat.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        <div style={{ background: "#0a0a14", borderRadius: 10, padding: 14 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#d4a843" }}>📑 Estructura de Encabezados</h4>
+          {Object.entries(d.headings).map(([h, n]) => (
+            <div key={h} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontFamily: "monospace", fontSize: 11, color: "#888", width: 24 }}>{'<' + h.toUpperCase() + '>'}</span>
+              <div style={{ flex: 1, height: 8, background: "#111", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(100, n * 10)}%`, height: "100%", background: h === "h1" && n !== 1 ? "#ef4444" : "#d4a843", borderRadius: 4 }} />
+              </div>
+              <span style={{ fontSize: 12, color: n > 0 ? "#eee" : "#555", width: 20, textAlign: "right" }}>{n}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: "#0a0a14", borderRadius: 10, padding: 14 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#d4a843" }}>📸 Imágenes</h4>
+          <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+            <div style={{ flex: d.images.withAlt || 1, background: "#22c55e33", height: 16, borderRadius: 4 }} title={`Con alt: ${d.images.withAlt}`} />
+            <div style={{ flex: d.images.withoutAlt || 0.001, background: "#ef444433", height: 16, borderRadius: 4 }} title={`Sin alt: ${d.images.withoutAlt}`} />
+          </div>
+          <p style={{ fontSize: 11, color: "#888", margin: 0 }}>✅ Con alt: {d.images.withAlt} &nbsp; ❌ Sin alt: {d.images.withoutAlt} &nbsp; 🔄 Lazy: {d.images.lazy}</p>
+        </div>
+      </div>
+
+      {d.accessibilityIssues.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#f97316", marginBottom: 10 }}>♿ Problemas de Accesibilidad WCAG ({d.accessibilityIssues.length})</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {d.accessibilityIssues.map((issue, i) => (
+              <div key={i} style={{ padding: "10px 14px", background: "#0a0a14", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <SevBadge s={issue.severity} />
+                <div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#eee" }}>{issue.type}</span>
+                  {issue.count > 1 && <span style={{ fontSize: 11, color: "#888", marginLeft: 6 }}>({issue.count} ocurrencias)</span>}
+                  <p style={{ color: "#aaa", fontSize: 11, margin: "2px 0 0" }}>{issue.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#d4a843", marginBottom: 10 }}>🔧 Librerías JavaScript Detectadas ({js.libraries.length})</h4>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          {[
+            { label: "GTM", active: js.hasGtm, color: "#4ade80" },
+            { label: "Analytics", active: js.hasAnalytics, color: "#4ade80" },
+            { label: "Facebook Pixel", active: js.hasPixel, color: "#60a5fa" },
+            { label: "Cookie Banner", active: js.hasCookieBanner, color: "#a78bfa" },
+            { label: "Chat/Soporte", active: js.hasChat, color: "#60a5fa" },
+            { label: "Lazy Load nativo", active: js.hasLazyLoad, color: "#4ade80" },
+          ].map((tag, i) => (
+            <span key={i} style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, background: tag.active ? tag.color + "22" : "#1a1a1a", color: tag.active ? tag.color : "#444", border: `1px solid ${tag.active ? tag.color + "44" : "#222"}` }}>
+              {tag.active ? "✅" : "○"} {tag.label}
+            </span>
+          ))}
+        </div>
+        {js.libraries.length > 0 ? (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {js.libraries.map((lib, i) => (
+              <span key={i} style={{ padding: "4px 10px", borderRadius: 20, background: "#1a1a2e", border: "1px solid #333", fontSize: 11, color: "#ccc" }}>
+                <span style={{ color: "#888", marginRight: 4 }}>{lib.category}</span>
+                <strong>{lib.name}</strong>
+                {lib.version && <span style={{ color: "#d4a843", marginLeft: 4 }}>v{lib.version}</span>}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "#555", fontSize: 12 }}>No se detectaron librerías conocidas (puede que estén minificadas o bajo CDN desconocido)</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PerformancePanel({ scan }: { scan: DeepScanResult }) {
+  const p = scan.performance;
+  const s = scan.seo;
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+        {[
+          { label: "Scripts externos", value: p.resourceCounts.scripts, warn: p.resourceCounts.scripts > 10 },
+          { label: "Hojas CSS", value: p.resourceCounts.stylesheets, warn: p.resourceCounts.stylesheets > 6 },
+          { label: "Imágenes totales", value: p.resourceCounts.images, warn: false },
+          { label: "Scripts bloqueantes", value: p.renderBlockingJs, warn: p.renderBlockingJs > 2 },
+          { label: "CSS bloqueante", value: p.renderBlockingCss, warn: p.renderBlockingCss > 0 },
+          { label: "Imgs lazy", value: p.lazyImages, warn: false },
+        ].map((stat, i) => (
+          <div key={i} style={{ padding: 14, background: "#0a0a14", borderRadius: 10, textAlign: "center", border: `1px solid ${stat.warn ? "#ef444433" : "#1a1a2e"}` }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: stat.warn ? "#ef4444" : "#d4a843" }}>{stat.value}</div>
+            <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {p.issues.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#f97316", marginBottom: 10 }}>⚠️ Problemas de Performance ({p.issues.length})</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {p.issues.map((issue, i) => (
+              <div key={i} style={{ padding: "10px 14px", background: "#0a0a14", borderRadius: 8, display: "flex", gap: 10 }}>
+                <SevBadge s={issue.severity} />
+                <div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#eee" }}>{issue.type}</span>
+                  <p style={{ color: "#aaa", fontSize: 11, margin: "2px 0 0" }}>{issue.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#d4a843", marginBottom: 10 }}>🔍 Auditoría SEO Técnico — Score: {s.score}/100</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginBottom: 12 }}>
+          {[
+            { label: "Título", status: s.titleStatus, detail: s.title ? `"${s.title.slice(0, 40)}${s.title.length > 40 ? "…" : ""}" (${s.titleLength} chars)` : "Sin título" },
+            { label: "Meta Description", status: s.metaDescriptionStatus, detail: s.metaDescription ? `${s.metaDescriptionLength} chars` : "Sin description" },
+            { label: "H1", status: s.h1Status, detail: `${s.h1Count} etiqueta(s) H1` },
+            { label: "Canonical", status: s.hasCanonical ? "good" : "missing", detail: s.canonicalUrl || "No definido" },
+            { label: "Open Graph", status: s.hasOpenGraph ? "good" : "missing", detail: s.ogTitle || (s.hasOpenGraph ? "Presente" : "Ausente") },
+            { label: "Twitter Card", status: s.hasTwitterCard ? "good" : "missing", detail: s.hasTwitterCard ? "Presente" : "Ausente" },
+            { label: "Datos Estructurados", status: s.hasStructuredData ? "good" : "missing", detail: s.structuredDataTypes.length ? s.structuredDataTypes.join(", ") : "Ausente" },
+            { label: "Hreflang", status: s.hasHreflang ? "good" : "info", detail: s.hasHreflang ? "Presente" : "No definido" },
+            { label: "Viewport", status: s.hasViewport ? "good" : "critical", detail: s.hasViewport ? "Presente" : "¡Ausente! Sitio no responsive" },
+          ].map((item, i) => (
+            <div key={i} style={{ padding: "10px 12px", background: "#0a0a14", borderRadius: 8, border: `1px solid ${item.status === "good" ? "#22c55e22" : item.status === "missing" || item.status === "critical" ? "#ef444422" : "#1a1a2e"}` }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 2 }}>
+                <span style={{ fontSize: 12 }}>{item.status === "good" ? "✅" : item.status === "info" ? "ℹ️" : "❌"}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#eee" }}>{item.label}</span>
+              </div>
+              <p style={{ color: "#888", fontSize: 10, margin: 0, wordBreak: "break-word" }}>{item.detail}</p>
+            </div>
+          ))}
+        </div>
+        {s.issues.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {s.issues.map((issue, i) => (
+              <div key={i} style={{ padding: "8px 12px", background: "#0a0a14", borderRadius: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <SevBadge s={issue.severity} />
+                <span style={{ fontSize: 12, color: "#aaa" }}><strong style={{ color: "#eee" }}>{issue.type}</strong> — {issue.detail}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EFFECT_ICONS: Record<string, string> = {
+  gsap_scroll_trigger: "🎬",
+  css_3d_perspective: "🎭",
+  three_js_background: "🌌",
+  exploded_view: "💥",
+  parallax_immersive: "🌊",
+};
+const COMPLEXITY_COLORS: Record<string, string> = { beginner: "#22c55e", intermediate: "#eab308", advanced: "#f97316" };
+
+function Effects3DPanel({ data, activeTab, setActiveTab, copied, setCopied }: {
+  data: Effects3DResult;
+  activeTab: number;
+  setActiveTab: (n: number) => void;
+  copied: string;
+  setCopied: (s: string) => void;
+}) {
+  const effect = data.effects[activeTab];
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 2500);
+    } catch {}
+  };
+
+  const download = (code: string, name: string) => {
+    const blob = new Blob([code], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name.toLowerCase().replace(/\s+/g, "-")}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>✨ Efectos 3D e Inmersivos — <span style={{ color: "#a78bfa" }}>{data.brand}</span></h3>
+          <p style={{ color: "#888", fontSize: 12, margin: "4px 0 0" }}>Sector: {data.sector} · {data.effects.length} efectos listos para producción</p>
+        </div>
+        {data.primaryColor && <div style={{ width: 36, height: 36, borderRadius: 8, background: data.primaryColor, border: "2px solid #333", flexShrink: 0 }} title={data.primaryColor} />}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {data.effects.map((e, i) => (
+          <button
+            key={i}
+            onClick={() => setActiveTab(i)}
+            style={{
+              padding: "8px 14px",
+              background: activeTab === i ? "linear-gradient(135deg, #7c3aed, #6d28d9)" : "#0a0a14",
+              border: activeTab === i ? "none" : "1px solid #333",
+              borderRadius: 8, color: activeTab === i ? "#fff" : "#a78bfa",
+              fontWeight: activeTab === i ? 700 : 400, cursor: "pointer", fontSize: 12,
+            }}
+          >
+            {EFFECT_ICONS[e.id] || "✨"} {e.name}
+          </button>
+        ))}
+      </div>
+
+      {effect && (
+        <div>
+          <div style={{ padding: "12px 16px", background: "#0a0a14", borderRadius: 10, marginBottom: 12, border: "1px solid #7c3aed33" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+              <span style={{ fontSize: 22 }}>{EFFECT_ICONS[effect.id] || "✨"}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#e2d9f3" }}>{effect.name}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: (COMPLEXITY_COLORS[effect.complexity] || "#888") + "22", color: COMPLEXITY_COLORS[effect.complexity] || "#888" }}>
+                {effect.complexity.toUpperCase()}
+              </span>
+              <span style={{ fontSize: 11, color: "#666" }}>Deps: {effect.dependencies.join(", ")}</span>
+            </div>
+            <p style={{ color: "#aaa", fontSize: 13, margin: 0 }}>{effect.description}</p>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#e2d9f3" }}>📋 Código listo para copiar</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => copy(effect.code, effect.id)}
+                  style={{ padding: "6px 12px", background: copied === effect.id ? "#22c55e22" : "#1a1a2e", border: `1px solid ${copied === effect.id ? "#22c55e" : "#444"}`, borderRadius: 6, color: copied === effect.id ? "#22c55e" : "#ccc", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                >
+                  {copied === effect.id ? "✅ Copiado" : "📋 Copiar código"}
+                </button>
+                <button
+                  onClick={() => download(effect.code, effect.name)}
+                  style={{ padding: "6px 12px", background: "#1a1a2e", border: "1px solid #444", borderRadius: 6, color: "#ccc", cursor: "pointer", fontSize: 11 }}
+                >
+                  💾 .html
+                </button>
+              </div>
+            </div>
+            <pre style={{ background: "#0d1117", border: "1px solid #30363d", borderRadius: 10, padding: 16, overflow: "auto", maxHeight: 500, fontSize: 12, lineHeight: 1.5, color: "#c9d1d9", fontFamily: "'Fira Code', monospace" }}>
+              <code>{effect.code}</code>
+            </pre>
+          </div>
+
+          <div style={{ padding: "10px 14px", background: "#0a1a0a", borderRadius: 8, border: "1px solid #22c55e22" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>📌 Cómo integrarlo: </span>
+            <span style={{ fontSize: 12, color: "#aaa" }}>{effect.installInstructions}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WebLabInner({ projectId }: { projectId: number }) {
   const [url, setUrl] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -110,7 +548,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
   // pasa explícitamente a "preview" para mostrar el iframe con el rediseño,
   // pero el primer renderizado al cargar la página o un histórico ya muestra
   // el código CSS real (con botones de copiar / descargar visibles).
-  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview" | "edit">("css");
+  const [tab, setTab] = useState<"summary" | "css" | "html" | "preview" | "edit" | "security" | "dom" | "performance" | "effects3d">("css");
   const [copied, setCopied] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -125,6 +563,17 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [editLabel, setEditLabel] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [savedEditMsg, setSavedEditMsg] = useState("");
+
+  // Deep Scan state
+  const [deepScan, setDeepScan] = useState<DeepScanResult | null>(null);
+  const [deepScanLoading, setDeepScanLoading] = useState(false);
+  const [deepScanError, setDeepScanError] = useState("");
+  // 3D Effects state
+  const [effects3d, setEffects3d] = useState<Effects3DResult | null>(null);
+  const [effects3dLoading, setEffects3dLoading] = useState(false);
+  const [effects3dError, setEffects3dError] = useState("");
+  const [effects3dTab, setEffects3dTab] = useState(0);
+  const [effects3dCopied, setEffects3dCopied] = useState("");
 
   // "Generar desde cero": inventamos una página entera con ADN de marca, sin URL
   // de partida. El backend usa fetchBrandProfile + Claude para componer HTML+CSS.
@@ -275,6 +724,58 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setError(err.message || "Error en el análisis");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runDeepScan = async () => {
+    if (!url.trim()) return;
+    setDeepScanLoading(true);
+    setDeepScanError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/deep-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: url.trim(), projectId }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setDeepScan(data.result);
+      setTab("security" as any);
+    } catch (e: any) {
+      setDeepScanError(e.message || "Error en el escaneo profundo");
+    } finally {
+      setDeepScanLoading(false);
+    }
+  };
+
+  const generate3dEffects = async () => {
+    if (!url.trim() && !a?.improvedCss) return;
+    setEffects3dLoading(true);
+    setEffects3dError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/generate-3d-effects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          url: url.trim() || undefined,
+          projectId,
+          css: a?.improvedCss || undefined,
+          brandInfo: brandName.trim() || undefined,
+        }),
+      });
+      const rawText = await res.text();
+      let data: any;
+      try { data = JSON.parse(rawText.trim()); } catch { throw new Error(`Error ${res.status}: respuesta inválida`); }
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setEffects3d(data);
+      setEffects3dTab(0);
+      setTab("effects3d" as any);
+    } catch (e: any) {
+      setEffects3dError(e.message || "Error generando efectos 3D");
+    } finally {
+      setEffects3dLoading(false);
     }
   };
 
@@ -565,6 +1066,40 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
             📜 Historial
           </button>
           <button
+            onClick={runDeepScan}
+            disabled={deepScanLoading || !url.trim()}
+            title="Escaneo profundo: seguridad, DOM, librerías JS, SEO técnico — sin IA, muy rápido"
+            style={{
+              padding: "12px 18px",
+              background: deepScanLoading ? "#333" : deepScan ? "linear-gradient(135deg, #22c55e22, #16a34a22)" : "transparent",
+              border: deepScan ? "1px solid #22c55e55" : "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: deepScanLoading ? "#555" : deepScan ? "#22c55e" : "var(--t2, #aaa)",
+              cursor: deepScanLoading || !url.trim() ? "not-allowed" : "pointer",
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {deepScanLoading ? "Escaneando…" : deepScan ? "✅ Re-escanear" : "🔍 Escaneo Profundo"}
+          </button>
+          <button
+            onClick={generate3dEffects}
+            disabled={effects3dLoading || (!url.trim() && !a?.improvedCss)}
+            title="Genera código listo: GSAP ScrollTrigger, CSS 3D, Three.js, Vista Explosionada, Parallax Inmersivo"
+            style={{
+              padding: "12px 18px",
+              background: effects3dLoading ? "#333" : effects3d ? "linear-gradient(135deg, #7c3aed22, #6d28d922)" : "transparent",
+              border: effects3d ? "1px solid #7c3aed55" : "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: effects3dLoading ? "#555" : effects3d ? "#a78bfa" : "var(--t2, #aaa)",
+              cursor: effects3dLoading || (!url.trim() && !a?.improvedCss) ? "not-allowed" : "pointer",
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {effects3dLoading ? "Generando…" : effects3d ? "✨ Re-generar 3D" : "✨ Efectos 3D"}
+          </button>
+          <button
             onClick={() => setShowScratch(s => !s)}
             style={{
               padding: "12px 16px",
@@ -670,6 +1205,17 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
         </div>
       )}
 
+      {deepScanError && (
+        <div style={{ background: "#2a0000", border: "1px solid #4a1111", borderRadius: 12, padding: 16, marginBottom: 24, color: "#fca5a5" }}>
+          ❌ Escaneo Profundo: {deepScanError}
+        </div>
+      )}
+      {effects3dError && (
+        <div style={{ background: "#1a002a", border: "1px solid #4a1155", borderRadius: 12, padding: 16, marginBottom: 24, color: "#d8b4fe" }}>
+          ❌ Efectos 3D: {effects3dError}
+        </div>
+      )}
+
       {showHistory && history.length > 0 && (
         <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 20, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--t1, #eee)" }}>📜 Análisis anteriores</h3>
@@ -700,6 +1246,39 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ═══ DEEP SCAN RESULTS (security, dom, effects3d) — independent of design analysis ═══ */}
+      {(deepScan || effects3d) && !a && (
+        <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {deepScan && (["security", "dom", "performance"] as const).map(t => {
+              const labels = { security: "🔒 Seguridad", dom: "🏗️ DOM & Código", performance: "⚡ Performance" };
+              return (
+                <button key={t} onClick={() => setTab(t as any)} style={{ padding: "10px 18px", background: tab === t ? "linear-gradient(135deg, #22c55e, #16a34a)" : "var(--ink, #0a0a0a)", border: tab === t ? "none" : "1px solid #333", borderRadius: 10, color: tab === t ? "#000" : "#aaa", fontWeight: tab === t ? 700 : 400, cursor: "pointer", fontSize: 13 }}>
+                  {labels[t]}
+                </button>
+              );
+            })}
+            {effects3d && (
+              <button onClick={() => setTab("effects3d" as any)} style={{ padding: "10px 18px", background: tab === "effects3d" ? "linear-gradient(135deg, #7c3aed, #6d28d9)" : "var(--ink, #0a0a0a)", border: tab === "effects3d" ? "none" : "1px solid #333", borderRadius: 10, color: tab === "effects3d" ? "#fff" : "#a78bfa", fontWeight: tab === "effects3d" ? 700 : 400, cursor: "pointer", fontSize: 13 }}>
+                ✨ Efectos 3D
+              </button>
+            )}
+          </div>
+          {tab === "security" && deepScan && <SecurityPanel scan={deepScan} />}
+          {tab === "dom" && deepScan && <DomPanel scan={deepScan} />}
+          {tab === "performance" && deepScan && <PerformancePanel scan={deepScan} />}
+          {tab === "effects3d" && effects3d && (
+            <Effects3DPanel
+              data={effects3d}
+              activeTab={effects3dTab}
+              setActiveTab={setEffects3dTab}
+              copied={effects3dCopied}
+              setCopied={setEffects3dCopied}
+            />
+          )}
         </div>
       )}
 
@@ -767,6 +1346,19 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                 </button>
               );
             })}
+            {deepScan && (["security", "dom", "performance"] as const).map(t => {
+              const labels = { security: "🔒 Seguridad", dom: "🏗️ DOM & JS", performance: "⚡ Performance" };
+              return (
+                <button key={t} onClick={() => setTab(t as any)} style={{ padding: "10px 18px", background: tab === t ? "linear-gradient(135deg, #22c55e, #16a34a)" : "var(--card, #111)", border: tab === t ? "none" : "1px solid #333", borderRadius: 10, color: tab === t ? "#000" : "#22c55e", fontWeight: tab === t ? 700 : 400, cursor: "pointer", fontSize: 13 }}>
+                  {labels[t]}
+                </button>
+              );
+            })}
+            {effects3d && (
+              <button onClick={() => setTab("effects3d" as any)} style={{ padding: "10px 18px", background: tab === "effects3d" ? "linear-gradient(135deg, #7c3aed, #6d28d9)" : "var(--card, #111)", border: tab === "effects3d" ? "none" : "1px solid #7c3aed55", borderRadius: 10, color: tab === "effects3d" ? "#fff" : "#a78bfa", fontWeight: tab === "effects3d" ? 700 : 400, cursor: "pointer", fontSize: 13 }}>
+                ✨ Efectos 3D
+              </button>
+            )}
           </div>
 
           <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
@@ -1156,6 +1748,19 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                   />
                 </div>
               </div>
+            )}
+
+            {tab === "security" && deepScan && <SecurityPanel scan={deepScan} />}
+            {tab === "dom" && deepScan && <DomPanel scan={deepScan} />}
+            {tab === "performance" && deepScan && <PerformancePanel scan={deepScan} />}
+            {tab === "effects3d" && effects3d && (
+              <Effects3DPanel
+                data={effects3d}
+                activeTab={effects3dTab}
+                setActiveTab={setEffects3dTab}
+                copied={effects3dCopied}
+                setCopied={setEffects3dCopied}
+              />
             )}
 
             {tab === "edit" && (

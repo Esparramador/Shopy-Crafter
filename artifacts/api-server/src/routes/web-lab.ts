@@ -1803,4 +1803,582 @@ REGLAS DURAS:
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// DEEP SCAN — Security, DOM, JS, SEO, Accessibility (no AI, fast)
+// ═══════════════════════════════════════════════════════════════
+
+interface DeepScanResult {
+  url: string;
+  scannedAt: string;
+  security: {
+    score: number;
+    headers: Array<{ name: string; present: boolean; value?: string; severity: "critical" | "high" | "medium" | "info"; description: string; recommendation: string }>;
+    vulnerabilities: Array<{ type: string; severity: "critical" | "high" | "medium" | "low"; description: string; recommendation: string }>;
+    https: boolean;
+    mixedContent: boolean;
+    serverInfo?: string;
+  };
+  dom: {
+    totalElements: number;
+    maxDepth: number;
+    headings: { h1: number; h2: number; h3: number; h4: number; h5: number; h6: number };
+    images: { total: number; withAlt: number; withoutAlt: number; lazy: number };
+    forms: number;
+    inputs: number;
+    links: { total: number; external: number; nofollow: number; blankTarget: number };
+    scripts: { inline: number; external: number; deferred: number; asyncLoaded: number };
+    iframes: number;
+    tables: number;
+    accessibilityIssues: Array<{ type: string; count: number; severity: "critical" | "high" | "medium" | "low"; detail: string }>;
+    domSize: string;
+  };
+  javascript: {
+    libraries: Array<{ name: string; version?: string; category: string }>;
+    hasGtm: boolean;
+    hasAnalytics: boolean;
+    hasPixel: boolean;
+    hasCookieBanner: boolean;
+    hasChat: boolean;
+    hasLazyLoad: boolean;
+    inlineScriptCount: number;
+    externalScriptCount: number;
+    renderBlockingScripts: number;
+  };
+  seo: {
+    score: number;
+    title: string;
+    titleLength: number;
+    titleStatus: "good" | "short" | "long" | "missing";
+    metaDescription: string;
+    metaDescriptionLength: number;
+    metaDescriptionStatus: "good" | "short" | "long" | "missing";
+    h1Count: number;
+    h1Status: "good" | "missing" | "multiple";
+    hasCanonical: boolean;
+    canonicalUrl?: string;
+    metaRobots?: string;
+    hasOpenGraph: boolean;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    hasTwitterCard: boolean;
+    hasStructuredData: boolean;
+    structuredDataTypes: string[];
+    hasHreflang: boolean;
+    hasViewport: boolean;
+    hasCharset: boolean;
+    issues: Array<{ type: string; severity: "critical" | "high" | "medium" | "low"; detail: string }>;
+  };
+  performance: {
+    resourceCounts: { scripts: number; stylesheets: number; images: number };
+    renderBlockingCss: number;
+    renderBlockingJs: number;
+    lazyImages: number;
+    inlineCriticalCss: boolean;
+    issues: Array<{ type: string; severity: "high" | "medium" | "low"; detail: string }>;
+  };
+}
+
+function parseDomFromHtml(html: string): DeepScanResult["dom"] {
+  const totalElements = (html.match(/<[a-zA-Z][^>]*>/g) || []).length;
+
+  const h1 = (html.match(/<h1[\s>]/gi) || []).length;
+  const h2 = (html.match(/<h2[\s>]/gi) || []).length;
+  const h3 = (html.match(/<h3[\s>]/gi) || []).length;
+  const h4 = (html.match(/<h4[\s>]/gi) || []).length;
+  const h5 = (html.match(/<h5[\s>]/gi) || []).length;
+  const h6 = (html.match(/<h6[\s>]/gi) || []).length;
+
+  const imgTags = html.match(/<img[^>]*>/gi) || [];
+  const imgTotal = imgTags.length;
+  const imgWithAlt = imgTags.filter(t => /\balt\s*=\s*["'][^"']+["']/i.test(t)).length;
+  const imgWithoutAlt = imgTags.filter(t => !/\balt\s*=/i.test(t) || /\balt\s*=\s*["']\s*["']/i.test(t)).length;
+  const imgLazy = imgTags.filter(t => /loading\s*=\s*["']lazy["']/i.test(t)).length;
+
+  const forms = (html.match(/<form[\s>]/gi) || []).length;
+  const inputs = (html.match(/<input[^>]*>/gi) || []).length;
+
+  const links = html.match(/<a\s[^>]*>/gi) || [];
+  const linksTotal = links.length;
+  const linksExternal = links.filter(l => /href\s*=\s*["']https?:\/\//i.test(l)).length;
+  const linksNofollow = links.filter(l => /rel\s*=\s*["'][^"']*nofollow/i.test(l)).length;
+  const linksBlankTarget = links.filter(l => /target\s*=\s*["']_blank["']/i.test(l)).length;
+
+  const scriptTags = html.match(/<script[^>]*>/gi) || [];
+  const scriptsInline = scriptTags.filter(t => !/\bsrc\s*=/i.test(t)).length;
+  const scriptsExternal = scriptTags.filter(t => /\bsrc\s*=/i.test(t)).length;
+  const scriptsDeferred = scriptTags.filter(t => /\bdefer\b/i.test(t)).length;
+  const scriptsAsync = scriptTags.filter(t => /\basync\b/i.test(t)).length;
+
+  const iframes = (html.match(/<iframe[\s>]/gi) || []).length;
+  const tables = (html.match(/<table[\s>]/gi) || []).length;
+
+  const a11yIssues: DeepScanResult["dom"]["accessibilityIssues"] = [];
+  if (imgWithoutAlt > 0) a11yIssues.push({ type: "Imágenes sin alt", count: imgWithoutAlt, severity: "high", detail: `${imgWithoutAlt} imágenes carecen de atributo alt descriptivo (WCAG 1.1.1)` });
+  if (!/\blang\s*=\s*["'][a-z]/i.test(html)) a11yIssues.push({ type: "Falta lang en html", count: 1, severity: "high", detail: "El elemento <html> no tiene atributo lang — lectores de pantalla no pueden identificar el idioma (WCAG 3.1.1)" });
+  if (h1 === 0) a11yIssues.push({ type: "Falta H1", count: 1, severity: "high", detail: "Sin H1 la jerarquía semántica es incompleta — dificulta navegación por teclado/lector de pantalla" });
+  if (linksBlankTarget > 0) {
+    const withoutWarning = links.filter(l => /target\s*=\s*["']_blank["']/i.test(l) && !/rel\s*=\s*["'][^"']*(noopener|noreferrer)/i.test(l)).length;
+    if (withoutWarning > 0) a11yIssues.push({ type: "Links _blank sin noopener", count: withoutWarning, severity: "medium", detail: `${withoutWarning} enlaces abren en nueva pestaña sin rel="noopener noreferrer" — riesgo de seguridad + confusión UX` });
+  }
+  if (forms > 0) {
+    const labelsCount = (html.match(/<label[\s>]/gi) || []).length;
+    if (labelsCount < inputs) a11yIssues.push({ type: "Inputs sin label", count: inputs - labelsCount, severity: "critical", detail: `${inputs} inputs detectados pero solo ${labelsCount} labels — formularios no accesibles (WCAG 1.3.1)` });
+  }
+
+  let domSizeLabel = "Óptimo";
+  if (totalElements > 1500) domSizeLabel = "Grande (lento)";
+  else if (totalElements > 800) domSizeLabel = "Moderado";
+
+  const estDepth = Math.min(Math.ceil(Math.log2(totalElements + 1) * 2), 20);
+
+  return {
+    totalElements,
+    maxDepth: estDepth,
+    headings: { h1, h2, h3, h4, h5, h6 },
+    images: { total: imgTotal, withAlt: imgWithAlt, withoutAlt: imgWithoutAlt, lazy: imgLazy },
+    forms,
+    inputs,
+    links: { total: linksTotal, external: linksExternal, nofollow: linksNofollow, blankTarget: linksBlankTarget },
+    scripts: { inline: scriptsInline, external: scriptsExternal, deferred: scriptsDeferred, asyncLoaded: scriptsAsync },
+    iframes,
+    tables,
+    accessibilityIssues: a11yIssues,
+    domSize: domSizeLabel,
+  };
+}
+
+function parseJsLibraries(html: string): DeepScanResult["javascript"] {
+  const KNOWN_LIBS: Array<{ name: string; pattern: RegExp; category: string; versionRe?: RegExp }> = [
+    { name: "jQuery", pattern: /jquery(?:\.min)?\.js/i, category: "Framework", versionRe: /jquery[.-](\d+\.\d+\.?\d*)/i },
+    { name: "jQuery UI", pattern: /jquery-ui/i, category: "UI Library" },
+    { name: "React", pattern: /react(?:\.production\.min|\.development)?\.js/i, category: "Framework", versionRe: /react@(\d+\.\d+\.?\d*)/i },
+    { name: "Vue.js", pattern: /vue(?:\.min)?\.js/i, category: "Framework", versionRe: /vue@(\d+\.\d+\.?\d*)/i },
+    { name: "Angular", pattern: /angular(?:\.min)?\.js/i, category: "Framework" },
+    { name: "Bootstrap JS", pattern: /bootstrap(?:\.bundle)?(?:\.min)?\.js/i, category: "CSS Framework", versionRe: /bootstrap[.-](\d+\.\d+\.?\d*)/i },
+    { name: "GSAP", pattern: /gsap(?:\.min)?\.js|TweenMax|TweenLite/i, category: "Animation" },
+    { name: "ScrollTrigger (GSAP)", pattern: /ScrollTrigger/i, category: "Animation" },
+    { name: "Three.js", pattern: /three(?:\.min)?\.js/i, category: "3D Graphics" },
+    { name: "AOS", pattern: /aos(?:\.min)?\.js/i, category: "Animation" },
+    { name: "Lottie", pattern: /lottie(?:\.min)?\.js|lottie-web/i, category: "Animation" },
+    { name: "Swiper", pattern: /swiper(?:\.min)?\.js/i, category: "Slider" },
+    { name: "Splide", pattern: /splide(?:\.min)?\.js/i, category: "Slider" },
+    { name: "Slick", pattern: /slick(?:\.min)?\.js/i, category: "Slider" },
+    { name: "Fancybox", pattern: /fancybox/i, category: "Lightbox" },
+    { name: "GLightbox", pattern: /glightbox/i, category: "Lightbox" },
+    { name: "Alpine.js", pattern: /alpinejs/i, category: "Framework" },
+    { name: "Stimulus", pattern: /stimulus/i, category: "Framework" },
+    { name: "Barba.js", pattern: /barba(?:\.min)?\.js/i, category: "Page Transitions" },
+    { name: "Locomotive Scroll", pattern: /locomotive-scroll/i, category: "Smooth Scroll" },
+    { name: "Smooth Scroll", pattern: /smoothscroll/i, category: "Smooth Scroll" },
+    { name: "Masonry", pattern: /masonry(?:\.pkgd)?(?:\.min)?\.js/i, category: "Layout" },
+    { name: "Isotope", pattern: /isotope(?:\.pkgd)?(?:\.min)?\.js/i, category: "Layout" },
+    { name: "Chart.js", pattern: /chart(?:\.min)?\.js/i, category: "Charts" },
+    { name: "D3.js", pattern: /d3(?:\.min)?\.js/i, category: "Data Viz" },
+    { name: "Typed.js", pattern: /typed(?:\.min)?\.js/i, category: "Animation" },
+    { name: "Parallax.js", pattern: /parallax(?:\.min)?\.js/i, category: "Animation" },
+    { name: "Rellax", pattern: /rellax(?:\.min)?\.js/i, category: "Parallax" },
+    { name: "ScrollReveal", pattern: /scrollreveal/i, category: "Animation" },
+    { name: "WOW.js", pattern: /wow(?:\.min)?\.js/i, category: "Animation" },
+    { name: "Video.js", pattern: /video(?:\.min)?\.js|video-js/i, category: "Video" },
+    { name: "Shopify", pattern: /shopify\.com\/s\/files\//i, category: "E-commerce Platform" },
+    { name: "WooCommerce", pattern: /woocommerce/i, category: "E-commerce Platform" },
+    { name: "Wix", pattern: /wix\.com\/|wixstatic\.com/i, category: "CMS Platform" },
+    { name: "WordPress", pattern: /wp-content\/|wp-includes\//i, category: "CMS Platform" },
+    { name: "Webflow", pattern: /webflow\.com\//i, category: "CMS Platform" },
+  ];
+
+  const detected: DeepScanResult["javascript"]["libraries"] = [];
+  const seen = new Set<string>();
+  for (const lib of KNOWN_LIBS) {
+    if (lib.pattern.test(html) && !seen.has(lib.name)) {
+      seen.add(lib.name);
+      let version: string | undefined;
+      if (lib.versionRe) {
+        const m = lib.versionRe.exec(html);
+        if (m) version = m[1];
+      }
+      detected.push({ name: lib.name, version, category: lib.category });
+    }
+  }
+
+  const hasGtm = /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]+/i.test(html);
+  const hasAnalytics = /google-analytics\.com|gtag\s*\(|ga\s*\(|UA-\d{6}/i.test(html);
+  const hasPixel = /fbevents\.js|facebook\.net.*fbevents|_fbq\s*=/i.test(html);
+  const hasCookieBanner = /cookie(?:yes|bot|consent|banner|notice|law|hub)|cookienotice|gdpr/i.test(html);
+  const hasChat = /intercom\.io|zendesk\.com|crisp\.chat|tawk\.to|livechat|freshchat|drift\.com|hotjar\.com/i.test(html);
+  const hasLazyLoad = /loading\s*=\s*["']lazy["']/i.test(html);
+
+  const scriptTags = html.match(/<script[^>]*>/gi) || [];
+  const inlineScriptCount = scriptTags.filter(t => !/\bsrc\s*=/i.test(t)).length;
+  const externalScriptCount = scriptTags.filter(t => /\bsrc\s*=/i.test(t)).length;
+  const renderBlockingScripts = scriptTags.filter(t => /\bsrc\s*=/i.test(t) && !/\b(defer|async)\b/i.test(t) && !/<script[^>]+type\s*=\s*["'][^"']*module/i.test(t)).length;
+
+  return { libraries: detected, hasGtm, hasAnalytics, hasPixel, hasCookieBanner, hasChat, hasLazyLoad, inlineScriptCount, externalScriptCount, renderBlockingScripts };
+}
+
+function parseSeoFromHtml(html: string): DeepScanResult["seo"] {
+  const titleM = /<title[^>]*>([^<]*)<\/title>/i.exec(html);
+  const title = titleM ? titleM[1].trim() : "";
+  const titleLength = title.length;
+  const titleStatus = !title ? "missing" : titleLength < 30 ? "short" : titleLength > 60 ? "long" : "good";
+
+  const descM = /<meta[^>]+name\s*=\s*["']description["'][^>]+content\s*=\s*["']([^"']*)/i.exec(html)
+    || /<meta[^>]+content\s*=\s*["']([^"']*)[^>]+name\s*=\s*["']description["']/i.exec(html);
+  const desc = descM ? descM[1].trim() : "";
+  const descLength = desc.length;
+  const descStatus = !desc ? "missing" : descLength < 120 ? "short" : descLength > 160 ? "long" : "good";
+
+  const h1Count = (html.match(/<h1[\s>]/gi) || []).length;
+  const h1Status = h1Count === 0 ? "missing" : h1Count > 1 ? "multiple" : "good";
+
+  const canonicalM = /<link[^>]+rel\s*=\s*["']canonical["'][^>]+href\s*=\s*["']([^"']*)/i.exec(html)
+    || /<link[^>]+href\s*=\s*["']([^"']*)[^>]+rel\s*=\s*["']canonical["']/i.exec(html);
+  const hasCanonical = !!canonicalM;
+  const canonicalUrl = canonicalM ? canonicalM[1] : undefined;
+
+  const robotsM = /<meta[^>]+name\s*=\s*["']robots["'][^>]+content\s*=\s*["']([^"']*)/i.exec(html);
+  const metaRobots = robotsM ? robotsM[1] : undefined;
+
+  const ogTitle = /<meta[^>]+property\s*=\s*["']og:title["'][^>]+content\s*=\s*["']([^"']*)/i.exec(html)?.[1];
+  const ogDesc = /<meta[^>]+property\s*=\s*["']og:description["'][^>]+content\s*=\s*["']([^"']*)/i.exec(html)?.[1];
+  const ogImg = /<meta[^>]+property\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']*)/i.exec(html)?.[1];
+  const hasOpenGraph = /property\s*=\s*["']og:/i.test(html);
+
+  const hasTwitterCard = /name\s*=\s*["']twitter:card["']/i.test(html);
+
+  const hasStructuredData = /<script[^>]+type\s*=\s*["']application\/ld\+json["']/i.test(html);
+  const structuredDataTypes: string[] = [];
+  const sdMatches = html.match(/"@type"\s*:\s*"([^"]+)"/g) || [];
+  for (const m of sdMatches) {
+    const t = /"@type"\s*:\s*"([^"]+)"/.exec(m)?.[1];
+    if (t && !structuredDataTypes.includes(t)) structuredDataTypes.push(t);
+  }
+
+  const hasHreflang = /hreflang\s*=/i.test(html);
+  const hasViewport = /name\s*=\s*["']viewport["']/i.test(html);
+  const hasCharset = /<meta\s+charset/i.test(html);
+
+  const issues: DeepScanResult["seo"]["issues"] = [];
+  if (titleStatus === "missing") issues.push({ type: "Sin título", severity: "critical", detail: "La página no tiene etiqueta <title>" });
+  else if (titleStatus === "short") issues.push({ type: "Título corto", severity: "medium", detail: `Título de ${titleLength} chars. Optimal: 30-60.` });
+  else if (titleStatus === "long") issues.push({ type: "Título largo", severity: "low", detail: `Título de ${titleLength} chars. Optimal: 30-60. Google trunca a ~60.` });
+  if (descStatus === "missing") issues.push({ type: "Sin meta description", severity: "high", detail: "Falta meta description — afecta CTR en resultados de búsqueda" });
+  else if (descStatus === "short") issues.push({ type: "Meta description corta", severity: "medium", detail: `${descLength} chars. Optimal: 120-160.` });
+  else if (descStatus === "long") issues.push({ type: "Meta description larga", severity: "low", detail: `${descLength} chars. Google trunca a ~160.` });
+  if (h1Status === "missing") issues.push({ type: "Sin H1", severity: "high", detail: "Falta encabezado H1 — señal SEO básica para Google" });
+  if (h1Status === "multiple") issues.push({ type: "Múltiples H1", severity: "medium", detail: `${h1Count} H1 encontrados. Best practice: solo 1 por página.` });
+  if (!hasCanonical) issues.push({ type: "Sin canonical", severity: "medium", detail: "Falta <link rel='canonical'>. Puede causar problemas de contenido duplicado." });
+  if (!hasOpenGraph) issues.push({ type: "Sin Open Graph", severity: "medium", detail: "Sin tags OG — los links compartidos en redes sociales no tendrán imagen/descripción." });
+  if (!hasTwitterCard) issues.push({ type: "Sin Twitter Card", severity: "low", detail: "Sin Twitter Card meta tags." });
+  if (!hasStructuredData) issues.push({ type: "Sin datos estructurados", severity: "medium", detail: "Sin JSON-LD/Schema.org — se pierde elegibilidad para rich snippets en Google." });
+  if (!hasViewport) issues.push({ type: "Sin viewport", severity: "critical", detail: "Sin meta viewport — la página no es responsive en móvil." });
+
+  let score = 100;
+  for (const issue of issues) {
+    if (issue.severity === "critical") score -= 20;
+    else if (issue.severity === "high") score -= 12;
+    else if (issue.severity === "medium") score -= 7;
+    else score -= 3;
+  }
+  score = Math.max(0, score);
+
+  return { score, title, titleLength, titleStatus, metaDescription: desc, metaDescriptionLength: descLength, metaDescriptionStatus: descStatus, h1Count, h1Status, hasCanonical, canonicalUrl, metaRobots, hasOpenGraph, ogTitle, ogDescription: ogDesc, ogImage: ogImg, hasTwitterCard, hasStructuredData, structuredDataTypes, hasHreflang, hasViewport, hasCharset, issues };
+}
+
+function parseSecurityFromHeaders(headers: Record<string, string>, url: string, html: string): DeepScanResult["security"] {
+  const SECURITY_HEADERS: Array<{ name: string; headerKey: string; severity: "critical" | "high" | "medium" | "info"; description: string; recommendation: string }> = [
+    { name: "Content-Security-Policy", headerKey: "content-security-policy", severity: "high", description: "Previene inyección de scripts maliciosos (XSS)", recommendation: "Añadir CSP estricta: default-src 'self'; script-src 'self' 'nonce-...';" },
+    { name: "Strict-Transport-Security", headerKey: "strict-transport-security", severity: "high", description: "Fuerza HTTPS — previene ataques de downgrade", recommendation: "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload" },
+    { name: "X-Frame-Options", headerKey: "x-frame-options", severity: "medium", description: "Previene clickjacking embebiendo la página en un iframe", recommendation: "X-Frame-Options: DENY o SAMEORIGIN" },
+    { name: "X-Content-Type-Options", headerKey: "x-content-type-options", severity: "medium", description: "Previene MIME sniffing por el navegador", recommendation: "X-Content-Type-Options: nosniff" },
+    { name: "Referrer-Policy", headerKey: "referrer-policy", severity: "info", description: "Controla qué info de referrer se envía con las peticiones", recommendation: "Referrer-Policy: strict-origin-when-cross-origin" },
+    { name: "Permissions-Policy", headerKey: "permissions-policy", severity: "info", description: "Controla el acceso a APIs del navegador (cámara, micrófono, etc.)", recommendation: "Permissions-Policy: geolocation=(), microphone=(), camera=()" },
+    { name: "X-XSS-Protection", headerKey: "x-xss-protection", severity: "info", description: "Filtro XSS en navegadores legacy (superado por CSP)", recommendation: "X-XSS-Protection: 1; mode=block (o eliminar si tienes CSP)" },
+    { name: "Cache-Control", headerKey: "cache-control", severity: "info", description: "Controla caché del navegador — crítico para datos sensibles", recommendation: "Cache-Control: no-store para páginas con datos privados" },
+  ];
+
+  const headerResults = SECURITY_HEADERS.map(h => {
+    const val = headers[h.headerKey];
+    return { name: h.name, present: !!val, value: val, severity: h.severity, description: h.description, recommendation: h.recommendation };
+  });
+
+  const vulnerabilities: DeepScanResult["security"]["vulnerabilities"] = [];
+
+  const serverHeader = headers["server"] || headers["x-powered-by"];
+  if (serverHeader) {
+    vulnerabilities.push({ type: "Divulgación de versión del servidor", severity: "medium", description: `Server header expone: "${serverHeader}" — revela tecnología y versión al atacante`, recommendation: "Eliminar o anonimizar headers Server y X-Powered-By" });
+  }
+
+  if (!headers["content-security-policy"]) {
+    vulnerabilities.push({ type: "Sin Content-Security-Policy", severity: "high", description: "Sin CSP el sitio es vulnerable a ataques XSS — scripts de terceros pueden ejecutarse sin restricción", recommendation: "Implementar CSP estricta con nonces o hashes para scripts inline" });
+  }
+
+  if (!headers["strict-transport-security"] && url.startsWith("https://")) {
+    vulnerabilities.push({ type: "Sin HSTS", severity: "high", description: "Sin HSTS el navegador puede ser engañado para conectar por HTTP (downgrade attack)", recommendation: "Activar HSTS con max-age mínimo de 1 año e includeSubDomains" });
+  }
+
+  if (!headers["x-frame-options"] && !headers["content-security-policy"]?.includes("frame-ancestors")) {
+    vulnerabilities.push({ type: "Vulnerable a Clickjacking", severity: "medium", description: "Sin X-Frame-Options ni CSP frame-ancestors, la página puede ser embebida en iframes maliciosos", recommendation: "Añadir X-Frame-Options: DENY o CSP frame-ancestors 'self'" });
+  }
+
+  const httpsInternalLinks = url.startsWith("https://") &&
+    /<(?:img|script|link|iframe)[^>]+(?:src|href)\s*=\s*["']http:\/\//i.test(html);
+  const mixedContent = httpsInternalLinks;
+  if (mixedContent) {
+    vulnerabilities.push({ type: "Contenido mixto (Mixed Content)", severity: "critical", description: "Recursos HTTP cargados en página HTTPS — el navegador puede bloquearlo y romperse el sitio", recommendation: "Cambiar todas las URLs de recursos a HTTPS" });
+  }
+
+  const inlineEventHandlers = (html.match(/\bon[a-z]+\s*=/gi) || []).length;
+  if (inlineEventHandlers > 20) {
+    vulnerabilities.push({ type: "Event handlers inline excesivos", severity: "low", description: `${inlineEventHandlers} manejadores de eventos inline (onclick, onload, etc.) — dificultan implementación de CSP estricta`, recommendation: "Mover event handlers a archivos JavaScript externos" });
+  }
+
+  if (/<input[^>]*type\s*=\s*["']password["'][^>]*autocomplete\s*=\s*["']on["']/i.test(html)) {
+    vulnerabilities.push({ type: "Autocomplete activado en campos contraseña", severity: "medium", description: "Campos de contraseña con autocomplete habilitado — riesgo en equipos compartidos", recommendation: "Añadir autocomplete='off' en campos de contraseña" });
+  }
+
+  let secScore = 100;
+  const missingCritical = headerResults.filter(h => !h.present && (h.severity === "critical" || h.severity === "high")).length;
+  const missingMedium = headerResults.filter(h => !h.present && h.severity === "medium").length;
+  secScore -= missingCritical * 18;
+  secScore -= missingMedium * 8;
+  secScore -= vulnerabilities.filter(v => v.severity === "critical").length * 25;
+  secScore -= vulnerabilities.filter(v => v.severity === "high").length * 15;
+  secScore -= vulnerabilities.filter(v => v.severity === "medium").length * 8;
+  secScore = Math.max(0, secScore);
+
+  return {
+    score: secScore,
+    headers: headerResults,
+    vulnerabilities,
+    https: url.startsWith("https://"),
+    mixedContent,
+    serverInfo: serverHeader,
+  };
+}
+
+router.post("/web-lab/deep-scan", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { url, projectId } = req.body as { url?: string; projectId?: number };
+    if (!url) { res.status(400).json({ error: "URL requerida" }); return; }
+
+    let normalizedUrl = url.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = "https://" + normalizedUrl;
+
+    await validateUrlWithDnsCheck(normalizedUrl);
+
+    // Fetch HTML + HEAD in parallel
+    const [htmlResp, headResp] = await Promise.all([
+      fetch(normalizedUrl, {
+        headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+        signal: AbortSignal.timeout(25_000),
+        redirect: "follow",
+      }).catch(() => null),
+      fetch(normalizedUrl, {
+        method: "HEAD",
+        headers: { "User-Agent": BROWSER_UA },
+        signal: AbortSignal.timeout(15_000),
+        redirect: "follow",
+      }).catch(() => null),
+    ]);
+
+    const html = htmlResp ? await htmlResp.text().catch(() => "") : "";
+    const responseHeaders: Record<string, string> = {};
+    const sourceHeaders = headResp?.headers ?? htmlResp?.headers;
+    if (sourceHeaders) {
+      for (const [k, v] of (sourceHeaders as any).entries?.() ?? []) {
+        responseHeaders[k.toLowerCase()] = v;
+      }
+    }
+
+    // Parse all dimensions in parallel
+    const [domResult, jsResult, seoResult, secResult] = await Promise.all([
+      Promise.resolve(parseDomFromHtml(html)),
+      Promise.resolve(parseJsLibraries(html)),
+      Promise.resolve(parseSeoFromHtml(html)),
+      Promise.resolve(parseSecurityFromHeaders(responseHeaders, normalizedUrl, html)),
+    ]);
+
+    // Performance issues from DOM/JS data
+    const perfIssues: DeepScanResult["performance"]["issues"] = [];
+    if (jsResult.renderBlockingScripts > 3) perfIssues.push({ type: "Scripts render-blocking", severity: "high", detail: `${jsResult.renderBlockingScripts} scripts externos sin defer/async bloquean el renderizado inicial` });
+    const cssFiles = (html.match(/<link[^>]+rel\s*=\s*["']stylesheet["']/gi) || []).length;
+    if (cssFiles > 8) perfIssues.push({ type: "Demasiados CSS externos", severity: "medium", detail: `${cssFiles} hojas de estilo externas detectadas — considera consolidarlas` });
+    if (domResult.images.total > 20 && domResult.images.lazy < domResult.images.total / 2) {
+      perfIssues.push({ type: "Imágenes sin lazy loading", severity: "medium", detail: `${domResult.images.total - domResult.images.lazy} imágenes cargadas sin loading="lazy"` });
+    }
+    if (domResult.totalElements > 1500) perfIssues.push({ type: "DOM muy grande", severity: "high", detail: `${domResult.totalElements} elementos DOM — Google recomienda menos de 1500. Penaliza Core Web Vitals.` });
+    const inlineCriticalCss = /<style[^>]*>[\s\S]{1000}/i.test(html);
+    if (!inlineCriticalCss && cssFiles > 0) perfIssues.push({ type: "Sin CSS crítico inline", severity: "low", detail: "No se detecta CSS crítico inline — considera incluir above-the-fold CSS en <style> para mejorar FCP" });
+
+    const result: DeepScanResult = {
+      url: normalizedUrl,
+      scannedAt: new Date().toISOString(),
+      security: secResult,
+      dom: domResult,
+      javascript: jsResult,
+      seo: seoResult,
+      performance: {
+        resourceCounts: {
+          scripts: domResult.scripts.external,
+          stylesheets: cssFiles,
+          images: domResult.images.total,
+        },
+        renderBlockingCss: Math.max(0, cssFiles - 3),
+        renderBlockingJs: jsResult.renderBlockingScripts,
+        lazyImages: domResult.images.lazy,
+        inlineCriticalCss,
+        issues: perfIssues,
+      },
+    };
+
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, "Web Lab deep-scan failed");
+    res.status(500).json({ error: err.message || "Error en el análisis profundo" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GENERATE 3D EFFECTS — Ready-to-use code: GSAP, CSS3D, Three.js
+// ═══════════════════════════════════════════════════════════════
+
+const EFFECTS_3D_SYSTEM = `Eres el experto mundial en efectos web inmersivos: CSS 3D, GSAP ScrollTrigger, Three.js, Parallax y animaciones de alto impacto.
+
+Tu trabajo es analizar el HTML/CSS/marca del cliente y generar código REAL, completo y listo para producción de 5 efectos distintos adaptados a su marca específica.
+
+EFECTOS A GENERAR (SIEMPRE LOS 5):
+1. **gsap_scroll_trigger** — Animaciones scroll-driven con GSAP ScrollTrigger: elementos que se revelan, textos que se mueven, secciones que se fijan (pin). Usa los colores y fuentes REALES de la marca.
+2. **css_3d_perspective** — Secciones con perspectiva 3D CSS pura: cards que rotan (rotateY), secciones con transformPerspective, elementos flotantes con translateZ. Sin librerías.
+3. **three_js_background** — Fondo Three.js interactivo: partículas flotantes O geometría 3D animada que reacciona al ratón, usando los colores de marca. Código completo con init+animate+resize.
+4. **exploded_view** — Vista explosionada CSS/JS: animación de producto/servicio donde los elementos se "explotan" y vuelven a ensamblar al scroll o hover. Con timeline GSAP.
+5. **parallax_immersive** — Secciones parallax multicapa inmersivas: profundidad visual con múltiples capas a distintas velocidades. Usando CSS custom properties de la marca.
+
+REGLAS CRÍTICAS:
+- Código 100% funcional y listo para copy-paste. Sin errores de sintaxis.
+- Cada efecto incluye HTML+CSS+JS integrado en un <div> autónomo que puede insertarse en cualquier página.
+- Usa los colores EXACTOS de la marca (hex reales del análisis).
+- Incluye siempre los CDN de las librerías necesarias en los scripts de cada efecto.
+- Los textos de ejemplo deben ser del sector/marca del cliente (no genéricos).
+- Añade comentarios en el código explicando cómo personalizar cada efecto.
+- PROHIBIDO: Lorem ipsum, placeholder, variables vacías, código incompleto.
+
+Responde SOLO JSON válido:
+{
+  "brand": "nombre de la marca detectado",
+  "sector": "sector de la empresa",
+  "primaryColor": "#hex color primario de la marca",
+  "effects": [
+    {
+      "id": "gsap_scroll_trigger|css_3d_perspective|three_js_background|exploded_view|parallax_immersive",
+      "name": "Nombre descriptivo del efecto",
+      "description": "Qué hace este efecto y por qué es ideal para esta marca",
+      "complexity": "beginner|intermediate|advanced",
+      "dependencies": ["GSAP + ScrollTrigger", "Three.js", "Vanilla JS"],
+      "code": "<!-- Código HTML+CSS+JS COMPLETO y funcional —>",
+      "cssOnly": false,
+      "installInstructions": "Pasos para integrar en Shopify/WordPress/HTML"
+    }
+  ]
+}`;
+
+router.post("/web-lab/generate-3d-effects", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { url, projectId, html, css, brandInfo } = req.body as {
+      url?: string;
+      projectId?: number;
+      html?: string;
+      css?: string;
+      brandInfo?: string;
+    };
+
+    if (!url && !html) { res.status(400).json({ error: "Se requiere url o html" }); return; }
+
+    const pid = projectId ?? 0;
+
+    res.status(200);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    enableLongRunning(res);
+    if (typeof (res as any).flushHeaders === "function") (res as any).flushHeaders();
+
+    let targetHtml = html || "";
+    let targetCss = css || "";
+
+    if (url && !html) {
+      let normalizedUrl = url.trim();
+      if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = "https://" + normalizedUrl;
+      try {
+        await validateUrlWithDnsCheck(normalizedUrl);
+        const resp = await fetch(normalizedUrl, {
+          headers: { "User-Agent": BROWSER_UA },
+          signal: AbortSignal.timeout(20_000),
+        });
+        targetHtml = (await resp.text()).substring(0, 60_000);
+      } catch { /* use empty */ }
+    }
+
+    const colorPalette = (targetCss || targetHtml).match(/#[0-9a-fA-F]{6}\b/g);
+    const topColors = colorPalette ? [...new Set(colorPalette)].slice(0, 8).join(", ") : "desconocido";
+
+    const htmlSnippet = targetHtml.substring(0, 15_000);
+    const cssSnippet = targetCss.substring(0, 10_000);
+
+    const userPrompt = `Analiza este sitio web y genera 5 efectos 3D/animación REALES adaptados a su marca y sector.
+
+URL: ${url || "HTML directo"}
+${brandInfo ? `INFO DE MARCA: ${brandInfo}` : ""}
+
+COLORES DETECTADOS EN EL CSS: ${topColors}
+
+HTML (extracto):
+${htmlSnippet}
+
+CSS (extracto):
+${cssSnippet}
+
+INSTRUCCIÓN: Usa los colores reales detectados en los efectos. El sector y estilo de la marca deben verse reflejados.`;
+
+    const result = await askClaudeJsonWithBrain<{
+      brand: string;
+      sector: string;
+      primaryColor: string;
+      effects: Array<{
+        id: string;
+        name: string;
+        description: string;
+        complexity: string;
+        dependencies: string[];
+        code: string;
+        cssOnly: boolean;
+        installInstructions: string;
+      }>;
+    }>(pid, userPrompt, EFFECTS_3D_SYSTEM, "general", undefined, 24000, 360_000);
+
+    if (!result.effects || result.effects.length === 0) {
+      res.end(JSON.stringify({ error: "No se generaron efectos" }));
+      return;
+    }
+
+    if (pid > 0) {
+      learnFromOperation({
+        operationType: "web_lab_3d_effects",
+        title: `Efectos 3D generados: ${result.brand} — ${url}`,
+        content: `Marca: ${result.brand}. Sector: ${result.sector}. Efectos: ${result.effects.map(e => e.name).join(", ")}. Colores: ${topColors}.`,
+        confidence: 0.85,
+        tags: ["web-lab", "3d-effects", result.sector, url || ""],
+      });
+    }
+
+    res.end(JSON.stringify({ success: true, ...result }));
+  } catch (err: any) {
+    logger.error({ err }, "Web Lab generate-3d-effects failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Error generando efectos 3D" });
+    } else {
+      try { res.end(JSON.stringify({ error: err.message })); } catch {}
+    }
+  }
+});
+
 export default router;
