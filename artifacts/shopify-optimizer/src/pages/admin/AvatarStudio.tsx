@@ -28,14 +28,44 @@ const VOICE_MODELS = [
   { id: "eleven_flash_v2_5", label: "Flash v2.5 (instantáneo)" },
 ];
 const VIDEO_MODELS = [
-  { id: "kling-master", label: "Kling Master (calidad cinemática)" },
-  { id: "kling-1.6", label: "Kling 1.6 (rápido)" },
-  { id: "runway-gen3", label: "Runway Gen3 (foto-real)" },
+  { id: "kling-master",     label: "Kling Master · cinemático max ($0.18/s)" },
+  { id: "kling-2.5-turbo",  label: "Kling 2.5 Turbo · 1080p rápido ($0.12/s)" },
+  { id: "kling-2.1",        label: "Kling 2.1 · 1080p realista ($0.09/s)" },
+  { id: "seedance-pro",     label: "Seedance Pro · multi-ref cinemático ($0.07/s)" },
+  { id: "runway-gen4.5",    label: "Runway Gen 4.5 · nueva gen ($0.06/s)" },
+  { id: "runway-gen4-turbo",label: "Runway Gen 4 · foto-real ($0.05/s)" },
+  { id: "veo-3",            label: "Google Veo 3 · máx calidad+audio ($0.75/s)" },
+  { id: "veo-2",            label: "Google Veo 2 · alta calidad ($0.35/s)" },
+  { id: "hailuo-02",        label: "Hailuo 02 · balance vel/calidad ($0.05/s)" },
+  { id: "hailuo-02-fast",   label: "Hailuo 02 Fast · económico ($0.03/s)" },
+  { id: "wan-2.5",          label: "Wan 2.5 · open-source calidad ($0.04/s)" },
+  { id: "seedance-fast",    label: "Seedance Fast · rápido y barato ($0.05/s)" },
+  { id: "seedance-1-lite",  label: "Seedance 1 Lite · económico ($0.03/s)" },
 ];
 const IMAGE_MODELS = [
-  { id: "nano-banana", label: "Nano Banana (recomendado)" },
-  { id: "ideogram-v3", label: "Ideogram v3" },
-  { id: "flux-schnell", label: "Flux Schnell (rápido)" },
+  // Premium
+  { id: "nano-banana-pro",        label: "Gemini 3 Pro Image · 4K ($0.12)" },
+  { id: "imagen-4-ultra",         label: "Imagen 4 Ultra · 2K ($0.06)" },
+  { id: "flux-1.1-pro-ultra",     label: "Flux 1.1 Pro Ultra · 4MP ($0.06)" },
+  { id: "flux-1.1-pro-ultra-raw", label: "Flux Pro Ultra RAW · natural ($0.06)" },
+  { id: "ideogram-v3-quality",    label: "Ideogram v3 Quality · texto max ($0.06)" },
+  // Best
+  { id: "recraft-v4",             label: "Recraft v4 · latest ($0.05)" },
+  { id: "recraft-v3",             label: "Recraft v3 · texto ($0.04)" },
+  { id: "recraft-v3-svg",         label: "Recraft v3 SVG · vectorial ($0.08)" },
+  { id: "seedream-4",             label: "Seedream 4 · ByteDance ($0.04)" },
+  { id: "ideogram-v3-turbo",      label: "Ideogram v3 Turbo · texto ($0.03)" },
+  // Balanced
+  { id: "nano-banana",            label: "Gemini 2.5 Flash Image · recomendado ($0.04)" },
+  { id: "imagen-4",               label: "Imagen 4 · estándar ($0.04)" },
+  { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)" },
+  { id: "flux-kontext-pro",       label: "Flux Kontext Pro · consistencia ($0.05)" },
+  { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)" },
+  { id: "gpt-image-1",            label: "OpenAI gpt-image-1 · alta ($0.04)" },
+  // Economy / creativo
+  { id: "flux-kontext-dev",       label: "Flux Kontext Dev · artístico ($0.03)" },
+  { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)" },
+  { id: "flux-schnell",           label: "Flux Schnell · ultra-rápido ($0.003)" },
 ];
 
 export default function AvatarStudio() {
