@@ -421,6 +421,86 @@ export async function enhanceFaces(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 5B: VIDEO UPSCALING / SUPER-RESOLUTION
+// ═══════════════════════════════════════════════════════════════════════════
+// Dos motores reales de Replicate verificados en la cuenta:
+//   • topaz  → topazlabs/video-upscale  (premium, hasta 4K, control de fps)
+//   • esrgan → lucataco/real-esrgan-video (por fotograma, económico, hasta 4K)
+// Los vídeos NO se envían como data-URI (demasiado grandes): se suben primero
+// con la Files API de Replicate y se pasa la URL como input.
+
+export type VideoUpscaleEngine = "topaz" | "esrgan";
+
+export const VIDEO_UPSCALE_MODELS: Record<VideoUpscaleEngine, {
+  modelId: string;
+  label: string;
+  description: string;
+  resolutions: string[];
+  defaultResolution: string;
+  videoField: string;
+  resolutionField: string;
+}> = {
+  topaz: {
+    modelId: "topazlabs/video-upscale",
+    label: "Topaz Video Upscale (premium)",
+    description: "Super-resolución de Topaz Labs — máxima calidad, hasta 4K con control de fps",
+    resolutions: ["720p", "1080p", "4k"],
+    defaultResolution: "1080p",
+    videoField: "video",
+    resolutionField: "target_resolution",
+  },
+  esrgan: {
+    modelId: "lucataco/real-esrgan-video",
+    label: "Real-ESRGAN Video",
+    description: "Upscale por fotograma con Real-ESRGAN — económico, hasta 4K",
+    resolutions: ["FHD", "2k", "4k"],
+    defaultResolution: "FHD",
+    videoField: "video_path",
+    resolutionField: "resolution",
+  },
+};
+
+/** Sube un buffer a la Files API de Replicate y devuelve la URL pública del fichero. */
+async function replicateUploadFileUrl(buffer: Buffer, mime: string, token: string): Promise<string> {
+  if (!token) throw new Error("REPLICATE_API_TOKEN no configurado");
+  const Replicate = (await import("replicate")).default;
+  const rep = new Replicate({ auth: token });
+  const ext = /webm/i.test(mime) ? "webm" : /(quicktime|mov)/i.test(mime) ? "mov" : "mp4";
+  const blob = new Blob([new Uint8Array(buffer)], { type: mime || "video/mp4" });
+  (blob as any).name = `fs-pro_${Date.now()}.${ext}`;
+  const file: any = await rep.files.create(blob as any);
+  const url = file?.urls?.get || file?.url;
+  if (!url || typeof url !== "string") {
+    throw new Error("Replicate Files API no devolvió URL del vídeo subido");
+  }
+  return url;
+}
+
+export async function upscaleVideo(
+  videoBuffer: Buffer,
+  videoMime: string,
+  opts: { engine?: VideoUpscaleEngine; resolution?: string; targetFps?: number; replicateToken?: string } = {},
+): Promise<Buffer> {
+  const token = getReplicateToken(opts.replicateToken);
+  const engine: VideoUpscaleEngine = opts.engine === "esrgan" ? "esrgan" : "topaz";
+  const cfg = VIDEO_UPSCALE_MODELS[engine];
+  const resolution = opts.resolution && cfg.resolutions.includes(opts.resolution)
+    ? opts.resolution
+    : cfg.defaultResolution;
+
+  const fileUrl = await replicateUploadFileUrl(videoBuffer, videoMime, token);
+  const input: Record<string, unknown> = {
+    [cfg.videoField]: fileUrl,
+    [cfg.resolutionField]: resolution,
+  };
+  if (engine === "topaz" && opts.targetFps) input.target_fps = opts.targetFps;
+  if (engine === "esrgan") input.model = "RealESRGAN_x4plus";
+
+  // El upscaling de vídeo es lento → timeout generoso (20 min) con polling robusto.
+  return await replicateRunLatestBuffer(cfg.modelId, input, token, 20 * 60_000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY 6: VOICE CLONING (ElevenLabs Instant Voice Clone)
 // ═══════════════════════════════════════════════════════════════════════════
 

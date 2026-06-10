@@ -1,1 +1,2 @@
 - [Social/URL ingestion provenance](social-url-ingestion.md) — IG/FB can't be scraped without official APIs; X oEmbed 404s; degrade via oEmbed→OG→AI-inference and LABEL the source honestly.
+- [Replicate upscaling (image+video)](replicate-upscaling.md) — verify model schemas via GET /v1/models; community models need latest_version resolver; video inputs via Files API not data-URI.

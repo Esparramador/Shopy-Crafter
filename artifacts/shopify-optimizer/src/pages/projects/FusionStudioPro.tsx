@@ -23,6 +23,7 @@ interface Capabilities {
   videoGeneration: ModelWithProvider[];
   imageEdit: ModelWithProvider[];
   enhance: Array<{ key: string; label: string; description: string }>;
+  videoUpscaling?: Array<{ key: string; label: string; description: string; resolutions: string[]; defaultResolution: string }>;
   background: Array<{ key: string; label: string; description: string }>;
   audio: Array<{ key: string; label: string; description: string }>;
   composition: Array<{ key: string; label: string; description: string }>;
@@ -168,7 +169,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "generate",   label: "Generar imagen",  icon: <Sparkles size={15} />, desc: "Flux Ultra, Recraft, Ideogram v3, Imagen 4, Kontext, Nano Banana" },
   { id: "edit",       label: "Editar imagen",   icon: <Wand2 size={15} />,    desc: "Nano Banana (Gemini), Flux Kontext, Runway Gen4 Edit" },
   { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional (Bria RMBG)" },
-  { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Real-ESRGAN, Clarity Upscaler, GFPGAN caras" },
+  { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Imágenes (Real-ESRGAN, Clarity, GFPGAN) y vídeo (Topaz, Real-ESRGAN Video) hasta 4K" },
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling 2.1, Seedance, Hailuo, Veo 3" },
   { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Seedance / Kling / Veo / Runway)" },
   { id: "uploadconcat", label: "Concat propio", icon: <Film size={15} />,     desc: "Sube tus propios clips MP4 y los concatena con voz/música" },
@@ -274,7 +275,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "generate"   && <GenerateTab caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen generada y guardada", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "edit"       && <EditTab     caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Edición guardada", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "background" && <BackgroundTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
-        {tab === "enhance"    && <EnhanceTab    projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Imagen mejorada", true); }} onError={(m) => showToast(m, false)} />}
+        {tab === "enhance"    && <EnhanceTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast(it.type === "video" ? "Vídeo mejorado" : "Imagen mejorada", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "video"      && <VideoTab    caps={caps} health={health} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video generado", true); }} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
         {tab === "multishot"  && <MultiShotTab caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Multi-shot listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "uploadconcat" && <UploadConcatTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Concat listo", true); }} onError={(m) => showToast(m, false)} />}
@@ -603,14 +604,32 @@ function BackgroundTab({ projectId, onSuccess, onError }: { projectId: number; o
 }
 
 // ─── TAB: ENHANCE ────────────────────────────────────────────────────────
-function EnhanceTab({ projectId, onSuccess, onError }: { projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+function EnhanceTab({ caps, projectId, onSuccess, onError }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
+  const [target, setTarget] = useState<"image" | "video">("image");
+  // ── Imagen
   const [mode, setMode] = useState<"esrgan" | "clarity" | "faces">("esrgan");
   const [scale, setScale] = useState<2 | 4>(2);
   const [prompt, setPrompt] = useState("high detail photograph");
   const [file, setFile] = useState<File | null>(null);
+  // ── Vídeo (motores reales desde capabilities, sin hardcode)
+  const vEngines = caps?.videoUpscaling ?? [];
+  const [vEngine, setVEngine] = useState<string>("");
+  const vCfg = vEngines.find(e => e.key === vEngine) ?? vEngines[0];
+  const [vResolution, setVResolution] = useState<string>("");
+  const [vFile, setVFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const run = async () => {
+  // Selecciona el primer motor disponible en cuanto cargan las capabilities.
+  useEffect(() => {
+    if (vCfg && vEngine !== vCfg.key) setVEngine(vCfg.key);
+  }, [vCfg, vEngine]);
+
+  // Mantén la resolución válida para el motor seleccionado.
+  useEffect(() => {
+    if (vCfg && !vCfg.resolutions.includes(vResolution)) setVResolution(vCfg.defaultResolution);
+  }, [vCfg, vResolution]);
+
+  const runImage = async () => {
     if (!file) { onError("Imagen requerida"); return; }
     setBusy(true);
     try {
@@ -627,49 +646,130 @@ function EnhanceTab({ projectId, onSuccess, onError }: { projectId: number; onSu
     } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
   };
 
+  const runVideo = async () => {
+    if (!vFile) { onError("Vídeo requerido"); return; }
+    if (!vCfg) { onError("Motor de upscaling de vídeo no disponible"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("video", vFile);
+      fd.append("engine", vCfg.key);
+      if (vResolution) fd.append("resolution", vResolution);
+      const res = await fetch(`${API_BASE}/api/fs-pro/upscale-video`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      onSuccess({ vaultId: d.vaultId, type: "video", label: `Upscale ${vCfg.key} ${vResolution}`, mimeType: "video/mp4" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
-        <Section title="Modo">
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <button onClick={() => setMode("esrgan")} style={pillButton(mode === "esrgan")}>Real-ESRGAN</button>
-            <button onClick={() => setMode("clarity")} style={pillButton(mode === "clarity")}>Clarity (creativo)</button>
-            <button onClick={() => setMode("faces")} style={pillButton(mode === "faces")}>Caras (GFPGAN)</button>
+        <Section title="Tipo de archivo">
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setTarget("image")} style={pillButton(target === "image")}>Imagen</button>
+            <button onClick={() => setTarget("video")} style={pillButton(target === "video")}>Vídeo</button>
           </div>
         </Section>
-        {mode !== "faces" && (
-          <Section title="Escala">
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setScale(2)} style={pillButton(scale === 2)}>x2</button>
-              <button onClick={() => setScale(4)} style={pillButton(scale === 4)}>x4</button>
-            </div>
-          </Section>
+
+        {target === "image" ? (
+          <>
+            <Section title="Modo">
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button onClick={() => setMode("esrgan")} style={pillButton(mode === "esrgan")}>Real-ESRGAN</button>
+                <button onClick={() => setMode("clarity")} style={pillButton(mode === "clarity")}>Clarity (creativo)</button>
+                <button onClick={() => setMode("faces")} style={pillButton(mode === "faces")}>Caras (GFPGAN)</button>
+              </div>
+            </Section>
+            {mode !== "faces" && (
+              <Section title="Escala">
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setScale(2)} style={pillButton(scale === 2)}>x2</button>
+                  <button onClick={() => setScale(4)} style={pillButton(scale === 4)}>x4</button>
+                </div>
+              </Section>
+            )}
+            {mode === "clarity" && (
+              <Section title="Prompt creativo (Clarity)">
+                <input value={prompt} onChange={e => setPrompt(e.target.value)} style={inputStyle} />
+              </Section>
+            )}
+            <Section title="Imagen origen">
+              <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+            </Section>
+          </>
+        ) : (
+          <>
+            <Section title="Motor de upscaling de vídeo">
+              {vEngines.length === 0 ? (
+                <p style={{ fontSize: 11, color: "var(--t3)" }}>Cargando motores…</p>
+              ) : (
+                vEngines.map(e => (
+                  <button key={e.key} onClick={() => setVEngine(e.key)} style={{ ...cardButton(vCfg?.key === e.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
+                    <strong style={{ fontSize: 12 }}>{e.label}</strong>
+                    <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{e.description}</div>
+                  </button>
+                ))
+              )}
+            </Section>
+            {vCfg && (
+              <Section title="Resolución objetivo">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {vCfg.resolutions.map(r => (
+                    <button key={r} onClick={() => setVResolution(r)} style={pillButton(vResolution === r)}>{r}</button>
+                  ))}
+                </div>
+              </Section>
+            )}
+            <Section title="Vídeo origen (MP4 / MOV / WebM)">
+              <input type="file" accept="video/*" onChange={e => setVFile(e.target.files?.[0] || null)} />
+            </Section>
+          </>
         )}
-        {mode === "clarity" && (
-          <Section title="Prompt creativo (Clarity)">
-            <input value={prompt} onChange={e => setPrompt(e.target.value)} style={inputStyle} />
-          </Section>
-        )}
-        <Section title="Imagen origen">
-          <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-        </Section>
       </div>
       <div>
-        <button onClick={run} disabled={busy || !file} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Maximize2 size={16} />} {busy ? "Mejorando..." : "Mejorar imagen"}
-        </button>
-        <LiveOperation
-          active={busy}
-          title="Mejorando resolución y calidad"
-          estimatedSec={20}
-          messages={[
-            "Subiendo imagen al motor de upscaling…",
-            "Reconstruyendo detalles a alta resolución…",
-            "Refinando texturas, bordes y rostros…",
-            "Exportando versión mejorada al Vault…",
-          ]}
-          className="w-full mt-3"
-        />
+        {target === "image" ? (
+          <>
+            <button onClick={runImage} disabled={busy || !file} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Maximize2 size={16} />} {busy ? "Mejorando..." : "Mejorar imagen"}
+            </button>
+            <LiveOperation
+              active={busy}
+              title="Mejorando resolución y calidad"
+              estimatedSec={20}
+              messages={[
+                "Subiendo imagen al motor de upscaling…",
+                "Reconstruyendo detalles a alta resolución…",
+                "Refinando texturas, bordes y rostros…",
+                "Exportando versión mejorada al Vault…",
+              ]}
+              className="w-full mt-3"
+            />
+          </>
+        ) : (
+          <>
+            <button onClick={runVideo} disabled={busy || !vFile || vEngines.length === 0} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Maximize2 size={16} />} {busy ? "Escalando vídeo..." : "Escalar resolución del vídeo"}
+            </button>
+            <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
+              El upscaling de vídeo es un proceso pesado: puede tardar varios minutos según la duración y la resolución objetivo.
+            </p>
+            <LiveOperation
+              active={busy}
+              title="Escalando resolución del vídeo"
+              estimatedSec={180}
+              messages={[
+                "Subiendo vídeo al motor de super-resolución…",
+                "Analizando fotogramas y movimiento…",
+                "Reconstruyendo detalle a alta resolución…",
+                "Re-codificando el vídeo final en MP4…",
+                "Guardando versión escalada en el Vault…",
+              ]}
+              className="w-full mt-3"
+            />
+          </>
+        )}
       </div>
     </div>
   );

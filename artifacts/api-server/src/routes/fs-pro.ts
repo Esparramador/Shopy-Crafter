@@ -15,6 +15,7 @@ import {
   IMAGE_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
+  upscaleVideo, VIDEO_UPSCALE_MODELS, type VideoUpscaleEngine,
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
   generateVideoFromImage, composeAd, concatVideos, packAssetsAsZip,
   fetchToBuffer,
@@ -252,6 +253,10 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
       { key: "clarity-upscaler", label: "Clarity Upscaler", description: "Tipo Magnific, añade detalle creativo" },
       { key: "gfpgan-faces", label: "GFPGAN", description: "Mejora caras y retratos" },
     ],
+    videoUpscaling: Object.entries(VIDEO_UPSCALE_MODELS).map(([k, v]) => ({
+      key: k, label: v.label, description: v.description,
+      resolutions: v.resolutions, defaultResolution: v.defaultResolution,
+    })),
     background: [
       { key: "remove-bg", label: "Eliminar fondo (Bria RMBG)", description: "Quita el fondo dejando producto recortado" },
       { key: "replace-bg", label: "Reemplazar fondo (Flux Inpaint)", description: "Coloca producto en escena nueva" },
@@ -1594,6 +1599,48 @@ router.post("/fs-pro/upscale", requireAdmin, upload.single("image"), async (req,
     res.json({ success: true, vaultId, dataUrl: `data:image/png;base64,${out.toString("base64")}` });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error en upscale" });
+  }
+});
+
+// ─── VIDEO UPSCALING / SUPER-RESOLUTION ────────────────────────────────────
+router.post("/fs-pro/upscale-video", requireAdmin, upload.single("video"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceVideoUrl, engine, resolution, targetFps } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const UPSCALE_VIDEO_CREDITS = 4;
+    const limit = await checkProductionLimit(projectId, "image", UPSCALE_VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer; let mime: string;
+    if (f) { buf = f.buffer; mime = f.mimetype || "video/mp4"; }
+    else if (sourceVideoUrl) { buf = await fetchToBuffer(sourceVideoUrl); mime = "video/mp4"; }
+    else { res.status(400).json({ error: "Vídeo requerido" }); return; }
+
+    const eng: VideoUpscaleEngine = engine === "esrgan" ? "esrgan" : "topaz";
+    const out = await upscaleVideo(buf, mime, {
+      engine: eng,
+      resolution: typeof resolution === "string" ? resolution : undefined,
+      targetFps: targetFps ? parseInt(targetFps, 10) : undefined,
+      replicateToken: getProjectReplicateToken(project),
+    });
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-upscaled", category: "fusion-studio-pro",
+      title: `FS Pro: Vídeo upscaled (${eng}${resolution ? ` ${resolution}` : ""})`,
+      mimeType: "video/mp4", generatedBy: `fs-pro:upscale-video-${eng}`,
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", UPSCALE_VIDEO_CREDITS);
+    res.json({ success: true, vaultId });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en upscale de vídeo" });
   }
 });
 
