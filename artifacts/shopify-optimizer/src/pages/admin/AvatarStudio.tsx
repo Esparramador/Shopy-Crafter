@@ -28,19 +28,35 @@ const VOICE_MODELS = [
   { id: "eleven_flash_v2_5", label: "Flash v2.5 (instantáneo)" },
 ];
 const VIDEO_MODELS = [
-  { id: "kling-master",     label: "Kling Master · cinemático max ($0.18/s)" },
-  { id: "kling-2.5-turbo",  label: "Kling 2.5 Turbo · 1080p rápido ($0.12/s)" },
-  { id: "kling-2.1",        label: "Kling 2.1 · 1080p realista ($0.09/s)" },
-  { id: "seedance-pro",     label: "Seedance Pro · multi-ref cinemático ($0.07/s)" },
-  { id: "runway-gen4.5",    label: "Runway Gen 4.5 · nueva gen ($0.06/s)" },
-  { id: "runway-gen4-turbo",label: "Runway Gen 4 · foto-real ($0.05/s)" },
-  { id: "veo-3",            label: "Google Veo 3 · máx calidad+audio ($0.75/s)" },
-  { id: "veo-2",            label: "Google Veo 2 · alta calidad ($0.35/s)" },
-  { id: "hailuo-02",        label: "Hailuo 02 · balance vel/calidad ($0.05/s)" },
-  { id: "hailuo-02-fast",   label: "Hailuo 02 Fast · económico ($0.03/s)" },
-  { id: "wan-2.5",          label: "Wan 2.5 · open-source calidad ($0.04/s)" },
-  { id: "seedance-fast",    label: "Seedance Fast · rápido y barato ($0.05/s)" },
-  { id: "seedance-1-lite",  label: "Seedance 1 Lite · económico ($0.03/s)" },
+  // Google Veo
+  { id: "veo-3.1",              label: "Google Veo 3.1 · última gen + audio ($0.75/s)" },
+  { id: "veo-3.1-fast",         label: "Google Veo 3.1 Fast · rápido + audio ($0.40/s)" },
+  { id: "veo-3",                label: "Google Veo 3 · calidad máx + audio ($0.75/s)" },
+  { id: "veo-3-fast",           label: "Google Veo 3 Fast · rápido + audio ($0.40/s)" },
+  { id: "veo-2",                label: "Google Veo 2 · alta calidad sin audio ($0.35/s)" },
+  // OpenAI
+  { id: "sora-2",               label: "OpenAI Sora 2 · narrativa cinemática ($0.30/s)" },
+  // Kling
+  { id: "kling-master",         label: "Kling Master · cinemático max + audio ($0.18/s)" },
+  { id: "kling-2.5-turbo",      label: "Kling 2.5 Turbo · 1080p rápido ($0.12/s)" },
+  { id: "kling-2.1",            label: "Kling 2.1 · 1080p realista ($0.09/s)" },
+  // Seedance (ByteDance)
+  { id: "seedance-pro",         label: "Seedance Pro · multi-ref cinemático ($0.07/s)" },
+  { id: "seedance-fast",        label: "Seedance Fast · rápido y barato ($0.05/s)" },
+  { id: "seedance-1-lite",      label: "Seedance 1 Lite · económico ($0.03/s)" },
+  // Runway
+  { id: "runway-gen4.5",        label: "Runway Gen 4.5 · nueva gen ($0.06/s)" },
+  { id: "runway-seedance2",     label: "Runway Seedance 2 · cinematográfico ($0.10/s)" },
+  { id: "runway-seedance2-fast",label: "Runway Seedance 2 Fast · rápido ($0.06/s)" },
+  { id: "runway-gen4-turbo",    label: "Runway Gen 4 Turbo · foto-real ($0.05/s)" },
+  { id: "runway-gen3-alpha",    label: "Runway Gen 3 Alpha · estable ($0.05/s)" },
+  // Hailuo (MiniMax)
+  { id: "hailuo-02",            label: "Hailuo 02 · balance vel/calidad ($0.05/s)" },
+  { id: "hailuo-02-fast",       label: "Hailuo 02 Fast · económico ($0.03/s)" },
+  // Wan (open-source)
+  { id: "wan-2.5",              label: "Wan 2.5 · open-source I2V calidad ($0.04/s)" },
+  { id: "wan-2.5-fast",         label: "Wan 2.5 Fast · open-source barato ($0.018/s)" },
+  { id: "wan-2.5-t2v",          label: "Wan 2.5 T2V · texto→vídeo puro ($0.025/s)" },
 ];
 const IMAGE_MODELS = [
   // Premium
