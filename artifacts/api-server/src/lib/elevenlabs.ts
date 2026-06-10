@@ -5,9 +5,10 @@ const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_TEXT_LENGTH = 5000;
 
 export type ElevenModel =
-  | "eleven_multilingual_v2"
-  | "eleven_turbo_v2_5"
-  | "eleven_flash_v2_5";
+  | "eleven_v3"              // Jun-2026: latest, 74 idiomas, máxima calidad
+  | "eleven_multilingual_v2" // 29 idiomas, calidad alta
+  | "eleven_turbo_v2_5"      // 32 idiomas, baja latencia
+  | "eleven_flash_v2_5";     // 32 idiomas, ultra-rápido, barato
 
 export type ElevenOutputFormat =
   | "mp3_44100_128"
@@ -206,7 +207,7 @@ export async function synthesizeSpeech(req: SynthesizeRequest): Promise<Synthesi
 
   const voiceId = ((req.voiceId ?? "").trim() || (await resolveDefaultVoiceId())).trim();
   validateVoiceId(voiceId);
-  const modelId: ElevenModel = req.modelId ?? "eleven_multilingual_v2";
+  const modelId: ElevenModel = req.modelId ?? "eleven_v3";
   const outputFormat: ElevenOutputFormat = req.outputFormat ?? "mp3_44100_128";
 
   // Defaults ajustados para sonar natural en español:

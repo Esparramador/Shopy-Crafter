@@ -14,6 +14,7 @@ const router = Router();
 // TEXT-TO-SPEECH (ElevenLabs)
 // ============================================================
 const ALLOWED_TTS_MODELS: ElevenModel[] = [
+  "eleven_v3",
   "eleven_multilingual_v2",
   "eleven_turbo_v2_5",
   "eleven_flash_v2_5",

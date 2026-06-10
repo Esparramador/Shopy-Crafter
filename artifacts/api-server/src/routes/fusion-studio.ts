@@ -1283,15 +1283,29 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
     }
 
     const FSP_MODEL_MAP: Record<string, FSPVideoModel> = {
-      kling_master: "kling-master",
-      kling_21: "kling-2.1",
-      seedance_pro: "seedance-pro",
-      seedance_fast: "seedance-fast",
-      hailuo_02: "hailuo-02",
-      wan_25: "wan-2.5-fast",
-      veo_3_fast: "veo-3-fast",
-      veo_3: "veo-3",
-      veo_2: "veo-2",
+      // Kling
+      kling_master:     "kling-master",
+      kling_25_turbo:   "kling-2.5-turbo",
+      kling_21:         "kling-2.1",
+      // Seedance
+      seedance_pro:     "seedance-pro",
+      seedance_fast:    "seedance-fast",
+      seedance_1_lite:  "seedance-1-lite",
+      // Hailuo
+      hailuo_02:        "hailuo-02",
+      hailuo_02_fast:   "hailuo-02-fast",
+      // Wan
+      wan_25:           "wan-2.5-fast",
+      wan_25_hq:        "wan-2.5",
+      wan_25_t2v:       "wan-2.5-t2v",
+      // Veo (Gemini)
+      veo_3_fast:       "veo-3-fast",
+      veo_3:            "veo-3",
+      veo_2:            "veo-2",
+      // Runway (via FSP generateVideoFromImage — includes gen4.5, seedance2)
+      runway_gen45:           "runway-gen4.5",
+      runway_seedance2:       "runway-seedance2",
+      runway_seedance2_fast:  "runway-seedance2-fast",
     };
 
     const isRunway = model === "gen3a_turbo" || model === "gen4_turbo";

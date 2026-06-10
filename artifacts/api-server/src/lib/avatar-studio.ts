@@ -245,7 +245,7 @@ export interface TalkingAvatarRequest {
   script: string;
   /** Override the avatar's default voice */
   voiceId?: string;
-  voiceModel?: "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
+  voiceModel?: "eleven_v3" | "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
   language?: string;
   aspect?: "9:16" | "16:9" | "1:1";
   /** Image model used to render the avatar headshot when none is provided */
@@ -333,7 +333,7 @@ export async function generateTalkingAvatar(req: TalkingAvatarRequest): Promise<
   const language = req.language || preset?.defaultLanguage || "en";
   const voiceover = await generateTTS(req.script, {
     voiceId,
-    modelId: req.voiceModel || "eleven_multilingual_v2",
+    modelId: req.voiceModel || "eleven_v3",
     languageCode: language.length === 2 ? language : undefined,
   });
   logger.info({ voiceBytes: voiceover.length }, "🎤 voiceover ready");
@@ -380,7 +380,7 @@ export interface ProductAvatarRequest {
   customPresenterMime?: string;
   script: string;
   voiceId?: string;
-  voiceModel?: "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
+  voiceModel?: "eleven_v3" | "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
   language?: string;
   aspect?: "9:16" | "16:9" | "1:1";
   /** Image model used to render presenter holding product (default nano-banana) */
@@ -459,7 +459,7 @@ export async function generateProductAvatar(req: ProductAvatarRequest): Promise<
   const language = req.language || preset?.defaultLanguage || "en";
   const voiceover = await generateTTS(req.script, {
     voiceId,
-    modelId: req.voiceModel || "eleven_multilingual_v2",
+    modelId: req.voiceModel || "eleven_v3",
     languageCode: language.length === 2 ? language : undefined,
   });
 

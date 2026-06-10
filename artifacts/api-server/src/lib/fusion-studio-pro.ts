@@ -107,16 +107,20 @@ export type ImageGenModel =
   | "flux-1.1-pro-ultra-raw"    // 4MP raw mode (naturalistic, no AI sheen)
   | "flux-1.1-pro"              // standard pro Flux
   | "flux-schnell"              // fastest, cheap
+  | "recraft-v4"                // Recraft V4 — última gen, texto nítido + realismo máximo
   | "recraft-v3"                // BEST for text on image (logos, posters)
   | "recraft-v3-svg"            // Recraft v3 SVG — vectorial real (logos, iconos)
-  | "ideogram-v3-turbo"         // text + photoreal
+  | "ideogram-v3-quality"       // Ideogram V3 Quality — máxima calidad texto + photoreal
+  | "ideogram-v3-turbo"         // text + photoreal, rápido
   | "imagen-4-ultra"            // Google Imagen 4 Ultra (premium)
   | "imagen-4"                  // Google Imagen 4 (standard)
   | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
   | "nano-banana"               // Gemini 2.5 Flash Image (v1)
   | "nano-banana-pro"           // Gemini 3 Pro Image (v2, 4K, top-tier)
   | "seedream-4"                // ByteDance Seedream 4 (text + photoreal)
-  | "flux-kontext-pro"          // Flux Kontext for character consistency
+  | "flux-kontext-pro"          // Flux Kontext Pro — character/style consistency
+  | "flux-kontext-max"          // Flux Kontext Max — máxima calidad, consistencia premium
+  | "flux-kontext-dev"          // Flux Kontext Dev — open-weights, edición artística
   | "gpt-image-1";              // OpenAI gpt-image-1 (vía Replit AI Integrations)
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
@@ -137,6 +141,10 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "nano-banana-pro":        { provider: "gemini",                                                          description: "Nano Banana 2 / Pro (Gemini 3 Pro Image) — 4K, texto nítido, identidad estable", costPerImage: 0.12, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "4K" },
   "seedream-4":             { provider: "replicate", replicateId: "bytedance/seedream-4",                 description: "ByteDance Seedream 4 — photoreal + texto, rival de Recraft/Ideogram", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
   "flux-kontext-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+  "flux-kontext-max":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-max",   description: "Flux Kontext Max — máxima calidad, consistencia de personaje/estilo premium", costPerImage: 0.07, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+  "flux-kontext-dev":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-dev",   description: "Flux Kontext Dev — open-weights, edición artística creativa", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
+  "recraft-v4":             { provider: "replicate", replicateId: "recraft-ai/recraft-v4",                description: "Recraft V4 — última generación, texto nítido + realismo máximo", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "ideogram-v3-quality":    { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-quality",      description: "Ideogram V3 Quality — máxima calidad texto en imagen + photoreal", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "gpt-image-1":            { provider: "openai",                                                          description: "OpenAI gpt-image-1 — render limpio, manejo de texto, vía Replit AI Integrations", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
 };
 
@@ -231,9 +239,10 @@ export async function generateImage(
     if (refs.length > 0) input.image_input = refs;
     input.size = "2K";
   }
-  if (model === "flux-kontext-pro" && opts.referenceImage) {
+  if ((model === "flux-kontext-pro" || model === "flux-kontext-max" || model === "flux-kontext-dev") && opts.referenceImage) {
     input.input_image = bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png");
   }
+  if (model === "ideogram-v3-quality") input = { ...input, magic_prompt_option: "AUTO" };
 
   const buffer = await replicateRunBuffer(cfg.replicateId, input, token);
   const mimeType = model === "recraft-v3-svg" ? "image/svg+xml" : "image/png";
@@ -555,7 +564,7 @@ export async function generateTTS(text: string, opts: TTSOptions): Promise<Buffe
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "audio/mpeg" },
     body: JSON.stringify({
       text,
-      model_id: opts.modelId || "eleven_multilingual_v2",
+      model_id: opts.modelId || "eleven_v3",
       voice_settings: {
         stability: opts.stability ?? 0.5,
         similarity_boost: opts.similarity ?? 0.75,
@@ -711,7 +720,12 @@ export type VideoModel =
   | "hailuo-02-fast"
   | "hailuo-02"
   | "wan-2.5"
-  | "wan-2.5-fast";
+  | "wan-2.5-fast"
+  | "runway-gen4.5"          // Runway Gen 4.5 — nueva gen, mejor motion y detalle
+  | "runway-seedance2"       // Seedance 2 vía Runway — calidad cinematográfica
+  | "runway-seedance2-fast"  // Seedance 2 Fast vía Runway — rápido
+  | "wan-2.5-t2v"            // Wan 2.5 Text-to-Video — T2V puro, sin imagen
+  | "seedance-1-lite";       // Seedance 1 Lite — versión económica de Pro
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
@@ -729,8 +743,13 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast",  description: "Seedance Fast — rápido y barato, calidad pro",                   costPerSec: 0.05, quality: 7,  maxDuration: 10 },
   "hailuo-02-fast":     { provider: "replicate", modelId: "minimax/hailuo-02-fast",         description: "Hailuo 02 Fast — variante rápida y barata de MiniMax",           costPerSec: 0.03, quality: 7,  maxDuration: 6  },
   "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",              description: "Hailuo 02 — buen balance velocidad/calidad",                     costPerSec: 0.05, quality: 7,  maxDuration: 6  },
-  "wan-2.5":            { provider: "replicate", modelId: "wan-video/wan-2.5-i2v",          description: "Wan 2.5 — open-source de calidad, mejor que la versión Fast",    costPerSec: 0.04, quality: 8,  maxDuration: 5  },
-  "wan-2.5-fast":       { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",     description: "Wan 2.5 Fast — open-source, el más barato del mercado",          costPerSec: 0.018, quality: 6, maxDuration: 5  },
+  "wan-2.5":             { provider: "replicate", modelId: "wan-video/wan-2.5-i2v",          description: "Wan 2.5 — open-source de calidad, mejor que la versión Fast",                costPerSec: 0.04,  quality: 8,  maxDuration: 5  },
+  "wan-2.5-fast":        { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",     description: "Wan 2.5 Fast — open-source, el más barato del mercado",                      costPerSec: 0.018, quality: 6,  maxDuration: 5  },
+  "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen 4.5 — nueva generación, mejor motion y detalle que Gen 4",       costPerSec: 0.06,  quality: 10, maxDuration: 10 },
+  "runway-seedance2":    { provider: "runway",                                                description: "Seedance 2 vía Runway — nueva generación, calidad cinematográfica",          costPerSec: 0.10,  quality: 10, maxDuration: 10 },
+  "runway-seedance2-fast":{ provider: "runway",                                               description: "Seedance 2 Fast vía Runway — rápido y barato, calidad pro",                  costPerSec: 0.06,  quality: 8,  maxDuration: 10 },
+  "wan-2.5-t2v":         { provider: "replicate", modelId: "wan-video/wan-2.5-t2v",          description: "Wan 2.5 Text-to-Video — T2V puro open-source, sin imagen origen",            costPerSec: 0.025, quality: 7,  maxDuration: 5  },
+  "seedance-1-lite":     { provider: "replicate", modelId: "bytedance/seedance-1-lite",       description: "Seedance 1 Lite — versión económica de Seedance Pro",                        costPerSec: 0.03,  quality: 6,  maxDuration: 10 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -751,8 +770,13 @@ const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "seedance-fast":   true,
   "hailuo-02-fast":  true,
   "hailuo-02":       true,
-  "wan-2.5":      false,
-  "wan-2.5-fast": false,
+  "wan-2.5":              false,
+  "wan-2.5-fast":         false,
+  "runway-gen4.5":        false,
+  "runway-seedance2":     false,
+  "runway-seedance2-fast":false,
+  "wan-2.5-t2v":          true,
+  "seedance-1-lite":      false,
 };
 
 export function modelSupportsTextToVideo(model: VideoModel): boolean {
@@ -911,7 +935,11 @@ export async function generateVideoFromImage(
       "21:9": "1584:672",
     };
     const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
-    const runwayModel = isGen3 ? "gen3a_turbo" : "gen4_turbo";
+    const runwayModel = isGen3 ? "gen3a_turbo"
+      : model === "runway-gen4.5" ? "gen4.5"
+      : model === "runway-seedance2" ? "seedance2"
+      : model === "runway-seedance2-fast" ? "seedance2_fast"
+      : "gen4_turbo";
     const runwayDur = duration >= 8 ? 10 : 5;
 
     const createRes = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
@@ -954,6 +982,9 @@ export async function generateVideoFromImage(
     // Hailuo: first_frame_image opcional
     input = { prompt, duration };
     if (dataUri) input.first_frame_image = dataUri;
+  } else if (cfg.modelId === "wan-video/wan-2.5-t2v") {
+    // Wan 2.5 T2V: text-to-video puro, no requiere imagen
+    input = { prompt, size: "480p", duration: Math.min(duration, 5) };
   } else if (cfg.modelId.startsWith("wan-video/")) {
     // Wan-2.5 i2v: requiere image
     if (!dataUri) throw new Error(`${model} requiere imagen origen`);

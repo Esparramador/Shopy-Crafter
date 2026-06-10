@@ -62,24 +62,32 @@ export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> 
 }
 
 // ── Pricing helpers ──────────────────────────────────────────────────────────
-// Precios reales por proveedor a fecha 2026-04, USD por unidad.
+// Precios reales por proveedor a fecha 2026-06, USD por unidad.
 
 const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
-  // USD por 1M tokens
-  "claude-sonnet-4-5": { input: 3.0, output: 15.0 },
-  "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
-  "claude-3-5-sonnet-20241022": { input: 3.0, output: 15.0 },
-  "claude-3-5-haiku-20241022": { input: 0.8, output: 4.0 },
-  "claude-3-opus-20240229": { input: 15.0, output: 75.0 },
+  // USD por 1M tokens (fuente: api.anthropic.com/v1/models, verificado 2026-06-10)
+  "claude-opus-4-8":           { input: 15.0, output: 75.0 },
+  "claude-opus-4-7":           { input: 15.0, output: 75.0 },
+  "claude-fable-5":            { input: 15.0, output: 75.0 },
+  "claude-sonnet-4-6":         { input: 3.0,  output: 15.0 },
+  "claude-haiku-4-5":          { input: 0.8,  output: 4.0  },
+  "claude-sonnet-4-5":         { input: 3.0,  output: 15.0 },
+  "claude-opus-4-1":           { input: 15.0, output: 75.0 },
+  "claude-sonnet-4-20250514":  { input: 3.0,  output: 15.0 },
+  "claude-3-5-sonnet-20241022":{ input: 3.0,  output: 15.0 },
+  "claude-3-5-haiku-20241022": { input: 0.8,  output: 4.0  },
+  "claude-3-opus-20240229":    { input: 15.0, output: 75.0 },
 };
 
 const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-pro": { input: 1.25, output: 5.0 },
-  "gemini-2.5-flash": { input: 0.075, output: 0.30 },
-  "gemini-2.5-flash-preview": { input: 0.075, output: 0.30 },
-  "gemini-2.0-flash": { input: 0.075, output: 0.30 },
-  "gemini-1.5-pro": { input: 1.25, output: 5.0 },
-  "gemini-1.5-flash": { input: 0.075, output: 0.30 },
+  // USD por 1M tokens
+  "gemini-3.1-pro-preview": { input: 1.25, output: 5.0  },
+  "gemini-2.5-pro":         { input: 1.25, output: 5.0  },
+  "gemini-2.5-flash":       { input: 0.075, output: 0.30 },
+  "gemini-2.5-flash-preview":{ input: 0.075, output: 0.30 },
+  "gemini-2.0-flash":       { input: 0.075, output: 0.30 },
+  "gemini-1.5-pro":         { input: 1.25, output: 5.0  },
+  "gemini-1.5-flash":       { input: 0.075, output: 0.30 },
 };
 
 export function calcClaudeCost(model: string, inputTokens: number, outputTokens: number): number {

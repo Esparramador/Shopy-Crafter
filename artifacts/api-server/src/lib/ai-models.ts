@@ -6,13 +6,13 @@
  *   1. Explicit override passed to the call (`opts.model`).
  *   2. DB override stored in `platform_settings` table (admin can change live).
  *   3. ENV defaults (CLAUDE_MODEL_*, GEMINI_MODEL_*).
- *   4. Hard fallback (latest known May-2026 stable models).
+ *   4. Hard fallback (latest known June-2026 stable models).
  *
  * Tiers:
  *   - "fast"   → cheap & quick (Haiku 4.5 / Gemini 2.5 Flash)
- *   - "smart"  → balanced default (Sonnet 4.5 / Gemini 2.5 Pro)
- *   - "genius" → max reasoning (Opus 4.1 / Gemini 3.1 Pro Preview)
- *   - "vision" → multimodal-strong (Sonnet 4.5 vision / Gemini 2.5 Pro)
+ *   - "smart"  → balanced default (Sonnet 4.6 / Gemini 2.5 Pro)
+ *   - "genius" → max reasoning (Opus 4.8 / Gemini 3.1 Pro Preview)
+ *   - "vision" → multimodal-strong (Sonnet 4.6 vision / Gemini 2.5 Pro)
  *
  * Cached for 60s so live admin changes propagate quickly without DB hammering.
  */
@@ -24,14 +24,14 @@ import { logger } from "./logger.js";
 export type AITier = "fast" | "smart" | "genius" | "vision";
 export type AIProvider = "claude" | "gemini";
 
-// May-2026 stable defaults. Override via env or admin UI; never hardcode in
+// June-2026 stable defaults. Override via env or admin UI; never hardcode in
 // callsites — always go through `pickModel(provider, tier, override)`.
 const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
   claude: {
     fast: "claude-haiku-4-5",
-    smart: "claude-sonnet-4-5",
-    genius: "claude-opus-4-1",
-    vision: "claude-sonnet-4-5",
+    smart: "claude-sonnet-4-6",
+    genius: "claude-opus-4-8",
+    vision: "claude-sonnet-4-6",
   },
   gemini: {
     fast: "gemini-2.5-flash",
@@ -209,12 +209,16 @@ export async function setAIModelOverride(provider: AIProvider, tier: AITier, mod
   invalidateAIModelCache();
 }
 
-/** Catalog of known May-2026 models for the admin UI dropdowns. */
+/** Catalog of known June-2026 models for the admin UI dropdowns. */
 export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string; tierHint: AITier; notes?: string }>> = {
   claude: [
     { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", tierHint: "fast", notes: "Cheapest, fast, good for classification & extraction" },
-    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", tierHint: "smart", notes: "Best balance — default for most tasks (vision-capable)" },
-    { id: "claude-opus-4-1", label: "Claude Opus 4.1", tierHint: "genius", notes: "Highest reasoning, slowest, most expensive" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", tierHint: "smart", notes: "Best balance — default for most tasks (vision-capable)" },
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8", tierHint: "genius", notes: "Highest reasoning, latest Opus, slowest, most expensive" },
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7", tierHint: "genius", notes: "High reasoning, alternative to Opus 4.8" },
+    { id: "claude-fable-5", label: "Claude Fable 5", tierHint: "genius", notes: "Creative storytelling & long-form generation" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5 (legacy)", tierHint: "smart" },
+    { id: "claude-opus-4-1", label: "Claude Opus 4.1 (legacy)", tierHint: "genius" },
     { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (legacy May-2025)", tierHint: "smart" },
     { id: "claude-3-5-sonnet-20241022", label: "Claude Sonnet 3.5 (legacy)", tierHint: "smart" },
   ],

@@ -6,7 +6,12 @@ const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS = 6 * 60_000;
 const MAX_PROMPT_LENGTH = 1000;
 
-export type RunwayModel = "gen3a_turbo" | "gen4_turbo";
+export type RunwayModel =
+  | "gen3a_turbo"
+  | "gen4_turbo"
+  | "gen4.5"          // Jun-2026: nueva generación, mejor motion y detalle
+  | "seedance2"       // Seedance 2 vía Runway, calidad cinematográfica
+  | "seedance2_fast"; // Seedance 2 Fast vía Runway, rápido
 export type RunwayRatio =
   | "1280:768"
   | "768:1280"
@@ -34,8 +39,11 @@ export interface RunwayVideoResult {
 }
 
 const COST_PER_SECOND: Record<RunwayModel, number> = {
-  gen3a_turbo: 0.05,
-  gen4_turbo: 0.05,
+  gen3a_turbo:  0.05,
+  gen4_turbo:   0.05,
+  "gen4.5":     0.06,
+  seedance2:    0.10,
+  seedance2_fast: 0.06,
 };
 
 function getApiKey(): string {

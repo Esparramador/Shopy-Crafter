@@ -84,7 +84,7 @@ export interface CinematicMultiShotRequest {
   narration?: {
     enabled: boolean;
     voiceId?: string;
-    voiceModel?: "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
+    voiceModel?: "eleven_v3" | "eleven_multilingual_v2" | "eleven_turbo_v2_5" | "eleven_flash_v2_5";
     voiceVolume?: number;
   };
   /**
@@ -927,7 +927,7 @@ export async function generateCinematicMultiShot(
     if (fullScript.trim().length > 0) {
       voiceoverBuffer = await generateTTS(fullScript, {
         voiceId: req.narration.voiceId || "21m00Tcm4TlvDq8ikWAM",
-        modelId: req.narration.voiceModel || "eleven_multilingual_v2",
+        modelId: req.narration.voiceModel || "eleven_v3",
         languageCode: req.language.length === 2 ? req.language : undefined,
       });
       logger.info({ voiceBytes: voiceoverBuffer.length }, "🎬 voiceover ready (pre-concat)");
