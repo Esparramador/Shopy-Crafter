@@ -1,0 +1,19 @@
+{
+  "id": "email_campaign",
+  "name": "Email de Campaña",
+  "description": "Email de marketing personalizado",
+  "category": "copy",
+  "prompt": "Escribe un email de {{tipo_email}} para {{nombre_cliente}} de la empresa {{empresa_cliente}}. El objetivo es {{objetivo}}. El email debe tener: asunto irresistible (max 50 chars), preheader, intro personalizada, cuerpo con propuesta de valor clara, prueba social, y CTA urgente. Tono: profesional pero cercano.",
+  "variables": [
+    "{{tipo_email}}",
+    "{{nombre_cliente}}",
+    "{{empresa_cliente}}",
+    "{{objetivo}}"
+  ],
+  "tags": [
+    "email",
+    "copy",
+    "marketing",
+    "campaign"
+  ]
+}

@@ -2,3 +2,5 @@
 - [Replicate upscaling (image+video)](replicate-upscaling.md) — verify model schemas via GET /v1/models; community models need latest_version resolver; video inputs via Files API not data-URI.
 - [API Model Catalog June 2026](api-model-catalog-june-2026.md) — all AI providers verified live; Claude smart→sonnet-4-6/genius→opus-4-8; eleven_v3 is new TTS default (74 langs); Runway gen4.5/seedance2; Replicate recraft-v4/flux-kontext-max/ideogram-v3-quality/wan-2.5-t2v/seedance-1-lite
 - [Runway API Config](runway-api-config.md) — endpoint MUST be api.dev.runwayml.com/v1 (NOT api.runwayml.com); version header MUST be 2024-11-06 (all 2025-* dates return 400)
+- [Master Prompt Library](master-prompt-library.md) — 5,582 templates en master-prompt-library.json (5.6MB), 19 librerías agencia + seeds internos; endpoint + UI browser en PromptLabTab.
+- [Video Model Selectors](video-model-selectors.md) — FusionStudioPro avatar filter era restrictivo (/kling|seedance|hailuo|veo/); CreateAdModal era hardcodeado 8 opciones. Ambos corregidos a 22 modelos completos.

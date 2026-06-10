@@ -1,5 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
@@ -527,6 +529,74 @@ router.post("/fs-pro/prompt-library/seed", requireAdmin, async (_req, res) => {
     });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "prompt-library seed failed" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MASTER PROMPT LIBRARY — 5000+ plantillas de la agencia (browse/search)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _masterLib: any = null;
+function getMasterLib(): any {
+  if (!_masterLib) {
+    const p = resolve(process.cwd(), "artifacts/api-server/src/lib/master-prompt-library.json");
+    try {
+      _masterLib = JSON.parse(readFileSync(p, "utf-8"));
+    } catch {
+      _masterLib = { _meta: { libraries: [], total_templates: 0 }, libraries: {} };
+    }
+  }
+  return _masterLib;
+}
+
+// GET /api/fs-pro/prompt-library-master?library=KEY&search=TEXT&limit=20&offset=0
+// Without params (or indexOnly=1) → returns the library index with counts only
+router.get("/fs-pro/prompt-library-master", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { library: libKey, search, limit = "20", offset = "0", indexOnly } = req.query as Record<string, string>;
+    const master = getMasterLib();
+
+    if (indexOnly === "1" || (!libKey && !search)) {
+      res.json({ meta: master._meta, libraries: master._meta.libraries });
+      return;
+    }
+
+    let templates: any[] = [];
+    if (libKey && typeof libKey === "string" && master.libraries[libKey]) {
+      templates = master.libraries[libKey].templates || [];
+    } else if (!libKey) {
+      for (const lib of Object.values(master.libraries) as any[]) {
+        templates = templates.concat(lib.templates || []);
+      }
+    }
+
+    if (search && typeof search === "string" && search.trim().length > 0) {
+      const q = search.toLowerCase();
+      templates = templates.filter((t: any) => {
+        const name   = String(t.name || t.id || t.title || "").toLowerCase();
+        const desc   = String(t.description || t.prompt || t.user_template || "").toLowerCase();
+        const cat    = String(t.category || t.type || t.useCase || "").toLowerCase();
+        return name.includes(q) || desc.includes(q) || cat.includes(q);
+      });
+    }
+
+    const lim = Math.min(parseInt(limit) || 20, 100);
+    const off = parseInt(offset) || 0;
+    const total = templates.length;
+    const items = templates.slice(off, off + lim).map((t: any) => ({
+      id:          t.id || t.slug || undefined,
+      name:        t.name || t.title || t.id || "(sin título)",
+      description: t.description || t.prompt?.slice?.(0, 120) || t.user_template?.slice?.(0, 120) || "",
+      category:    t.category || t.type || t.useCase || t._category || "",
+      engine:      t.engine || t.engine_hint || t.ai_model || "",
+      variables:   t.variables || t.dna_variables || [],
+      _library:    t._library || libKey || "all",
+      _raw:        t,
+    }));
+
+    res.json({ total, limit: lim, offset: off, library: libKey || "all", items });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "master prompt library failed" });
   }
 });
 

@@ -1,0 +1,3131 @@
+{
+  "synced_at": "2026-05-30T17:41:46",
+  "designs": [
+    {
+      "slug": "google-labs-code/atmospheric-glass",
+      "name": "Atmospheric Glass",
+      "tags": [
+        "glassmorphism",
+        "weather",
+        "dark",
+        "minimal",
+        "blur",
+        "frosted"
+      ]
+    },
+    {
+      "slug": "google-labs-code/paws-and-paths",
+      "name": "Paws & Paths",
+      "tags": [
+        "pet-care",
+        "light",
+        "warm",
+        "friendly",
+        "corporate",
+        "mobile-first"
+      ]
+    },
+    {
+      "slug": "google-labs-code/totality-festival",
+      "name": "Totality Festival",
+      "tags": [
+        "festival",
+        "dark",
+        "glassmorphism",
+        "space",
+        "premium",
+        "event"
+      ]
+    },
+    {
+      "slug": "chef/genesis",
+      "name": "Genesis",
+      "tags": [
+        "saas",
+        "clean",
+        "minimal",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "yiujc/flip7-card-game",
+      "name": "Flip7 Card Game",
+      "tags": [
+        "game",
+        "card",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/verdana-health-design-system",
+      "name": "Verdana Health",
+      "tags": [
+        "health",
+        "medical",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "groquispe100inf-max/design-md-sistema-de-monitoreo-el-ctrico-wattvision",
+      "name": "WattVision (Electrical Monitoring)",
+      "tags": [
+        "dashboard",
+        "monitoring",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/voicebox",
+      "name": "VoiceBox",
+      "tags": [
+        "audio",
+        "podcast",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/questui",
+      "name": "Journey UI",
+      "tags": [
+        "saas",
+        "minimal",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/rawblock",
+      "name": "RawBlock",
+      "tags": [
+        "developer",
+        "minimal",
+        "dark",
+        "code"
+      ]
+    },
+    {
+      "slug": "chef/shopvibe",
+      "name": "ShopVibe",
+      "tags": [
+        "ecommerce",
+        "retail",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/red-broadcast",
+      "name": "Red Broadcast",
+      "tags": [
+        "media",
+        "news",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/ember-studio",
+      "name": "Ember Studio",
+      "tags": [
+        "creative",
+        "studio",
+        "warm",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/thoughtstream",
+      "name": "ThoughtStream",
+      "tags": [
+        "productivity",
+        "notes",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/createspace",
+      "name": "CreateSpace",
+      "tags": [
+        "creative",
+        "portfolio",
+        "light",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "frknaykc/command-center",
+      "name": "Command Center",
+      "tags": [
+        "dashboard",
+        "admin",
+        "dark",
+        "dense"
+      ]
+    },
+    {
+      "slug": "chef/green-deck",
+      "name": "Green Deck",
+      "tags": [
+        "presentation",
+        "slides",
+        "green",
+        "clean"
+      ]
+    },
+    {
+      "slug": "Akagi201/longcipher-design",
+      "name": "LongCipher Design",
+      "tags": [
+        "security",
+        "tech",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/nomadkit",
+      "name": "NomadKit",
+      "tags": [
+        "travel",
+        "remote-work",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/feedloop",
+      "name": "FeedLoop",
+      "tags": [
+        "social",
+        "feed",
+        "minimal",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/docuforge",
+      "name": "DocuForge",
+      "tags": [
+        "docs",
+        "documentation",
+        "clean",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/octo-code",
+      "name": "Octo Code",
+      "tags": [
+        "developer",
+        "code",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/chatbubble",
+      "name": "ChatBubble",
+      "tags": [
+        "chat",
+        "messaging",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/violet-issue",
+      "name": "Violet Issue",
+      "tags": [
+        "saas",
+        "purple",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/crypto-blue",
+      "name": "Crypto Blue",
+      "tags": [
+        "crypto",
+        "finance",
+        "dark",
+        "blue"
+      ]
+    },
+    {
+      "slug": "yiujc/flip7-2",
+      "name": "Flip7 2",
+      "tags": [
+        "game",
+        "card",
+        "dark"
+      ]
+    },
+    {
+      "slug": "hoangndmiraisoft-hash/cooking-app-design-system",
+      "name": "Cooking App Design System",
+      "tags": [
+        "food",
+        "mobile-app",
+        "light",
+        "warm"
+      ]
+    },
+    {
+      "slug": "chef/studioblank",
+      "name": "StudioBlank",
+      "tags": [
+        "creative",
+        "agency",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/localguide",
+      "name": "LocalGuide",
+      "tags": [
+        "local",
+        "maps",
+        "travel",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/corpscale",
+      "name": "CorpScale",
+      "tags": [
+        "corporate",
+        "enterprise",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/pipelinepro",
+      "name": "PipelinePro",
+      "tags": [
+        "crm",
+        "sales",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/touchflow",
+      "name": "TouchFlow",
+      "tags": [
+        "mobile-app",
+        "ux",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/bouncebox",
+      "name": "BounceBox",
+      "tags": [
+        "ecommerce",
+        "playful",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/studioblank-design-system",
+      "name": "StudioBlank Design System",
+      "tags": [
+        "creative",
+        "agency",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/marketnest",
+      "name": "MarketNest",
+      "tags": [
+        "marketplace",
+        "ecommerce",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/resortlux",
+      "name": "ResortLux",
+      "tags": [
+        "hospitality",
+        "luxury",
+        "elegant",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/learnflow",
+      "name": "LearnFlow",
+      "tags": [
+        "education",
+        "edtech",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/open-serif",
+      "name": "Open Serif",
+      "tags": [
+        "editorial",
+        "blog",
+        "serif",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/devlog",
+      "name": "DevLog",
+      "tags": [
+        "developer",
+        "blog",
+        "minimal",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/prismatic-pay",
+      "name": "Prismatic Pay",
+      "tags": [
+        "fintech",
+        "payments",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/purple-stream",
+      "name": "Purple Stream",
+      "tags": [
+        "streaming",
+        "media",
+        "dark",
+        "purple"
+      ]
+    },
+    {
+      "slug": "chef/insightdeck",
+      "name": "InsightDeck",
+      "tags": [
+        "analytics",
+        "dashboard",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/starchart",
+      "name": "StarChart",
+      "tags": [
+        "data",
+        "analytics",
+        "dark",
+        "visualization"
+      ]
+    },
+    {
+      "slug": "matuspambol/design-system-universidad-panamericana",
+      "name": "Universidad Panamericana",
+      "tags": [
+        "education",
+        "university",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "nswamy14/midnight-banking-dashboard",
+      "name": "Midnight Banking Dashboard",
+      "tags": [
+        "banking",
+        "finance",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/coinpulse",
+      "name": "CoinPulse",
+      "tags": [
+        "crypto",
+        "finance",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/minidash",
+      "name": "MiniDash",
+      "tags": [
+        "dashboard",
+        "minimal",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/micropost",
+      "name": "MicroPost",
+      "tags": [
+        "blog",
+        "minimal",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/cloud-tower",
+      "name": "Cloud Tower",
+      "tags": [
+        "cloud",
+        "saas",
+        "tech",
+        "blue"
+      ]
+    },
+    {
+      "slug": "chef/creative-crimson",
+      "name": "Creative Crimson",
+      "tags": [
+        "creative",
+        "agency",
+        "red",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/kidlearn",
+      "name": "KidLearn",
+      "tags": [
+        "education",
+        "kids",
+        "colorful",
+        "playful"
+      ]
+    },
+    {
+      "slug": "chef/typegallery-design-system",
+      "name": "TypeGallery Design System",
+      "tags": [
+        "typography",
+        "editorial",
+        "clean",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/fooddash",
+      "name": "FoodDash",
+      "tags": [
+        "food-delivery",
+        "mobile-app",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/trust-blue-pay",
+      "name": "Trust Blue Pay",
+      "tags": [
+        "fintech",
+        "payments",
+        "blue",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/nordic-yellow",
+      "name": "Nordic Yellow",
+      "tags": [
+        "nordic",
+        "minimal",
+        "yellow",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/esportsarena",
+      "name": "ESports Arena",
+      "tags": [
+        "gaming",
+        "esports",
+        "dark",
+        "neon"
+      ]
+    },
+    {
+      "slug": "young/realsee-as-your-service",
+      "name": "RealSee as Your Service",
+      "tags": [
+        "real-estate",
+        "saas",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/coral-stay",
+      "name": "Coral Stay",
+      "tags": [
+        "hospitality",
+        "travel",
+        "warm",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/homenest",
+      "name": "HomeNest",
+      "tags": [
+        "real-estate",
+        "property",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/threadweave",
+      "name": "ThreadWeave",
+      "tags": [
+        "fashion",
+        "ecommerce",
+        "minimal",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "chef/bookingflow",
+      "name": "BookingFlow",
+      "tags": [
+        "booking",
+        "travel",
+        "saas",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/terminalui-design-system",
+      "name": "TerminalUI Design System",
+      "tags": [
+        "developer",
+        "terminal",
+        "dark",
+        "monospace"
+      ]
+    },
+    {
+      "slug": "chef/wandermap",
+      "name": "WanderMap",
+      "tags": [
+        "travel",
+        "maps",
+        "adventure",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/adminforge",
+      "name": "AdminForge",
+      "tags": [
+        "admin",
+        "dashboard",
+        "dark",
+        "dense"
+      ]
+    },
+    {
+      "slug": "chef/greenleaf",
+      "name": "GreenLeaf",
+      "tags": [
+        "eco",
+        "sustainability",
+        "green",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/cafeblend",
+      "name": "CaféBlend",
+      "tags": [
+        "food",
+        "coffee",
+        "warm",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/urbanloft",
+      "name": "UrbanLoft",
+      "tags": [
+        "real-estate",
+        "urban",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/auction-quad",
+      "name": "Auction Quad",
+      "tags": [
+        "auction",
+        "marketplace",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/budgetzen",
+      "name": "BudgetZen",
+      "tags": [
+        "finance",
+        "personal",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/luxcart",
+      "name": "LuxCart",
+      "tags": [
+        "luxury",
+        "ecommerce",
+        "elegant",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/swoosh-bold",
+      "name": "Swoosh Bold",
+      "tags": [
+        "sports",
+        "bold",
+        "colorful",
+        "energetic"
+      ]
+    },
+    {
+      "slug": "chef/pixeldiary",
+      "name": "PixelDiary",
+      "tags": [
+        "blog",
+        "personal",
+        "colorful",
+        "playful"
+      ]
+    },
+    {
+      "slug": "chef/noirluxe",
+      "name": "Noir Luxe",
+      "tags": [
+        "luxury",
+        "dark",
+        "elegant",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/broadsheet",
+      "name": "Broadsheet",
+      "tags": [
+        "news",
+        "editorial",
+        "serif",
+        "professional"
+      ]
+    },
+    {
+      "slug": "nogueirajf/ifraldas-design-system",
+      "name": "iFraldas Design System",
+      "tags": [
+        "baby",
+        "parenting",
+        "light",
+        "playful"
+      ]
+    },
+    {
+      "slug": "chef/cloudpulse",
+      "name": "CloudPulse",
+      "tags": [
+        "cloud",
+        "monitoring",
+        "saas",
+        "dark"
+      ]
+    },
+    {
+      "slug": "ontugoshal2025v1-alt/carpro-design-system",
+      "name": "CarPro Design System",
+      "tags": [
+        "automotive",
+        "cars",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/pulsepoint",
+      "name": "PulsePoint",
+      "tags": [
+        "health",
+        "fitness",
+        "dashboard",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/zengrid",
+      "name": "ZenGrid",
+      "tags": [
+        "minimal",
+        "grid",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/doodlepad",
+      "name": "DoodlePad",
+      "tags": [
+        "creative",
+        "playful",
+        "colorful",
+        "kids"
+      ]
+    },
+    {
+      "slug": "chef/green-chat",
+      "name": "Green Chat",
+      "tags": [
+        "chat",
+        "messaging",
+        "green",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/medicare",
+      "name": "Medicare",
+      "tags": [
+        "health",
+        "medical",
+        "light",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/magspread",
+      "name": "MagSpread",
+      "tags": [
+        "magazine",
+        "editorial",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/hrflow",
+      "name": "HRFlow",
+      "tags": [
+        "hr",
+        "saas",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/propertyvue",
+      "name": "PropertyVue",
+      "tags": [
+        "real-estate",
+        "dashboard",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/govkit",
+      "name": "GovKit",
+      "tags": [
+        "government",
+        "civic",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/greenearth",
+      "name": "GreenEarth",
+      "tags": [
+        "eco",
+        "sustainability",
+        "green",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/storysnap",
+      "name": "StorySnap",
+      "tags": [
+        "social",
+        "stories",
+        "mobile-app",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/prestige-purple",
+      "name": "Prestige Purple",
+      "tags": [
+        "luxury",
+        "purple",
+        "dark",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "chef/arcadeneon",
+      "name": "ArcadeNeon",
+      "tags": [
+        "gaming",
+        "neon",
+        "dark",
+        "retro"
+      ]
+    },
+    {
+      "slug": "chef/rentease",
+      "name": "RentEase",
+      "tags": [
+        "real-estate",
+        "rental",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/dark-ride",
+      "name": "Dark Ride",
+      "tags": [
+        "entertainment",
+        "dark",
+        "bold",
+        "adventure"
+      ]
+    },
+    {
+      "slug": "chef/brushstroke-design-system",
+      "name": "Brushstroke Design System",
+      "tags": [
+        "creative",
+        "art",
+        "warm",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/bistromenu",
+      "name": "BistroMenu",
+      "tags": [
+        "restaurant",
+        "food",
+        "warm",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "cccRaim/aime-design-system",
+      "name": "Aime Design System",
+      "tags": [
+        "ai",
+        "minimal",
+        "dark",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/archline-design-system",
+      "name": "ArchLine Design System",
+      "tags": [
+        "architecture",
+        "dark",
+        "minimal",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "mahimaalphadroid015-eng/heyalpha-ai-kiosk-design-system-v1-2",
+      "name": "HeyAlpha AI Kiosk v1.2",
+      "tags": [
+        "ai",
+        "kiosk",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "chef/debugdeck",
+      "name": "DebugDeck",
+      "tags": [
+        "developer",
+        "debugging",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "chef/creatorhub",
+      "name": "CreatorHub",
+      "tags": [
+        "creator",
+        "content",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/createspace-design-system",
+      "name": "CreateSpace Design System",
+      "tags": [
+        "creative",
+        "component-library",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/vaultline",
+      "name": "VaultLine",
+      "tags": [
+        "security",
+        "finance",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/blue-pulse",
+      "name": "Blue Pulse",
+      "tags": [
+        "health",
+        "tech",
+        "blue",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/electric-volt",
+      "name": "Electric Volt",
+      "tags": [
+        "energy",
+        "electric",
+        "yellow",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/gitboard",
+      "name": "GitBoard",
+      "tags": [
+        "developer",
+        "git",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/retrowave",
+      "name": "RetroWave",
+      "tags": [
+        "retro",
+        "neon",
+        "dark",
+        "80s"
+      ]
+    },
+    {
+      "slug": "chef/red-cinema",
+      "name": "Red Cinema",
+      "tags": [
+        "entertainment",
+        "cinema",
+        "dark",
+        "red"
+      ]
+    },
+    {
+      "slug": "chef/schemablue",
+      "name": "SchemaBlue",
+      "tags": [
+        "saas",
+        "blue",
+        "clean",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/maptrack",
+      "name": "MapTrack",
+      "tags": [
+        "logistics",
+        "maps",
+        "dashboard",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/podwave",
+      "name": "PodWave",
+      "tags": [
+        "podcast",
+        "audio",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "marinalobyntseva1976/generium-design-kit",
+      "name": "Generium Design Kit",
+      "tags": [
+        "corporate",
+        "clean",
+        "professional",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/campuskit",
+      "name": "CampusKit",
+      "tags": [
+        "education",
+        "university",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/quizforge",
+      "name": "QuizForge",
+      "tags": [
+        "education",
+        "quiz",
+        "colorful",
+        "interactive"
+      ]
+    },
+    {
+      "slug": "chef/ledgercraft",
+      "name": "LedgerCraft",
+      "tags": [
+        "finance",
+        "accounting",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/healhub",
+      "name": "HealHub",
+      "tags": [
+        "health",
+        "medical",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/metric-flow",
+      "name": "Metric Flow",
+      "tags": [
+        "analytics",
+        "dashboard",
+        "dark",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/codecademy",
+      "name": "CodeCademy",
+      "tags": [
+        "education",
+        "code",
+        "dark",
+        "interactive"
+      ]
+    },
+    {
+      "slug": "chef/marblecrest",
+      "name": "MarbleCrest",
+      "tags": [
+        "luxury",
+        "elegant",
+        "minimal",
+        "light"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/apple",
+      "name": "Apple (Inspired)",
+      "tags": [
+        "minimal",
+        "clean",
+        "light",
+        "premium"
+      ]
+    },
+    {
+      "slug": "chef/swipecard",
+      "name": "SwipeCard",
+      "tags": [
+        "mobile-app",
+        "cards",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/team-blue",
+      "name": "Team Blue",
+      "tags": [
+        "team",
+        "collaboration",
+        "blue",
+        "clean"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aether-the-new-frontier",
+      "name": "Aether: The New Frontier",
+      "tags": [
+        "futuristic",
+        "dark",
+        "bold",
+        "tech"
+      ]
+    },
+    {
+      "slug": "chef/gbrosss",
+      "name": "GBross",
+      "tags": [
+        "sports",
+        "bold",
+        "dark",
+        "energetic"
+      ]
+    },
+    {
+      "slug": "chef/complianceone",
+      "name": "ComplianceOne",
+      "tags": [
+        "compliance",
+        "legal",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/paystream",
+      "name": "PayStream",
+      "tags": [
+        "fintech",
+        "payments",
+        "dark",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/spark-mart",
+      "name": "Spark Mart",
+      "tags": [
+        "ecommerce",
+        "marketplace",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/newsdesk-red",
+      "name": "NewsDesk Red",
+      "tags": [
+        "news",
+        "media",
+        "red",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/notipulse",
+      "name": "NotiPulse",
+      "tags": [
+        "notifications",
+        "mobile-app",
+        "clean",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/lime-commerce",
+      "name": "Lime Commerce",
+      "tags": [
+        "ecommerce",
+        "green",
+        "fresh",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/supplygrid",
+      "name": "SupplyGrid",
+      "tags": [
+        "logistics",
+        "supply-chain",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "chef/apivault",
+      "name": "APIVault",
+      "tags": [
+        "developer",
+        "api",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "chef/midnightops",
+      "name": "MidnightOps",
+      "tags": [
+        "dark",
+        "operations",
+        "dashboard",
+        "dense"
+      ]
+    },
+    {
+      "slug": "chef/pharmflow",
+      "name": "PharmFlow",
+      "tags": [
+        "pharma",
+        "health",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "chef/bullseye-red",
+      "name": "Bullseye Red",
+      "tags": [
+        "marketing",
+        "bold",
+        "red",
+        "energetic"
+      ]
+    },
+    {
+      "slug": "chef/wellpath",
+      "name": "WellPath",
+      "tags": [
+        "health",
+        "wellness",
+        "light",
+        "calm"
+      ]
+    },
+    {
+      "slug": "chef/streamflix",
+      "name": "StreamFlix",
+      "tags": [
+        "streaming",
+        "media",
+        "dark",
+        "entertainment"
+      ]
+    },
+    {
+      "slug": "chef/block-canvas",
+      "name": "Block Canvas",
+      "tags": [
+        "creative",
+        "blocks",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/orange-cart",
+      "name": "Orange Cart",
+      "tags": [
+        "ecommerce",
+        "orange",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/owl-green",
+      "name": "Owl Green",
+      "tags": [
+        "education",
+        "green",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/emerald-base",
+      "name": "Emerald Base",
+      "tags": [
+        "saas",
+        "green",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/recipebook",
+      "name": "RecipeBook",
+      "tags": [
+        "food",
+        "cooking",
+        "warm",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/serif-journal",
+      "name": "Serif Journal",
+      "tags": [
+        "blog",
+        "editorial",
+        "serif",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "chef/mono-deploy",
+      "name": "Mono Deploy",
+      "tags": [
+        "developer",
+        "deployment",
+        "dark",
+        "monospace"
+      ]
+    },
+    {
+      "slug": "chef/motionkit-design-system",
+      "name": "MotionKit Design System",
+      "tags": [
+        "animation",
+        "motion",
+        "dark",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/cartcraft",
+      "name": "CartCraft",
+      "tags": [
+        "ecommerce",
+        "clean",
+        "light",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/pureform",
+      "name": "PureForm",
+      "tags": [
+        "minimal",
+        "forms",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/design-multiplay",
+      "name": "Design Multiplay",
+      "tags": [
+        "gaming",
+        "multiplayer",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/pastel-transfer",
+      "name": "Pastel Transfer",
+      "tags": [
+        "fintech",
+        "pastel",
+        "light",
+        "soft"
+      ]
+    },
+    {
+      "slug": "chef/mountain-view-bright",
+      "name": "Mountain View Bright",
+      "tags": [
+        "outdoor",
+        "bright",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/blurple-guild",
+      "name": "Blurple Guild",
+      "tags": [
+        "gaming",
+        "community",
+        "dark",
+        "purple"
+      ]
+    },
+    {
+      "slug": "chef/gray-paper",
+      "name": "Gray Paper",
+      "tags": [
+        "minimal",
+        "gray",
+        "editorial",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/velvetedge",
+      "name": "VelvetEdge",
+      "tags": [
+        "luxury",
+        "fashion",
+        "dark",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "chef/causeconnect",
+      "name": "CauseConnect",
+      "tags": [
+        "nonprofit",
+        "social",
+        "warm",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/navy-professional",
+      "name": "Navy Professional",
+      "tags": [
+        "corporate",
+        "navy",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/channel-palette",
+      "name": "Channel Palette",
+      "tags": [
+        "media",
+        "colorful",
+        "dashboard",
+        "bold"
+      ]
+    },
+    {
+      "slug": "ragabshiha/fixflow-odoo-19-kit",
+      "name": "FixFlow Odoo 19 Kit",
+      "tags": [
+        "erp",
+        "odoo",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "TySnyder/design-system-inspired-by-solutions-treatment-center",
+      "name": "Solutions Treatment Center",
+      "tags": [
+        "health",
+        "mental-health",
+        "calm",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/inkwell",
+      "name": "Inkwell",
+      "tags": [
+        "writing",
+        "blog",
+        "dark",
+        "editorial"
+      ]
+    },
+    {
+      "slug": "chef/teamsync",
+      "name": "TeamSync",
+      "tags": [
+        "collaboration",
+        "team",
+        "saas",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/green-trade",
+      "name": "Green Trade",
+      "tags": [
+        "finance",
+        "trading",
+        "green",
+        "dark"
+      ]
+    },
+    {
+      "slug": "chef/cupertino-minimal",
+      "name": "Cupertino Minimal",
+      "tags": [
+        "minimal",
+        "clean",
+        "light",
+        "ios"
+      ]
+    },
+    {
+      "slug": "chef/insureshield",
+      "name": "InsureShield",
+      "tags": [
+        "insurance",
+        "finance",
+        "professional",
+        "blue"
+      ]
+    },
+    {
+      "slug": "chef/farmtable",
+      "name": "FarmTable",
+      "tags": [
+        "food",
+        "farm",
+        "organic",
+        "warm"
+      ]
+    },
+    {
+      "slug": "chef/stream-green",
+      "name": "Stream Green",
+      "tags": [
+        "streaming",
+        "green",
+        "dark",
+        "media"
+      ]
+    },
+    {
+      "slug": "chef/neon-scroll",
+      "name": "Neon Scroll",
+      "tags": [
+        "neon",
+        "dark",
+        "bold",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "chef/gradient-story",
+      "name": "Gradient Story",
+      "tags": [
+        "gradient",
+        "colorful",
+        "bold",
+        "creative"
+      ]
+    },
+    {
+      "slug": "mangisaus/softro-saas",
+      "name": "Softro SaaS",
+      "tags": [
+        "saas",
+        "clean",
+        "dashboard",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/dropzone",
+      "name": "DropZone",
+      "tags": [
+        "logistics",
+        "delivery",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "chef/quickmart",
+      "name": "QuickMart",
+      "tags": [
+        "ecommerce",
+        "quick",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "chef/blue-grid",
+      "name": "Blue Grid",
+      "tags": [
+        "minimal",
+        "grid",
+        "blue",
+        "clean"
+      ]
+    },
+    {
+      "slug": "WOLFSI-DEVELOPMENT/design-system",
+      "name": "WOLFSI Design System",
+      "tags": [
+        "corporate",
+        "dark",
+        "bold",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/volunteerhub",
+      "name": "VolunteerHub",
+      "tags": [
+        "nonprofit",
+        "community",
+        "warm",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/clearview",
+      "name": "ClearView",
+      "tags": [
+        "saas",
+        "analytics",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/pink-shot",
+      "name": "Pink Shot",
+      "tags": [
+        "beauty",
+        "fashion",
+        "pink",
+        "bold"
+      ]
+    },
+    {
+      "slug": "wlabidi91/padel-championship-neon-athletic-dark",
+      "name": "Padel Championship Neon",
+      "tags": [
+        "sports",
+        "neon",
+        "dark",
+        "athletic"
+      ]
+    },
+    {
+      "slug": "xantilon/ks-tools-france",
+      "name": "KS Tools France",
+      "tags": [
+        "industrial",
+        "tools",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/orange-forum",
+      "name": "Orange Forum",
+      "tags": [
+        "community",
+        "forum",
+        "orange",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nx9-neural-gateway",
+      "name": "NX9 Neural Gateway",
+      "tags": [
+        "ai",
+        "futuristic",
+        "dark",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/freelance-designer-growth-partner",
+      "name": "Freelance Designer Growth",
+      "tags": [
+        "portfolio",
+        "creative",
+        "minimal",
+        "light"
+      ]
+    },
+    {
+      "slug": "NEWbieerror/karya-design-system",
+      "name": "Karya Design System",
+      "tags": [
+        "productivity",
+        "clean",
+        "minimal",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "chef/indiecraft",
+      "name": "IndieCraft",
+      "tags": [
+        "indie",
+        "creative",
+        "colorful",
+        "playful"
+      ]
+    },
+    {
+      "slug": "chef/blue-vault",
+      "name": "Blue Vault",
+      "tags": [
+        "security",
+        "blue",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/uber",
+      "name": "Uber (Inspired)",
+      "tags": [
+        "mobility",
+        "dark",
+        "bold",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "chef/social-blue",
+      "name": "Social Blue",
+      "tags": [
+        "social",
+        "blue",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "chef/pin-rouge",
+      "name": "Pin Rouge",
+      "tags": [
+        "fashion",
+        "red",
+        "elegant",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/mintlify",
+      "name": "Mintlify (Inspired)",
+      "tags": [
+        "docs",
+        "developer",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/tactile-analytics-interface",
+      "name": "Tactile Analytics Interface",
+      "tags": [
+        "analytics",
+        "dark",
+        "dashboard",
+        "dense"
+      ]
+    },
+    {
+      "slug": "chai-wanchai/wallet-tool-bitkub-admin",
+      "name": "Bitkub Admin Wallet",
+      "tags": [
+        "crypto",
+        "admin",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/webgl-scene-editor-skeuomorphic-2d",
+      "name": "WebGL Scene Editor Skeuomorphic",
+      "tags": [
+        "creative",
+        "3d",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "tivitalinoplix-prog/memorial-financeiro-ibmm-v5-0-3",
+      "name": "Memorial Financeiro IBMM v5.0.3",
+      "tags": [
+        "finance",
+        "memorial",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "tagseagencia/design-system-inspired-by-ita",
+      "name": "ITA Design System",
+      "tags": [
+        "corporate",
+        "clean",
+        "professional",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/raycast",
+      "name": "Raycast (Inspired)",
+      "tags": [
+        "productivity",
+        "dark",
+        "minimal",
+        "launcher"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/neural-synthesis",
+      "name": "Neural Synthesis",
+      "tags": [
+        "ai",
+        "dark",
+        "futuristic",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aurelia-systems-grid",
+      "name": "Aurelia Systems Grid",
+      "tags": [
+        "enterprise",
+        "dark",
+        "grid",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/security-diagnostics",
+      "name": "Security Diagnostics",
+      "tags": [
+        "security",
+        "dark",
+        "dashboard",
+        "technical"
+      ]
+    },
+    {
+      "slug": "hightall/ibox-3-0",
+      "name": "iBox 3.0",
+      "tags": [
+        "mobile-app",
+        "dark",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "young/homeui-design-system-v2",
+      "name": "HomeUI Design System v2",
+      "tags": [
+        "real-estate",
+        "clean",
+        "light",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "juanBL/35mm-talent-makers",
+      "name": "35mm Talent Makers",
+      "tags": [
+        "creative",
+        "photography",
+        "dark",
+        "editorial"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/bmw-m",
+      "name": "BMW M (Inspired)",
+      "tags": [
+        "automotive",
+        "dark",
+        "bold",
+        "premium"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/shopify",
+      "name": "Shopify (Inspired)",
+      "tags": [
+        "ecommerce",
+        "green",
+        "clean",
+        "saas"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/playstation",
+      "name": "PlayStation (Inspired)",
+      "tags": [
+        "gaming",
+        "dark",
+        "bold",
+        "entertainment"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/supabase",
+      "name": "Supabase (Inspired)",
+      "tags": [
+        "developer",
+        "dark",
+        "green",
+        "saas"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/vertex-2",
+      "name": "Vertex 2",
+      "tags": [
+        "tech",
+        "dark",
+        "minimal",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "Jmtamayocruz/design-system-luxury-brand",
+      "name": "Luxury Brand Design System",
+      "tags": [
+        "luxury",
+        "elegant",
+        "minimal",
+        "dark"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/design-documentation-production",
+      "name": "Design Documentation Production",
+      "tags": [
+        "docs",
+        "clean",
+        "professional",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "tivitalinoplix-prog/memorial-financeiro-ibmm-v5-0",
+      "name": "Memorial Financeiro IBMM v5.0",
+      "tags": [
+        "finance",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "duanhdan/skylearn",
+      "name": "SkyLearn",
+      "tags": [
+        "education",
+        "edtech",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "chef/tutorspace",
+      "name": "TutorSpace",
+      "tags": [
+        "education",
+        "tutoring",
+        "light",
+        "clean"
+      ]
+    },
+    {
+      "slug": "mahimaalphadroid015-eng/heyalpha-ai-kiosk-design-system-v1-1",
+      "name": "HeyAlpha AI Kiosk v1.1",
+      "tags": [
+        "ai",
+        "kiosk",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/bugatti",
+      "name": "Bugatti (Inspired)",
+      "tags": [
+        "automotive",
+        "luxury",
+        "dark",
+        "premium"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/advancedture",
+      "name": "Advancedture",
+      "tags": [
+        "adventure",
+        "travel",
+        "bold",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/autonomous-traffic-vectors",
+      "name": "Autonomous Traffic Vectors",
+      "tags": [
+        "automotive",
+        "ai",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/protocol-interface",
+      "name": "Protocol Interface",
+      "tags": [
+        "tech",
+        "dark",
+        "minimal",
+        "developer"
+      ]
+    },
+    {
+      "slug": "tivitalinoplix-prog/memorial-financeiro-ibmm-v5-0-2",
+      "name": "Memorial Financeiro IBMM v5.0.2",
+      "tags": [
+        "finance",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/atmospheric-glass",
+      "name": "Atmospheric Glass",
+      "tags": [
+        "glassmorphism",
+        "dark",
+        "elegant",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/wise",
+      "name": "Wise (Inspired)",
+      "tags": [
+        "fintech",
+        "green",
+        "clean",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/lumina",
+      "name": "Lumina",
+      "tags": [
+        "light",
+        "clean",
+        "minimal",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/platform-overview",
+      "name": "Platform Overview",
+      "tags": [
+        "saas",
+        "dashboard",
+        "dark",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/neurovox-neural-audio-engine",
+      "name": "NeuroVox Neural Audio Engine",
+      "tags": [
+        "ai",
+        "audio",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "friburgerbund-dev/novaspark-design-system",
+      "name": "NovaSpark Design System",
+      "tags": [
+        "saas",
+        "colorful",
+        "bold",
+        "component-library"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/opencode",
+      "name": "OpenCode (Inspired)",
+      "tags": [
+        "developer",
+        "dark",
+        "minimal",
+        "code"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/ferrari",
+      "name": "Ferrari (Inspired)",
+      "tags": [
+        "automotive",
+        "luxury",
+        "red",
+        "premium"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexusgrid",
+      "name": "NexusGrid",
+      "tags": [
+        "tech",
+        "dark",
+        "grid",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexusech",
+      "name": "NexusTech",
+      "tags": [
+        "tech",
+        "dark",
+        "enterprise",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aetherics",
+      "name": "Aetherics",
+      "tags": [
+        "futuristic",
+        "dark",
+        "tech",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/navihero",
+      "name": "NaviHero",
+      "tags": [
+        "navigation",
+        "dark",
+        "bold",
+        "tech"
+      ]
+    },
+    {
+      "slug": "Zhandosik22/codecraft-academy",
+      "name": "CodeCraft Academy",
+      "tags": [
+        "education",
+        "code",
+        "dark",
+        "interactive"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/autonomous-infrastructure-command",
+      "name": "Autonomous Infrastructure Command",
+      "tags": [
+        "devops",
+        "dark",
+        "dashboard",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/binance",
+      "name": "Binance (Inspired)",
+      "tags": [
+        "crypto",
+        "dark",
+        "yellow",
+        "finance"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aiface",
+      "name": "AIFace",
+      "tags": [
+        "ai",
+        "facial",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/axiom",
+      "name": "Axiom (Inspired)",
+      "tags": [
+        "developer",
+        "dark",
+        "minimal",
+        "logs"
+      ]
+    },
+    {
+      "slug": "sofiene-ghandri/al-razi-hub-design-system",
+      "name": "Al-Razi Hub Design System",
+      "tags": [
+        "health",
+        "medical",
+        "clean",
+        "professional"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-globa",
+      "name": "Nexus Global",
+      "tags": [
+        "enterprise",
+        "dark",
+        "global",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aura-connect-interface",
+      "name": "Aura Connect Interface",
+      "tags": [
+        "communication",
+        "dark",
+        "futuristic",
+        "ai"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/network-reboot",
+      "name": "Network Reboot",
+      "tags": [
+        "networking",
+        "dark",
+        "technical",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nvidia",
+      "name": "NVIDIA (Inspired)",
+      "tags": [
+        "tech",
+        "dark",
+        "green",
+        "gaming"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/lamborghini",
+      "name": "Lamborghini (Inspired)",
+      "tags": [
+        "automotive",
+        "luxury",
+        "yellow",
+        "dark"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/vodafone",
+      "name": "Vodafone (Inspired)",
+      "tags": [
+        "telecom",
+        "red",
+        "bold",
+        "corporate"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexlayer",
+      "name": "NexLayer",
+      "tags": [
+        "tech",
+        "dark",
+        "layers",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/pulsegrid",
+      "name": "PulseGrid",
+      "tags": [
+        "analytics",
+        "dark",
+        "grid",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-orchestration-engine",
+      "name": "Nexus Orchestration Engine",
+      "tags": [
+        "devops",
+        "dark",
+        "orchestration",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/systems-interface",
+      "name": "Systems Interface",
+      "tags": [
+        "systems",
+        "dark",
+        "dashboard",
+        "technical"
+      ]
+    },
+    {
+      "slug": "songmenglin-dev/mistral-ai",
+      "name": "Mistral AI (Inspired)",
+      "tags": [
+        "ai",
+        "dark",
+        "minimal",
+        "saas"
+      ]
+    },
+    {
+      "slug": "kimtim0923-hub/event-proposal-deck",
+      "name": "Event Proposal Deck",
+      "tags": [
+        "events",
+        "presentation",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/paws-paths",
+      "name": "Paws & Paths",
+      "tags": [
+        "pets",
+        "friendly",
+        "warm",
+        "colorful"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/renault",
+      "name": "Renault (Inspired)",
+      "tags": [
+        "automotive",
+        "yellow",
+        "bold",
+        "modern"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/globation",
+      "name": "Globation",
+      "tags": [
+        "global",
+        "tech",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aurora-gl",
+      "name": "Aurora GL",
+      "tags": [
+        "glassmorphism",
+        "colorful",
+        "gradient",
+        "dark"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/meridian-geo",
+      "name": "Meridian Geo",
+      "tags": [
+        "maps",
+        "geo",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "AtulPahal/designmd-ai-darkgreen",
+      "name": "DesignMD AI DarkGreen",
+      "tags": [
+        "ai",
+        "dark",
+        "green",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/morph",
+      "name": "Morph",
+      "tags": [
+        "creative",
+        "morphing",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/quantum-network",
+      "name": "Quantum Network",
+      "tags": [
+        "tech",
+        "quantum",
+        "dark",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/vertex-digital-infrastructure",
+      "name": "Vertex Digital Infrastructure",
+      "tags": [
+        "infrastructure",
+        "dark",
+        "technical",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "nengoxx/ctrl-b",
+      "name": "CTRL-B",
+      "tags": [
+        "developer",
+        "dark",
+        "bold",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/operative-selection",
+      "name": "Operative Selection",
+      "tags": [
+        "ops",
+        "dark",
+        "dashboard",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/revolut",
+      "name": "Revolut (Inspired)",
+      "tags": [
+        "fintech",
+        "dark",
+        "minimal",
+        "premium"
+      ]
+    },
+    {
+      "slug": "ontugoshal/carpro-mobile-ui-design-system",
+      "name": "CarPro Mobile UI",
+      "tags": [
+        "automotive",
+        "mobile-app",
+        "dark",
+        "clean"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/quantumetry",
+      "name": "Quantumetry",
+      "tags": [
+        "quantum",
+        "dark",
+        "tech",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexum",
+      "name": "Nexum",
+      "tags": [
+        "tech",
+        "dark",
+        "enterprise",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexuture",
+      "name": "Nexuture",
+      "tags": [
+        "future",
+        "dark",
+        "tech",
+        "futuristic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/vertexable",
+      "name": "Vertexable",
+      "tags": [
+        "tech",
+        "dark",
+        "vertex",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-v3",
+      "name": "Nexus V3",
+      "tags": [
+        "tech",
+        "dark",
+        "enterprise",
+        "v3"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/blackbox-ai",
+      "name": "Blackbox AI (Inspired)",
+      "tags": [
+        "ai",
+        "dark",
+        "code",
+        "developer"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-vision-logic",
+      "name": "Nexus Vision Logic",
+      "tags": [
+        "ai",
+        "vision",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aegisnode-global-kinetic-network",
+      "name": "AegisNode Global Kinetic Network",
+      "tags": [
+        "security",
+        "dark",
+        "network",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/system-telemetry",
+      "name": "System Telemetry",
+      "tags": [
+        "monitoring",
+        "dark",
+        "dashboard",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/auracore-spatial-visualization-system",
+      "name": "AuraCore Spatial Visualization",
+      "tags": [
+        "visualization",
+        "dark",
+        "3d",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/extracta-system-terminal",
+      "name": "Extracta System Terminal",
+      "tags": [
+        "terminal",
+        "dark",
+        "technical",
+        "developer"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/vertex-platform",
+      "name": "Vertex Platform",
+      "tags": [
+        "saas",
+        "dark",
+        "platform",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/notion",
+      "name": "Notion (Inspired)",
+      "tags": [
+        "productivity",
+        "minimal",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/spacex",
+      "name": "SpaceX (Inspired)",
+      "tags": [
+        "space",
+        "dark",
+        "minimal",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/whitex",
+      "name": "WhiteX",
+      "tags": [
+        "minimal",
+        "white",
+        "clean",
+        "light"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/quantum-systems",
+      "name": "Quantum Systems",
+      "tags": [
+        "quantum",
+        "dark",
+        "tech",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/quantum-architecture-features",
+      "name": "Quantum Architecture Features",
+      "tags": [
+        "quantum",
+        "architecture",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/cognitive-processing-hub",
+      "name": "Cognitive Processing Hub",
+      "tags": [
+        "ai",
+        "cognitive",
+        "dark",
+        "technical"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/aura-platform",
+      "name": "Aura Platform",
+      "tags": [
+        "saas",
+        "dark",
+        "platform",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/syntagma-cinematic-data-extraction",
+      "name": "Syntagma Cinematic Data Extraction",
+      "tags": [
+        "media",
+        "dark",
+        "data",
+        "cinematic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/diagnostic-architecture-model-teardown",
+      "name": "Diagnostic Architecture Model",
+      "tags": [
+        "architecture",
+        "dark",
+        "technical",
+        "diagnostic"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/enterprize",
+      "name": "Enterprize",
+      "tags": [
+        "enterprise",
+        "dark",
+        "professional",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/atmospheric-command-nexus",
+      "name": "Atmospheric Command Nexus",
+      "tags": [
+        "command",
+        "dark",
+        "futuristic",
+        "atmospheric"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/synapse-enterprise-intelligence",
+      "name": "Synapse Enterprise Intelligence",
+      "tags": [
+        "ai",
+        "enterprise",
+        "dark",
+        "intelligence"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexis-compute-enterprise-ai-infrastructure",
+      "name": "NEXIS Compute Enterprise AI Infrastructure",
+      "tags": [
+        "ai",
+        "infrastructure",
+        "dark",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/temporal-resonance-array",
+      "name": "Temporal Resonance Array",
+      "tags": [
+        "sci-fi",
+        "dark",
+        "futuristic",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/runway",
+      "name": "Runway (Inspired)",
+      "tags": [
+        "creative",
+        "dark",
+        "media",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "eldaphi05-pixel/software-requirements-specification-srs",
+      "name": "SRS Specification System",
+      "tags": [
+        "docs",
+        "technical",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-core-autonomous-systems",
+      "name": "Nexus Core Autonomous Systems",
+      "tags": [
+        "autonomous",
+        "dark",
+        "tech",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/quantum-data-synchronization",
+      "name": "Quantum Data Synchronization",
+      "tags": [
+        "data",
+        "quantum",
+        "dark",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-analytics-dashboard",
+      "name": "Nexus Analytics Dashboard",
+      "tags": [
+        "analytics",
+        "dark",
+        "dashboard",
+        "enterprise"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/choose-your-reality",
+      "name": "Choose Your Reality",
+      "tags": [
+        "creative",
+        "dark",
+        "interactive",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexus-core-2",
+      "name": "Nexus Core 2",
+      "tags": [
+        "tech",
+        "dark",
+        "enterprise",
+        "v2"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/system-focus-override-remix",
+      "name": "System Focus Override Remix",
+      "tags": [
+        "dark",
+        "tech",
+        "override",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/omnicore-quantum-mesh",
+      "name": "OmniCore Quantum Mesh",
+      "tags": [
+        "quantum",
+        "dark",
+        "mesh",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/warp",
+      "name": "Warp (Inspired)",
+      "tags": [
+        "developer",
+        "terminal",
+        "dark",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/financial-saas-platform-metrics",
+      "name": "Financial SaaS Platform Metrics",
+      "tags": [
+        "fintech",
+        "saas",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/nexural",
+      "name": "Nexural",
+      "tags": [
+        "neural",
+        "ai",
+        "dark",
+        "tech"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/legal-sys-automated-compliance-interface",
+      "name": "Legal Sys Automated Compliance",
+      "tags": [
+        "legal",
+        "compliance",
+        "dark",
+        "professional"
+      ]
+    },
+    {
+      "slug": "dsollero-ai/design-system-tra-o-feito-sinal",
+      "name": "Traço Feito Sinal Design System",
+      "tags": [
+        "creative",
+        "art",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "brunopetrovic/velocity-infrastructure-for-scale",
+      "name": "Velocity Infrastructure for Scale",
+      "tags": [
+        "infrastructure",
+        "dark",
+        "scale",
+        "tech"
+      ]
+    },
+    {
+      "slug": "duanhdan/reel-theory",
+      "name": "Reel Theory",
+      "tags": [
+        "film",
+        "cinema",
+        "dark",
+        "editorial"
+      ]
+    },
+    {
+      "slug": "duanhdan/airwave",
+      "name": "Airwave",
+      "tags": [
+        "music",
+        "audio",
+        "minimal",
+        "clean"
+      ]
+    },
+    {
+      "slug": "duanhdan/pulsetrack",
+      "name": "PulseTrack",
+      "tags": [
+        "health",
+        "fitness",
+        "tracking",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "duanhdan/concrete",
+      "name": "Concrete",
+      "tags": [
+        "minimal",
+        "gray",
+        "bold",
+        "architectural"
+      ]
+    },
+    {
+      "slug": "luuphuc6297/magnifi-ai-investing-platform",
+      "name": "Magnifi AI Investing Platform",
+      "tags": [
+        "fintech",
+        "ai",
+        "dark",
+        "dashboard"
+      ]
+    },
+    {
+      "slug": "luuphuc6297/betterment-robo-advisor-investing",
+      "name": "Betterment Robo Advisor",
+      "tags": [
+        "fintech",
+        "clean",
+        "green",
+        "light"
+      ]
+    },
+    {
+      "slug": "duanhdan/hearthstone",
+      "name": "Hearthstone (Inspired)",
+      "tags": [
+        "gaming",
+        "card",
+        "warm",
+        "playful"
+      ]
+    },
+    {
+      "slug": "duanhdan/mise",
+      "name": "Mise",
+      "tags": [
+        "minimal",
+        "clean",
+        "light",
+        "elegant"
+      ]
+    },
+    {
+      "slug": "luuphuc6297/business-wire-corporate-press-release-platform",
+      "name": "Business Wire Corporate Platform",
+      "tags": [
+        "corporate",
+        "news",
+        "professional",
+        "clean"
+      ]
+    },
+    {
+      "slug": "duanhdan/counselbook",
+      "name": "CounselBook",
+      "tags": [
+        "legal",
+        "professional",
+        "clean",
+        "dark"
+      ]
+    },
+    {
+      "slug": "duanhdan/broadsheet",
+      "name": "Broadsheet (duanhdan)",
+      "tags": [
+        "editorial",
+        "news",
+        "serif",
+        "clean"
+      ]
+    },
+    {
+      "slug": "duanhdan/vault-amp-ledger",
+      "name": "Vault & Ledger",
+      "tags": [
+        "finance",
+        "dark",
+        "professional",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "luuphuc6297/tavily-web-access-layer-for-ai-agents",
+      "name": "Tavily Web Access Layer for AI",
+      "tags": [
+        "ai",
+        "developer",
+        "dark",
+        "minimal"
+      ]
+    },
+    {
+      "slug": "luuphuc6297/zalopay-vietnamese-e-wallet-super-app",
+      "name": "ZaloPay Vietnamese E-Wallet",
+      "tags": [
+        "fintech",
+        "mobile-app",
+        "colorful",
+        "bold"
+      ]
+    },
+    {
+      "slug": "sanwithz/alpha-academy",
+      "name": "Alpha Academy",
+      "tags": [
+        "education",
+        "dark",
+        "bold",
+        "colorful"
+      ]
+    }
+  ],
+  "stats": {
+    "downloaded": 226,
+    "skipped": 86,
+    "failed": 0,
+    "total": 312
+  }
+}

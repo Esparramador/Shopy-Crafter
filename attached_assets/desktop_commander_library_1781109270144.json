@@ -1,0 +1,1330 @@
+{
+  "meta": {
+    "version": "1.0",
+    "total": 73,
+    "source": "https://desktopcommander.app/library/prompts/",
+    "methodology": "plan-first + architecture-before-code + verify-after",
+    "categories": [
+      "desktop_commander_build_features",
+      "desktop_commander_explore_codebase",
+      "desktop_commander_organize_files",
+      "desktop_commander_write_documentation"
+    ]
+  },
+  "templates": [
+    {
+      "id": "dc_001_explain_codebase_or_repository",
+      "name": "Desktop Commander: Explain Codebase or Repository",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "step-by-step"
+      ],
+      "description": "Point Desktop Commander's AI agent at any repository and get a plain-English walkthrough",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza la estructura completa del repositorio en {repo_path}. Identifica: 1) Arquitectura general (monolítico/microservicios/modular), 2) Stack tecnológico, 3) Punto de entrada principal, 4) Patrones de diseño usados, 5) Dependencias clave. Devuelve un walkthrough en lenguaje natural con diagrama de árbol simplificado y explicación de cada carpeta principal.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_002_organize_downloads_folder",
+      "name": "Desktop Commander: Organize Downloads Folder",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Sort messy Downloads folder into clean subfolders in seconds",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza el contenido de {downloads_path}. Crea subcarpetas por tipo (Documents/Images/Videos/Code/Archives/Installers/Misc). Mueve cada archivo a la carpeta correcta basándote en la extensión. Para PDFs/documentos, agrupa por año-mes en subcarpetas. Reporta resumen: # archivos por categoría, espacio liberado, archivos duplicados detectados.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_003_build_a_feature_from_scratch",
+      "name": "Desktop Commander: Build A Feature from Scratch",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Scope a feature in plain English against existing codebase",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nFEATURE: {feature_description}\n\nFASE 1 - PLAN (no codear todavía): 1) Identifica módulos del codebase actual que tocaremos, 2) Arquitectura propuesta (componentes/funciones), 3) APIs/DB schema changes, 4) Riesgos y edge cases, 5) Tests necesarios. FASE 2 - IMPLEMENTACIÓN: Solo cuando el plan esté aprobado. Crea archivos, escribe código, añade tests, documenta.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_004_create_project_documentation",
+      "name": "Desktop Commander: Create Project Documentation",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Generate architecture docs, decision logs, specifications from actual codebase",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nGenera documentación profesional del proyecto en {repo_path}. Estructura: 1) README.md ejecutivo (qué hace, cómo usar), 2) ARCHITECTURE.md (diagramas Mermaid, decisiones técnicas), 3) API.md (endpoints + ejemplos), 4) CONTRIBUTING.md, 5) DEPLOYMENT.md, 6) CHANGELOG.md. Todo en markdown, listo para GitHub/GitLab.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_005_set_up_cloud_infrastructure",
+      "name": "Desktop Commander: Set Up Cloud Infrastructure",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Deploy production-ready cloud infrastructure from natural language",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDespliega infraestructura cloud para {app_description} en {cloud_provider} (AWS/GCP/Azure/Hetzner). Incluye: 1) Terraform/Pulumi IaC, 2) VPC + subnets + security groups, 3) Compute (EC2/Cloud Run/AKS), 4) Database (RDS/CloudSQL), 5) CDN + load balancer, 6) Monitoring (CloudWatch/Stackdriver), 7) CI/CD (GitHub Actions deploy). Output: archivos IaC + diagrama arquitectura + estimación de coste mensual.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_006_clean_up_unused_code",
+      "name": "Desktop Commander: Clean Up Unused Code",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "step-by-step"
+      ],
+      "description": "Find unused imports, dead functions, redundant code",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita {repo_path} buscando código muerto: 1) Imports no usados, 2) Funciones/clases nunca referenciadas, 3) Variables declaradas sin uso, 4) Archivos huérfanos no importados, 5) Código comentado mayor a 30 días, 6) Duplicados (DRY violations). Devuelve: tabla con archivo:línea + acción recomendada (delete/refactor) + script auto-fix sin tocar nada.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_007_extract_data_from_pdfs",
+      "name": "Desktop Commander: Extract Data from PDFs",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Extract tables, fields, structured data from any PDF",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nExtrae datos estructurados de {pdf_files}. Para cada PDF: 1) Texto completo (OCR si es necesario), 2) Tablas detectadas (formato CSV/JSON), 3) Metadatos (autor/fecha/páginas), 4) Formularios rellenables, 5) Imágenes embebidas. Devuelve JSON estructurado + opcional export a Excel.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_008_create_knowledge_base_folder",
+      "name": "Desktop Commander: Create Knowledge Base Folder",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Scaffold personal knowledge-base folder structure (Obsidian-friendly)",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCrea estructura Knowledge Base markdown en {target_path}: /00-Inbox /01-Daily-Notes /02-Projects /03-Areas /04-Resources /05-Archive (PARA method). Incluye: plantillas markdown, frontmatter YAML, índice automático, configuración Obsidian (.obsidian/), tags taxonomy. Compatible con Obsidian/LogSeq/Foam.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_009_automate_competitor_research",
+      "name": "Desktop Commander: Automate Competitor Research",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Weekly competitor-research workflow",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConfigura workflow de competitor research: 1) Lista de competidores: {competitors}, 2) Cron weekly que scrape sus webs (precios, features, blog posts, equipo), 3) Cambios detectados vs semana anterior, 4) Análisis de positioning, 5) Email/Slack notification con diff resumido. Stack: Python + Playwright + diff + SendGrid/Slack webhook.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_010_set_up_wordpress_environment",
+      "name": "Desktop Commander: Set Up WordPress Environment",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Set up dev environment for WordPress",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInstala entorno WordPress local: 1) LAMP/LEMP stack (Apache/Nginx + MySQL + PHP 8.2), 2) WP-CLI configurado, 3) WordPress última versión, 4) Tema starter (Underscores o Sage), 5) Plugins esenciales (Yoast, WP Rocket, Wordfence), 6) Stages dev/staging/prod, 7) Git workflow con .gitignore correcto.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_011_build_and_deploy_landing_page",
+      "name": "Desktop Commander: Build and Deploy Landing Page",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Create professional landing page and deploy to live server",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCrea landing page profesional para {product_description}. Stack: HTML/Tailwind/Alpine.js (o Next.js si dinámico). Secciones: Hero+CTA, Features (3-6 con iconos), Social proof (logos+testimonials), Pricing (3 tiers), FAQ, Footer. Optimizado SEO + Open Graph + analytics. Deploy a Vercel/Netlify con custom domain configurado.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_012_analyze_my_data_file",
+      "name": "Desktop Commander: Analyze My Data File",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Make sense of a data file",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza {data_file} (CSV/JSON/XLSX/Parquet): 1) Schema inferido (columnas + tipos), 2) Estadísticas descriptivas, 3) Missing values + outliers, 4) Distribuciones (histogramas), 5) Correlaciones, 6) Quality issues (duplicados, encoding), 7) Insights destacables. Output: reporte HTML + Pandas profiling.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_013_build_personal_finance_tracker",
+      "name": "Desktop Commander: Build Personal Finance Tracker",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Get a working personal finance tracker web app",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConstruye web app finance tracker. Stack: Next.js + Prisma + Postgres + Auth.js. Features: 1) Conexión a banco (Plaid/Tink), 2) Categorización auto con AI, 3) Dashboard ingresos/gastos, 4) Budgets con alertas, 5) Goals + progress, 6) Charts (Chart.js), 7) Mobile-first responsive. Deploy a Vercel.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_014_set_up_local_development_environment",
+      "name": "Desktop Commander: Set Up Local Development Environment",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Configure complete local dev environment",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConfigura entorno dev local para {stack} (Node/Python/Go/Rust/etc.): 1) Version managers (nvm/pyenv), 2) Package managers (pnpm/uv/poetry), 3) IDE config (VSCode settings + extensions), 4) Pre-commit hooks (Husky/lefthook), 5) Linter+formatter (ESLint/ruff/biome), 6) Docker compose con DBs, 7) Variables .env.example, 8) Scripts dev/test/build/deploy.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_015_set_up_google_analytics_4_+_traffic_anal",
+      "name": "Desktop Commander: Set Up Google Analytics 4 + Traffic Analysis",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Analyze traffic data from Google Analytics",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConfigura GA4 en {website}: 1) Crear property + data stream, 2) Instalar gtag.js + custom events, 3) Conversion tracking (signup/purchase/lead), 4) Server-side tagging vía GTM, 5) Conexión BigQuery export, 6) Dashboards Looker Studio. Después, analiza últimos 30 días: top sources, conversion funnel, drop-off pages, top content.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_016_explain_react_component_architecture",
+      "name": "Desktop Commander: Explain React Component Architecture",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Get clear breakdown of how React component works",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza componente React {component_path}. Explica: 1) Props (tipos + descripción), 2) State (useState/useReducer), 3) Side effects (useEffect/data fetching), 4) Render tree (sub-componentes), 5) Performance (memos/callbacks needed?), 6) Accessibility issues, 7) Tests recomendados. Output: diagrama + recomendaciones de refactor.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_017_create_database_schema_diagram",
+      "name": "Desktop Commander: Create Database Schema Diagram",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Generate Mermaid ER diagrams from database structure",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConecta a {db_connection_string} (Postgres/MySQL/SQLite). Extrae: tablas, columnas, FKs, índices. Genera: 1) Diagrama Mermaid erDiagram, 2) Markdown con descripción de cada tabla, 3) Tabla de relaciones, 4) Identificación de N+1 query risks, 5) Sugerencias de índices faltantes.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_018_compare_config_files_to_baseline",
+      "name": "Desktop Commander: Compare Config Files to Baseline",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Detect configuration drift",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCompara configs en {target_path} vs baseline {baseline_path}. Detecta drift en: .env, package.json, tsconfig.json, dockerfile, k8s manifests, nginx confs. Output: diff por archivo + recomendación (sync/keep custom/security risk).\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_019_convert_heic_to_png",
+      "name": "Desktop Commander: Convert HEIC to PNG",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Convert iPhone HEIC photos to universal PNG",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConvierte todos los archivos .HEIC en {folder_path} a PNG. Preserva metadatos EXIF. Mantén calidad original. Crea subcarpeta /converted con los PNGs. Mueve los .HEIC originales a /archive.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_020_consolidate_data_files_into_one",
+      "name": "Desktop Commander: Consolidate Data Files into One",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Extract and standardize data for analysis",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConsolida todos los archivos CSV/Excel en {folder_path} en un único dataset. Detecta automáticamente: schemas compatibles, columnas comunes, encoding, separators. Resuelve conflictos. Output: archivo único merged.csv + reporte de filas/columnas/duplicados.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_021_get_my_ip_address",
+      "name": "Desktop Commander: Get My IP Address",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Quickly get your IP address",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDevuelve mi IP pública (curl ifconfig.me) + IP local (todas las interfaces) + geolocalización + ISP info. Formato JSON.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_022_generate_docker_configuration",
+      "name": "Desktop Commander: Generate Docker Configuration",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Create optimized Docker setup",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nPara {project_path} genera: 1) Dockerfile multi-stage optimizado, 2) docker-compose.yml con servicios necesarios (app+db+redis+nginx), 3) .dockerignore, 4) Healthchecks, 5) Volumes para persistencia, 6) Environment variables, 7) Network setup. Imagen final <200MB si es posible.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_023_optimize_docker_setup",
+      "name": "Desktop Commander: Optimize Docker Setup",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Production-ready Docker configuration",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nOptimiza Docker setup actual: 1) Reduce tamaño imagen (multi-stage + alpine + no cache), 2) Layer caching óptimo, 3) Non-root user, 4) Vulnerability scanning (trivy), 5) BuildKit cache mounts, 6) k8s manifests si aplica. Target: <100MB y build <2min.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_024_create_folder_with_images",
+      "name": "Desktop Commander: Create Folder with Images",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Use AI to create files and automate simple workflows",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCrea carpeta {folder_name} y genera N imágenes usando Stable Diffusion/DALL-E/Flux. Prompts: {prompts}. Resolución: {resolution}. Formato: PNG. Nomenclatura: {prefix}_001.png, etc.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_025_document_ansible_configuration",
+      "name": "Desktop Commander: Document Ansible Configuration",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Explain Ansible playbooks, roles, automation workflows",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDocumenta proyecto Ansible en {repo_path}: 1) Inventory hosts, 2) Playbooks (qué hace cada uno), 3) Roles + dependencias, 4) Variables (defaults + overrides), 5) Tags + targeting, 6) Idempotency check, 7) Diagrama de ejecución.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_026_create_team_onboarding_documentation",
+      "name": "Desktop Commander: Create Team Onboarding Documentation",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Comprehensive onboarding guide for new developers",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nGenera guía onboarding para {project_name}: Día 1: setup local (con scripts auto), Día 2-3: arquitectura overview, Día 4-5: primer PR (good first issues), Semana 2: dominio del negocio, Semana 3-4: ownership de features. Incluye: glosario, who-is-who, FAQs, troubleshooting.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_027_remove_background_from_profile_picture",
+      "name": "Desktop Commander: Remove Background from Profile Picture",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Get headshot without background",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nProcesa {image_path}: remove background usando rembg/Photoroom API. Output: PNG transparente + variantes con fondos sólidos (white/black/blue corporate). Optimizado para LinkedIn/CV/redes sociales.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_028_convert_edoc_to_doc",
+      "name": "Desktop Commander: Convert EDOC to DOC",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Convert electronically signed documents",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConvierte archivos .edoc/.bdoc/.asice en {folder} a formato .doc o .pdf manteniendo signatures válidas. Verifica signatures, extrae metadatos firmantes, genera audit trail.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_029_build_github_issues_dashboard",
+      "name": "Desktop Commander: Build GitHub Issues Dashboard",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Real-time dashboard for tracking GitHub issues",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConstruye dashboard issues GitHub para repos {repos_list}. Stack: Next.js + GitHub API + GraphQL. Features: 1) Issues por priority/label/assignee, 2) Velocity chart, 3) Burn-down per milestone, 4) Stale issues (>30d), 5) Top contributors, 6) SLA tracking. Real-time vía webhooks.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_030_update_my_cv_resume",
+      "name": "Desktop Commander: Update My CV/Resume",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Quickly update resume with new experience",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nActualiza CV en {cv_path}. Añadir: {new_experience}. Mejora: action verbs, métricas cuantificadas (X%, Y$, Z hours saved). Optimiza para ATS (keywords del job target). Output: PDF + markdown source.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_031_rename_bank_statements_by_account",
+      "name": "Desktop Commander: Rename Bank Statements by Account",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Intelligent renaming of bank statements",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nRenombra PDFs bancarios en {folder} usando patrón: {bank}_{account_last4}_{YYYY-MM}.pdf. Detecta automáticamente banco/cuenta/fecha del contenido. Mueve a estructura: /bank-name/account-XXXX/year/.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_032_find_large_receipts_by_vendor",
+      "name": "Desktop Commander: Find Large Receipts by Vendor",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Locate and organize high-value receipts",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nBusca recibos >{amount}€ en {folder}. Agrupa por vendor. Extrae: fecha, total, IVA, items. Output: CSV + reorganización en subcarpetas /vendor/year-month/. Útil para tax season.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_033_analyze_error_handling_strategy",
+      "name": "Desktop Commander: Analyze Error Handling Strategy",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Document error handling and logging approaches",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita error handling en {repo_path}: 1) try/catch patterns, 2) Custom error classes, 3) Logging strategy (winston/pino/loguru), 4) Error reporting (Sentry/Rollbar), 5) User-facing error messages, 6) Retry/circuit breaker patterns, 7) Recommendations + fixes.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_034_implement_github_issue",
+      "name": "Desktop Commander: Implement GitHub Issue",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Create working implementation for GitHub issue",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nPara GitHub issue {repo}#{issue_number}: 1) Lee issue + comments + linked PRs, 2) Identifica módulos a tocar, 3) Plan de implementación, 4) Crea branch feat/issue-{N}, 5) Implementa + tests, 6) Commit con conventional commits, 7) Push + open PR linking al issue.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_035_set_up_new_project_structure",
+      "name": "Desktop Commander: Set Up New Project Structure",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Complete project setup with standard structure",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInicia proyecto {project_name} con stack {stack}. Crea: estructura carpetas estándar, .gitignore, README, LICENSE, CI/CD básico (GitHub Actions), pre-commit hooks, linter config, EditorConfig, dev container, docker-compose, .env.example. Git init + first commit.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_036_visualize_microservices_communication",
+      "name": "Desktop Commander: Visualize Microservices Communication",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Visual diagrams of microservices interaction",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza {repo_path} con microservicios. Detecta comunicaciones (REST/gRPC/Kafka/RabbitMQ). Genera diagrama Mermaid sequence + C4 components. Identifica: cyclic dependencies, single points of failure, latency hotspots.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_037_document_system_architecture",
+      "name": "Desktop Commander: Document System Architecture",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Comprehensive overview of system architecture",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDocumenta arquitectura completa de {project}: 1) C4 model (Context/Container/Component/Code), 2) Decisiones técnicas (ADRs), 3) Data flow diagrams, 4) Deployment topology, 5) Tech stack rationale, 6) Trade-offs explicados. Formato profesional para stakeholders.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_038_generate_dev_onboarding_guide",
+      "name": "Desktop Commander: Generate Dev Onboarding Guide",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Step-by-step doc for new developers",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCrea ONBOARDING.md profesional para {project}: prerequisites, account setup, repo clone, dependency install, env vars, first run, common tasks, debugging, contributing guidelines, FAQ. Optimizado para reducir time-to-first-PR a <2 días.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_039_assess_scalability_challenges",
+      "name": "Desktop Commander: Assess Scalability Challenges",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Identify scaling and debugging bottlenecks",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita {project} para scalability: 1) DB bottlenecks (N+1, missing indexes), 2) Memory leaks potenciales, 3) Hot paths CPU-intensive, 4) Caching opportunities, 5) Horizontal scaling readiness, 6) State management issues. Reporte con prioridad + estimación esfuerzo.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_040_document_dependencies_and_tools",
+      "name": "Desktop Commander: Document Dependencies and Tools",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Overview of tools and libraries used",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInventario completo de dependencias en {repo_path}: package.json/requirements.txt/Cargo.toml. Para cada dep: versión, propósito, licencia, último update, alternativas, security advisories. Output: DEPENDENCIES.md.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_041_plan_migration_strategy",
+      "name": "Desktop Commander: Plan Migration Strategy",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "step-by-step"
+      ],
+      "description": "Plan migration to newer technologies",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nPlan migración de {from_stack} a {to_stack}. Fases: 1) Audit estado actual, 2) Strangler Fig pattern proposal, 3) Roadmap con milestones, 4) Risk register, 5) Rollback strategy, 6) Team training plan, 7) Estimación esfuerzo (story points). Output: MIGRATION-PLAN.md.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_042_create_git_history_presentation",
+      "name": "Desktop Commander: Create Git History Presentation",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Visual presentation of team's recent dev activity",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nGenera presentación HTML/PPTX del git history últimos {days} días en {repo_path}: 1) Top contributors, 2) Commits por día, 3) Top files changed, 4) Mejoras PRs cerrados, 5) Bugs fixed, 6) New features shipped. Listo para sprint review.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_043_find_error_patterns_in_logs",
+      "name": "Desktop Commander: Find Error Patterns in Logs",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "step-by-step"
+      ],
+      "description": "Analyze log files to identify system issues",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza logs en {logs_path}. Agrupa errores por: tipo, severity, frecuencia, módulo. Identifica patterns (timestamps, correlación con releases). Top 10 errores recurrentes + root cause hypothesis + fix recommendation.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_044_merge_two_pdfs",
+      "name": "Desktop Commander: Merge Two PDFs",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Combine multiple PDFs into one",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nCombina {pdf_files} en orden especificado. Output: merged.pdf. Opcional: TOC automático, bookmarks por archivo, numeración páginas continua.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_045_batch_convert_and_rename_images",
+      "name": "Desktop Commander: Batch Convert and Rename Images",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Process multiple images with format conversion + renaming",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nProcesa imágenes en {folder}: 1) Convierte a {target_format} (PNG/JPG/WebP/AVIF), 2) Resize a {max_dimension}px max, 3) Optimiza calidad/peso, 4) Renombra con patrón {pattern}, 5) Preserva EXIF si requerido.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_046_organize_pdf_invoices_by_date",
+      "name": "Desktop Commander: Organize PDF Invoices by Date",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Sort PDFs by dates extracted from content",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nOrganiza PDFs en {folder} extrayendo fecha del contenido (OCR si necesario). Mueve a estructura /YYYY/MM/. Renombra: {YYYY-MM-DD}_{vendor}_{amount}.pdf.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_047_remove_duplicate_contacts_from_spreadshe",
+      "name": "Desktop Commander: Remove Duplicate Contacts from Spreadsheet",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Clean up contact lists by removing duplicates",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nLimpia {spreadsheet}. Detecta duplicados por: email exact match, phone normalized, name fuzzy match (Levenshtein <2). Merge inteligente (preserva mejor data). Output: cleaned.xlsx + report duplicates merged.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_048_find_all_todo_comments",
+      "name": "Desktop Commander: Find All TODO Comments",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Locate and report TODO items across codebase",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nEscanea {repo_path} buscando: TODO, FIXME, XXX, HACK, NOTE comments. Output: tabla file:line + comment + author (via git blame) + age (días). Prioriza por antigüedad + critical paths.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_049_generate_tests_for_missing_coverage",
+      "name": "Desktop Commander: Generate Tests for Missing Coverage",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Create tests for modules lacking testing",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nIdentifica módulos en {repo_path} con coverage <50%. Genera tests: unit + integration. Stack: {test_framework} (Jest/Vitest/pytest/Go test). Mocks + fixtures. Target coverage >80%.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_050_document_api_endpoints",
+      "name": "Desktop Commander: Document API Endpoints",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Transform API endpoints into comprehensive docs",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza routes en {repo_path}. Para cada endpoint: method, path, params, body schema, response schema, status codes, auth required, rate limits, examples. Output: OpenAPI/Swagger spec + Postman collection + markdown docs.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_051_assess_technical_debt",
+      "name": "Desktop Commander: Assess Technical Debt",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "step-by-step"
+      ],
+      "description": "Comprehensive technical debt analysis",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita technical debt en {repo_path}: 1) Code smells (long methods, large classes, duplications), 2) Outdated dependencies, 3) Missing tests, 4) Documentation gaps, 5) Performance issues, 6) Security warnings, 7) Architectural drift. Output: prioritized backlog con effort estimates.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_052_assess_project_security",
+      "name": "Desktop Commander: Assess Project Security",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "step-by-step"
+      ],
+      "description": "Identify security measures in codebase",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nSecurity audit de {repo_path}: 1) Dependency vulnerabilities (npm audit / safety / cargo audit), 2) Secrets en repo (gitleaks/truffleHog), 3) SQL injection risks, 4) XSS vulnerabilities, 5) CSRF protection, 6) Auth/authz issues, 7) HTTPS enforcement, 8) Headers (CSP, HSTS), 9) Input validation. OWASP Top 10 coverage.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_053_find_invoices_and_move_them_to_folder",
+      "name": "Desktop Commander: Find Invoices and Move Them to Folder",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Organize invoices for accounting/tax reports",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nBusca PDFs/imágenes que sean facturas en {source_path}. Detecta por keywords: invoice, factura, receipt, rechnung. Mueve a {target_path} organizados por /YYYY/Q-N/vendor/. Genera CSV con: fecha, vendor, total, IVA.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_054_visualize_project_architecture",
+      "name": "Desktop Commander: Visualize Project Architecture",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Visual diagrams of system components and data flow",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza {repo_path} y genera diagrama Mermaid/PlantUML: 1) Componentes principales, 2) Data flow entre ellos, 3) External integrations, 4) Database connections, 5) User journey overlay. Output: SVG + interactive HTML.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_055_generate_architecture_diagram",
+      "name": "Desktop Commander: Generate Architecture Diagram",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Auto Mermaid diagrams from codebase",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDe {repo_path} infiere arquitectura analizando imports, dependencies, folder structure. Genera Mermaid graph TD con nodes (modules) y edges (dependencies). Detecta circular dependencies.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_056_document_rest_api_endpoints",
+      "name": "Desktop Commander: Document REST API Endpoints",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Extract and document all REST API endpoints",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nExtrae endpoints REST de {repo_path}. Por cada uno: HTTP method, path, parámetros (query+body+headers), response schemas, status codes, auth, rate limits, ejemplos curl. Genera OpenAPI 3.1 YAML + Swagger UI.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_057_document_graphql_schema",
+      "name": "Desktop Commander: Document GraphQL Schema",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Analyze and document GraphQL endpoints",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza schema GraphQL en {repo_path}. Documenta: types, queries, mutations, subscriptions, resolvers, args, return types. Genera HTML interactive docs (GraphQL Voyager style).\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_058_visualize_database_schema",
+      "name": "Desktop Commander: Visualize Database Schema",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Visual database schema diagrams",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConecta a {db_connection_string}. Extrae schema. Genera: 1) Mermaid erDiagram, 2) DBML para dbdiagram.io, 3) Markdown con descripción de cada tabla + relaciones.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_059_explain_docker_configuration",
+      "name": "Desktop Commander: Explain Docker Configuration",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Document Docker setup, containers, networks",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDocumenta setup Docker en {repo_path}: Dockerfile breakdown (qué hace cada layer), docker-compose services + dependencies, volumes, networks, env vars, healthchecks, exposed ports. Reporta optimizaciones posibles.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_060_visualize_terraform_architecture",
+      "name": "Desktop Commander: Visualize Terraform Architecture",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Diagrams of Terraform infrastructure",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nPara {terraform_path} genera: 1) Resource dependency graph (terraform graph), 2) Diagrama visual (rover/terraform-docs), 3) Costo estimado (Infracost), 4) Compliance check, 5) Drift detection.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_061_explain_ci_cd_pipeline",
+      "name": "Desktop Commander: Explain CI/CD Pipeline",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "write_documentation",
+        "instant"
+      ],
+      "description": "Document GitHub Actions workflows",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Write Documentation\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nDocumenta {repo_path}/.github/workflows/. Por cada workflow: triggers, jobs, steps, secrets used, deployment target, dependencies entre workflows. Sugiere optimizaciones (caching, parallelism, conditional runs).\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_write_documentation",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_062_debug_remote_server_errors",
+      "name": "Desktop Commander: Debug Remote Server Errors",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Investigate and resolve server errors",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nSSH a {server_host} (vía gestionado credentials). Diagnostica: 1) System logs (journalctl), 2) App logs (/var/log/app/), 3) Resource usage (top/htop/free), 4) Network (ss/netstat), 5) Disk (df/du), 6) Recent changes (audit log). Identifica root cause + fix.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_063_optimize_database_schema",
+      "name": "Desktop Commander: Optimize Database Schema",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Analyze DB design for performance",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita schema {db}: 1) Missing indexes (slow queries log), 2) Over-indexing, 3) Normalization issues (1NF/2NF/3NF), 4) Datatype optimization, 5) Partitioning candidates, 6) Foreign keys, 7) Vacuum/analyze schedule. Output: SQL migrations + benchmark before/after.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_064_set_up_mysql_database",
+      "name": "Desktop Commander: Set Up MySQL Database",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Install and configure MySQL with optimized settings",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInstala MySQL 8 en {target_env}. Config optimizado para {workload_type} (OLTP/OLAP/mixed). Setup: users + privileges, charset utf8mb4, slow query log, replication ready, automated backups (mysqldump cron), SSL/TLS, firewall rules.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_065_set_up_postgresql_database",
+      "name": "Desktop Commander: Set Up PostgreSQL Database",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Install and configure PostgreSQL",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInstala Postgres 16 en {target_env}. Config: shared_buffers, work_mem, max_connections según RAM. Extensions útiles (uuid-ossp, pg_stat_statements, pgvector). pgBouncer pooling. Streaming replication. WAL archiving. Daily pg_basebackup.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_066_set_up_mongodb_database",
+      "name": "Desktop Commander: Set Up MongoDB Database",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Install and configure MongoDB",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInstala MongoDB en {target_env}. Replica set 3 nodes, sharding setup, auth enabled, mongoexport/mongoimport scripts, oplog monitoring, change streams ready, indexes para queries frecuentes.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_067_set_up_redis_server",
+      "name": "Desktop Commander: Set Up Redis Server",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Install and configure Redis for caching/sessions",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nInstala Redis 7 en {target_env}. Config: maxmemory + eviction policy (LRU/LFU), persistence (AOF + RDB), Redis Sentinel para HA, ACLs por usuario, TLS, monitoring (redis-cli info), pub/sub channels.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_068_set_up_github_actions_ci_cd",
+      "name": "Desktop Commander: Set Up GitHub Actions CI/CD",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "instant"
+      ],
+      "description": "Automated testing pipeline on every push",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nEn {repo}: crear .github/workflows/ci.yml con: 1) Lint job, 2) Test job (matrix Node 18/20), 3) Build job, 4) Deploy job condicional (main only), 5) Security scan (CodeQL), 6) Cache deps, 7) Notifications Slack si falla.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_069_audit_authentication_security",
+      "name": "Desktop Commander: Audit Authentication Security",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Comprehensive security review of auth systems",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAudita auth en {repo_path}: 1) Password hashing (bcrypt/argon2/scrypt), 2) Token strategy (JWT/session), 3) Refresh tokens, 4) 2FA support, 5) OAuth flows, 6) Brute force protection, 7) Session fixation, 8) Logout (token revocation), 9) Password reset flow secure, 10) OWASP ASVS compliance.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_070_analyze_test_coverage_gaps",
+      "name": "Desktop Commander: Analyze Test Coverage Gaps",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "explore_codebase",
+        "instant"
+      ],
+      "description": "Review tests and identify missing coverage",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Explore Codebase\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nEjecuta coverage en {repo_path} ({test_runner}). Identifica: 1) Files <50% coverage, 2) Critical paths sin tests, 3) Edge cases missing, 4) Error paths not tested, 5) Integration vs unit ratio, 6) Mutation testing score. Sugiere tests prioritarios.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_explore_codebase",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_071_manage_wordpress_site_natural_language",
+      "name": "Desktop Commander: Manage WordPress Site Natural Language",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "Install WP-CLI, SSH, remote WordPress management",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConecta vía SSH a {wp_host}. Instala WP-CLI si no está. Operaciones: 1) Plugin install/update/deactivate, 2) Theme management, 3) DB search-replace, 4) User management, 5) Cron scheduling, 6) Backup/restore, 7) Security scans (WPScan).\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_072_setup_posthog_analytics_custom_events",
+      "name": "Desktop Commander: Setup PostHog Analytics Custom Events",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "build_features",
+        "step-by-step"
+      ],
+      "description": "PostHog with event tracking, autocapture, reverse proxy",
+      "prompt": "[DESKTOP COMMANDER SKILL — Step-by-Step]\nCategory: Build Features\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nConfigura PostHog en {project}: 1) posthog-js SDK install, 2) Autocapture eventos, 3) Custom events definidos para conversion goals, 4) User identification + properties, 5) Reverse proxy via Cloudflare/Vercel rewrites (evade ad-blockers), 6) Feature flags + A/B tests, 7) Funnels + cohorts dashboards.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_build_features",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Step-by-Step",
+      "methodology": "plan-architecture-execute-verify"
+    },
+    {
+      "id": "dc_073_organize_desktop_files",
+      "name": "Desktop Commander: Organize Desktop Files",
+      "icon": "CMD",
+      "tags": [
+        "desktop-commander",
+        "automation",
+        "cli",
+        "organize_files",
+        "instant"
+      ],
+      "description": "Analyze and organize Desktop files into subfolders",
+      "prompt": "[DESKTOP COMMANDER SKILL — Instant]\nCategory: Organize Files\n\nMETHODOLOGY (CRITICAL — apply BEFORE writing any code):\n\nPHASE 1 — PLAN\n- Understand the request: what exactly will be done?\n- Identify dependencies: files, tools, permissions needed\n- List risks + edge cases\n- Define success criteria\n\nPHASE 2 — ARCHITECTURE\n- Tree of files/folders to create/modify\n- Order of operations (idempotent where possible)\n- Rollback strategy if something fails\n- Confirm with user before executing destructive ops\n\nPHASE 3 — EXECUTION\nAnaliza ~/Desktop. Crea subcarpetas (Documents/Images/Videos/Downloads/Code/Archives). Mueve archivos según extensión. Crea acceso directo a cada subcarpeta en Desktop. Limpia archivos >30 días no abiertos. Reporta espacio liberado.\n\nPHASE 4 — VERIFY\n- Run the result, check output\n- Validate against success criteria\n- Report what was done + what to do next",
+      "category": "desktop_commander_organize_files",
+      "source": "desktopcommander.app/library/prompts",
+      "tag": "Instant",
+      "methodology": "plan-architecture-execute-verify"
+    }
+  ]
+}

@@ -1,0 +1,1115 @@
+{
+  "meta": {
+    "version": "1.0",
+    "total": 61,
+    "source": "docs.swmansion.com/TypeGPU/examples",
+    "categories": [
+      "typegpu_3d_geometry",
+      "typegpu_compute",
+      "typegpu_effects",
+      "typegpu_post_processing",
+      "typegpu_rendering",
+      "typegpu_webgpu_shaders"
+    ]
+  },
+  "templates": [
+    {
+      "id": "typegpu_001_jelly_slider",
+      "name": "TypeGPU: Jelly Slider",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "WebGPU jelly slider — elastic spring physics, distortion shader on cursor drag",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: jelly-slider\nCategory: Rendering\n\nWebGPU jelly slider — elastic spring physics, distortion shader on cursor drag\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_002_volumetric_fog",
+      "name": "TypeGPU: Volumetric Fog",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Volumetric fog rendering with raymarching, Beer-Lambert absorption",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: volumetric-fog\nCategory: Rendering\n\nVolumetric fog rendering with raymarching, Beer-Lambert absorption\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_003_procedural_terrain",
+      "name": "TypeGPU: Procedural Terrain",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Procedural terrain mesh generated in compute shader, dynamic LOD",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: procedural-terrain\nCategory: Rendering\n\nProcedural terrain mesh generated in compute shader, dynamic LOD\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_004_liquid_marble",
+      "name": "TypeGPU: Liquid Marble",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Animated liquid marble shader with iridescence, surface tension simulation",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: liquid-marble\nCategory: Rendering\n\nAnimated liquid marble shader with iridescence, surface tension simulation\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_005_chromatic_aberration",
+      "name": "TypeGPU: Chromatic Aberration",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Chromatic aberration post-processing with adjustable RGB split",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: chromatic-aberration\nCategory: Rendering\n\nChromatic aberration post-processing with adjustable RGB split\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_006_depth_of_field",
+      "name": "TypeGPU: Depth Of Field",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "DOF blur with bokeh disc kernel, depth-aware filtering",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: depth-of-field\nCategory: Rendering\n\nDOF blur with bokeh disc kernel, depth-aware filtering\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_007_screen_space_reflections",
+      "name": "TypeGPU: Screen Space Reflections",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "SSR — screen-space ray marching for reflections",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: screen-space-reflections\nCategory: Rendering\n\nSSR — screen-space ray marching for reflections\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_008_parallax_occlusion",
+      "name": "TypeGPU: Parallax Occlusion",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "POM mapping for 3D depth on flat surfaces",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: parallax-occlusion\nCategory: Rendering\n\nPOM mapping for 3D depth on flat surfaces\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_009_subsurface_scattering",
+      "name": "TypeGPU: Subsurface Scattering",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "SSS approximation for skin/wax/marble materials",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: subsurface-scattering\nCategory: Rendering\n\nSSS approximation for skin/wax/marble materials\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_010_caustics_pool",
+      "name": "TypeGPU: Caustics Pool",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Animated underwater caustics shader, voronoi-based",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: caustics-pool\nCategory: Rendering\n\nAnimated underwater caustics shader, voronoi-based\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_011_hologram_glitch",
+      "name": "TypeGPU: Hologram Glitch",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Holographic glitch effect with RGB shift, scanlines, noise",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: hologram-glitch\nCategory: Rendering\n\nHolographic glitch effect with RGB shift, scanlines, noise\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_012_crystal_refraction",
+      "name": "TypeGPU: Crystal Refraction",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Crystal refraction with dispersion, total internal reflection",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: crystal-refraction\nCategory: Rendering\n\nCrystal refraction with dispersion, total internal reflection\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_013_iridescent_bubble",
+      "name": "TypeGPU: Iridescent Bubble",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Iridescent soap bubble shader, thin-film interference",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: iridescent-bubble\nCategory: Rendering\n\nIridescent soap bubble shader, thin-film interference\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_014_fire_volumetric",
+      "name": "TypeGPU: Fire Volumetric",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Volumetric fire shader with curl noise advection",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: fire-volumetric\nCategory: Rendering\n\nVolumetric fire shader with curl noise advection\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_015_lightning_bolt",
+      "name": "TypeGPU: Lightning Bolt",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "rendering"
+      ],
+      "description": "Procedural lightning bolt with electric glow, branch fractals",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: lightning-bolt\nCategory: Rendering\n\nProcedural lightning bolt with electric glow, branch fractals\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_rendering",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_016_flocking_boids",
+      "name": "TypeGPU: Flocking Boids",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "GPU-accelerated boids flocking simulation, 100k+ agents",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: flocking-boids\nCategory: Compute\n\nGPU-accelerated boids flocking simulation, 100k+ agents\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_017_cloth_simulation",
+      "name": "TypeGPU: Cloth Simulation",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Mass-spring cloth simulation with collision detection",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: cloth-simulation\nCategory: Compute\n\nMass-spring cloth simulation with collision detection\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_018_fluid_2d",
+      "name": "TypeGPU: Fluid 2D",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "2D fluid simulation, Navier-Stokes velocity field",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: fluid-2d\nCategory: Compute\n\n2D fluid simulation, Navier-Stokes velocity field\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_019_particle_attractor",
+      "name": "TypeGPU: Particle Attractor",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Particle attractor with N-body gravity, GPU compute",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: particle-attractor\nCategory: Compute\n\nParticle attractor with N-body gravity, GPU compute\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_020_rope_physics",
+      "name": "TypeGPU: Rope Physics",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Rope simulation with verlet integration, segment chains",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: rope-physics\nCategory: Compute\n\nRope simulation with verlet integration, segment chains\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_021_soft_body_mesh",
+      "name": "TypeGPU: Soft Body Mesh",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Soft body mesh deformation, jelly-like physics",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: soft-body-mesh\nCategory: Compute\n\nSoft body mesh deformation, jelly-like physics\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_022_reaction_diffusion",
+      "name": "TypeGPU: Reaction Diffusion",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Gray-Scott reaction-diffusion, organic pattern generation",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: reaction-diffusion\nCategory: Compute\n\nGray-Scott reaction-diffusion, organic pattern generation\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_023_cellular_automaton",
+      "name": "TypeGPU: Cellular Automaton",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Cellular automaton GPU compute, conway/life variants",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: cellular-automaton\nCategory: Compute\n\nCellular automaton GPU compute, conway/life variants\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_024_marching_cubes",
+      "name": "TypeGPU: Marching Cubes",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Marching cubes algorithm for isosurface extraction",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: marching-cubes\nCategory: Compute\n\nMarching cubes algorithm for isosurface extraction\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_025_particle_tornado",
+      "name": "TypeGPU: Particle Tornado",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "compute"
+      ],
+      "description": "Particle tornado vortex simulation, curl noise",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: particle-tornado\nCategory: Compute\n\nParticle tornado vortex simulation, curl noise\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_compute",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_026_matrix_rain",
+      "name": "TypeGPU: Matrix Rain",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Classic matrix digital rain with character spawning, varied speed",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: matrix-rain\nCategory: Effects\n\nClassic matrix digital rain with character spawning, varied speed\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_027_mouse_trail_flames",
+      "name": "TypeGPU: Mouse Trail Flames",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Mouse trail with flame particle emission, additive blending",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: mouse-trail-flames\nCategory: Effects\n\nMouse trail with flame particle emission, additive blending\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_028_mesh_distortion_cursor",
+      "name": "TypeGPU: Mesh Distortion Cursor",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Cursor-driven mesh distortion, elastic spring back",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: mesh-distortion-cursor\nCategory: Effects\n\nCursor-driven mesh distortion, elastic spring back\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_029_shockwave_ripple",
+      "name": "TypeGPU: Shockwave Ripple",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Click shockwave ripple, distortion + chromatic aberration",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: shockwave-ripple\nCategory: Effects\n\nClick shockwave ripple, distortion + chromatic aberration\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_030_plasma_tunnel",
+      "name": "TypeGPU: Plasma Tunnel",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Plasma tunnel effect with polar coordinate UVs, color cycling",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: plasma-tunnel\nCategory: Effects\n\nPlasma tunnel effect with polar coordinate UVs, color cycling\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_031_aurora_borealis",
+      "name": "TypeGPU: Aurora Borealis",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Aurora borealis simulation with flowing color bands, noise",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: aurora-borealis\nCategory: Effects\n\nAurora borealis simulation with flowing color bands, noise\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_032_confetti_burst",
+      "name": "TypeGPU: Confetti Burst",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Confetti burst with physics, gravity + air resistance",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: confetti-burst\nCategory: Effects\n\nConfetti burst with physics, gravity + air resistance\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_033_paper_shred_transition",
+      "name": "TypeGPU: Paper Shred Transition",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Paper shred page transition, strip animation with shadows",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: paper-shred-transition\nCategory: Effects\n\nPaper shred page transition, strip animation with shadows\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_034_liquid_button_hover",
+      "name": "TypeGPU: Liquid Button Hover",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Liquid button hover effect, gooey distortion on mouse",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: liquid-button-hover\nCategory: Effects\n\nLiquid button hover effect, gooey distortion on mouse\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_035_hover_glow_trail",
+      "name": "TypeGPU: Hover Glow Trail",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "effects"
+      ],
+      "description": "Hover glow trail with bloom post-processing",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: hover-glow-trail\nCategory: Effects\n\nHover glow trail with bloom post-processing\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_effects",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_036_voronoi_cells",
+      "name": "TypeGPU: Voronoi Cells",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Animated voronoi cells, organic cell membrane look",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: voronoi-cells\nCategory: Webgpu Shaders\n\nAnimated voronoi cells, organic cell membrane look\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_037_worley_noise",
+      "name": "TypeGPU: Worley Noise",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Worley noise for cell patterns, F1/F2 distance metrics",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: worley-noise\nCategory: Webgpu Shaders\n\nWorley noise for cell patterns, F1/F2 distance metrics\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_038_perlin_flow",
+      "name": "TypeGPU: Perlin Flow",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Perlin noise flow field visualization, particle following",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: perlin-flow\nCategory: Webgpu Shaders\n\nPerlin noise flow field visualization, particle following\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_039_simplex_clouds",
+      "name": "TypeGPU: Simplex Clouds",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Simplex noise clouds with multi-octave fractal Brownian motion",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: simplex-clouds\nCategory: Webgpu Shaders\n\nSimplex noise clouds with multi-octave fractal Brownian motion\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_040_domain_warping",
+      "name": "TypeGPU: Domain Warping",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Domain warping with nested noise for organic shapes",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: domain-warping\nCategory: Webgpu Shaders\n\nDomain warping with nested noise for organic shapes\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_041_fbm_mountains",
+      "name": "TypeGPU: Fbm Mountains",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "FBM mountain landscape with ridge noise, atmospheric perspective",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: fbm-mountains\nCategory: Webgpu Shaders\n\nFBM mountain landscape with ridge noise, atmospheric perspective\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_042_value_noise_fire",
+      "name": "TypeGPU: Value Noise Fire",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Value noise fire shader with vertical UV scroll",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: value-noise-fire\nCategory: Webgpu Shaders\n\nValue noise fire shader with vertical UV scroll\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_043_truchet_tiles",
+      "name": "TypeGPU: Truchet Tiles",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Truchet tile patterns, animated rotation per cell",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: truchet-tiles\nCategory: Webgpu Shaders\n\nTruchet tile patterns, animated rotation per cell\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_044_penrose_tiling",
+      "name": "TypeGPU: Penrose Tiling",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Penrose aperiodic tiling generation in shader",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: penrose-tiling\nCategory: Webgpu Shaders\n\nPenrose aperiodic tiling generation in shader\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_045_reaction_coral",
+      "name": "TypeGPU: Reaction Coral",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "webgpu_shaders"
+      ],
+      "description": "Reaction-diffusion coral growth pattern simulation",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: reaction-coral\nCategory: Webgpu Shaders\n\nReaction-diffusion coral growth pattern simulation\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_webgpu_shaders",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_046_signed_distance_spheres",
+      "name": "TypeGPU: Signed Distance Spheres",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "SDF spheres with smooth union/intersection blending",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: signed-distance-spheres\nCategory: 3D Geometry\n\nSDF spheres with smooth union/intersection blending\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_047_mandelbulb_fractal",
+      "name": "TypeGPU: Mandelbulb Fractal",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Mandelbulb 3D fractal raymarching, infinite detail",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: mandelbulb-fractal\nCategory: 3D Geometry\n\nMandelbulb 3D fractal raymarching, infinite detail\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_048_menger_sponge",
+      "name": "TypeGPU: Menger Sponge",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Menger sponge fractal raymarching with AO",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: menger-sponge\nCategory: 3D Geometry\n\nMenger sponge fractal raymarching with AO\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_049_quaternion_julia",
+      "name": "TypeGPU: Quaternion Julia",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Quaternion Julia set 3D fractal, smooth coloring",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: quaternion-julia\nCategory: 3D Geometry\n\nQuaternion Julia set 3D fractal, smooth coloring\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_050_torus_knot",
+      "name": "TypeGPU: Torus Knot",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Animated torus knot with material variations",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: torus-knot\nCategory: 3D Geometry\n\nAnimated torus knot with material variations\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_051_voronoi_3d_cells",
+      "name": "TypeGPU: Voronoi 3D Cells",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "3D voronoi cells, cell wall rendering, transparent shells",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: voronoi-3d-cells\nCategory: 3D Geometry\n\n3D voronoi cells, cell wall rendering, transparent shells\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_052_isosurface_blobs",
+      "name": "TypeGPU: Isosurface Blobs",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Animated isosurface blobs, metaballs in 3D",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: isosurface-blobs\nCategory: 3D Geometry\n\nAnimated isosurface blobs, metaballs in 3D\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_053_hyperbolic_tessellation",
+      "name": "TypeGPU: Hyperbolic Tessellation",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "3d_geometry"
+      ],
+      "description": "Hyperbolic tessellation in Poincaré disk",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: hyperbolic-tessellation\nCategory: 3D Geometry\n\nHyperbolic tessellation in Poincaré disk\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_3d_geometry",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_054_bloom_filter",
+      "name": "TypeGPU: Bloom Filter",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "Bloom post-processing with multi-pass Gaussian blur, threshold",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: bloom-filter\nCategory: Post Processing\n\nBloom post-processing with multi-pass Gaussian blur, threshold\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_055_tonemap_aces",
+      "name": "TypeGPU: Tonemap Aces",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "ACES filmic tone mapping, real-time HDR display",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: tonemap-aces\nCategory: Post Processing\n\nACES filmic tone mapping, real-time HDR display\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_056_vignette_grain",
+      "name": "TypeGPU: Vignette Grain",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "Vignette + film grain post effect, color grading",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: vignette-grain\nCategory: Post Processing\n\nVignette + film grain post effect, color grading\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_057_motion_blur",
+      "name": "TypeGPU: Motion Blur",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "Velocity-based motion blur, temporal AA-compatible",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: motion-blur\nCategory: Post Processing\n\nVelocity-based motion blur, temporal AA-compatible\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_058_color_grade_luts",
+      "name": "TypeGPU: Color Grade Luts",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "LUT-based color grading, .cube file loading",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: color-grade-luts\nCategory: Post Processing\n\nLUT-based color grading, .cube file loading\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_059_crt_screen",
+      "name": "TypeGPU: Crt Screen",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "CRT screen effect with scanlines, RGB pixels, curvature",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: crt-screen\nCategory: Post Processing\n\nCRT screen effect with scanlines, RGB pixels, curvature\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_060_vhs_tape",
+      "name": "TypeGPU: Vhs Tape",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "VHS tape glitch effect, color bleed, tracking lines",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: vhs-tape\nCategory: Post Processing\n\nVHS tape glitch effect, color bleed, tracking lines\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    },
+    {
+      "id": "typegpu_061_dithering",
+      "name": "TypeGPU: Dithering",
+      "icon": "GPU",
+      "tags": [
+        "typegpu",
+        "webgpu",
+        "shader",
+        "gpu",
+        "post_processing"
+      ],
+      "description": "Bayer dithering for retro look, customizable matrix",
+      "prompt": "[STITCH SKILL + TypeGPU effect]\nEffect: dithering\nCategory: Post Processing\n\nBayer dithering for retro look, customizable matrix\n\nWEBGPU/TYPEGPU REQUIREMENTS:\n- Use TypeGPU library (https://docs.swmansion.com/TypeGPU)\n- WebGPU compute shaders or vertex/fragment shaders\n- GPU-accelerated, 60fps target\n- Adaptive resolution (HiDPI support)\n- WebGL2 fallback for unsupported browsers\n- Mouse/touch interactive\n- Adjustable parameters via UI sliders\n- Mobile-responsive (touch events)\n\nIMPLEMENTATION:\n- WGSL shader code (WebGPU Shading Language)\n- Bind groups for uniform updates\n- Pipeline state setup\n- Render loop with requestAnimationFrame\n- Resize observer for responsive canvas\n- Performance counter overlay (FPS, draw calls)\n\nReturn COMPLETE HTML with embedded shader code and TypeGPU setup.",
+      "category": "typegpu_post_processing",
+      "source": "docs.swmansion.com/TypeGPU/examples",
+      "skill": "stitch::generate-screen",
+      "api_endpoint": "/api/stitch/generate-screen"
+    }
+  ]
+}

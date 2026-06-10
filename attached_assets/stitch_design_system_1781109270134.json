@@ -1,0 +1,913 @@
+{
+  "meta": {
+    "version": "1.0",
+    "total": 52,
+    "source": "google-labs-code/stitch-skills + @google/stitch-sdk",
+    "skills_count": 20,
+    "api_base": "/api/stitch",
+    "categories": [
+      "stitch_themes",
+      "stitch_export",
+      "stitch_verticals",
+      "stitch_design_systems",
+      "stitch_ui_generation",
+      "stitch_components"
+    ]
+  },
+  "templates": [
+    {
+      "id": "stitch_ui_000",
+      "name": "Stitch UI: Modern SaaS Landing Page",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Modern SaaS Landing Page",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nGenerate a complete SaaS landing page with hero particle background, glassmorphism feature cards, pricing table with animated toggle, customer logos, and GSAP scroll animations. Use Three.js particle field with mouse-responsive motion. Dark theme with indigo accent.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_001",
+      "name": "Stitch UI: E-commerce Product Page",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: E-commerce Product Page",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nCreate an e-commerce product page with Three.js 3D product viewer (OrbitControls + MeshPhysicalMaterial glass), image gallery lightbox, size/color selector, reviews section with star ratings, sticky add-to-cart sidebar.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_002",
+      "name": "Stitch UI: AI Chat Interface",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: AI Chat Interface",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nDesign a modern AI chat interface like Claude or ChatGPT: left sidebar with conversation history, main chat area with streaming message animation, markdown rendering, code highlighting, file upload button. Dark glassmorphism style.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_003",
+      "name": "Stitch UI: Analytics Dashboard",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Analytics Dashboard",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nGenerate a dark analytics dashboard with KPI cards with micro-animations, Chart.js line/bar/pie charts, data table with sorting/filtering, date range picker, sidebar navigation with icons, and real-time updating number counters.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_004",
+      "name": "Stitch UI: Portfolio Creative Agency",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Portfolio Creative Agency",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nCreate an award-winning portfolio for a creative agency: custom magnetic cursor, horizontal scroll gallery with GSAP, split-text reveal animations, full-screen project showcase, contact form with micro-interactions.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_005",
+      "name": "Stitch UI: FinTech Mobile App UI",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: FinTech Mobile App UI",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nDesign a FinTech mobile app UI (375px): dark glassmorphism card with balance display, spending chart, recent transactions list, bottom navigation with animated icons, quick transfer buttons, biometric auth screen.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_006",
+      "name": "Stitch UI: Restaurant Luxury Website",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Restaurant Luxury Website",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nLuxury restaurant website with cinematic video hero (scroll-scrubbed), animated menu with hover effects, reservation form with date picker, chef team section with parallax, wine pairing section, warm gold color palette.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_007",
+      "name": "Stitch UI: SaaS Pricing Page",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: SaaS Pricing Page",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nCreate a pricing comparison page with animated toggle (monthly/yearly), three tier cards with feature comparison table, popular badge animation, FAQ accordion with smooth expand, testimonials slider, gradient background.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_008",
+      "name": "Stitch UI: Doctor/Healthcare Portal",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Doctor/Healthcare Portal",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nHealthcare patient portal: appointment booking calendar, doctor cards with availability, medical records list, prescription tracker, health metrics charts, accessible design (WCAG AA), clean white + teal color scheme.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_ui_009",
+      "name": "Stitch UI: Real Estate Listings",
+      "icon": "🧵",
+      "tags": [
+        "stitch",
+        "ui",
+        "design",
+        "generation",
+        "google"
+      ],
+      "description": "Google Stitch design generation: Real Estate Listings",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\n\nReal estate platform: map integration with property pins, listing cards grid with filter sidebar, property detail page with image carousel, mortgage calculator, virtual tour button, agent contact form.\n\nSTITCH PARAMETERS:\n- style: modern\n- responsive: true\n- include_animations: true\n- output_format: html\n- framework: vanilla\n\nDESIGN REQUIREMENTS (Stitch-grade quality):\n- Award-winning visual design (Awwwards-level)\n- Fully responsive 320px → 1920px\n- CSS custom properties for easy theming\n- Dark mode with system preference detection\n- Smooth loading animation (skeleton screens)\n- Micro-interactions on all interactive elements\n- Accessible: ARIA labels, keyboard navigation, WCAG AA contrast\n- Performance: lazy loading, optimized assets\n- Complete HTML from <!DOCTYPE> to </html>, never truncated",
+      "category": "stitch_ui_generation",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_comp_000",
+      "name": "Stitch Component: Glassmorphism Navbar",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "navbar"
+      ],
+      "description": "Stitch component generation: Glassmorphism Navbar",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: navbar\nDescription: Glassmorphism navbar with blur background, animated hamburger menu, logo, nav links with hover underline animation, CTA button, dark/light toggle\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/navbar"
+    },
+    {
+      "id": "stitch_comp_001",
+      "name": "Stitch Component: Animated Hero Section",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "hero"
+      ],
+      "description": "Stitch component generation: Animated Hero Section",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: hero\nDescription: Full-viewport hero with Three.js floating particles, animated headline with SplitType typewriter, subtitle, two CTA buttons, scroll indicator arrow\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/hero"
+    },
+    {
+      "id": "stitch_comp_002",
+      "name": "Stitch Component: Pricing Card Grid",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Pricing Card Grid",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: Three pricing cards (Basic/Pro/Enterprise) with gradient border on hover, feature list with checkmarks, popular badge with shimmer animation, CTA buttons\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_comp_003",
+      "name": "Stitch Component: Testimonials Slider",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Testimonials Slider",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: Customer testimonials slider with avatar, quote, star rating, company logo, smooth Swiper.js transitions, auto-play, dot navigation\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_comp_004",
+      "name": "Stitch Component: Feature Cards Grid",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Feature Cards Grid",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: 6-column feature cards grid with icon, title, description, hover lift animation, gradient icon background, responsive 3-col → 2-col → 1-col\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_comp_005",
+      "name": "Stitch Component: Statistics Counter Section",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Statistics Counter Section",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: Animated statistics section: 4 KPIs with CountUp.js number animation on scroll, icon, label, subtle background gradient\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_comp_006",
+      "name": "Stitch Component: Form with Validation",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "form"
+      ],
+      "description": "Stitch component generation: Form with Validation",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: form\nDescription: Contact form with floating labels, real-time validation, success animation, email/phone/message fields, honeypot spam protection, GSAP submit animation\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/form"
+    },
+    {
+      "id": "stitch_comp_007",
+      "name": "Stitch Component: Footer Complete",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "footer"
+      ],
+      "description": "Stitch component generation: Footer Complete",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: footer\nDescription: Complete footer with logo, newsletter subscription, social icons with hover glow, sitemap columns, legal links, copyright, gradient separator\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/footer"
+    },
+    {
+      "id": "stitch_comp_008",
+      "name": "Stitch Component: Image Gallery Lightbox",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Image Gallery Lightbox",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: Masonry image gallery with hover overlay, click-to-open lightbox with zoom, keyboard navigation, touch swipe support, lazy loading\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_comp_009",
+      "name": "Stitch Component: Notification Toast System",
+      "icon": "🧩",
+      "tags": [
+        "stitch",
+        "component",
+        "design",
+        "card"
+      ],
+      "description": "Stitch component generation: Notification Toast System",
+      "prompt": "[STITCH SKILL: stitch::generate-component]\nComponent Type: card\nDescription: Toast notification system with 4 types (success/error/warning/info), slide-in animation, progress bar auto-dismiss, stacking support\n\nGenerate a production-ready, pixel-perfect HTML/CSS/JS component.\nInclude hover states, transitions, and accessibility attributes.\nReturn ONLY the component code (no full page wrapper needed).",
+      "category": "stitch_components",
+      "source": "google-stitch",
+      "skill": "stitch::generate-component",
+      "api_endpoint": "/api/stitch/card"
+    },
+    {
+      "id": "stitch_theme_000",
+      "name": "Stitch Theme: Dark Cyberpunk",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "dark"
+      ],
+      "description": "Apply Dark Cyberpunk theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: dark\nDescription: Apply cyberpunk aesthetic: neon green/purple glows, scan-line effect, terminal-style fonts, RGB border animations, holographic hover effects\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_001",
+      "name": "Stitch Theme: Luxury Gold",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "luxury"
+      ],
+      "description": "Apply Luxury Gold theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: luxury\nDescription: Apply luxury brand aesthetic: deep navy + gold palette, Playfair Display serif font, subtle shimmer animations, premium whitespace, elegant hover transitions\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_002",
+      "name": "Stitch Theme: Nature & Eco",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "nature"
+      ],
+      "description": "Apply Nature & Eco theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: nature\nDescription: Apply eco/sustainable aesthetic: sage green + earthy tones, organic shapes, parallax leaf patterns, clean typography, warm natural textures\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_003",
+      "name": "Stitch Theme: Corporate Minimal",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "corporate"
+      ],
+      "description": "Apply Corporate Minimal theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: corporate\nDescription: Apply corporate minimal style: Inter font, blue/gray palette, clean grid layout, professional spacing, subtle shadow system\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_004",
+      "name": "Stitch Theme: Neon Gradient",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "dark"
+      ],
+      "description": "Apply Neon Gradient theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: dark\nDescription: Apply neon gradient style: vivid purple-to-cyan gradient backgrounds, glow effects on text, glassmorphism cards, dark background\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_005",
+      "name": "Stitch Theme: Brutalist Modern",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "creative"
+      ],
+      "description": "Apply Brutalist Modern theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: creative\nDescription: Apply neo-brutalist style: thick borders, bold typography, high contrast, flat shadows, monochrome with accent pops\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_006",
+      "name": "Stitch Theme: Pastel Soft",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "light"
+      ],
+      "description": "Apply Pastel Soft theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: light\nDescription: Apply soft pastel style: lavender/peach/mint palette, rounded corners, playful micro-interactions, clean whitespace, friendly tone\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_theme_007",
+      "name": "Stitch Theme: Dark Minimal",
+      "icon": "🎭",
+      "tags": [
+        "stitch",
+        "theme",
+        "styling",
+        "minimal"
+      ],
+      "description": "Apply Dark Minimal theme via stitch::apply-theme",
+      "prompt": "[STITCH SKILL: stitch::apply-theme]\nTheme: minimal\nDescription: Apply dark minimal style: near-black background, white text, single accent color, maximum whitespace, refined typography\n\nApply this theme to the current design. Maintain all layout and functionality.\nUpdate ONLY: colors, typography, shadows, hover effects, animations.\nReturn complete themed HTML.",
+      "category": "stitch_themes",
+      "source": "google-stitch",
+      "skill": "stitch::apply-theme",
+      "api_endpoint": "/api/stitch/theme"
+    },
+    {
+      "id": "stitch_system_000",
+      "name": "Stitch Design System: CSS Design Tokens",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate CSS Design Tokens via stitch::design-tokens",
+      "prompt": "[STITCH SKILL: stitch::design-tokens]\n\nGenerate a complete CSS design tokens file: --color-primary, --color-secondary, --font-size-xs/sm/md/lg/xl/2xl, --spacing-1 through --spacing-16, --shadow-sm/md/lg/xl, --radius-sm/md/lg/full, --z-dropdown/modal/tooltip\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::design-tokens",
+      "api_endpoint": "/api/stitch/design-tokens"
+    },
+    {
+      "id": "stitch_system_001",
+      "name": "Stitch Design System: Color Palette System",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Color Palette System via stitch::color-system",
+      "prompt": "[STITCH SKILL: stitch::color-system]\n\nGenerate a 12-color palette with 9 shades each (50-900), semantic colors (success/warning/error/info), dark mode variants, CSS custom properties, color usage guidelines\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::color-system",
+      "api_endpoint": "/api/stitch/color-system"
+    },
+    {
+      "id": "stitch_system_002",
+      "name": "Stitch Design System: Typography Scale",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Typography Scale via stitch::typography-system",
+      "prompt": "[STITCH SKILL: stitch::typography-system]\n\nGenerate a modular typography scale: display/h1-h6/body/caption sizes, Google Fonts pairing, line heights, letter spacing, font weights, responsive fluid typography with clamp()\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::typography-system",
+      "api_endpoint": "/api/stitch/typography-system"
+    },
+    {
+      "id": "stitch_system_003",
+      "name": "Stitch Design System: Responsive Grid System",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Responsive Grid System via stitch::responsive-layout",
+      "prompt": "[STITCH SKILL: stitch::responsive-layout]\n\nGenerate a 12-column responsive grid system: container widths, breakpoints (sm/md/lg/xl/2xl), gap utilities, offset classes, CSS Grid + Flexbox hybrid\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::responsive-layout",
+      "api_endpoint": "/api/stitch/responsive-layout"
+    },
+    {
+      "id": "stitch_system_004",
+      "name": "Stitch Design System: Animation Library",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Animation Library via stitch::motion-design",
+      "prompt": "[STITCH SKILL: stitch::motion-design]\n\nGenerate a GSAP animation library: scroll reveal presets, page transition effects, hover animations, loading states, micro-interactions — all with configurable timing and easing\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::motion-design",
+      "api_endpoint": "/api/stitch/motion-design"
+    },
+    {
+      "id": "stitch_system_005",
+      "name": "Stitch Design System: Component Tokens",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Component Tokens via stitch::design-tokens",
+      "prompt": "[STITCH SKILL: stitch::design-tokens]\n\nGenerate component-level design tokens: button variants, input states, card styles, badge colors, table styles — all as CSS custom properties with light/dark mode\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::design-tokens",
+      "api_endpoint": "/api/stitch/design-tokens"
+    },
+    {
+      "id": "stitch_system_006",
+      "name": "Stitch Design System: Accessibility Utilities",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Accessibility Utilities via stitch::design-tokens",
+      "prompt": "[STITCH SKILL: stitch::design-tokens]\n\nGenerate accessibility CSS utilities: focus ring styles, screen-reader-only classes, reduced-motion safe alternatives, high-contrast mode support, ARIA role styles\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::design-tokens",
+      "api_endpoint": "/api/stitch/design-tokens"
+    },
+    {
+      "id": "stitch_system_007",
+      "name": "Stitch Design System: Brand Identity System",
+      "icon": "🔷",
+      "tags": [
+        "stitch",
+        "design-system",
+        "tokens",
+        "css"
+      ],
+      "description": "Generate Brand Identity System via stitch::brand-guidelines",
+      "prompt": "[STITCH SKILL: stitch::brand-guidelines]\n\nGenerate a complete brand identity CSS: logo area dimensions, brand colors with semantic naming, approved font combinations, spacing philosophy, image treatment guidelines\n\nReturn as production-ready CSS with:\n- Complete documentation comments\n- CSS custom properties (--variables)\n- Dark mode variants where applicable\n- Usage examples in comments",
+      "category": "stitch_design_systems",
+      "source": "google-stitch",
+      "skill": "stitch::brand-guidelines",
+      "api_endpoint": "/api/stitch/brand-guidelines"
+    },
+    {
+      "id": "stitch_vertical_000",
+      "name": "Stitch Vertical: AI SaaS Platform",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: AI SaaS Platform",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: AI SaaS Platform\n\nAn AI tool platform landing page: animated neural network hero background, capability cards with icons, API integration showcase, pricing tiers, developer-focused CTA\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_001",
+      "name": "Stitch Vertical: Crypto/DeFi Exchange",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Crypto/DeFi Exchange",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Crypto/DeFi Exchange\n\nDark DeFi trading platform: live price ticker, swap interface, wallet connection button, TVL statistics, protocol features, tokenomics chart\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_002",
+      "name": "Stitch Vertical: Ed-Tech LMS",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Ed-Tech LMS",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Ed-Tech LMS\n\nEducation platform: course discovery grid, progress tracking dashboard, video player with chapters, quiz module, certificate showcase, enrollment CTA\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_003",
+      "name": "Stitch Vertical: Health & Wellness App",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Health & Wellness App",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Health & Wellness App\n\nWellness app landing: meditation timer hero, feature cards with animations, testimonials from users, app store download CTAs, floating mockup preview\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_004",
+      "name": "Stitch Vertical: Legal Services Firm",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Legal Services Firm",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Legal Services Firm\n\nProfessional legal firm: trust signals prominently displayed, practice areas grid, attorney profiles with credentials, case results statistics, contact form\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_005",
+      "name": "Stitch Vertical: Architecture Studio",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Architecture Studio",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Architecture Studio\n\nArchitecture firm portfolio: full-screen project imagery with hover titles, services menu, team page with B&W photos, awards section, minimal typography\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_006",
+      "name": "Stitch Vertical: Gaming Studio",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Gaming Studio",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Gaming Studio\n\nGame studio landing: epic game trailer auto-play hero, game feature cards with parallax, character showcase, lore section with atmospheric background, pre-order CTA\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_007",
+      "name": "Stitch Vertical: Food Delivery App",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Food Delivery App",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Food Delivery App\n\nFood delivery app: location-aware restaurant grid, food category filters, featured dish cards with ratings, delivery time estimates, promotion banner carousel\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_008",
+      "name": "Stitch Vertical: Music Streaming Service",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Music Streaming Service",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Music Streaming Service\n\nMusic platform: dark UI with vinyl texture, artist spotlight with photo, playlist cards, audio visualizer animation, genre filters, premium upgrade CTA\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_vertical_009",
+      "name": "Stitch Vertical: Travel Booking Platform",
+      "icon": "🏢",
+      "tags": [
+        "stitch",
+        "vertical",
+        "industry",
+        "landing-page"
+      ],
+      "description": "Industry-specific Stitch design: Travel Booking Platform",
+      "prompt": "[STITCH SKILL: stitch::generate-design]\nIndustry: Travel Booking Platform\n\nTravel booking: destination search with autocomplete, featured destinations with parallax, popular packages grid, review quotes, booking form with datepicker\n\nStitch Design Requirements:\n- Industry-appropriate visual language and color palette\n- Trust signals and conversion-focused layout\n- Modern animations without sacrificing performance\n- Mobile-first responsive design\n- Complete, deployable HTML page",
+      "category": "stitch_verticals",
+      "source": "google-stitch",
+      "skill": "stitch::generate-design",
+      "api_endpoint": "/api/stitch/generate"
+    },
+    {
+      "id": "stitch_export_000",
+      "name": "Stitch Export: HTML → React",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "react"
+      ],
+      "description": "Convert design via stitch::export-code",
+      "prompt": "[STITCH SKILL: stitch::export-code]\nTarget Format: react\n\nConvert the HTML design to React functional components with hooks. Split into Header, Hero, Features, Pricing, Footer components. Add PropTypes, useState for interactive elements.\n\nReturn COMPLETE, production-ready react code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::export-code",
+      "api_endpoint": "/api/stitch/export"
+    },
+    {
+      "id": "stitch_export_001",
+      "name": "Stitch Export: HTML → Next.js App Router",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "nextjs"
+      ],
+      "description": "Convert design via stitch::export-code",
+      "prompt": "[STITCH SKILL: stitch::export-code]\nTarget Format: nextjs\n\nConvert to Next.js 14 App Router structure: layout.tsx, page.tsx, components folder. Use Server Components where possible, Client Components for interactive parts.\n\nReturn COMPLETE, production-ready nextjs code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::export-code",
+      "api_endpoint": "/api/stitch/export"
+    },
+    {
+      "id": "stitch_export_002",
+      "name": "Stitch Export: HTML → Vue 3 SFC",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "vue"
+      ],
+      "description": "Convert design via stitch::export-code",
+      "prompt": "[STITCH SKILL: stitch::export-code]\nTarget Format: vue\n\nConvert to Vue 3 Single-File Components with <script setup>, <template>, <style scoped>. Use Composition API, defineProps, computed.\n\nReturn COMPLETE, production-ready vue code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::export-code",
+      "api_endpoint": "/api/stitch/export"
+    },
+    {
+      "id": "stitch_export_003",
+      "name": "Stitch Export: HTML → Astro",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "astro"
+      ],
+      "description": "Convert design via stitch::export-code",
+      "prompt": "[STITCH SKILL: stitch::export-code]\nTarget Format: astro\n\nConvert to Astro: .astro components with zero-JS by default, island architecture for interactive sections, Astro.props typing.\n\nReturn COMPLETE, production-ready astro code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::export-code",
+      "api_endpoint": "/api/stitch/export"
+    },
+    {
+      "id": "stitch_export_004",
+      "name": "Stitch Export: HTML → Tailwind CSS",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "tailwind"
+      ],
+      "description": "Convert design via stitch::export-code",
+      "prompt": "[STITCH SKILL: stitch::export-code]\nTarget Format: tailwind\n\nConvert custom CSS to Tailwind utility classes. Replace all style rules with Tailwind equivalents, use @apply for repeated patterns, add dark: variants.\n\nReturn COMPLETE, production-ready tailwind code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::export-code",
+      "api_endpoint": "/api/stitch/export"
+    },
+    {
+      "id": "stitch_export_005",
+      "name": "Stitch Export: Screenshot → UI",
+      "icon": "⬇️",
+      "tags": [
+        "stitch",
+        "export",
+        "conversion",
+        "html"
+      ],
+      "description": "Convert design via stitch::screenshot-to-ui",
+      "prompt": "[STITCH SKILL: stitch::screenshot-to-ui]\nTarget Format: html\n\nConvert this screenshot/URL to clean, editable HTML/CSS code. Recreate the design faithfully with proper semantic HTML and organized CSS.\n\nReturn COMPLETE, production-ready html code.\nInclude all necessary imports, dependencies, and file structure notes.",
+      "category": "stitch_export",
+      "source": "google-stitch",
+      "skill": "stitch::screenshot-to-ui",
+      "api_endpoint": "/api/stitch/export"
+    }
+  ]
+}

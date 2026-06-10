@@ -2273,8 +2273,7 @@ function AvatarsTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
             <Section title="Modelo de video">
               <select value={videoModel} onChange={e => setVideoModel(e.target.value)} style={inputStyle}>
                 {caps?.videoGeneration
-                  .filter(m => /kling|seedance|hailuo|veo/i.test(m.key))
-                  .map(m => (<option key={m.key} value={m.key}>{m.label} · €{m.costPerSec}/s</option>))}
+                  .map(m => (<option key={m.key} value={m.key}>{m.label} · €{m.costPerSec}/s · Q{m.quality}/10</option>))}
               </select>
             </Section>
             <Section title="Aspecto / Idioma / Lip-sync">
@@ -2406,6 +2405,17 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [savingToLib, setSavingToLib] = useState(false);
 
+  // Master Library (agencia) state
+  const [masterOpen, setMasterOpen] = useState(false);
+  const [masterIndex, setMasterIndex] = useState<Array<{ key: string; description: string; count: number }>>([]);
+  const [masterLibKey, setMasterLibKey] = useState("shopy_crafter_seeds");
+  const [masterSearch, setMasterSearch] = useState("");
+  const [masterItems, setMasterItems] = useState<any[]>([]);
+  const [masterTotal, setMasterTotal] = useState(0);
+  const [masterOffset, setMasterOffset] = useState(0);
+  const [masterLoading, setMasterLoading] = useState(false);
+  const MASTER_LIMIT = 15;
+
   const isVisualIntent = INTENT_LABELS[intent]?.visual ?? true;
   const presetKind: "image" | "video" = intent === "video" || intent === "ad_cinematic" || intent === "multishot_director" || intent === "ugc_video" ? "video" : "image";
 
@@ -2523,6 +2533,40 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
     } catch (e: any) {
       onError(e?.message || "Error de red");
     } finally { setSavingToLib(false); }
+  };
+
+  const loadMasterLib = async (libKey = masterLibKey, search = masterSearch, off = 0) => {
+    setMasterLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (libKey) params.set("library", libKey);
+      if (search.trim()) params.set("search", search.trim());
+      params.set("limit", String(MASTER_LIMIT));
+      params.set("offset", String(off));
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?${params}`, { credentials: "include" });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+      setMasterItems(d.items || []);
+      setMasterTotal(d.total || 0);
+      setMasterOffset(off);
+    } catch (e: any) { onError(e?.message || "Error cargando biblioteca maestra"); }
+    finally { setMasterLoading(false); }
+  };
+
+  const loadMasterIndex = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?indexOnly=1`, { credentials: "include" });
+      const d = await res.json();
+      if (res.ok && d.libraries) setMasterIndex(d.libraries);
+    } catch { /* non-fatal */ }
+  };
+
+  const useMasterTemplate = (item: any) => {
+    const raw = item._raw || item;
+    const tpl = raw.user_template || raw.userTemplate || raw.prompt || raw.description || raw.name || "";
+    setOutput(tpl);
+    setBaseline(tpl);
+    onInfo(`Plantilla "${item.name}" cargada en el editor`);
   };
 
   const loadFromLibrary = async (item: LibraryItem) => {
@@ -2735,6 +2779,98 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
                   );
                 })}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─── BIBLIOTECA MAESTRA AGENCIA (5000+ templates) ─────────────── */}
+        <div style={{ marginTop: 12, borderRadius: 10, background: "var(--ink2, #14141d)", border: "1px solid rgba(200,168,75,0.25)" }}>
+          <button
+            onClick={() => {
+              const next = !masterOpen;
+              setMasterOpen(next);
+              if (next && masterIndex.length === 0) {
+                loadMasterIndex();
+                loadMasterLib(masterLibKey, masterSearch, 0);
+              }
+            }}
+            style={{ width: "100%", textAlign: "left", padding: "12px 14px", background: "transparent", border: "none", color: "var(--t1)", fontWeight: 600, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+          >
+            <span>
+              🏛 Biblioteca Maestra de la Agencia{" "}
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(200,168,75,0.15)", color: "var(--gold, #fbbf24)", fontWeight: 700 }}>5,582 templates</span>
+            </span>
+            <span style={{ color: "var(--t3)" }}>{masterOpen ? "▾" : "▸"}</span>
+          </button>
+          {masterOpen && (
+            <div style={{ padding: "0 14px 14px 14px" }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                <select
+                  value={masterLibKey}
+                  onChange={e => { setMasterLibKey(e.target.value); loadMasterLib(e.target.value, masterSearch, 0); }}
+                  style={{ ...inputStyle, flex: 2, minWidth: 160 }}
+                >
+                  {masterIndex.length === 0 && <option value="">Cargando librerías…</option>}
+                  {masterIndex.map(lib => (
+                    <option key={lib.key} value={lib.key}>{lib.key.replace(/_/g, " ")} ({lib.count})</option>
+                  ))}
+                </select>
+                <input
+                  value={masterSearch}
+                  onChange={e => setMasterSearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { loadMasterLib(masterLibKey, masterSearch, 0); } }}
+                  placeholder="🔍 Buscar en librería…"
+                  style={{ ...inputStyle, flex: 3, minWidth: 140 }}
+                />
+                <button onClick={() => loadMasterLib(masterLibKey, masterSearch, 0)} className="btn" style={{ padding: "6px 10px", fontSize: 11 }}>
+                  Buscar
+                </button>
+              </div>
+              {masterLoading && <p style={{ fontSize: 11, color: "var(--t3)", margin: "6px 0" }}>Cargando…</p>}
+              {!masterLoading && masterItems.length === 0 && (
+                <p style={{ fontSize: 11, color: "var(--t3)", margin: "6px 0" }}>Sin resultados. Cambia la librería o el término de búsqueda.</p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 300, overflowY: "auto" }}>
+                {masterItems.map((item, i) => (
+                  <div key={item.id || i} style={{ padding: "8px 10px", borderRadius: 6, background: "var(--ink, #0d0d14)", border: "1px solid var(--bdr, #22222e)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: "var(--t1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.name}
+                        </div>
+                        {item.description && (
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.description}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 3, display: "flex", gap: 8 }}>
+                          {item.category && <span style={{ padding: "1px 5px", borderRadius: 3, background: "rgba(99,102,241,0.15)", color: "#a5b4fc" }}>{item.category}</span>}
+                          {item.engine && <span style={{ padding: "1px 5px", borderRadius: 3, background: "rgba(16,185,129,0.1)", color: "#6ee7b7" }}>{item.engine}</span>}
+                          {Array.isArray(item.variables) && item.variables.length > 0 && (
+                            <span style={{ color: "var(--t3)" }}>{item.variables.slice(0, 4).map((v: string) => `{{${v}}}`).join(" ")}{item.variables.length > 4 ? ` +${item.variables.length - 4}` : ""}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={() => useMasterTemplate(item)} className="btn" style={{ padding: "4px 8px", fontSize: 11, flexShrink: 0 }} title="Cargar al editor">
+                        📥
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {masterTotal > MASTER_LIMIT && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                  <button onClick={() => loadMasterLib(masterLibKey, masterSearch, Math.max(0, masterOffset - MASTER_LIMIT))} disabled={masterOffset === 0 || masterLoading} className="btn" style={{ padding: "4px 10px", fontSize: 11 }}>
+                    ← Anterior
+                  </button>
+                  <span style={{ fontSize: 11, color: "var(--t3)", flex: 1, textAlign: "center" }}>
+                    {masterOffset + 1}–{Math.min(masterOffset + MASTER_LIMIT, masterTotal)} de {masterTotal}
+                  </span>
+                  <button onClick={() => loadMasterLib(masterLibKey, masterSearch, masterOffset + MASTER_LIMIT)} disabled={masterOffset + MASTER_LIMIT >= masterTotal || masterLoading} className="btn" style={{ padding: "4px 10px", fontSize: 11 }}>
+                    Siguiente →
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
