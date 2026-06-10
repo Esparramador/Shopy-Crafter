@@ -1,0 +1,126 @@
+# FoodDash Design System
+
+## Overview
+
+FoodDash is a fast, delivery-focused design system optimized for food delivery and quick-service ordering apps. Speed and clarity drive every decision, from the bold red CTA to the rounded, tap-friendly components. Designed mobile-first, it ensures that ordering, tracking, and checkout flows feel effortless under time pressure.
+
+---
+
+## Colors
+
+- **Primary** (#DC2626): CTAs, brand header, order button
+- **Secondary** (#EA580C): Promotions, deals badges
+- **Tertiary** (#16A34A): Delivered, available, open
+- **Background** (#FFFFFF): Page background
+- **Surface** (#FFFFFF): Cards, sheets
+- **Success** (#16A34A): Delivered, order complete
+- **Warning** (#D97706): Delayed, preparing
+- **Error** (#EF4444): Cancelled, failed
+- **Info** (#2563EB): Tracking, informational
+
+## Typography
+
+- **Headline Font**: Poppins
+- **Body Font**: DM Sans
+- **Mono Font**: Roboto Mono
+
+- **h1**: 28px bold, 34px line height. Hero banners.
+- **h2**: 22px semibold, 28px line height. Section titles.
+- **h3**: 18px semibold, 24px line height. Restaurant names.
+- **h4**: 15px semibold, 20px line height. Dish names.
+- **body**: 14px regular, 22px line height. Descriptions.
+- **small**: 12px regular, 18px line height. Prices, delivery times.
+- **mono**: 13px regular, 18px line height. Order IDs, codes.
+
+---
+
+## Spacing
+
+Base unit: **6px** (mobile-optimized)
+- **xs**: 3px — Icon-to-label gap
+- **sm**: 6px — Inline spacing
+- **md**: 12px — Component padding
+- **lg**: 18px — Card padding
+- **xl**: 24px — Section gaps
+- **2xl**: 36px — Page section spacing
+- **3xl**: 48px — Layout margins
+
+## Border Radius
+
+- **None** (0px): —
+- **sm** (6px): Tags, small elements
+- **md** (12px): Cards, inputs
+- **lg** (16px): Bottom sheets, modals
+- **pill** (9999px): CTA buttons, search bar
+
+## Elevation
+
+Material-style shadows for depth and layering.
+- **sm**: 1px offset, 3px blur, #000000 at 8%. Cards, inputs.
+- **md**: 4px offset, 12px blur, #000000 at 12%. Elevated cards.
+- **lg**: 8px offset, 24px blur, #000000 at 16%. Bottom sheets.
+- **xl**: 12px offset, 32px blur, #000000 at 20%. Modals.
+- **focus**: 3px ring #DC2626 at 25%. Focus ring.
+
+## Components
+
+### Buttons
+#### Variants
+- ****Primary****: #DC2626 fill, #FFFFFF text, no border, #B91C1C fill.
+- ****Secondary****: Transparent fill, #DC2626 text, 1.5px #DC2626 border, #FEF2F2 fill.
+- ****Ghost****: Transparent fill, #525252 text, no border, #F5F5F5 fill.
+- ****Destructive****: #171717 fill, #FFFFFF text, no border, #404040 fill.
+- Primary CTAs ("Order Now", "Add to Cart") use pill` radius (9999px)
+#### Sizes
+Sizes: sm (6px 14px, 12px, 32px), md (8px 20px, 14px, 42px), lg (12px 28px, 16px, 50px).
+#### Disabled State
+0.4 opacity, disabled cursor.
+- No hover, focus, or active effects
+
+### Cards
+- ****Default****: #FFFFFF fill, no border, sm shadow, 12px radius.
+- ****Elevated****: #FFFFFF fill, no border, md shadow, 12px radius.
+18px padding, top position, radius `12px 12px 0 0` image slot, inline with star icon, DM Sans 500 restaurant rating.
+
+### Inputs
+- **Default**: #E5E5E5 border, #FFFFFF fill, sm shadow.
+- **Hover**: #A3A3A3 border, #FFFFFF fill, sm shadow.
+- **Focus**: #DC2626 border, #FFFFFF fill, focus` ring shadow.
+- **Error**: #EF4444 border, #FEF2F2 fill, no shadow.
+- **Disabled**: #E5E5E5 border, #FAFAFA fill, no shadow.
+42px, padding: 10px 14px, radius: 12px tall.
+- Search input uses `pill` radius with leading search icon
+DM Sans 500, 14px, `text-primary`, 4px bottom margin **label**, DM Sans 400, 12px, `text-tertiary`, 4px margin-top; errors use `error` color **helper text**.
+
+### Chips
+- ****Filter****: #F5F5F5 fill, #171717 text, no border, pill shape.
+- ****Status****: varies fill, varies text, no border, pill shape.
+selected state uses `primary` bg with `text-inverse` filter chips.
+Status chip semantic mapping:
+bg #DCFCE7, text #16A34A delivered, bg #FEF3C7, text #D97706 preparing, bg #FEE2E2, text #EF4444 cancelled, bg #DBEAFE, text #2563EB on the way.
+
+### Lists
+DM Sans 400 14px. 64px (accommodates thumbnail) row height, 12px/18px padding, 1px #F5F5F5 divider, 48px square, radius 8px, left aligned thumbnail slot. Hover: background #FAFAFA. Selected: background #FEF2F2, left border 3px #DC2626.
+
+### Checkboxes
+20px square, radius: 6px. Unchecked: border 2px #D4D4D4, background white. Checked: background #DC2626, border #DC2626, white checkmark. Indeterminate: background #DC2626, white dash. Disabled: 40% opacity. Labels in 8px gap DM Sans 400 14px.
+
+### Radio Buttons
+20px circle. Unchecked: border 2px #D4D4D4, background white. Selected: border 2px #DC2626, inner dot 12px #DC2626. Disabled: 40% opacity. Labels in 8px gap DM Sans 400 14px.
+
+### Tooltips
+#171717 fill, #FFFFFF, DM Sans 400, 12px text, 8px corners, `md` shadow. 6px/12px padding, 6px arrow, 200px max width.
+---
+
+## Do's and Don'ts
+
+1. **Do** use pill-shaped primary buttons for all main CTAs ("Order Now", "Add to Cart", "Checkout").
+2. **Do** design for one-thumb reachability — critical actions go at the bottom of the screen.
+3. **Don't** use small text for prices or delivery times — they must be instantly scannable.
+4. **Do** include food photography with consistent aspect ratios (16:9 for banners, 1:1 for menu items).
+5. **Don't** use the primary red for non-interactive decorative elements — it signals tappable actions.
+6. **Do** show real-time order status using semantic color chips with clear labels.
+7. **Don't** require more than three taps to complete an order from a restaurant page.
+8. **Do** provide haptic-ready interaction cues — shadows increase on press for touchscreen feedback.
+9. **Don't** stack more than two promotional banners; excess banners delay the user from ordering.
+10. **Do** ensure the cart summary is always accessible via a persistent floating button.

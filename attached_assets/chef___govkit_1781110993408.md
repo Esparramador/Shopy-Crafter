@@ -1,0 +1,132 @@
+# GovKit Design System
+
+## Overview
+
+GovKit is an accessible, formal design system designed for government portals and civic tech applications. It adheres to WCAG AAA compliance throughout, ensuring that all citizens -- including those with disabilities -- can navigate and use public services effectively. The flat, border-defined aesthetic avoids reliance on shadows or color alone, using high-contrast text, generous spacing, and large touch targets. Every component prioritizes clarity, legal compliance, and universal access above all else.
+
+---
+
+## Colors
+
+- **Primary** (#1D4ED8): Blue -- primary actions, navigation, links
+- **Secondary** (#B91C1C): Red -- alerts, required fields, official warnings
+- **Tertiary** (#4B5563): Gray -- secondary content, neutral actions
+- **Background** (#FFFFFF): Page background
+- **Surface** (#FFFFFF): Cards, form groups, panels
+- **Success** (#15803D): Form submitted, payment confirmed
+- **Warning** (#A16207): Approaching deadlines, incomplete
+- **Error** (#B91C1C): Validation errors, missing required
+- **Info** (#1D4ED8): Guidance, help links, notifications
+All semantic colors meet WCAG AAA contrast requirements (7:1 minimum) against both white and Surface Raised backgrounds.
+
+## Typography
+
+- **Headline Font**: PT Serif
+- **Body Font**: Open Sans
+- **Mono Font**: Source Code Pro
+
+- **Display**: PT Serif 32px bold, 42px line height
+- **Headline**: PT Serif 26px bold, 36px line height
+- **Subhead**: PT Serif 20px bold, 30px line height
+- **Body Large**: Open Sans 18px regular, 30px line height
+- **Body**: Open Sans 16px regular, 28px line height
+- **Body Small**: Open Sans 14px regular, 24px line height
+- **Caption**: Open Sans 13px semibold, 22px line height
+- **Overline**: Open Sans 12px semibold, 18px line height
+- **Code**: Source Code Pro 15px regular, 24px line height
+
+Line heights are generous (1.5x-1.75x) to maximize readability for all users.
+
+---
+
+## Spacing
+
+- **Base unit:** 8px
+- **Scale:** 8 / 16 / 24 / 32 / 40 / 48 / 64 / 80 / 96
+- **Component padding:** 16px (compact) | 24px (default) | 32px (relaxed)
+- **Section spacing:** 48px between major sections, 24px between related form groups
+- **Form fields:** 24px vertical gap between fields, 8px between label and input
+- **Page margins:** Minimum 24px horizontal; max-width 960px for content areas
+
+## Border Radius
+
+- **None** (0px): Full-width banners, tables
+- **Small** (2px): Inline badges, small indicators
+- **Medium** (4px): Buttons, inputs, cards
+- **Large** (4px): Modals, dialogs (same as Medium)
+- **XL** (6px): Popovers, floating panels
+- **Full** (9999px): Status dots only
+Radius is intentionally restrained -- formal government interfaces should not appear playful.
+
+## Elevation
+
+Flat design with borders as primary depth indicator. Shadows are used sparingly.
+- **Subtle**: none (use border instead). Cards, resting panels.
+- **Medium**: 1px offset, 3px blur, #000000 at 6%. Dropdowns only.
+- **Large**: 4px offset, 12px blur, #000000 at 8%. Modals, dialogs.
+- **Overlay**: 8px offset, 24px blur, #000000 at 12%. Full-screen overlays.
+Primary visual hierarchy is achieved through borders, background fills, and typography weight -- not shadows.
+
+## Components
+
+### Buttons
+- **Primary**: #1D4ED8 fill, #FFFFFF text, no border, #1E40AF fill.
+- **Secondary**: #FFFFFF fill, #1D4ED8 text, 2px #1D4ED8 border, #EFF6FF fill.
+- **Ghost**: transparent fill, #374151 text, no border, #F3F4F6 fill.
+- **Destructive**: #B91C1C fill, #FFFFFF text, no border, #991B1B fill.
+- **Sizes**: Medium (48px height, 20px pad) | Large (56px, 24px) -- no small size (accessibility minimum)
+- **Minimum touch target**: 44px height, 44px width on all buttons
+- **Disabled**: 50% opacity, disabled cursor, `aria-disabled="true"`
+- **Focus**: 3px outline offset #1D4ED8, visible on all interactive elements (`focus-visible`)
+
+### Cards
+** Background #FFFFFF, border 2px #D1D5DB, radius 4px, padding 24px, no shadow **default, ** Background #FFFFFF, border 2px #4B5563, radius 4px, padding 24px, shadow Medium **elevated.
+- All cards use `role="region"` with `aria-label` for screen reader navigation
+- Form section cards have a visible heading as the first child element
+
+### Inputs
+- **Default**: 2px #D1D5DB border, #FFFFFF fill.
+- **Hover**: 2px #9CA3AF border, #FFFFFF fill.
+- **Focus**: 2px #1D4ED8 border, #FFFFFF fill, 3px offset outline #1D4ED8 outline.
+- **Error**: 2px #B91C1C border, #FEF2F2 fill, 3px offset outline #B91C1C on focus outline.
+- **Disabled**: 2px #E5E7EB border, #F9FAFB fill.
+** 16px, weight 600, color Text Primary, 8px below label -- always visible, never floating **label, ** 14px, color Text Secondary; error helper uses Error color and includes icon **helper text, ** "(required)" text after label, not asterisk alone **required indicator, 48px minimum, font-size 16px to prevent mobile zoom input height.
+- All inputs use `aria-describedby` pointing to helper/error text
+
+### Chips
+** Background #EFF6FF, text #1D4ED8, border 1px #1D4ED8, radius 4px, padding 8px 16px **filter chip, ** Semantic background at 10% opacity, semantic text, border 1px semantic color, radius 4px, padding 6px 14px **status chip.
+- All chips have minimum 44px touch target, even if visual size is smaller
+- Include `role="status"` with `aria-live="polite"` for dynamic status chips
+
+### Lists
+52px minimum, padding 12px 24px row height, 1px #E5E7EB between rows divider, background #EFF6FF, left border 4px #1D4ED8 active/selected. Hover: background #F9FAFB. Focus: 3px outline #1D4ED8 visible around the row.
+- All list items are keyboard navigable with `role="listbox"` or `role="list"`
+
+### Checkboxes
+24px square, radius 4px. 44px minimum touch target. Unchecked: border 2px #4B5563, background #FFFFFF. Checked: background #1D4ED8, white checkmark icon (3px stroke for visibility). Focus: 3px outline offset #1D4ED8.
+- Label always visible, positioned to the right, clickable to toggle
+. Disabled: 50% opacity, `aria-disabled="true"`.
+
+### Radio Buttons
+24px circle. border 2px #4B5563, background #FFFFFF unselected, 44px minimum touch target. Selected: border 2px #1D4ED8, inner dot 12px #1D4ED8. Focus: 3px outline offset #1D4ED8.
+- Radio groups use `role="radiogroup"` with `aria-label`
+. Disabled: 50% opacity, `aria-disabled="true"`.
+
+### Tooltips
+#111827, text: #FFFFFF, border 1px #374151, radius 4px, padding 10px 16px fill. 14px Open Sans regular. 8px, matching background arrow, 280px max width, `focus` and `hover`, not hover-only (keyboard accessible) trigger.
+- Uses `role="tooltip"` and connected via `aria-describedby`
+200ms show, persists while focused delay.
+---
+
+## Do's and Don'ts
+
+1. **Do** meet WCAG AAA contrast (7:1 for normal text, 4.5:1 for large text) on every text element.
+2. **Do** provide visible focus indicators (3px outline) on all interactive elements without exception.
+3. **Don't** use color as the sole means of conveying information -- always pair with text, icons, or patterns.
+4. **Do** use "(required)" text labels instead of asterisks for required form fields.
+5. **Don't** use placeholder text as a replacement for labels -- labels must always be visible.
+6. **Do** maintain minimum 44px touch targets on all buttons, links, and form controls.
+7. **Don't** use custom scrollbars or override native browser focus behavior.
+8. **Do** support screen readers with proper ARIA roles, labels, and live regions throughout.
+9. **Don't** rely on hover-only interactions -- every feature must be accessible via keyboard and focus.
+10. **Do** test with assistive technologies (VoiceOver, NVDA, JAWS) before any release.
