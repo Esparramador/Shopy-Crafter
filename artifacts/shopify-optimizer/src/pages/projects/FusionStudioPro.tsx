@@ -18,6 +18,8 @@ interface ModelWithProvider {
   costPerImage?: number; aspectRatios?: string[]; maxResolution?: string;
   costPerSec?: number; quality?: number; maxDuration?: number;
 }
+interface CinematicStyle { key: string; label: string; description: string }
+interface AvatarEntry { id: string; name: string; niche: string; gender: string; defaultLanguage: string; defaultVoiceId: string; personaPrompt?: string }
 interface Capabilities {
   imageGeneration: ModelWithProvider[];
   videoGeneration: ModelWithProvider[];
@@ -32,6 +34,9 @@ interface Capabilities {
   transitionPresets?: Array<{ key: string; label: string; xfade: string; defaultDurationSec: number }>;
   proTools?: Array<{ key: string; label: string; description: string }>;
   adTemplates?: Array<{ key: string; label: string; description: string; cameraPreset: string; transitionPreset: string; defaultAspect: string; defaultDurationSec: number }>;
+  cinematicMultiShot?: { description: string; styles: CinematicStyle[]; scenesRange: { min: number; max: number }; durationRange: { min: number; max: number }; aspects: string[] };
+  longAd?: { description: string; scenesRange: { min: number; max: number }; durationRange: { min: number; max: number }; compositionModes: string[]; aspects: string[] };
+  avatarStudio?: { description: string; niches: string[]; avatars: AvatarEntry[] };
 }
 
 // ── Hook & helpers para health de proveedores
@@ -1731,7 +1736,7 @@ function MultiShotTab({ caps, projectId, onSuccess, onError }: { caps: Capabilit
   const [activeTemplateId, setActiveTemplateId] = useState<string>("");
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string | null; useCount: number | null; isPublic: number | null; niche: string | null }>>([]);
 
-  const styles = (caps as any)?.cinematicMultiShot?.styles ?? [
+  const styles: CinematicStyle[] = caps?.cinematicMultiShot?.styles ?? [
     { key: "cinematic", label: "Cinematic", description: "Look anamórfico" },
     { key: "ugc", label: "UGC", description: "Estilo creador" },
     { key: "luxury", label: "Luxury", description: "Premium reveal" },
@@ -2136,13 +2141,13 @@ function AvatarsTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
   const [sourceVideoUrl, setSourceVideoUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const avatars = (caps as any)?.avatarStudio?.avatars ?? [];
-  const niches: string[] = (caps as any)?.avatarStudio?.niches ?? ["beauty", "health", "fashion", "tech", "food", "home", "fitness", "finance"];
-  const filtered = avatars.filter((a: any) => a.niche === niche);
+  const avatars: AvatarEntry[] = caps?.avatarStudio?.avatars ?? [];
+  const niches: string[] = caps?.avatarStudio?.niches ?? ["beauty", "health", "fashion", "tech", "food", "home", "fitness", "finance"];
+  const filtered = avatars.filter(a => a.niche === niche);
 
   // auto-pick first avatar of niche
   useEffect(() => {
-    if (filtered.length > 0 && !filtered.find((a: any) => a.id === avatarId)) {
+    if (filtered.length > 0 && !filtered.find(a => a.id === avatarId)) {
       setAvatarId(filtered[0].id);
       setVoiceId(filtered[0].defaultVoiceId);
       setLanguage(filtered[0].defaultLanguage);
