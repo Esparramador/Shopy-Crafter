@@ -5214,9 +5214,9 @@ import { generateExecutivePptx } from "../lib/pptx-generator.js";
 import { generateExecutiveDocx } from "../lib/docx-generator.js";
 import { analyzeDeadCosts } from "../lib/dead-costs.js";
 
-router.get("/projects/:projectId/exports/cogs-xlsx", async (req, res) => {
+router.get("/projects/:projectId/exports/cogs-xlsx", requireProjectAccess, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -5274,9 +5274,9 @@ router.get("/projects/:projectId/exports/cogs-xlsx", async (req, res) => {
   }
 });
 
-router.get("/projects/:projectId/exports/suppliers-xlsx", async (req, res) => {
+router.get("/projects/:projectId/exports/suppliers-xlsx", requireProjectAccess, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -5317,9 +5317,9 @@ router.get("/projects/:projectId/exports/suppliers-xlsx", async (req, res) => {
   }
 });
 
-router.get("/projects/:projectId/exports/financial-xlsx", async (req, res) => {
+router.get("/projects/:projectId/exports/financial-xlsx", requireProjectAccess, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -5389,13 +5389,13 @@ router.get("/projects/:projectId/exports/financial-xlsx", async (req, res) => {
   }
 });
 
-router.get("/projects/:projectId/exports/executive-pptx", async (req, res) => {
+router.get("/projects/:projectId/exports/executive-pptx", requireProjectAccess, async (req, res) => {
   // Pre-set binary Content-Type BEFORE enableLongRunning so heartbeat skips
   // (sending " " bytes would corrupt the .pptx download).
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
   enableLongRunning(res);
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -5484,9 +5484,9 @@ router.get("/projects/:projectId/exports/executive-pptx", async (req, res) => {
   }
 });
 
-router.get("/projects/:projectId/exports/executive-docx", async (req, res) => {
+router.get("/projects/:projectId/exports/executive-docx", requireProjectAccess, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
@@ -5576,9 +5576,9 @@ router.get("/projects/:projectId/exports/executive-docx", async (req, res) => {
   }
 });
 
-router.get("/projects/:projectId/exports/dead-costs", async (req, res) => {
+router.get("/projects/:projectId/exports/dead-costs", requireProjectAccess, async (req, res) => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 

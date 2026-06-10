@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAdmin } from "../lib/auth.js";
 import {
   db,
   omnicoreMemoriesTable,
@@ -356,7 +357,7 @@ export async function syncFromExternalBrain(url: string, apiKey?: string, source
 
 // ─── HTTP ROUTES ───────────────────────────────────────────────────────────────
 
-router.get("/admin/brain-export/knowledge", async (req, res) => {
+router.get("/admin/brain-export/knowledge", requireAdmin, async (req, res) => {
   try {
     const domain = req.query.domain as string | undefined;
     const format = (req.query.format as string) || "json";
@@ -387,7 +388,7 @@ router.get("/admin/brain-export/knowledge", async (req, res) => {
   }
 });
 
-router.get("/admin/brain-export/domains", async (_req, res) => {
+router.get("/admin/brain-export/domains", requireAdmin, async (_req, res) => {
   try {
     const allDomains = await db.select().from(omnicoreKnowledgeDomainsTable);
     const insightCounts = await db
@@ -419,7 +420,7 @@ router.get("/admin/brain-export/domains", async (_req, res) => {
   }
 });
 
-router.get("/admin/brain-export/prompts", async (_req, res) => {
+router.get("/admin/brain-export/prompts", requireAdmin, async (_req, res) => {
   try {
     const prompts = await db.select().from(omnicorePromptLibraryTable);
     const allDomains = await db.select().from(omnicoreKnowledgeDomainsTable);
